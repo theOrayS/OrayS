@@ -39,8 +39,7 @@ axdriver_block = "0.2"
 axns = { workspace = true }
 
 [dependencies.fatfs]
-git = "https://github.com/rafalh/rust-fatfs"
-rev = "4eccb50"
+path = "../../../vendor/rust-fatfs"
 optional = true
 default-features = false
 features = [ # no std

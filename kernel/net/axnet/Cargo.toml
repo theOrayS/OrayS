@@ -27,8 +27,7 @@ axdriver = { workspace = true, features = ["net"] }
 axdriver_net = "0.2"
 
 [dependencies.smoltcp]
-git = "https://github.com/rcore-os/smoltcp.git"
-rev = "21a2f82"
+path = "../../../vendor/smoltcp"
 default-features = false
 features = [
     "alloc", "log",   # no std
