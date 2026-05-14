@@ -2,12 +2,6 @@ fn main() {
     use std::io::Write;
 
     fn gen_pthread_mutex(out_file: &str) -> std::io::Result<()> {
-        let (mutex_size, mutex_init) = if cfg!(feature = "multitask") {
-            (5, "{0, 0, 0, 0, 0}")
-        } else {
-            (1, "{0}")
-        };
-
         let mut output = Vec::new();
         writeln!(
             output,
@@ -17,10 +11,10 @@ fn main() {
             output,
             r#"
 typedef struct {{
-    unsigned long long __l[{mutex_size}];
+    unsigned long long __l[5];
 }} pthread_mutex_t;
 
-#define PTHREAD_MUTEX_INITIALIZER {{ .__l = {mutex_init} }}
+#define PTHREAD_MUTEX_INITIALIZER {{ .__l = {{0, 0, 0, 0, 0}} }}
 "#
         )?;
         std::fs::write(out_file, output)?;
