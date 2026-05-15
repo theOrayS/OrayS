@@ -1192,6 +1192,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_newfstatat => {
             sys_newfstatat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
+        general::__NR_statx => sys_statx(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg4()),
         general::__NR_fstat => sys_fstat(&process, tf.arg0(), tf.arg1()),
         general::__NR_getdents64 => sys_getdents64(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_lseek => sys_lseek(&process, tf.arg0(), tf.arg1(), tf.arg2()),
@@ -2203,7 +2204,10 @@ fn sys_fchownat(
     flags: usize,
 ) -> isize {
     let flags = flags as u32;
-    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW
+        | general::AT_NO_AUTOMOUNT
+        | general::AT_EMPTY_PATH
+        | general::AT_STATX_SYNC_TYPE;
     if flags & !supported_flags != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
@@ -2357,6 +2361,78 @@ fn sys_fstat(process: &UserProcess, fd: usize, statbuf: usize) -> isize {
         Err(err) => return neg_errno(err),
     };
     write_user_value(process, statbuf, &st)
+}
+
+fn stat_to_statx(st: general::stat) -> general::statx {
+    let mut stx: general::statx = unsafe { core::mem::zeroed() };
+    stx.stx_mask = general::STATX_BASIC_STATS;
+    stx.stx_blksize = st.st_blksize as _;
+    stx.stx_nlink = st.st_nlink as _;
+    stx.stx_uid = st.st_uid as _;
+    stx.stx_gid = st.st_gid as _;
+    stx.stx_mode = st.st_mode as _;
+    stx.stx_ino = st.st_ino as _;
+    stx.stx_size = st.st_size as _;
+    stx.stx_blocks = st.st_blocks as _;
+    stx.stx_attributes_mask = 0;
+    stx.stx_dev_major = ((st.st_dev as u64) >> 8) as _;
+    stx.stx_dev_minor = ((st.st_dev as u64) & 0xff) as _;
+    stx.stx_rdev_major = ((st.st_rdev as u64) >> 8) as _;
+    stx.stx_rdev_minor = ((st.st_rdev as u64) & 0xff) as _;
+    stx
+}
+
+fn sys_statx(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    flags: usize,
+    statxbuf: usize,
+) -> isize {
+    if statxbuf == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let flags = flags as u32;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let st = if pathname == 0 {
+        if flags & general::AT_EMPTY_PATH == 0 {
+            return neg_errno(LinuxError::EFAULT);
+        }
+        match process
+            .fds
+            .lock()
+            .stat_with_recorded_path(process, dirfd as i32)
+        {
+            Ok((_, st)) => st,
+            Err(err) => return neg_errno(err),
+        }
+    } else {
+        let path = read_cstr_or_return!(process, pathname);
+        if path.is_empty() && flags & general::AT_EMPTY_PATH != 0 {
+            match process
+                .fds
+                .lock()
+                .stat_with_recorded_path(process, dirfd as i32)
+            {
+                Ok((_, st)) => st,
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            match process
+                .fds
+                .lock()
+                .stat_path(process, dirfd as i32, path.as_str())
+            {
+                Ok(st) => st,
+                Err(err) => return neg_errno(err),
+            }
+        }
+    };
+    write_user_value(process, statxbuf, &stat_to_statx(st))
 }
 
 fn sys_statfs(process: &UserProcess, pathname: usize, statfsbuf: usize) -> isize {
