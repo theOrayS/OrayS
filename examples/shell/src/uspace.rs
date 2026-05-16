@@ -66,7 +66,7 @@ use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
     fd_entry_path, normalize_file_mode, sys_fstat, sys_fstatfs, sys_newfstatat, sys_readlinkat,
-    sys_statfs, sys_statx,
+    sys_statfs, sys_statx, sys_utimensat,
 };
 use process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use process_lifecycle::ProcessTeardown;
@@ -1721,35 +1721,6 @@ fn sys_fchownat(
         (Some(resolved_path), st)
     };
     apply_chown_metadata(process, record_path, &st, owner, group)
-}
-
-fn sys_utimensat(
-    process: &UserProcess,
-    dirfd: usize,
-    pathname: usize,
-    _times: usize,
-    _flags: usize,
-) -> isize {
-    if pathname == 0 {
-        let table = process.fds.lock();
-        return if table.entry(dirfd as i32).is_ok() {
-            0
-        } else {
-            neg_errno(LinuxError::EBADF)
-        };
-    }
-    let path = read_cstr_or_return!(process, pathname);
-    let abs_path = {
-        let table = process.fds.lock();
-        match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
-            Ok(path) => path,
-            Err(err) => return neg_errno(err),
-        }
-    };
-    match axfs::api::metadata(abs_path.as_str()) {
-        Ok(_) => 0,
-        Err(err) => neg_errno(LinuxError::from(err)),
-    }
 }
 
 fn sys_renameat2(
