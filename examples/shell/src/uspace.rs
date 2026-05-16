@@ -14,7 +14,7 @@ use axmm::AddrSpace;
 use axns::AxNamespace;
 use axsync::Mutex;
 use axtask::{AxTaskRef, TaskInner, WaitQueue};
-use linux_raw_sys::{general, ioctl};
+use linux_raw_sys::general;
 use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use std::collections::BTreeMap;
 use std::string::{String, ToString};
@@ -59,7 +59,8 @@ use fd_socket::{
 };
 use fd_table::{
     FdEntry, FdTable, open_dir_entry, read_file_at_into, resolve_dirfd_path, sys_close, sys_dup,
-    sys_dup3, sys_fcntl, sys_ftruncate, sys_getdents64, sys_lseek,
+    sys_dup3, sys_fchdir, sys_fcntl, sys_fsync, sys_ftruncate, sys_getdents64, sys_ioctl,
+    sys_lseek,
 };
 use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
@@ -85,7 +86,7 @@ use signal_abi::{
     riscv_signal_frame_size, trap_frame_to_riscv_sigcontext,
 };
 use synthetic_fs::proc_exe_link_target;
-use system_info::{sys_getrusage, sys_syslog, sys_uname, write_default_winsize};
+use system_info::{sys_getrusage, sys_syslog, sys_uname};
 use task_context::{
     UserTaskExt, child_trap_frame, current_process, current_task_ext, current_tid,
     fixup_riscv_clone_child_return, make_uspace_context, robust_list_for_task,
@@ -97,9 +98,9 @@ use task_registry::{
 };
 use time_abi::{
     itimerval_to_micros_pair, micros_to_duration, micros_to_timeval, monotonic_time_micros,
-    rtc_time_from_wall_time, socket_duration_to_timeval, socket_timeval_to_duration, sys_adjtimex,
-    sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_gettimeofday,
-    sys_nanosleep, sys_times,
+    socket_duration_to_timeval, socket_timeval_to_duration, sys_adjtimex, sys_clock_getres,
+    sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_gettimeofday, sys_nanosleep,
+    sys_times,
 };
 use user_memory::{
     clear_user_bytes, read_cstr, read_execve_argv, read_iovec_entries, read_user_bytes,
@@ -2486,39 +2487,6 @@ fn sys_readlinkat(
         Ok(_) => neg_errno(LinuxError::EINVAL),
         Err(err) => neg_errno(LinuxError::from(err)),
     }
-}
-
-fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
-    match process.fds.lock().entry(fd as i32) {
-        Ok(_) => 0,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
-    let new_cwd = {
-        let table = process.fds.lock();
-        match table.entry(fd as i32) {
-            Ok(FdEntry::Directory(dir)) => dir.path.clone(),
-            Ok(_) => return neg_errno(LinuxError::ENOTDIR),
-            Err(err) => return neg_errno(err),
-        }
-    };
-    process.set_cwd(new_cwd);
-    0
-}
-
-fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize {
-    if req as u32 == RTC_RD_TIME && process.fds.lock().is_rtc(fd as i32) {
-        let rtc = rtc_time_from_wall_time();
-        return write_user_value(process, arg, &rtc);
-    }
-    if req as u32 == ioctl::TIOCGWINSZ {
-        if process.fds.lock().is_stdio(fd as i32) {
-            return write_default_winsize(process, arg);
-        }
-    }
-    neg_errno(LinuxError::ENOTTY)
 }
 
 fn sys_setitimer(

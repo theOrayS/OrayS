@@ -5,7 +5,7 @@ use core::ptr;
 use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
-use linux_raw_sys::general;
+use linux_raw_sys::{general, ioctl};
 use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
@@ -15,8 +15,8 @@ use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE,
-    ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME, ST_MODE_CHR, ST_MODE_DIR,
+    ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -34,7 +34,9 @@ use super::synthetic_fs::{
     proc_self_maps_is_writable_open, proc_self_maps_path_entry, synthetic_file_is_writable_open,
     synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
-use super::user_memory::{validate_user_write, write_user_bytes};
+use super::system_info::write_default_winsize;
+use super::time_abi::rtc_time_from_wall_time;
+use super::user_memory::{validate_user_write, write_user_bytes, write_user_value};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -168,6 +170,39 @@ pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize
         Ok(v) => v as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
+    match process.fds.lock().entry(fd as i32) {
+        Ok(_) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
+    let new_cwd = {
+        let table = process.fds.lock();
+        match table.entry(fd as i32) {
+            Ok(FdEntry::Directory(dir)) => dir.path.clone(),
+            Ok(_) => return neg_errno(LinuxError::ENOTDIR),
+            Err(err) => return neg_errno(err),
+        }
+    };
+    process.set_cwd(new_cwd);
+    0
+}
+
+pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize {
+    if req as u32 == RTC_RD_TIME && process.fds.lock().is_rtc(fd as i32) {
+        let rtc = rtc_time_from_wall_time();
+        return write_user_value(process, arg, &rtc);
+    }
+    if req as u32 == ioctl::TIOCGWINSZ {
+        if process.fds.lock().is_stdio(fd as i32) {
+            return write_default_winsize(process, arg);
+        }
+    }
+    neg_errno(LinuxError::ENOTTY)
 }
 
 impl FdTable {
