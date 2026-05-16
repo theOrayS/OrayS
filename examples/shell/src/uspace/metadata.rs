@@ -7,11 +7,12 @@ use linux_raw_sys::general;
 use std::string::{String, ToString};
 
 use super::UserProcess;
+use super::credentials::access_allowed;
 use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    DEVFS_MAGIC, FILE_MODE_PERMISSION_MASK, PIPEFS_MAGIC, PROC_SUPER_MAGIC, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC,
-    neg_errno,
+    ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_PERMISSION_MASK, LINUX_EACCES, PIPEFS_MAGIC,
+    PROC_SUPER_MAGIC, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
+    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -60,6 +61,39 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::Path(path) => Some(path.path.as_str()),
         FdEntry::MemoryFile(file) => Some(file.path.as_str()),
         _ => None,
+    }
+}
+
+pub(super) fn sys_faccessat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    mode: usize,
+    _flags: usize,
+) -> isize {
+    if mode & !ACCESS_MODE_MASK != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let mut fds = process.fds.lock();
+    let (resolved_path, stat) = match fds.path_stat(process, dirfd as i32, path.as_str()) {
+        Ok(result) => result,
+        Err(err) => return neg_errno(err),
+    };
+    let uid = process.uid();
+    let gid = process.gid();
+    let parents_searchable =
+        match fds.parent_dirs_searchable(process, resolved_path.as_str(), uid, gid) {
+            Ok(searchable) => searchable,
+            Err(err) => return neg_errno(err),
+        };
+    if parents_searchable && access_allowed(&stat, mode, uid, gid) {
+        0
+    } else {
+        neg_errno_code(LINUX_EACCES)
     }
 }
 

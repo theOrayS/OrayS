@@ -45,9 +45,9 @@ mod time_abi;
 mod user_memory;
 
 use credentials::{
-    access_allowed, apply_chown_metadata, chown_ids, sys_getgroups, sys_getresgid, sys_getresuid,
-    sys_setfsgid, sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid,
-    sys_setresuid, sys_setreuid, sys_setuid,
+    apply_chown_metadata, chown_ids, sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid,
+    sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid,
+    sys_setreuid, sys_setuid,
 };
 use fd_pipe::sys_pipe2;
 use fd_socket::{
@@ -65,8 +65,8 @@ use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
-    normalize_file_mode, sys_fchmod, sys_fchmodat, sys_fstat, sys_fstatfs, sys_newfstatat,
-    sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
+    normalize_file_mode, sys_faccessat, sys_fchmod, sys_fchmodat, sys_fstat, sys_fstatfs,
+    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
 };
 use process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use process_lifecycle::ProcessTeardown;
@@ -1557,36 +1557,6 @@ fn sys_wait4(
         return_on_user_write_error!(process, status, &wait_status);
     }
     child_pid as isize
-}
-
-fn sys_faccessat(
-    process: &UserProcess,
-    dirfd: usize,
-    pathname: usize,
-    mode: usize,
-    _flags: usize,
-) -> isize {
-    if mode & !ACCESS_MODE_MASK != 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let path = read_cstr_or_return!(process, pathname);
-    let mut fds = process.fds.lock();
-    let (resolved_path, stat) = match fds.path_stat(process, dirfd as i32, path.as_str()) {
-        Ok(result) => result,
-        Err(err) => return neg_errno(err),
-    };
-    let uid = process.uid();
-    let gid = process.gid();
-    let parents_searchable =
-        match fds.parent_dirs_searchable(process, resolved_path.as_str(), uid, gid) {
-            Ok(searchable) => searchable,
-            Err(err) => return neg_errno(err),
-        };
-    if parents_searchable && access_allowed(&stat, mode, uid, gid) {
-        0
-    } else {
-        neg_errno_code(LINUX_EACCES)
-    }
 }
 
 fn sys_fchown(process: &UserProcess, fd: usize, owner: usize, group: usize) -> isize {
