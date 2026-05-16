@@ -1,10 +1,14 @@
 use core::cmp;
 use core::mem::size_of;
 
+use axerrno::LinuxError;
 use linux_raw_sys::general;
 
 use super::linux_abi::{
-    DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE,
+    DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE, neg_errno,
+};
+use super::user_memory::{
+    clear_user_bytes, read_user_value, validate_user_read, write_user_bytes, write_user_value,
 };
 use super::{UserProcess, task_context::current_tid};
 
@@ -73,4 +77,102 @@ pub(super) fn sched_affinity_accepts_current_cpu(first_mask_byte: u8) -> bool {
 
 pub(super) fn sched_affinity_result_len(cpusetsize: usize) -> usize {
     cmp::min(cpusetsize, size_of::<usize>())
+}
+
+pub(super) fn sys_sched_setparam(process: &UserProcess, pid: i32, param: usize) -> isize {
+    if !is_same_sched_target(process, pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if param == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    match read_user_value::<UserSchedParam>(process, param) {
+        Ok(value) if sched_param_accepts_setparam(value) => 0,
+        Ok(_) => neg_errno(LinuxError::EINVAL),
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_sched_getparam(process: &UserProcess, pid: i32, param: usize) -> isize {
+    if !is_same_sched_target(process, pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if param == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let value = default_sched_param();
+    write_user_value(process, param, &value)
+}
+
+pub(super) fn sys_sched_setscheduler(
+    process: &UserProcess,
+    pid: i32,
+    policy: i32,
+    param: usize,
+) -> isize {
+    if !is_same_sched_target(process, pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if param == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let param = match read_user_value::<UserSchedParam>(process, param) {
+        Ok(param) => param,
+        Err(err) => return neg_errno(err),
+    };
+    if sched_param_accepts_policy(policy, param) {
+        0
+    } else {
+        neg_errno(LinuxError::EINVAL)
+    }
+}
+
+pub(super) fn sys_sched_getscheduler(process: &UserProcess, pid: i32) -> isize {
+    if !is_same_sched_target(process, pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    0
+}
+
+pub(super) fn sys_sched_setaffinity(
+    process: &UserProcess,
+    pid: i32,
+    cpusetsize: usize,
+    mask: usize,
+) -> isize {
+    if !is_same_sched_target(process, pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if cpusetsize == 0 || mask == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_user_read(process, mask, cpusetsize) {
+        return neg_errno(err);
+    }
+    match read_user_value::<u8>(process, mask) {
+        Ok(first) if sched_affinity_accepts_current_cpu(first) => 0,
+        Ok(_) => neg_errno(LinuxError::EINVAL),
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_sched_getaffinity(
+    process: &UserProcess,
+    pid: i32,
+    cpusetsize: usize,
+    mask: usize,
+) -> isize {
+    if !is_same_sched_target(process, pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if cpusetsize == 0 || mask == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = clear_user_bytes(process, mask, cpusetsize) {
+        return neg_errno(err);
+    }
+    if let Err(err) = write_user_bytes(process, mask, &[1]) {
+        return neg_errno(err);
+    }
+    sched_affinity_result_len(cpusetsize) as isize
 }

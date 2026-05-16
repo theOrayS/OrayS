@@ -70,9 +70,9 @@ use process_abi::apply_personality_request;
 use process_lifecycle::ProcessTeardown;
 use program_loader::load_program_image;
 use resource_sched::{
-    UserRlimit, UserSchedParam, default_rlimit, default_sched_param, is_same_sched_target,
-    prlimit_target_valid, rlimit_is_valid, sched_affinity_accepts_current_cpu,
-    sched_affinity_result_len, sched_param_accepts_policy, sched_param_accepts_setparam,
+    UserRlimit, default_rlimit, prlimit_target_valid, rlimit_is_valid, sys_sched_getaffinity,
+    sys_sched_getparam, sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setparam,
+    sys_sched_setscheduler,
 };
 use runtime_paths::{current_cwd, resolve_host_path};
 use select_fdset::{SelectMode, poll_fd_set, read_fd_set, read_pselect_deadline, write_fd_set};
@@ -2823,67 +2823,6 @@ fn sys_times(process: &UserProcess, buf: usize) -> isize {
     let tms = default_tms();
     return_on_user_write_error!(process, buf, &tms);
     times_ticks()
-}
-
-fn sys_sched_setparam(process: &UserProcess, pid: i32, param: usize) -> isize {
-    return_errno_if!(!is_same_sched_target(process, pid), LinuxError::ESRCH);
-    return_errno_if!(param == 0, LinuxError::EINVAL);
-    match read_user_value::<UserSchedParam>(process, param) {
-        Ok(value) if sched_param_accepts_setparam(value) => 0,
-        Ok(_) => neg_errno(LinuxError::EINVAL),
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_sched_getparam(process: &UserProcess, pid: i32, param: usize) -> isize {
-    return_errno_if!(!is_same_sched_target(process, pid), LinuxError::ESRCH);
-    return_errno_if!(param == 0, LinuxError::EINVAL);
-    let value = default_sched_param();
-    write_user_value(process, param, &value)
-}
-
-fn sys_sched_setscheduler(process: &UserProcess, pid: i32, policy: i32, param: usize) -> isize {
-    return_errno_if!(!is_same_sched_target(process, pid), LinuxError::ESRCH);
-    return_errno_if!(param == 0, LinuxError::EINVAL);
-    let param = match read_user_value::<UserSchedParam>(process, param) {
-        Ok(param) => param,
-        Err(err) => return neg_errno(err),
-    };
-    if sched_param_accepts_policy(policy, param) {
-        0
-    } else {
-        neg_errno(LinuxError::EINVAL)
-    }
-}
-
-fn sys_sched_getscheduler(process: &UserProcess, pid: i32) -> isize {
-    return_errno_if!(!is_same_sched_target(process, pid), LinuxError::ESRCH);
-    0
-}
-
-fn sys_sched_setaffinity(process: &UserProcess, pid: i32, cpusetsize: usize, mask: usize) -> isize {
-    return_errno_if!(!is_same_sched_target(process, pid), LinuxError::ESRCH);
-    return_errno_if!(cpusetsize == 0 || mask == 0, LinuxError::EINVAL);
-    if let Err(err) = validate_user_read(process, mask, cpusetsize) {
-        return neg_errno(err);
-    }
-    match read_user_value::<u8>(process, mask) {
-        Ok(first) if sched_affinity_accepts_current_cpu(first) => 0,
-        Ok(_) => neg_errno(LinuxError::EINVAL),
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_sched_getaffinity(process: &UserProcess, pid: i32, cpusetsize: usize, mask: usize) -> isize {
-    return_errno_if!(!is_same_sched_target(process, pid), LinuxError::ESRCH);
-    return_errno_if!(cpusetsize == 0 || mask == 0, LinuxError::EINVAL);
-    if let Err(err) = clear_user_bytes(process, mask, cpusetsize) {
-        return neg_errno(err);
-    }
-    if let Err(err) = write_user_bytes(process, mask, &[1]) {
-        return neg_errno(err);
-    }
-    sched_affinity_result_len(cpusetsize) as isize
 }
 
 fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: usize) -> isize {
