@@ -1,10 +1,14 @@
 #[cfg(target_arch = "riscv64")]
 use core::mem::{offset_of, size_of};
+use core::sync::atomic::Ordering;
 
 #[cfg(target_arch = "riscv64")]
 use axhal::context::TrapFrame;
 
 use axerrno::LinuxError;
+
+use super::linux_abi::SIGCANCEL_NUM;
+use super::task_context::{UserTaskExt, current_task_ext};
 
 #[cfg(target_arch = "riscv64")]
 use super::linux_abi::{RISCV_SIGNAL_FPSTATE_BYTES, RISCV_SIGNAL_SIGSET_RESERVED_BYTES};
@@ -14,6 +18,33 @@ pub(super) fn validate_signal_target(sig: i32) -> Result<(), LinuxError> {
         return Err(LinuxError::EINVAL);
     }
     Ok(())
+}
+
+pub(super) fn signal_mask_bit(sig: i32) -> u64 {
+    if (1..=64).contains(&sig) {
+        1u64 << ((sig - 1) as u32)
+    } else {
+        0
+    }
+}
+
+pub(super) fn signal_is_blocked(ext: &UserTaskExt, sig: i32) -> bool {
+    let bit = signal_mask_bit(sig);
+    bit != 0 && ext.signal_mask.load(Ordering::Acquire) & bit != 0
+}
+
+pub(super) fn current_sigcancel_pending() -> bool {
+    current_task_ext().is_some_and(|ext| {
+        ext.pending_signal.load(Ordering::Acquire) == SIGCANCEL_NUM
+            && !signal_is_blocked(ext, SIGCANCEL_NUM)
+    })
+}
+
+pub(super) fn current_unblocked_signal_pending() -> bool {
+    current_task_ext().is_some_and(|ext| {
+        let sig = ext.pending_signal.load(Ordering::Acquire);
+        sig != 0 && !signal_is_blocked(ext, sig)
+    })
 }
 
 #[cfg(target_arch = "riscv64")]

@@ -78,12 +78,15 @@ use resource_sched::{
     sys_sched_yield,
 };
 use runtime_paths::current_cwd;
-use select_fdset::{SelectMode, poll_fd_set, read_fd_set, read_pselect_deadline, write_fd_set};
-use signal_abi::validate_signal_target;
+use select_fdset::{SelectMode, sys_pselect6};
 #[cfg(target_arch = "riscv64")]
 use signal_abi::{
     RiscvSignalFrame, apply_riscv_sigcontext, make_riscv_signal_frame, riscv_signal_frame_offsets,
     riscv_signal_frame_size, trap_frame_to_riscv_sigcontext,
+};
+use signal_abi::{
+    current_sigcancel_pending, current_unblocked_signal_pending, signal_is_blocked,
+    signal_mask_bit, validate_signal_target,
 };
 use synthetic_fs::proc_exe_link_target;
 use system_info::{sys_getrusage, sys_syslog, sys_uname};
@@ -137,23 +140,6 @@ macro_rules! socket_entry_or_return {
         match socket_entry($process, $fd) {
             Ok(socket) => socket,
             Err(err) => return neg_errno(err),
-        }
-    };
-}
-
-macro_rules! return_errno_if {
-    ($condition:expr, $err:expr) => {
-        if $condition {
-            return neg_errno($err);
-        }
-    };
-}
-
-macro_rules! return_on_fd_set_write_error {
-    ($process:expr, $ptr:expr, $bits:expr) => {
-        let ret = write_fd_set($process, $ptr, $bits);
-        if ret != 0 {
-            return ret;
         }
     };
 }
@@ -734,33 +720,6 @@ fn perform_deferred_self_unmap() {
     let _ = ext.process.aspace.lock().unmap(VirtAddr::from(start), len);
 }
 
-fn signal_mask_bit(sig: i32) -> u64 {
-    if (1..=64).contains(&sig) {
-        1u64 << ((sig - 1) as u32)
-    } else {
-        0
-    }
-}
-
-fn signal_is_blocked(ext: &UserTaskExt, sig: i32) -> bool {
-    let bit = signal_mask_bit(sig);
-    bit != 0 && ext.signal_mask.load(Ordering::Acquire) & bit != 0
-}
-
-fn current_sigcancel_pending() -> bool {
-    current_task_ext().is_some_and(|ext| {
-        ext.pending_signal.load(Ordering::Acquire) == SIGCANCEL_NUM
-            && !signal_is_blocked(ext, SIGCANCEL_NUM)
-    })
-}
-
-fn current_unblocked_signal_pending() -> bool {
-    current_task_ext().is_some_and(|ext| {
-        let sig = ext.pending_signal.load(Ordering::Acquire);
-        sig != 0 && !signal_is_blocked(ext, sig)
-    })
-}
-
 fn ensure_user_return_hook_registered() {
     if !USER_RETURN_HOOK_REGISTERED.swap(true, Ordering::AcqRel) {
         register_user_return_handler(user_return_hook);
@@ -1293,82 +1252,6 @@ fn sys_pwrite64(
             .lock()
             .write_file_at(fd as i32, offset as u64, src)
     })
-}
-
-fn sys_pselect6(
-    process: &UserProcess,
-    nfds: i32,
-    readfds: usize,
-    writefds: usize,
-    exceptfds: usize,
-    timeout: usize,
-    _sigmask: usize,
-) -> isize {
-    if nfds < 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let nfds = (nfds as usize).min(FD_SETSIZE);
-    let read_bits = match read_fd_set(process, readfds) {
-        Ok(bits) => bits,
-        Err(err) => return neg_errno(err),
-    };
-    let write_bits = match read_fd_set(process, writefds) {
-        Ok(bits) => bits,
-        Err(err) => return neg_errno(err),
-    };
-    let except_bits = match read_fd_set(process, exceptfds) {
-        Ok(bits) => bits,
-        Err(err) => return neg_errno(err),
-    };
-    let deadline = match read_pselect_deadline(process, timeout) {
-        Ok(deadline) => deadline,
-        Err(err) => return neg_errno(err),
-    };
-    loop {
-        if current_unblocked_signal_pending() {
-            return neg_errno(LinuxError::EINTR);
-        }
-        let mut ready_read = [0usize; FD_SET_WORDS];
-        let mut ready_write = [0usize; FD_SET_WORDS];
-        let mut ready_except = [0usize; FD_SET_WORDS];
-        let ready = {
-            let table = process.fds.lock();
-            let mut count = 0usize;
-            count += poll_fd_set(&table, nfds, &read_bits, &mut ready_read, SelectMode::Read);
-            count += poll_fd_set(
-                &table,
-                nfds,
-                &write_bits,
-                &mut ready_write,
-                SelectMode::Write,
-            );
-            count += poll_fd_set(
-                &table,
-                nfds,
-                &except_bits,
-                &mut ready_except,
-                SelectMode::Except,
-            );
-            count
-        };
-        if ready > 0 {
-            return_on_fd_set_write_error!(process, readfds, &ready_read);
-            return_on_fd_set_write_error!(process, writefds, &ready_write);
-            return_on_fd_set_write_error!(process, exceptfds, &ready_except);
-            // In this cooperative single-core environment, a hot readiness loop
-            // can otherwise starve the peer process that would consume the event.
-            axtask::yield_now();
-            return ready as isize;
-        }
-        if deadline.is_some_and(|ddl| axhal::time::wall_time() >= ddl) {
-            axtask::yield_now();
-            return_on_fd_set_write_error!(process, readfds, &[0; FD_SET_WORDS]);
-            return_on_fd_set_write_error!(process, writefds, &[0; FD_SET_WORDS]);
-            return_on_fd_set_write_error!(process, exceptfds, &[0; FD_SET_WORDS]);
-            return 0;
-        }
-        axtask::yield_now();
-    }
 }
 
 fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: usize) -> isize {
