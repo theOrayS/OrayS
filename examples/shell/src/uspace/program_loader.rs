@@ -2,6 +2,7 @@ use core::cmp;
 use core::mem::size_of;
 
 use axhal::paging::MappingFlags;
+use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use linux_raw_sys::auxvec;
 use memory_addr::{PAGE_SIZE_4K, VirtAddr};
@@ -120,9 +121,9 @@ pub(super) fn load_program_image(
             VirtAddr::from(stack_base),
             USER_STACK_SIZE,
             user_mapping_flags(true, true, false),
-            true,
+            false,
         )
-        .map_err(|err| format!("failed to map user stack: {err}"))?;
+        .map_err(|err| format!("failed to reserve user stack: {err}"))?;
 
     let argv_refs = prepared.argv.iter().map(String::as_str).collect::<Vec<_>>();
     let env = default_exec_env(prepared.exec_root.as_str(), cwd);
@@ -548,6 +549,9 @@ fn build_initial_stack(
         return Err("user stack overflow".into());
     }
     aspace
+        .populate_range(VirtAddr::from(sp), bytes.len(), PageFaultFlags::WRITE)
+        .map_err(|err| format!("failed to populate user stack pages: {err}"))?;
+    aspace
         .write(VirtAddr::from(sp), &bytes)
         .map_err(|err| format!("failed to populate user stack: {err}"))?;
     Ok(sp)
@@ -564,6 +568,9 @@ fn push_stack_bytes(
     if *sp < stack_base {
         return Err("user stack overflow".into());
     }
+    aspace
+        .populate_range(VirtAddr::from(*sp), data.len(), PageFaultFlags::WRITE)
+        .map_err(|err| format!("failed to populate user stack pages: {err}"))?;
     aspace
         .write(VirtAddr::from(*sp), data)
         .map_err(|err| format!("failed to write user stack data: {err}"))?;

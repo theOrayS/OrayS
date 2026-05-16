@@ -37,6 +37,7 @@ mod memory_map;
 mod memory_policy;
 mod metadata;
 mod process_abi;
+mod process_lifecycle;
 mod program_loader;
 mod resource_sched;
 mod runtime_paths;
@@ -70,6 +71,7 @@ use metadata::{
     fd_entry_statfs_path, file_attr_to_stat, generic_statfs, normalize_file_mode, stdio_stat,
 };
 use process_abi::apply_personality_request;
+use process_lifecycle::ProcessTeardown;
 use program_loader::load_program_image;
 use resource_sched::{
     UserRlimit, UserSchedParam, default_rlimit, default_sched_param, is_same_sched_target,
@@ -202,6 +204,7 @@ struct UserProcess {
     exit_group_code: AtomicI32,
     exit_code: AtomicI32,
     exit_wait: WaitQueue,
+    teardown: ProcessTeardown,
 }
 
 #[derive(Clone, Copy)]
@@ -316,6 +319,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
         exit_code: AtomicI32::new(0),
         exit_wait: WaitQueue::new(),
+        teardown: ProcessTeardown::new(),
     });
 
     Ok(LoadedProgram {
@@ -525,10 +529,7 @@ impl UserProcess {
     }
 
     fn teardown(&self) {
-        self.aspace.lock().clear();
-        let mut fds = self.fds.lock();
-        fds.close_all();
-        *fds = FdTable::new();
+        self.teardown.run(&self.aspace, &self.fds, &self.children);
     }
 
     fn ppid(&self) -> i32 {
@@ -674,6 +675,7 @@ impl UserProcess {
         self.exit_code.store(code, Ordering::Release);
         let live_before = self.live_threads.fetch_sub(1, Ordering::AcqRel);
         if live_before == 1 {
+            self.teardown();
             self.exit_wait.notify_all(false);
             notify_parent_child_exit(self.ppid);
         }
@@ -716,9 +718,9 @@ impl UserProcess {
         let mut aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
             .map_err(LinuxError::from)?;
         {
-            let parent_aspace = self.aspace.lock();
+            let mut parent_aspace = self.aspace.lock();
             aspace
-                .clone_user_mappings_from(&parent_aspace)
+                .clone_user_mappings_from(&mut parent_aspace)
                 .map_err(LinuxError::from)?;
         }
 
@@ -753,6 +755,7 @@ impl UserProcess {
             exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
             exit_code: AtomicI32::new(0),
             exit_wait: WaitQueue::new(),
+            teardown: ProcessTeardown::new(),
         }))
     }
 
@@ -968,9 +971,20 @@ fn user_pc(tf: &TrapFrame) -> usize {
 }
 
 fn terminate_current_thread(process: &UserProcess, code: i32) -> ! {
+    terminate_current_thread_inner(process, code, false)
+}
+
+fn terminate_current_thread_for_exit_group(process: &UserProcess, code: i32) -> ! {
+    terminate_current_thread_inner(process, code, true)
+}
+
+fn terminate_current_thread_inner(process: &UserProcess, code: i32, teardown_now: bool) -> ! {
     clear_current_tid_and_wake();
     perform_deferred_self_unmap();
     unregister_user_task(current_tid());
+    if teardown_now {
+        process.teardown();
+    }
     process.note_thread_exit(code);
     axtask::exit(code)
 }
@@ -1027,7 +1041,7 @@ fn inject_pending_signal(
         ext.pending_signal.store(0, Ordering::Release);
         if sig == SIGKILL_NUM {
             ext.process.request_exit_group(128 + sig);
-            terminate_current_thread(ext.process.as_ref(), 128 + sig);
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
         }
         return Ok(());
     }
@@ -1086,7 +1100,7 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
             "user-exit-group-pf: tid={} code={code} fault_vaddr={vaddr:#x} flags={flags:?}",
             current_tid(),
         );
-        terminate_current_thread(process.as_ref(), code);
+        terminate_current_thread_for_exit_group(process.as_ref(), code);
     }
     let should_trace = _from_user
         && flags.contains(PageFaultFlags::WRITE)
@@ -1137,7 +1151,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
                     tf.regs.ra,
                     user_pc(tf),
                 );
-                terminate_current_thread(process.as_ref(), code);
+                terminate_current_thread_for_exit_group(process.as_ref(), code);
             }
         }
     };
@@ -3985,7 +3999,7 @@ fn sys_exit_group(process: &UserProcess, _tf: &TrapFrame, code: i32) -> ! {
         user_pc(tf),
     );
     process.request_exit_group(code);
-    terminate_current_thread(process, code)
+    terminate_current_thread_for_exit_group(process, code)
 }
 
 impl FdTable {
