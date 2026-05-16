@@ -119,6 +119,88 @@ pub(super) fn read_group_list(
     Ok(groups)
 }
 
+pub(super) fn sys_setuid(process: &UserProcess, uid: usize) -> isize {
+    set_single_id(uid, |uid| process.set_uid(uid))
+}
+
+pub(super) fn sys_setgid(process: &UserProcess, gid: usize) -> isize {
+    set_single_id(gid, |gid| process.set_gid(gid))
+}
+
+pub(super) fn sys_setreuid(process: &UserProcess, ruid: usize, euid: usize) -> isize {
+    set_re_ids(ruid, euid, |ruid, euid, saved| {
+        process.set_user_ids(ruid, euid, saved);
+    })
+}
+
+pub(super) fn sys_setregid(process: &UserProcess, rgid: usize, egid: usize) -> isize {
+    set_re_ids(rgid, egid, |rgid, egid, saved| {
+        process.set_group_ids(rgid, egid, saved);
+    })
+}
+
+pub(super) fn sys_setresuid(process: &UserProcess, ruid: usize, euid: usize, suid: usize) -> isize {
+    set_res_ids(ruid, euid, suid, |ruid, euid, suid| {
+        process.set_user_ids(ruid, euid, suid);
+    })
+}
+
+pub(super) fn sys_setresgid(process: &UserProcess, rgid: usize, egid: usize, sgid: usize) -> isize {
+    set_res_ids(rgid, egid, sgid, |rgid, egid, sgid| {
+        process.set_group_ids(rgid, egid, sgid);
+    })
+}
+
+pub(super) fn sys_getresuid(process: &UserProcess, ruid: usize, euid: usize, suid: usize) -> isize {
+    write_id_triplet(
+        process,
+        [ruid, euid, suid],
+        [process.real_uid(), process.uid(), process.saved_uid()],
+    )
+}
+
+pub(super) fn sys_getresgid(process: &UserProcess, rgid: usize, egid: usize, sgid: usize) -> isize {
+    write_id_triplet(
+        process,
+        [rgid, egid, sgid],
+        [process.real_gid(), process.gid(), process.saved_gid()],
+    )
+}
+
+pub(super) fn sys_setfsuid(process: &UserProcess, uid: usize) -> isize {
+    let old = process.uid();
+    set_fs_id(old, uid, |uid| {
+        process.set_user_ids(None, Some(uid), None);
+    })
+}
+
+pub(super) fn sys_setfsgid(process: &UserProcess, gid: usize) -> isize {
+    let old = process.gid();
+    set_fs_id(old, gid, |gid| {
+        process.set_group_ids(None, Some(gid), None);
+    })
+}
+
+pub(super) fn sys_getgroups(process: &UserProcess, size: usize, list: usize) -> isize {
+    let groups = process.groups();
+    write_getgroups_response(process, size, list, &groups)
+}
+
+pub(super) fn sys_setgroups(process: &UserProcess, size: usize, list: usize) -> isize {
+    if process.uid() != 0 {
+        return neg_errno(LinuxError::EPERM);
+    }
+    if size > 65_536 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let groups = match read_group_list(process, size, list) {
+        Ok(groups) => groups,
+        Err(err) => return neg_errno(err),
+    };
+    process.set_groups(groups);
+    0
+}
+
 pub(super) fn access_allowed(st: &general::stat, mode: usize, uid: u32, gid: u32) -> bool {
     if mode == 0 {
         return true;
