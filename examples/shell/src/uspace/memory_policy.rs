@@ -57,3 +57,36 @@ pub(super) fn write_default_mempolicy(
     }
     0
 }
+
+pub(super) fn sys_mbind(
+    process: &UserProcess,
+    start: usize,
+    len: usize,
+    mode: usize,
+    nodemask: usize,
+    maxnode: usize,
+) -> isize {
+    let _ = (start, len, mode);
+    validate_mempolicy_request(process, nodemask, maxnode)
+}
+
+pub(super) fn sys_get_mempolicy(
+    process: &UserProcess,
+    mode: usize,
+    nodemask: usize,
+    maxnode: usize,
+    _addr: usize,
+    _flags: usize,
+) -> isize {
+    write_default_mempolicy(process, mode, nodemask, maxnode)
+}
+
+pub(super) fn sys_set_mempolicy(
+    process: &UserProcess,
+    mode: usize,
+    nodemask: usize,
+    maxnode: usize,
+) -> isize {
+    let _ = mode;
+    validate_mempolicy_request(process, nodemask, maxnode)
+}
