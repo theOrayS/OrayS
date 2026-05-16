@@ -65,8 +65,8 @@ use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
-    fd_entry_path, normalize_file_mode, sys_fstat, sys_fstatfs, sys_newfstatat, sys_readlinkat,
-    sys_statfs, sys_statx, sys_utimensat,
+    normalize_file_mode, sys_fchmod, sys_fchmodat, sys_fstat, sys_fstatfs, sys_newfstatat,
+    sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
 };
 use process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use process_lifecycle::ProcessTeardown;
@@ -1586,67 +1586,6 @@ fn sys_faccessat(
         0
     } else {
         neg_errno_code(LINUX_EACCES)
-    }
-}
-
-fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize {
-    let path = match process.fds.lock().entry(fd as i32) {
-        Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
-        Err(err) => return neg_errno(err),
-    };
-    if let Some(path) = path {
-        process.set_path_mode(path, mode as u32);
-    }
-    0
-}
-
-fn sys_fchmodat(
-    process: &UserProcess,
-    dirfd: usize,
-    pathname: usize,
-    mode: usize,
-    flags: usize,
-) -> isize {
-    let flags = flags as u32;
-    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
-    if flags & !supported_flags != 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-
-    let path = read_cstr_or_return!(process, pathname);
-    let mode = mode as u32;
-    if path.is_empty() {
-        if flags & general::AT_EMPTY_PATH == 0 {
-            return neg_errno(LinuxError::ENOENT);
-        }
-        if dirfd as i32 == general::AT_FDCWD {
-            let cwd = process.cwd();
-            return match axfs::api::metadata(cwd.as_str()) {
-                Ok(_) => {
-                    process.set_path_mode(cwd, mode);
-                    0
-                }
-                Err(err) => neg_errno(LinuxError::from(err)),
-            };
-        }
-        return match process.fds.lock().entry(dirfd as i32) {
-            Ok(entry) => {
-                if let Some(path) = fd_entry_path(entry) {
-                    process.set_path_mode(path.to_string(), mode);
-                }
-                0
-            }
-            Err(err) => neg_errno(err),
-        };
-    }
-
-    let mut fds = process.fds.lock();
-    match fds.path_stat(process, dirfd as i32, path.as_str()) {
-        Ok((resolved_path, _)) => {
-            process.set_path_mode(resolved_path, mode);
-            0
-        }
-        Err(err) => neg_errno(err),
     }
 }
 
