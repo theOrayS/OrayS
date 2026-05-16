@@ -24,9 +24,6 @@ use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
-#[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{FS, Sstatus};
-
 mod credentials;
 mod fd_pipe;
 mod fd_socket;
@@ -100,7 +97,8 @@ use system_info::{
     write_default_utsname, write_default_winsize,
 };
 use task_context::{
-    UserTaskExt, current_process, current_task_ext, current_tid, robust_list_for_task,
+    UserTaskExt, child_trap_frame, current_process, current_task_ext, current_tid,
+    fixup_riscv_clone_child_return, make_uspace_context, robust_list_for_task,
     set_current_clear_child_tid, set_current_robust_list, task_ext,
 };
 use task_registry::{
@@ -326,165 +324,6 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         process,
         context: make_uspace_context(image.entry, image.stack_ptr, image.argc),
     })
-}
-
-fn make_uspace_context(entry: usize, stack_ptr: usize, argc: usize) -> UspaceContext {
-    #[cfg(target_arch = "riscv64")]
-    {
-        let mut sstatus = Sstatus::from_bits(0);
-        sstatus.set_spie(true);
-        sstatus.set_sum(true);
-        sstatus.set_fs(FS::Initial);
-        let mut tf = TrapFrame {
-            regs: axhal::context::TrapFrame::default().regs,
-            sepc: entry,
-            sstatus,
-        };
-        tf.regs.sp = stack_ptr;
-        // RISC-V glibc crt1 treats entry a0 as rtld_fini, while argc/argv/envp
-        // are read from the initial stack. Passing argc here makes static glibc
-        // call argc as an exit handler.
-        tf.regs.a0 = 0;
-        tf.regs.a1 = stack_ptr + size_of::<usize>();
-        tf.regs.a2 = stack_ptr + (argc + 2) * size_of::<usize>();
-        UspaceContext::from(&tf)
-    }
-    #[cfg(target_arch = "loongarch64")]
-    {
-        let mut tf = TrapFrame::default();
-        tf.prmd = 0b11 | (1 << 2);
-        tf.era = entry;
-        tf.regs.sp = stack_ptr;
-        // LoongArch glibc has the same crt1 convention: a0 is rtld_fini, not
-        // argc. The argument vector starts on the user stack.
-        tf.regs.a0 = 0;
-        tf.regs.a1 = stack_ptr + size_of::<usize>();
-        tf.regs.a2 = stack_ptr + (argc + 2) * size_of::<usize>();
-        UspaceContext::from(&tf)
-    }
-}
-
-fn child_trap_frame(parent: &TrapFrame, child_stack: usize) -> TrapFrame {
-    let mut child = *parent;
-    child.regs.a0 = 0;
-    if child_stack != 0 {
-        child.regs.sp = child_stack;
-    }
-    advance_syscall_pc(&mut child);
-    child
-}
-
-#[cfg(target_arch = "riscv64")]
-fn sign_extend(value: usize, bits: usize) -> isize {
-    let shift = usize::BITS as usize - bits;
-    ((value << shift) as isize) >> shift
-}
-
-#[cfg(target_arch = "riscv64")]
-fn riscv_b_type_next_pc(pc: usize, inst: u32, a0: usize) -> Option<usize> {
-    if inst & 0x7f != 0x63 {
-        return None;
-    }
-
-    let funct3 = (inst >> 12) & 0x7;
-    let rs1 = (inst >> 15) & 0x1f;
-    let rs2 = (inst >> 20) & 0x1f;
-    if !((rs1 == 10 && rs2 == 0) || (rs1 == 0 && rs2 == 10)) {
-        return None;
-    }
-
-    let rs1_value = if rs1 == 10 { a0 } else { 0 };
-    let rs2_value = if rs2 == 10 { a0 } else { 0 };
-    let taken = match funct3 {
-        0x0 => rs1_value == rs2_value,
-        0x1 => rs1_value != rs2_value,
-        0x4 => (rs1_value as isize) < (rs2_value as isize),
-        0x5 => (rs1_value as isize) >= (rs2_value as isize),
-        0x6 => rs1_value < rs2_value,
-        0x7 => rs1_value >= rs2_value,
-        _ => return None,
-    };
-
-    let imm = (((inst >> 31) & 0x1) << 12)
-        | (((inst >> 7) & 0x1) << 11)
-        | (((inst >> 25) & 0x3f) << 5)
-        | (((inst >> 8) & 0xf) << 1);
-    let target = pc.wrapping_add(sign_extend(imm as usize, 13) as usize);
-    Some(if taken { target } else { pc + 4 })
-}
-
-#[cfg(target_arch = "riscv64")]
-fn riscv_compressed_branch_next_pc(pc: usize, inst: u16, a0: usize) -> Option<usize> {
-    if inst & 0x3 != 0x1 {
-        return None;
-    }
-
-    let funct3 = (inst >> 13) & 0x7;
-    if funct3 != 0x6 && funct3 != 0x7 {
-        return None;
-    }
-    let rs1 = 8 + ((inst >> 7) & 0x7);
-    if rs1 != 10 {
-        return None;
-    }
-
-    let taken = match funct3 {
-        0x6 => a0 == 0,
-        0x7 => a0 != 0,
-        _ => unreachable!(),
-    };
-
-    let imm = (((inst >> 12) & 0x1) << 8)
-        | (((inst >> 10) & 0x3) << 3)
-        | (((inst >> 2) & 0x1) << 5)
-        | (((inst >> 5) & 0x3) << 6)
-        | (((inst >> 3) & 0x3) << 1);
-    let target = pc.wrapping_add(sign_extend(imm as usize, 9) as usize);
-    Some(if taken { target } else { pc + 2 })
-}
-
-#[cfg(target_arch = "riscv64")]
-fn riscv_branch_next_pc(process: &UserProcess, pc: usize, a0: usize) -> Option<usize> {
-    let Ok(low) = read_user_value::<u16>(process, pc) else {
-        return None;
-    };
-
-    if low & 0x3 == 0x3 {
-        read_user_value::<u32>(process, pc)
-            .ok()
-            .and_then(|inst| riscv_b_type_next_pc(pc, inst, a0))
-    } else {
-        riscv_compressed_branch_next_pc(pc, low, a0)
-    }
-}
-
-#[cfg(target_arch = "riscv64")]
-fn fixup_riscv_clone_child_return(process: &UserProcess, tf: &mut TrapFrame) {
-    // The child starts from a freshly built UspaceContext instead of the
-    // original trap-return path. Interpret the clone wrapper's deterministic
-    // a0/zero return dispatch so a0 == 0 reaches the real child-side entry.
-    let mut pc = tf.sepc;
-    for _ in 0..4 {
-        let Some(next_pc) = riscv_branch_next_pc(process, pc, tf.regs.a0) else {
-            break;
-        };
-        if next_pc == pc {
-            break;
-        }
-        pc = next_pc;
-    }
-    tf.sepc = pc;
-}
-
-fn advance_syscall_pc(tf: &mut TrapFrame) {
-    #[cfg(target_arch = "riscv64")]
-    {
-        tf.sepc += 4;
-    }
-    #[cfg(target_arch = "loongarch64")]
-    {
-        tf.era += 4;
-    }
 }
 
 fn exec_program(
