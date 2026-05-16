@@ -1,4 +1,3 @@
-use core::cmp;
 use core::ffi::c_void;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
@@ -66,8 +65,8 @@ use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
-    fd_entry_path, normalize_file_mode, sys_fstat, sys_fstatfs, sys_newfstatat, sys_statfs,
-    sys_statx,
+    fd_entry_path, normalize_file_mode, sys_fstat, sys_fstatfs, sys_newfstatat, sys_readlinkat,
+    sys_statfs, sys_statx,
 };
 use process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use process_lifecycle::ProcessTeardown;
@@ -88,7 +87,6 @@ use signal_abi::{
     current_sigcancel_pending, current_unblocked_signal_pending, signal_is_blocked,
     signal_mask_bit, validate_signal_target,
 };
-use synthetic_fs::proc_exe_link_target;
 use system_info::{sys_getrusage, sys_syslog, sys_uname};
 use task_context::{
     UserTaskExt, child_trap_frame, current_process, current_task_ext, current_tid,
@@ -2315,36 +2313,6 @@ fn sys_getsockopt_bridge(
     return_on_user_write_error!(process, optval, &value);
     let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
     write_user_value(process, optlen, &out_len)
-}
-
-fn sys_readlinkat(
-    process: &UserProcess,
-    dirfd: usize,
-    pathname: usize,
-    buf: usize,
-    bufsiz: usize,
-) -> isize {
-    if bufsiz == 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let path = read_cstr_or_return!(process, pathname);
-    let resolved_path = {
-        let table = process.fds.lock();
-        match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
-            Ok(path) => path,
-            Err(err) => return neg_errno(err),
-        }
-    };
-    if let Some(target) = proc_exe_link_target(process, resolved_path.as_str()) {
-        let bytes = target.as_bytes();
-        let copy_len = cmp::min(bytes.len(), bufsiz);
-        return write_user_bytes(process, buf, &bytes[..copy_len])
-            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
-    }
-    match axfs::api::metadata(resolved_path.as_str()) {
-        Ok(_) => neg_errno(LinuxError::EINVAL),
-        Err(err) => neg_errno(LinuxError::from(err)),
-    }
 }
 
 fn sys_setitimer(
