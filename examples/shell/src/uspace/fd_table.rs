@@ -207,6 +207,46 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
     0
 }
 
+pub(super) fn sys_mkdirat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    mode: usize,
+) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    match process
+        .fds
+        .lock()
+        .mkdirat(process, dirfd as i32, path.as_str(), mode as u32)
+    {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_unlinkat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    flags: usize,
+) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    match process
+        .fds
+        .lock()
+        .unlinkat(process, dirfd as i32, path.as_str(), flags as u32)
+    {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
 pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
     let new_cwd = {
         let table = process.fds.lock();
