@@ -69,7 +69,7 @@ use metadata::{
     fd_entry_path, normalize_file_mode, sys_fstat, sys_fstatfs, sys_newfstatat, sys_statfs,
     sys_statx,
 };
-use process_abi::apply_personality_request;
+use process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use process_lifecycle::ProcessTeardown;
 use program_loader::load_program_image;
 use resource_sched::{
@@ -1802,49 +1802,6 @@ fn sys_faccessat(
     }
 }
 
-fn sys_setpgid(process: &UserProcess, pid: usize, pgid: usize) -> isize {
-    let pid = pid as i32;
-    let pgid = pgid as i32;
-    if pid < 0 || pgid < 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-
-    let current = process.pid();
-    let target = if pid == 0 { current } else { pid };
-    if target != current {
-        return neg_errno(LinuxError::ESRCH);
-    }
-
-    let group = if pgid == 0 { target } else { pgid };
-    if group <= 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    if group != target {
-        return neg_errno(LinuxError::EPERM);
-    }
-
-    0
-}
-
-fn sys_getpgid(process: &UserProcess, pid: usize) -> isize {
-    let pid = pid as i32;
-    if pid < 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-
-    let current = process.pid();
-    let target = if pid == 0 { current } else { pid };
-    if target != current {
-        return neg_errno(LinuxError::ESRCH);
-    }
-
-    target as isize
-}
-
-fn sys_setsid(process: &UserProcess) -> isize {
-    process.pid() as isize
-}
-
 fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize {
     let path = match process.fds.lock().entry(fd as i32) {
         Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
@@ -2925,10 +2882,6 @@ fn sys_set_tid_address(_tf: &TrapFrame, _tidptr: usize) -> isize {
         user_pc(tf),
     );
     axtask::current().id().as_u64() as isize
-}
-
-fn sys_personality(process: &UserProcess, persona: usize) -> isize {
-    apply_personality_request(process, persona) as isize
 }
 
 fn sys_set_robust_list(head: usize, len: usize) -> isize {
