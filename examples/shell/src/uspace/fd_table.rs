@@ -104,6 +104,29 @@ pub(super) fn read_file_at_into(
     Ok(filled)
 }
 
+pub(super) fn sys_openat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    flags: usize,
+    mode: usize,
+) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    match process.fds.lock().open(
+        process,
+        dirfd as i32,
+        path.as_str(),
+        flags as u32,
+        mode as u32,
+    ) {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
 pub(super) fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> isize {
     let length = length as isize;
     if length < 0 {
