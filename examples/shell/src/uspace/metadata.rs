@@ -7,7 +7,7 @@ use linux_raw_sys::general;
 use std::string::{String, ToString};
 
 use super::UserProcess;
-use super::credentials::access_allowed;
+use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
 use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_PERMISSION_MASK, LINUX_EACCES, PIPEFS_MAGIC,
@@ -159,6 +159,82 @@ pub(super) fn sys_fchmodat(
         }
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn sys_fchown(process: &UserProcess, fd: usize, owner: usize, group: usize) -> isize {
+    let (owner, group) = match chown_ids(owner, group) {
+        Ok(ids) => ids,
+        Err(err) => return neg_errno(err),
+    };
+    let (path, st) = match process
+        .fds
+        .lock()
+        .stat_with_recorded_path(process, fd as i32)
+    {
+        Ok((path, st)) => (path, st),
+        Err(err) => return neg_errno(err),
+    };
+    apply_chown_metadata(process, path, &st, owner, group)
+}
+
+pub(super) fn sys_fchownat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    owner: usize,
+    group: usize,
+    flags: usize,
+) -> isize {
+    let flags = flags as u32;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW
+        | general::AT_NO_AUTOMOUNT
+        | general::AT_EMPTY_PATH
+        | general::AT_STATX_SYNC_TYPE;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let (owner, group) = match chown_ids(owner, group) {
+        Ok(ids) => ids,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let (record_path, st) = if path.is_empty() {
+        if flags & general::AT_EMPTY_PATH == 0 {
+            return neg_errno(LinuxError::ENOENT);
+        }
+        if dirfd as i32 == general::AT_FDCWD {
+            let cwd = process.cwd();
+            let st = match process
+                .fds
+                .lock()
+                .stat_path(process, general::AT_FDCWD, ".")
+            {
+                Ok(st) => st,
+                Err(err) => return neg_errno(err),
+            };
+            (Some(cwd), st)
+        } else {
+            match process
+                .fds
+                .lock()
+                .stat_with_recorded_path(process, dirfd as i32)
+            {
+                Ok((path, st)) => (path, st),
+                Err(err) => return neg_errno(err),
+            }
+        }
+    } else {
+        let mut fds = process.fds.lock();
+        let (resolved_path, st) = match fds.path_stat(process, dirfd as i32, path.as_str()) {
+            Ok(result) => result,
+            Err(err) => return neg_errno(err),
+        };
+        (Some(resolved_path), st)
+    };
+    apply_chown_metadata(process, record_path, &st, owner, group)
 }
 
 pub(super) fn fd_entry_statfs_path(entry: &FdEntry) -> Option<&str> {

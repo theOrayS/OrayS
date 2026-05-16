@@ -45,9 +45,8 @@ mod time_abi;
 mod user_memory;
 
 use credentials::{
-    apply_chown_metadata, chown_ids, sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid,
-    sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid,
-    sys_setreuid, sys_setuid,
+    sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid, sys_setfsuid, sys_setgid,
+    sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid, sys_setreuid, sys_setuid,
 };
 use fd_pipe::sys_pipe2;
 use fd_socket::{
@@ -65,8 +64,8 @@ use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
-    normalize_file_mode, sys_faccessat, sys_fchmod, sys_fchmodat, sys_fstat, sys_fstatfs,
-    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
+    normalize_file_mode, sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat,
+    sys_fstat, sys_fstatfs, sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
 };
 use process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use process_lifecycle::ProcessTeardown;
@@ -1557,79 +1556,6 @@ fn sys_wait4(
         return_on_user_write_error!(process, status, &wait_status);
     }
     child_pid as isize
-}
-
-fn sys_fchown(process: &UserProcess, fd: usize, owner: usize, group: usize) -> isize {
-    let (owner, group) = match chown_ids(owner, group) {
-        Ok(ids) => ids,
-        Err(err) => return neg_errno(err),
-    };
-    let (path, st) = match process
-        .fds
-        .lock()
-        .stat_with_recorded_path(process, fd as i32)
-    {
-        Ok((path, st)) => (path, st),
-        Err(err) => return neg_errno(err),
-    };
-    apply_chown_metadata(process, path, &st, owner, group)
-}
-
-fn sys_fchownat(
-    process: &UserProcess,
-    dirfd: usize,
-    pathname: usize,
-    owner: usize,
-    group: usize,
-    flags: usize,
-) -> isize {
-    let flags = flags as u32;
-    let supported_flags = general::AT_SYMLINK_NOFOLLOW
-        | general::AT_NO_AUTOMOUNT
-        | general::AT_EMPTY_PATH
-        | general::AT_STATX_SYNC_TYPE;
-    if flags & !supported_flags != 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let (owner, group) = match chown_ids(owner, group) {
-        Ok(ids) => ids,
-        Err(err) => return neg_errno(err),
-    };
-    let path = read_cstr_or_return!(process, pathname);
-    let (record_path, st) = if path.is_empty() {
-        if flags & general::AT_EMPTY_PATH == 0 {
-            return neg_errno(LinuxError::ENOENT);
-        }
-        if dirfd as i32 == general::AT_FDCWD {
-            let cwd = process.cwd();
-            let st = match process
-                .fds
-                .lock()
-                .stat_path(process, general::AT_FDCWD, ".")
-            {
-                Ok(st) => st,
-                Err(err) => return neg_errno(err),
-            };
-            (Some(cwd), st)
-        } else {
-            match process
-                .fds
-                .lock()
-                .stat_with_recorded_path(process, dirfd as i32)
-            {
-                Ok((path, st)) => (path, st),
-                Err(err) => return neg_errno(err),
-            }
-        }
-    } else {
-        let mut fds = process.fds.lock();
-        let (resolved_path, st) = match fds.path_stat(process, dirfd as i32, path.as_str()) {
-            Ok(result) => result,
-            Err(err) => return neg_errno(err),
-        };
-        (Some(resolved_path), st)
-    };
-    apply_chown_metadata(process, record_path, &st, owner, group)
 }
 
 fn sys_renameat2(
