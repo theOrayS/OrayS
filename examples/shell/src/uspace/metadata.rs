@@ -1,3 +1,5 @@
+use core::cmp;
+
 use axalloc::global_allocator;
 use axerrno::LinuxError;
 use axfs::fops::{FileAttr, FileType};
@@ -5,15 +7,15 @@ use linux_raw_sys::general;
 use std::string::String;
 
 use super::UserProcess;
-use super::fd_table::FdEntry;
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     DEVFS_MAGIC, FILE_MODE_PERMISSION_MASK, PIPEFS_MAGIC, PROC_SUPER_MAGIC, ST_MODE_CHR,
     ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC,
     neg_errno,
 };
 use super::runtime_paths::normalize_path;
-use super::synthetic_fs::dev_shm_host_path;
-use super::user_memory::{read_cstr, write_user_value};
+use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
+use super::user_memory::{read_cstr, write_user_bytes, write_user_value};
 
 pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general::stat {
     let st_mode = file_type_mode(attr.file_type()) | attr.perm().bits() as u32;
@@ -255,6 +257,39 @@ pub(super) fn sys_statx(
         }
     };
     write_user_value(process, statxbuf, &stat_to_statx(st))
+}
+
+pub(super) fn sys_readlinkat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    buf: usize,
+    bufsiz: usize,
+) -> isize {
+    if bufsiz == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let resolved_path = {
+        let table = process.fds.lock();
+        match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    if let Some(target) = proc_exe_link_target(process, resolved_path.as_str()) {
+        let bytes = target.as_bytes();
+        let copy_len = cmp::min(bytes.len(), bufsiz);
+        return write_user_bytes(process, buf, &bytes[..copy_len])
+            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
+    }
+    match axfs::api::metadata(resolved_path.as_str()) {
+        Ok(_) => neg_errno(LinuxError::EINVAL),
+        Err(err) => neg_errno(LinuxError::from(err)),
+    }
 }
 
 pub(super) fn sys_statfs(process: &UserProcess, pathname: usize, statfsbuf: usize) -> isize {
