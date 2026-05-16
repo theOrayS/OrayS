@@ -6,16 +6,27 @@ use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr};
 use axio::SeekFrom;
 use linux_raw_sys::general;
-use std::string::String;
+use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::UserProcess;
+use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry};
-use super::linux_abi::{MAX_IN_MEMORY_FILE_SIZE, ST_MODE_CHR, ST_MODE_FILE, fd_cloexec_flag};
+use super::linux_abi::{
+    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE,
+    ST_MODE_TYPE_MASK, fd_cloexec_flag, posix_ret_i32,
+};
 use super::memory_map::align_up;
-use super::metadata::{dirent_type, file_type_mode, path_inode};
+use super::metadata::{
+    apply_recorded_path_metadata, canonical_permission_path, dirent_type, fd_entry_path,
+    fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
+    stdio_stat,
+};
+use super::runtime_paths::{normalize_path, resolve_host_path};
 use super::select_fdset::SelectMode;
+use super::{directory_create_dir, directory_remove_dir, directory_remove_file, open_fd_entry};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -438,6 +449,278 @@ impl FdTable {
             .get_mut(fd as usize)
             .and_then(|entry| entry.as_mut())
             .ok_or(LinuxError::EBADF)
+    }
+}
+
+impl FdTable {
+    pub(super) fn open(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+        flags: u32,
+        mode: u32,
+    ) -> Result<i32, LinuxError> {
+        let entry = open_fd_entry(process, self, dirfd, path, flags, mode)?;
+        self.insert_with_flags(entry, fd_cloexec_flag(flags & general::O_CLOEXEC != 0))
+    }
+
+    pub(super) fn mkdirat(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+        mode: u32,
+    ) -> Result<(), LinuxError> {
+        if path.starts_with('/') || dirfd == general::AT_FDCWD {
+            let cwd = process.cwd();
+            let abs_path = resolve_host_path(cwd, path).map_err(|_| LinuxError::EINVAL)?;
+            directory_create_dir(abs_path.as_str())?;
+            process.set_path_mode(abs_path, mode);
+            return Ok(());
+        }
+        let FdEntry::Directory(dir) = self.entry(dirfd)? else {
+            return Err(LinuxError::ENOTDIR);
+        };
+        let abs_path = normalize_path(dir.path.as_str(), path).ok_or(LinuxError::EINVAL)?;
+        dir.dir.create_dir(path).map_err(LinuxError::from)?;
+        process.set_path_mode(abs_path, mode);
+        Ok(())
+    }
+
+    pub(super) fn unlinkat(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+        flags: u32,
+    ) -> Result<(), LinuxError> {
+        let remove_dir = flags & general::AT_REMOVEDIR != 0;
+        if path.starts_with('/') || dirfd == general::AT_FDCWD {
+            let cwd = process.cwd();
+            let abs_path = resolve_host_path(cwd, path).map_err(|_| LinuxError::EINVAL)?;
+            return if remove_dir {
+                directory_remove_dir(abs_path.as_str())
+            } else {
+                directory_remove_file(abs_path.as_str())
+            };
+        }
+        let FdEntry::Directory(dir) = self.entry(dirfd)? else {
+            return Err(LinuxError::ENOTDIR);
+        };
+        if remove_dir {
+            dir.dir.remove_dir(path).map_err(LinuxError::from)
+        } else {
+            dir.dir.remove_file(path).map_err(LinuxError::from)
+        }
+    }
+
+    pub(super) fn stat(&mut self, fd: i32) -> Result<general::stat, LinuxError> {
+        match self.entry_mut(fd)? {
+            FdEntry::Stdin => Ok(stdio_stat(true)),
+            FdEntry::Stdout | FdEntry::Stderr => Ok(stdio_stat(false)),
+            FdEntry::DevNull => Ok(stdio_stat(false)),
+            FdEntry::Rtc => Ok(stdio_stat(false)),
+            FdEntry::File(file) => Ok(file_attr_to_stat(
+                &file.file.get_attr().map_err(LinuxError::from)?,
+                Some(file.path.as_str()),
+            )),
+            FdEntry::Directory(dir) => Ok(file_attr_to_stat(&dir.attr, Some(dir.path.as_str()))),
+            FdEntry::Path(path) => Ok(path.stat()),
+            FdEntry::MemoryFile(file) => Ok(file.stat()),
+            FdEntry::Pipe(pipe) => Ok(pipe.stat()),
+            FdEntry::Socket(socket) => Ok(socket.stat()),
+            FdEntry::LocalSocket(socket) => Ok(socket.stat()),
+        }
+    }
+
+    pub(super) fn stat_with_recorded_path(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+    ) -> Result<(Option<String>, general::stat), LinuxError> {
+        let path = fd_entry_path(self.entry(fd)?).map(ToString::to_string);
+        let st = self.stat(fd)?;
+        let st = match path.as_deref() {
+            Some(path) => apply_recorded_path_metadata(process, path, st),
+            None => st,
+        };
+        Ok((path, st))
+    }
+
+    pub(super) fn statfs(&self, fd: i32) -> Result<general::statfs, LinuxError> {
+        Ok(generic_statfs(fd_entry_statfs_path(self.entry(fd)?)))
+    }
+
+    pub(super) fn stat_path(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+    ) -> Result<general::stat, LinuxError> {
+        match open_fd_entry(process, self, dirfd, path, general::O_RDONLY, 0) {
+            Ok(FdEntry::DevNull) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
+            Ok(FdEntry::File(file)) => Ok(apply_recorded_path_metadata(
+                process,
+                file.path.as_str(),
+                file_attr_to_stat(
+                    &file.file.get_attr().map_err(LinuxError::from)?,
+                    Some(file.path.as_str()),
+                ),
+            )),
+            Ok(FdEntry::Directory(dir)) => Ok(apply_recorded_path_metadata(
+                process,
+                dir.path.as_str(),
+                file_attr_to_stat(&dir.attr, Some(dir.path.as_str())),
+            )),
+            Ok(FdEntry::Path(path)) => Ok(apply_recorded_path_metadata(
+                process,
+                path.path.as_str(),
+                path.stat(),
+            )),
+            Ok(FdEntry::MemoryFile(file)) => Ok(apply_recorded_path_metadata(
+                process,
+                file.path.as_str(),
+                file.stat(),
+            )),
+            Ok(_) => Err(LinuxError::EINVAL),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub(super) fn path_stat(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+    ) -> Result<(String, general::stat), LinuxError> {
+        let resolved_path = self.resolve_path(process, dirfd, path)?;
+        let st = self.stat_path(process, dirfd, path)?;
+        Ok((resolved_path, st))
+    }
+
+    pub(super) fn resolve_path(
+        &self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+    ) -> Result<String, LinuxError> {
+        if path.is_empty() {
+            return Err(LinuxError::ENOENT);
+        }
+        let normalized = if path.starts_with('/') {
+            normalize_path("/", path).ok_or(LinuxError::EINVAL)?
+        } else if dirfd == general::AT_FDCWD {
+            let cwd = process.cwd();
+            normalize_path(cwd.as_str(), path).ok_or(LinuxError::EINVAL)?
+        } else {
+            let base = match self.entry(dirfd)? {
+                FdEntry::Directory(dir) => dir.path.as_str(),
+                FdEntry::Path(path_entry) if path_entry.mode & ST_MODE_TYPE_MASK == ST_MODE_DIR => {
+                    path_entry.path.as_str()
+                }
+                _ => return Err(LinuxError::ENOTDIR),
+            };
+            normalize_path(base, path).ok_or(LinuxError::EINVAL)?
+        };
+        Ok(canonical_permission_path(normalized))
+    }
+
+    pub(super) fn parent_dirs_searchable(
+        &mut self,
+        process: &UserProcess,
+        path: &str,
+        uid: u32,
+        gid: u32,
+    ) -> Result<bool, LinuxError> {
+        if uid == 0 {
+            return Ok(true);
+        }
+        let components: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+        if components.len() <= 1 {
+            return Ok(true);
+        }
+        let mut parent = String::new();
+        for component in &components[..components.len() - 1] {
+            parent.push('/');
+            parent.push_str(component);
+            let st = self.stat_path(process, general::AT_FDCWD, parent.as_str())?;
+            if !access_allowed(&st, ACCESS_X_OK, uid, gid) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    pub(super) fn statfs_path(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+    ) -> Result<general::statfs, LinuxError> {
+        let entry = open_fd_entry(process, self, dirfd, path, general::O_RDONLY, 0)?;
+        Ok(generic_statfs(fd_entry_statfs_path(&entry)))
+    }
+
+    pub(super) fn fcntl(&mut self, fd: i32, cmd: u32, arg: usize) -> Result<i32, LinuxError> {
+        if matches!(self.entry(fd)?, FdEntry::Path(_)) && cmd == general::F_GETFL {
+            return Ok(O_PATH_FLAG as i32);
+        }
+        let local_socket = match self.entry(fd)? {
+            FdEntry::LocalSocket(socket) => Some(socket.clone()),
+            _ => None,
+        };
+        if let Some(socket) = local_socket {
+            return match cmd {
+                general::F_DUPFD => {
+                    self.insert_min_with_flags(FdEntry::LocalSocket(socket.duplicate()), arg, 0)
+                }
+                general::F_DUPFD_CLOEXEC => self.insert_min_with_flags(
+                    FdEntry::LocalSocket(socket.duplicate()),
+                    arg,
+                    general::FD_CLOEXEC,
+                ),
+                general::F_GETFD => self.get_fd_flags(fd),
+                general::F_SETFD => self.set_fd_flags(fd, arg as u32),
+                general::F_GETFL => Ok(socket.status_flags()),
+                general::F_SETFL => Ok(0),
+                _ => Ok(0),
+            };
+        }
+        let socket = match self.entry(fd)? {
+            FdEntry::Socket(socket) => Some(socket.clone()),
+            _ => None,
+        };
+        if let Some(socket) = socket {
+            return match cmd {
+                general::F_DUPFD => {
+                    self.insert_min_with_flags(FdEntry::Socket(socket.duplicate()?), arg, 0)
+                }
+                general::F_DUPFD_CLOEXEC => self.insert_min_with_flags(
+                    FdEntry::Socket(socket.duplicate()?),
+                    arg,
+                    general::FD_CLOEXEC,
+                ),
+                general::F_GETFD => self.get_fd_flags(fd),
+                general::F_SETFD => self.set_fd_flags(fd, arg as u32),
+                general::F_GETFL | general::F_SETFL => posix_ret_i32(arceos_posix_api::sys_fcntl(
+                    socket.posix_fd,
+                    cmd as i32,
+                    arg,
+                )),
+                _ => Ok(0),
+            };
+        }
+        match cmd {
+            general::F_DUPFD => self.dup_min_with_flags(fd, arg as i32, 0),
+            general::F_DUPFD_CLOEXEC => {
+                self.dup_min_with_flags(fd, arg as i32, general::FD_CLOEXEC)
+            }
+            general::F_GETFD => self.get_fd_flags(fd),
+            general::F_SETFD => self.set_fd_flags(fd, arg as u32),
+            general::F_GETFL | general::F_SETFL => Ok(0),
+            _ => Ok(0),
+        }
     }
 }
 
