@@ -59,7 +59,7 @@ use fd_socket::{
 use fd_table::{
     FdEntry, FdTable, read_file_at_into, resolve_dirfd_path, sys_chdir, sys_close, sys_dup,
     sys_dup3, sys_fchdir, sys_fcntl, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64,
-    sys_ioctl, sys_lseek,
+    sys_ioctl, sys_lseek, sys_mkdirat, sys_unlinkat,
 };
 use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
@@ -1575,30 +1575,6 @@ fn sys_openat(
         mode as u32,
     ) {
         Ok(fd) => fd as isize,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_mkdirat(process: &UserProcess, dirfd: usize, pathname: usize, mode: usize) -> isize {
-    let path = read_cstr_or_return!(process, pathname);
-    match process
-        .fds
-        .lock()
-        .mkdirat(process, dirfd as i32, path.as_str(), mode as u32)
-    {
-        Ok(()) => 0,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_unlinkat(process: &UserProcess, dirfd: usize, pathname: usize, flags: usize) -> isize {
-    let path = read_cstr_or_return!(process, pathname);
-    match process
-        .fds
-        .lock()
-        .unlinkat(process, dirfd as i32, path.as_str(), flags as u32)
-    {
-        Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
 }
