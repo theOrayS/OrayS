@@ -1,18 +1,16 @@
 use core::cmp;
 use core::ffi::c_void;
-use core::mem::{offset_of, size_of};
-use core::ptr;
+use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use arceos_posix_api::ctypes as posix_ctypes;
 use axerrno::LinuxError;
-use axfs::fops::{self, Directory, File, OpenOptions};
+use axfs::fops::{Directory, File, OpenOptions};
 use axhal::context::{TrapFrame, UspaceContext};
 use axhal::mem::virt_to_phys;
 use axhal::trap::{
     PAGE_FAULT, PageFaultFlags, SYSCALL, register_trap_handler, register_user_return_handler,
 };
-use axio::SeekFrom;
 use axmm::AddrSpace;
 use axns::AxNamespace;
 use axsync::Mutex;
@@ -64,8 +62,8 @@ use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{validate_mempolicy_request, write_default_mempolicy};
 use metadata::{
-    apply_recorded_path_metadata, canonical_permission_path, dirent_type, fd_entry_path,
-    fd_entry_statfs_path, file_attr_to_stat, generic_statfs, normalize_file_mode, stdio_stat,
+    apply_recorded_path_metadata, canonical_permission_path, fd_entry_path, fd_entry_statfs_path,
+    file_attr_to_stat, generic_statfs, normalize_file_mode, stdio_stat,
 };
 use process_abi::apply_personality_request;
 use process_lifecycle::ProcessTeardown;
@@ -3842,122 +3840,6 @@ fn sys_exit_group(process: &UserProcess, _tf: &TrapFrame, code: i32) -> ! {
 }
 
 impl FdTable {
-    fn new() -> Self {
-        Self {
-            entries: vec![
-                Some(FdEntry::Stdin),
-                Some(FdEntry::Stdout),
-                Some(FdEntry::Stderr),
-            ],
-            fd_flags: vec![0, 0, 0],
-        }
-    }
-
-    fn fork_copy(&self) -> Result<Self, LinuxError> {
-        let mut entries = Vec::with_capacity(self.entries.len());
-        let mut fd_flags = Vec::with_capacity(self.entries.len());
-        for (idx, entry) in self.entries.iter().enumerate() {
-            entries.push(match entry {
-                Some(entry) => Some(entry.duplicate_for_fork()?),
-                None => None,
-            });
-            fd_flags.push(if entry.is_some() {
-                self.fd_flags.get(idx).copied().unwrap_or(0)
-            } else {
-                0
-            });
-        }
-        Ok(Self { entries, fd_flags })
-    }
-
-    fn is_stdio(&self, fd: i32) -> bool {
-        matches!(fd, 0..=2)
-    }
-
-    fn is_rtc(&self, fd: i32) -> bool {
-        matches!(self.entry(fd), Ok(FdEntry::Rtc))
-    }
-
-    fn poll(&self, fd: i32, mode: SelectMode) -> bool {
-        let Ok(entry) = self.entry(fd) else {
-            return matches!(mode, SelectMode::Except);
-        };
-        match mode {
-            SelectMode::Read => match entry {
-                FdEntry::Stdin => false,
-                FdEntry::Stdout | FdEntry::Stderr => false,
-                FdEntry::DevNull
-                | FdEntry::Rtc
-                | FdEntry::File(_)
-                | FdEntry::Directory(_)
-                | FdEntry::MemoryFile(_) => true,
-                FdEntry::Path(_) => false,
-                FdEntry::Pipe(pipe) => pipe.poll().readable,
-                FdEntry::Socket(socket) => socket.poll(mode),
-                FdEntry::LocalSocket(socket) => socket.poll(mode),
-            },
-            SelectMode::Write => match entry {
-                FdEntry::Stdin => false,
-                FdEntry::Stdout | FdEntry::Stderr | FdEntry::DevNull | FdEntry::Rtc => true,
-                FdEntry::File(_) => true,
-                FdEntry::Directory(_) | FdEntry::Path(_) | FdEntry::MemoryFile(_) => false,
-                FdEntry::Pipe(pipe) => pipe.poll().writable,
-                FdEntry::Socket(socket) => socket.poll(mode),
-                FdEntry::LocalSocket(socket) => socket.poll(mode),
-            },
-            SelectMode::Except => false,
-        }
-    }
-
-    fn read(&mut self, fd: i32, dst: &mut [u8]) -> Result<usize, LinuxError> {
-        match self.entry_mut(fd)? {
-            FdEntry::Stdin => Ok(0),
-            FdEntry::DevNull => Ok(0),
-            FdEntry::Rtc => Ok(0),
-            FdEntry::File(file) => file.file.read(dst).map_err(LinuxError::from),
-            FdEntry::MemoryFile(file) => Ok(file.read(dst)),
-            FdEntry::Directory(_) => Err(LinuxError::EISDIR),
-            FdEntry::Pipe(pipe) => pipe.read(dst),
-            FdEntry::Socket(socket) => socket.read(dst),
-            FdEntry::LocalSocket(socket) => socket.read(dst),
-            _ => Err(LinuxError::EBADF),
-        }
-    }
-
-    fn write(&mut self, fd: i32, src: &[u8]) -> Result<usize, LinuxError> {
-        match self.entry_mut(fd)? {
-            FdEntry::Stdout | FdEntry::Stderr => {
-                axhal::console::write_bytes(src);
-                Ok(src.len())
-            }
-            FdEntry::DevNull => Ok(src.len()),
-            FdEntry::Rtc => Ok(src.len()),
-            FdEntry::File(file) => file.file.write(src).map_err(LinuxError::from),
-            FdEntry::Pipe(pipe) => pipe.write(src),
-            FdEntry::Socket(socket) => socket.write(src),
-            FdEntry::LocalSocket(socket) => socket.write(src),
-            _ => Err(LinuxError::EBADF),
-        }
-    }
-
-    fn write_file_at(&mut self, fd: i32, offset: u64, src: &[u8]) -> Result<usize, LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return Err(LinuxError::EBADF);
-        };
-        let mut written = 0usize;
-        while written < src.len() {
-            let count = file
-                .file
-                .write_at(offset + written as u64, &src[written..])
-                .map_err(LinuxError::from)?;
-            if count == 0 {
-                break;
-            }
-            written += count;
-        }
-        Ok(written)
-    }
-
     fn open(
         &mut self,
         process: &UserProcess,
@@ -4017,39 +3899,6 @@ impl FdTable {
             dir.dir.remove_dir(path).map_err(LinuxError::from)
         } else {
             dir.dir.remove_file(path).map_err(LinuxError::from)
-        }
-    }
-
-    fn close_slot(&mut self, idx: usize) -> Result<(), LinuxError> {
-        if let Some(FdEntry::Socket(socket)) = self.entries[idx].as_ref() {
-            socket.close()?;
-        }
-        self.entries[idx] = None;
-        if let Some(flags) = self.fd_flags.get_mut(idx) {
-            *flags = 0;
-        }
-        Ok(())
-    }
-
-    fn close(&mut self, fd: i32) -> Result<(), LinuxError> {
-        if !(0..self.entries.len() as i32).contains(&fd) || self.entries[fd as usize].is_none() {
-            return Err(LinuxError::EBADF);
-        }
-        self.close_slot(fd as usize)
-    }
-
-    fn close_all(&mut self) {
-        for idx in 0..self.entries.len() {
-            let _ = self.close_slot(idx);
-        }
-    }
-
-    fn close_cloexec(&mut self) {
-        for idx in 0..self.entries.len() {
-            if self.fd_flags.get(idx).copied().unwrap_or(0) & general::FD_CLOEXEC == 0 {
-                continue;
-            }
-            let _ = self.close_slot(idx);
         }
     }
 
@@ -4200,21 +4049,6 @@ impl FdTable {
         Ok(generic_statfs(fd_entry_statfs_path(&entry)))
     }
 
-    fn truncate(&mut self, fd: i32, size: u64) -> Result<(), LinuxError> {
-        match self.entry_mut(fd)? {
-            FdEntry::File(file) => {
-                if size > MAX_IN_MEMORY_FILE_SIZE {
-                    return Err(LinuxError::ENOSPC);
-                }
-                file.file.truncate(size).map_err(LinuxError::from)
-            }
-            FdEntry::DevNull => Ok(()),
-            FdEntry::Rtc => Ok(()),
-            FdEntry::Path(_) | FdEntry::MemoryFile(_) => Err(LinuxError::EBADF),
-            _ => Err(LinuxError::EINVAL),
-        }
-    }
-
     fn fcntl(&mut self, fd: i32, cmd: u32, arg: usize) -> Result<i32, LinuxError> {
         if matches!(self.entry(fd)?, FdEntry::Path(_)) && cmd == general::F_GETFL {
             return Ok(O_PATH_FLAG as i32);
@@ -4274,184 +4108,6 @@ impl FdTable {
             general::F_GETFL | general::F_SETFL => Ok(0),
             _ => Ok(0),
         }
-    }
-
-    fn lseek(&mut self, fd: i32, offset: i64, whence: u32) -> Result<u64, LinuxError> {
-        let pos = match whence {
-            general::SEEK_SET => SeekFrom::Start(offset.max(0) as u64),
-            general::SEEK_CUR => SeekFrom::Current(offset),
-            general::SEEK_END => SeekFrom::End(offset),
-            _ => return Err(LinuxError::EINVAL),
-        };
-        match self.entry_mut(fd)? {
-            FdEntry::File(file) => file.file.seek(pos).map_err(LinuxError::from),
-            FdEntry::DevNull => Ok(0),
-            FdEntry::Rtc => Ok(0),
-            FdEntry::Directory(_) => Err(LinuxError::EISDIR),
-            FdEntry::Path(_) => Err(LinuxError::EBADF),
-            FdEntry::MemoryFile(file) => file.seek(pos),
-            FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
-            FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
-            _ => Err(LinuxError::ESPIPE),
-        }
-    }
-
-    fn dup(&mut self, fd: i32) -> Result<i32, LinuxError> {
-        self.dup_min(fd, 0)
-    }
-
-    fn dup_min(&mut self, fd: i32, min_fd: i32) -> Result<i32, LinuxError> {
-        self.dup_min_with_flags(fd, min_fd, 0)
-    }
-
-    fn dup_min_with_flags(
-        &mut self,
-        fd: i32,
-        min_fd: i32,
-        fd_flags: u32,
-    ) -> Result<i32, LinuxError> {
-        if min_fd < 0 {
-            return Err(LinuxError::EINVAL);
-        }
-        let entry = self.entry(fd)?.duplicate_for_fork()?;
-        self.insert_min_with_flags(entry, min_fd as usize, fd_flags & general::FD_CLOEXEC)
-    }
-
-    fn dup3(&mut self, oldfd: i32, newfd: i32, flags: u32) -> Result<i32, LinuxError> {
-        if oldfd == newfd {
-            return Err(LinuxError::EINVAL);
-        }
-        if flags & !general::O_CLOEXEC != 0 {
-            return Err(LinuxError::EINVAL);
-        }
-        let entry = self.entry(oldfd)?.duplicate_for_fork()?;
-        if newfd < 0 {
-            return Err(LinuxError::EBADF);
-        }
-        let newfd = newfd as usize;
-        if self.entries.len() <= newfd {
-            self.entries.resize_with(newfd + 1, || None);
-            self.fd_flags.resize(newfd + 1, 0);
-        } else if self.entries[newfd].is_some() {
-            let _ = self.close(newfd as i32);
-        }
-        if self.fd_flags.len() <= newfd {
-            self.fd_flags.resize(newfd + 1, 0);
-        }
-        self.entries[newfd] = Some(entry);
-        self.fd_flags[newfd] = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
-        Ok(newfd as i32)
-    }
-
-    fn getdents64(&mut self, fd: i32, max_len: usize) -> Result<Vec<u8>, LinuxError> {
-        let entry = self.entry_mut(fd)?;
-        let FdEntry::Directory(dir) = entry else {
-            return Err(LinuxError::ENOTDIR);
-        };
-        let mut read_buf: [fops::DirEntry; 16] =
-            core::array::from_fn(|_| fops::DirEntry::default());
-        let count = dir.dir.read_dir(&mut read_buf).map_err(LinuxError::from)?;
-        let mut out = Vec::new();
-        for (idx, item) in read_buf[..count].iter().enumerate() {
-            let name = item.name_as_bytes();
-            let reclen = align_up(
-                offset_of!(general::linux_dirent64, d_name) + name.len() + 1,
-                8,
-            );
-            if out.len() + reclen > max_len {
-                break;
-            }
-            let start = out.len();
-            out.resize(start + reclen, 0);
-            unsafe {
-                let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
-                ptr::write_unaligned(
-                    dirent,
-                    general::linux_dirent64 {
-                        d_ino: (idx + 1) as _,
-                        d_off: 0,
-                        d_reclen: reclen as _,
-                        d_type: dirent_type(item.entry_type()) as u8,
-                        d_name: Default::default(),
-                    },
-                );
-            }
-            let name_start = start + offset_of!(general::linux_dirent64, d_name);
-            out[name_start..name_start + name.len()].copy_from_slice(name);
-        }
-        Ok(out)
-    }
-
-    fn read_file_at(&mut self, fd: i32, offset: u64, len: usize) -> Result<Vec<u8>, LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return Err(LinuxError::EBADF);
-        };
-        let mut buf = vec![0u8; len];
-        let filled = read_file_at_into(&file.file, offset, &mut buf)?;
-        buf.truncate(filled);
-        Ok(buf)
-    }
-
-    fn insert_with_flags(&mut self, entry: FdEntry, fd_flags: u32) -> Result<i32, LinuxError> {
-        self.insert_min_with_flags(entry, 0, fd_flags)
-    }
-
-    fn insert_min_with_flags(
-        &mut self,
-        entry: FdEntry,
-        min_fd: usize,
-        fd_flags: u32,
-    ) -> Result<i32, LinuxError> {
-        if self.entries.len() < min_fd {
-            self.entries.resize_with(min_fd, || None);
-            self.fd_flags.resize(min_fd, 0);
-        }
-        if self.fd_flags.len() < self.entries.len() {
-            self.fd_flags.resize(self.entries.len(), 0);
-        }
-        if let Some((idx, slot)) = self
-            .entries
-            .iter_mut()
-            .enumerate()
-            .skip(min_fd)
-            .find(|(_, slot)| slot.is_none())
-        {
-            *slot = Some(entry);
-            self.fd_flags[idx] = fd_flags & general::FD_CLOEXEC;
-            return Ok(idx as i32);
-        }
-        self.entries.push(Some(entry));
-        self.fd_flags.push(fd_flags & general::FD_CLOEXEC);
-        Ok((self.entries.len() - 1) as i32)
-    }
-
-    fn get_fd_flags(&self, fd: i32) -> Result<i32, LinuxError> {
-        self.entry(fd)?;
-        Ok(self.fd_flags.get(fd as usize).copied().unwrap_or(0) as i32)
-    }
-
-    fn set_fd_flags(&mut self, fd: i32, flags: u32) -> Result<i32, LinuxError> {
-        self.entry(fd)?;
-        let idx = fd as usize;
-        if self.fd_flags.len() <= idx {
-            self.fd_flags.resize(idx + 1, 0);
-        }
-        self.fd_flags[idx] = flags & general::FD_CLOEXEC;
-        Ok(0)
-    }
-
-    fn entry(&self, fd: i32) -> Result<&FdEntry, LinuxError> {
-        self.entries
-            .get(fd as usize)
-            .and_then(|entry| entry.as_ref())
-            .ok_or(LinuxError::EBADF)
-    }
-
-    fn entry_mut(&mut self, fd: i32) -> Result<&mut FdEntry, LinuxError> {
-        self.entries
-            .get_mut(fd as usize)
-            .and_then(|entry| entry.as_mut())
-            .ok_or(LinuxError::EBADF)
     }
 }
 
