@@ -58,9 +58,9 @@ use fd_socket::{
     write_socket_addr_to_user,
 };
 use fd_table::{
-    FdEntry, FdTable, open_dir_entry, read_file_at_into, resolve_dirfd_path, sys_close, sys_dup,
-    sys_dup3, sys_fchdir, sys_fcntl, sys_fsync, sys_ftruncate, sys_getdents64, sys_ioctl,
-    sys_lseek,
+    FdEntry, FdTable, read_file_at_into, resolve_dirfd_path, sys_chdir, sys_close, sys_dup,
+    sys_dup3, sys_fchdir, sys_fcntl, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64,
+    sys_ioctl, sys_lseek,
 };
 use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
@@ -77,7 +77,7 @@ use resource_sched::{
     sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setparam, sys_sched_setscheduler,
     sys_sched_yield,
 };
-use runtime_paths::{current_cwd, resolve_host_path};
+use runtime_paths::current_cwd;
 use select_fdset::{SelectMode, poll_fd_set, read_fd_set, read_pselect_deadline, write_fd_set};
 use signal_abi::validate_signal_target;
 #[cfg(target_arch = "riscv64")]
@@ -1437,31 +1437,6 @@ fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: usize) -> isi
         }
     }
     total
-}
-
-fn sys_getcwd(process: &UserProcess, buf: usize, size: usize) -> isize {
-    let cwd = process.cwd();
-    let mut bytes = cwd.into_bytes();
-    bytes.push(0);
-    if bytes.len() > size {
-        return neg_errno(LinuxError::ERANGE);
-    }
-    write_user_bytes(process, buf, &bytes)
-        .map_or_else(|err| neg_errno(err), |_| bytes.len() as isize)
-}
-
-fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
-    let path = read_cstr_or_return!(process, pathname);
-    let cwd = process.cwd();
-    let abs_path = match resolve_host_path(cwd, path.as_str()) {
-        Ok(path) => path,
-        Err(_) => return neg_errno(LinuxError::EINVAL),
-    };
-    if open_dir_entry(abs_path.as_str()).is_err() {
-        return neg_errno(LinuxError::ENOENT);
-    }
-    process.set_cwd(abs_path);
-    0
 }
 
 fn sys_execve(

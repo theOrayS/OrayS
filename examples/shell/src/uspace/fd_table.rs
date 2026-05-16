@@ -36,7 +36,7 @@ use super::synthetic_fs::{
 };
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
-use super::user_memory::{validate_user_write, write_user_bytes, write_user_value};
+use super::user_memory::{read_cstr, validate_user_write, write_user_bytes, write_user_value};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -177,6 +177,34 @@ pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
         Ok(_) => 0,
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn sys_getcwd(process: &UserProcess, buf: usize, size: usize) -> isize {
+    let cwd = process.cwd();
+    let mut bytes = cwd.into_bytes();
+    bytes.push(0);
+    if bytes.len() > size {
+        return neg_errno(LinuxError::ERANGE);
+    }
+    write_user_bytes(process, buf, &bytes)
+        .map_or_else(|err| neg_errno(err), |_| bytes.len() as isize)
+}
+
+pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let cwd = process.cwd();
+    let abs_path = match resolve_host_path(cwd, path.as_str()) {
+        Ok(path) => path,
+        Err(_) => return neg_errno(LinuxError::EINVAL),
+    };
+    if open_dir_entry(abs_path.as_str()).is_err() {
+        return neg_errno(LinuxError::ENOENT);
+    }
+    process.set_cwd(abs_path);
+    0
 }
 
 pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
