@@ -50,7 +50,7 @@ use credentials::{
     sys_setfsgid, sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid,
     sys_setresuid, sys_setreuid, sys_setuid,
 };
-use fd_pipe::PipeEndpoint;
+use fd_pipe::sys_pipe2;
 use fd_socket::{
     insert_local_socket_entry, insert_socket_entry, is_local_socket_fd, read_socket_addr_from_user,
     read_socket_data_from_user, recv_socket_data_to_user, recv_socket_data_to_user_with_addr,
@@ -1292,31 +1292,6 @@ fn sys_pwrite64(
             .lock()
             .write_file_at(fd as i32, offset as u64, src)
     })
-}
-
-fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
-    let flags = flags as u32;
-    if flags & !general::O_CLOEXEC != 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
-    let (read_end, write_end) = PipeEndpoint::new_pair();
-    let fds = {
-        let mut table = process.fds.lock();
-        let read_fd = match table.insert_with_flags(FdEntry::Pipe(read_end), fd_flags) {
-            Ok(fd) => fd,
-            Err(err) => return neg_errno(err),
-        };
-        let write_fd = match table.insert_with_flags(FdEntry::Pipe(write_end), fd_flags) {
-            Ok(fd) => fd,
-            Err(err) => {
-                let _ = table.close(read_fd);
-                return neg_errno(err);
-            }
-        };
-        [read_fd, write_fd]
-    };
-    write_user_value(process, pipefd, &fds)
 }
 
 fn sys_pselect6(

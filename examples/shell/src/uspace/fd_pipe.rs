@@ -4,6 +4,11 @@ use axsync::Mutex;
 use linux_raw_sys::general;
 use std::sync::Arc;
 
+use super::fd_table::FdEntry;
+use super::linux_abi::fd_cloexec_flag;
+use super::user_memory::write_user_value;
+use super::{UserProcess, neg_errno};
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum RingBufferStatus {
     Full,
@@ -167,4 +172,29 @@ impl PipeEndpoint {
             writable: self.writable() && (ring.available_write() > 0 || self.peer_closed()),
         }
     }
+}
+
+pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
+    let flags = flags as u32;
+    if flags & !general::O_CLOEXEC != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
+    let (read_end, write_end) = PipeEndpoint::new_pair();
+    let fds = {
+        let mut table = process.fds.lock();
+        let read_fd = match table.insert_with_flags(FdEntry::Pipe(read_end), fd_flags) {
+            Ok(fd) => fd,
+            Err(err) => return neg_errno(err),
+        };
+        let write_fd = match table.insert_with_flags(FdEntry::Pipe(write_end), fd_flags) {
+            Ok(fd) => fd,
+            Err(err) => {
+                let _ = table.close(read_fd);
+                return neg_errno(err);
+            }
+        };
+        [read_fd, write_fd]
+    };
+    write_user_value(process, pipefd, &fds)
 }
