@@ -3,7 +3,7 @@ use core::mem::offset_of;
 use core::ptr;
 
 use axerrno::LinuxError;
-use axfs::fops::{self, Directory, File, FileAttr};
+use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
 use linux_raw_sys::general;
 use std::string::{String, ToString};
@@ -24,9 +24,16 @@ use super::metadata::{
     fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
     stdio_stat,
 };
-use super::runtime_paths::{normalize_path, resolve_host_path};
+use super::runtime_paths::{
+    busybox_applet_target_path, normalize_path, push_runtime_candidate, resolve_host_path,
+    runtime_absolute_path_candidates, runtime_library_name_candidates,
+};
 use super::select_fdset::SelectMode;
-use super::{directory_create_dir, directory_remove_dir, directory_remove_file, open_fd_entry};
+use super::synthetic_fs::{
+    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_self_maps_fd_entry,
+    proc_self_maps_is_writable_open, proc_self_maps_path_entry, synthetic_file_is_writable_open,
+    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
+};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -810,4 +817,254 @@ impl FdEntry {
             Self::LocalSocket(socket) => Ok(Self::LocalSocket(socket.duplicate())),
         }
     }
+}
+
+fn open_fd_entry(
+    process: &UserProcess,
+    table: &FdTable,
+    dirfd: i32,
+    path: &str,
+    flags: u32,
+    mode: u32,
+) -> Result<FdEntry, LinuxError> {
+    let mut opts = OpenOptions::new();
+    let access = flags & general::O_ACCMODE;
+    if access == general::O_WRONLY {
+        opts.write(true);
+    } else if access == general::O_RDWR {
+        opts.read(true);
+        opts.write(true);
+    } else {
+        opts.read(true);
+    }
+    if flags & general::O_APPEND != 0 {
+        opts.append(true);
+    }
+    if flags & general::O_TRUNC != 0 {
+        opts.truncate(true);
+    }
+    if flags & general::O_CREAT != 0 {
+        opts.create(true);
+    }
+    if flags & general::O_EXCL != 0 {
+        opts.create_new(true);
+    }
+
+    let absolute = path.starts_with('/');
+    let exec_root = process.exec_root();
+    let add_busybox_aliases = busybox_applet_alias_allowed(flags, access);
+
+    if absolute || dirfd == general::AT_FDCWD {
+        let mut candidates = if absolute {
+            if let Some(path) = dev_shm_host_path(path) {
+                ensure_dev_shm_dir()?;
+                return open_candidates(process, &[path], &opts, flags, mode);
+            }
+            runtime_absolute_path_candidates(exec_root.as_str(), path)
+        } else {
+            let cwd = process.cwd();
+            let primary = normalize_path(cwd.as_str(), path).ok_or(LinuxError::EINVAL)?;
+            let mut candidates = vec![primary];
+            for extra in runtime_library_name_candidates(exec_root.as_str(), path) {
+                push_runtime_candidate(&mut candidates, Some(extra));
+            }
+            candidates
+        };
+        if add_busybox_aliases {
+            append_busybox_applet_alias_candidates(&mut candidates);
+        }
+        if candidates.is_empty() {
+            return Err(LinuxError::EINVAL);
+        }
+        open_candidates(process, &candidates, &opts, flags, mode)
+    } else {
+        let FdEntry::Directory(dir) = table.entry(dirfd)? else {
+            return Err(LinuxError::ENOTDIR);
+        };
+        let primary = normalize_path(dir.path.as_str(), path).ok_or(LinuxError::EINVAL)?;
+        let mut candidates = vec![primary];
+        for extra in runtime_library_name_candidates(exec_root.as_str(), path) {
+            push_runtime_candidate(&mut candidates, Some(extra));
+        }
+        if add_busybox_aliases {
+            append_busybox_applet_alias_candidates(&mut candidates);
+        }
+        open_candidates(process, &candidates, &opts, flags, mode)
+    }
+}
+
+fn busybox_applet_alias_allowed(flags: u32, access: u32) -> bool {
+    access != general::O_WRONLY
+        && access != general::O_RDWR
+        && flags & (general::O_CREAT | general::O_TRUNC | general::O_APPEND) == 0
+}
+
+fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {
+    for candidate in candidates.clone() {
+        push_runtime_candidate(candidates, busybox_applet_target_path(candidate.as_str()));
+    }
+}
+
+fn open_candidates(
+    process: &UserProcess,
+    candidates: &[String],
+    opts: &OpenOptions,
+    flags: u32,
+    mode: u32,
+) -> Result<FdEntry, LinuxError> {
+    let prefer_dir = flags & general::O_DIRECTORY != 0;
+    let path_only = flags & O_PATH_FLAG != 0;
+    let mut path_opts = OpenOptions::new();
+    if path_only {
+        path_opts.read(true);
+    }
+    let file_opts = if path_only { &path_opts } else { opts };
+    let mut last_err = LinuxError::ENOENT;
+    for path in candidates {
+        if is_proc_self_maps_path(path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && proc_self_maps_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(if path_only {
+                proc_self_maps_path_entry(process)
+            } else {
+                proc_self_maps_fd_entry(process)
+            });
+        }
+        if let Some((synthetic_path, data)) = synthetic_userdb_content(path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(if path_only {
+                synthetic_userdb_path_entry(synthetic_path, data)
+            } else {
+                synthetic_userdb_fd_entry(synthetic_path, data)
+            });
+        }
+        if path == "/dev/null" {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_char("/dev/null"))
+            } else {
+                FdEntry::DevNull
+            });
+        }
+        if path == "/dev/misc/rtc" || path == "/dev/rtc" {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_char(path.as_str()))
+            } else {
+                FdEntry::Rtc
+            });
+        }
+        if prefer_dir {
+            match open_dir_entry(path.as_str()) {
+                Ok(FdEntry::Directory(dir)) if path_only => {
+                    return Ok(path_entry_from_directory(dir));
+                }
+                Ok(entry) if !path_only => return Ok(entry),
+                Ok(_) => return Err(LinuxError::EINVAL),
+                Err(err) => record_missing_candidate(&mut last_err, err)?,
+            }
+            continue;
+        }
+        let created_by_this_open = !path_only
+            && flags & general::O_CREAT != 0
+            && axfs::api::metadata(path.as_str()).is_err();
+        match File::open(path.as_str(), file_opts) {
+            Ok(file) if path_only => {
+                let attr = file.get_attr().map_err(LinuxError::from)?;
+                return Ok(FdEntry::Path(PathEntry::from_attr(path.as_str(), &attr)));
+            }
+            Ok(file) => {
+                if created_by_this_open {
+                    process.set_path_mode(path.clone(), mode);
+                    process.set_path_owner(path.clone(), Some(process.uid()), Some(process.gid()));
+                }
+                return Ok(FdEntry::File(FileEntry {
+                    file,
+                    path: path.clone(),
+                }));
+            }
+            Err(err) => {
+                let err = LinuxError::from(err);
+                if err == LinuxError::EISDIR {
+                    return match open_dir_entry(path.as_str())? {
+                        FdEntry::Directory(dir) if path_only => Ok(path_entry_from_directory(dir)),
+                        entry if !path_only => Ok(entry),
+                        _ => Err(LinuxError::EINVAL),
+                    };
+                }
+                record_missing_candidate(&mut last_err, err)?;
+            }
+        }
+    }
+    Err(last_err)
+}
+
+fn path_entry_from_directory(dir: DirectoryEntry) -> FdEntry {
+    FdEntry::Path(PathEntry::from_attr(dir.path.as_str(), &dir.attr))
+}
+
+fn record_missing_candidate(last_err: &mut LinuxError, err: LinuxError) -> Result<(), LinuxError> {
+    *last_err = err;
+    if err == LinuxError::ENOENT {
+        Ok(())
+    } else {
+        Err(err)
+    }
+}
+
+pub(super) fn open_dir_entry(path: &str) -> Result<FdEntry, LinuxError> {
+    let mut opts = OpenOptions::new();
+    opts.read(true);
+    let dir = Directory::open_dir(path, &opts).map_err(LinuxError::from)?;
+    let file = File::open(path, &opts).map_err(LinuxError::from)?;
+    let attr = file.get_attr().map_err(LinuxError::from)?;
+    Ok(FdEntry::Directory(DirectoryEntry {
+        dir,
+        attr,
+        path: path.into(),
+    }))
+}
+
+fn directory_create_dir(path: &str) -> Result<(), LinuxError> {
+    axfs::api::create_dir(path).map_err(LinuxError::from)
+}
+
+fn directory_remove_file(path: &str) -> Result<(), LinuxError> {
+    axfs::api::remove_file(path).map_err(LinuxError::from)
+}
+
+fn directory_remove_dir(path: &str) -> Result<(), LinuxError> {
+    axfs::api::remove_dir(path).map_err(LinuxError::from)
+}
+
+pub(super) fn resolve_dirfd_path(
+    process: &UserProcess,
+    table: &FdTable,
+    dirfd: i32,
+    path: &str,
+) -> Result<String, LinuxError> {
+    if path.starts_with('/') {
+        return normalize_path("/", path).ok_or(LinuxError::EINVAL);
+    }
+    if dirfd == general::AT_FDCWD {
+        let cwd = process.cwd();
+        return normalize_path(cwd.as_str(), path).ok_or(LinuxError::EINVAL);
+    }
+    let FdEntry::Directory(dir) = table.entry(dirfd)? else {
+        return Err(LinuxError::ENOTDIR);
+    };
+    normalize_path(dir.path.as_str(), path).ok_or(LinuxError::EINVAL)
 }
