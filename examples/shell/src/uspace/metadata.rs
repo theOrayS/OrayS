@@ -1,4 +1,5 @@
 use axalloc::global_allocator;
+use axerrno::LinuxError;
 use axfs::fops::{FileAttr, FileType};
 use linux_raw_sys::general;
 use std::string::String;
@@ -8,8 +9,11 @@ use super::fd_table::FdEntry;
 use super::linux_abi::{
     DEVFS_MAGIC, FILE_MODE_PERMISSION_MASK, PIPEFS_MAGIC, PROC_SUPER_MAGIC, ST_MODE_CHR,
     ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC,
+    neg_errno,
 };
+use super::runtime_paths::normalize_path;
 use super::synthetic_fs::dev_shm_host_path;
+use super::user_memory::{read_cstr, write_user_value};
 
 pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general::stat {
     let st_mode = file_type_mode(attr.file_type()) | attr.perm().bits() as u32;
@@ -142,4 +146,147 @@ pub(super) fn file_type_mode(ty: FileType) -> u32 {
         FileType::CharDevice => ST_MODE_CHR,
         _ => ST_MODE_FILE,
     }
+}
+
+pub(super) fn sys_newfstatat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    statbuf: usize,
+    _flags: usize,
+) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let st = match process
+        .fds
+        .lock()
+        .stat_path(process, dirfd as i32, path.as_str())
+    {
+        Ok(st) => st,
+        Err(err) => return neg_errno(err),
+    };
+    write_user_value(process, statbuf, &st)
+}
+
+pub(super) fn sys_fstat(process: &UserProcess, fd: usize, statbuf: usize) -> isize {
+    let st = match process
+        .fds
+        .lock()
+        .stat_with_recorded_path(process, fd as i32)
+    {
+        Ok((_, st)) => st,
+        Err(err) => return neg_errno(err),
+    };
+    write_user_value(process, statbuf, &st)
+}
+
+fn stat_to_statx(st: general::stat) -> general::statx {
+    let mut stx: general::statx = unsafe { core::mem::zeroed() };
+    stx.stx_mask = general::STATX_BASIC_STATS;
+    stx.stx_blksize = st.st_blksize as _;
+    stx.stx_nlink = st.st_nlink as _;
+    stx.stx_uid = st.st_uid as _;
+    stx.stx_gid = st.st_gid as _;
+    stx.stx_mode = st.st_mode as _;
+    stx.stx_ino = st.st_ino as _;
+    stx.stx_size = st.st_size as _;
+    stx.stx_blocks = st.st_blocks as _;
+    stx.stx_attributes_mask = 0;
+    stx.stx_dev_major = ((st.st_dev as u64) >> 8) as _;
+    stx.stx_dev_minor = ((st.st_dev as u64) & 0xff) as _;
+    stx.stx_rdev_major = ((st.st_rdev as u64) >> 8) as _;
+    stx.stx_rdev_minor = ((st.st_rdev as u64) & 0xff) as _;
+    stx
+}
+
+pub(super) fn sys_statx(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    flags: usize,
+    statxbuf: usize,
+) -> isize {
+    if statxbuf == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let flags = flags as u32;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let st = if pathname == 0 {
+        if flags & general::AT_EMPTY_PATH == 0 {
+            return neg_errno(LinuxError::EFAULT);
+        }
+        match process
+            .fds
+            .lock()
+            .stat_with_recorded_path(process, dirfd as i32)
+        {
+            Ok((_, st)) => st,
+            Err(err) => return neg_errno(err),
+        }
+    } else {
+        let path = match read_cstr(process, pathname) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
+        if path.is_empty() && flags & general::AT_EMPTY_PATH != 0 {
+            match process
+                .fds
+                .lock()
+                .stat_with_recorded_path(process, dirfd as i32)
+            {
+                Ok((_, st)) => st,
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            match process
+                .fds
+                .lock()
+                .stat_path(process, dirfd as i32, path.as_str())
+            {
+                Ok(st) => st,
+                Err(err) => return neg_errno(err),
+            }
+        }
+    };
+    write_user_value(process, statxbuf, &stat_to_statx(st))
+}
+
+pub(super) fn sys_statfs(process: &UserProcess, pathname: usize, statfsbuf: usize) -> isize {
+    if statfsbuf == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let cwd = process.cwd();
+    let Some(abs_path) = normalize_path(cwd.as_str(), path.as_str()) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    let st = match process
+        .fds
+        .lock()
+        .statfs_path(process, general::AT_FDCWD, abs_path.as_str())
+    {
+        Ok(st) => st,
+        Err(err) => return neg_errno(err),
+    };
+    write_user_value(process, statfsbuf, &st)
+}
+
+pub(super) fn sys_fstatfs(process: &UserProcess, fd: usize, statfsbuf: usize) -> isize {
+    if statfsbuf == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let st = match process.fds.lock().statfs(fd as i32) {
+        Ok(st) => st,
+        Err(err) => return neg_errno(err),
+    };
+    write_user_value(process, statfsbuf, &st)
 }
