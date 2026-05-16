@@ -83,10 +83,7 @@ use signal_abi::{
     riscv_signal_frame_size, trap_frame_to_riscv_sigcontext,
 };
 use synthetic_fs::proc_exe_link_target;
-use system_info::{
-    SyslogAction, syslog_action, syslog_empty_read_bytes, write_default_rusage,
-    write_default_utsname, write_default_winsize,
-};
+use system_info::{sys_getrusage, sys_syslog, sys_uname, write_default_winsize};
 use task_context::{
     UserTaskExt, child_trap_frame, current_process, current_task_ext, current_tid,
     fixup_riscv_clone_child_return, make_uspace_context, robust_list_for_task,
@@ -2823,32 +2820,6 @@ fn sys_times(process: &UserProcess, buf: usize) -> isize {
     let tms = default_tms();
     return_on_user_write_error!(process, buf, &tms);
     times_ticks()
-}
-
-fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: usize) -> isize {
-    match syslog_action(log_type) {
-        SyslogAction::EmptyRead => {
-            if let Some(bytes) = syslog_empty_read_bytes(buf, len) {
-                if let Err(err) = validate_user_write(process, buf, len) {
-                    return neg_errno(err);
-                }
-                if let Err(err) = write_user_bytes(process, buf, bytes) {
-                    return neg_errno(err);
-                }
-            }
-            0
-        }
-        SyslogAction::SizeBuffer | SyslogAction::ConsoleControl => 0,
-        SyslogAction::Invalid => neg_errno(LinuxError::EINVAL),
-    }
-}
-
-fn sys_getrusage(process: &UserProcess, who: i32, usage: usize) -> isize {
-    write_default_rusage(process, who, usage)
-}
-
-fn sys_uname(process: &UserProcess, buf: usize) -> isize {
-    write_default_utsname(process, buf)
 }
 
 fn sys_nanosleep(process: &UserProcess, req: usize, rem: usize) -> isize {

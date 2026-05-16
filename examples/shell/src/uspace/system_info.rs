@@ -3,7 +3,7 @@ use core::cmp;
 use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
-use super::user_memory::write_user_value;
+use super::user_memory::{validate_user_write, write_user_bytes, write_user_value};
 use super::{UserProcess, neg_errno};
 
 pub(super) enum SyslogAction {
@@ -89,6 +89,32 @@ fn default_utsname() -> system::new_utsname {
 pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize {
     let value = default_utsname();
     write_user_value(process, buf, &value)
+}
+
+pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: usize) -> isize {
+    match syslog_action(log_type) {
+        SyslogAction::EmptyRead => {
+            if let Some(bytes) = syslog_empty_read_bytes(buf, len) {
+                if let Err(err) = validate_user_write(process, buf, len) {
+                    return neg_errno(err);
+                }
+                if let Err(err) = write_user_bytes(process, buf, bytes) {
+                    return neg_errno(err);
+                }
+            }
+            0
+        }
+        SyslogAction::SizeBuffer | SyslogAction::ConsoleControl => 0,
+        SyslogAction::Invalid => neg_errno(LinuxError::EINVAL),
+    }
+}
+
+pub(super) fn sys_getrusage(process: &UserProcess, who: i32, usage: usize) -> isize {
+    write_default_rusage(process, who, usage)
+}
+
+pub(super) fn sys_uname(process: &UserProcess, buf: usize) -> isize {
+    write_default_utsname(process, buf)
 }
 
 trait CCharSlot: Copy {
