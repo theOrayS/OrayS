@@ -16,7 +16,7 @@ use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
     ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE,
-    ST_MODE_TYPE_MASK, fd_cloexec_flag, posix_ret_i32,
+    ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -34,6 +34,7 @@ use super::synthetic_fs::{
     proc_self_maps_is_writable_open, proc_self_maps_path_entry, synthetic_file_is_writable_open,
     synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
+use super::user_memory::{validate_user_write, write_user_bytes};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -99,6 +100,74 @@ pub(super) fn read_file_at_into(
         filled += read;
     }
     Ok(filled)
+}
+
+pub(super) fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> isize {
+    let length = length as isize;
+    if length < 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    match process.fds.lock().truncate(fd as i32, length as u64) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
+    match process.fds.lock().close(fd as i32) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_getdents64(process: &UserProcess, fd: usize, dirp: usize, count: usize) -> isize {
+    if let Err(err) = validate_user_write(process, dirp, count) {
+        return neg_errno(err);
+    }
+    let bytes = match process.fds.lock().getdents64(fd as i32, count) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    if let Err(err) = write_user_bytes(process, dirp, &bytes) {
+        return neg_errno(err);
+    }
+    bytes.len() as isize
+}
+
+pub(super) fn sys_lseek(process: &UserProcess, fd: usize, offset: usize, whence: usize) -> isize {
+    match process
+        .fds
+        .lock()
+        .lseek(fd as i32, offset as isize as i64, whence as u32)
+    {
+        Ok(v) => v as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_dup(process: &UserProcess, fd: usize) -> isize {
+    match process.fds.lock().dup(fd as i32) {
+        Ok(new_fd) => new_fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_dup3(process: &UserProcess, oldfd: usize, newfd: usize, flags: usize) -> isize {
+    match process
+        .fds
+        .lock()
+        .dup3(oldfd as i32, newfd as i32, flags as u32)
+    {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize) -> isize {
+    match process.fds.lock().fcntl(fd as i32, cmd as u32, arg) {
+        Ok(v) => v as isize,
+        Err(err) => neg_errno(err),
+    }
 }
 
 impl FdTable {

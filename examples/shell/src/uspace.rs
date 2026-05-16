@@ -58,7 +58,10 @@ use fd_socket::{
     socket_addr_call, socket_entry, socket_name_bridge, socket_option_supported,
     write_socket_addr_to_user,
 };
-use fd_table::{FdEntry, FdTable, open_dir_entry, read_file_at_into, resolve_dirfd_path};
+use fd_table::{
+    FdEntry, FdTable, open_dir_entry, read_file_at_into, resolve_dirfd_path, sys_close, sys_dup,
+    sys_dup3, sys_fcntl, sys_ftruncate, sys_getdents64, sys_lseek,
+};
 use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
@@ -1983,17 +1986,6 @@ fn sys_fchownat(
     apply_chown_metadata(process, record_path, &st, owner, group)
 }
 
-fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> isize {
-    let length = length as isize;
-    if length < 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    match process.fds.lock().truncate(fd as i32, length as u64) {
-        Ok(()) => 0,
-        Err(err) => neg_errno(err),
-    }
-}
-
 fn sys_utimensat(
     process: &UserProcess,
     dirfd: usize,
@@ -2053,63 +2045,6 @@ fn sys_renameat2(
     match axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()) {
         Ok(()) => 0,
         Err(err) => neg_errno(LinuxError::from(err)),
-    }
-}
-
-fn sys_close(process: &UserProcess, fd: usize) -> isize {
-    match process.fds.lock().close(fd as i32) {
-        Ok(()) => 0,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_getdents64(process: &UserProcess, fd: usize, dirp: usize, count: usize) -> isize {
-    if let Err(err) = validate_user_write(process, dirp, count) {
-        return neg_errno(err);
-    }
-    let bytes = match process.fds.lock().getdents64(fd as i32, count) {
-        Ok(bytes) => bytes,
-        Err(err) => return neg_errno(err),
-    };
-    if let Err(err) = write_user_bytes(process, dirp, &bytes) {
-        return neg_errno(err);
-    }
-    bytes.len() as isize
-}
-
-fn sys_lseek(process: &UserProcess, fd: usize, offset: usize, whence: usize) -> isize {
-    match process
-        .fds
-        .lock()
-        .lseek(fd as i32, offset as isize as i64, whence as u32)
-    {
-        Ok(v) => v as isize,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_dup(process: &UserProcess, fd: usize) -> isize {
-    match process.fds.lock().dup(fd as i32) {
-        Ok(new_fd) => new_fd as isize,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_dup3(process: &UserProcess, oldfd: usize, newfd: usize, flags: usize) -> isize {
-    match process
-        .fds
-        .lock()
-        .dup3(oldfd as i32, newfd as i32, flags as u32)
-    {
-        Ok(fd) => fd as isize,
-        Err(err) => neg_errno(err),
-    }
-}
-
-fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize) -> isize {
-    match process.fds.lock().fcntl(fd as i32, cmd as u32, arg) {
-        Ok(v) => v as isize,
-        Err(err) => neg_errno(err),
     }
 }
 
