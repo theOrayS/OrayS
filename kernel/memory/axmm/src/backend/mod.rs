@@ -1,15 +1,22 @@
 //! Memory mapping backends.
 
+use ::alloc::collections::BTreeMap;
+use ::alloc::sync::Arc;
 use axhal::paging::{MappingFlags, PageTable};
-use memory_addr::VirtAddr;
+use kspin::SpinNoIrq;
+use memory_addr::{PhysAddr, VirtAddr};
 use memory_set::MappingBackend;
 
 mod alloc;
 mod linear;
 
+pub(crate) use self::alloc::retain_shared_frame;
+
+pub(crate) type SharedPages = Arc<SpinNoIrq<BTreeMap<usize, (PhysAddr, MappingFlags)>>>;
+
 /// A unified enum type for different memory mapping backends.
 ///
-/// Currently, two backends are implemented:
+/// Currently, three backends are implemented:
 ///
 /// - **Linear**: used for linear mappings. The target physical frames are
 ///   contiguous and their addresses should be known when creating the mapping.
@@ -36,6 +43,11 @@ pub enum Backend {
         /// Whether to populate the physical frames when creating the mapping.
         populate: bool,
     },
+    /// Shared physical mappings owned by another address space.
+    Shared {
+        pages: SharedPages,
+        alloc_missing: bool,
+    },
 }
 
 impl MappingBackend for Backend {
@@ -46,6 +58,7 @@ impl MappingBackend for Backend {
         match *self {
             Self::Linear { pa_va_offset } => self.map_linear(start, size, flags, pt, pa_va_offset),
             Self::Alloc { populate } => self.map_alloc(start, size, flags, pt, populate),
+            Self::Shared { .. } => true,
         }
     }
 
@@ -53,6 +66,7 @@ impl MappingBackend for Backend {
         match *self {
             Self::Linear { pa_va_offset } => self.unmap_linear(start, size, pt, pa_va_offset),
             Self::Alloc { populate } => self.unmap_alloc(start, size, pt, populate),
+            Self::Shared { ref pages, .. } => self.unmap_shared(start, size, pt, pages),
         }
     }
 
@@ -76,6 +90,22 @@ impl Backend {
             Self::Linear { .. } => "linear",
             Self::Alloc { populate: true } => "alloc-populate",
             Self::Alloc { populate: false } => "alloc-lazy",
+            Self::Shared { .. } => "shared",
+        }
+    }
+
+    pub(crate) fn alloc_missing_on_fault(&self) -> bool {
+        match *self {
+            Self::Alloc { .. } => true,
+            Self::Shared { alloc_missing, .. } => alloc_missing,
+            Self::Linear { .. } => false,
+        }
+    }
+
+    pub(crate) fn shared_page(&self, vaddr: VirtAddr) -> Option<(PhysAddr, MappingFlags)> {
+        match *self {
+            Self::Shared { ref pages, .. } => pages.lock().get(&vaddr.as_usize()).copied(),
+            _ => None,
         }
     }
 
@@ -90,6 +120,10 @@ impl Backend {
             Self::Alloc { populate } => {
                 self.handle_page_fault_alloc(vaddr, orig_flags, page_table, populate)
             }
+            Self::Shared {
+                ref pages,
+                alloc_missing,
+            } => self.handle_page_fault_shared(vaddr, orig_flags, page_table, pages, alloc_missing),
         }
     }
 }

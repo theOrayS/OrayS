@@ -1,15 +1,18 @@
 use core::fmt;
 
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
+
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
-use axhal::paging::{MappingFlags, PageTable};
+use axhal::paging::{MappingFlags, PageSize, PageTable};
 use axhal::trap::PageFaultFlags;
 use memory_addr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
 
-use crate::backend::Backend;
+use crate::backend::{Backend, retain_shared_frame};
 use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.
@@ -81,9 +84,11 @@ impl AddrSpace {
     ///
     /// Unlike [`Self::copy_mappings_from`], this duplicates user mappings even
     /// when the two address spaces cover the same virtual range. Allocation
-    /// backends are recreated in the destination, and currently mapped pages
-    /// are copied page-by-page.
-    pub fn clone_user_mappings_from(&mut self, other: &AddrSpace) -> AxResult {
+    /// backends are recreated in the destination. Non-writable pages are
+    /// retained as lazy shared metadata; writable resident pages are
+    /// materialized privately so fork either preserves write isolation or fails
+    /// with `NoMemory` before the child is exposed.
+    pub fn clone_user_mappings_from(&mut self, other: &mut AddrSpace) -> AxResult {
         if self.va_range != other.va_range {
             return ax_err!(InvalidInput, "address space range mismatch");
         }
@@ -91,11 +96,46 @@ impl AddrSpace {
         self.clear();
 
         for area in other.areas.iter() {
+            let mut shared_pages = BTreeMap::new();
+            let mut private_pages = Vec::new();
+            let cow_pages = area.flags().contains(MappingFlags::WRITE);
+            let alloc_missing = area.backend().alloc_missing_on_fault();
+            for vaddr in PageIter4K::new(area.start(), area.end())
+                .expect("memory area bounds must be 4K aligned")
+            {
+                let query = other.pt.query(vaddr).ok().or_else(|| {
+                    area.backend()
+                        .shared_page(vaddr)
+                        .map(|(paddr, flags)| (paddr, flags, PageSize::Size4K))
+                });
+                let Some((src_paddr, src_flags, page_size)) = query else {
+                    continue;
+                };
+                if page_size.is_huge() {
+                    warn!(
+                        "clone_user_mappings_from: huge user page is not supported area_start={:#x} area_end={:#x} vaddr={:#x} src_paddr={:#x} flags={:?} backend={}",
+                        area.start(),
+                        area.end(),
+                        vaddr,
+                        src_paddr,
+                        src_flags,
+                        area.backend().kind_name()
+                    );
+                    self.clear();
+                    return ax_err!(BadState, "failed to clone huge user page");
+                }
+                if cow_pages {
+                    private_pages.push((vaddr, src_paddr));
+                } else {
+                    shared_pages.insert(vaddr.as_usize(), (src_paddr, src_flags));
+                }
+            }
+
             let cloned_area = MemoryArea::new(
                 area.start(),
                 area.size(),
                 area.flags(),
-                area.backend().clone(),
+                Backend::new_shared(shared_pages.clone(), alloc_missing),
             );
             if let Err(err) = self.areas.map(cloned_area, &mut self.pt, false) {
                 warn!(
@@ -107,19 +147,19 @@ impl AddrSpace {
                     area.backend().kind_name(),
                     err
                 );
+                self.clear();
                 return Err(mapping_err_to_ax_err(err));
             }
 
+            for (_, (src_paddr, _)) in shared_pages {
+                retain_shared_frame(src_paddr);
+            }
+
             let fault_flags = fault_flags_from_mapping(area.flags());
-            for vaddr in PageIter4K::new(area.start(), area.end())
-                .expect("memory area bounds must be 4K aligned")
-            {
-                let Ok((src_paddr, _, _)) = other.pt.query(vaddr) else {
-                    continue;
-                };
+            for (vaddr, src_paddr) in private_pages {
                 if self.pt.query(vaddr).is_err() && !self.handle_page_fault(vaddr, fault_flags) {
                     warn!(
-                        "clone_user_mappings_from: materialize child page failed area_start={:#x} area_end={:#x} vaddr={:#x} src_paddr={:#x} flags={:?} backend={} fault_flags={:?}",
+                        "clone_user_mappings_from: materialize private child page failed area_start={:#x} area_end={:#x} vaddr={:#x} src_paddr={:#x} flags={:?} backend={} fault_flags={:?}",
                         area.start(),
                         area.end(),
                         vaddr,
@@ -128,7 +168,8 @@ impl AddrSpace {
                         area.backend().kind_name(),
                         fault_flags
                     );
-                    return ax_err!(BadState, "failed to materialize child page");
+                    self.clear();
+                    return ax_err!(NoMemory, "failed to materialize private child page");
                 }
                 let (dst_paddr, _, _) = self.pt.query(vaddr).map_err(|_| AxError::BadState)?;
                 unsafe {
@@ -290,6 +331,27 @@ impl AddrSpace {
         self.process_area_data(start, buf.len(), |dst, offset, write_size| unsafe {
             core::ptr::copy_nonoverlapping(buf.as_ptr().add(offset), dst.as_mut_ptr(), write_size);
         })
+    }
+
+    /// Populates lazy pages in the specified virtual address range.
+    pub fn populate_range(
+        &mut self,
+        start: VirtAddr,
+        size: usize,
+        access_flags: PageFaultFlags,
+    ) -> AxResult {
+        if !self.contains_range(start, size) {
+            return ax_err!(InvalidInput, "address out of range");
+        }
+        let end_align_up = (start + size).align_up_4k();
+        for vaddr in PageIter4K::new(start.align_down_4k(), end_align_up)
+            .expect("Failed to create page iterator")
+        {
+            if self.pt.query(vaddr).is_err() && !self.handle_page_fault(vaddr, access_flags) {
+                return ax_err!(BadState, "failed to populate lazy page");
+            }
+        }
+        Ok(())
     }
 
     /// Updates mapping within the specified virtual address range.
