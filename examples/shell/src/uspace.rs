@@ -61,7 +61,7 @@ use fd_socket::{
 use fd_table::{FdEntry, FdTable, open_dir_entry, read_file_at_into, resolve_dirfd_path};
 use linux_abi::*;
 use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
-use memory_policy::{validate_mempolicy_request, write_default_mempolicy};
+use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
     fd_entry_path, normalize_file_mode, sys_fstat, sys_fstatfs, sys_newfstatat, sys_statfs,
     sys_statx,
@@ -1300,34 +1300,6 @@ fn sys_pwrite64(
 fn sys_sched_yield(_tf: &TrapFrame) -> isize {
     axtask::yield_now();
     0
-}
-
-fn sys_mbind(
-    process: &UserProcess,
-    start: usize,
-    len: usize,
-    mode: usize,
-    nodemask: usize,
-    maxnode: usize,
-) -> isize {
-    let _ = (start, len, mode);
-    validate_mempolicy_request(process, nodemask, maxnode)
-}
-
-fn sys_get_mempolicy(
-    process: &UserProcess,
-    mode: usize,
-    nodemask: usize,
-    maxnode: usize,
-    _addr: usize,
-    _flags: usize,
-) -> isize {
-    write_default_mempolicy(process, mode, nodemask, maxnode)
-}
-
-fn sys_set_mempolicy(process: &UserProcess, mode: usize, nodemask: usize, maxnode: usize) -> isize {
-    let _ = mode;
-    validate_mempolicy_request(process, nodemask, maxnode)
 }
 
 fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
