@@ -4,7 +4,7 @@ use axalloc::global_allocator;
 use axerrno::LinuxError;
 use axfs::fops::{FileAttr, FileType};
 use linux_raw_sys::general;
-use std::string::String;
+use std::string::{String, ToString};
 
 use super::UserProcess;
 use super::fd_table::{FdEntry, resolve_dirfd_path};
@@ -60,6 +60,70 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::Path(path) => Some(path.path.as_str()),
         FdEntry::MemoryFile(file) => Some(file.path.as_str()),
         _ => None,
+    }
+}
+
+pub(super) fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize {
+    let path = match process.fds.lock().entry(fd as i32) {
+        Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
+        Err(err) => return neg_errno(err),
+    };
+    if let Some(path) = path {
+        process.set_path_mode(path, mode as u32);
+    }
+    0
+}
+
+pub(super) fn sys_fchmodat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    mode: usize,
+    flags: usize,
+) -> isize {
+    let flags = flags as u32;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let mode = mode as u32;
+    if path.is_empty() {
+        if flags & general::AT_EMPTY_PATH == 0 {
+            return neg_errno(LinuxError::ENOENT);
+        }
+        if dirfd as i32 == general::AT_FDCWD {
+            let cwd = process.cwd();
+            return match axfs::api::metadata(cwd.as_str()) {
+                Ok(_) => {
+                    process.set_path_mode(cwd, mode);
+                    0
+                }
+                Err(err) => neg_errno(LinuxError::from(err)),
+            };
+        }
+        return match process.fds.lock().entry(dirfd as i32) {
+            Ok(entry) => {
+                if let Some(path) = fd_entry_path(entry) {
+                    process.set_path_mode(path.to_string(), mode);
+                }
+                0
+            }
+            Err(err) => neg_errno(err),
+        };
+    }
+
+    let mut fds = process.fds.lock();
+    match fds.path_stat(process, dirfd as i32, path.as_str()) {
+        Ok((resolved_path, _)) => {
+            process.set_path_mode(resolved_path, mode);
+            0
+        }
+        Err(err) => neg_errno(err),
     }
 }
 
