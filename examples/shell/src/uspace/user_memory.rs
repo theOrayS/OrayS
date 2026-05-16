@@ -2,6 +2,7 @@ use core::mem::{MaybeUninit, size_of};
 use core::ptr;
 
 use axerrno::LinuxError;
+use axfs::fops::{File, OpenOptions};
 use axhal::paging::MappingFlags;
 use linux_raw_sys::general;
 use memory_addr::VirtAddr;
@@ -25,6 +26,47 @@ pub(super) fn validate_user_write(
     len: usize,
 ) -> Result<(), LinuxError> {
     validate_user_access(process, ptr, len, true)
+}
+
+pub(super) fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags: usize) -> isize {
+    const GRND_NONBLOCK: usize = 0x0001;
+    const GRND_RANDOM: usize = 0x0002;
+    const GRND_INSECURE: usize = 0x0004;
+    if flags & !(GRND_NONBLOCK | GRND_RANDOM | GRND_INSECURE) != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_user_write(process, buf, len) {
+        return neg_errno(err);
+    }
+
+    let mut opts = OpenOptions::new();
+    opts.read(true);
+    let mut file = match File::open("/dev/urandom", &opts) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(LinuxError::from(err)),
+    };
+
+    let mut filled = 0usize;
+    let mut chunk = [0u8; 256];
+    while filled < len {
+        let chunk_len = (len - filled).min(chunk.len());
+        let n = match file.read(&mut chunk[..chunk_len]) {
+            Ok(n) => n,
+            Err(err) => return neg_errno(LinuxError::from(err)),
+        };
+        if n == 0 {
+            break;
+        }
+        let dst = match buf.checked_add(filled) {
+            Some(dst) => dst,
+            None => return neg_errno(LinuxError::EFAULT),
+        };
+        if let Err(err) = write_user_bytes(process, dst, &chunk[..n]) {
+            return neg_errno(err);
+        }
+        filled += n;
+    }
+    filled as isize
 }
 
 fn validate_user_access(
