@@ -292,6 +292,38 @@ pub(super) fn sys_readlinkat(
     }
 }
 
+pub(super) fn sys_utimensat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    _times: usize,
+    _flags: usize,
+) -> isize {
+    if pathname == 0 {
+        let table = process.fds.lock();
+        return if table.entry(dirfd as i32).is_ok() {
+            0
+        } else {
+            neg_errno(LinuxError::EBADF)
+        };
+    }
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let abs_path = {
+        let table = process.fds.lock();
+        match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    match axfs::api::metadata(abs_path.as_str()) {
+        Ok(_) => 0,
+        Err(err) => neg_errno(LinuxError::from(err)),
+    }
+}
+
 pub(super) fn sys_statfs(process: &UserProcess, pathname: usize, statfsbuf: usize) -> isize {
     if statfsbuf == 0 {
         return neg_errno(LinuxError::EFAULT);
