@@ -5,7 +5,6 @@ use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsiz
 
 use arceos_posix_api::ctypes as posix_ctypes;
 use axerrno::LinuxError;
-use axfs::fops::{File, OpenOptions};
 use axhal::context::{TrapFrame, UspaceContext};
 use axhal::mem::virt_to_phys;
 use axhal::trap::{
@@ -104,7 +103,7 @@ use time_abi::{
 };
 use user_memory::{
     clear_user_bytes, read_cstr, read_execve_argv, read_iovec_entries, read_user_bytes,
-    read_user_value, user_io_buffer, validate_user_read, validate_user_write,
+    read_user_value, sys_getrandom, user_io_buffer, validate_user_read, validate_user_write,
     with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
 };
 
@@ -2482,47 +2481,6 @@ fn sys_getsockopt_bridge(
     return_on_user_write_error!(process, optval, &value);
     let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
     write_user_value(process, optlen, &out_len)
-}
-
-fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags: usize) -> isize {
-    const GRND_NONBLOCK: usize = 0x0001;
-    const GRND_RANDOM: usize = 0x0002;
-    const GRND_INSECURE: usize = 0x0004;
-    if flags & !(GRND_NONBLOCK | GRND_RANDOM | GRND_INSECURE) != 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    if let Err(err) = validate_user_write(process, buf, len) {
-        return neg_errno(err);
-    }
-
-    let mut opts = OpenOptions::new();
-    opts.read(true);
-    let mut file = match File::open("/dev/urandom", &opts) {
-        Ok(file) => file,
-        Err(err) => return neg_errno(LinuxError::from(err)),
-    };
-
-    let mut filled = 0usize;
-    let mut chunk = [0u8; 256];
-    while filled < len {
-        let chunk_len = (len - filled).min(chunk.len());
-        let n = match file.read(&mut chunk[..chunk_len]) {
-            Ok(n) => n,
-            Err(err) => return neg_errno(LinuxError::from(err)),
-        };
-        if n == 0 {
-            break;
-        }
-        let dst = match buf.checked_add(filled) {
-            Some(dst) => dst,
-            None => return neg_errno(LinuxError::EFAULT),
-        };
-        if let Err(err) = write_user_bytes(process, dst, &chunk[..n]) {
-            return neg_errno(err);
-        }
-        filled += n;
-    }
-    filled as isize
 }
 
 fn sys_readlinkat(
