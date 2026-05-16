@@ -73,9 +73,9 @@ use process_abi::apply_personality_request;
 use process_lifecycle::ProcessTeardown;
 use program_loader::load_program_image;
 use resource_sched::{
-    UserRlimit, default_rlimit, prlimit_target_valid, rlimit_is_valid, sys_sched_getaffinity,
-    sys_sched_getparam, sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setparam,
-    sys_sched_setscheduler,
+    UserRlimit, default_rlimit, sys_prlimit64, sys_sched_getaffinity, sys_sched_getparam,
+    sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setparam, sys_sched_setscheduler,
+    sys_sched_yield,
 };
 use runtime_paths::{current_cwd, resolve_host_path};
 use select_fdset::{SelectMode, poll_fd_set, read_fd_set, read_pselect_deadline, write_fd_set};
@@ -1295,11 +1295,6 @@ fn sys_pwrite64(
             .lock()
             .write_file_at(fd as i32, offset as u64, src)
     })
-}
-
-fn sys_sched_yield(_tf: &TrapFrame) -> isize {
-    axtask::yield_now();
-    0
 }
 
 fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
@@ -3376,36 +3371,6 @@ fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -> isize {
         );
     }
     deliver_user_signal_result(&entry, sig)
-}
-
-fn sys_prlimit64(
-    process: &UserProcess,
-    pid: i32,
-    resource: u32,
-    new_limit: usize,
-    old_limit: usize,
-) -> isize {
-    if !prlimit_target_valid(pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
-
-    if old_limit != 0 {
-        let current = process.get_rlimit(resource);
-        return_on_user_write_error!(process, old_limit, &current);
-    }
-
-    if new_limit != 0 {
-        let limit = match read_user_value::<UserRlimit>(process, new_limit) {
-            Ok(limit) => limit,
-            Err(err) => return neg_errno(err),
-        };
-        if !rlimit_is_valid(limit) {
-            return neg_errno(LinuxError::EINVAL);
-        }
-        process.set_rlimit(resource, limit);
-    }
-
-    0
 }
 
 fn sys_exit(process: &UserProcess, _tf: &TrapFrame, code: i32) -> ! {

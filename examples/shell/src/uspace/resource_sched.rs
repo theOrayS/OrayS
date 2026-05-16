@@ -2,6 +2,7 @@ use core::cmp;
 use core::mem::size_of;
 
 use axerrno::LinuxError;
+use axhal::context::TrapFrame;
 use linux_raw_sys::general;
 
 use super::linux_abi::{
@@ -77,6 +78,11 @@ pub(super) fn sched_affinity_accepts_current_cpu(first_mask_byte: u8) -> bool {
 
 pub(super) fn sched_affinity_result_len(cpusetsize: usize) -> usize {
     cmp::min(cpusetsize, size_of::<usize>())
+}
+
+pub(super) fn sys_sched_yield(_tf: &TrapFrame) -> isize {
+    axtask::yield_now();
+    0
 }
 
 pub(super) fn sys_sched_setparam(process: &UserProcess, pid: i32, param: usize) -> isize {
@@ -175,4 +181,37 @@ pub(super) fn sys_sched_getaffinity(
         return neg_errno(err);
     }
     sched_affinity_result_len(cpusetsize) as isize
+}
+
+pub(super) fn sys_prlimit64(
+    process: &UserProcess,
+    pid: i32,
+    resource: u32,
+    new_limit: usize,
+    old_limit: usize,
+) -> isize {
+    if !prlimit_target_valid(pid) {
+        return neg_errno(LinuxError::ESRCH);
+    }
+
+    if old_limit != 0 {
+        let current = process.get_rlimit(resource);
+        let ret = write_user_value(process, old_limit, &current);
+        if ret != 0 {
+            return ret;
+        }
+    }
+
+    if new_limit != 0 {
+        let limit = match read_user_value::<UserRlimit>(process, new_limit) {
+            Ok(limit) => limit,
+            Err(err) => return neg_errno(err),
+        };
+        if !rlimit_is_valid(limit) {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        process.set_rlimit(resource, limit);
+    }
+
+    0
 }
