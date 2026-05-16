@@ -97,12 +97,10 @@ use task_registry::{
     user_thread_entry_by_tid, user_thread_entry_for_process,
 };
 use time_abi::{
-    UserTimex, adjtimex_changes_clock, adjtimex_input_valid, clock_getres_timespec,
-    clock_gettime_timespec, clock_now_duration, current_timeval, default_tms,
     itimerval_to_micros_pair, micros_to_duration, micros_to_timeval, monotonic_time_micros,
-    read_timespec_duration, rtc_time_from_wall_time, set_realtime_offset_from_timespec,
-    sleep_duration, socket_duration_to_timeval, socket_timeval_to_duration, times_ticks,
-    write_default_timex, zero_timespec, zero_timezone,
+    rtc_time_from_wall_time, socket_duration_to_timeval, socket_timeval_to_duration, sys_adjtimex,
+    sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_gettimeofday,
+    sys_nanosleep, sys_times,
 };
 use user_memory::{
     clear_user_bytes, read_cstr, read_execve_argv, read_iovec_entries, read_user_bytes,
@@ -2633,73 +2631,6 @@ fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize 
     neg_errno(LinuxError::ENOTTY)
 }
 
-fn sys_clock_gettime(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
-    let ts = match clock_gettime_timespec(clk_id as u32) {
-        Ok(ts) => ts,
-        Err(err) => return neg_errno(err),
-    };
-    write_user_value(process, tp, &ts)
-}
-
-fn sys_clock_settime(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
-    if clk_id != general::CLOCK_REALTIME as usize {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let ts = match read_user_value::<general::timespec>(process, tp) {
-        Ok(ts) => ts,
-        Err(err) => return neg_errno(err),
-    };
-    if ts.tv_sec < 0 || !(0..1_000_000_000).contains(&ts.tv_nsec) {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    set_realtime_offset_from_timespec(ts);
-    0
-}
-
-fn sys_clock_getres(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
-    let ts = match clock_getres_timespec(clk_id as u32) {
-        Ok(ts) => ts,
-        Err(err) => return neg_errno(err),
-    };
-    if tp == 0 {
-        return 0;
-    }
-    write_user_value(process, tp, &ts)
-}
-
-fn sys_gettimeofday(process: &UserProcess, tv: usize, tz: usize) -> isize {
-    if tv != 0 {
-        let value = current_timeval();
-        return_on_user_write_error!(process, tv, &value);
-    }
-    if tz != 0 {
-        let value = zero_timezone();
-        return_on_user_write_error!(process, tz, &value);
-    }
-    0
-}
-
-fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
-    const TIME_OK: isize = 0;
-
-    let input = match read_user_value::<UserTimex>(process, tx) {
-        Ok(input) => input,
-        Err(err) => return neg_errno(err),
-    };
-    if !adjtimex_input_valid(input) {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    if adjtimex_changes_clock(input) && process.uid() != 0 {
-        return neg_errno(LinuxError::EPERM);
-    }
-
-    let ret = write_default_timex(process, tx);
-    if ret != 0 {
-        return ret;
-    }
-    TIME_OK
-}
-
 fn sys_setitimer(
     process: &Arc<UserProcess>,
     which: i32,
@@ -2744,52 +2675,6 @@ fn sys_setitimer(
         arm_real_itimer(process.clone(), generation, first_us, interval_us);
     }
     0
-}
-
-fn sys_times(process: &UserProcess, buf: usize) -> isize {
-    let tms = default_tms();
-    return_on_user_write_error!(process, buf, &tms);
-    times_ticks()
-}
-
-fn sys_nanosleep(process: &UserProcess, req: usize, rem: usize) -> isize {
-    let duration = match read_timespec_duration(process, req) {
-        Ok(duration) => duration,
-        Err(err) => return neg_errno(err),
-    };
-    sleep_duration(duration);
-    if rem != 0 {
-        let zero = zero_timespec();
-        return_on_user_write_error!(process, rem, &zero);
-    }
-    0
-}
-
-fn sys_clock_nanosleep(
-    process: &UserProcess,
-    clockid: usize,
-    flags: usize,
-    req: usize,
-    rem: usize,
-) -> isize {
-    let duration = match read_timespec_duration(process, req) {
-        Ok(duration) => duration,
-        Err(err) => return neg_errno(err),
-    };
-    if flags as u32 & !general::TIMER_ABSTIME != 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    if flags as u32 & general::TIMER_ABSTIME != 0 {
-        let now = match clock_now_duration(clockid as u32) {
-            Ok(now) => now,
-            Err(err) => return neg_errno(err),
-        };
-        if let Some(delta) = duration.checked_sub(now) {
-            sleep_duration(delta);
-        }
-        return 0;
-    }
-    sys_nanosleep(process, req, rem)
 }
 
 fn sys_brk(process: &UserProcess, addr: usize) -> isize {

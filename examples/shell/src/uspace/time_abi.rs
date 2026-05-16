@@ -4,8 +4,8 @@ use core::sync::atomic::{AtomicI64, Ordering};
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 
-use super::UserProcess;
 use super::user_memory::{read_user_value, write_user_value};
+use super::{UserProcess, neg_errno};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 
@@ -343,6 +343,131 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
     while axhal::time::wall_time() < deadline {
         axtask::yield_now();
     }
+}
+
+pub(super) fn sys_clock_gettime(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
+    let ts = match clock_gettime_timespec(clk_id as u32) {
+        Ok(ts) => ts,
+        Err(err) => return neg_errno(err),
+    };
+    write_user_value(process, tp, &ts)
+}
+
+pub(super) fn sys_clock_settime(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
+    if clk_id != general::CLOCK_REALTIME as usize {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let ts = match read_user_value::<general::timespec>(process, tp) {
+        Ok(ts) => ts,
+        Err(err) => return neg_errno(err),
+    };
+    if ts.tv_sec < 0 || !(0..1_000_000_000).contains(&ts.tv_nsec) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    set_realtime_offset_from_timespec(ts);
+    0
+}
+
+pub(super) fn sys_clock_getres(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
+    let ts = match clock_getres_timespec(clk_id as u32) {
+        Ok(ts) => ts,
+        Err(err) => return neg_errno(err),
+    };
+    if tp == 0 {
+        return 0;
+    }
+    write_user_value(process, tp, &ts)
+}
+
+pub(super) fn sys_gettimeofday(process: &UserProcess, tv: usize, tz: usize) -> isize {
+    if tv != 0 {
+        let value = current_timeval();
+        let ret = write_user_value(process, tv, &value);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    if tz != 0 {
+        let value = zero_timezone();
+        let ret = write_user_value(process, tz, &value);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    0
+}
+
+pub(super) fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
+    const TIME_OK: isize = 0;
+
+    let input = match read_user_value::<UserTimex>(process, tx) {
+        Ok(input) => input,
+        Err(err) => return neg_errno(err),
+    };
+    if !adjtimex_input_valid(input) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if adjtimex_changes_clock(input) && process.uid() != 0 {
+        return neg_errno(LinuxError::EPERM);
+    }
+
+    let ret = write_default_timex(process, tx);
+    if ret != 0 {
+        return ret;
+    }
+    TIME_OK
+}
+
+pub(super) fn sys_times(process: &UserProcess, buf: usize) -> isize {
+    let tms = default_tms();
+    let ret = write_user_value(process, buf, &tms);
+    if ret != 0 {
+        return ret;
+    }
+    times_ticks()
+}
+
+pub(super) fn sys_nanosleep(process: &UserProcess, req: usize, rem: usize) -> isize {
+    let duration = match read_timespec_duration(process, req) {
+        Ok(duration) => duration,
+        Err(err) => return neg_errno(err),
+    };
+    sleep_duration(duration);
+    if rem != 0 {
+        let zero = zero_timespec();
+        let ret = write_user_value(process, rem, &zero);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    0
+}
+
+pub(super) fn sys_clock_nanosleep(
+    process: &UserProcess,
+    clockid: usize,
+    flags: usize,
+    req: usize,
+    rem: usize,
+) -> isize {
+    let duration = match read_timespec_duration(process, req) {
+        Ok(duration) => duration,
+        Err(err) => return neg_errno(err),
+    };
+    if flags as u32 & !general::TIMER_ABSTIME != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if flags as u32 & general::TIMER_ABSTIME != 0 {
+        let now = match clock_now_duration(clockid as u32) {
+            Ok(now) => now,
+            Err(err) => return neg_errno(err),
+        };
+        if let Some(delta) = duration.checked_sub(now) {
+            sleep_duration(delta);
+        }
+        return 0;
+    }
+    sys_nanosleep(process, req, rem)
 }
 
 const ADJ_OFFSET: u32 = 0x0001;
