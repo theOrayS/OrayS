@@ -1,15 +1,23 @@
+use core::mem::size_of;
 use core::ptr;
 use core::sync::atomic::{AtomicI32, Ordering};
 
 use axalloc::global_allocator;
 use axerrno::LinuxError;
+use axhal::context::TrapFrame;
+use axhal::mem::virt_to_phys;
 use axsync::Mutex;
 use lazyinit::LazyInit;
-use memory_addr::PAGE_SIZE_4K;
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::collections::BTreeMap;
 
-use super::linux_abi::{SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_PRIVATE, SYSV_SHM_MAX_SIZE};
-use super::memory_map::align_up;
+use super::UserProcess;
+use super::linux_abi::{
+    SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET, SYSV_IPC_STAT,
+    SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
+};
+use super::memory_map::{align_down, align_up, sys_munmap, user_mapping_flags};
+use super::user_memory::clear_user_bytes;
 
 #[derive(Clone)]
 struct SysvShmSegment {
@@ -28,7 +36,7 @@ fn table() -> &'static Mutex<BTreeMap<i32, SysvShmSegment>> {
     &SYSV_SHM
 }
 
-pub(super) fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i32, LinuxError> {
+fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i32, LinuxError> {
     let key = key as i32;
     let flags = shmflg as i32;
     let mut table = table().lock();
@@ -70,17 +78,102 @@ pub(super) fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i3
     Ok(shmid)
 }
 
-pub(super) fn lookup(shmid: i32) -> Option<(usize, usize)> {
+fn lookup(shmid: i32) -> Option<(usize, usize)> {
     table()
         .lock()
         .get(&shmid)
         .map(|segment| (segment.size, segment.backing_vaddr))
 }
 
-pub(super) fn contains(shmid: i32) -> bool {
+fn contains(shmid: i32) -> bool {
     table().lock().contains_key(&shmid)
 }
 
-pub(super) fn remove(shmid: i32) {
+fn remove(shmid: i32) {
     table().lock().remove(&shmid);
+}
+
+pub(super) fn sys_shmget(_process: &UserProcess, key: usize, size: usize, shmflg: usize) -> isize {
+    match get_or_create(key, size, shmflg) {
+        Ok(shmid) => shmid as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_shmat(
+    process: &UserProcess,
+    shmid: usize,
+    shmaddr: usize,
+    shmflg: usize,
+) -> isize {
+    let shmid = shmid as i32;
+    let Some((size, backing_vaddr)) = lookup(shmid) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    let map_flags = if shmflg as i32 & SYSV_SHM_RDONLY != 0 {
+        user_mapping_flags(true, false, false)
+    } else {
+        user_mapping_flags(true, true, false)
+    };
+    let target = {
+        let mut brk = process.brk.lock();
+        let start = if shmaddr == 0 {
+            let start = align_up(brk.next_mmap, PAGE_SIZE_4K);
+            brk.next_mmap = start + size + PAGE_SIZE_4K;
+            start
+        } else {
+            align_down(shmaddr, PAGE_SIZE_4K)
+        };
+        let Some(end) = start.checked_add(size) else {
+            return neg_errno(LinuxError::ENOMEM);
+        };
+        if start < USER_MMAP_BASE || end >= USER_STACK_TOP - USER_STACK_SIZE {
+            return neg_errno(LinuxError::ENOMEM);
+        }
+        start
+    };
+    let paddr = virt_to_phys(VirtAddr::from(backing_vaddr));
+    let map_result = {
+        let mut aspace = process.aspace.lock();
+        if shmaddr != 0 {
+            let _ = aspace.unmap(VirtAddr::from(target), size);
+        }
+        aspace.map_linear(VirtAddr::from(target), paddr, size, map_flags)
+    };
+    if let Err(err) = map_result {
+        return neg_errno(LinuxError::from(err));
+    }
+    process.shm_attachments.lock().insert(target, (shmid, size));
+    target as isize
+}
+
+pub(super) fn sys_shmdt(process: &UserProcess, tf: &TrapFrame, shmaddr: usize) -> isize {
+    let Some((_shmid, size)) = process.shm_attachments.lock().remove(&shmaddr) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    sys_munmap(process, tf, shmaddr, size)
+}
+
+pub(super) fn sys_shmctl(process: &UserProcess, shmid: usize, cmd: usize, buf: usize) -> isize {
+    let shmid = shmid as i32;
+    let cmd = cmd as i32;
+    if !contains(shmid) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    match cmd {
+        SYSV_IPC_RMID => {
+            remove(shmid);
+            0
+        }
+        SYSV_IPC_STAT => {
+            if buf != 0 {
+                if let Err(err) = clear_user_bytes(process, buf, size_of::<usize>() * 16) {
+                    return neg_errno(err);
+                }
+            }
+            0
+        }
+        SYSV_IPC_SET => 0,
+        _ => neg_errno(LinuxError::EINVAL),
+    }
 }

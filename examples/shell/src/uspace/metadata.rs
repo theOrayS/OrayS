@@ -10,9 +10,10 @@ use super::UserProcess;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
 use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_PERMISSION_MASK, LINUX_EACCES, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
-    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
+    ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
+    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, PIPEFS_MAGIC, PROC_SUPER_MAGIC,
+    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC,
+    TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -33,6 +34,46 @@ pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general:
 
 pub(super) fn normalize_file_mode(mode: u32) -> u32 {
     mode & FILE_MODE_PERMISSION_MASK
+}
+
+impl UserProcess {
+    pub(super) fn set_path_mode(&self, path: String, mode: u32) {
+        self.path_modes
+            .lock()
+            .insert(path, normalize_file_mode(mode));
+    }
+
+    pub(super) fn path_mode(&self, path: &str) -> Option<u32> {
+        self.path_modes.lock().get(path).copied()
+    }
+
+    pub(super) fn set_path_owner(&self, path: String, owner: Option<u32>, group: Option<u32>) {
+        let mut path_owners = self.path_owners.lock();
+        let (current_owner, current_group) =
+            path_owners.get(path.as_str()).copied().unwrap_or((0, 0));
+        path_owners.insert(
+            path,
+            (
+                owner.unwrap_or(current_owner),
+                group.unwrap_or(current_group),
+            ),
+        );
+    }
+
+    pub(super) fn path_owner(&self, path: &str) -> Option<(u32, u32)> {
+        self.path_owners.lock().get(path).copied()
+    }
+
+    pub(super) fn clear_path_chown_special_bits(&self, path: &str, current_mode: u32) {
+        let mode = self
+            .path_mode(path)
+            .unwrap_or(current_mode & FILE_MODE_PERMISSION_MASK);
+        let mut updated_mode = mode & !FILE_MODE_SET_UID;
+        if mode & FILE_MODE_GROUP_EXECUTE != 0 {
+            updated_mode &= !FILE_MODE_SET_GID;
+        }
+        self.set_path_mode(path.to_string(), updated_mode);
+    }
 }
 
 pub(super) fn apply_recorded_path_metadata(
