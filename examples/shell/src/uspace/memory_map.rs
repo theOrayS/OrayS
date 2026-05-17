@@ -1,6 +1,20 @@
 use axhal::paging::MappingFlags;
 use linux_raw_sys::general;
 
+use super::UserProcess;
+
+pub(super) fn sys_brk(process: &UserProcess, addr: usize) -> isize {
+    let mut brk = process.brk.lock();
+    if addr == 0 {
+        return brk.end as isize;
+    }
+    if addr < brk.start || addr > brk.limit {
+        return brk.end as isize;
+    }
+    brk.end = addr;
+    brk.end as isize
+}
+
 pub(super) fn mmap_prot_to_flags(prot: u32) -> MappingFlags {
     let mut flags = MappingFlags::USER;
     if prot & general::PROT_READ != 0 {
