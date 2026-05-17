@@ -61,7 +61,7 @@ use fd_table::{
     sys_ioctl, sys_lseek, sys_mkdirat, sys_openat, sys_unlinkat,
 };
 use linux_abi::*;
-use memory_map::{align_down, align_up, mmap_prot_to_flags, user_mapping_flags};
+use memory_map::{align_down, align_up, mmap_prot_to_flags, sys_brk, user_mapping_flags};
 use memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use metadata::{
     normalize_file_mode, sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat,
@@ -2121,18 +2121,6 @@ fn sys_setitimer(
         arm_real_itimer(process.clone(), generation, first_us, interval_us);
     }
     0
-}
-
-fn sys_brk(process: &UserProcess, addr: usize) -> isize {
-    let mut brk = process.brk.lock();
-    if addr == 0 {
-        return brk.end as isize;
-    }
-    if addr < brk.start || addr > brk.limit {
-        return brk.end as isize;
-    }
-    brk.end = addr;
-    brk.end as isize
 }
 
 fn sys_shmget(_process: &UserProcess, key: usize, size: usize, shmflg: usize) -> isize {
