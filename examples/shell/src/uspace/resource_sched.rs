@@ -43,6 +43,20 @@ pub(super) fn default_rlimit(resource: u32) -> UserRlimit {
     }
 }
 
+impl UserProcess {
+    pub(super) fn get_rlimit(&self, resource: u32) -> UserRlimit {
+        self.rlimits
+            .lock()
+            .get(&resource)
+            .copied()
+            .unwrap_or_else(|| default_rlimit(resource))
+    }
+
+    pub(super) fn set_rlimit(&self, resource: u32, limit: UserRlimit) {
+        self.rlimits.lock().insert(resource, limit);
+    }
+}
+
 pub(super) fn rlimit_is_valid(limit: UserRlimit) -> bool {
     limit.rlim_cur <= limit.rlim_max
 }

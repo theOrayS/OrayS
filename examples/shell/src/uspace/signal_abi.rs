@@ -1,17 +1,44 @@
 #[cfg(target_arch = "riscv64")]
 use core::mem::{offset_of, size_of};
-use core::sync::atomic::Ordering;
-
-#[cfg(target_arch = "riscv64")]
-use axhal::context::TrapFrame;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use axerrno::LinuxError;
+use axhal::context::TrapFrame;
+#[cfg(target_arch = "riscv64")]
+use axhal::trap::PageFaultFlags;
+use axhal::trap::register_user_return_handler;
+use linux_raw_sys::general;
+#[cfg(target_arch = "riscv64")]
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 
-use super::linux_abi::SIGCANCEL_NUM;
-use super::task_context::{UserTaskExt, current_task_ext};
+use super::UserProcess;
+use super::futex;
+use super::linux_abi::{
+    KERNEL_SIGSET_BYTES, SA_NODEFER_FLAG, SI_TKILL_CODE, SIG_BLOCK_HOW, SIG_SETMASK_HOW,
+    SIG_UNBLOCK_HOW, SIGCANCEL_NUM, SIGCHLD_NUM, SIGKILL_NUM, neg_errno,
+};
+#[cfg(target_arch = "riscv64")]
+use super::linux_abi::{RISCV_SIGTRAMP_CODE, SS_DISABLE};
+#[cfg(target_arch = "riscv64")]
+use super::memory_map::{align_down, align_up, user_mapping_flags};
+use super::process_lifecycle::terminate_current_thread_for_exit_group;
+use super::task_context::{UserTaskExt, current_task_ext, current_tid};
+use super::task_registry::{
+    UserThreadEntry, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
+    user_thread_entry_for_process,
+};
+use super::user_memory::{
+    clear_user_bytes, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
+};
+
+macro_rules! user_trace {
+    ($($arg:tt)*) => {};
+}
 
 #[cfg(target_arch = "riscv64")]
 use super::linux_abi::{RISCV_SIGNAL_FPSTATE_BYTES, RISCV_SIGNAL_SIGSET_RESERVED_BYTES};
+
+static USER_RETURN_HOOK_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn validate_signal_target(sig: i32) -> Result<(), LinuxError> {
     if sig < 0 || sig > 64 {
@@ -45,6 +72,394 @@ pub(super) fn current_unblocked_signal_pending() -> bool {
         let sig = ext.pending_signal.load(Ordering::Acquire);
         sig != 0 && !signal_is_blocked(ext, sig)
     })
+}
+
+pub(super) fn deliver_user_signal(entry: &UserThreadEntry, sig: i32) -> Result<(), LinuxError> {
+    if sig == 0 {
+        return Ok(());
+    }
+    let ext = super::task_context::task_ext(&entry.task).ok_or(LinuxError::ESRCH)?;
+    if sig == SIGKILL_NUM {
+        ext.process.request_exit_group(128 + sig);
+    }
+    ext.pending_signal.store(sig, Ordering::Release);
+    if sig == SIGCANCEL_NUM {
+        user_trace!(
+            "sigdbg: deliver tid={} blocked={} futex_wait={:#x}",
+            entry.task.id().as_u64(),
+            signal_is_blocked(ext, sig),
+            ext.futex_wait.load(Ordering::Acquire),
+        );
+    }
+    if sig == SIGCANCEL_NUM && !signal_is_blocked(ext, sig) {
+        let futex_wait = ext.futex_wait.load(Ordering::Acquire);
+        if futex_wait != 0 {
+            futex::wake_task(futex_wait, &entry.task);
+        }
+    }
+    Ok(())
+}
+
+fn deliver_user_signal_result(entry: &UserThreadEntry, sig: i32) -> isize {
+    match deliver_user_signal(entry, sig) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn ensure_user_return_hook_registered() {
+    if !USER_RETURN_HOOK_REGISTERED.swap(true, Ordering::AcqRel) {
+        register_user_return_handler(user_return_hook);
+    }
+}
+
+fn user_return_hook(tf: &mut TrapFrame) {
+    let Some(ext) = current_task_ext() else {
+        return;
+    };
+    if ext.signal_frame.load(Ordering::Acquire) == 0 {
+        if let Some(restored) = ext.pending_sigreturn.lock().take() {
+            *tf = restored;
+            return;
+        }
+    }
+    #[cfg(target_arch = "riscv64")]
+    if ext.signal_frame.load(Ordering::Acquire) == 0 {
+        let sig = ext.pending_signal.load(Ordering::Acquire);
+        if sig != 0 && !signal_is_blocked(ext, sig) {
+            let _ = inject_pending_signal(tf, ext, sig);
+        }
+    }
+}
+
+#[cfg(target_arch = "riscv64")]
+fn ensure_signal_frame_pages(
+    process: &UserProcess,
+    start: usize,
+    len: usize,
+) -> Result<(), LinuxError> {
+    let end = start.checked_add(len).ok_or(LinuxError::EFAULT)?;
+    let page_start = align_down(start, PAGE_SIZE_4K);
+    let page_end = align_up(end, PAGE_SIZE_4K);
+    let mut aspace = process.aspace.lock();
+    for page in (page_start..page_end).step_by(PAGE_SIZE_4K) {
+        let _ = aspace.handle_page_fault(VirtAddr::from(page), PageFaultFlags::WRITE);
+    }
+    aspace
+        .protect(
+            VirtAddr::from(page_start),
+            page_end - page_start,
+            user_mapping_flags(true, true, true),
+        )
+        .map_err(LinuxError::from)
+}
+
+#[cfg(target_arch = "riscv64")]
+fn inject_pending_signal(
+    tf: &mut TrapFrame,
+    ext: &UserTaskExt,
+    sig: i32,
+) -> Result<(), LinuxError> {
+    let action = ext
+        .process
+        .signal_actions
+        .lock()
+        .get(&(sig as usize))
+        .copied()
+        .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+    let handler = action
+        .sa_handler_kernel
+        .map(|func| func as usize)
+        .unwrap_or(0);
+    if sig >= 32 {
+        user_trace!(
+            "sigdbg: inject tid={} sig={sig} handler={handler:#x} flags={:#x} sp={:#x} tp={:#x}",
+            current_tid(),
+            action.sa_flags,
+            tf.regs.sp,
+            tf.regs.tp,
+        );
+    }
+    if handler <= 1 {
+        ext.pending_signal.store(0, Ordering::Release);
+        if sig == SIGKILL_NUM {
+            ext.process.request_exit_group(128 + sig);
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
+        }
+        return Ok(());
+    }
+    let current_mask = ext.signal_mask.load(Ordering::Acquire);
+    let frame_size = riscv_signal_frame_size();
+    let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
+    ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
+
+    let frame = make_riscv_signal_frame(
+        sig,
+        SI_TKILL_CODE,
+        current_tid(),
+        current_mask,
+        SS_DISABLE,
+        RISCV_SIGTRAMP_CODE,
+        trap_frame_to_riscv_sigcontext(tf),
+    );
+
+    let frame_ret = write_user_value(ext.process.as_ref(), frame_addr, &frame);
+    if frame_ret != 0 {
+        return Err(LinuxError::EFAULT);
+    }
+
+    *ext.pending_sigreturn.lock() = Some(*tf);
+    ext.signal_frame.store(frame_addr, Ordering::Release);
+    ext.pending_signal.store(0, Ordering::Release);
+    let mut next_mask = current_mask | action.sa_mask.sig[0];
+    if action.sa_flags & SA_NODEFER_FLAG == 0 {
+        next_mask |= signal_mask_bit(sig);
+    }
+    ext.signal_mask.store(next_mask, Ordering::Release);
+    if sig >= 32 {
+        user_trace!(
+            "sigdbg: frame tid={} sig={sig} frame_addr={frame_addr:#x} size={frame_size:#x}",
+            current_tid(),
+        );
+    }
+
+    let frame_offsets = riscv_signal_frame_offsets();
+    tf.regs.sp = frame_addr;
+    tf.regs.ra = frame_addr + frame_offsets.trampoline;
+    tf.regs.a0 = sig as usize;
+    tf.regs.a1 = frame_addr + frame_offsets.info;
+    tf.regs.a2 = frame_addr + frame_offsets.ucontext;
+    tf.sepc = handler;
+    Ok(())
+}
+
+pub(super) fn sys_rt_sigaction(
+    process: &UserProcess,
+    signum: usize,
+    act: usize,
+    oldact: usize,
+    _sigsetsize: usize,
+) -> isize {
+    if signum == 0 || signum >= 65 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let new_action = if act != 0 {
+        match read_user_value::<general::kernel_sigaction>(process, act) {
+            Ok(value) => Some(value),
+            Err(err) => return neg_errno(err),
+        }
+    } else {
+        None
+    };
+
+    if oldact != 0 {
+        let old = process
+            .signal_actions
+            .lock()
+            .get(&signum)
+            .copied()
+            .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+        let ret = write_user_value(process, oldact, &old);
+        if ret != 0 {
+            return ret;
+        }
+    }
+
+    if let Some(new_action) = new_action {
+        if signum >= 32 {
+            let _handler = new_action
+                .sa_handler_kernel
+                .map(|func| func as usize)
+                .unwrap_or(0);
+            user_trace!(
+                "sigdbg: rt_sigaction tid={} sig={} handler={_handler:#x} flags={:#x} mask={:#x}",
+                current_tid(),
+                signum,
+                new_action.sa_flags,
+                new_action.sa_mask.sig[0],
+            );
+        }
+        process.signal_actions.lock().insert(signum, new_action);
+    }
+
+    0
+}
+
+pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
+    #[cfg(target_arch = "riscv64")]
+    {
+        let Some(ext) = current_task_ext() else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        let frame_addr = ext.signal_frame.load(Ordering::Acquire);
+        if frame_addr == 0 {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let frame = match read_user_value::<RiscvSignalFrame>(process, frame_addr) {
+            Ok(frame) => frame,
+            Err(err) => return neg_errno(err),
+        };
+        let Some(mut restored) = ext.pending_sigreturn.lock().take() else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        apply_riscv_sigcontext(&mut restored, &frame.ucontext.mcontext);
+        ext.signal_mask
+            .store(frame.ucontext.sigmask.sig[0], Ordering::Release);
+        if ext.pending_signal.load(Ordering::Acquire) == 0 {
+            user_trace!(
+                "sigdbg: rt_sigreturn tid={} frame={frame_addr:#x} restore_sp={:#x} restore_tp={:#x} restore_pc={:#x}",
+                current_tid(),
+                restored.regs.sp,
+                restored.regs.tp,
+                restored.sepc,
+            );
+        }
+        ext.signal_frame.store(0, Ordering::Release);
+        *ext.pending_sigreturn.lock() = Some(restored);
+        0
+    }
+    #[cfg(not(target_arch = "riscv64"))]
+    {
+        let _ = process;
+        neg_errno(LinuxError::ENOSYS)
+    }
+}
+
+pub(super) fn sys_rt_sigprocmask(
+    process: &UserProcess,
+    how: usize,
+    set: usize,
+    oldset: usize,
+    sigsetsize: usize,
+) -> isize {
+    let Some(ext) = current_task_ext() else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    if sigsetsize != 0 && sigsetsize < KERNEL_SIGSET_BYTES {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let current_mask = ext.signal_mask.load(Ordering::Acquire);
+    if oldset != 0 {
+        if let Err(err) = clear_user_bytes(process, oldset, sigsetsize) {
+            return neg_errno(err);
+        }
+        if sigsetsize >= KERNEL_SIGSET_BYTES {
+            if let Err(err) = write_user_bytes(process, oldset, &current_mask.to_ne_bytes()) {
+                return neg_errno(err);
+            }
+        }
+    }
+    if set != 0 {
+        let src = match read_user_bytes(process, set, KERNEL_SIGSET_BYTES) {
+            Ok(src) => src,
+            Err(err) => return neg_errno(err),
+        };
+        let mut set_bytes = [0u8; KERNEL_SIGSET_BYTES];
+        set_bytes.copy_from_slice(&src);
+        let set_mask = u64::from_ne_bytes(set_bytes);
+        let next_mask = match how {
+            SIG_BLOCK_HOW => current_mask | set_mask,
+            SIG_UNBLOCK_HOW => current_mask & !set_mask,
+            SIG_SETMASK_HOW => set_mask,
+            _ => return neg_errno(LinuxError::EINVAL),
+        };
+        if (current_mask | set_mask | next_mask) & signal_mask_bit(SIGCANCEL_NUM) != 0 {
+            user_trace!(
+                "sigdbg: rt_sigprocmask tid={} how={} set={set_mask:#x} old={current_mask:#x} new={next_mask:#x}",
+                current_tid(),
+                how,
+            );
+        }
+        ext.signal_mask.store(next_mask, Ordering::Release);
+    }
+    0
+}
+
+pub(super) fn sys_rt_sigtimedwait(
+    process: &UserProcess,
+    _set: usize,
+    info: usize,
+    timeout: usize,
+    _sigsetsize: usize,
+) -> isize {
+    if timeout != 0 {
+        if let Err(err) = read_user_value::<general::timespec>(process, timeout) {
+            return neg_errno(err);
+        }
+    }
+    if info != 0 {
+        if let Err(err) = clear_user_bytes(process, info, 128) {
+            return neg_errno(err);
+        }
+    }
+    SIGCHLD_NUM
+}
+
+pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
+    if let Err(err) = validate_signal_target(sig) {
+        return neg_errno(err);
+    }
+    if pid == 0 {
+        return 0;
+    }
+    if pid == process.pid() || pid == current_tid() {
+        let Some(entry) = user_thread_entry_for_process(process) else {
+            return neg_errno(LinuxError::ESRCH);
+        };
+        return deliver_user_signal_result(&entry, sig);
+    }
+    let Some(entry) = process
+        .child_thread_entry_by_pid(pid)
+        .or_else(|| user_thread_entry_by_process_pid(pid))
+    else {
+        return neg_errno(LinuxError::ESRCH);
+    };
+    deliver_user_signal_result(&entry, sig)
+}
+
+pub(super) fn sys_tkill(process: &UserProcess, tid: i32, sig: i32) -> isize {
+    if tid <= 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_signal_target(sig) {
+        return neg_errno(err);
+    }
+    let entry = match user_thread_entry_by_tid(tid) {
+        Some(entry) => entry,
+        None => return neg_errno(LinuxError::ESRCH),
+    };
+    if entry.process.pid() != process.pid() {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if sig >= 32 {
+        user_trace!(
+            "sigdbg: tkill from tid={} to tid={tid} sig={sig}",
+            current_tid()
+        );
+    }
+    deliver_user_signal_result(&entry, sig)
+}
+
+pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -> isize {
+    if tgid <= 0 || tid <= 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let entry = match user_thread_entry_by_tid(tid) {
+        Some(entry) => entry,
+        None => return neg_errno(LinuxError::ESRCH),
+    };
+    if entry.process.pid() != process.pid() || entry.process.pid() != tgid {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    if sig >= 32 {
+        user_trace!(
+            "sigdbg: tgkill from tid={} tgid={} to tid={tid} sig={sig}",
+            current_tid(),
+            tgid,
+        );
+    }
+    deliver_user_signal_result(&entry, sig)
 }
 
 #[cfg(target_arch = "riscv64")]

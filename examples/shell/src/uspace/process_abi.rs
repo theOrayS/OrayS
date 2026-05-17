@@ -1,7 +1,20 @@
+use core::sync::atomic::Ordering;
+
 use axerrno::LinuxError;
 
-use super::linux_abi::LINUX_PERSONALITY_QUERY;
+use super::linux_abi::{LINUX_PERSONALITY_MASK, LINUX_PERSONALITY_QUERY};
 use super::{UserProcess, neg_errno};
+
+impl UserProcess {
+    pub(super) fn personality(&self) -> usize {
+        self.personality.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_personality(&self, persona: usize) {
+        self.personality
+            .store(persona & LINUX_PERSONALITY_MASK, Ordering::Release);
+    }
+}
 
 pub(super) fn sys_setpgid(process: &UserProcess, pid: usize, pgid: usize) -> isize {
     let pid = pid as i32;

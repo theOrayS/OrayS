@@ -3,7 +3,11 @@ use core::sync::atomic::{AtomicI64, Ordering};
 
 use axerrno::LinuxError;
 use linux_raw_sys::general;
+use std::sync::Arc;
 
+use super::linux_abi::SIGALRM_NUM;
+use super::signal_abi::deliver_user_signal;
+use super::task_registry::user_thread_entry_for_process;
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
 
@@ -11,6 +15,12 @@ static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 
 const NSEC_PER_SEC: i128 = 1_000_000_000;
 pub(super) const USER_HZ: c_long = 100;
+
+impl UserProcess {
+    pub(super) fn real_timer_active(&self) -> bool {
+        self.real_timer_deadline_us.load(Ordering::Acquire) != 0
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -325,6 +335,105 @@ pub(super) fn itimerval_to_micros_pair(
     let first_us = timeval_to_micros(value.it_value)?;
     let interval_us = timeval_to_micros(value.it_interval)?;
     Ok((first_us, interval_us))
+}
+
+fn current_real_itimer(process: &UserProcess) -> general::itimerval {
+    let deadline = process.real_timer_deadline_us.load(Ordering::Acquire);
+    let remaining = if deadline == 0 {
+        0
+    } else {
+        deadline.saturating_sub(monotonic_time_micros())
+    };
+    general::itimerval {
+        it_interval: micros_to_timeval(process.real_timer_interval_us.load(Ordering::Acquire)),
+        it_value: micros_to_timeval(remaining),
+    }
+}
+
+fn arm_real_itimer(
+    process: Arc<UserProcess>,
+    generation: u64,
+    first_delay_us: u64,
+    interval_us: u64,
+) {
+    let _ = axtask::spawn(move || {
+        let mut delay_us = first_delay_us;
+        loop {
+            if delay_us == 0 {
+                axtask::yield_now();
+            } else {
+                axtask::sleep(micros_to_duration(delay_us));
+            }
+            if process.real_timer_generation.load(Ordering::Acquire) != generation
+                || process.live_threads.load(Ordering::Acquire) == 0
+            {
+                break;
+            }
+            if let Some(entry) = user_thread_entry_for_process(&process) {
+                let _ = deliver_user_signal(&entry, SIGALRM_NUM);
+            }
+            if interval_us == 0 {
+                if process.real_timer_generation.load(Ordering::Acquire) == generation {
+                    process.real_timer_deadline_us.store(0, Ordering::Release);
+                }
+                break;
+            }
+            process.real_timer_deadline_us.store(
+                monotonic_time_micros().saturating_add(interval_us),
+                Ordering::Release,
+            );
+            delay_us = interval_us;
+        }
+    });
+}
+
+pub(super) fn sys_setitimer(
+    process: &Arc<UserProcess>,
+    which: i32,
+    new_value: usize,
+    old_value: usize,
+) -> isize {
+    if which != general::ITIMER_REAL as i32 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if old_value != 0 {
+        let value = current_real_itimer(process);
+        let ret = write_user_value(process, old_value, &value);
+        if ret != 0 {
+            return ret;
+        }
+    }
+
+    let new_timer = if new_value == 0 {
+        None
+    } else {
+        match read_user_value::<general::itimerval>(process, new_value) {
+            Ok(value) => Some(value),
+            Err(_) => return neg_errno(LinuxError::EFAULT),
+        }
+    };
+    let (first_us, interval_us) = match new_timer {
+        Some(value) => match itimerval_to_micros_pair(value) {
+            Ok(pair) => pair,
+            Err(err) => return neg_errno(err),
+        },
+        None => (0, 0),
+    };
+
+    let generation = process.real_timer_generation.fetch_add(1, Ordering::AcqRel) + 1;
+    process
+        .real_timer_interval_us
+        .store(interval_us, Ordering::Release);
+    if first_us == 0 {
+        process.real_timer_deadline_us.store(0, Ordering::Release);
+    } else {
+        process.real_timer_deadline_us.store(
+            monotonic_time_micros().saturating_add(first_us),
+            Ordering::Release,
+        );
+        arm_real_itimer(process.clone(), generation, first_us, interval_us);
+    }
+    0
 }
 
 pub(super) fn read_timespec_duration(

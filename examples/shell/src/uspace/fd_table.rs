@@ -13,7 +13,7 @@ use std::vec::Vec;
 use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
     ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME, ST_MODE_CHR, ST_MODE_DIR,
     ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
@@ -36,7 +36,10 @@ use super::synthetic_fs::{
 };
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
-use super::user_memory::{read_cstr, validate_user_write, write_user_bytes, write_user_value};
+use super::user_memory::{
+    read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer, validate_user_write,
+    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
+};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -145,6 +148,120 @@ pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
     }
 }
 
+pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
+    if let Ok(socket) = socket_entry(process, fd) {
+        return recv_socket_data_to_user(process, socket.posix_fd, buf, count, 0);
+    }
+    with_writable_user_buffer(process, buf, count, |dst| {
+        process.fds.lock().read(fd as i32, dst)
+    })
+}
+
+pub(super) fn sys_pread64(
+    process: &UserProcess,
+    fd: usize,
+    buf: usize,
+    count: usize,
+    offset: usize,
+) -> isize {
+    with_writable_user_buffer(process, buf, count, |dst| {
+        let mut table = process.fds.lock();
+        let FdEntry::File(file) = table.entry_mut(fd as i32)? else {
+            return Err(LinuxError::EBADF);
+        };
+        read_file_at_into(&file.file, offset as u64, dst)
+    })
+}
+
+pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
+    with_readable_user_buffer(process, buf, count, |src| {
+        process.fds.lock().write(fd as i32, src)
+    })
+}
+
+pub(super) fn sys_pwrite64(
+    process: &UserProcess,
+    fd: usize,
+    buf: usize,
+    count: usize,
+    offset: usize,
+) -> isize {
+    with_readable_user_buffer(process, buf, count, |src| {
+        process
+            .fds
+            .lock()
+            .write_file_at(fd as i32, offset as u64, src)
+    })
+}
+
+pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: usize) -> isize {
+    let iov_entries = match read_iovec_entries(process, iov, iovcnt) {
+        Ok(iov_entries) => iov_entries,
+        Err(err) => return neg_errno(err),
+    };
+    let mut written = 0isize;
+    for entry in iov_entries {
+        let len = entry.iov_len as usize;
+        if len == 0 {
+            continue;
+        }
+        let src = match read_user_bytes(process, entry.iov_base as usize, len) {
+            Ok(bytes) => bytes,
+            Err(err) => return if written > 0 { written } else { neg_errno(err) },
+        };
+        let n = match process.fds.lock().write(fd as i32, &src) {
+            Ok(v) => v,
+            Err(err) => return if written > 0 { written } else { neg_errno(err) },
+        };
+        written += n as isize;
+        if n < len {
+            break;
+        }
+    }
+    written
+}
+
+pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: usize) -> isize {
+    let iov_entries = match read_iovec_entries(process, iov, iovcnt) {
+        Ok(iov_entries) => iov_entries,
+        Err(err) => return neg_errno(err),
+    };
+    let mut total = 0isize;
+    for entry in iov_entries {
+        let len = entry.iov_len as usize;
+        if len == 0 {
+            continue;
+        }
+        let base = entry.iov_base as usize;
+        if let Err(err) = validate_user_write(process, base, len) {
+            return if total > 0 { total } else { neg_errno(err) };
+        }
+        let mut bytes = match user_io_buffer(len) {
+            Ok(bytes) => bytes,
+            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+        };
+        let n = match process.fds.lock().read(fd as i32, &mut bytes) {
+            Ok(v) => v,
+            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+        };
+        if n > len {
+            return if total > 0 {
+                total
+            } else {
+                neg_errno(LinuxError::EINVAL)
+            };
+        }
+        if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
+            return if total > 0 { total } else { neg_errno(err) };
+        }
+        total += n as isize;
+        if n < len {
+            break;
+        }
+    }
+    total
+}
+
 pub(super) fn sys_getdents64(process: &UserProcess, fd: usize, dirp: usize, count: usize) -> isize {
     if let Err(err) = validate_user_write(process, dirp, count) {
         return neg_errno(err);
@@ -199,6 +316,45 @@ pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().entry(fd as i32) {
         Ok(_) => 0,
         Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_renameat2(
+    process: &UserProcess,
+    olddirfd: usize,
+    oldpath: usize,
+    newdirfd: usize,
+    newpath: usize,
+    flags: usize,
+) -> isize {
+    if flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let old_path = match read_cstr(process, oldpath) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let new_path = match read_cstr(process, newpath) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let (old_abs_path, new_abs_path) = {
+        let table = process.fds.lock();
+        let old_abs = match resolve_dirfd_path(process, &table, olddirfd as i32, old_path.as_str())
+        {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
+        let new_abs = match resolve_dirfd_path(process, &table, newdirfd as i32, new_path.as_str())
+        {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
+        (old_abs, new_abs)
+    };
+    match axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(LinuxError::from(err)),
     }
 }
 

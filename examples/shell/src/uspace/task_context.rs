@@ -11,8 +11,15 @@ use std::sync::Arc;
 use riscv::register::sstatus::{FS, Sstatus};
 
 use super::UserProcess;
+use super::linux_abi::neg_errno;
+use super::task_registry::user_thread_entry_by_tid;
 #[cfg(target_arch = "riscv64")]
 use super::user_memory::read_user_value;
+use super::user_memory::write_user_value;
+
+macro_rules! user_trace {
+    ($($arg:tt)*) => {};
+}
 
 pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
@@ -96,6 +103,58 @@ pub(super) fn robust_list_for_task(task: &AxTaskRef) -> Option<(usize, usize)> {
 
 pub(super) fn current_tid() -> i32 {
     axtask::current().id().as_u64() as i32
+}
+
+#[cfg(target_arch = "riscv64")]
+#[allow(dead_code)]
+pub(super) fn user_pc(tf: &TrapFrame) -> usize {
+    tf.sepc
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[allow(dead_code)]
+pub(super) fn user_pc(tf: &TrapFrame) -> usize {
+    tf.era
+}
+
+pub(super) fn sys_set_tid_address(_tf: &TrapFrame, _tidptr: usize) -> isize {
+    set_current_clear_child_tid(_tidptr);
+    user_trace!(
+        "user-set-tid: tid={} tidptr={_tidptr:#x} sp={:#x} tp={:#x} ra={:#x} pc={:#x}",
+        current_tid(),
+        tf.regs.sp,
+        tf.regs.tp,
+        tf.regs.ra,
+        user_pc(tf),
+    );
+    axtask::current().id().as_u64() as isize
+}
+
+pub(super) fn sys_set_robust_list(head: usize, len: usize) -> isize {
+    set_current_robust_list(head, len).map_or_else(neg_errno, |_| 0)
+}
+
+pub(super) fn sys_get_robust_list(
+    process: &UserProcess,
+    pid: i32,
+    head_ptr: usize,
+    len_ptr: usize,
+) -> isize {
+    let tid = if pid == 0 { current_tid() } else { pid };
+    let Some(entry) = user_thread_entry_by_tid(tid) else {
+        return neg_errno(LinuxError::ESRCH);
+    };
+    if entry.process.pid() != process.pid() {
+        return neg_errno(LinuxError::EPERM);
+    }
+    let Some((head, len)) = robust_list_for_task(&entry.task) else {
+        return neg_errno(LinuxError::ESRCH);
+    };
+    let ret = write_user_value(process, head_ptr, &head);
+    if ret != 0 {
+        return ret;
+    }
+    write_user_value(process, len_ptr, &len)
 }
 
 pub(super) fn make_uspace_context(entry: usize, stack_ptr: usize, argc: usize) -> UspaceContext {

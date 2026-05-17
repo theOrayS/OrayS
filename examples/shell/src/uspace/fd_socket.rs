@@ -11,20 +11,31 @@ use std::vec::Vec;
 
 use super::fd_table::FdEntry;
 use super::linux_abi::{
-    IP_RECVERR_OPT, IPPROTO_IP_LEVEL, LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT,
+    AF_UNIX_DOMAIN, DEFAULT_SOCKET_BUFFER_SIZE, DEFAULT_TCP_MAXSEG,
+    INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IP_RECVERR_OPT, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
+    LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT,
     MCAST_LEAVE_GROUP_OPT, SO_BROADCAST_OPT, SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT,
     SO_RCVBUF_OPT, SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT,
-    SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_MAXSEG_OPT,
-    TCP_NODELAY_OPT, fd_cloexec_flag, posix_errno_from_ret,
+    SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
+    TCP_INFO_OPT, TCP_MAXSEG_OPT, TCP_NODELAY_OPT, fd_cloexec_flag, neg_errno_code,
+    posix_errno_from_ret,
 };
+use super::signal_abi::current_unblocked_signal_pending;
+use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    read_user_bytes, read_user_value, user_io_buffer, validate_user_read, validate_user_write,
-    write_user_bytes, write_user_value,
+    clear_user_bytes, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
+    validate_user_write, write_user_bytes, write_user_value,
 };
-use super::{
-    SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize,
-    recv_with_real_timer_interrupt,
-};
+use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
+
+macro_rules! socket_entry_or_return {
+    ($process:expr, $fd:expr) => {
+        match socket_entry($process, $fd) {
+            Ok(socket) => socket,
+            Err(err) => return neg_errno(err),
+        }
+    };
+}
 
 #[derive(Default)]
 pub(super) struct SocketOptions {
@@ -424,4 +435,460 @@ fn recv_socket_data_to_user_inner(
         Ok(()) => ret,
         Err(err) => neg_errno(err),
     }
+}
+
+fn recv_with_real_timer_interrupt<F>(
+    process: &UserProcess,
+    posix_fd: i32,
+    mut recv_once: F,
+) -> isize
+where
+    F: FnMut() -> isize,
+{
+    let original_timeout = match arceos_posix_api::socket_recv_timeout(posix_fd) {
+        Ok(timeout) => timeout,
+        Err(err) => return neg_errno(err),
+    };
+    if original_timeout.is_some() || !process.real_timer_active() {
+        return match posix_ret_usize(recv_once()) {
+            Ok(n) => n as isize,
+            Err(err) => neg_errno(err),
+        };
+    }
+
+    if let Err(err) =
+        arceos_posix_api::set_socket_recv_timeout(posix_fd, Some(INTERRUPTIBLE_SOCKET_RECV_QUANTUM))
+    {
+        return neg_errno(err);
+    }
+
+    let result = loop {
+        if current_unblocked_signal_pending() {
+            break neg_errno(LinuxError::EINTR);
+        }
+        match posix_ret_usize(recv_once()) {
+            Ok(n) => break n as isize,
+            Err(LinuxError::EAGAIN) => {
+                if current_unblocked_signal_pending() {
+                    break neg_errno(LinuxError::EINTR);
+                }
+                if !process.real_timer_active() {
+                    break neg_errno(LinuxError::EAGAIN);
+                }
+            }
+            Err(err) => break neg_errno(err),
+        }
+    };
+
+    match arceos_posix_api::set_socket_recv_timeout(posix_fd, original_timeout) {
+        Ok(()) => result,
+        Err(err) if result >= 0 => neg_errno(err),
+        Err(_) => result,
+    }
+}
+
+pub(super) fn sys_socket_bridge(
+    process: &UserProcess,
+    domain: usize,
+    socktype: usize,
+    protocol: usize,
+) -> isize {
+    let domain = domain as i32;
+    let raw_socktype = socktype as i32;
+    let protocol = protocol as i32;
+    let flag_mask = (posix_ctypes::SOCK_CLOEXEC | posix_ctypes::SOCK_NONBLOCK) as i32;
+    let flags = raw_socktype & flag_mask;
+    let base_socktype = raw_socktype & !flag_mask;
+    if domain == AF_UNIX_DOMAIN {
+        if protocol != 0 {
+            return neg_errno_code(LINUX_EPROTONOSUPPORT);
+        }
+        if base_socktype as u32 != posix_ctypes::SOCK_STREAM
+            && base_socktype as u32 != posix_ctypes::SOCK_DGRAM
+        {
+            return neg_errno_code(LINUX_ESOCKTNOSUPPORT);
+        }
+        return insert_local_socket_entry(process, base_socktype, flags);
+    }
+    if domain as u32 != posix_ctypes::AF_INET {
+        return neg_errno_code(LINUX_EAFNOSUPPORT);
+    }
+    if base_socktype as u32 == posix_ctypes::SOCK_STREAM {
+        if protocol != 0 && protocol as u32 != posix_ctypes::IPPROTO_TCP {
+            return neg_errno_code(LINUX_EPROTONOSUPPORT);
+        }
+    } else if base_socktype as u32 == posix_ctypes::SOCK_DGRAM {
+        if protocol != 0 && protocol as u32 != posix_ctypes::IPPROTO_UDP {
+            return neg_errno_code(LINUX_EPROTONOSUPPORT);
+        }
+    } else {
+        return neg_errno_code(LINUX_ESOCKTNOSUPPORT);
+    }
+    let posix_fd = match posix_ret_i32(arceos_posix_api::sys_socket(
+        domain,
+        base_socktype,
+        protocol,
+    )) {
+        Ok(fd) => fd,
+        Err(err) => return neg_errno(err),
+    };
+    insert_socket_entry(process, posix_fd, base_socktype, flags)
+}
+
+pub(super) fn sys_bind_bridge(
+    process: &UserProcess,
+    fd: usize,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    socket_addr_call(process, fd, addr, addrlen, arceos_posix_api::sys_bind)
+}
+
+pub(super) fn sys_listen_bridge(process: &UserProcess, fd: usize, backlog: usize) -> isize {
+    let socket = socket_entry_or_return!(process, fd);
+    match posix_ret_i32(arceos_posix_api::sys_listen(
+        socket.posix_fd,
+        backlog as i32,
+    )) {
+        Ok(_) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_accept_bridge(
+    process: &UserProcess,
+    fd: usize,
+    addr: usize,
+    addrlen: usize,
+    flags: usize,
+) -> isize {
+    match is_local_socket_fd(process, fd) {
+        Ok(true) => return neg_errno(LinuxError::EINVAL),
+        Ok(false) => {}
+        Err(err) => return neg_errno(err),
+    }
+    let socket = socket_entry_or_return!(process, fd);
+    let flag_mask = (posix_ctypes::SOCK_CLOEXEC | posix_ctypes::SOCK_NONBLOCK) as usize;
+    if flags & !flag_mask != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let user_addr_requested = !(addr == 0 && addrlen == 0);
+    if user_addr_requested && (addr == 0 || addrlen == 0) {
+        return neg_errno(LinuxError::EFAULT);
+    }
+
+    let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
+    let mut local_len = size_of::<posix_ctypes::sockaddr>() as posix_ctypes::socklen_t;
+
+    let new_posix_fd = match posix_ret_i32(unsafe {
+        arceos_posix_api::sys_accept(socket.posix_fd, &mut local_addr, &mut local_len)
+    }) {
+        Ok(fd) => fd,
+        Err(err) => return neg_errno(err),
+    };
+
+    if user_addr_requested {
+        let cleanup = |err| {
+            let _ = arceos_posix_api::sys_close(new_posix_fd);
+            neg_errno(err)
+        };
+        if let Err(err) =
+            validate_user_write(process, addrlen, size_of::<posix_ctypes::socklen_t>())
+        {
+            return cleanup(err);
+        }
+        let len = match read_user_value::<posix_ctypes::socklen_t>(process, addrlen) {
+            Ok(len) => len as usize,
+            Err(err) => return cleanup(err),
+        };
+        if let Err(err) = validate_user_write(process, addr, len) {
+            return cleanup(err);
+        }
+        let ret = write_socket_addr_to_user(process, addr, addrlen, len, &local_addr, local_len);
+        if ret < 0 {
+            let _ = arceos_posix_api::sys_close(new_posix_fd);
+            return ret;
+        }
+    }
+
+    insert_socket_entry(process, new_posix_fd, socket.socktype, flags as i32)
+}
+
+pub(super) fn sys_connect_bridge(
+    process: &UserProcess,
+    fd: usize,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    socket_addr_call(process, fd, addr, addrlen, arceos_posix_api::sys_connect)
+}
+
+pub(super) fn sys_sendto_bridge(
+    process: &UserProcess,
+    fd: usize,
+    buf: usize,
+    len: usize,
+    flags: usize,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    let socket = socket_entry_or_return!(process, fd);
+    let bytes = match read_socket_data_from_user(process, buf, len) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    let data_ptr = bytes.as_ptr() as *const c_void;
+    let ret = if addr == 0 {
+        unsafe { arceos_posix_api::sys_send(socket.posix_fd, data_ptr, len, flags as i32) }
+    } else {
+        let addr_bytes = match read_socket_addr_from_user(process, addr, addrlen) {
+            Ok(bytes) => bytes,
+            Err(err) => return neg_errno(err),
+        };
+        unsafe {
+            arceos_posix_api::sys_sendto(
+                socket.posix_fd,
+                data_ptr,
+                len,
+                flags as i32,
+                addr_bytes.as_ptr() as *const posix_ctypes::sockaddr,
+                addrlen as posix_ctypes::socklen_t,
+            )
+        }
+    };
+    match posix_ret_usize(ret) {
+        Ok(n) => n as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_recvfrom_bridge(
+    process: &UserProcess,
+    fd: usize,
+    buf: usize,
+    len: usize,
+    flags: usize,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    let socket = socket_entry_or_return!(process, fd);
+    if addr == 0 || addrlen == 0 {
+        recv_socket_data_to_user(process, socket.posix_fd, buf, len, flags as i32)
+    } else {
+        if let Err(err) =
+            validate_user_write(process, addrlen, size_of::<posix_ctypes::socklen_t>())
+        {
+            return neg_errno(err);
+        }
+        let addr_len_value = match read_user_value::<posix_ctypes::socklen_t>(process, addrlen) {
+            Ok(len) => len as usize,
+            Err(err) => return neg_errno(err),
+        };
+        if let Err(err) = validate_user_write(process, addr, addr_len_value) {
+            return neg_errno(err);
+        }
+        recv_socket_data_to_user_with_addr(
+            process,
+            socket.posix_fd,
+            buf,
+            len,
+            flags as i32,
+            addr,
+            addrlen,
+            addr_len_value,
+        )
+    }
+}
+
+pub(super) fn sys_shutdown_bridge(process: &UserProcess, fd: usize, how: usize) -> isize {
+    let socket = socket_entry_or_return!(process, fd);
+    match posix_ret_i32(arceos_posix_api::sys_shutdown(socket.posix_fd, how as i32)) {
+        Ok(_) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_getsockname_bridge(
+    process: &UserProcess,
+    fd: usize,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    socket_name_bridge(
+        process,
+        fd,
+        addr,
+        addrlen,
+        arceos_posix_api::sys_getsockname,
+    )
+}
+
+pub(super) fn sys_getpeername_bridge(
+    process: &UserProcess,
+    fd: usize,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    socket_name_bridge(
+        process,
+        fd,
+        addr,
+        addrlen,
+        arceos_posix_api::sys_getpeername,
+    )
+}
+
+pub(super) fn sys_setsockopt_bridge(
+    process: &UserProcess,
+    fd: usize,
+    level: usize,
+    optname: usize,
+    optval: usize,
+    optlen: usize,
+) -> isize {
+    let socket = socket_entry_or_return!(process, fd);
+    if optlen > 0 {
+        if let Err(err) = validate_user_read(process, optval, optlen) {
+            return neg_errno(err);
+        }
+    }
+    let level_i32 = level as i32;
+    let optname_i32 = optname as i32;
+    if level_i32 == IPPROTO_IP_LEVEL
+        && matches!(optname_i32, MCAST_JOIN_GROUP_OPT | MCAST_LEAVE_GROUP_OPT)
+    {
+        if optval == 0 || optlen < size_of::<u32>() {
+            neg_errno(LinuxError::EINVAL)
+        } else {
+            let mut table = process.fds.lock();
+            match table.entry_mut(fd as i32) {
+                Ok(FdEntry::Socket(socket)) => {
+                    let mut options = socket.options.lock();
+                    if optname_i32 == MCAST_JOIN_GROUP_OPT {
+                        options.ip_mcast_joined = true;
+                        0
+                    } else if options.ip_mcast_joined {
+                        options.ip_mcast_joined = false;
+                        0
+                    } else {
+                        neg_errno(LinuxError::EADDRNOTAVAIL)
+                    }
+                }
+                Ok(_) => neg_errno(LinuxError::ENOTSOCK),
+                Err(err) => neg_errno(err),
+            }
+        }
+    } else if !socket_option_supported(level_i32, optname_i32) {
+        neg_errno(LinuxError::EINVAL)
+    } else if level_i32 == SOL_SOCKET_LEVEL
+        && matches!(optname_i32, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT)
+    {
+        if optlen < size_of::<general::timeval>() {
+            neg_errno(LinuxError::EINVAL)
+        } else {
+            match read_user_value::<general::timeval>(process, optval)
+                .and_then(socket_timeval_to_duration)
+            {
+                Ok(timeout) => {
+                    let result = if optname_i32 == SO_RCVTIMEO_OPT {
+                        arceos_posix_api::set_socket_recv_timeout(socket.posix_fd, timeout)
+                    } else {
+                        arceos_posix_api::set_socket_send_timeout(socket.posix_fd, timeout)
+                    };
+                    match result {
+                        Ok(()) => 0,
+                        Err(err) => neg_errno(err),
+                    }
+                }
+                Err(err) => neg_errno(err),
+            }
+        }
+    } else {
+        0
+    }
+}
+
+pub(super) fn sys_getsockopt_bridge(
+    process: &UserProcess,
+    fd: usize,
+    level: usize,
+    optname: usize,
+    optval: usize,
+    optlen: usize,
+) -> isize {
+    let socket = socket_entry_or_return!(process, fd);
+    if optval == 0 || optlen == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let len = match read_user_value::<posix_ctypes::socklen_t>(process, optlen) {
+        Ok(len) => len as usize,
+        Err(err) => return neg_errno(err),
+    };
+    let level = level as i32;
+    let optname = optname as i32;
+    if level == posix_ctypes::IPPROTO_TCP as i32 && optname == TCP_INFO_OPT {
+        if len == 0 {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let out_len = len.min(TCP_INFO_COMPAT_SIZE);
+        if let Err(err) = clear_user_bytes(process, optval, out_len) {
+            return neg_errno(err);
+        }
+        let out_len = out_len as posix_ctypes::socklen_t;
+        return write_user_value(process, optlen, &out_len);
+    }
+    if level == SOL_SOCKET_LEVEL && matches!(optname, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT) {
+        if len < size_of::<general::timeval>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if let Err(err) = validate_user_write(process, optval, size_of::<general::timeval>()) {
+            return neg_errno(err);
+        }
+        let timeout = if optname == SO_RCVTIMEO_OPT {
+            arceos_posix_api::socket_recv_timeout(socket.posix_fd)
+        } else {
+            arceos_posix_api::socket_send_timeout(socket.posix_fd)
+        };
+        let value = match timeout {
+            Ok(timeout) => socket_duration_to_timeval(timeout),
+            Err(err) => return neg_errno(err),
+        };
+        let ret = write_user_value(process, optval, &value);
+        if ret != 0 {
+            return ret;
+        }
+        let out_len = size_of::<general::timeval>() as posix_ctypes::socklen_t;
+        return write_user_value(process, optlen, &out_len);
+    }
+    if len < size_of::<i32>() {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
+        return neg_errno(err);
+    }
+    let value = if level == SOL_SOCKET_LEVEL {
+        match optname {
+            SO_ERROR_OPT => 0,
+            SO_TYPE_OPT => socket.socktype,
+            SO_SNDBUF_OPT | SO_RCVBUF_OPT => DEFAULT_SOCKET_BUFFER_SIZE,
+            _ if socket_option_supported(level, optname) => 0,
+            _ => return neg_errno(LinuxError::EINVAL),
+        }
+    } else if level == posix_ctypes::IPPROTO_TCP as i32 && socket_option_supported(level, optname) {
+        match optname {
+            TCP_MAXSEG_OPT => DEFAULT_TCP_MAXSEG,
+            _ => 0,
+        }
+    } else if level == IPPROTO_IP_LEVEL && socket_option_supported(level, optname) {
+        0
+    } else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    let ret = write_user_value(process, optval, &value);
+    if ret != 0 {
+        return ret;
+    }
+    let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
+    write_user_value(process, optlen, &out_len)
 }

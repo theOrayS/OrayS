@@ -1,4 +1,5 @@
 use core::mem::size_of;
+use core::sync::atomic::Ordering;
 
 use axerrno::LinuxError;
 use linux_raw_sys::general;
@@ -8,6 +9,90 @@ use std::vec::Vec;
 use super::linux_abi::{ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CHOWN_ID_UNCHANGED};
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
+
+impl UserProcess {
+    pub(super) fn real_uid(&self) -> u32 {
+        self.real_uid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn uid(&self) -> u32 {
+        self.uid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn saved_uid(&self) -> u32 {
+        self.saved_uid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn real_gid(&self) -> u32 {
+        self.real_gid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn gid(&self) -> u32 {
+        self.gid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn saved_gid(&self) -> u32 {
+        self.saved_gid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_uid(&self, uid: u32) {
+        self.real_uid.store(uid, Ordering::Release);
+        self.uid.store(uid, Ordering::Release);
+        self.saved_uid.store(uid, Ordering::Release);
+    }
+
+    pub(super) fn set_gid(&self, gid: u32) {
+        self.real_gid.store(gid, Ordering::Release);
+        self.gid.store(gid, Ordering::Release);
+        self.saved_gid.store(gid, Ordering::Release);
+    }
+
+    pub(super) fn set_user_ids(
+        &self,
+        real: Option<u32>,
+        effective: Option<u32>,
+        saved: Option<u32>,
+    ) {
+        if let Some(uid) = real {
+            self.real_uid.store(uid, Ordering::Release);
+        }
+        if let Some(uid) = effective {
+            self.uid.store(uid, Ordering::Release);
+        }
+        if let Some(uid) = saved {
+            self.saved_uid.store(uid, Ordering::Release);
+        }
+    }
+
+    pub(super) fn set_group_ids(
+        &self,
+        real: Option<u32>,
+        effective: Option<u32>,
+        saved: Option<u32>,
+    ) {
+        if let Some(gid) = real {
+            self.real_gid.store(gid, Ordering::Release);
+        }
+        if let Some(gid) = effective {
+            self.gid.store(gid, Ordering::Release);
+        }
+        if let Some(gid) = saved {
+            self.saved_gid.store(gid, Ordering::Release);
+        }
+    }
+
+    pub(super) fn groups(&self) -> Vec<u32> {
+        self.groups.lock().clone()
+    }
+
+    pub(super) fn set_groups(&self, groups: Vec<u32>) {
+        *self.groups.lock() = groups;
+    }
+
+    pub(super) fn has_group(&self, gid: u32) -> bool {
+        self.gid() == gid || self.groups.lock().contains(&gid)
+    }
+}
 
 pub(super) fn set_single_id<F>(id: usize, apply: F) -> isize
 where
