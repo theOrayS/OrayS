@@ -3,6 +3,18 @@ set -euo pipefail
 
 ARCH="${1:-rv}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+TESTSUITE_DIR="${TESTSUITE_DIR:-$SCRIPT_DIR/../testsuits-for-oskernel}"
+RV_IMG="${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}"
+LA_IMG="${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}"
+export PATH="$HOME/.cargo/bin:$PATH"
+
+require_img() {
+    if [ ! -f "$1" ]; then
+        echo "缺少评测镜像: $1"
+        echo "可通过 TESTSUITE_DIR 或 RV_TESTSUITE_IMG/LA_TESTSUITE_IMG 指定路径"
+        exit 1
+    fi
+}
 
 usage() {
     printf '用法: %s [rv|la]\n' "$0" >&2

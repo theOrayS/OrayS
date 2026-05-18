@@ -67,7 +67,10 @@ KERNEL_LA_CONFIG ?= $(KERNEL_BUILD_DIR)/loongarch64.axconfig.toml
 KERNEL_RV_TARGET_DIR ?= $(KERNEL_TARGET_DIR)/riscv64
 KERNEL_LA_TARGET_DIR ?= $(KERNEL_TARGET_DIR)/loongarch64
 KERNEL_RV_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
-KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
+# QEMU loongarch64 virt splits 1G RAM into lowram [0, 0x1000_0000)
+# and highram [0x8000_0000, 0xb000_0000). ArceOS uses highram as the
+# contiguous RAM window, so do not advertise the hole above 0xb000_0000.
+KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
 TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
@@ -80,7 +83,15 @@ LA_AUX_DISK ?= $(CURDIR)/disk-la.img
 RV_MEM ?= 1G
 LA_MEM ?= 1G
 RV_NETDEV_ARGS ?= user,id=net
-LA_NETDEV_ARGS ?= user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+# Keep LA default consistent with RV: no host port binding by default.
+# If you need forwarding, append for example:
+#   make run-la LA_HOSTFWD_ARGS='hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555'
+LA_HOSTFWD_ARGS ?=
+ifeq ($(strip $(LA_HOSTFWD_ARGS)),)
+LA_NETDEV_ARGS ?= user,id=net0
+else
+LA_NETDEV_ARGS ?= user,id=net0,$(LA_HOSTFWD_ARGS)
+endif
 DOCKER_IMAGE ?= orays-arceos-dev
 
 # App options
@@ -304,7 +315,7 @@ run-rv: kernel-rv prepare-rv-testsuite-img
 
 run-la: kernel-la prepare-la-testsuite-img
 	qemu-system-loongarch64 -kernel $(KERNEL_LA) -m $(LA_MEM) -nographic -smp $(KERNEL_SMP) -drive file=$(LA_TESTSUITE_RUN_IMG),if=none,format=qcow2,id=x0 \
-		-device virtio-blk-pci,drive=x0 -no-reboot -device virtio-net-pci,netdev=net0 \
+		-device virtio-blk-pci,drive=x0,bus=pcie.0 -no-reboot -device virtio-net-pci,netdev=net0 \
 		-netdev $(LA_NETDEV_ARGS) -rtc base=utc $(la_aux_drive)
 
 disasm:
