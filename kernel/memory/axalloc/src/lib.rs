@@ -23,6 +23,15 @@ const MIN_HEAP_SIZE: usize = 0x8000; // 32 K
 
 pub use page::GlobalPage;
 
+/// A snapshot of the frame allocator state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameAllocatorStats {
+    /// Frames currently available for allocation.
+    pub free_frames: usize,
+    /// Frames currently allocated from the frame allocator.
+    pub allocated_frames: usize,
+}
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "slab")] {
         /// The default byte allocator.
@@ -194,6 +203,15 @@ impl GlobalAllocator {
     pub fn available_pages(&self) -> usize {
         self.palloc.lock().available_pages()
     }
+
+    /// Returns a snapshot of the page-frame allocator counters.
+    pub fn frame_stats(&self) -> FrameAllocatorStats {
+        let palloc = self.palloc.lock();
+        FrameAllocatorStats {
+            free_frames: palloc.available_pages(),
+            allocated_frames: palloc.used_pages(),
+        }
+    }
 }
 
 unsafe impl GlobalAlloc for GlobalAllocator {
@@ -216,6 +234,11 @@ static GLOBAL_ALLOCATOR: GlobalAllocator = GlobalAllocator::new();
 /// Returns the reference to the global allocator.
 pub fn global_allocator() -> &'static GlobalAllocator {
     &GLOBAL_ALLOCATOR
+}
+
+/// Returns a snapshot of the global frame allocator counters.
+pub fn frame_allocator_stats() -> FrameAllocatorStats {
+    GLOBAL_ALLOCATOR.frame_stats()
 }
 
 /// Initializes the global allocator with the given memory region.

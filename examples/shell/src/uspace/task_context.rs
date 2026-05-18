@@ -32,6 +32,7 @@ pub(super) struct UserTaskExt {
     pub(super) deferred_unmap_start: AtomicUsize,
     pub(super) deferred_unmap_len: AtomicUsize,
     pub(super) signal_frame: AtomicUsize,
+    pub(super) last_user_pc: AtomicUsize,
     pub(super) pending_sigreturn: Mutex<Option<TrapFrame>>,
 }
 
@@ -48,6 +49,7 @@ impl UserTaskExt {
             deferred_unmap_start: AtomicUsize::new(0),
             deferred_unmap_len: AtomicUsize::new(0),
             signal_frame: AtomicUsize::new(0),
+            last_user_pc: AtomicUsize::new(0),
             pending_sigreturn: Mutex::new(None),
         }
     }
@@ -105,6 +107,18 @@ pub(super) fn current_tid() -> i32 {
     axtask::current().id().as_u64() as i32
 }
 
+pub(super) fn current_user_pc() -> usize {
+    current_task_ext()
+        .map(|ext| ext.last_user_pc.load(Ordering::Acquire))
+        .unwrap_or(0)
+}
+
+pub(super) fn set_current_user_pc(pc: usize) {
+    if let Some(ext) = current_task_ext() {
+        ext.last_user_pc.store(pc, Ordering::Release);
+    }
+}
+
 #[cfg(target_arch = "riscv64")]
 #[allow(dead_code)]
 pub(super) fn user_pc(tf: &TrapFrame) -> usize {
@@ -115,6 +129,18 @@ pub(super) fn user_pc(tf: &TrapFrame) -> usize {
 #[allow(dead_code)]
 pub(super) fn user_pc(tf: &TrapFrame) -> usize {
     tf.era
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(dead_code)]
+pub(super) fn user_pc(tf: &TrapFrame) -> usize {
+    tf.rip as usize
+}
+
+#[cfg(target_arch = "aarch64")]
+#[allow(dead_code)]
+pub(super) fn user_pc(tf: &TrapFrame) -> usize {
+    tf.elr as usize
 }
 
 pub(super) fn sys_set_tid_address(_tf: &TrapFrame, _tidptr: usize) -> isize {

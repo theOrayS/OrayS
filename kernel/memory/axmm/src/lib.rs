@@ -9,7 +9,7 @@ extern crate alloc;
 mod aspace;
 mod backend;
 
-pub use self::aspace::AddrSpace;
+pub use self::aspace::{AddrSpace, AddrSpaceQuery};
 pub use self::backend::Backend;
 
 use axerrno::{AxError, AxResult};

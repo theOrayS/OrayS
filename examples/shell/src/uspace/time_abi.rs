@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use super::linux_abi::SIGALRM_NUM;
 use super::signal_abi::deliver_user_signal;
-use super::task_registry::user_thread_entry_for_process;
+use super::task_context::current_tid;
+use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
 
@@ -17,8 +18,47 @@ const NSEC_PER_SEC: i128 = 1_000_000_000;
 pub(super) const USER_HZ: c_long = 100;
 
 impl UserProcess {
-    pub(super) fn real_timer_active(&self) -> bool {
+    pub(super) fn real_timer_armed(&self) -> bool {
         self.real_timer_deadline_us.load(Ordering::Acquire) != 0
+    }
+
+    fn take_expired_real_timer(&self, allow_interval: bool) -> Option<u64> {
+        let deadline = self.real_timer_deadline_us.load(Ordering::Acquire);
+        if deadline == 0 || monotonic_time_micros() < deadline {
+            return None;
+        }
+
+        let interval = self.real_timer_interval_us.load(Ordering::Acquire);
+        if interval != 0 && !allow_interval {
+            return None;
+        }
+        let next_deadline = if interval == 0 {
+            0
+        } else {
+            monotonic_time_micros().saturating_add(interval)
+        };
+        if self
+            .real_timer_deadline_us
+            .compare_exchange(deadline, next_deadline, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return None;
+        }
+
+        if interval == 0 {
+            self.real_timer_generation.fetch_add(1, Ordering::AcqRel);
+        }
+        Some(interval)
+    }
+
+    pub(super) fn consume_expired_real_timer(&self) -> bool {
+        if self.take_expired_real_timer(false).is_none() {
+            return false;
+        }
+        if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
+            let _ = deliver_user_signal(&entry, SIGALRM_NUM);
+        }
+        true
     }
 }
 
@@ -369,19 +409,14 @@ fn arm_real_itimer(
             {
                 break;
             }
-            if let Some(entry) = user_thread_entry_for_process(&process) {
-                let _ = deliver_user_signal(&entry, SIGALRM_NUM);
+            if process.take_expired_real_timer(true).is_some() {
+                if let Some(entry) = user_thread_entry_for_process(&process) {
+                    let _ = deliver_user_signal(&entry, SIGALRM_NUM);
+                }
             }
             if interval_us == 0 {
-                if process.real_timer_generation.load(Ordering::Acquire) == generation {
-                    process.real_timer_deadline_us.store(0, Ordering::Release);
-                }
                 break;
             }
-            process.real_timer_deadline_us.store(
-                monotonic_time_micros().saturating_add(interval_us),
-                Ordering::Release,
-            );
             delay_us = interval_us;
         }
     });

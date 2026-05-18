@@ -1,5 +1,6 @@
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
+use axalloc::frame_allocator_stats;
 use axerrno::LinuxError;
 use axhal::context::{TrapFrame, UspaceContext};
 use axmm::AddrSpace;
@@ -45,6 +46,7 @@ impl ProcessTeardown {
 
     pub(super) fn run(
         &self,
+        pid: i32,
         aspace: &Mutex<AddrSpace>,
         fds: &Mutex<FdTable>,
         children: &Mutex<Vec<ChildTask>>,
@@ -53,7 +55,19 @@ impl ProcessTeardown {
             return;
         }
 
+        let before = frame_allocator_stats();
         aspace.lock().clear();
+        let after_aspace = frame_allocator_stats();
+        let reclaimed_frames = before
+            .allocated_frames
+            .saturating_sub(after_aspace.allocated_frames);
+        println!(
+            "frame-allocator-diagnostic: process-teardown pid={pid} reclaimed_frames={reclaimed_frames} before_free={} before_allocated={} after_free={} after_allocated={}",
+            before.free_frames,
+            before.allocated_frames,
+            after_aspace.free_frames,
+            after_aspace.allocated_frames,
+        );
         {
             let mut fds = fds.lock();
             fds.close_all();
@@ -142,6 +156,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         gid: AtomicU32::new(0),
         saved_gid: AtomicU32::new(0),
         groups: Mutex::new(Vec::new()),
+        created_by_fork: AtomicBool::new(false),
+        credential_generation: AtomicUsize::new(0),
         personality: AtomicUsize::new(0),
         real_timer_generation: AtomicU64::new(0),
         real_timer_deadline_us: AtomicU64::new(0),
@@ -214,8 +230,17 @@ impl UserProcess {
         self.pid.store(pid, Ordering::Release);
     }
 
+    pub(super) fn created_by_fork(&self) -> bool {
+        self.created_by_fork.load(Ordering::Acquire)
+    }
+
+    pub(super) fn credential_generation(&self) -> usize {
+        self.credential_generation.load(Ordering::Acquire)
+    }
+
     pub(super) fn teardown(&self) {
-        self.teardown.run(&self.aspace, &self.fds, &self.children);
+        self.teardown
+            .run(self.pid(), &self.aspace, &self.fds, &self.children);
     }
 
     pub(super) fn add_thread(&self) {
@@ -284,6 +309,8 @@ impl UserProcess {
             gid: AtomicU32::new(self.gid()),
             saved_gid: AtomicU32::new(self.saved_gid()),
             groups: Mutex::new(self.groups()),
+            created_by_fork: AtomicBool::new(true),
+            credential_generation: AtomicUsize::new(self.credential_generation()),
             personality: AtomicUsize::new(self.personality()),
             real_timer_generation: AtomicU64::new(0),
             real_timer_deadline_us: AtomicU64::new(0),

@@ -449,7 +449,18 @@ where
         Ok(timeout) => timeout,
         Err(err) => return neg_errno(err),
     };
-    if original_timeout.is_some() || !process.real_timer_active() {
+    let status_flags = match posix_ret_i32(arceos_posix_api::sys_fcntl(
+        posix_fd,
+        posix_ctypes::F_GETFL as i32,
+        0,
+    )) {
+        Ok(flags) => flags,
+        Err(err) => return neg_errno(err),
+    };
+    if original_timeout.is_some()
+        || status_flags & posix_ctypes::O_NONBLOCK as i32 != 0
+        || !process.real_timer_armed()
+    {
         return match posix_ret_usize(recv_once()) {
             Ok(n) => n as isize,
             Err(err) => neg_errno(err),
@@ -463,7 +474,7 @@ where
     }
 
     let result = loop {
-        if current_unblocked_signal_pending() {
+        if current_unblocked_signal_pending() || process.consume_expired_real_timer() {
             break neg_errno(LinuxError::EINTR);
         }
         match posix_ret_usize(recv_once()) {
@@ -472,8 +483,8 @@ where
                 if current_unblocked_signal_pending() {
                     break neg_errno(LinuxError::EINTR);
                 }
-                if !process.real_timer_active() {
-                    break neg_errno(LinuxError::EAGAIN);
+                if process.consume_expired_real_timer() {
+                    break neg_errno(LinuxError::EINTR);
                 }
             }
             Err(err) => break neg_errno(err),
@@ -581,9 +592,12 @@ pub(super) fn sys_accept_bridge(
     let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
     let mut local_len = size_of::<posix_ctypes::sockaddr>() as posix_ctypes::socklen_t;
 
-    let new_posix_fd = match posix_ret_i32(unsafe {
-        arceos_posix_api::sys_accept(socket.posix_fd, &mut local_addr, &mut local_len)
-    }) {
+    let new_posix_fd = match accept_with_real_timer_interrupt(
+        process,
+        socket.posix_fd,
+        &mut local_addr,
+        &mut local_len,
+    ) {
         Ok(fd) => fd,
         Err(err) => return neg_errno(err),
     };
@@ -613,6 +627,59 @@ pub(super) fn sys_accept_bridge(
     }
 
     insert_socket_entry(process, new_posix_fd, socket.socktype, flags as i32)
+}
+
+fn accept_with_real_timer_interrupt(
+    process: &UserProcess,
+    posix_fd: i32,
+    local_addr: &mut posix_ctypes::sockaddr,
+    local_len: &mut posix_ctypes::socklen_t,
+) -> Result<i32, LinuxError> {
+    let original_timeout = arceos_posix_api::socket_recv_timeout(posix_fd)?;
+    let status_flags = posix_ret_i32(arceos_posix_api::sys_fcntl(
+        posix_fd,
+        posix_ctypes::F_GETFL as i32,
+        0,
+    ))?;
+    if original_timeout.is_some()
+        || status_flags & posix_ctypes::O_NONBLOCK as i32 != 0
+        || !process.real_timer_armed()
+    {
+        return posix_ret_i32(unsafe {
+            arceos_posix_api::sys_accept(posix_fd, local_addr, local_len)
+        });
+    }
+
+    arceos_posix_api::set_socket_recv_timeout(posix_fd, Some(INTERRUPTIBLE_SOCKET_RECV_QUANTUM))?;
+
+    let result = loop {
+        if current_unblocked_signal_pending() || process.consume_expired_real_timer() {
+            break Err(LinuxError::EINTR);
+        }
+        match posix_ret_i32(unsafe {
+            arceos_posix_api::sys_accept(posix_fd, local_addr, local_len)
+        }) {
+            Ok(fd) => break Ok(fd),
+            Err(LinuxError::EAGAIN) => {
+                if current_unblocked_signal_pending() || process.consume_expired_real_timer() {
+                    break Err(LinuxError::EINTR);
+                }
+            }
+            Err(err) => break Err(err),
+        }
+    };
+
+    match (
+        arceos_posix_api::set_socket_recv_timeout(posix_fd, original_timeout),
+        result,
+    ) {
+        (Ok(()), result) => result,
+        (Err(err), Ok(fd)) => {
+            let _ = arceos_posix_api::sys_close(fd);
+            Err(err)
+        }
+        (Err(_), Err(err)) => Err(err),
+    }
 }
 
 pub(super) fn sys_connect_bridge(

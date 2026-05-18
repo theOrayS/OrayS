@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, AtomicUsize};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize};
 
 use axmm::AddrSpace;
 use axns::AxNamespace;
@@ -42,7 +42,9 @@ mod user_memory;
 use fd_table::FdTable;
 use linux_abi::*;
 use process_lifecycle::ProcessTeardown;
-pub use process_lifecycle::{run_user_program, run_user_program_in};
+pub use process_lifecycle::run_user_program;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::run_user_program_in;
 use resource_sched::UserRlimit;
 use select_fdset::SelectMode;
 
@@ -69,6 +71,8 @@ struct UserProcess {
     gid: AtomicU32,
     saved_gid: AtomicU32,
     groups: Mutex<Vec<u32>>,
+    created_by_fork: AtomicBool,
+    credential_generation: AtomicUsize,
     personality: AtomicUsize,
     real_timer_generation: AtomicU64,
     real_timer_deadline_us: AtomicU64,

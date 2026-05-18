@@ -10,6 +10,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
+use super::task_context::{current_tid, current_user_pc};
 use super::{UserProcess, neg_errno};
 
 pub(super) fn validate_user_read(
@@ -258,7 +259,7 @@ pub(super) fn clear_user_bytes(
     }
     validate_user_write(process, ptr, len)?;
 
-    let aspace = process.aspace.lock();
+    let mut aspace = process.aspace.lock();
     let mut offset = 0;
     while offset < len {
         let chunk_len = core::cmp::min(len - offset, ZERO_CHUNK.len());
@@ -334,23 +335,31 @@ pub(super) fn read_cstr(process: &UserProcess, ptr: usize) -> Result<String, Lin
     const MAX_USER_CSTR_LEN: usize = 128 * 1024;
 
     if ptr == 0 {
-        return Err(LinuxError::EFAULT);
+        return read_cstr_efault(process, ptr, ptr, "null pointer");
     }
     if !user_range_fits(ptr, 1) {
-        return Err(LinuxError::EFAULT);
+        return read_cstr_efault(process, ptr, ptr, "pointer overflow");
     }
 
-    let aspace = process.aspace.lock();
+    let mut aspace = process.aspace.lock();
     let mut bytes = Vec::new();
     for offset in 0..MAX_USER_CSTR_LEN {
-        let addr = ptr.checked_add(offset).ok_or(LinuxError::EFAULT)?;
+        let addr = match ptr.checked_add(offset) {
+            Some(addr) => addr,
+            None => {
+                log_read_cstr_efault(process, ptr, ptr, "string pointer overflow", &aspace);
+                return Err(LinuxError::EFAULT);
+            }
+        };
         if !aspace.can_access_range(VirtAddr::from(addr), 1, MappingFlags::READ) {
+            log_read_cstr_efault(process, ptr, addr, "range is not readable", &aspace);
             return Err(LinuxError::EFAULT);
         }
         let mut byte = [0u8; 1];
-        aspace
-            .read(VirtAddr::from(addr), &mut byte)
-            .map_err(|_| LinuxError::EFAULT)?;
+        if aspace.read(VirtAddr::from(addr), &mut byte).is_err() {
+            log_read_cstr_efault(process, ptr, addr, "address-space read failed", &aspace);
+            return Err(LinuxError::EFAULT);
+        }
         if byte[0] == 0 {
             return String::from_utf8(bytes).map_err(|_| LinuxError::EINVAL);
         }
@@ -358,4 +367,37 @@ pub(super) fn read_cstr(process: &UserProcess, ptr: usize) -> Result<String, Lin
     }
 
     Err(LinuxError::EINVAL)
+}
+
+fn read_cstr_efault(
+    process: &UserProcess,
+    ptr: usize,
+    fault_addr: usize,
+    reason: &'static str,
+) -> Result<String, LinuxError> {
+    let aspace = process.aspace.lock();
+    log_read_cstr_efault(process, ptr, fault_addr, reason, &aspace);
+    Err(LinuxError::EFAULT)
+}
+
+fn log_read_cstr_efault(
+    process: &UserProcess,
+    ptr: usize,
+    fault_addr: usize,
+    reason: &'static str,
+    aspace: &axmm::AddrSpace,
+) {
+    let query = aspace.query_address(VirtAddr::from(fault_addr));
+    println!(
+        "read-cstr-efault: pid={} tid={} ptr={ptr:#x} fault_addr={fault_addr:#x} pc={:#x} reason=\"{}\" aspace={:?} created_by_fork={} credential_generation={} uid={} gid={}",
+        process.pid(),
+        current_tid(),
+        current_user_pc(),
+        reason,
+        query,
+        process.created_by_fork(),
+        process.credential_generation(),
+        process.uid(),
+        process.gid(),
+    );
 }

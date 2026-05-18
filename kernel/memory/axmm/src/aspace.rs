@@ -22,6 +22,22 @@ pub struct AddrSpace {
     pt: PageTable,
 }
 
+/// Diagnostic information for a single virtual address lookup.
+#[derive(Clone, Copy, Debug)]
+pub struct AddrSpaceQuery {
+    pub contains: bool,
+    pub area_found: bool,
+    pub area_start: usize,
+    pub area_end: usize,
+    pub area_flags: MappingFlags,
+    pub backend: &'static str,
+    pub pte_mapped: bool,
+    pub paddr: usize,
+    pub pte_flags: MappingFlags,
+    pub page_size: Option<PageSize>,
+    pub shared_metadata: bool,
+}
+
 impl AddrSpace {
     /// Returns the address space base.
     pub const fn base(&self) -> VirtAddr {
@@ -84,10 +100,10 @@ impl AddrSpace {
     ///
     /// Unlike [`Self::copy_mappings_from`], this duplicates user mappings even
     /// when the two address spaces cover the same virtual range. Allocation
-    /// backends are recreated in the destination. Non-writable pages are
-    /// retained as lazy shared metadata; writable resident pages are
-    /// materialized privately so fork either preserves write isolation or fails
-    /// with `NoMemory` before the child is exposed.
+    /// backends are recreated in the destination. Resident pages are retained
+    /// as lazy shared metadata; writable pages are write-protected in both
+    /// parent and child so copy-on-write can preserve isolation without
+    /// eagerly duplicating the process's writable working set.
     pub fn clone_user_mappings_from(&mut self, other: &mut AddrSpace) -> AxResult {
         if self.va_range != other.va_range {
             return ax_err!(InvalidInput, "address space range mismatch");
@@ -97,13 +113,15 @@ impl AddrSpace {
 
         for area in other.areas.iter() {
             let mut shared_pages = BTreeMap::new();
-            let mut private_pages = Vec::new();
+            let mut retained_frames = Vec::new();
+            let mut parent_protect_pages = Vec::new();
             let cow_pages = area.flags().contains(MappingFlags::WRITE);
             let alloc_missing = area.backend().alloc_missing_on_fault();
             for vaddr in PageIter4K::new(area.start(), area.end())
                 .expect("memory area bounds must be 4K aligned")
             {
-                let query = other.pt.query(vaddr).ok().or_else(|| {
+                let parent_pte = other.pt.query(vaddr).ok();
+                let query = parent_pte.or_else(|| {
                     area.backend()
                         .shared_page(vaddr)
                         .map(|(paddr, flags)| (paddr, flags, PageSize::Size4K))
@@ -124,11 +142,15 @@ impl AddrSpace {
                     self.clear();
                     return ax_err!(BadState, "failed to clone huge user page");
                 }
+                let mut child_flags = src_flags;
                 if cow_pages {
-                    private_pages.push((vaddr, src_paddr));
-                } else {
-                    shared_pages.insert(vaddr.as_usize(), (src_paddr, src_flags));
+                    child_flags.remove(MappingFlags::WRITE);
+                    if parent_pte.is_some() {
+                        parent_protect_pages.push((vaddr, child_flags));
+                    }
                 }
+                shared_pages.insert(vaddr.as_usize(), (src_paddr, child_flags));
+                retained_frames.push(src_paddr);
             }
 
             let cloned_area = MemoryArea::new(
@@ -151,33 +173,22 @@ impl AddrSpace {
                 return Err(mapping_err_to_ax_err(err));
             }
 
-            for (_, (src_paddr, _)) in shared_pages {
-                retain_shared_frame(src_paddr);
+            for frame in retained_frames {
+                retain_shared_frame(frame);
             }
 
-            let fault_flags = fault_flags_from_mapping(area.flags());
-            for (vaddr, src_paddr) in private_pages {
-                if self.pt.query(vaddr).is_err() && !self.handle_page_fault(vaddr, fault_flags) {
+            for (vaddr, flags) in parent_protect_pages {
+                if let Err(err) = other.pt.cursor().protect(vaddr, flags) {
                     warn!(
-                        "clone_user_mappings_from: materialize private child page failed area_start={:#x} area_end={:#x} vaddr={:#x} src_paddr={:#x} flags={:?} backend={} fault_flags={:?}",
+                        "clone_user_mappings_from: COW parent protect failed area_start={:#x} area_end={:#x} vaddr={:#x} flags={:?} err={:?}",
                         area.start(),
                         area.end(),
                         vaddr,
-                        src_paddr,
-                        area.flags(),
-                        area.backend().kind_name(),
-                        fault_flags
+                        flags,
+                        err
                     );
                     self.clear();
-                    return ax_err!(NoMemory, "failed to materialize private child page");
-                }
-                let (dst_paddr, _, _) = self.pt.query(vaddr).map_err(|_| AxError::BadState)?;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        phys_to_virt(src_paddr).as_ptr(),
-                        phys_to_virt(dst_paddr).as_mut_ptr(),
-                        PAGE_SIZE_4K,
-                    );
+                    return ax_err!(BadState, "failed to protect parent COW page");
                 }
             }
         }
@@ -278,7 +289,14 @@ impl AddrSpace {
     /// To process data in this area with the given function.
     ///
     /// Now it supports reading and writing data in the given interval.
-    fn process_area_data<F>(&self, start: VirtAddr, size: usize, mut f: F) -> AxResult
+    fn process_area_data<F>(
+        &mut self,
+        start: VirtAddr,
+        size: usize,
+        access_flags: MappingFlags,
+        fault_flags: PageFaultFlags,
+        mut f: F,
+    ) -> AxResult
     where
         F: FnMut(VirtAddr, usize, usize),
     {
@@ -291,7 +309,7 @@ impl AddrSpace {
         for vaddr in PageIter4K::new(start.align_down_4k(), end_align_up)
             .expect("Failed to create page iterator")
         {
-            let (mut paddr, _, _) = self.pt.query(vaddr).map_err(|_| AxError::BadAddress)?;
+            let (mut paddr, _, _) = self.ensure_page_access(vaddr, access_flags, fault_flags)?;
 
             let mut copy_size = (size - cnt).min(PAGE_SIZE_4K);
 
@@ -309,16 +327,92 @@ impl AddrSpace {
         Ok(())
     }
 
+    fn ensure_page_access(
+        &mut self,
+        vaddr: VirtAddr,
+        access_flags: MappingFlags,
+        fault_flags: PageFaultFlags,
+    ) -> AxResult<(PhysAddr, MappingFlags, PageSize)> {
+        let needs_write = access_flags.contains(MappingFlags::WRITE);
+        match self.pt.query(vaddr) {
+            Ok((paddr, flags, page_size)) => {
+                if needs_write && !flags.contains(MappingFlags::WRITE) {
+                    if self.handle_page_fault(vaddr, PageFaultFlags::WRITE) {
+                        return self.ensure_write_resolved(vaddr);
+                    }
+                    if !self.area_allows_write(vaddr) {
+                        return Ok((paddr, flags, page_size));
+                    }
+                    return ax_err!(BadAddress, "write fault was not handled");
+                }
+                if !needs_write && !flags.contains(access_flags) {
+                    return ax_err!(BadAddress, "page permissions do not allow access");
+                }
+                Ok((paddr, flags, page_size))
+            }
+            _ => {
+                let handled = self.handle_page_fault(vaddr, fault_flags)
+                    || (needs_write && self.handle_page_fault(vaddr, PageFaultFlags::READ));
+                if !handled {
+                    return ax_err!(BadAddress, "page fault was not handled");
+                }
+                if needs_write {
+                    return self.ensure_write_resolved(vaddr);
+                }
+                let (paddr, flags, page_size) =
+                    self.pt.query(vaddr).map_err(|_| AxError::BadAddress)?;
+                if !flags.contains(access_flags) {
+                    return ax_err!(BadAddress, "page permissions do not allow access");
+                }
+                Ok((paddr, flags, page_size))
+            }
+        }
+    }
+
+    fn ensure_write_resolved(
+        &mut self,
+        vaddr: VirtAddr,
+    ) -> AxResult<(PhysAddr, MappingFlags, PageSize)> {
+        let (paddr, flags, page_size) = self.pt.query(vaddr).map_err(|_| AxError::BadAddress)?;
+        if flags.contains(MappingFlags::WRITE) || !self.area_allows_write(vaddr) {
+            return Ok((paddr, flags, page_size));
+        }
+        if self.handle_page_fault(vaddr, PageFaultFlags::WRITE) {
+            let (paddr, flags, page_size) =
+                self.pt.query(vaddr).map_err(|_| AxError::BadAddress)?;
+            if flags.contains(MappingFlags::WRITE) {
+                return Ok((paddr, flags, page_size));
+            }
+        }
+        ax_err!(BadAddress, "write fault was not resolved")
+    }
+
+    fn area_allows_write(&self, vaddr: VirtAddr) -> bool {
+        self.areas
+            .find(vaddr)
+            .is_some_and(|area| area.flags().contains(MappingFlags::WRITE))
+    }
+
     /// To read data from the address space.
     ///
     /// # Arguments
     ///
     /// * `start` - The start virtual address to read.
     /// * `buf` - The buffer to store the data.
-    pub fn read(&self, start: VirtAddr, buf: &mut [u8]) -> AxResult {
-        self.process_area_data(start, buf.len(), |src, offset, read_size| unsafe {
-            core::ptr::copy_nonoverlapping(src.as_ptr(), buf.as_mut_ptr().add(offset), read_size);
-        })
+    pub fn read(&mut self, start: VirtAddr, buf: &mut [u8]) -> AxResult {
+        self.process_area_data(
+            start,
+            buf.len(),
+            MappingFlags::READ,
+            PageFaultFlags::READ,
+            |src, offset, read_size| unsafe {
+                core::ptr::copy_nonoverlapping(
+                    src.as_ptr(),
+                    buf.as_mut_ptr().add(offset),
+                    read_size,
+                );
+            },
+        )
     }
 
     /// To write data to the address space.
@@ -327,10 +421,20 @@ impl AddrSpace {
     ///
     /// * `start_vaddr` - The start virtual address to write.
     /// * `buf` - The buffer to write to the address space.
-    pub fn write(&self, start: VirtAddr, buf: &[u8]) -> AxResult {
-        self.process_area_data(start, buf.len(), |dst, offset, write_size| unsafe {
-            core::ptr::copy_nonoverlapping(buf.as_ptr().add(offset), dst.as_mut_ptr(), write_size);
-        })
+    pub fn write(&mut self, start: VirtAddr, buf: &[u8]) -> AxResult {
+        self.process_area_data(
+            start,
+            buf.len(),
+            MappingFlags::WRITE,
+            PageFaultFlags::WRITE,
+            |dst, offset, write_size| unsafe {
+                core::ptr::copy_nonoverlapping(
+                    buf.as_ptr().add(offset),
+                    dst.as_mut_ptr(),
+                    write_size,
+                );
+            },
+        )
     }
 
     /// Populates lazy pages in the specified virtual address range.
@@ -410,6 +514,39 @@ impl AddrSpace {
         false
     }
 
+    /// Returns diagnostic information for one virtual address.
+    pub fn query_address(&self, vaddr: VirtAddr) -> AddrSpaceQuery {
+        let contains = self.va_range.contains(vaddr);
+        let mut query = AddrSpaceQuery {
+            contains,
+            area_found: false,
+            area_start: 0,
+            area_end: 0,
+            area_flags: MappingFlags::empty(),
+            backend: "none",
+            pte_mapped: false,
+            paddr: 0,
+            pte_flags: MappingFlags::empty(),
+            page_size: None,
+            shared_metadata: false,
+        };
+        if let Some(area) = self.areas.find(vaddr) {
+            query.area_found = true;
+            query.area_start = area.start().as_usize();
+            query.area_end = area.end().as_usize();
+            query.area_flags = area.flags();
+            query.backend = area.backend().kind_name();
+            query.shared_metadata = area.backend().shared_page(vaddr.align_down_4k()).is_some();
+        }
+        if let Ok((paddr, flags, page_size)) = self.pt.query(vaddr.align_down_4k()) {
+            query.pte_mapped = true;
+            query.paddr = paddr.as_usize();
+            query.pte_flags = flags;
+            query.page_size = Some(page_size);
+        }
+        query
+    }
+
     /// Handles a page fault at the given address.
     ///
     /// `access_flags` indicates the access type that caused the page fault.
@@ -430,16 +567,6 @@ impl AddrSpace {
             }
         }
         false
-    }
-}
-
-fn fault_flags_from_mapping(flags: MappingFlags) -> PageFaultFlags {
-    if flags.contains(MappingFlags::WRITE) {
-        PageFaultFlags::WRITE
-    } else if flags.contains(MappingFlags::EXECUTE) {
-        PageFaultFlags::EXECUTE
-    } else {
-        PageFaultFlags::READ
     }
 }
 
