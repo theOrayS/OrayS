@@ -43,7 +43,8 @@ use super::signal_abi::{
 use super::system_info::{sys_getrusage, sys_syslog, sys_uname};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
-    current_process, sys_get_robust_list, sys_set_robust_list, sys_set_tid_address,
+    current_process, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
+    sys_set_tid_address, user_pc,
 };
 use super::time_abi::{
     sys_adjtimex, sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime,
@@ -56,6 +57,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
     let Some(process) = current_process() else {
         return neg_errno(LinuxError::ENOSYS);
     };
+    set_current_user_pc(user_pc(tf));
     match syscall_num as u32 {
         general::__NR_exit | general::__NR_exit_group => {}
         _ => {

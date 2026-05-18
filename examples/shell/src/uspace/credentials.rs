@@ -39,12 +39,14 @@ impl UserProcess {
         self.real_uid.store(uid, Ordering::Release);
         self.uid.store(uid, Ordering::Release);
         self.saved_uid.store(uid, Ordering::Release);
+        self.mark_credentials_changed();
     }
 
     pub(super) fn set_gid(&self, gid: u32) {
         self.real_gid.store(gid, Ordering::Release);
         self.gid.store(gid, Ordering::Release);
         self.saved_gid.store(gid, Ordering::Release);
+        self.mark_credentials_changed();
     }
 
     pub(super) fn set_user_ids(
@@ -61,6 +63,9 @@ impl UserProcess {
         }
         if let Some(uid) = saved {
             self.saved_uid.store(uid, Ordering::Release);
+        }
+        if real.is_some() || effective.is_some() || saved.is_some() {
+            self.mark_credentials_changed();
         }
     }
 
@@ -79,6 +84,9 @@ impl UserProcess {
         if let Some(gid) = saved {
             self.saved_gid.store(gid, Ordering::Release);
         }
+        if real.is_some() || effective.is_some() || saved.is_some() {
+            self.mark_credentials_changed();
+        }
     }
 
     pub(super) fn groups(&self) -> Vec<u32> {
@@ -87,10 +95,15 @@ impl UserProcess {
 
     pub(super) fn set_groups(&self, groups: Vec<u32>) {
         *self.groups.lock() = groups;
+        self.mark_credentials_changed();
     }
 
     pub(super) fn has_group(&self, gid: u32) -> bool {
         self.gid() == gid || self.groups.lock().contains(&gid)
+    }
+
+    fn mark_credentials_changed(&self) {
+        self.credential_generation.fetch_add(1, Ordering::AcqRel);
     }
 }
 

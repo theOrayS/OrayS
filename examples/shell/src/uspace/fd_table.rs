@@ -1368,11 +1368,25 @@ fn path_entry_from_directory(dir: DirectoryEntry) -> FdEntry {
 }
 
 fn record_missing_candidate(last_err: &mut LinuxError, err: LinuxError) -> Result<(), LinuxError> {
-    *last_err = err;
-    if err == LinuxError::ENOENT {
-        Ok(())
-    } else {
-        Err(err)
+    match err {
+        LinuxError::ENOENT => Ok(()),
+        LinuxError::ENOTDIR => {
+            // Runtime loader paths often probe absolute locations such as
+            // `/lib/libc.so.6` before this compatibility layer redirects them
+            // to the suite-local runtime root (`/glibc/lib/libc.so.6`,
+            // `/musl/lib/libc.so`, etc.).  A missing leading directory is a
+            // failed candidate, not proof that later runtime candidates are
+            // invalid.  Preserve ENOTDIR as the final error if every candidate
+            // misses, but keep searching the candidate list.
+            if *last_err == LinuxError::ENOENT {
+                *last_err = err;
+            }
+            Ok(())
+        }
+        _ => {
+            *last_err = err;
+            Err(err)
+        }
     }
 }
 

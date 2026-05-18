@@ -2,7 +2,7 @@ use ::alloc::collections::BTreeMap;
 use ::alloc::sync::Arc;
 use ::alloc::vec::Vec;
 
-use axalloc::global_allocator;
+use axalloc::{frame_allocator_stats, global_allocator};
 use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use kspin::SpinNoIrq;
@@ -109,9 +109,10 @@ impl Backend {
             let mut cursor = pt.cursor();
             for addr in PageIter4K::new(start, start + size).unwrap() {
                 let Some(frame) = alloc_frame(true) else {
+                    let stats = frame_allocator_stats();
                     warn!(
-                        "map_alloc: frame allocation failed start={:#x} size={:#x} at={:#x} flags={:?} populate=true",
-                        start, size, addr, flags
+                        "map_alloc: frame allocation failed start={:#x} size={:#x} at={:#x} flags={:?} populate=true free_frames={} allocated_frames={}",
+                        start, size, addr, flags, stats.free_frames, stats.allocated_frames
                     );
                     for rollback_addr in PageIter4K::new(start, addr).unwrap() {
                         if let Ok((mapped_frame, _, page_size)) = cursor.unmap(rollback_addr)
@@ -215,9 +216,7 @@ impl Backend {
         {
             return false;
         }
-        let Some(count) = shared_frame_count(old_frame) else {
-            return false;
-        };
+        let count = shared_frame_count(old_frame).unwrap_or(1);
         if count <= 1 {
             let res = pt.cursor().protect(vaddr, orig_flags);
             if let Err(err) = &res {
@@ -231,9 +230,10 @@ impl Backend {
             return res.is_ok();
         }
         let Some(new_frame) = alloc_frame(false) else {
+            let stats = frame_allocator_stats();
             warn!(
-                "handle_page_fault_alloc: COW frame allocation failed for {:#x} flags={:?}",
-                vaddr, orig_flags
+                "handle_page_fault_alloc: COW frame allocation failed for {:#x} flags={:?} free_frames={} allocated_frames={}",
+                vaddr, orig_flags, stats.free_frames, stats.allocated_frames
             );
             return false;
         };
@@ -269,9 +269,10 @@ impl Backend {
             }
             res.is_ok()
         } else {
+            let stats = frame_allocator_stats();
             warn!(
-                "handle_page_fault_alloc: frame allocation failed for {:#x} flags={:?}",
-                vaddr, flags
+                "handle_page_fault_alloc: frame allocation failed for {:#x} flags={:?} free_frames={} allocated_frames={}",
+                vaddr, flags, stats.free_frames, stats.allocated_frames
             );
             false
         }
