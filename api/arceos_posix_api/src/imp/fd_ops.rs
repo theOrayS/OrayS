@@ -38,6 +38,9 @@ pub fn get_file_like(fd: c_int) -> LinuxResult<Arc<dyn FileLike>> {
 }
 
 pub fn poll_file_like(fd: c_int) -> LinuxResult<PollState> {
+    #[cfg(feature = "net")]
+    axnet::poll_interfaces();
+
     get_file_like(fd)?.poll()
 }
 

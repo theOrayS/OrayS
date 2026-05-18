@@ -201,6 +201,40 @@ impl Backend {
         true
     }
 
+    pub(crate) fn map_shared(
+        &self,
+        start: VirtAddr,
+        size: usize,
+        pt: &mut PageTable,
+        pages: &SharedPages,
+    ) -> bool {
+        let end = start + size;
+        let entries = pages
+            .lock()
+            .range(start.as_usize()..end.as_usize())
+            .map(|(addr, (frame, flags))| (VirtAddr::from(*addr), *frame, *flags))
+            .collect::<Vec<_>>();
+
+        let mut cursor = pt.cursor();
+        for (addr, frame, flags) in entries.iter().copied() {
+            if cursor.map(addr, frame, PageSize::Size4K, flags).is_err() {
+                warn!(
+                    "map_shared: page-table map failed start={:#x} size={:#x} at={:#x} frame={:#x} flags={:?}",
+                    start, size, addr, frame, flags
+                );
+                for (rollback_addr, _, _) in entries
+                    .iter()
+                    .copied()
+                    .take_while(|(rollback_addr, _, _)| *rollback_addr != addr)
+                {
+                    let _ = cursor.unmap(rollback_addr);
+                }
+                return false;
+            }
+        }
+        true
+    }
+
     fn handle_cow_fault(
         &self,
         vaddr: VirtAddr,

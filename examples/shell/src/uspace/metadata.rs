@@ -141,7 +141,9 @@ pub(super) fn sys_faccessat(
 pub(super) fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize {
     let path = match process.fds.lock().entry(fd as i32) {
         Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
-        Err(err) => return neg_errno(err),
+        Err(err) => {
+            return neg_errno(err);
+        }
     };
     if let Some(path) = path {
         process.set_path_mode(path, mode as u32);
@@ -193,8 +195,18 @@ pub(super) fn sys_fchmodat(
     }
 
     let mut fds = process.fds.lock();
-    match fds.path_stat(process, dirfd as i32, path.as_str()) {
-        Ok((resolved_path, _)) => {
+    let resolved_path = match fds.resolve_path(process, dirfd as i32, path.as_str()) {
+        Ok(path) => path,
+        Err(err) => {
+            return neg_errno(err);
+        }
+    };
+    if axfs::api::metadata(resolved_path.as_str()).is_ok() {
+        process.set_path_mode(resolved_path, mode);
+        return 0;
+    }
+    match fds.stat_path(process, dirfd as i32, path.as_str()) {
+        Ok(_) => {
             process.set_path_mode(resolved_path, mode);
             0
         }
@@ -429,7 +441,10 @@ pub(super) fn sys_statx(
         return neg_errno(LinuxError::EFAULT);
     }
     let flags = flags as u32;
-    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW
+        | general::AT_EMPTY_PATH
+        | general::AT_NO_AUTOMOUNT
+        | general::AT_STATX_SYNC_TYPE;
     if flags & !supported_flags != 0 {
         return neg_errno(LinuxError::EINVAL);
     }

@@ -207,7 +207,7 @@ pub(super) fn make_uspace_context(entry: usize, stack_ptr: usize, argc: usize) -
     #[cfg(target_arch = "loongarch64")]
     {
         let mut tf = TrapFrame::default();
-        tf.prmd = 0b11 | (1 << 2);
+        tf.prmd = 0x7;
         tf.era = entry;
         tf.regs.sp = stack_ptr;
         // LoongArch glibc has the same crt1 convention: a0 is rtld_fini, not
@@ -224,6 +224,10 @@ pub(super) fn child_trap_frame(parent: &TrapFrame, child_stack: usize) -> TrapFr
     child.regs.a0 = 0;
     if child_stack != 0 {
         child.regs.sp = child_stack;
+    }
+    #[cfg(target_arch = "loongarch64")]
+    {
+        child.prmd = 0x7;
     }
     advance_syscall_pc(&mut child);
     child

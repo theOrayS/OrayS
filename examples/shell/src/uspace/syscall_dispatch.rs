@@ -326,6 +326,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         ),
         general::__NR_getpid => process.pid() as isize,
         general::__NR_getppid => process.ppid() as isize,
+        #[cfg(not(target_arch = "loongarch64"))]
         general::__NR_clone => sys_clone(
             &process,
             tf,
@@ -334,6 +335,16 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg2(),
             tf.arg3(),
             tf.arg4(),
+        ),
+        #[cfg(target_arch = "loongarch64")]
+        general::__NR_clone => sys_clone(
+            &process,
+            tf,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg4(),
+            tf.arg3(),
         ),
         general::__NR_execve => sys_execve(&process, tf, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_wait4 => {

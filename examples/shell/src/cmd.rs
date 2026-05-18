@@ -25,8 +25,8 @@ const SCRIPT_BUSYBOX_APPLETS: &[&str] = &["basename", "dirname", "kill", "sleep"
 const PATH_BUSYBOX_APPLETS: &[&str] = &[
     "awk", "basename", "cat", "chmod", "cp", "cut", "date", "dirname", "echo", "expr", "find",
     "grep", "head", "kill", "ln", "ls", "mkdir", "mktemp", "mv", "printf", "ps", "pwd", "readlink",
-    "rm", "rmdir", "sed", "seq", "sh", "sleep", "sort", "tail", "tee", "test", "touch", "tr",
-    "true", "uname", "wc", "xargs",
+    "rm", "rmdir", "sed", "seq", "sh", "sleep", "sort", "tail", "tee", "touch", "tr", "true",
+    "uname", "wc", "xargs",
 ];
 
 macro_rules! print_err {
@@ -792,9 +792,9 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
         }
         let line = line.replace("./busybox", &busybox_path);
         let command = if line.starts_with(&busybox_path) {
-            format!("{busybox_path} chmod +x {chmod_args}; PATH={cwd}:. {line}")
+            format!("{busybox_path} chmod 755 {chmod_args}; PATH={cwd}:. {line}")
         } else {
-            format!("{busybox_path} chmod +x {chmod_args}; PATH={cwd}:. {busybox_path} {line}")
+            format!("{busybox_path} chmod 755 {chmod_args}; PATH={cwd}:. {busybox_path} {line}")
         };
         match run_user_program_argv_in(cwd, &[&busybox_path, "sh", "-c", &command]) {
             Ok(status) if status == 0 || line == "false" => {
@@ -956,7 +956,7 @@ pub fn maybe_run_official_tests() {
         }
         let chmod_args = busybox_path_wrapper_chmod_args(path_dir);
         let command = format!(
-            "{shell_path} chmod +x {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
+            "{shell_path} chmod 755 {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
         );
         if let Err(err) = run_user_program_argv_in(&cwd, &[&shell_path, "sh", "-c", &command]) {
             println!("autorun: {cwd}/{script} failed: {err}");

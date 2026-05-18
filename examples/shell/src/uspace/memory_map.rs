@@ -110,6 +110,10 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
     if !handled && _from_user {
         terminate_current_thread(process.as_ref(), 128 + 11);
     }
+    #[cfg(target_arch = "loongarch64")]
+    if handled {
+        axhal::asm::flush_tlb(None);
+    }
     handled
 }
 

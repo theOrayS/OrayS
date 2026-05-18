@@ -77,6 +77,10 @@ impl OpenOptions {
 }
 
 impl Metadata {
+    pub(crate) const fn from_attr(attr: fops::FileAttr) -> Self {
+        Self(attr)
+    }
+
     /// Returns the file type for this metadata.
     pub const fn file_type(&self) -> FileType {
         self.0.file_type()
