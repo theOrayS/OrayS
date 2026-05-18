@@ -14,13 +14,14 @@ use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
-    KERNEL_SIGSET_BYTES, SA_NODEFER_FLAG, SI_TKILL_CODE, SIG_BLOCK_HOW, SIG_SETMASK_HOW,
-    SIG_UNBLOCK_HOW, SIGCANCEL_NUM, SIGCHLD_NUM, SIGKILL_NUM, neg_errno,
+    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGCANCEL_NUM,
+    SIGCHLD_NUM, SIGKILL_NUM, neg_errno,
 };
 #[cfg(target_arch = "riscv64")]
-use super::linux_abi::{RISCV_SIGTRAMP_CODE, SS_DISABLE};
+use super::linux_abi::{RISCV_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
 #[cfg(target_arch = "riscv64")]
 use super::memory_map::{align_down, align_up, user_mapping_flags};
+#[cfg(target_arch = "riscv64")]
 use super::process_lifecycle::terminate_current_thread_for_exit_group;
 use super::task_context::{UserTaskExt, current_task_ext, current_tid};
 use super::task_registry::{
