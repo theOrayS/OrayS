@@ -1394,8 +1394,7 @@ pub(super) fn open_dir_entry(path: &str) -> Result<FdEntry, LinuxError> {
     let mut opts = OpenOptions::new();
     opts.read(true);
     let dir = Directory::open_dir(path, &opts).map_err(LinuxError::from)?;
-    let file = File::open(path, &opts).map_err(LinuxError::from)?;
-    let attr = file.get_attr().map_err(LinuxError::from)?;
+    let attr = dir.get_attr().map_err(LinuxError::from)?;
     Ok(FdEntry::Directory(DirectoryEntry {
         dir,
         attr,

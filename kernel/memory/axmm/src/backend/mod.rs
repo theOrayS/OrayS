@@ -58,7 +58,7 @@ impl MappingBackend for Backend {
         match *self {
             Self::Linear { pa_va_offset } => self.map_linear(start, size, flags, pt, pa_va_offset),
             Self::Alloc { populate } => self.map_alloc(start, size, flags, pt, populate),
-            Self::Shared { .. } => true,
+            Self::Shared { ref pages, .. } => self.map_shared(start, size, pt, pages),
         }
     }
 

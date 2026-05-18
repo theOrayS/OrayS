@@ -1,27 +1,29 @@
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use core::mem::{offset_of, size_of};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use axhal::trap::PageFaultFlags;
 use axhal::trap::register_user_return_handler;
 use linux_raw_sys::general;
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 
 use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
-    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGCANCEL_NUM,
-    SIGCHLD_NUM, SIGKILL_NUM, neg_errno,
+    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGALRM_NUM,
+    SIGCANCEL_NUM, SIGCHLD_NUM, SIGKILL_NUM, neg_errno,
 };
+#[cfg(target_arch = "loongarch64")]
+use super::linux_abi::{LOONGARCH_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
 #[cfg(target_arch = "riscv64")]
 use super::linux_abi::{RISCV_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::memory_map::{align_down, align_up, user_mapping_flags};
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::process_lifecycle::terminate_current_thread_for_exit_group;
 use super::task_context::{UserTaskExt, current_task_ext, current_tid};
 use super::task_registry::{
@@ -54,6 +56,10 @@ pub(super) fn signal_mask_bit(sig: i32) -> u64 {
     } else {
         0
     }
+}
+
+fn default_signal_terminates(sig: i32) -> bool {
+    matches!(sig, SIGKILL_NUM | SIGALRM_NUM)
 }
 
 pub(super) fn signal_is_blocked(ext: &UserTaskExt, sig: i32) -> bool {
@@ -115,6 +121,10 @@ pub(super) fn ensure_user_return_hook_registered() {
 }
 
 fn user_return_hook(tf: &mut TrapFrame) {
+    #[cfg(target_arch = "loongarch64")]
+    {
+        tf.prmd = 0x7;
+    }
     let Some(ext) = current_task_ext() else {
         return;
     };
@@ -124,7 +134,8 @@ fn user_return_hook(tf: &mut TrapFrame) {
             return;
         }
     }
-    #[cfg(target_arch = "riscv64")]
+    let _ = ext.process.consume_expired_real_timer();
+    #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
     if ext.signal_frame.load(Ordering::Acquire) == 0 {
         let sig = ext.pending_signal.load(Ordering::Acquire);
         if sig != 0 && !signal_is_blocked(ext, sig) {
@@ -133,7 +144,7 @@ fn user_return_hook(tf: &mut TrapFrame) {
     }
 }
 
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 fn ensure_signal_frame_pages(
     process: &UserProcess,
     start: usize,
@@ -183,7 +194,7 @@ fn inject_pending_signal(
     }
     if handler <= 1 {
         ext.pending_signal.store(0, Ordering::Release);
-        if sig == SIGKILL_NUM {
+        if handler == 0 && default_signal_terminates(sig) {
             ext.process.request_exit_group(128 + sig);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
         }
@@ -231,6 +242,70 @@ fn inject_pending_signal(
     tf.regs.a1 = frame_addr + frame_offsets.info;
     tf.regs.a2 = frame_addr + frame_offsets.ucontext;
     tf.sepc = handler;
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn inject_pending_signal(
+    tf: &mut TrapFrame,
+    ext: &UserTaskExt,
+    sig: i32,
+) -> Result<(), LinuxError> {
+    let action = ext
+        .process
+        .signal_actions
+        .lock()
+        .get(&(sig as usize))
+        .copied()
+        .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+    let handler = action
+        .sa_handler_kernel
+        .map(|func| func as usize)
+        .unwrap_or(0);
+    if handler <= 1 {
+        ext.pending_signal.store(0, Ordering::Release);
+        if handler == 0 && default_signal_terminates(sig) {
+            ext.process.request_exit_group(128 + sig);
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
+        }
+        return Ok(());
+    }
+
+    let current_mask = ext.signal_mask.load(Ordering::Acquire);
+    let frame_size = loongarch_signal_frame_size();
+    let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
+    ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
+
+    let frame = make_loongarch_signal_frame(
+        sig,
+        SI_TKILL_CODE,
+        current_tid(),
+        current_mask,
+        SS_DISABLE,
+        LOONGARCH_SIGTRAMP_CODE,
+        trap_frame_to_loongarch_sigcontext(tf),
+    );
+    let frame_ret = write_user_value(ext.process.as_ref(), frame_addr, &frame);
+    if frame_ret != 0 {
+        return Err(LinuxError::EFAULT);
+    }
+
+    *ext.pending_sigreturn.lock() = Some(*tf);
+    ext.signal_frame.store(frame_addr, Ordering::Release);
+    ext.pending_signal.store(0, Ordering::Release);
+    let mut next_mask = current_mask | action.sa_mask.sig[0];
+    if action.sa_flags & SA_NODEFER_FLAG == 0 {
+        next_mask |= signal_mask_bit(sig);
+    }
+    ext.signal_mask.store(next_mask, Ordering::Release);
+
+    let frame_offsets = loongarch_signal_frame_offsets();
+    tf.regs.sp = frame_addr;
+    tf.regs.ra = frame_addr + frame_offsets.trampoline;
+    tf.regs.a0 = sig as usize;
+    tf.regs.a1 = frame_addr + frame_offsets.info;
+    tf.regs.a2 = frame_addr + frame_offsets.ucontext;
+    tf.era = handler;
     Ok(())
 }
 
@@ -320,7 +395,31 @@ pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
         *ext.pending_sigreturn.lock() = Some(restored);
         0
     }
-    #[cfg(not(target_arch = "riscv64"))]
+    #[cfg(target_arch = "loongarch64")]
+    {
+        let Some(ext) = current_task_ext() else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        let frame_addr = ext.signal_frame.load(Ordering::Acquire);
+        if frame_addr == 0 {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let frame = match read_user_value::<LoongArchSignalFrame>(process, frame_addr) {
+            Ok(frame) => frame,
+            Err(err) => return neg_errno(err),
+        };
+        let Some(mut restored) = ext.pending_sigreturn.lock().take() else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        apply_loongarch_sigcontext(&mut restored, &frame.ucontext.mcontext);
+        restored.prmd = 0x7;
+        ext.signal_mask
+            .store(frame.ucontext.sigmask.sig[0], Ordering::Release);
+        ext.signal_frame.store(0, Ordering::Release);
+        *ext.pending_sigreturn.lock() = Some(restored);
+        0
+    }
+    #[cfg(not(any(target_arch = "riscv64", target_arch = "loongarch64")))]
     {
         let _ = process;
         neg_errno(LinuxError::ENOSYS)
@@ -659,6 +758,196 @@ pub(super) fn make_riscv_signal_frame(
             sigmask: RiscvKernelSigset {
                 sig: [current_mask],
                 reserved: [0; RISCV_SIGNAL_SIGSET_RESERVED_BYTES],
+            },
+            mcontext,
+        },
+        trampoline,
+    }
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(super) struct LoongArchSignalInfo {
+    pub(super) bytes: [u8; 128],
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(super) struct LoongArchSignalStack {
+    pub(super) sp: usize,
+    pub(super) stack_flags: i32,
+    pub(super) stack_pad: i32,
+    pub(super) size: usize,
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(super) struct LoongArchKernelSigset {
+    pub(super) sig: [u64; 1],
+    pub(super) reserved: [u8; 120],
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(super) struct LoongArchSigcontext {
+    pub(super) pc: usize,
+    pub(super) gregs: [usize; 32],
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(super) struct LoongArchUcontext {
+    pub(super) flags: usize,
+    pub(super) link: usize,
+    pub(super) stack: LoongArchSignalStack,
+    pub(super) sigmask: LoongArchKernelSigset,
+    pub(super) mcontext: LoongArchSigcontext,
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[repr(C, align(16))]
+#[derive(Clone, Copy)]
+pub(super) struct LoongArchSignalFrame {
+    pub(super) info: LoongArchSignalInfo,
+    pub(super) ucontext: LoongArchUcontext,
+    pub(super) trampoline: [u32; 3],
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub(super) struct LoongArchSignalFrameOffsets {
+    pub(super) info: usize,
+    pub(super) ucontext: usize,
+    pub(super) trampoline: usize,
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub(super) fn loongarch_signal_frame_size() -> usize {
+    size_of::<LoongArchSignalFrame>()
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub(super) fn loongarch_signal_frame_offsets() -> LoongArchSignalFrameOffsets {
+    LoongArchSignalFrameOffsets {
+        info: offset_of!(LoongArchSignalFrame, info),
+        ucontext: offset_of!(LoongArchSignalFrame, ucontext),
+        trampoline: offset_of!(LoongArchSignalFrame, trampoline),
+    }
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub(super) fn trap_frame_to_loongarch_sigcontext(tf: &TrapFrame) -> LoongArchSigcontext {
+    let mut gregs = [0usize; 32];
+    gregs[1] = tf.regs.ra;
+    gregs[2] = tf.regs.tp;
+    gregs[3] = tf.regs.sp;
+    gregs[4] = tf.regs.a0;
+    gregs[5] = tf.regs.a1;
+    gregs[6] = tf.regs.a2;
+    gregs[7] = tf.regs.a3;
+    gregs[8] = tf.regs.a4;
+    gregs[9] = tf.regs.a5;
+    gregs[10] = tf.regs.a6;
+    gregs[11] = tf.regs.a7;
+    gregs[12] = tf.regs.t0;
+    gregs[13] = tf.regs.t1;
+    gregs[14] = tf.regs.t2;
+    gregs[15] = tf.regs.t3;
+    gregs[16] = tf.regs.t4;
+    gregs[17] = tf.regs.t5;
+    gregs[18] = tf.regs.t6;
+    gregs[19] = tf.regs.t7;
+    gregs[20] = tf.regs.t8;
+    gregs[21] = tf.regs.u0;
+    gregs[22] = tf.regs.fp;
+    gregs[23] = tf.regs.s0;
+    gregs[24] = tf.regs.s1;
+    gregs[25] = tf.regs.s2;
+    gregs[26] = tf.regs.s3;
+    gregs[27] = tf.regs.s4;
+    gregs[28] = tf.regs.s5;
+    gregs[29] = tf.regs.s6;
+    gregs[30] = tf.regs.s7;
+    gregs[31] = tf.regs.s8;
+    LoongArchSigcontext { pc: tf.era, gregs }
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub(super) fn apply_loongarch_sigcontext(tf: &mut TrapFrame, sigcontext: &LoongArchSigcontext) {
+    tf.era = sigcontext.pc;
+    tf.regs.zero = 0;
+    tf.regs.ra = sigcontext.gregs[1];
+    tf.regs.tp = sigcontext.gregs[2];
+    tf.regs.sp = sigcontext.gregs[3];
+    tf.regs.a0 = sigcontext.gregs[4];
+    tf.regs.a1 = sigcontext.gregs[5];
+    tf.regs.a2 = sigcontext.gregs[6];
+    tf.regs.a3 = sigcontext.gregs[7];
+    tf.regs.a4 = sigcontext.gregs[8];
+    tf.regs.a5 = sigcontext.gregs[9];
+    tf.regs.a6 = sigcontext.gregs[10];
+    tf.regs.a7 = sigcontext.gregs[11];
+    tf.regs.t0 = sigcontext.gregs[12];
+    tf.regs.t1 = sigcontext.gregs[13];
+    tf.regs.t2 = sigcontext.gregs[14];
+    tf.regs.t3 = sigcontext.gregs[15];
+    tf.regs.t4 = sigcontext.gregs[16];
+    tf.regs.t5 = sigcontext.gregs[17];
+    tf.regs.t6 = sigcontext.gregs[18];
+    tf.regs.t7 = sigcontext.gregs[19];
+    tf.regs.t8 = sigcontext.gregs[20];
+    tf.regs.u0 = sigcontext.gregs[21];
+    tf.regs.fp = sigcontext.gregs[22];
+    tf.regs.s0 = sigcontext.gregs[23];
+    tf.regs.s1 = sigcontext.gregs[24];
+    tf.regs.s2 = sigcontext.gregs[25];
+    tf.regs.s3 = sigcontext.gregs[26];
+    tf.regs.s4 = sigcontext.gregs[27];
+    tf.regs.s5 = sigcontext.gregs[28];
+    tf.regs.s6 = sigcontext.gregs[29];
+    tf.regs.s7 = sigcontext.gregs[30];
+    tf.regs.s8 = sigcontext.gregs[31];
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn make_loongarch_siginfo(sig: i32, code: i32, tid: i32) -> LoongArchSignalInfo {
+    let mut info = LoongArchSignalInfo { bytes: [0; 128] };
+    info.bytes[0..4].copy_from_slice(&sig.to_ne_bytes());
+    info.bytes[4..8].copy_from_slice(&0i32.to_ne_bytes());
+    info.bytes[8..12].copy_from_slice(&code.to_ne_bytes());
+    info.bytes[16..20].copy_from_slice(&tid.to_ne_bytes());
+    info.bytes[20..24].copy_from_slice(&0u32.to_ne_bytes());
+    info
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub(super) fn make_loongarch_signal_frame(
+    sig: i32,
+    code: i32,
+    tid: i32,
+    current_mask: u64,
+    stack_flags: i32,
+    trampoline: [u32; 3],
+    mcontext: LoongArchSigcontext,
+) -> LoongArchSignalFrame {
+    LoongArchSignalFrame {
+        info: make_loongarch_siginfo(sig, code, tid),
+        ucontext: LoongArchUcontext {
+            flags: 0,
+            link: 0,
+            stack: LoongArchSignalStack {
+                sp: 0,
+                stack_flags,
+                stack_pad: 0,
+                size: 0,
+            },
+            sigmask: LoongArchKernelSigset {
+                sig: [current_mask],
+                reserved: [0; 120],
             },
             mcontext,
         },

@@ -263,6 +263,7 @@ fn init_interrupt() {
         #[cfg(feature = "multitask")]
         axtask::on_timer_tick();
     });
+    update_timer();
 
     #[cfg(feature = "ipi")]
     axhal::irq::register(axhal::irq::IPI_IRQ, || {

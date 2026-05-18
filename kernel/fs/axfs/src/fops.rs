@@ -367,6 +367,11 @@ impl Directory {
         Ok(n)
     }
 
+    /// Gets the directory attributes.
+    pub fn get_attr(&self) -> AxResult<FileAttr> {
+        self.access_node(Cap::empty())?.get_attr()
+    }
+
     /// Rename a file or directory to a new name.
     /// Delete the original file if `old` already exists.
     ///

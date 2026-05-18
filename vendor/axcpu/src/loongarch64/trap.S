@@ -33,6 +33,9 @@
 
     LDD     $t1,  $sp, 33       // era
     LDD     $t2,  $sp, 32       // prmd
+.if \from_user == 1
+    ori     $t2,  $t2, 0x7      // return to PLV3 with user interrupts enabled
+.endif
     csrwr   $t1,  LA_CSR_ERA
     csrwr   $t2,  LA_CSR_PRMD
     POP_GENERAL_REGS
