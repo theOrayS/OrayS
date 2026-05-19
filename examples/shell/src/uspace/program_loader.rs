@@ -5,12 +5,18 @@ use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use linux_raw_sys::auxvec;
+#[cfg(target_arch = "loongarch64")]
+use linux_raw_sys::general;
 use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::string::{String, ToString};
 use std::vec::Vec;
 use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
+#[cfg(target_arch = "loongarch64")]
+use xmas_elf::sections::SectionData;
+#[cfg(target_arch = "loongarch64")]
+use xmas_elf::symbol_table::Entry;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, USER_BRK_GROW_SIZE,
@@ -82,8 +88,14 @@ pub(super) fn load_program_image(
 
     if let Some(raw_interp) = main.interpreter.as_deref() {
         let interp_path = resolve_runtime_support_file(prepared.exec_root.as_str(), raw_interp)?;
-        let interp_image = std::fs::read(interp_path.as_str())
+        let mut interp_image = std::fs::read(interp_path.as_str())
             .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
+        #[cfg(target_arch = "loongarch64")]
+        patch_loongarch_musl_sched_syscall_stubs(
+            prepared.exec_root.as_str(),
+            raw_interp,
+            &mut interp_image,
+        )?;
         let interp_elf =
             ElfFile::new(&interp_image).map_err(|err| format!("invalid interpreter ELF: {err}"))?;
         let interp = analyze_elf(
@@ -337,6 +349,117 @@ fn read_interp_path(elf: &ElfFile<'_>, ph: &ProgramHeader<'_>) -> Result<String,
         return Err("empty PT_INTERP path".into());
     }
     Ok(path.to_string())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_sched_syscall_stubs(
+    exec_root: &str,
+    raw_interp: &str,
+    image: &mut [u8],
+) -> Result<(), String> {
+    if exec_root != "/musl" || !raw_interp.contains("ld-musl") {
+        return Ok(());
+    }
+    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
+    let patches = [
+        ("sched_setparam", general::__NR_sched_setparam),
+        ("sched_getparam", general::__NR_sched_getparam),
+        ("sched_setscheduler", general::__NR_sched_setscheduler),
+        ("sched_getscheduler", general::__NR_sched_getscheduler),
+    ];
+    let mut offsets = Vec::new();
+    for (name, syscall_nr) in patches {
+        let Some(offset) = find_dynsym_file_offset(&elf, name)? else {
+            continue;
+        };
+        offsets.push((offset, syscall_nr));
+    }
+    drop(elf);
+
+    for (offset, syscall_nr) in offsets {
+        patch_loongarch_enosys_stub(image, offset, syscall_nr)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn find_dynsym_file_offset(elf: &ElfFile<'_>, name: &str) -> Result<Option<usize>, String> {
+    let Some(dynsym) = elf.find_section_by_name(".dynsym") else {
+        return Ok(None);
+    };
+    let SectionData::DynSymbolTable64(entries) = dynsym.get_data(elf).map_err(str_err)? else {
+        return Ok(None);
+    };
+    for entry in entries {
+        if entry.get_name(elf).unwrap_or("") == name {
+            let value = entry.value() as usize;
+            return vaddr_to_file_offset(elf, value).map(Some);
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn vaddr_to_file_offset(elf: &ElfFile<'_>, vaddr: usize) -> Result<usize, String> {
+    for ph in elf.program_iter() {
+        if ph.get_type().map_err(str_err)? != PhType::Load {
+            continue;
+        }
+        let start = ph.virtual_addr() as usize;
+        let file_size = ph.file_size() as usize;
+        let end = start
+            .checked_add(file_size)
+            .ok_or_else(|| "ELF LOAD range overflow".to_string())?;
+        if (start..end).contains(&vaddr) {
+            return Ok(ph.offset() as usize + (vaddr - start));
+        }
+    }
+    Err(format!(
+        "symbol address {vaddr:#x} is outside LOAD segments"
+    ))
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_enosys_stub(
+    image: &mut [u8],
+    offset: usize,
+    syscall_nr: u32,
+) -> Result<(), String> {
+    const ENOSYS_STUB_PREFIX: [u8; 8] = [0x63, 0xc0, 0xff, 0x02, 0x04, 0x68, 0xbf, 0x02];
+    const SYSCALL: u32 = 0x002b_0000;
+    const SIGN_EXTEND_A0: u32 = 0x0040_8084;
+    const RET: u32 = 0x4c00_0020;
+    const PATCH_LEN: usize = 16;
+
+    let end = offset
+        .checked_add(PATCH_LEN)
+        .ok_or_else(|| "musl sched stub patch range overflow".to_string())?;
+    if end > image.len() {
+        return Err("musl sched stub patch exceeds image".into());
+    }
+    if image
+        .get(offset..offset + ENOSYS_STUB_PREFIX.len())
+        .is_some_and(|prefix| prefix == ENOSYS_STUB_PREFIX)
+    {
+        let load_syscall_nr = loongarch_addi_w_a7(syscall_nr)?;
+        let patch = [
+            load_syscall_nr.to_le_bytes(),
+            SYSCALL.to_le_bytes(),
+            SIGN_EXTEND_A0.to_le_bytes(),
+            RET.to_le_bytes(),
+        ]
+        .concat();
+        image[offset..end].copy_from_slice(&patch);
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_addi_w_a7(imm: u32) -> Result<u32, String> {
+    if imm > 0xfff {
+        return Err(format!("LoongArch addi.w immediate out of range: {imm}"));
+    }
+    Ok(0x0280_000b | (imm << 10))
 }
 
 fn map_elf_image(

@@ -375,14 +375,15 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
         Err(err) => return neg_errno(err),
     };
     let cwd = process.cwd();
-    let abs_path = match resolve_host_path(cwd, path.as_str()) {
+    let visible_path = match resolve_host_path(cwd, path.as_str()) {
         Ok(path) => path,
         Err(_) => return neg_errno(LinuxError::EINVAL),
     };
-    if open_dir_entry(abs_path.as_str()).is_err() {
+    let host_path = process.translate_mount_path(visible_path.as_str());
+    if open_dir_entry(host_path.as_str()).is_err() {
         return neg_errno(LinuxError::ENOENT);
     }
-    process.set_cwd(abs_path);
+    process.set_cwd(visible_path);
     0
 }
 
@@ -830,18 +831,11 @@ impl FdTable {
         path: &str,
         mode: u32,
     ) -> Result<(), LinuxError> {
-        if path.starts_with('/') || dirfd == general::AT_FDCWD {
-            let cwd = process.cwd();
-            let abs_path = resolve_host_path(cwd, path).map_err(|_| LinuxError::EINVAL)?;
-            directory_create_dir(abs_path.as_str())?;
-            process.set_path_mode(abs_path, mode);
-            return Ok(());
+        if path.is_empty() {
+            return Err(LinuxError::ENOENT);
         }
-        let FdEntry::Directory(dir) = self.entry(dirfd)? else {
-            return Err(LinuxError::ENOTDIR);
-        };
-        let abs_path = normalize_path(dir.path.as_str(), path).ok_or(LinuxError::EINVAL)?;
-        dir.dir.create_dir(path).map_err(LinuxError::from)?;
+        let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        directory_create_dir(abs_path.as_str())?;
         process.set_path_mode(abs_path, mode);
         Ok(())
     }
@@ -854,22 +848,18 @@ impl FdTable {
         flags: u32,
     ) -> Result<(), LinuxError> {
         let remove_dir = flags & general::AT_REMOVEDIR != 0;
-        if path.starts_with('/') || dirfd == general::AT_FDCWD {
-            let cwd = process.cwd();
-            let abs_path = resolve_host_path(cwd, path).map_err(|_| LinuxError::EINVAL)?;
-            return if remove_dir {
-                directory_remove_dir(abs_path.as_str())
-            } else {
-                directory_remove_file(abs_path.as_str())
-            };
+        let supported_flags = general::AT_REMOVEDIR;
+        if flags & !supported_flags != 0 {
+            return Err(LinuxError::EINVAL);
         }
-        let FdEntry::Directory(dir) = self.entry(dirfd)? else {
-            return Err(LinuxError::ENOTDIR);
-        };
+        if path.is_empty() {
+            return Err(LinuxError::ENOENT);
+        }
+        let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         if remove_dir {
-            dir.dir.remove_dir(path).map_err(LinuxError::from)
+            directory_remove_dir(abs_path.as_str())
         } else {
-            dir.dir.remove_file(path).map_err(LinuxError::from)
+            directory_remove_file(abs_path.as_str())
         }
     }
 
@@ -1024,24 +1014,27 @@ impl FdTable {
         if matches!(self.entry(fd)?, FdEntry::Path(_)) && cmd == general::F_GETFL {
             return Ok(O_PATH_FLAG as i32);
         }
-        let local_socket = match self.entry(fd)? {
-            FdEntry::LocalSocket(socket) => Some(socket.clone()),
-            _ => None,
-        };
-        if let Some(socket) = local_socket {
+        if matches!(self.entry(fd)?, FdEntry::LocalSocket(_)) {
             return match cmd {
-                general::F_DUPFD => {
-                    self.insert_min_with_flags(FdEntry::LocalSocket(socket.duplicate()), arg, 0)
-                }
+                general::F_DUPFD => self.dup_min_with_flags(fd, arg as i32, 0),
                 general::F_DUPFD_CLOEXEC => self.insert_min_with_flags(
-                    FdEntry::LocalSocket(socket.duplicate()),
+                    self.entry(fd)?.duplicate_for_fork()?,
                     arg,
                     general::FD_CLOEXEC,
                 ),
                 general::F_GETFD => self.get_fd_flags(fd),
                 general::F_SETFD => self.set_fd_flags(fd, arg as u32),
-                general::F_GETFL => Ok(socket.status_flags()),
-                general::F_SETFL => Ok(0),
+                general::F_GETFL => match self.entry(fd)? {
+                    FdEntry::LocalSocket(socket) => Ok(socket.status_flags()),
+                    _ => unreachable!(),
+                },
+                general::F_SETFL => match self.entry_mut(fd)? {
+                    FdEntry::LocalSocket(socket) => {
+                        socket.set_status_flags(arg as i32);
+                        Ok(0)
+                    }
+                    _ => unreachable!(),
+                },
                 _ => Ok(0),
             };
         }
@@ -1224,6 +1217,7 @@ fn open_fd_entry(
         if add_busybox_aliases {
             append_busybox_applet_alias_candidates(&mut candidates);
         }
+        translate_mount_candidates(process, &mut candidates);
         if candidates.is_empty() {
             return Err(LinuxError::EINVAL);
         }
@@ -1240,8 +1234,20 @@ fn open_fd_entry(
         if add_busybox_aliases {
             append_busybox_applet_alias_candidates(&mut candidates);
         }
+        translate_mount_candidates(process, &mut candidates);
         open_candidates(process, &candidates, &opts, flags, mode)
     }
+}
+
+fn translate_mount_candidates(process: &UserProcess, candidates: &mut Vec<String>) {
+    for candidate in candidates.iter_mut() {
+        *candidate = process.translate_mount_path(candidate.as_str());
+    }
+    let mut deduped = Vec::new();
+    for candidate in candidates.drain(..) {
+        push_runtime_candidate(&mut deduped, Some(candidate));
+    }
+    *candidates = deduped;
 }
 
 fn busybox_applet_alias_allowed(flags: u32, access: u32) -> bool {
@@ -1421,14 +1427,20 @@ pub(super) fn resolve_dirfd_path(
     path: &str,
 ) -> Result<String, LinuxError> {
     if path.starts_with('/') {
-        return normalize_path("/", path).ok_or(LinuxError::EINVAL);
+        return normalize_path("/", path)
+            .map(|path| process.translate_mount_path(path.as_str()))
+            .ok_or(LinuxError::EINVAL);
     }
     if dirfd == general::AT_FDCWD {
         let cwd = process.cwd();
-        return normalize_path(cwd.as_str(), path).ok_or(LinuxError::EINVAL);
+        return normalize_path(cwd.as_str(), path)
+            .map(|path| process.translate_mount_path(path.as_str()))
+            .ok_or(LinuxError::EINVAL);
     }
     let FdEntry::Directory(dir) = table.entry(dirfd)? else {
         return Err(LinuxError::ENOTDIR);
     };
-    normalize_path(dir.path.as_str(), path).ok_or(LinuxError::EINVAL)
+    normalize_path(dir.path.as_str(), path)
+        .map(|path| process.translate_mount_path(path.as_str()))
+        .ok_or(LinuxError::EINVAL)
 }

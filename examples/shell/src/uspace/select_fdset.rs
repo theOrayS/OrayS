@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 
@@ -12,12 +14,26 @@ struct UserFdSet {
     fds_bits: [usize; FD_SET_WORDS],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserPollFd {
+    fd: i32,
+    events: i16,
+    revents: i16,
+}
+
 #[derive(Clone, Copy)]
 pub(super) enum SelectMode {
     Read,
     Write,
     Except,
 }
+
+const POLLIN: i16 = 0x0001;
+const POLLPRI: i16 = 0x0002;
+const POLLOUT: i16 = 0x0004;
+const POLLERR: i16 = 0x0008;
+const POLLNVAL: i16 = 0x0020;
 
 pub(super) fn read_pselect_deadline(
     process: &UserProcess,
@@ -172,6 +188,115 @@ pub(super) fn sys_pselect6(
             if ret != 0 {
                 return ret;
             }
+            return 0;
+        }
+        axtask::yield_now();
+    }
+}
+
+#[cfg(not(any(
+    target_arch = "riscv64",
+    target_arch = "aarch64",
+    target_arch = "loongarch64"
+)))]
+fn poll_deadline_from_timeout_ms(timeout_ms: i32) -> Option<core::time::Duration> {
+    (timeout_ms >= 0)
+        .then(|| axhal::time::wall_time() + core::time::Duration::from_millis(timeout_ms as u64))
+}
+
+fn poll_one_fd(table: &FdTable, pollfd: &mut UserPollFd) -> bool {
+    pollfd.revents = 0;
+    if pollfd.fd < 0 {
+        return false;
+    }
+    if table.entry(pollfd.fd).is_err() {
+        pollfd.revents = POLLNVAL;
+        return true;
+    }
+    if pollfd.events & (POLLIN | POLLPRI) != 0 && table.poll(pollfd.fd, SelectMode::Read) {
+        pollfd.revents |= pollfd.events & (POLLIN | POLLPRI);
+    }
+    if pollfd.events & POLLOUT != 0 && table.poll(pollfd.fd, SelectMode::Write) {
+        pollfd.revents |= POLLOUT;
+    }
+    if table.poll(pollfd.fd, SelectMode::Except) {
+        pollfd.revents |= POLLERR;
+    }
+    pollfd.revents != 0
+}
+
+fn poll_fds_once(process: &UserProcess, fds: usize, nfds: usize) -> Result<usize, LinuxError> {
+    let mut ready = 0usize;
+    let table = process.fds.lock();
+    for idx in 0..nfds {
+        let ptr = fds + idx * size_of::<UserPollFd>();
+        let mut pollfd = read_user_value::<UserPollFd>(process, ptr)?;
+        if poll_one_fd(&table, &mut pollfd) {
+            ready += 1;
+        }
+        let ret = write_user_value(process, ptr, &pollfd);
+        if ret != 0 {
+            return Err(LinuxError::EFAULT);
+        }
+    }
+    Ok(ready)
+}
+
+pub(super) fn sys_ppoll(
+    process: &UserProcess,
+    fds: usize,
+    nfds: usize,
+    timeout: usize,
+    _sigmask: usize,
+    _sigsetsize: usize,
+) -> isize {
+    if nfds > FD_SETSIZE {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let deadline = match read_pselect_deadline(process, timeout) {
+        Ok(deadline) => deadline,
+        Err(err) => return neg_errno(err),
+    };
+    sys_poll_until(process, fds, nfds, deadline)
+}
+
+#[cfg(not(any(
+    target_arch = "riscv64",
+    target_arch = "aarch64",
+    target_arch = "loongarch64"
+)))]
+pub(super) fn sys_poll(process: &UserProcess, fds: usize, nfds: usize, timeout_ms: i32) -> isize {
+    if nfds > FD_SETSIZE {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    sys_poll_until(
+        process,
+        fds,
+        nfds,
+        poll_deadline_from_timeout_ms(timeout_ms),
+    )
+}
+
+fn sys_poll_until(
+    process: &UserProcess,
+    fds: usize,
+    nfds: usize,
+    deadline: Option<core::time::Duration>,
+) -> isize {
+    loop {
+        if current_unblocked_signal_pending() {
+            return neg_errno(LinuxError::EINTR);
+        }
+        match poll_fds_once(process, fds, nfds) {
+            Ok(ready) if ready > 0 => {
+                axtask::yield_now();
+                return ready as isize;
+            }
+            Ok(_) => {}
+            Err(err) => return neg_errno(err),
+        }
+        if deadline.is_some_and(|ddl| axhal::time::wall_time() >= ddl) {
+            axtask::yield_now();
             return 0;
         }
         axtask::yield_now();

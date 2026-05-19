@@ -1,3 +1,4 @@
+use core::cmp;
 use core::ffi::c_void;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -49,15 +50,40 @@ pub(super) struct SocketEntry {
     pub(super) options: Arc<Mutex<SocketOptions>>,
 }
 
-#[derive(Clone)]
 pub(super) struct LocalSocketEntry {
     id: usize,
     socktype: i32,
     nonblocking: bool,
+    pair: Option<LocalSocketPairEndpoint>,
     options: Arc<Mutex<SocketOptions>>,
 }
 
 static NEXT_LOCAL_SOCKET_ID: AtomicUsize = AtomicUsize::new(1);
+const LOCAL_SOCKET_BUFFER_SIZE: usize = 4096;
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum LocalSocketBufferStatus {
+    Full,
+    Empty,
+    Normal,
+}
+
+struct LocalSocketBuffer {
+    data: [u8; LOCAL_SOCKET_BUFFER_SIZE],
+    head: usize,
+    tail: usize,
+    status: LocalSocketBufferStatus,
+}
+
+struct LocalSocketPairState {
+    buffers: [Mutex<LocalSocketBuffer>; 2],
+    open_ends: Mutex<[usize; 2]>,
+}
+
+struct LocalSocketPairEndpoint {
+    side: usize,
+    state: Arc<LocalSocketPairState>,
+}
 
 impl SocketEntry {
     pub(super) fn new(posix_fd: i32, socktype: i32) -> Self {
@@ -114,14 +140,138 @@ impl SocketEntry {
     }
 }
 
+impl LocalSocketBuffer {
+    const fn new() -> Self {
+        Self {
+            data: [0; LOCAL_SOCKET_BUFFER_SIZE],
+            head: 0,
+            tail: 0,
+            status: LocalSocketBufferStatus::Empty,
+        }
+    }
+
+    fn write_byte(&mut self, byte: u8) {
+        self.status = LocalSocketBufferStatus::Normal;
+        self.data[self.tail] = byte;
+        self.tail = (self.tail + 1) % LOCAL_SOCKET_BUFFER_SIZE;
+        if self.tail == self.head {
+            self.status = LocalSocketBufferStatus::Full;
+        }
+    }
+
+    fn read_byte(&mut self) -> u8 {
+        self.status = LocalSocketBufferStatus::Normal;
+        let byte = self.data[self.head];
+        self.head = (self.head + 1) % LOCAL_SOCKET_BUFFER_SIZE;
+        if self.head == self.tail {
+            self.status = LocalSocketBufferStatus::Empty;
+        }
+        byte
+    }
+
+    const fn available_read(&self) -> usize {
+        if matches!(self.status, LocalSocketBufferStatus::Empty) {
+            0
+        } else if self.tail > self.head {
+            self.tail - self.head
+        } else {
+            self.tail + LOCAL_SOCKET_BUFFER_SIZE - self.head
+        }
+    }
+
+    const fn available_write(&self) -> usize {
+        if matches!(self.status, LocalSocketBufferStatus::Full) {
+            0
+        } else {
+            LOCAL_SOCKET_BUFFER_SIZE - self.available_read()
+        }
+    }
+}
+
+impl LocalSocketPairState {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            buffers: [
+                Mutex::new(LocalSocketBuffer::new()),
+                Mutex::new(LocalSocketBuffer::new()),
+            ],
+            open_ends: Mutex::new([1, 1]),
+        })
+    }
+
+    fn duplicate_side(&self, side: usize) {
+        self.open_ends.lock()[side] += 1;
+    }
+
+    fn close_side(&self, side: usize) {
+        let mut open = self.open_ends.lock();
+        if open[side] > 0 {
+            open[side] -= 1;
+        }
+    }
+
+    fn peer_open(&self, side: usize) -> bool {
+        self.open_ends.lock()[1 - side] > 0
+    }
+}
+
+impl Clone for LocalSocketPairEndpoint {
+    fn clone(&self) -> Self {
+        self.state.duplicate_side(self.side);
+        Self {
+            side: self.side,
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl Drop for LocalSocketPairEndpoint {
+    fn drop(&mut self) {
+        self.state.close_side(self.side);
+    }
+}
+
+impl Clone for LocalSocketEntry {
+    fn clone(&self) -> Self {
+        self.duplicate()
+    }
+}
+
 impl LocalSocketEntry {
     pub(super) fn new(socktype: i32, flags: i32) -> Self {
         Self {
             id: NEXT_LOCAL_SOCKET_ID.fetch_add(1, Ordering::Relaxed),
             socktype,
             nonblocking: flags & posix_ctypes::SOCK_NONBLOCK as i32 != 0,
+            pair: None,
             options: Arc::new(Mutex::new(SocketOptions::default())),
         }
+    }
+
+    pub(super) fn new_pair(socktype: i32, flags: i32) -> (Self, Self) {
+        let state = LocalSocketPairState::new();
+        let options = Arc::new(Mutex::new(SocketOptions::default()));
+        let nonblocking = flags & posix_ctypes::SOCK_NONBLOCK as i32 != 0;
+        let first_id = NEXT_LOCAL_SOCKET_ID.fetch_add(2, Ordering::Relaxed);
+        (
+            Self {
+                id: first_id,
+                socktype,
+                nonblocking,
+                pair: Some(LocalSocketPairEndpoint {
+                    side: 0,
+                    state: state.clone(),
+                }),
+                options: options.clone(),
+            },
+            Self {
+                id: first_id + 1,
+                socktype,
+                nonblocking,
+                pair: Some(LocalSocketPairEndpoint { side: 1, state }),
+                options,
+            },
+        )
     }
 
     pub(super) fn duplicate(&self) -> Self {
@@ -129,20 +279,98 @@ impl LocalSocketEntry {
             id: self.id,
             socktype: self.socktype,
             nonblocking: self.nonblocking,
+            pair: self.pair.clone(),
             options: self.options.clone(),
         }
     }
 
-    pub(super) fn read(&self, _dst: &mut [u8]) -> Result<usize, LinuxError> {
-        Err(LinuxError::EINVAL)
+    pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        let Some(pair) = &self.pair else {
+            return Err(LinuxError::EINVAL);
+        };
+        let mut read_len = 0usize;
+        while read_len < dst.len() {
+            let mut buffer = pair.state.buffers[pair.side].lock();
+            let available = buffer.available_read();
+            if available == 0 {
+                if read_len > 0 || !pair.state.peer_open(pair.side) {
+                    return Ok(read_len);
+                }
+                if self.nonblocking {
+                    return Err(LinuxError::EAGAIN);
+                }
+                drop(buffer);
+                axtask::yield_now();
+                continue;
+            }
+            let take = cmp::min(available, dst.len() - read_len);
+            for byte in &mut dst[read_len..read_len + take] {
+                *byte = buffer.read_byte();
+            }
+            read_len += take;
+            if read_len > 0 {
+                return Ok(read_len);
+            }
+        }
+        Ok(read_len)
     }
 
-    pub(super) fn write(&self, _src: &[u8]) -> Result<usize, LinuxError> {
-        Err(LinuxError::EINVAL)
+    pub(super) fn write(&self, src: &[u8]) -> Result<usize, LinuxError> {
+        let Some(pair) = &self.pair else {
+            return Err(LinuxError::EINVAL);
+        };
+        if !pair.state.peer_open(pair.side) {
+            return Err(LinuxError::EPIPE);
+        }
+        let peer_side = 1 - pair.side;
+        let mut written = 0usize;
+        while written < src.len() {
+            if !pair.state.peer_open(pair.side) {
+                return if written > 0 {
+                    Ok(written)
+                } else {
+                    Err(LinuxError::EPIPE)
+                };
+            }
+            let mut buffer = pair.state.buffers[peer_side].lock();
+            let available = buffer.available_write();
+            if available == 0 {
+                if self.nonblocking {
+                    return if written > 0 {
+                        Ok(written)
+                    } else {
+                        Err(LinuxError::EAGAIN)
+                    };
+                }
+                drop(buffer);
+                axtask::yield_now();
+                continue;
+            }
+            let take = cmp::min(available, src.len() - written);
+            for byte in &src[written..written + take] {
+                buffer.write_byte(*byte);
+            }
+            written += take;
+        }
+        Ok(written)
     }
 
     pub(super) fn poll(&self, mode: SelectMode) -> bool {
-        matches!(mode, SelectMode::Write)
+        let Some(pair) = &self.pair else {
+            return matches!(mode, SelectMode::Write);
+        };
+        match mode {
+            SelectMode::Read => {
+                let buffer = pair.state.buffers[pair.side].lock();
+                buffer.available_read() > 0 || !pair.state.peer_open(pair.side)
+            }
+            SelectMode::Write => {
+                let peer_side = 1 - pair.side;
+                let buffer = pair.state.buffers[peer_side].lock();
+                buffer.available_write() > 0 && pair.state.peer_open(pair.side)
+            }
+            SelectMode::Except => false,
+        }
     }
 
     pub(super) fn status_flags(&self) -> i32 {
@@ -151,6 +379,10 @@ impl LocalSocketEntry {
             flags |= posix_ctypes::SOCK_NONBLOCK as i32;
         }
         flags
+    }
+
+    pub(super) fn set_status_flags(&mut self, flags: i32) {
+        self.nonblocking = flags & posix_ctypes::O_NONBLOCK as i32 != 0;
     }
 
     pub(super) fn stat(&self) -> general::stat {
@@ -237,6 +469,38 @@ pub(super) fn insert_local_socket_entry(process: &UserProcess, socktype: i32, fl
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn insert_local_socket_pair_entries(
+    process: &UserProcess,
+    socktype: i32,
+    flags: i32,
+    sv: usize,
+) -> isize {
+    let fd_flags = fd_cloexec_flag(flags & posix_ctypes::SOCK_CLOEXEC as i32 != 0);
+    let (first, second) = LocalSocketEntry::new_pair(socktype, flags);
+    let fds = {
+        let mut table = process.fds.lock();
+        let first_fd = match table.insert_with_flags(FdEntry::LocalSocket(first), fd_flags) {
+            Ok(fd) => fd,
+            Err(err) => return neg_errno(err),
+        };
+        let second_fd = match table.insert_with_flags(FdEntry::LocalSocket(second), fd_flags) {
+            Ok(fd) => fd,
+            Err(err) => {
+                let _ = table.close(first_fd);
+                return neg_errno(err);
+            }
+        };
+        [first_fd, second_fd]
+    };
+    let ret = write_user_value(process, sv, &fds);
+    if ret != 0 {
+        let mut table = process.fds.lock();
+        let _ = table.close(fds[0]);
+        let _ = table.close(fds[1]);
+    }
+    ret
 }
 
 pub(super) fn is_local_socket_fd(process: &UserProcess, fd: usize) -> Result<bool, LinuxError> {
@@ -544,6 +808,34 @@ pub(super) fn sys_socket_bridge(
         Err(err) => return neg_errno(err),
     };
     insert_socket_entry(process, posix_fd, base_socktype, flags)
+}
+
+pub(super) fn sys_socketpair_bridge(
+    process: &UserProcess,
+    domain: usize,
+    socktype: usize,
+    protocol: usize,
+    sv: usize,
+) -> isize {
+    let domain = domain as i32;
+    let raw_socktype = socktype as i32;
+    let protocol = protocol as i32;
+    let flag_mask = (posix_ctypes::SOCK_CLOEXEC | posix_ctypes::SOCK_NONBLOCK) as i32;
+    let flags = raw_socktype & flag_mask;
+    let base_socktype = raw_socktype & !flag_mask;
+
+    if domain != AF_UNIX_DOMAIN {
+        return neg_errno_code(LINUX_EAFNOSUPPORT);
+    }
+    if protocol != 0 {
+        return neg_errno_code(LINUX_EPROTONOSUPPORT);
+    }
+    if base_socktype as u32 != posix_ctypes::SOCK_STREAM
+        && base_socktype as u32 != posix_ctypes::SOCK_DGRAM
+    {
+        return neg_errno_code(LINUX_ESOCKTNOSUPPORT);
+    }
+    insert_local_socket_pair_entries(process, base_socktype, flags, sv)
 }
 
 pub(super) fn sys_bind_bridge(

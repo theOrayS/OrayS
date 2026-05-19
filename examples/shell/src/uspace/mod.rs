@@ -23,6 +23,7 @@ mod linux_abi;
 mod memory_map;
 mod memory_policy;
 mod metadata;
+mod mount_abi;
 mod process_abi;
 mod process_lifecycle;
 mod program_loader;
@@ -45,7 +46,7 @@ use process_lifecycle::ProcessTeardown;
 pub use process_lifecycle::run_user_program;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in;
-use resource_sched::UserRlimit;
+use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
 
 struct AxNamespaceImpl;
@@ -60,9 +61,11 @@ struct UserProcess {
     children: Mutex<Vec<ChildTask>>,
     child_exit_wait: WaitQueue,
     rlimits: Mutex<BTreeMap<u32, UserRlimit>>,
+    sched_state: Mutex<UserSchedState>,
     signal_actions: Mutex<BTreeMap<usize, general::kernel_sigaction>>,
     path_modes: Mutex<BTreeMap<String, u32>>,
     path_owners: Mutex<BTreeMap<String, (u32, u32)>>,
+    mount_points: Arc<Mutex<BTreeMap<String, String>>>,
     shm_attachments: Mutex<BTreeMap<usize, (i32, usize)>>,
     real_uid: AtomicU32,
     uid: AtomicU32,

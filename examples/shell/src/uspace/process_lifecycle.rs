@@ -16,6 +16,7 @@ use std::vec::Vec;
 use super::futex;
 use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
 use super::program_loader::load_program_image;
+use super::resource_sched::default_sched_state;
 use super::runtime_paths::current_cwd;
 use super::signal_abi::ensure_user_return_hook_registered;
 #[cfg(target_arch = "riscv64")]
@@ -145,9 +146,11 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         children: Mutex::new(Vec::new()),
         child_exit_wait: WaitQueue::new(),
         rlimits: Mutex::new(BTreeMap::new()),
+        sched_state: Mutex::new(default_sched_state()),
         signal_actions: Mutex::new(BTreeMap::new()),
         path_modes: Mutex::new(BTreeMap::new()),
         path_owners: Mutex::new(BTreeMap::new()),
+        mount_points: Arc::new(Mutex::new(BTreeMap::new())),
         shm_attachments: Mutex::new(BTreeMap::new()),
         real_uid: AtomicU32::new(0),
         uid: AtomicU32::new(0),
@@ -298,9 +301,11 @@ impl UserProcess {
             children: Mutex::new(Vec::new()),
             child_exit_wait: WaitQueue::new(),
             rlimits: Mutex::new(self.rlimits.lock().clone()),
+            sched_state: Mutex::new(self.get_sched_state()),
             signal_actions: Mutex::new(self.signal_actions.lock().clone()),
             path_modes: Mutex::new(self.path_modes.lock().clone()),
             path_owners: Mutex::new(self.path_owners.lock().clone()),
+            mount_points: self.mount_points.clone(),
             shm_attachments: Mutex::new(self.shm_attachments.lock().clone()),
             real_uid: AtomicU32::new(self.real_uid()),
             uid: AtomicU32::new(self.uid()),

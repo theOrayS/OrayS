@@ -12,6 +12,7 @@ use super::fd_socket::{
     sys_accept_bridge, sys_bind_bridge, sys_connect_bridge, sys_getpeername_bridge,
     sys_getsockname_bridge, sys_getsockopt_bridge, sys_listen_bridge, sys_recvfrom_bridge,
     sys_sendto_bridge, sys_setsockopt_bridge, sys_shutdown_bridge, sys_socket_bridge,
+    sys_socketpair_bridge,
 };
 use super::fd_table::{
     sys_chdir, sys_close, sys_dup, sys_dup3, sys_fchdir, sys_fcntl, sys_fsync, sys_ftruncate,
@@ -26,16 +27,24 @@ use super::metadata::{
     sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fstat, sys_fstatfs,
     sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
 };
+use super::mount_abi::{sys_mount, sys_umount2};
 use super::process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
 use super::process_lifecycle::{
     sys_clone, sys_execve, sys_exit, sys_exit_group, sys_wait4,
     terminate_current_thread_for_exit_group,
 };
 use super::resource_sched::{
-    sys_prlimit64, sys_sched_getaffinity, sys_sched_getparam, sys_sched_getscheduler,
-    sys_sched_setaffinity, sys_sched_setparam, sys_sched_setscheduler, sys_sched_yield,
+    sys_prlimit64, sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam,
+    sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
+    sys_sched_setscheduler, sys_sched_yield,
 };
-use super::select_fdset::sys_pselect6;
+#[cfg(not(any(
+    target_arch = "riscv64",
+    target_arch = "aarch64",
+    target_arch = "loongarch64"
+)))]
+use super::select_fdset::sys_poll;
+use super::select_fdset::{sys_ppoll, sys_pselect6};
 use super::signal_abi::{
     sys_kill, sys_rt_sigaction, sys_rt_sigprocmask, sys_rt_sigreturn, sys_rt_sigtimedwait,
     sys_tgkill, sys_tkill,
@@ -90,6 +99,15 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_openat => sys_openat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_mkdirat => sys_mkdirat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_unlinkat => sys_unlinkat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_mount => sys_mount(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_umount2 => sys_umount2(&process, tf.arg0(), tf.arg1()),
         general::__NR_pipe2 => sys_pipe2(&process, tf.arg0(), tf.arg1()),
         general::__NR_ftruncate => sys_ftruncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchmod => sys_fchmod(&process, tf.arg0(), tf.arg1()),
@@ -137,6 +155,9 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             sys_readlinkat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
         general::__NR_socket => sys_socket_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_socketpair => {
+            sys_socketpair_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
         general::__NR_bind => sys_bind_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_listen => sys_listen_bridge(&process, tf.arg0(), tf.arg1()),
         general::__NR_accept => sys_accept_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2(), 0),
@@ -194,6 +215,20 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
             tf.arg5(),
         ),
+        general::__NR_ppoll => sys_ppoll(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        #[cfg(not(any(
+            target_arch = "riscv64",
+            target_arch = "aarch64",
+            target_arch = "loongarch64"
+        )))]
+        general::__NR_poll => sys_poll(&process, tf.arg0(), tf.arg1(), tf.arg2() as i32),
         general::__NR_ioctl => sys_ioctl(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_clock_gettime => sys_clock_gettime(&process, tf.arg0(), tf.arg1()),
         general::__NR_clock_settime => sys_clock_settime(&process, tf.arg0(), tf.arg1()),
@@ -216,6 +251,12 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             sys_sched_setscheduler(&process, tf.arg0() as i32, tf.arg1() as i32, tf.arg2())
         }
         general::__NR_sched_getscheduler => sys_sched_getscheduler(&process, tf.arg0() as i32),
+        general::__NR_sched_setattr => {
+            sys_sched_setattr(&process, tf.arg0() as i32, tf.arg1(), tf.arg2())
+        }
+        general::__NR_sched_getattr => {
+            sys_sched_getattr(&process, tf.arg0() as i32, tf.arg1(), tf.arg2(), tf.arg3())
+        }
         general::__NR_sched_setaffinity => {
             sys_sched_setaffinity(&process, tf.arg0() as i32, tf.arg1(), tf.arg2())
         }
