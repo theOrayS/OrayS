@@ -382,19 +382,44 @@ pub(super) fn sys_newfstatat(
     dirfd: usize,
     pathname: usize,
     statbuf: usize,
-    _flags: usize,
+    flags: usize,
 ) -> isize {
+    let flags = flags as u32;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW
+        | general::AT_EMPTY_PATH
+        | general::AT_NO_AUTOMOUNT
+        | general::AT_STATX_SYNC_TYPE;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if pathname == 0 {
+        if flags & general::AT_EMPTY_PATH == 0 {
+            return neg_errno(LinuxError::EFAULT);
+        }
+        let st = match stat_empty_path(process, dirfd as i32) {
+            Ok(st) => st,
+            Err(err) => return neg_errno(err),
+        };
+        return write_user_value(process, statbuf, &st);
+    }
     let path = match read_cstr(process, pathname) {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let st = match process
-        .fds
-        .lock()
-        .stat_path(process, dirfd as i32, path.as_str())
-    {
-        Ok(st) => st,
-        Err(err) => return neg_errno(err),
+    let st = if path.is_empty() && flags & general::AT_EMPTY_PATH != 0 {
+        match stat_empty_path(process, dirfd as i32) {
+            Ok(st) => st,
+            Err(err) => return neg_errno(err),
+        }
+    } else {
+        match process
+            .fds
+            .lock()
+            .stat_path(process, dirfd as i32, path.as_str())
+        {
+            Ok(st) => st,
+            Err(err) => return neg_errno(err),
+        }
     };
     write_user_value(process, statbuf, &st)
 }
@@ -453,12 +478,8 @@ pub(super) fn sys_statx(
         if flags & general::AT_EMPTY_PATH == 0 {
             return neg_errno(LinuxError::EFAULT);
         }
-        match process
-            .fds
-            .lock()
-            .stat_with_recorded_path(process, dirfd as i32)
-        {
-            Ok((_, st)) => st,
+        match stat_empty_path(process, dirfd as i32) {
+            Ok(st) => st,
             Err(err) => return neg_errno(err),
         }
     } else {
@@ -467,12 +488,8 @@ pub(super) fn sys_statx(
             Err(err) => return neg_errno(err),
         };
         if path.is_empty() && flags & general::AT_EMPTY_PATH != 0 {
-            match process
-                .fds
-                .lock()
-                .stat_with_recorded_path(process, dirfd as i32)
-            {
-                Ok((_, st)) => st,
+            match stat_empty_path(process, dirfd as i32) {
+                Ok(st) => st,
                 Err(err) => return neg_errno(err),
             }
         } else {
@@ -487,6 +504,21 @@ pub(super) fn sys_statx(
         }
     };
     write_user_value(process, statxbuf, &stat_to_statx(st))
+}
+
+fn stat_empty_path(process: &UserProcess, dirfd: i32) -> Result<general::stat, LinuxError> {
+    if dirfd == general::AT_FDCWD {
+        process
+            .fds
+            .lock()
+            .stat_path(process, general::AT_FDCWD, ".")
+    } else {
+        process
+            .fds
+            .lock()
+            .stat_with_recorded_path(process, dirfd)
+            .map(|(_, st)| st)
+    }
 }
 
 pub(super) fn sys_readlinkat(
