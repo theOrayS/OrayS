@@ -1,0 +1,2 @@
+cases=getpgid02,getsid02,getppid02,gettid02,gettimeofday02,getrlimit02,getrusage02,uname02,wait01,wait02,getgroups01,getgroups03,getuid03,getgid03,geteuid02,getegid02
+exit=0

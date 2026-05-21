@@ -1,0 +1,237 @@
+{
+  "plan": {
+    "version": 1,
+    "createdAt": "2026-05-21T10:29:56.043Z",
+    "updatedAt": "2026-05-21T14:42:38.032Z",
+    "briefPath": ".omx/ultragoal/brief.md",
+    "goalsPath": ".omx/ultragoal/goals.json",
+    "ledgerPath": ".omx/ultragoal/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-no-fake-pass-no-case-name-hardcoded",
+        "title": "No fake PASS, no case-name hardcoded PASS, no silent SKIP of real fai...",
+        "objective": "No fake PASS, no case-name hardcoded PASS, no silent SKIP of real failures.",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:30:25.137Z",
+        "startedAt": "2026-05-21T10:30:02.968Z",
+        "completedAt": "2026-05-21T10:30:25.137Z",
+        "evidence": "Baseline guard established in docs/ltp-score-improvement-2026-05-23/brief.md and .omx/context/ltp-score-improvement-next-20260521T102908Z.md: no fake PASS, no case-name hardcoded PASS, no silent SKIP of real LTP failures; runner audit starts from examples/shell/src/cmd.rs and scripts/ltp_summary.py."
+      },
+      {
+        "id": "G002-timeout-is-a-failure-signal-counted",
+        "title": "Timeout is a failure signal, counted separately, never counted as PASS.",
+        "objective": "Timeout is a failure signal, counted separately, never counted as PASS.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:00.169Z",
+        "completedAt": "2026-05-21T10:31:00.169Z",
+        "evidence": "Timeout-as-fail guard established: examples/shell/src/cmd.rs::run_ltp_suite prints FAIL LTP CASE plus TIMEOUT LTP CASE for status 137/143 or timeout errors; scripts/ltp_summary.py counts timeout separately."
+      },
+      {
+        "id": "G003-do-not-rely-on-run-eval-exit-code-al",
+        "title": "Do not rely on `run-eval` exit code alone; use `scripts/ltp_summary.p...",
+        "objective": "Do not rely on `run-eval` exit code alone; use `scripts/ltp_summary.py` for internal TFAIL/TBROK/TCONF, timeout, ENOSYS, panic/trap.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:00.743Z",
+        "completedAt": "2026-05-21T10:31:00.743Z",
+        "evidence": "Summary guard established: docs/ltp-score-improvement-2026-05-22/final-gate-report.md and final-gate-output-*-summary.txt were read; this run will use scripts/ltp_summary.py for TFAIL/TBROK/TCONF/timeout/ENOSYS/panic classification."
+      },
+      {
+        "id": "G004-targeted-batches-first-final-full-ru",
+        "title": "Targeted batches first; final full `./run-eval.sh la` and `./run-eval...",
+        "objective": "Targeted batches first; final full `./run-eval.sh la` and `./run-eval.sh` only after promotion is justified.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:01.319Z",
+        "completedAt": "2026-05-21T10:31:01.319Z",
+        "evidence": "Execution order recorded in docs/ltp-score-improvement-2026-05-23/brief.md and .omx/context/ltp-score-improvement-next-20260521T102908Z.md: targeted batches before final full run-eval gates."
+      },
+      {
+        "id": "G005-every-promoted-case-needs-la-rv-musl",
+        "title": "Every promoted case needs LA/RV × musl/glibc evidence and a promotion...",
+        "objective": "Every promoted case needs LA/RV × musl/glibc evidence and a promotion rationale.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:01.889Z",
+        "completedAt": "2026-05-21T10:31:01.889Z",
+        "evidence": "Promotion evidence requirement recorded in docs/ltp-score-improvement-2026-05-23/brief.md: every newly stable case needs LA/RV x musl/glibc matrix plus internal signal counts."
+      },
+      {
+        "id": "G006-workers-do-not-mutate-omx-ultragoal",
+        "title": "Workers do not mutate `.omx/ultragoal`; the leader owns `goals.json`...",
+        "objective": "Workers do not mutate `.omx/ultragoal`; the leader owns `goals.json` / `ledger.jsonl` checkpoints.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:02.310Z",
+        "completedAt": "2026-05-21T10:31:02.310Z",
+        "evidence": "Team/Ultragoal ownership guard recorded: workers report task evidence only; leader owns .omx/ultragoal/goals.json and ledger.jsonl checkpoints."
+      },
+      {
+        "id": "G007-preserve-transparent-read02-tconf-re",
+        "title": "Preserve transparent `read02` TCONF record; do not hide it.",
+        "objective": "Preserve transparent `read02` TCONF record; do not hide it.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:02.851Z",
+        "completedAt": "2026-05-21T10:31:02.851Z",
+        "evidence": "read02 risk preserved: docs/ltp-score-improvement-2026-05-22/final-gate-report.md records read02 as pass_with_tconf with TCONF=2 per libc and not hidden as clean pass."
+      },
+      {
+        "id": "G008-previous-ultragoal-10-10-complete-cu",
+        "title": "Previous Ultragoal 10/10 complete; current Codex goal was clear befor...",
+        "objective": "Previous Ultragoal 10/10 complete; current Codex goal was clear before this plan.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:03.279Z",
+        "completedAt": "2026-05-21T10:31:03.279Z",
+        "evidence": "Old run status verified: omx ultragoal status before recreation reported 10/10 complete and get_goal returned null; old .omx/ultragoal was archived before --force recreation."
+      },
+      {
+        "id": "G009-examples-shell-src-cmd-rs-ltp-stable",
+        "title": "`examples/shell/src/cmd.rs::LTP_STABLE_CASES` currently has 63 cases...",
+        "objective": "`examples/shell/src/cmd.rs::LTP_STABLE_CASES` currently has 63 cases per libc/arch.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:03.850Z",
+        "completedAt": "2026-05-21T10:31:03.850Z",
+        "evidence": "Baseline stable list verified from examples/shell/src/cmd.rs::LTP_STABLE_CASES: 63 cases per libc/arch, including the previous 19 additions and transparent read02."
+      },
+      {
+        "id": "G010-docs-ltp-score-improvement-2026-05-2",
+        "title": "`docs/ltp-score-improvement-2026-05-22/final-gate-report.md` reports...",
+        "objective": "`docs/ltp-score-improvement-2026-05-22/final-gate-report.md` reports final LA/RV gates exit 0 and 126 PASS / 0 FAIL per arch.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:04.260Z",
+        "completedAt": "2026-05-21T10:31:04.260Z",
+        "evidence": "Prior final gate verified from docs/ltp-score-improvement-2026-05-22/final-gate-report.md and summaries: LA/RV final run-eval exit 0, 126 PASS/0 FAIL per arch, ltp-musl 63/0, ltp-glibc 63/0."
+      },
+      {
+        "id": "G011-2026-05-22-combined-candidate-report",
+        "title": "2026-05-22 combined candidate report has no obvious clean not-yet-sta...",
+        "objective": "2026-05-22 combined candidate report has no obvious clean not-yet-stable cases; this phase must discover fresh candidates and/or make real ABI fixes before promotion.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:04.818Z",
+        "completedAt": "2026-05-21T10:31:04.818Z",
+        "evidence": "Candidate baseline verified: combined-promotion-candidates.txt/json report 62 clean candidates and 26 blocked/incomplete; no obvious clean not-yet-stable set remains from stale evidence."
+      },
+      {
+        "id": "G012-establish-and-document-the-baseline",
+        "title": "Establish and document the baseline/context for the new run, includin...",
+        "objective": "Establish and document the baseline/context for the new run, including old Ultragoal clear status, current 63-case stable list, prior final-gate evidence, and blocked-case guardrails.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T10:31:05.215Z",
+        "completedAt": "2026-05-21T10:31:05.215Z",
+        "evidence": "New-run baseline/context documented in .omx/context/ltp-score-improvement-next-20260521T102908Z.md and docs/ltp-score-improvement-2026-05-23/brief*.md."
+      },
+      {
+        "id": "G013-launch-and-supervise-an-omx-team-wit",
+        "title": "Launch and supervise an OMX Team with discovery, stats/report, runner...",
+        "objective": "Launch and supervise an OMX Team with discovery, stats/report, runner/harness, syscall/ABI, and verification/review lanes; collect terminal evidence before shutdown.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:40:47.951Z",
+        "completedAt": "2026-05-21T14:40:47.951Z",
+        "evidence": "Completed in stable75 LTP promotion; see docs/ltp-score-improvement-2026-05-23/final-gate-report.md and final-gate-quality-gate.json."
+      },
+      {
+        "id": "G014-enumerate-available-ltp-cases-from-s",
+        "title": "Enumerate available LTP cases from sdcard images and prior docs, sele...",
+        "objective": "Enumerate available LTP cases from sdcard images and prior docs, select 20-40 plausible candidates outside stable, and run small targeted RV/LA batches to classify them.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:40:48.775Z",
+        "completedAt": "2026-05-21T14:40:48.775Z",
+        "evidence": "Completed in stable75 LTP promotion; see docs/ltp-score-improvement-2026-05-23/final-gate-report.md and final-gate-quality-gate.json."
+      },
+      {
+        "id": "G015-generate-a-promotion-matrix-with-la",
+        "title": "Generate a promotion matrix with LA/RV × musl/glibc rows and internal...",
+        "objective": "Generate a promotion matrix with LA/RV × musl/glibc rows and internal TFAIL/TBROK/TCONF, timeout, ENOSYS, panic/trap classification; save raw logs and JSON/TXT summaries under `docs/ltp-score-improvement-2026-05-23/`.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:40:49.344Z",
+        "completedAt": "2026-05-21T14:40:49.344Z",
+        "evidence": "Completed in stable75 LTP promotion; see docs/ltp-score-improvement-2026-05-23/final-gate-report.md and final-gate-quality-gate.json."
+      },
+      {
+        "id": "G016-if-targeted-logs-reveal-low-risk-rea",
+        "title": "If targeted logs reveal low-risk real ABI/errno/metadata/time/signal...",
+        "objective": "If targeted logs reveal low-risk real ABI/errno/metadata/time/signal fixes, implement only those fixes and rerun the affected targeted cases; otherwise document blockers without promotion.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:40:49.788Z",
+        "completedAt": "2026-05-21T14:40:49.788Z",
+        "evidence": "Completed in stable75 LTP promotion; see docs/ltp-score-improvement-2026-05-23/final-gate-report.md and final-gate-quality-gate.json."
+      },
+      {
+        "id": "G017-promote-only-freshly-clean-cases-to",
+        "title": "Promote only freshly clean cases to `LTP_STABLE_CASES` (prefer 75-85...",
+        "objective": "Promote only freshly clean cases to `LTP_STABLE_CASES` (prefer 75-85 first) and explain each addition; blocked cases remain outside stable with evidence.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:40:50.307Z",
+        "completedAt": "2026-05-21T14:40:50.307Z",
+        "evidence": "Completed in stable75 LTP promotion; see docs/ltp-score-improvement-2026-05-23/final-gate-report.md and final-gate-quality-gate.json."
+      },
+      {
+        "id": "G018-run-promoted-stable-targeted-gates-o",
+        "title": "Run promoted stable targeted gates on LA and RV, then final full gate...",
+        "objective": "Run promoted stable targeted gates on LA and RV, then final full gates: `cargo fmt --all -- --check`, `./run-eval.sh la 2>&1 | tee output_la.md`, `./run-eval.sh 2>&1 | tee output_rv.md`, and `scripts/ltp_summary.py` on both logs.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:42:25.035Z",
+        "evidence": "Promoted stable75 targeted gates passed on LA/RV; final full LA/RV run-eval gates and required ltp_summary commands exited 0. See final-gate-report.md and final-gate-quality-gate.json.",
+        "completedAt": "2026-05-21T14:42:25.035Z"
+      },
+      {
+        "id": "G019-complete-final-cleanup-review-qualit",
+        "title": "Complete final cleanup/review/quality gate: changed-file anti-slop sc...",
+        "objective": "Complete final cleanup/review/quality gate: changed-file anti-slop scan, post-clean verification, code review approval, final report, quality-gate JSON, and Ultragoal final checkpoint.",
+        "status": "complete",
+        "attempt": 0,
+        "createdAt": "2026-05-21T10:29:56.043Z",
+        "updatedAt": "2026-05-21T14:42:38.032Z",
+        "completedAt": "2026-05-21T14:42:38.032Z",
+        "evidence": "Final cleanup/review/quality gate complete with aiSlopCleaner passed, verification passed, codeReview APPROVE and architect CLEAR; Codex aggregate goal complete. See final-gate-quality-gate.json and final-gate-report.md."
+      }
+    ],
+    "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 19,
+    "pending": 0,
+    "inProgress": 0,
+    "complete": 19,
+    "failed": 0,
+    "reviewBlocked": 0,
+    "needsUserDecision": 0,
+    "superseded": 0,
+    "steeringBlocked": 0,
+    "aggregateComplete": false
+  },
+  "reconciliation": null
+}
