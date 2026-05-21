@@ -1,381 +1,105 @@
 {
-  "candidate_count": 40,
-  "candidate_pool": [
-    {
-      "case": "getpgid01",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "process_abi.rs",
-      "rank": 1,
-      "selected_batch": true
-    },
-    {
-      "case": "getpgid02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "process_abi.rs",
-      "rank": 2,
-      "selected_batch": true
-    },
-    {
-      "case": "getsid01",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "process_abi.rs",
-      "rank": 3,
-      "selected_batch": true
-    },
-    {
-      "case": "getsid02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "process_abi.rs",
-      "rank": 4,
-      "selected_batch": true
-    },
-    {
-      "case": "getppid02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "process_lifecycle.rs",
-      "rank": 5,
-      "selected_batch": true
-    },
-    {
-      "case": "getrlimit02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "resource_sched.rs",
-      "rank": 6,
-      "selected_batch": true
-    },
-    {
-      "case": "getrusage02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "system_info.rs",
-      "rank": 7,
-      "selected_batch": true
-    },
-    {
-      "case": "gettimeofday02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "time_abi.rs",
-      "rank": 8,
-      "selected_batch": true
-    },
-    {
-      "case": "uname02",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "system_info.rs",
-      "rank": 9,
-      "selected_batch": true
-    },
-    {
-      "case": "uname04",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "system_info.rs",
-      "rank": 10,
-      "selected_batch": true
-    },
-    {
-      "case": "sched_get_priority_max01",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "resource_sched.rs",
-      "rank": 11,
-      "selected_batch": true
-    },
-    {
-      "case": "sched_get_priority_min01",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "resource_sched.rs",
-      "rank": 12,
-      "selected_batch": true
-    },
-    {
-      "case": "sched_getscheduler01",
-      "category": "proc/session/getter",
-      "likely_touchpoint": "resource_sched.rs",
-      "rank": 13,
-      "selected_batch": false
-    },
-    {
-      "case": "clock_getres01",
-      "category": "time/signal",
-      "likely_touchpoint": "time_abi.rs",
-      "rank": 14,
-      "selected_batch": false
-    },
-    {
-      "case": "clock_gettime01",
-      "category": "time/signal",
-      "likely_touchpoint": "time_abi.rs",
-      "rank": 15,
-      "selected_batch": false
-    },
-    {
-      "case": "nanosleep01",
-      "category": "time/signal",
-      "likely_touchpoint": "time_abi.rs",
-      "rank": 16,
-      "selected_batch": false
-    },
-    {
-      "case": "nanosleep02",
-      "category": "time/signal",
-      "likely_touchpoint": "time_abi.rs",
-      "rank": 17,
-      "selected_batch": false
-    },
-    {
-      "case": "pause01",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 18,
-      "selected_batch": false
-    },
-    {
-      "case": "rt_sigprocmask01",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 19,
-      "selected_batch": false
-    },
-    {
-      "case": "rt_sigprocmask02",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 20,
-      "selected_batch": false
-    },
-    {
-      "case": "sigpending02",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 21,
-      "selected_batch": false
-    },
-    {
-      "case": "sigprocmask01",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 22,
-      "selected_batch": false
-    },
-    {
-      "case": "sigsuspend01",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 23,
-      "selected_batch": false
-    },
-    {
-      "case": "kill02",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 24,
-      "selected_batch": false
-    },
-    {
-      "case": "kill05",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 25,
-      "selected_batch": false
-    },
-    {
-      "case": "sigaction02",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 26,
-      "selected_batch": false
-    },
-    {
-      "case": "rt_sigaction02",
-      "category": "time/signal",
-      "likely_touchpoint": "signal_abi.rs",
-      "rank": 27,
-      "selected_batch": false
-    },
-    {
-      "case": "access02",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 28,
-      "selected_batch": false
-    },
-    {
-      "case": "access04",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 29,
-      "selected_batch": false
-    },
-    {
-      "case": "dup03",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 30,
-      "selected_batch": false
-    },
-    {
-      "case": "pipe02",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_pipe.rs",
-      "rank": 31,
-      "selected_batch": false
-    },
-    {
-      "case": "lseek02",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 32,
-      "selected_batch": false
-    },
-    {
-      "case": "mkdir02",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 33,
-      "selected_batch": false
-    },
-    {
-      "case": "link02",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "metadata.rs",
-      "rank": 34,
-      "selected_batch": false
-    },
-    {
-      "case": "unlink05",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 35,
-      "selected_batch": false
-    },
-    {
-      "case": "rename01",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "fd_table.rs",
-      "rank": 36,
-      "selected_batch": false
-    },
-    {
-      "case": "statfs01",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "metadata.rs",
-      "rank": 37,
-      "selected_batch": false
-    },
-    {
-      "case": "fstatfs01",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "metadata.rs",
-      "rank": 38,
-      "selected_batch": false
-    },
-    {
-      "case": "statvfs01",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "metadata.rs",
-      "rank": 39,
-      "selected_batch": false
-    },
-    {
-      "case": "readlinkat01",
-      "category": "fs/syscall-neighbor",
-      "likely_touchpoint": "metadata.rs",
-      "rank": 40,
-      "selected_batch": false
-    }
-  ],
-  "expected_summary_combined_la_rv": {
-    "enosys": 0,
-    "fail_ltp_case": 0,
-    "internal_tbrok": 0,
-    "internal_tconf": 0,
-    "internal_tfail": 0,
-    "panic_trap": 0,
-    "pass_ltp_case": 48,
-    "timeout": 0
-  },
-  "expected_summary_per_arch": {
-    "enosys": 0,
-    "fail_ltp_case": 0,
-    "internal_tbrok": 0,
-    "internal_tconf": 0,
-    "internal_tfail": 0,
-    "panic_trap": 0,
-    "pass_ltp_case": 24,
-    "timeout": 0
-  },
-  "notes": [
-    "The 40-case pool is copied from the current worker inventory and stays outside the stable list.",
-    "The selected batch deliberately stays in the process/session/getter neighborhood before stepping into time/signal or filesystem candidates.",
-    "read02 remains outside the batch because it is already a stable TCONF-only case."
-  ],
+  "date": "2026-05-24",
+  "lane": "Discovery+Stats",
+  "stable_source_count": 75,
+  "candidate_count": 46,
+  "selected_batch_count": 16,
   "selected_batch": [
-    {
-      "case": "getpgid01",
-      "likely_touchpoint": "process_abi.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "getpgid02",
-      "likely_touchpoint": "process_abi.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "getsid01",
-      "likely_touchpoint": "process_abi.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "getsid02",
-      "likely_touchpoint": "process_abi.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "getppid02",
-      "likely_touchpoint": "process_lifecycle.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "getrlimit02",
-      "likely_touchpoint": "resource_sched.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "getrusage02",
-      "likely_touchpoint": "system_info.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "gettimeofday02",
-      "likely_touchpoint": "time_abi.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "uname02",
-      "likely_touchpoint": "system_info.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "uname04",
-      "likely_touchpoint": "system_info.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "sched_get_priority_max01",
-      "likely_touchpoint": "resource_sched.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    },
-    {
-      "case": "sched_get_priority_min01",
-      "likely_touchpoint": "resource_sched.rs",
-      "rationale": "Simple process getter / scheduler metadata neighbor"
-    }
+    "getpgid01",
+    "getsid01",
+    "getrusage02",
+    "gettimeofday02",
+    "gettid02",
+    "getgroups01",
+    "getresuid01",
+    "getresuid02",
+    "getresuid03",
+    "getresgid01",
+    "getresgid02",
+    "getresgid03",
+    "sched_getparam01",
+    "sched_getscheduler01",
+    "sched_getscheduler02",
+    "waitpid01"
   ],
-  "selected_batch_count": 12,
-  "source": {
-    "inventory_ref": "docs/ltp-score-improvement-2026-05-23/raw/worker1-discovery-inventory.json",
-    "stable_baseline_cases_per_libc_arch": 75,
-    "stable_summary_refs": [
-      "docs/ltp-score-improvement-2026-05-23/rv-stable75-targeted-summary.txt",
-      "docs/ltp-score-improvement-2026-05-23/la-stable75-targeted-summary.txt"
+  "selected_batch_expected_per_arch_pass_markers": 32,
+  "selected_batch_expected_combined_pass_markers": 64,
+  "promotion_gate": "RV+LA x musl+glibc PASS with zero TFAIL/TBROK/TCONF, timeout, ENOSYS, panic/trap",
+  "guardrails": [
+    "do not mutate .omx/ultragoal from worker lane",
+    "do not promote from stale evidence",
+    "keep read02 TCONF transparent",
+    "timeout is failure signal"
+  ],
+  "candidate_groups": {
+    "process/credentials/scheduler": [
+      "getpgid01",
+      "getsid01",
+      "getrusage02",
+      "gettimeofday02",
+      "gettid02",
+      "getgroups01",
+      "getresuid01",
+      "getresuid02",
+      "getresuid03",
+      "getresgid01",
+      "getresgid02",
+      "getresgid03",
+      "sched_getparam01",
+      "sched_getscheduler01",
+      "sched_getscheduler02",
+      "waitpid01",
+      "sched_getaffinity01",
+      "sched_getattr01",
+      "sched_getattr02",
+      "setpgid01",
+      "setsid01",
+      "waitpid03",
+      "getpriority01",
+      "getpriority02",
+      "getrandom01",
+      "getrandom02",
+      "get_robust_list01"
+    ],
+    "time/signal": [
+      "clock_getres01",
+      "clock_gettime01",
+      "clock_nanosleep01",
+      "nanosleep01",
+      "nanosleep02",
+      "rt_sigprocmask01",
+      "rt_sigprocmask02",
+      "sigpending02",
+      "sigprocmask01",
+      "pause01",
+      "kill02"
+    ],
+    "fs/fd/syscall-neighbor": [
+      "dup03",
+      "pipe02",
+      "statfs01",
+      "fstatfs01",
+      "readlinkat01",
+      "symlinkat01",
+      "fchmod02",
+      "ftruncate03"
     ]
-  }
+  },
+  "blocked_or_risk_gated": [
+    "getpgid01",
+    "getsid01",
+    "clock_getres01",
+    "clock_gettime01",
+    "nanosleep01",
+    "nanosleep02",
+    "rt_sigprocmask01",
+    "sigpending02",
+    "sigprocmask01",
+    "pause01",
+    "kill02",
+    "dup03",
+    "pipe02",
+    "statfs01",
+    "fstatfs01"
+  ]
 }
