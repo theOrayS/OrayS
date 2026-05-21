@@ -1,0 +1,32 @@
+Discovery candidate summary expectations
+
+- Source inventory: docs/ltp-score-improvement-2026-05-23/raw/worker1-discovery-inventory.json
+- Stable baseline: 75 cases per libc/arch, all green in docs/ltp-score-improvement-2026-05-23/rv-stable75-targeted-summary.txt and docs/ltp-score-improvement-2026-05-23/la-stable75-targeted-summary.txt.
+- Candidate pool size: 40 cases outside stable.
+- Selected batch size: 12 low-risk cases.
+
+Selected batch:
+
+getpgid01, getpgid02, getsid01, getsid02, getppid02, getrlimit02, getrusage02, gettimeofday02, uname02, uname04, sched_get_priority_max01, sched_get_priority_min01
+
+Expected per-arch summary if the batch is clean:
+- pass_ltp_case: 24
+- fail_ltp_case: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- internal_tconf: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+
+Expected combined LA+RV summary if the batch is clean:
+- PASS LTP CASE: 48
+- FAIL LTP CASE: 0
+- internal markers: none
+
+Fallback inspection order if a case regresses:
+- process_abi.rs for getpgid/getsid
+- resource_sched.rs for scheduler getters
+- system_info.rs / time_abi.rs for getter/time neighbors
+
+Guardrails: no fake PASS, no silent SKIP, no `.omx/ultragoal` edits.
