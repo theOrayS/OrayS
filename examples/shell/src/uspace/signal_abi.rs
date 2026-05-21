@@ -570,11 +570,7 @@ pub(super) fn sys_rt_sigprocmask(
     0
 }
 
-pub(super) fn sys_rt_sigpending(
-    process: &UserProcess,
-    set: usize,
-    sigsetsize: usize,
-) -> isize {
+pub(super) fn sys_rt_sigpending(process: &UserProcess, set: usize, sigsetsize: usize) -> isize {
     let Some(ext) = current_task_ext() else {
         return neg_errno(LinuxError::EINVAL);
     };
@@ -592,11 +588,7 @@ pub(super) fn sys_rt_sigpending(
         .unwrap_or_else(neg_errno)
 }
 
-pub(super) fn sys_rt_sigsuspend(
-    process: &UserProcess,
-    set: usize,
-    sigsetsize: usize,
-) -> isize {
+pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: usize) -> isize {
     let Some(ext) = current_task_ext() else {
         return neg_errno(LinuxError::EINVAL);
     };

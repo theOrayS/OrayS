@@ -1,0 +1,214 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24/stable85-targeted-la.log`
+
+- PASS LTP CASE: 170
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 4 ({'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 85 passed, 0 failed
+- ltp-glibc: 85 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| access01 | la | glibc | ltp-glibc | PASS | 0 | 6163 | 185272 | 184342 | -930 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access01 | la | musl | ltp-musl | PASS | 0 | 4923 | 194416 | 191544 | -2872 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access03 | la | glibc | ltp-glibc | PASS | 0 | 2024 | 125735 | 125678 | -57 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access03 | la | musl | ltp-musl | PASS | 0 | 1206 | 186368 | 186320 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm02 | la | glibc | ltp-glibc | PASS | 0 | 1980 | 125042 | 125021 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm02 | la | musl | ltp-musl | PASS | 0 | 1024 | 185840 | 185824 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm03 | la | glibc | ltp-glibc | PASS | 0 | 2034 | 125021 | 124991 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm03 | la | musl | ltp-musl | PASS | 0 | 958 | 185824 | 185800 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brk01 | la | glibc | ltp-glibc | PASS | 0 | 2123 | 184342 | 184312 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brk01 | la | musl | ltp-musl | PASS | 0 | 1024 | 191544 | 191520 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chdir01 | la | glibc | ltp-glibc | PASS | 0 | 2501 | 184312 | 184291 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chdir01 | la | musl | ltp-musl | PASS | 0 | 1149 | 191520 | 191504 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod01 | la | glibc | ltp-glibc | PASS | 0 | 1984 | 125198 | 125168 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod01 | la | musl | ltp-musl | PASS | 0 | 1071 | 185960 | 185936 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_gettime02 | la | glibc | ltp-glibc | PASS | 0 | 1947 | 124991 | 124970 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_gettime02 | la | musl | ltp-musl | PASS | 0 | 961 | 185800 | 185784 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone01 | la | glibc | ltp-glibc | PASS | 0 | 2211 | 184291 | 184261 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone01 | la | musl | ltp-musl | PASS | 0 | 1062 | 191504 | 191480 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close01 | la | glibc | ltp-glibc | PASS | 0 | 2115 | 184261 | 184240 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close01 | la | musl | ltp-musl | PASS | 0 | 1050 | 191480 | 191464 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close02 | la | glibc | ltp-glibc | PASS | 0 | 1991 | 125678 | 125657 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close02 | la | musl | ltp-musl | PASS | 0 | 913 | 186320 | 186304 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat01 | la | glibc | ltp-glibc | PASS | 0 | 1887 | 125324 | 125303 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat01 | la | musl | ltp-musl | PASS | 0 | 1033 | 186056 | 186040 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat03 | la | glibc | ltp-glibc | PASS | 0 | 1954 | 125303 | 125282 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat03 | la | musl | ltp-musl | PASS | 0 | 962 | 186040 | 186024 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup01 | la | glibc | ltp-glibc | PASS | 0 | 2030 | 184240 | 184219 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup01 | la | musl | ltp-musl | PASS | 0 | 1141 | 191464 | 191448 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup02 | la | glibc | ltp-glibc | PASS | 0 | 1972 | 125657 | 125636 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup02 | la | musl | ltp-musl | PASS | 0 | 894 | 186304 | 186288 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit01 | la | glibc | ltp-glibc | PASS | 0 | 1923 | 124838 | 124817 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit01 | la | musl | ltp-musl | PASS | 0 | 1016 | 185688 | 185672 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit02 | la | glibc | ltp-glibc | PASS | 0 | 1881 | 124817 | 124787 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit02 | la | musl | ltp-musl | PASS | 0 | 1114 | 185672 | 185648 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit_group01 | la | glibc | ltp-glibc | PASS | 0 | 2119 | 124787 | 124755 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit_group01 | la | musl | ltp-musl | PASS | 0 | 1137 | 185648 | 185624 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod01 | la | glibc | ltp-glibc | PASS | 0 | 1872 | 125168 | 125147 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod01 | la | musl | ltp-musl | PASS | 0 | 1002 | 185936 | 185920 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl01 | la | glibc | ltp-glibc | PASS | 0 | 2020 | 184219 | 184207 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl01 | la | musl | ltp-musl | PASS | 0 | 1068 | 191448 | 191440 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl02 | la | glibc | ltp-glibc | PASS | 0 | 2126 | 184207 | 184186 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl02 | la | musl | ltp-musl | PASS | 0 | 998 | 191440 | 191424 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl03 | la | glibc | ltp-glibc | PASS | 0 | 1856 | 125636 | 125615 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl03 | la | musl | ltp-musl | PASS | 0 | 1057 | 186288 | 186272 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork01 | la | glibc | ltp-glibc | PASS | 0 | 2141 | 184186 | 184156 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork01 | la | musl | ltp-musl | PASS | 0 | 1090 | 191424 | 191400 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate01 | la | glibc | ltp-glibc | PASS | 0 | 1924 | 125084 | 125063 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate01 | la | musl | ltp-musl | PASS | 0 | 1085 | 185872 | 185856 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcwd01 | la | glibc | ltp-glibc | PASS | 0 | 1891 | 125615 | 125594 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcwd01 | la | musl | ltp-musl | PASS | 0 | 1014 | 186272 | 186256 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01 | la | glibc | ltp-glibc | PASS | 0 | 1985 | 125480 | 125459 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01 | la | musl | ltp-musl | PASS | 0 | 1046 | 186168 | 186152 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid02 | la | glibc | ltp-glibc | PASS | 0 | 2006 | 124422 | 124401 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid02 | la | musl | ltp-musl | PASS | 0 | 1187 | 185368 | 185352 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid01 | la | glibc | ltp-glibc | PASS | 0 | 1825 | 125522 | 125501 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid01 | la | musl | ltp-musl | PASS | 0 | 1031 | 186200 | 186184 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid02 | la | glibc | ltp-glibc | PASS | 0 | 1983 | 124464 | 124443 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid02 | la | musl | ltp-musl | PASS | 0 | 1082 | 185400 | 185384 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid01 | la | glibc | ltp-glibc | PASS | 0 | 1931 | 125501 | 125480 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid01 | la | musl | ltp-musl | PASS | 0 | 979 | 186184 | 186168 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid03 | la | glibc | ltp-glibc | PASS | 0 | 1948 | 124443 | 124422 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid03 | la | musl | ltp-musl | PASS | 0 | 1241 | 185384 | 185368 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups03 | la | glibc | ltp-glibc | PASS | 0 | 1921 | 124401 | 124389 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups03 | la | musl | ltp-musl | PASS | 0 | 1002 | 185352 | 185344 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgid02 | la | glibc | ltp-glibc | PASS | 0 | 1873 | 124557 | 124536 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgid02 | la | musl | ltp-musl | PASS | 0 | 1017 | 185472 | 185456 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgrp01 | la | glibc | ltp-glibc | PASS | 0 | 1902 | 124755 | 124734 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgrp01 | la | musl | ltp-musl | PASS | 0 | 1009 | 185624 | 185608 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid01 | la | glibc | ltp-glibc | PASS | 0 | 5218 | 184156 | 183235 | -921 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid01 | la | musl | ltp-musl | PASS | 0 | 3654 | 191400 | 190584 | -816 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid02 | la | glibc | ltp-glibc | PASS | 0 | 1910 | 125594 | 125564 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid02 | la | musl | ltp-musl | PASS | 0 | 1005 | 186256 | 186232 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid01 | la | glibc | ltp-glibc | PASS | 0 | 1838 | 125564 | 125543 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid01 | la | musl | ltp-musl | PASS | 0 | 926 | 186232 | 186216 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid02 | la | glibc | ltp-glibc | PASS | 0 | 1905 | 124515 | 124485 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid02 | la | musl | ltp-musl | PASS | 0 | 1084 | 185440 | 185416 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresgid01 | la | glibc | ltp-glibc | PASS | 0 | 1776 | 125423 | 125411 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresgid01 | la | musl | ltp-musl | PASS | 0 | 935 | 186128 | 186120 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresgid02 | la | glibc | ltp-glibc | PASS | 0 | 1810 | 125411 | 125399 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresgid02 | la | musl | ltp-musl | PASS | 0 | 978 | 186120 | 186112 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresgid03 | la | glibc | ltp-glibc | PASS | 0 | 1814 | 125399 | 125387 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresgid03 | la | musl | ltp-musl | PASS | 0 | 1021 | 186112 | 186104 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresuid01 | la | glibc | ltp-glibc | PASS | 0 | 1826 | 125459 | 125447 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresuid01 | la | musl | ltp-musl | PASS | 0 | 947 | 186152 | 186144 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresuid02 | la | glibc | ltp-glibc | PASS | 0 | 1905 | 125447 | 125435 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresuid02 | la | musl | ltp-musl | PASS | 0 | 962 | 186144 | 186136 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresuid03 | la | glibc | ltp-glibc | PASS | 0 | 1817 | 125435 | 125423 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getresuid03 | la | musl | ltp-musl | PASS | 0 | 990 | 186136 | 186128 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit01 | la | glibc | ltp-glibc | PASS | 0 | 1911 | 124641 | 124620 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit01 | la | musl | ltp-musl | PASS | 0 | 1066 | 185536 | 185520 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit02 | la | glibc | ltp-glibc | PASS | 0 | 1916 | 124317 | 124296 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit02 | la | musl | ltp-musl | PASS | 0 | 981 | 185288 | 185272 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage01 | la | glibc | ltp-glibc | PASS | 0 | 1933 | 124620 | 124599 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage01 | la | musl | ltp-musl | PASS | 0 | 1001 | 185520 | 185504 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid01 | la | glibc | ltp-glibc | PASS | 0 | 1875 | 124734 | 124704 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid01 | la | musl | ltp-musl | PASS | 0 | 1102 | 185608 | 185584 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid02 | la | glibc | ltp-glibc | PASS | 0 | 1881 | 124536 | 124515 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid02 | la | musl | ltp-musl | PASS | 0 | 1024 | 185456 | 185440 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettid01 | la | glibc | ltp-glibc | PASS | 0 | 1989 | 124704 | 124683 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettid01 | la | musl | ltp-musl | PASS | 0 | 1039 | 185584 | 185568 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday01 | la | glibc | ltp-glibc | PASS | 0 | 1900 | 124970 | 124949 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday01 | la | musl | ltp-musl | PASS | 0 | 1078 | 185784 | 185768 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid01 | la | glibc | ltp-glibc | PASS | 0 | 1846 | 125543 | 125522 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid01 | la | musl | ltp-musl | PASS | 0 | 970 | 186216 | 186200 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid03 | la | glibc | ltp-glibc | PASS | 0 | 1934 | 124485 | 124464 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid03 | la | musl | ltp-musl | PASS | 0 | 1107 | 185416 | 185400 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill03 | la | glibc | ltp-glibc | PASS | 0 | 1859 | 124907 | 124886 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill03 | la | musl | ltp-musl | PASS | 0 | 938 | 185736 | 185720 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek01 | la | glibc | ltp-glibc | PASS | 0 | 1935 | 125387 | 125366 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek01 | la | musl | ltp-musl | PASS | 0 | 1112 | 186104 | 186088 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lstat01 | la | glibc | ltp-glibc | PASS | 0 | 1922 | 125219 | 125198 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lstat01 | la | musl | ltp-musl | PASS | 0 | 1039 | 185976 | 185960 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap01 | la | glibc | ltp-glibc | PASS | 0 | 1893 | 183235 | 183214 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap01 | la | musl | ltp-musl | PASS | 0 | 1094 | 190584 | 190568 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open01 | la | glibc | ltp-glibc | PASS | 0 | 1907 | 183214 | 183193 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open01 | la | musl | ltp-musl | PASS | 0 | 1098 | 190568 | 190552 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open02 | la | glibc | ltp-glibc | PASS | 0 | 1844 | 125282 | 125261 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open02 | la | musl | ltp-musl | PASS | 0 | 965 | 186024 | 186008 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open03 | la | glibc | ltp-glibc | PASS | 0 | 1829 | 125261 | 125240 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open03 | la | musl | ltp-musl | PASS | 0 | 1056 | 186008 | 185992 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe01 | la | glibc | ltp-glibc | PASS | 0 | 1806 | 183193 | 183172 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe01 | la | musl | ltp-musl | PASS | 0 | 1070 | 190552 | 186440 | -4112 | 0 | 0 | 0 | 0 | 0 | 0 |
+| proc01 | la | glibc | ltp-glibc | PASS | 0 | 1989 | 124850 | 124838 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| proc01 | la | musl | ltp-musl | PASS | 0 | 1113 | 185696 | 185688 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read01 | la | glibc | ltp-glibc | PASS | 0 | 1886 | 183172 | 183151 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read01 | la | musl | ltp-musl | PASS | 0 | 942 | 186440 | 186424 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read02 | la | glibc | ltp-glibc | PASS | 0 | 1997 | 125366 | 125345 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| read02 | la | musl | ltp-musl | PASS | 0 | 1061 | 186088 | 186072 | -16 | 0 | 0 | 2 | 0 | 0 | 0 |
+| readlink01 | la | glibc | ltp-glibc | PASS | 0 | 1965 | 125114 | 125084 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink01 | la | musl | ltp-musl | PASS | 0 | 1169 | 185896 | 185872 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir01 | la | glibc | ltp-glibc | PASS | 0 | 1880 | 125147 | 125126 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir01 | la | musl | ltp-musl | PASS | 0 | 1030 | 185920 | 185904 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction01 | la | glibc | ltp-glibc | PASS | 0 | 2655 | 124886 | 124874 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction01 | la | musl | ltp-musl | PASS | 0 | 1418 | 185720 | 185712 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction02 | la | glibc | ltp-glibc | PASS | 0 | 2139 | 124874 | 124862 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction02 | la | musl | ltp-musl | PASS | 0 | 1195 | 185712 | 185704 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getscheduler01 | la | glibc | ltp-glibc | PASS | 0 | 1874 | 124599 | 124569 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getscheduler01 | la | musl | ltp-musl | PASS | 0 | 1032 | 185504 | 185480 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_yield01 | la | glibc | ltp-glibc | PASS | 0 | 1860 | 124569 | 124557 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_yield01 | la | musl | ltp-musl | PASS | 0 | 1052 | 185480 | 185472 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sigaction01 | la | glibc | ltp-glibc | PASS | 0 | 1758 | 124862 | 124850 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sigaction01 | la | musl | ltp-musl | PASS | 0 | 994 | 185704 | 185696 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat01 | la | glibc | ltp-glibc | PASS | 0 | 1965 | 183151 | 183130 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat01 | la | musl | ltp-musl | PASS | 0 | 1039 | 186424 | 186408 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat02 | la | glibc | ltp-glibc | PASS | 0 | 1896 | 125240 | 125219 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat02 | la | musl | ltp-musl | PASS | 0 | 1089 | 185992 | 185976 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | la | glibc | ltp-glibc | PASS | 0 | 1959 | 125126 | 125114 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | la | musl | ltp-musl | PASS | 0 | 1126 | 185904 | 185896 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| time01 | la | glibc | ltp-glibc | PASS | 0 | 1913 | 124949 | 124928 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| time01 | la | musl | ltp-musl | PASS | 0 | 880 | 185768 | 185752 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| times01 | la | glibc | ltp-glibc | PASS | 0 | 1875 | 124928 | 124907 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| times01 | la | musl | ltp-musl | PASS | 0 | 924 | 185752 | 185736 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | la | glibc | ltp-glibc | PASS | 0 | 2136 | 125063 | 125042 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | la | musl | ltp-musl | PASS | 0 | 1296 | 185856 | 185840 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname01 | la | glibc | ltp-glibc | PASS | 0 | 1930 | 124683 | 124662 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname01 | la | musl | ltp-musl | PASS | 0 | 1023 | 185568 | 185552 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname02 | la | glibc | ltp-glibc | PASS | 0 | 2034 | 124389 | 124368 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname02 | la | musl | ltp-musl | PASS | 0 | 931 | 185344 | 185328 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname04 | la | glibc | ltp-glibc | PASS | 0 | 1968 | 124662 | 124641 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname04 | la | musl | ltp-musl | PASS | 0 | 1065 | 185552 | 185536 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait01 | la | glibc | ltp-glibc | PASS | 0 | 1939 | 124368 | 124347 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait01 | la | musl | ltp-musl | PASS | 0 | 983 | 185328 | 185312 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait02 | la | glibc | ltp-glibc | PASS | 0 | 1982 | 124347 | 124317 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait02 | la | musl | ltp-musl | PASS | 0 | 1106 | 185312 | 185288 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait401 | la | glibc | ltp-glibc | PASS | 0 | 1972 | 183130 | 183100 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait401 | la | musl | ltp-musl | PASS | 0 | 1263 | 186408 | 186384 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write01 | la | glibc | ltp-glibc | PASS | 0 | 2927 | 183100 | 125735 | -57365 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write01 | la | musl | ltp-musl | PASS | 0 | 1050 | 186384 | 186368 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write02 | la | glibc | ltp-glibc | PASS | 0 | 1922 | 125345 | 125324 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write02 | la | musl | ltp-musl | PASS | 0 | 1023 | 186072 | 186056 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 168 (la:glibc:access01, la:musl:access01, la:glibc:access03, la:musl:access03, la:glibc:alarm02, la:musl:alarm02, la:glibc:alarm03, la:musl:alarm03, la:glibc:brk01, la:musl:brk01, la:glibc:chdir01, la:musl:chdir01, la:glibc:chmod01, la:musl:chmod01, la:glibc:clock_gettime02, la:musl:clock_gettime02, la:glibc:clone01, la:musl:clone01, la:glibc:close01, la:musl:close01, la:glibc:close02, la:musl:close02, la:glibc:creat01, la:musl:creat01, la:glibc:creat03, la:musl:creat03, la:glibc:dup01, la:musl:dup01, la:glibc:dup02, la:musl:dup02, la:glibc:exit01, la:musl:exit01, la:glibc:exit02, la:musl:exit02, la:glibc:exit_group01, la:musl:exit_group01, la:glibc:fchmod01, la:musl:fchmod01, la:glibc:fcntl01, la:musl:fcntl01, la:glibc:fcntl02, la:musl:fcntl02, la:glibc:fcntl03, la:musl:fcntl03, la:glibc:fork01, la:musl:fork01, la:glibc:ftruncate01, la:musl:ftruncate01, la:glibc:getcwd01, la:musl:getcwd01, la:glibc:getegid01, la:musl:getegid01, la:glibc:getegid02, la:musl:getegid02, la:glibc:geteuid01, la:musl:geteuid01, la:glibc:geteuid02, la:musl:geteuid02, la:glibc:getgid01, la:musl:getgid01, la:glibc:getgid03, la:musl:getgid03, la:glibc:getgroups03, la:musl:getgroups03, la:glibc:getpgid02, la:musl:getpgid02, la:glibc:getpgrp01, la:musl:getpgrp01, la:glibc:getpid01, la:musl:getpid01, la:glibc:getpid02, la:musl:getpid02, la:glibc:getppid01, la:musl:getppid01, la:glibc:getppid02, la:musl:getppid02, la:glibc:getresgid01, la:musl:getresgid01, la:glibc:getresgid02, la:musl:getresgid02, la:glibc:getresgid03, la:musl:getresgid03, la:glibc:getresuid01, la:musl:getresuid01, la:glibc:getresuid02, la:musl:getresuid02, la:glibc:getresuid03, la:musl:getresuid03, la:glibc:getrlimit01, la:musl:getrlimit01, la:glibc:getrlimit02, la:musl:getrlimit02, la:glibc:getrusage01, la:musl:getrusage01, la:glibc:getsid01, la:musl:getsid01, la:glibc:getsid02, la:musl:getsid02, la:glibc:gettid01, la:musl:gettid01, la:glibc:gettimeofday01, la:musl:gettimeofday01, la:glibc:getuid01, la:musl:getuid01, la:glibc:getuid03, la:musl:getuid03, la:glibc:kill03, la:musl:kill03, la:glibc:lseek01, la:musl:lseek01, la:glibc:lstat01, la:musl:lstat01, la:glibc:mmap01, la:musl:mmap01, la:glibc:open01, la:musl:open01, la:glibc:open02, la:musl:open02, la:glibc:open03, la:musl:open03, la:glibc:pipe01, la:musl:pipe01, la:glibc:proc01, la:musl:proc01, la:glibc:read01, la:musl:read01, la:glibc:readlink01, la:musl:readlink01, la:glibc:rmdir01, la:musl:rmdir01, la:glibc:rt_sigaction01, la:musl:rt_sigaction01, la:glibc:rt_sigaction02, la:musl:rt_sigaction02, la:glibc:sched_getscheduler01, la:musl:sched_getscheduler01, la:glibc:sched_yield01, la:musl:sched_yield01, la:glibc:sigaction01, la:musl:sigaction01, la:glibc:stat01, la:musl:stat01, la:glibc:stat02, la:musl:stat02, la:glibc:symlink01, la:musl:symlink01, la:glibc:time01, la:musl:time01, la:glibc:times01, la:musl:times01, la:glibc:umask01, la:musl:umask01, la:glibc:uname01, la:musl:uname01, la:glibc:uname02, la:musl:uname02, la:glibc:uname04, la:musl:uname04, la:glibc:wait01, la:musl:wait01, la:glibc:wait02, la:musl:wait02, la:glibc:wait401, la:musl:wait401, la:glibc:write01, la:musl:write01, la:glibc:write02, la:musl:write02)
+- pass_with_tconf: 2 (la:glibc:read02, la:musl:read02)
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 85
+- FAIL: 0
+- Internal: {'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 85
+- FAIL: 0
+- Internal: {'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

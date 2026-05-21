@@ -1,0 +1,72 @@
+# Worker worker-1 shutdown report
+
+- worktree: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-1
+- report_path: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-1/.omx/diff.md
+- source_ref: ab1ca208dcc605cf55af3b1dba17a4ce30063338
+- synthetic_commit: ab1ca208dcc605cf55af3b1dba17a4ce30063338
+- merge_outcome: merged
+- merge_detail: Merge made by the 'ort' strategy.
+ docs/ltp-score-improvement-2026-05-24/task6/time-signal-cases.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 docs/ltp-score-improvement-2026-05-24/task6/time-signal-cases.txt
+- leader_head_before: 4dc6ebd5fb16957500188f59781feb3dc96824ee
+- leader_head_after: 187dc5088b72b42a10ba4434034e09ea0ab86790
+
+## Summary
+sparkshell summary unavailable; using raw diff fallback.
+
+## Diff
+(no diff output)
+
+# Worker worker-2 shutdown report
+
+- worktree: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-2
+- report_path: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-2/.omx/diff.md
+- source_ref: c93130135584bc7effb175c623d399401e70cffc
+- synthetic_commit: none
+- merge_outcome: merged
+- merge_detail: Merge made by the 'ort' strategy.
+- leader_head_before: 187dc5088b72b42a10ba4434034e09ea0ab86790
+- leader_head_after: dead5f4247c1f600d8f9b6c945168f93f303db4a
+
+## Summary
+sparkshell summary unavailable; using raw diff fallback.
+
+## Diff
+(no diff output)
+
+# Worker worker-3 shutdown report
+
+- worktree: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-3
+- report_path: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-3/.omx/diff.md
+- source_ref: 0c948e752302b8040eb803e1480ce0efd83a2b41
+- synthetic_commit: none
+- merge_outcome: merged
+- merge_detail: Auto-merging examples/shell/src/uspace/syscall_dispatch.rs
+Merge made by the 'ort' strategy.
+- leader_head_before: dead5f4247c1f600d8f9b6c945168f93f303db4a
+- leader_head_after: e85d3f4e39c784ae6016caf1cdfed7e603190681
+
+## Summary
+sparkshell summary unavailable; using raw diff fallback.
+
+## Diff
+(no diff output)
+
+# Worker worker-4 shutdown report
+
+- worktree: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-4
+- report_path: /root/oskernel2026-orays/.omx/team/continue-ltp-stable-s-8231c807/worktrees/worker-4/.omx/diff.md
+- source_ref: a8917b671c55f367fd19a2e4fcbb34b170a76ad8
+- synthetic_commit: none
+- merge_outcome: merged
+- merge_detail: Auto-merging examples/shell/src/uspace/syscall_dispatch.rs
+Merge made by the 'ort' strategy.
+- leader_head_before: e85d3f4e39c784ae6016caf1cdfed7e603190681
+- leader_head_after: 592ff3739e53ba9b3405f024795fd85628bf86fd
+
+## Summary
+sparkshell summary unavailable; using raw diff fallback.
+
+## Diff
+(no diff output)

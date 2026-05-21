@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{SYSCALL, register_trap_handler};
 use linux_raw_sys::general;
 
 use super::credentials::{

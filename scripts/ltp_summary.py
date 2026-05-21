@@ -109,14 +109,13 @@ def normalize_wrapper_status(raw_status: str, code: int) -> str:
     """Return the semantic wrapper status for an LTP result line.
 
     The official score parser-compatible harness line is historically
-    `FAIL LTP CASE <case> : 0` even when the test program exited cleanly.  Treat
-    exit status 0 as PASS while preserving non-zero FAIL/TIMEOUT evidence via
-    the numeric code and internal markers.
+    `FAIL LTP CASE <case> : 0` even when the test program exited cleanly.  The
+    numeric exit status is the source of truth: only status 0 is PASS, and every
+    non-zero status remains FAIL even if an input log ever contains a misleading
+    PASS token.
     """
 
-    if code == 0:
-        return "PASS"
-    return raw_status
+    return "PASS" if code == 0 else "FAIL"
 
 
 def parse_log(text: str) -> dict[str, Any]:
