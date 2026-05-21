@@ -28,7 +28,7 @@ TIMEOUT_RE = re.compile(
 )
 ENOSYS_RE = re.compile(r"\bENOSYS\b|errno=ENOSYS|not implemented", re.IGNORECASE)
 PANIC_TRAP_RE = re.compile(
-    r"\b(panic|panicked|Unhandled trap|InstructionNotExist|fatal trap|kernel trap)\b",
+    r"\b(panic|panicked|trap|Unhandled trap|InstructionNotExist|fatal trap|kernel trap)\b",
     re.IGNORECASE,
 )
 SUITE_SUMMARY_RE = re.compile(r"ltp cases:\s+(\d+)\s+passed,\s+(\d+)\s+failed")
@@ -212,6 +212,44 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
         rows.append(row)
         matrix.setdefault(detail["case"], {}).setdefault(arch, {})[libc] = row
 
+    categories: dict[str, list[str]] = {
+        "pass_clean": [],
+        "pass_with_tconf": [],
+        "fail_wrapper": [],
+        "internal_tfail": [],
+        "internal_tbrok": [],
+        "timeout": [],
+        "enosys": [],
+        "panic_trap": [],
+        "unknown": [],
+    }
+    for row in rows:
+        label = f"{row['arch']}:{row['libc']}:{row['case']}"
+        has_problem_marker = row["internal"] or row["timeouts"] or row["enosys"] or row["panic_trap"]
+        if row["status"] == "PASS" and not has_problem_marker:
+            categories["pass_clean"].append(label)
+        has_only_tconf = (
+            row["internal"].get("TCONF", 0)
+            and not row["internal"].get("TFAIL", 0)
+            and not row["internal"].get("TBROK", 0)
+        )
+        if row["status"] == "PASS" and has_only_tconf:
+            categories["pass_with_tconf"].append(label)
+        if row["status"] == "FAIL":
+            categories["fail_wrapper"].append(label)
+        if row["internal"].get("TFAIL", 0):
+            categories["internal_tfail"].append(label)
+        if row["internal"].get("TBROK", 0):
+            categories["internal_tbrok"].append(label)
+        if row["timeouts"]:
+            categories["timeout"].append(label)
+        if row["enosys"]:
+            categories["enosys"].append(label)
+        if row["panic_trap"]:
+            categories["panic_trap"].append(label)
+        if row["status"] == "UNKNOWN":
+            categories["unknown"].append(label)
+
     return {
         "pass_count": len(summary["pass_cases"]),
         "fail_count": len(summary["fail_cases"]),
@@ -225,6 +263,7 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
         "groups": {name: compact_group(group) for name, group in summary["groups"].items()},
         "case_matrix_rows": rows,
         "case_matrix": matrix,
+        "categories": categories,
     }
 
 
@@ -272,6 +311,11 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
                     panic=row["panic_trap"],
                 )
             )
+        lines.append("")
+    if data.get("categories"):
+        lines.append("## Categories")
+        for name, cases in data["categories"].items():
+            lines.append(f"- {name}: {len(cases)}" + (f" ({', '.join(cases)})" if cases else ""))
         lines.append("")
     if data["fail_cases"]:
         lines.append("## FAIL LTP CASE")
