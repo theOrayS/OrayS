@@ -12,7 +12,7 @@ rusty-tags.vi
 /.axconfig.*
 /cratesbuild/
 *.log
-!docs/ltp-score-improvement-2026-05-24/**/*.log
+!docs/ltp-score-improvement-2026-05-21-phase-d/**/*.log
 __pycache__/
 *.pyc
 kernel-*
