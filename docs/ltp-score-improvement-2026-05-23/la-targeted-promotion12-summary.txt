@@ -1,0 +1,68 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-23/la-targeted-promotion12.log`
+
+- PASS LTP CASE: 24
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 12 passed, 0 failed
+- ltp-glibc: 12 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| getegid02 | la | glibc | ltp-glibc | PASS | 0 | 8965 | 192109 | 192088 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid02 | la | musl | ltp-musl | PASS | 0 | 2938 | 192324 | 192308 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid02 | la | glibc | ltp-glibc | PASS | 0 | 5761 | 192088 | 192067 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid02 | la | musl | ltp-musl | PASS | 0 | 4655 | 192308 | 192292 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid03 | la | glibc | ltp-glibc | PASS | 0 | 8052 | 192067 | 192046 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid03 | la | musl | ltp-musl | PASS | 0 | 4017 | 192292 | 192276 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups03 | la | glibc | ltp-glibc | PASS | 0 | 6915 | 192046 | 192034 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups03 | la | musl | ltp-musl | PASS | 0 | 4478 | 192276 | 192268 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgid02 | la | glibc | ltp-glibc | PASS | 0 | 6818 | 192172 | 192151 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgid02 | la | musl | ltp-musl | PASS | 0 | 2565 | 194420 | 192356 | -2064 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid02 | la | glibc | ltp-glibc | PASS | 0 | 7564 | 192034 | 192004 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid02 | la | musl | ltp-musl | PASS | 0 | 3132 | 192268 | 192244 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit02 | la | glibc | ltp-glibc | PASS | 0 | 7261 | 192130 | 192109 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit02 | la | musl | ltp-musl | PASS | 0 | 2529 | 192340 | 192324 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid02 | la | glibc | ltp-glibc | PASS | 0 | 6400 | 192151 | 192130 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid02 | la | musl | ltp-musl | PASS | 0 | 3909 | 192356 | 192340 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid03 | la | glibc | ltp-glibc | PASS | 0 | 7959 | 192004 | 191983 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid03 | la | musl | ltp-musl | PASS | 0 | 3384 | 192244 | 192228 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname02 | la | glibc | ltp-glibc | PASS | 0 | 6529 | 191983 | 191962 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname02 | la | musl | ltp-musl | PASS | 0 | 3640 | 192228 | 192212 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait01 | la | glibc | ltp-glibc | PASS | 0 | 5637 | 191962 | 191941 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait01 | la | musl | ltp-musl | PASS | 0 | 3269 | 192212 | 192196 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait02 | la | glibc | ltp-glibc | PASS | 0 | 5728 | 191941 | 191911 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait02 | la | musl | ltp-musl | PASS | 0 | 3276 | 192196 | 192172 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 24 (la:glibc:getegid02, la:musl:getegid02, la:glibc:geteuid02, la:musl:geteuid02, la:glibc:getgid03, la:musl:getgid03, la:glibc:getgroups03, la:musl:getgroups03, la:glibc:getpgid02, la:musl:getpgid02, la:glibc:getppid02, la:musl:getppid02, la:glibc:getrlimit02, la:musl:getrlimit02, la:glibc:getsid02, la:musl:getsid02, la:glibc:getuid03, la:musl:getuid03, la:glibc:uname02, la:musl:uname02, la:glibc:wait01, la:musl:wait01, la:glibc:wait02, la:musl:wait02)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 12
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 12
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
