@@ -1,0 +1,1413 @@
+{
+  "case_matrix": {
+    "access02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "access02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -98,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 4
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4745,
+              "free_frames": 256509
+            },
+            "after_run": {
+              "allocated_frames": 4745,
+              "free_frames": 256509
+            },
+            "before": {
+              "allocated_frames": 4647,
+              "free_frames": 256607
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1547,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "access02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -2146,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 4
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4535,
+              "free_frames": 256719
+            },
+            "after_run": {
+              "allocated_frames": 4535,
+              "free_frames": 256719
+            },
+            "before": {
+              "allocated_frames": 2389,
+              "free_frames": 258865
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1135,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "access04": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "access04",
+          "code": 2,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4752,
+              "free_frames": 256502
+            },
+            "after_run": {
+              "allocated_frames": 4752,
+              "free_frames": 256502
+            },
+            "before": {
+              "allocated_frames": 4745,
+              "free_frames": 256509
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1045,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "access04",
+          "code": 2,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4542,
+              "free_frames": 256712
+            },
+            "after_run": {
+              "allocated_frames": 4542,
+              "free_frames": 256712
+            },
+            "before": {
+              "allocated_frames": 4535,
+              "free_frames": 256719
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 886,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "dup03": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "dup03",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4766,
+              "free_frames": 256488
+            },
+            "after_run": {
+              "allocated_frames": 4766,
+              "free_frames": 256488
+            },
+            "before": {
+              "allocated_frames": 4752,
+              "free_frames": 256502
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1307,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "dup03",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4556,
+              "free_frames": 256698
+            },
+            "after_run": {
+              "allocated_frames": 4556,
+              "free_frames": 256698
+            },
+            "before": {
+              "allocated_frames": 4542,
+              "free_frames": 256712
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 882,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "link02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "link02",
+          "code": 1,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4829,
+              "free_frames": 256425
+            },
+            "after_run": {
+              "allocated_frames": 4829,
+              "free_frames": 256425
+            },
+            "before": {
+              "allocated_frames": 4815,
+              "free_frames": 256439
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1292,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "link02",
+          "code": 1,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4619,
+              "free_frames": 256635
+            },
+            "after_run": {
+              "allocated_frames": 4619,
+              "free_frames": 256635
+            },
+            "before": {
+              "allocated_frames": 4605,
+              "free_frames": 256649
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 727,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "lseek02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "lseek02",
+          "code": 2,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4780,
+              "free_frames": 256474
+            },
+            "after_run": {
+              "allocated_frames": 4780,
+              "free_frames": 256474
+            },
+            "before": {
+              "allocated_frames": 4766,
+              "free_frames": 256488
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1234,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "lseek02",
+          "code": 2,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4570,
+              "free_frames": 256684
+            },
+            "after_run": {
+              "allocated_frames": 4570,
+              "free_frames": 256684
+            },
+            "before": {
+              "allocated_frames": 4556,
+              "free_frames": 256698
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 800,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "mkdir02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "mkdir02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 2
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4815,
+              "free_frames": 256439
+            },
+            "after_run": {
+              "allocated_frames": 4815,
+              "free_frames": 256439
+            },
+            "before": {
+              "allocated_frames": 4801,
+              "free_frames": 256453
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 997,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "mkdir02",
+          "code": 2,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4605,
+              "free_frames": 256649
+            },
+            "after_run": {
+              "allocated_frames": 4605,
+              "free_frames": 256649
+            },
+            "before": {
+              "allocated_frames": 4591,
+              "free_frames": 256663
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 852,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "pipe02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "pipe02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4801,
+              "free_frames": 256453
+            },
+            "after_run": {
+              "allocated_frames": 4801,
+              "free_frames": 256453
+            },
+            "before": {
+              "allocated_frames": 4780,
+              "free_frames": 256474
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1067,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "pipe02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4591,
+              "free_frames": 256663
+            },
+            "after_run": {
+              "allocated_frames": 4591,
+              "free_frames": 256663
+            },
+            "before": {
+              "allocated_frames": 4570,
+              "free_frames": 256684
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 888,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "proc01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "proc01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8953,
+              "free_frames": 252301
+            },
+            "after_run": {
+              "allocated_frames": 8953,
+              "free_frames": 252301
+            },
+            "before": {
+              "allocated_frames": 8946,
+              "free_frames": 252308
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1158,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "proc01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4647,
+              "free_frames": 256607
+            },
+            "after_run": {
+              "allocated_frames": 4647,
+              "free_frames": 256607
+            },
+            "before": {
+              "allocated_frames": 4640,
+              "free_frames": 256614
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 878,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "rename01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "rename01",
+          "code": 6,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8946,
+              "free_frames": 252308
+            },
+            "after_run": {
+              "allocated_frames": 8946,
+              "free_frames": 252308
+            },
+            "before": {
+              "allocated_frames": 8939,
+              "free_frames": 252315
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1069,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "rename01",
+          "code": 6,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4640,
+              "free_frames": 256614
+            },
+            "after_run": {
+              "allocated_frames": 4640,
+              "free_frames": 256614
+            },
+            "before": {
+              "allocated_frames": 4633,
+              "free_frames": 256621
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 818,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "unlink05": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "unlink05",
+          "code": 2,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -4110,
+          "group": "ltp-glibc",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8939,
+              "free_frames": 252315
+            },
+            "after_run": {
+              "allocated_frames": 8939,
+              "free_frames": 252315
+            },
+            "before": {
+              "allocated_frames": 4829,
+              "free_frames": 256425
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1099,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "unlink05",
+          "code": 2,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TBROK": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4633,
+              "free_frames": 256621
+            },
+            "after_run": {
+              "allocated_frames": 4633,
+              "free_frames": 256621
+            },
+            "before": {
+              "allocated_frames": 4619,
+              "free_frames": 256635
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 834,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    }
+  },
+  "case_matrix_rows": [
+    {
+      "arch": "rv",
+      "case": "access02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -98,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 4
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4745,
+          "free_frames": 256509
+        },
+        "after_run": {
+          "allocated_frames": 4745,
+          "free_frames": 256509
+        },
+        "before": {
+          "allocated_frames": 4647,
+          "free_frames": 256607
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1547,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "access02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -2146,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 4
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4535,
+          "free_frames": 256719
+        },
+        "after_run": {
+          "allocated_frames": 4535,
+          "free_frames": 256719
+        },
+        "before": {
+          "allocated_frames": 2389,
+          "free_frames": 258865
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1135,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "access04",
+      "code": 2,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4752,
+          "free_frames": 256502
+        },
+        "after_run": {
+          "allocated_frames": 4752,
+          "free_frames": 256502
+        },
+        "before": {
+          "allocated_frames": 4745,
+          "free_frames": 256509
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1045,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "access04",
+      "code": 2,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4542,
+          "free_frames": 256712
+        },
+        "after_run": {
+          "allocated_frames": 4542,
+          "free_frames": 256712
+        },
+        "before": {
+          "allocated_frames": 4535,
+          "free_frames": 256719
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 886,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "dup03",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4766,
+          "free_frames": 256488
+        },
+        "after_run": {
+          "allocated_frames": 4766,
+          "free_frames": 256488
+        },
+        "before": {
+          "allocated_frames": 4752,
+          "free_frames": 256502
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1307,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "dup03",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4556,
+          "free_frames": 256698
+        },
+        "after_run": {
+          "allocated_frames": 4556,
+          "free_frames": 256698
+        },
+        "before": {
+          "allocated_frames": 4542,
+          "free_frames": 256712
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 882,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "link02",
+      "code": 1,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4829,
+          "free_frames": 256425
+        },
+        "after_run": {
+          "allocated_frames": 4829,
+          "free_frames": 256425
+        },
+        "before": {
+          "allocated_frames": 4815,
+          "free_frames": 256439
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1292,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "link02",
+      "code": 1,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4619,
+          "free_frames": 256635
+        },
+        "after_run": {
+          "allocated_frames": 4619,
+          "free_frames": 256635
+        },
+        "before": {
+          "allocated_frames": 4605,
+          "free_frames": 256649
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 727,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "lseek02",
+      "code": 2,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4780,
+          "free_frames": 256474
+        },
+        "after_run": {
+          "allocated_frames": 4780,
+          "free_frames": 256474
+        },
+        "before": {
+          "allocated_frames": 4766,
+          "free_frames": 256488
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1234,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "lseek02",
+      "code": 2,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4570,
+          "free_frames": 256684
+        },
+        "after_run": {
+          "allocated_frames": 4570,
+          "free_frames": 256684
+        },
+        "before": {
+          "allocated_frames": 4556,
+          "free_frames": 256698
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 800,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "mkdir02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 2
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4815,
+          "free_frames": 256439
+        },
+        "after_run": {
+          "allocated_frames": 4815,
+          "free_frames": 256439
+        },
+        "before": {
+          "allocated_frames": 4801,
+          "free_frames": 256453
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 997,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "mkdir02",
+      "code": 2,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4605,
+          "free_frames": 256649
+        },
+        "after_run": {
+          "allocated_frames": 4605,
+          "free_frames": 256649
+        },
+        "before": {
+          "allocated_frames": 4591,
+          "free_frames": 256663
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 852,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "pipe02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4801,
+          "free_frames": 256453
+        },
+        "after_run": {
+          "allocated_frames": 4801,
+          "free_frames": 256453
+        },
+        "before": {
+          "allocated_frames": 4780,
+          "free_frames": 256474
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1067,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "pipe02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4591,
+          "free_frames": 256663
+        },
+        "after_run": {
+          "allocated_frames": 4591,
+          "free_frames": 256663
+        },
+        "before": {
+          "allocated_frames": 4570,
+          "free_frames": 256684
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 888,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "proc01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8953,
+          "free_frames": 252301
+        },
+        "after_run": {
+          "allocated_frames": 8953,
+          "free_frames": 252301
+        },
+        "before": {
+          "allocated_frames": 8946,
+          "free_frames": 252308
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1158,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "proc01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4647,
+          "free_frames": 256607
+        },
+        "after_run": {
+          "allocated_frames": 4647,
+          "free_frames": 256607
+        },
+        "before": {
+          "allocated_frames": 4640,
+          "free_frames": 256614
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 878,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "rename01",
+      "code": 6,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8946,
+          "free_frames": 252308
+        },
+        "after_run": {
+          "allocated_frames": 8946,
+          "free_frames": 252308
+        },
+        "before": {
+          "allocated_frames": 8939,
+          "free_frames": 252315
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1069,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "rename01",
+      "code": 6,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4640,
+          "free_frames": 256614
+        },
+        "after_run": {
+          "allocated_frames": 4640,
+          "free_frames": 256614
+        },
+        "before": {
+          "allocated_frames": 4633,
+          "free_frames": 256621
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 818,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "unlink05",
+      "code": 2,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -4110,
+      "group": "ltp-glibc",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8939,
+          "free_frames": 252315
+        },
+        "after_run": {
+          "allocated_frames": 8939,
+          "free_frames": 252315
+        },
+        "before": {
+          "allocated_frames": 4829,
+          "free_frames": 256425
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1099,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "unlink05",
+      "code": 2,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TBROK": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4633,
+          "free_frames": 256621
+        },
+        "after_run": {
+          "allocated_frames": 4633,
+          "free_frames": 256621
+        },
+        "before": {
+          "allocated_frames": 4619,
+          "free_frames": 256635
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 834,
+      "status": "FAIL",
+      "timeouts": 0
+    }
+  ],
+  "categories": {
+    "enosys": [
+      "rv:glibc:link02",
+      "rv:musl:link02",
+      "rv:glibc:lseek02",
+      "rv:musl:lseek02",
+      "rv:glibc:unlink05",
+      "rv:musl:unlink05"
+    ],
+    "fail_wrapper": [
+      "rv:glibc:access02",
+      "rv:musl:access02",
+      "rv:glibc:access04",
+      "rv:musl:access04",
+      "rv:glibc:dup03",
+      "rv:musl:dup03",
+      "rv:glibc:link02",
+      "rv:musl:link02",
+      "rv:glibc:lseek02",
+      "rv:musl:lseek02",
+      "rv:glibc:mkdir02",
+      "rv:musl:mkdir02",
+      "rv:glibc:pipe02",
+      "rv:musl:pipe02",
+      "rv:glibc:rename01",
+      "rv:musl:rename01",
+      "rv:glibc:unlink05",
+      "rv:musl:unlink05"
+    ],
+    "internal_tbrok": [
+      "rv:glibc:access04",
+      "rv:musl:access04",
+      "rv:glibc:lseek02",
+      "rv:musl:lseek02",
+      "rv:musl:mkdir02",
+      "rv:glibc:rename01",
+      "rv:musl:rename01",
+      "rv:glibc:unlink05",
+      "rv:musl:unlink05"
+    ],
+    "internal_tfail": [
+      "rv:glibc:access02",
+      "rv:musl:access02",
+      "rv:glibc:dup03",
+      "rv:musl:dup03",
+      "rv:glibc:link02",
+      "rv:musl:link02",
+      "rv:glibc:mkdir02",
+      "rv:glibc:pipe02",
+      "rv:musl:pipe02"
+    ],
+    "panic_trap": [],
+    "pass_clean": [
+      "rv:glibc:proc01",
+      "rv:musl:proc01"
+    ],
+    "pass_with_tconf": [],
+    "timeout": [],
+    "unknown": []
+  },
+  "enosys": 6,
+  "fail_cases": [
+    "ltp-musl:access02",
+    "ltp-musl:access04",
+    "ltp-musl:dup03",
+    "ltp-musl:lseek02",
+    "ltp-musl:pipe02",
+    "ltp-musl:mkdir02",
+    "ltp-musl:link02",
+    "ltp-musl:unlink05",
+    "ltp-musl:rename01",
+    "ltp-glibc:access02",
+    "ltp-glibc:access04",
+    "ltp-glibc:dup03",
+    "ltp-glibc:lseek02",
+    "ltp-glibc:pipe02",
+    "ltp-glibc:mkdir02",
+    "ltp-glibc:link02",
+    "ltp-glibc:unlink05",
+    "ltp-glibc:rename01"
+  ],
+  "fail_count": 18,
+  "groups": {
+    "ltp-glibc": {
+      "enosys": 3,
+      "fail_cases": [
+        "access02",
+        "access04",
+        "dup03",
+        "lseek02",
+        "pipe02",
+        "mkdir02",
+        "link02",
+        "unlink05",
+        "rename01"
+      ],
+      "fail_count": 9,
+      "internal": {
+        "TBROK": 4,
+        "TFAIL": 9
+      },
+      "panic_trap": 0,
+      "pass_cases": [
+        "proc01"
+      ],
+      "pass_count": 1,
+      "suite_summaries": [
+        {
+          "failed": 9,
+          "group": "ltp-glibc",
+          "passed": 1,
+          "timed_out": 0
+        }
+      ],
+      "timeouts": 0
+    },
+    "ltp-musl": {
+      "enosys": 3,
+      "fail_cases": [
+        "access02",
+        "access04",
+        "dup03",
+        "lseek02",
+        "pipe02",
+        "mkdir02",
+        "link02",
+        "unlink05",
+        "rename01"
+      ],
+      "fail_count": 9,
+      "internal": {
+        "TBROK": 5,
+        "TFAIL": 7
+      },
+      "panic_trap": 0,
+      "pass_cases": [
+        "proc01"
+      ],
+      "pass_count": 1,
+      "suite_summaries": [
+        {
+          "failed": 9,
+          "group": "ltp-musl",
+          "passed": 1,
+          "timed_out": 0
+        }
+      ],
+      "timeouts": 0
+    }
+  },
+  "internal": {
+    "TBROK": 9,
+    "TFAIL": 16
+  },
+  "panic_trap": 0,
+  "pass_cases": [
+    "ltp-musl:proc01",
+    "ltp-glibc:proc01"
+  ],
+  "pass_count": 2,
+  "suite_summaries": [
+    {
+      "failed": 9,
+      "group": "ltp-musl",
+      "passed": 1,
+      "timed_out": 0
+    },
+    {
+      "failed": 9,
+      "group": "ltp-glibc",
+      "passed": 1,
+      "timed_out": 0
+    }
+  ],
+  "timeouts": 0
+}
