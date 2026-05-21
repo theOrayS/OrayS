@@ -24,6 +24,12 @@ pub static PAGE_FAULT: [fn(VirtAddr, PageFaultFlags, bool) -> bool];
 #[def_trap_handler]
 pub static SYSCALL: [fn(&TrapFrame, usize) -> isize];
 
+/// A slice of user exception handler functions.
+#[cfg(feature = "uspace")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uspace")))]
+#[def_trap_handler]
+pub static USER_EXCEPTION: [fn(&TrapFrame, usize) -> bool];
+
 #[cfg(feature = "uspace")]
 static USER_RETURN_HANDLER: AtomicUsize = AtomicUsize::new(0);
 
@@ -47,6 +53,12 @@ macro_rules! handle_trap {
 #[cfg(feature = "uspace")]
 pub(crate) fn handle_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
     SYSCALL[0](tf, syscall_num)
+}
+
+/// Dispatch an exception raised by user code to the user-space runtime.
+#[cfg(feature = "uspace")]
+pub(crate) fn handle_user_exception(tf: &TrapFrame, signal: usize) -> bool {
+    handle_trap!(USER_EXCEPTION, tf, signal)
 }
 
 /// Call the external user-return hook.

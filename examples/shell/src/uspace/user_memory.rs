@@ -10,8 +10,9 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
-use super::task_context::{current_tid, current_user_pc};
 use super::{UserProcess, neg_errno};
+
+pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
 
 pub(super) fn validate_user_read(
     process: &UserProcess,
@@ -149,7 +150,11 @@ pub(super) fn read_user_bytes(
         return Err(LinuxError::EFAULT);
     }
 
-    let mut bytes = vec![0; len];
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(len)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    bytes.resize(len, 0);
     process
         .aspace
         .lock()
@@ -196,6 +201,7 @@ pub(super) fn write_user_bytes(
 }
 
 pub(super) fn user_io_buffer(len: usize) -> Result<Vec<u8>, LinuxError> {
+    let len = len.min(MAX_USER_IO_CHUNK);
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(len)
@@ -210,6 +216,7 @@ pub(super) fn with_readable_user_buffer(
     len: usize,
     f: impl FnOnce(&[u8]) -> Result<usize, LinuxError>,
 ) -> isize {
+    let len = len.min(MAX_USER_IO_CHUNK);
     let bytes = match read_user_bytes(process, ptr, len) {
         Ok(bytes) => bytes,
         Err(err) => return neg_errno(err),
@@ -226,6 +233,7 @@ pub(super) fn with_writable_user_buffer(
     len: usize,
     f: impl FnOnce(&mut [u8]) -> Result<usize, LinuxError>,
 ) -> isize {
+    let len = len.min(MAX_USER_IO_CHUNK);
     if let Err(err) = validate_user_write(process, ptr, len) {
         return neg_errno(err);
     }
@@ -331,6 +339,27 @@ pub(super) fn read_execve_argv(
     Ok(argv)
 }
 
+pub(super) fn read_execve_envp(
+    process: &UserProcess,
+    envp_ptr: usize,
+) -> Result<Vec<String>, LinuxError> {
+    const MAX_ENVC: usize = 512;
+
+    if envp_ptr == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut env = Vec::new();
+    for idx in 0..MAX_ENVC {
+        let item_ptr = read_user_word(process, envp_ptr + idx * size_of::<usize>())?;
+        if item_ptr == 0 {
+            break;
+        }
+        env.push(read_cstr(process, item_ptr)?);
+    }
+    Ok(env)
+}
+
 pub(super) fn read_cstr(process: &UserProcess, ptr: usize) -> Result<String, LinuxError> {
     const MAX_USER_CSTR_LEN: usize = 128 * 1024;
 
@@ -381,23 +410,10 @@ fn read_cstr_efault(
 }
 
 fn log_read_cstr_efault(
-    process: &UserProcess,
-    ptr: usize,
-    fault_addr: usize,
-    reason: &'static str,
-    aspace: &axmm::AddrSpace,
+    _process: &UserProcess,
+    _ptr: usize,
+    _fault_addr: usize,
+    _reason: &'static str,
+    _aspace: &axmm::AddrSpace,
 ) {
-    let query = aspace.query_address(VirtAddr::from(fault_addr));
-    println!(
-        "read-cstr-efault: pid={} tid={} ptr={ptr:#x} fault_addr={fault_addr:#x} pc={:#x} reason=\"{}\" aspace={:?} created_by_fork={} credential_generation={} uid={} gid={}",
-        process.pid(),
-        current_tid(),
-        current_user_pc(),
-        reason,
-        query,
-        process.created_by_fork(),
-        process.credential_generation(),
-        process.uid(),
-        process.gid(),
-    );
 }

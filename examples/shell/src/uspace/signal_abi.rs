@@ -6,7 +6,7 @@ use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use axhal::trap::PageFaultFlags;
-use axhal::trap::register_user_return_handler;
+use axhal::trap::{USER_EXCEPTION, register_trap_handler, register_user_return_handler};
 use linux_raw_sys::general;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use memory_addr::{PAGE_SIZE_4K, VirtAddr};
@@ -14,8 +14,9 @@ use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
-    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGALRM_NUM,
-    SIGCANCEL_NUM, SIGCHLD_NUM, SIGKILL_NUM, neg_errno,
+    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM,
+    SIGCANCEL_NUM, SIGCHLD_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
+    SIGQUIT_NUM, SIGSEGV_NUM, SIGTERM_NUM, neg_errno,
 };
 #[cfg(target_arch = "loongarch64")]
 use super::linux_abi::{LOONGARCH_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
@@ -24,11 +25,11 @@ use super::linux_abi::{RISCV_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_D
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::memory_map::{align_down, align_up, user_mapping_flags};
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
-use super::process_lifecycle::terminate_current_thread_for_exit_group;
+use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::task_context::{UserTaskExt, current_task_ext, current_tid};
 use super::task_registry::{
-    UserThreadEntry, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
-    user_thread_entry_for_process,
+    UserThreadEntry, user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
+    user_thread_entry_by_tid, user_thread_entry_for_process,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
@@ -59,10 +60,25 @@ pub(super) fn signal_mask_bit(sig: i32) -> u64 {
 }
 
 fn default_signal_terminates(sig: i32) -> bool {
-    matches!(sig, SIGKILL_NUM | SIGALRM_NUM)
+    matches!(
+        sig,
+        SIGINT_NUM
+            | SIGQUIT_NUM
+            | SIGILL_NUM
+            | SIGABRT_NUM
+            | SIGFPE_NUM
+            | SIGKILL_NUM
+            | SIGSEGV_NUM
+            | SIGPIPE_NUM
+            | SIGALRM_NUM
+            | SIGTERM_NUM
+    )
 }
 
 pub(super) fn signal_is_blocked(ext: &UserTaskExt, sig: i32) -> bool {
+    if sig == SIGKILL_NUM {
+        return false;
+    }
     let bit = signal_mask_bit(sig);
     bit != 0 && ext.signal_mask.load(Ordering::Acquire) & bit != 0
 }
@@ -81,7 +97,11 @@ pub(super) fn current_unblocked_signal_pending() -> bool {
     })
 }
 
-pub(super) fn deliver_user_signal(entry: &UserThreadEntry, sig: i32) -> Result<(), LinuxError> {
+pub(super) fn deliver_user_signal(
+    entry: &UserThreadEntry,
+    sig: i32,
+    sender_pid: i32,
+) -> Result<(), LinuxError> {
     if sig == 0 {
         return Ok(());
     }
@@ -89,6 +109,8 @@ pub(super) fn deliver_user_signal(entry: &UserThreadEntry, sig: i32) -> Result<(
     if sig == SIGKILL_NUM {
         ext.process.request_exit_group(128 + sig);
     }
+    ext.pending_signal_sender
+        .store(sender_pid, Ordering::Release);
     ext.pending_signal.store(sig, Ordering::Release);
     if sig == SIGCANCEL_NUM {
         user_trace!(
@@ -107,11 +129,37 @@ pub(super) fn deliver_user_signal(entry: &UserThreadEntry, sig: i32) -> Result<(
     Ok(())
 }
 
-fn deliver_user_signal_result(entry: &UserThreadEntry, sig: i32) -> isize {
-    match deliver_user_signal(entry, sig) {
+fn deliver_user_signal_result(entry: &UserThreadEntry, sig: i32, sender_pid: i32) -> isize {
+    match deliver_user_signal(entry, sig, sender_pid) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
+}
+
+fn deliver_process_group_signal(pgid: i32, sig: i32, sender_pid: i32) -> isize {
+    let entries = user_thread_entries_by_process_group(pgid);
+    if entries.is_empty() {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    for entry in entries {
+        if let Err(err) = deliver_user_signal(&entry, sig, sender_pid) {
+            return neg_errno(err);
+        }
+    }
+    0
+}
+
+#[register_trap_handler(USER_EXCEPTION)]
+fn user_exception(_tf: &TrapFrame, signal: usize) -> bool {
+    let Some(ext) = current_task_ext() else {
+        return false;
+    };
+    let signal = match signal as i32 {
+        SIGILL_NUM | SIGSEGV_NUM => signal as i32,
+        _ => SIGSEGV_NUM,
+    };
+    ext.process.request_exit_group(128 + signal);
+    terminate_current_thread(ext.process.as_ref(), 128 + signal)
 }
 
 pub(super) fn ensure_user_return_hook_registered() {
@@ -128,6 +176,25 @@ fn user_return_hook(tf: &mut TrapFrame) {
     let Some(ext) = current_task_ext() else {
         return;
     };
+    let eval_deadline_us = ext
+        .process
+        .eval_watchdog_deadline_us
+        .load(Ordering::Acquire);
+    if eval_deadline_us != 0
+        && (axhal::time::monotonic_time().as_micros() as u64) >= eval_deadline_us
+    {
+        ext.process.request_exit_group(137);
+        terminate_current_thread_for_exit_group(ext.process.as_ref(), 137);
+    }
+    if let Some(code) = ext.process.pending_exit_group() {
+        terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
+    }
+    if ext.pending_signal.load(Ordering::Acquire) == SIGCANCEL_NUM
+        && !signal_is_blocked(ext, SIGCANCEL_NUM)
+    {
+        ext.pending_signal.store(0, Ordering::Release);
+        terminate_current_thread(ext.process.as_ref(), 0);
+    }
     if ext.signal_frame.load(Ordering::Acquire) == 0 {
         if let Some(restored) = ext.pending_sigreturn.lock().take() {
             *tf = restored;
@@ -205,10 +272,11 @@ fn inject_pending_signal(
     let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
 
+    let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
     let frame = make_riscv_signal_frame(
         sig,
         SI_TKILL_CODE,
-        current_tid(),
+        sender_pid,
         current_mask,
         SS_DISABLE,
         RISCV_SIGTRAMP_CODE,
@@ -276,10 +344,11 @@ fn inject_pending_signal(
     let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
 
+    let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
     let frame = make_loongarch_signal_frame(
         sig,
         SI_TKILL_CODE,
-        current_tid(),
+        sender_pid,
         current_mask,
         SS_DISABLE,
         LOONGARCH_SIGTRAMP_CODE,
@@ -501,13 +570,19 @@ pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
         return neg_errno(err);
     }
     if pid == 0 {
-        return 0;
+        return deliver_process_group_signal(process.pgid(), sig, process.pid());
+    }
+    if pid < -1 {
+        return deliver_process_group_signal(-pid, sig, process.pid());
+    }
+    if pid == -1 {
+        return neg_errno(LinuxError::EPERM);
     }
     if pid == process.pid() || pid == current_tid() {
         let Some(entry) = user_thread_entry_for_process(process) else {
             return neg_errno(LinuxError::ESRCH);
         };
-        return deliver_user_signal_result(&entry, sig);
+        return deliver_user_signal_result(&entry, sig, process.pid());
     }
     let Some(entry) = process
         .child_thread_entry_by_pid(pid)
@@ -515,7 +590,7 @@ pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
     else {
         return neg_errno(LinuxError::ESRCH);
     };
-    deliver_user_signal_result(&entry, sig)
+    deliver_user_signal_result(&entry, sig, process.pid())
 }
 
 pub(super) fn sys_tkill(process: &UserProcess, tid: i32, sig: i32) -> isize {
@@ -538,7 +613,7 @@ pub(super) fn sys_tkill(process: &UserProcess, tid: i32, sig: i32) -> isize {
             current_tid()
         );
     }
-    deliver_user_signal_result(&entry, sig)
+    deliver_user_signal_result(&entry, sig, process.pid())
 }
 
 pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -> isize {
@@ -559,7 +634,7 @@ pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -
             tgid,
         );
     }
-    deliver_user_signal_result(&entry, sig)
+    deliver_user_signal_result(&entry, sig, process.pid())
 }
 
 #[cfg(target_arch = "riscv64")]

@@ -24,8 +24,8 @@ use super::linux_abi::{
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    clear_user_bytes, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
-    validate_user_write, write_user_bytes, write_user_value,
+    MAX_USER_IO_CHUNK, clear_user_bytes, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, write_user_bytes, write_user_value,
 };
 use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
 
@@ -576,7 +576,7 @@ pub(super) fn read_socket_data_from_user(
     if ptr == 0 {
         return Err(LinuxError::EFAULT);
     }
-    read_user_bytes(process, ptr, len)
+    read_user_bytes(process, ptr, len.min(MAX_USER_IO_CHUNK))
 }
 
 pub(super) fn read_socket_addr_from_user(
@@ -632,6 +632,7 @@ pub(super) fn recv_socket_data_to_user(
     len: usize,
     flags: i32,
 ) -> isize {
+    let len = len.min(MAX_USER_IO_CHUNK);
     recv_socket_data_to_user_inner(process, posix_fd, buf, len, |dst| unsafe {
         arceos_posix_api::sys_recv(posix_fd, dst, len, flags)
     })
@@ -647,6 +648,7 @@ pub(super) fn recv_socket_data_to_user_with_addr(
     addrlen: usize,
     user_addr_len: usize,
 ) -> isize {
+    let len = len.min(MAX_USER_IO_CHUNK);
     let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
     let mut local_len = 0 as posix_ctypes::socklen_t;
     let ret = recv_socket_data_to_user_inner(process, posix_fd, buf, len, |dst| unsafe {
@@ -997,6 +999,7 @@ pub(super) fn sys_sendto_bridge(
         Ok(bytes) => bytes,
         Err(err) => return neg_errno(err),
     };
+    let len = bytes.len();
     let data_ptr = bytes.as_ptr() as *const c_void;
     let ret = if addr == 0 {
         unsafe { arceos_posix_api::sys_send(socket.posix_fd, data_ptr, len, flags as i32) }

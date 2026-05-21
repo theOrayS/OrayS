@@ -19,6 +19,8 @@ use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
 use super::user_memory::{read_cstr, write_user_bytes, write_user_value};
 
+const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
+
 pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general::stat {
     let st_mode = file_type_mode(attr.file_type()) | attr.perm().bits() as u32;
     let mut st: general::stat = unsafe { core::mem::zeroed() };
@@ -97,6 +99,7 @@ pub(super) fn canonical_permission_path(path: String) -> String {
 
 pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
     match entry {
+        FdEntry::BlockDevice(dev) => Some(dev.path.as_str()),
         FdEntry::File(file) => Some(file.path.as_str()),
         FdEntry::Directory(dir) => Some(dir.path.as_str()),
         FdEntry::Path(path) => Some(path.path.as_str()),
@@ -345,14 +348,31 @@ pub(super) fn dirent_type(ty: FileType) -> u32 {
     }
 }
 
-pub(super) fn stdio_stat(readable: bool) -> general::stat {
-    let perm = if readable { 0o440 } else { 0o220 };
+fn synthetic_char_stat(ino: u64, mode: u32, rdev: u64) -> general::stat {
     let mut st: general::stat = unsafe { core::mem::zeroed() };
-    st.st_ino = 1;
-    st.st_mode = ST_MODE_CHR | perm;
+    st.st_ino = ino;
+    st.st_mode = mode;
     st.st_nlink = 1;
+    st.st_rdev = rdev as _;
     st.st_blksize = 512;
     st
+}
+
+pub(super) fn stdio_stat(readable: bool) -> general::stat {
+    let perm = if readable { 0o440 } else { 0o220 };
+    synthetic_char_stat(1, ST_MODE_CHR | perm, 0)
+}
+
+pub(super) fn synthetic_char_stat_for_path(path: &str, mode: u32) -> general::stat {
+    let rdev = match path {
+        "/dev/null" => DEV_NULL_RDEV,
+        _ => 0,
+    };
+    synthetic_char_stat(path_inode(Some(path)), mode, rdev)
+}
+
+pub(super) fn dev_null_stat() -> general::stat {
+    synthetic_char_stat_for_path("/dev/null", ST_MODE_CHR | 0o220)
 }
 
 pub(super) fn path_inode(path: Option<&str>) -> u64 {

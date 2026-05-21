@@ -34,6 +34,11 @@ fn handle_page_fault(tf: &TrapFrame, mut access_flags: PageFaultFlags, is_user: 
     }
 }
 
+#[cfg(feature = "uspace")]
+fn handle_user_signal(tf: &TrapFrame, signal: usize) -> bool {
+    crate::trap::handle_user_exception(tf, signal)
+}
+
 #[unsafe(no_mangle)]
 fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     let estat = estat::read();
@@ -56,10 +61,52 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
         | Trap::Exception(Exception::PageNonExecutableFault) => {
             handle_page_fault(tf, PageFaultFlags::EXECUTE, from_user);
         }
+        #[cfg(feature = "uspace")]
+        Trap::Exception(
+            Exception::FetchInstructionAddressError
+            | Exception::MemoryAccessAddressError
+            | Exception::AddressNotAligned
+            | Exception::PagePrivilegeIllegal,
+        ) if from_user => {
+            if !handle_user_signal(tf, 11) {
+                panic!(
+                    "Unhandled user trap {:?} @ {:#x}:\n{:#x?}",
+                    estat.cause(),
+                    tf.era,
+                    tf
+                );
+            }
+        }
+        #[cfg(feature = "uspace")]
+        Trap::Exception(
+            Exception::InstructionNotExist
+            | Exception::InstructionPrivilegeIllegal
+            | Exception::FloatingPointUnavailable,
+        ) if from_user => {
+            if !handle_user_signal(tf, 4) {
+                panic!(
+                    "Unhandled user trap {:?} @ {:#x}:\n{:#x?}",
+                    estat.cause(),
+                    tf.era,
+                    tf
+                );
+            }
+        }
         Trap::Exception(Exception::Breakpoint) => handle_breakpoint(&mut tf.era),
         Trap::Interrupt(_) => {
             let irq_num: usize = estat.is().trailing_zeros() as usize;
             handle_trap!(IRQ, irq_num);
+        }
+        #[cfg(feature = "uspace")]
+        _ if from_user => {
+            if !handle_user_signal(tf, 4) {
+                panic!(
+                    "Unhandled user trap {:?} @ {:#x}:\n{:#x?}",
+                    estat.cause(),
+                    tf.era,
+                    tf
+                );
+            }
         }
         _ => {
             panic!(

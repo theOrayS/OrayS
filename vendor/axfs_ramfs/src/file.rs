@@ -1,8 +1,11 @@
 use alloc::vec::Vec;
-use axfs_vfs::{VfsError, VfsNodeAttr, VfsNodeOps, VfsResult, impl_vfs_non_dir_default};
+use axfs_vfs::{impl_vfs_non_dir_default, VfsError, VfsNodeAttr, VfsNodeOps, VfsResult};
 use spin::RwLock;
 
-const MAX_RAMFS_FILE_SIZE: usize = 128 * 1024 * 1024;
+// The evaluator mounts /tmp and /var as ramfs. Keep a per-file ceiling so
+// runaway scratch data cannot starve later user processes, but allow regular
+// syscall tests such as glibc write01 to create their expected ~32 MiB file.
+const MAX_RAMFS_FILE_SIZE: usize = 64 * 1024 * 1024;
 
 /// The file node in the RAM filesystem.
 ///

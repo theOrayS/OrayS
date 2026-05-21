@@ -76,11 +76,16 @@ pub(super) fn sys_mount(
     if let Err(err) = ensure_mount_target_directory(process, target_path.as_str()) {
         return neg_errno(err);
     }
-    let source_root =
-        match resolve_mount_source(process, source.as_deref(), fstype.as_deref(), flags) {
-            Ok(source_root) => source_root,
-            Err(err) => return neg_errno(err),
-        };
+    let source_root = match resolve_mount_source(
+        process,
+        source.as_deref(),
+        fstype.as_deref(),
+        flags,
+        target_path.as_str(),
+    ) {
+        Ok(source_root) => source_root,
+        Err(err) => return neg_errno(err),
+    };
     process.add_mount_point(target_path, source_root);
     0
 }
@@ -140,6 +145,7 @@ fn resolve_mount_source(
     source: Option<&str>,
     fstype: Option<&str>,
     flags: u32,
+    target_path: &str,
 ) -> Result<String, LinuxError> {
     if flags & general::MS_BIND != 0 {
         let source = source.ok_or(LinuxError::EINVAL)?;
@@ -158,7 +164,7 @@ fn resolve_mount_source(
         "devtmpfs" | "devfs" => Ok("/dev".into()),
         "proc" | "procfs" => Ok("/proc".into()),
         "sysfs" => Ok("/sys".into()),
-        "tmpfs" => Ok("/tmp".into()),
+        "tmpfs" => Ok(target_path.into()),
         "vfat" | "msdos" | "fat" | "ext2" | "ext3" | "ext4" => {
             let source = source.ok_or(LinuxError::EINVAL)?;
             // The evaluator exposes a single block-backed root filesystem and does not

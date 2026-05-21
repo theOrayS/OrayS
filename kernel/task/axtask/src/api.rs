@@ -207,6 +207,15 @@ pub fn yield_now() {
     current_run_queue::<NoPreemptIrqSave>().yield_current()
 }
 
+/// Reclaims exited tasks whose remaining external references have been dropped.
+///
+/// The background GC task also performs this work. This explicit pass is useful
+/// after code drops a batch of task handles without causing a new task exit that
+/// would otherwise wake the GC task.
+pub fn reap_exited_tasks() {
+    crate::run_queue::reap_exited_tasks();
+}
+
 /// Current task is going to sleep for the given duration.
 ///
 /// If the feature `irq` is not enabled, it uses busy-wait instead.

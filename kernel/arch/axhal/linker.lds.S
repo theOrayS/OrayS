@@ -96,6 +96,8 @@ SECTIONS {
     linkm2_PAGE_FAULT : { *(linkm2_PAGE_FAULT) }
     linkme_SYSCALL : { *(linkme_SYSCALL) }
     linkm2_SYSCALL : { *(linkm2_SYSCALL) }
+    linkme_USER_EXCEPTION : { *(linkme_USER_EXCEPTION) }
+    linkm2_USER_EXCEPTION : { *(linkm2_USER_EXCEPTION) }
     axns_resource : { *(axns_resource) }
 }
 INSERT AFTER .tbss;

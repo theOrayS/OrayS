@@ -50,6 +50,11 @@ pub struct UdpLoopbackPacket {
 #[derive(Clone)]
 struct UdpLoopbackBinding {
     local: IpEndpoint,
+    // Mirrors the owning UdpSocket's connected peer for loopback demux.
+    // Keep updates scoped to UdpSocket::connect() so packets sent to a shared
+    // local UDP port can be routed to the same peer-specific stream that
+    // non-loopback UDP recv() would accept.
+    peer: Option<IpEndpoint>,
     queue: UdpLoopbackQueue,
 }
 
@@ -73,7 +78,11 @@ pub fn register_udp_loopback(local: IpEndpoint, queue: UdpLoopbackQueue) {
         table.resize_with(PORT_NUM, || None);
     }
     let bindings = table[local.port as usize].get_or_insert_with(Vec::new);
-    bindings.push(UdpLoopbackBinding { local, queue });
+    bindings.push(UdpLoopbackBinding {
+        local,
+        peer: None,
+        queue,
+    });
 }
 
 pub fn unregister_udp_loopback(local: IpEndpoint, queue: &UdpLoopbackQueue) {
@@ -91,6 +100,21 @@ pub fn unregister_udp_loopback(local: IpEndpoint, queue: &UdpLoopbackQueue) {
     }
 }
 
+pub fn update_udp_loopback_peer(local: IpEndpoint, queue: &UdpLoopbackQueue, peer: IpEndpoint) {
+    let mut table = UDP_LOOPBACK_TABLE.lock();
+    if table.is_empty() {
+        return;
+    }
+    if let Some(bindings) = &mut table[local.port as usize] {
+        for binding in bindings {
+            if binding.local == local && Arc::ptr_eq(&binding.queue.queue, &queue.queue) {
+                binding.peer = Some(peer);
+                return;
+            }
+        }
+    }
+}
+
 pub fn send_udp_loopback(local: IpEndpoint, remote: IpEndpoint, buf: &[u8]) -> usize {
     let table = UDP_LOOPBACK_TABLE.lock();
     if table.is_empty() {
@@ -98,8 +122,14 @@ pub fn send_udp_loopback(local: IpEndpoint, remote: IpEndpoint, buf: &[u8]) -> u
     }
     if let Some(bindings) = &table[remote.port as usize] {
         let peer = loopback_source_endpoint(local, remote);
+        let has_connected_match = bindings.iter().any(|binding| {
+            binding_accepts(binding.local, remote)
+                && binding.peer.is_some_and(|p| endpoint_matches(p, peer))
+        });
         for binding in bindings {
-            if binding_accepts(binding.local, remote) {
+            if binding_accepts(binding.local, remote)
+                && binding_peer_accepts(binding.peer, peer, has_connected_match)
+            {
                 binding.queue.push(UdpLoopbackPacket {
                     data: buf.to_vec(),
                     peer,
@@ -112,6 +142,17 @@ pub fn send_udp_loopback(local: IpEndpoint, remote: IpEndpoint, buf: &[u8]) -> u
 
 fn binding_accepts(local: IpEndpoint, remote: IpEndpoint) -> bool {
     local.port == remote.port && (local.addr.is_unspecified() || local.addr == remote.addr)
+}
+
+fn binding_peer_accepts(
+    expected: Option<IpEndpoint>,
+    actual: IpEndpoint,
+    prefer_connected: bool,
+) -> bool {
+    match expected {
+        Some(expected) => endpoint_matches(expected, actual),
+        None => !prefer_connected,
+    }
 }
 
 fn endpoint_matches(expected: IpEndpoint, actual: IpEndpoint) -> bool {

@@ -112,6 +112,8 @@ pub(super) fn sys_futex(
                     || read_user_value::<u32>(process, uaddr)
                         .map_or(true, |value| value != val as u32)
                     || current_sigcancel_pending()
+                    || process.pending_exit_group().is_some()
+                    || process.eval_watchdog_expired()
             };
             if timeout != 0 {
                 let ts = match read_user_value::<general::timespec>(process, timeout) {
@@ -122,9 +124,15 @@ pub(super) fn sys_futex(
                     ts.tv_sec.max(0) as u64,
                     ts.tv_nsec.clamp(0, 999_999_999) as u32,
                 );
+                let dur = process
+                    .eval_watchdog_remaining()
+                    .map_or(dur, |remaining| remaining.min(dur));
                 if state.queue.wait_timeout_until(dur, wait_cond) {
                     if let Some(ext) = current_task_ext() {
                         ext.futex_wait.store(0, Ordering::Release);
+                    }
+                    if process.eval_watchdog_expired() || process.pending_exit_group().is_some() {
+                        return neg_errno(LinuxError::EINTR);
                     }
                     return neg_errno(LinuxError::ETIMEDOUT);
                 }
@@ -136,11 +144,18 @@ pub(super) fn sys_futex(
                 }
                 return 0;
             }
-            state.queue.wait_until(wait_cond);
+            if let Some(dur) = process.eval_watchdog_remaining() {
+                let _ = state.queue.wait_timeout_until(dur, wait_cond);
+            } else {
+                state.queue.wait_until(wait_cond);
+            }
             if let Some(ext) = current_task_ext() {
                 ext.futex_wait.store(0, Ordering::Release);
             }
-            if current_sigcancel_pending() {
+            if current_sigcancel_pending()
+                || process.pending_exit_group().is_some()
+                || process.eval_watchdog_expired()
+            {
                 return neg_errno(LinuxError::EINTR);
             }
             0

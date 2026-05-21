@@ -13,9 +13,9 @@ use std::vec::Vec;
 use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
-#[cfg(target_arch = "loongarch64")]
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::sections::SectionData;
-#[cfg(target_arch = "loongarch64")]
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::symbol_table::Entry;
 
 use super::linux_abi::{
@@ -73,9 +73,11 @@ fn default_exec_env(exec_root: &str, cwd: &str) -> Vec<String> {
 pub(super) fn load_program_image(
     aspace: &mut AddrSpace,
     cwd: &str,
+    program_path: &str,
     argv: &[&str],
+    env_override: Option<&[String]>,
 ) -> Result<LoadedImage, String> {
-    let prepared = prepare_program(cwd, argv, 0)?;
+    let prepared = prepare_program(cwd, program_path, argv, 0)?;
     let elf = ElfFile::new(&prepared.image).map_err(|err| format!("invalid ELF: {err}"))?;
     let main = analyze_elf(&elf, USER_PIE_LOAD_BASE)?;
 
@@ -88,14 +90,20 @@ pub(super) fn load_program_image(
 
     if let Some(raw_interp) = main.interpreter.as_deref() {
         let interp_path = resolve_runtime_support_file(prepared.exec_root.as_str(), raw_interp)?;
+        #[cfg(not(any(target_arch = "loongarch64", target_arch = "riscv64")))]
+        let interp_image = std::fs::read(interp_path.as_str())
+            .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
+        #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
         let mut interp_image = std::fs::read(interp_path.as_str())
             .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
         #[cfg(target_arch = "loongarch64")]
-        patch_loongarch_musl_sched_syscall_stubs(
+        patch_loongarch_musl_syscall_stubs(
             prepared.exec_root.as_str(),
             raw_interp,
             &mut interp_image,
         )?;
+        #[cfg(target_arch = "riscv64")]
+        patch_riscv_musl_syscall_stubs(prepared.exec_root.as_str(), raw_interp, &mut interp_image)?;
         let interp_elf =
             ElfFile::new(&interp_image).map_err(|err| format!("invalid interpreter ELF: {err}"))?;
         let interp = analyze_elf(
@@ -138,8 +146,13 @@ pub(super) fn load_program_image(
         .map_err(|err| format!("failed to reserve user stack: {err}"))?;
 
     let argv_refs = prepared.argv.iter().map(String::as_str).collect::<Vec<_>>();
-    let env = default_exec_env(prepared.exec_root.as_str(), cwd);
-    let env_refs = env.iter().map(String::as_str).collect::<Vec<_>>();
+    let default_env;
+    let env_refs = if let Some(env) = env_override {
+        env.iter().map(String::as_str).collect::<Vec<_>>()
+    } else {
+        default_env = default_exec_env(prepared.exec_root.as_str(), cwd);
+        default_env.iter().map(String::as_str).collect::<Vec<_>>()
+    };
     let stack_ptr = build_initial_stack(
         aspace,
         stack_base,
@@ -175,21 +188,27 @@ pub(super) fn load_program_image(
     })
 }
 
-fn prepare_program(cwd: &str, argv: &[&str], depth: usize) -> Result<PreparedProgram, String> {
-    if argv.is_empty() {
+fn prepare_program(
+    cwd: &str,
+    program_path: &str,
+    argv: &[&str],
+    depth: usize,
+) -> Result<PreparedProgram, String> {
+    if program_path.is_empty() || argv.is_empty() {
         return Err("empty argv".into());
     }
     if depth > MAX_SCRIPT_INTERPRETER_DEPTH {
         return Err("script interpreter recursion limit exceeded".into());
     }
 
-    let path = resolve_host_path(cwd.to_string(), argv[0])?;
+    let path = resolve_host_path(cwd.to_string(), program_path)?;
     let image =
         std::fs::read(path.as_str()).map_err(|err| format!("failed to read {path}: {err}"))?;
 
     if let Some(next_argv) = parse_shebang_argv(path.as_str(), &image, argv)? {
         let next_refs = next_argv.iter().map(String::as_str).collect::<Vec<_>>();
-        return prepare_program(cwd, &next_refs, depth + 1);
+        let next_program = next_refs.first().copied().unwrap_or(program_path);
+        return prepare_program(cwd, next_program, &next_refs, depth + 1);
     }
 
     Ok(PreparedProgram {
@@ -352,7 +371,7 @@ fn read_interp_path(elf: &ElfFile<'_>, ph: &ProgramHeader<'_>) -> Result<String,
 }
 
 #[cfg(target_arch = "loongarch64")]
-fn patch_loongarch_musl_sched_syscall_stubs(
+fn patch_loongarch_musl_syscall_stubs(
     exec_root: &str,
     raw_interp: &str,
     image: &mut [u8],
@@ -361,28 +380,49 @@ fn patch_loongarch_musl_sched_syscall_stubs(
         return Ok(());
     }
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
-    let patches = [
+    let raw_syscall_patches = [
         ("sched_setparam", general::__NR_sched_setparam),
         ("sched_getparam", general::__NR_sched_getparam),
         ("sched_setscheduler", general::__NR_sched_setscheduler),
         ("sched_getscheduler", general::__NR_sched_getscheduler),
     ];
     let mut offsets = Vec::new();
-    for (name, syscall_nr) in patches {
+    for (name, syscall_nr) in raw_syscall_patches {
         let Some(offset) = find_dynsym_file_offset(&elf, name)? else {
             continue;
         };
         offsets.push((offset, syscall_nr));
     }
+    let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
     drop(elf);
 
     for (offset, syscall_nr) in offsets {
         patch_loongarch_enosys_stub(image, offset, syscall_nr)?;
     }
+    if let Some(offset) = brk_offset {
+        patch_loongarch_musl_brk_stub(image, offset)?;
+    }
     Ok(())
 }
 
-#[cfg(target_arch = "loongarch64")]
+#[cfg(target_arch = "riscv64")]
+fn patch_riscv_musl_syscall_stubs(
+    exec_root: &str,
+    raw_interp: &str,
+    image: &mut [u8],
+) -> Result<(), String> {
+    if exec_root != "/musl" || !raw_interp.contains("ld-musl") {
+        return Ok(());
+    }
+    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
+    let Some(offset) = find_dynsym_file_offset(&elf, "brk")? else {
+        return Ok(());
+    };
+    drop(elf);
+    patch_riscv_musl_brk_stub(image, offset)
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 fn find_dynsym_file_offset(elf: &ElfFile<'_>, name: &str) -> Result<Option<usize>, String> {
     let Some(dynsym) = elf.find_section_by_name(".dynsym") else {
         return Ok(None);
@@ -399,7 +439,7 @@ fn find_dynsym_file_offset(elf: &ElfFile<'_>, name: &str) -> Result<Option<usize
     Ok(None)
 }
 
-#[cfg(target_arch = "loongarch64")]
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 fn vaddr_to_file_offset(elf: &ElfFile<'_>, vaddr: usize) -> Result<usize, String> {
     for ph in elf.program_iter() {
         if ph.get_type().map_err(str_err)? != PhType::Load {
@@ -417,6 +457,63 @@ fn vaddr_to_file_offset(elf: &ElfFile<'_>, vaddr: usize) -> Result<usize, String
     Err(format!(
         "symbol address {vaddr:#x} is outside LOAD segments"
     ))
+}
+
+#[cfg(target_arch = "riscv64")]
+fn patch_riscv_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), String> {
+    const ENOSYS_BRK_STUB_PREFIX: [u8; 8] = [0x13, 0x01, 0x01, 0xff, 0x13, 0x05, 0x40, 0xff];
+    const PATCH_LEN: usize = 20;
+    let end = offset
+        .checked_add(PATCH_LEN)
+        .ok_or_else(|| "riscv musl brk stub patch range overflow".to_string())?;
+    if end > image.len() {
+        return Err("riscv musl brk stub patch exceeds image".into());
+    }
+    if image
+        .get(offset..offset + ENOSYS_BRK_STUB_PREFIX.len())
+        .is_some_and(|prefix| prefix == ENOSYS_BRK_STUB_PREFIX)
+    {
+        let patch = [
+            0xaa, 0x85, // mv a1, a0 (save requested break).
+            0x93, 0x08, 0x60, 0x0d, // li a7, __NR_brk (214).
+            0x73, 0x00, 0x00, 0x00, // ecall.
+            0x33, 0x35, 0xb5, 0x00, // sltu a0, a0, a1 (failure if ret < requested).
+            0x33, 0x05, 0xa0, 0x40, // neg a0, a0 (0 on success, -1 on failure).
+            0x82, 0x80, // ret.
+        ];
+        image[offset..end].copy_from_slice(&patch);
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), String> {
+    const ENOSYS_BRK_STUB_PREFIX: [u8; 4] = [0x63, 0xc0, 0xff, 0x02];
+    const PATCH_LEN: usize = 24;
+
+    let end = offset
+        .checked_add(PATCH_LEN)
+        .ok_or_else(|| "loongarch musl brk stub patch range overflow".to_string())?;
+    if end > image.len() {
+        return Err("loongarch musl brk stub patch exceeds image".into());
+    }
+    if image
+        .get(offset..offset + ENOSYS_BRK_STUB_PREFIX.len())
+        .is_some_and(|prefix| prefix == ENOSYS_BRK_STUB_PREFIX)
+    {
+        let load_syscall_nr = loongarch_addi_w_a7(general::__NR_brk)?;
+        let patch = [
+            0x0015_0085u32.to_le_bytes(), // move a1, a0 (save requested break).
+            load_syscall_nr.to_le_bytes(),
+            0x002b_0000u32.to_le_bytes(), // syscall 0.
+            0x0012_9484u32.to_le_bytes(), // sltu a0, a0, a1.
+            0x0011_9004u32.to_le_bytes(), // sub.d a0, zero, a0.
+            0x4c00_0020u32.to_le_bytes(), // ret.
+        ]
+        .concat();
+        image[offset..end].copy_from_slice(&patch);
+    }
+    Ok(())
 }
 
 #[cfg(target_arch = "loongarch64")]
@@ -437,10 +534,13 @@ fn patch_loongarch_enosys_stub(
     if end > image.len() {
         return Err("musl sched stub patch exceeds image".into());
     }
-    if image
+    let known_stub = image
         .get(offset..offset + ENOSYS_STUB_PREFIX.len())
         .is_some_and(|prefix| prefix == ENOSYS_STUB_PREFIX)
-    {
+        || image
+            .get(offset..offset + 4)
+            .is_some_and(|prefix| prefix == [0x63, 0xc0, 0xff, 0x02]);
+    if known_stub {
         let load_syscall_nr = loongarch_addi_w_a7(syscall_nr)?;
         let patch = [
             load_syscall_nr.to_le_bytes(),

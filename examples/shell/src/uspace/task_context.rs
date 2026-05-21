@@ -25,6 +25,7 @@ pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
     pub(super) clear_child_tid: AtomicUsize,
     pub(super) pending_signal: AtomicI32,
+    pub(super) pending_signal_sender: AtomicI32,
     pub(super) signal_mask: AtomicU64,
     pub(super) futex_wait: AtomicUsize,
     pub(super) robust_list_head: AtomicUsize,
@@ -42,6 +43,7 @@ impl UserTaskExt {
             process,
             clear_child_tid: AtomicUsize::new(clear_child_tid),
             pending_signal: AtomicI32::new(0),
+            pending_signal_sender: AtomicI32::new(0),
             signal_mask: AtomicU64::new(signal_mask),
             futex_wait: AtomicUsize::new(0),
             robust_list_head: AtomicUsize::new(0),
@@ -105,12 +107,6 @@ pub(super) fn robust_list_for_task(task: &AxTaskRef) -> Option<(usize, usize)> {
 
 pub(super) fn current_tid() -> i32 {
     axtask::current().id().as_u64() as i32
-}
-
-pub(super) fn current_user_pc() -> usize {
-    current_task_ext()
-        .map(|ext| ext.last_user_pc.load(Ordering::Acquire))
-        .unwrap_or(0)
 }
 
 pub(super) fn set_current_user_pc(pc: usize) {
