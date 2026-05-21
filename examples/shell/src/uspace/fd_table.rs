@@ -31,9 +31,10 @@ use super::runtime_paths::{
 use super::select_fdset::SelectMode;
 use super::synthetic_fs::{
     dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_pid_stat_fd_entry,
-    proc_pid_stat_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
-    proc_self_maps_path_entry, synthetic_file_is_writable_open, synthetic_userdb_content,
-    synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
+    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
+    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
+    synthetic_file_is_writable_open, synthetic_userdb_content, synthetic_userdb_fd_entry,
+    synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
@@ -68,6 +69,7 @@ pub(super) enum FdEntry {
 pub(super) struct FileEntry {
     pub(super) file: File,
     pub(super) path: String,
+    pub(super) status_flags: u32,
 }
 
 #[derive(Clone)]
@@ -909,7 +911,7 @@ impl FdTable {
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         directory_create_dir(abs_path.as_str())?;
-        process.set_path_mode(abs_path, mode);
+        process.set_path_mode(abs_path, process.apply_umask(mode));
         Ok(())
     }
 
@@ -929,6 +931,9 @@ impl FdTable {
             return Err(LinuxError::ENOENT);
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        if process.remove_path_symlink(abs_path.as_str()) {
+            return Ok(());
+        }
         if remove_dir {
             directory_remove_dir(abs_path.as_str())
         } else {
@@ -1146,7 +1151,18 @@ impl FdTable {
             }
             general::F_GETFD => self.get_fd_flags(fd),
             general::F_SETFD => self.set_fd_flags(fd, arg as u32),
-            general::F_GETFL | general::F_SETFL => Ok(0),
+            general::F_GETFL => match self.entry(fd)? {
+                FdEntry::File(file) => Ok(file.status_flags as i32),
+                _ => Ok(0),
+            },
+            general::F_SETFL => match self.entry_mut(fd)? {
+                FdEntry::File(file) => {
+                    file.status_flags =
+                        (file.status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
+                _ => Ok(0),
+            },
             _ => Ok(0),
         }
     }
@@ -1352,6 +1368,21 @@ fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {
     }
 }
 
+fn fcntl_status_flags(open_flags: u32) -> u32 {
+    open_flags
+        & (general::O_ACCMODE
+            | general::O_APPEND
+            | general::O_NONBLOCK
+            | general::O_DSYNC
+            | general::O_SYNC
+            | general::O_DIRECT
+            | general::O_NOATIME)
+}
+
+fn fcntl_setfl_flags(flags: u32) -> u32 {
+    flags & (general::O_APPEND | general::O_NONBLOCK | general::O_DIRECT | general::O_NOATIME)
+}
+
 fn open_candidates(
     process: &UserProcess,
     candidates: &[String],
@@ -1368,6 +1399,9 @@ fn open_candidates(
     let file_opts = if path_only { &path_opts } else { opts };
     let mut last_err = LinuxError::ENOENT;
     for path in candidates {
+        if let Some(resolved_path) = process.resolve_path_symlink(path.as_str())? {
+            return open_candidates(process, &[resolved_path], opts, flags, mode);
+        }
         if is_proc_self_maps_path(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -1385,6 +1419,19 @@ fn open_candidates(
             proc_pid_stat_path_entry(process, path.as_str())
         } else {
             proc_pid_stat_fd_entry(process, path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
+            proc_pid_status_path_entry(process, path.as_str())
+        } else {
+            proc_pid_status_fd_entry(process, path.as_str())
         } {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -1451,6 +1498,15 @@ fn open_candidates(
         let created_by_this_open = !path_only
             && flags & general::O_CREAT != 0
             && axfs::api::metadata(path.as_str()).is_err();
+        if flags & general::O_NOATIME != 0 && !created_by_this_open && process.uid() != 0 {
+            let owner = process
+                .path_owner(path.as_str())
+                .map(|(uid, _)| uid)
+                .unwrap_or(0);
+            if owner != process.uid() {
+                return Err(LinuxError::EPERM);
+            }
+        }
         match File::open(path.as_str(), file_opts) {
             Ok(file) if path_only => {
                 let attr = file.get_attr().map_err(LinuxError::from)?;
@@ -1458,12 +1514,13 @@ fn open_candidates(
             }
             Ok(file) => {
                 if created_by_this_open {
-                    process.set_path_mode(path.clone(), mode);
+                    process.set_path_mode(path.clone(), process.apply_umask(mode));
                     process.set_path_owner(path.clone(), Some(process.uid()), Some(process.gid()));
                 }
                 return Ok(FdEntry::File(FileEntry {
                     file,
                     path: path.clone(),
+                    status_flags: fcntl_status_flags(flags),
                 }));
             }
             Err(err) => {

@@ -1,3 +1,5 @@
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+use axalloc::frame_allocator_stats;
 use core::str;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 use std::collections::BTreeSet;
@@ -5,6 +7,8 @@ use std::fs::{self, File, FileType};
 use std::io::{self, prelude::*};
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 use std::string::ToString;
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+use std::time::Instant;
 use std::{string::String, vec::Vec};
 
 #[cfg(all(not(feature = "axstd"), unix))]
@@ -41,6 +45,131 @@ const LTP_CORE_CASES: &[&str] = &[
     "access01", "brk01", "chdir01", "clone01", "close01", "dup01", "fcntl02", "fork01", "getpid01",
     "mmap01", "open01", "pipe01", "read01", "stat01", "wait401", "write01",
 ];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_STABLE_CASES: &[&str] = &[
+    "access01",
+    "brk01",
+    "chdir01",
+    "clone01",
+    "close01",
+    "dup01",
+    "fcntl01",
+    "fcntl02",
+    "fork01",
+    "getpid01",
+    "mmap01",
+    "open01",
+    "pipe01",
+    "read01",
+    "stat01",
+    "wait401",
+    "write01",
+    "access03",
+    "close02",
+    "dup02",
+    "fcntl03",
+    "getcwd01",
+    "getpid02",
+    "getppid01",
+    "getuid01",
+    "geteuid01",
+    "getgid01",
+    "getegid01",
+    "lseek01",
+    "read02",
+    "write02",
+    "creat01",
+    "creat03",
+    "open02",
+    "open03",
+    "stat02",
+    "lstat01",
+    "chmod01",
+    "fchmod01",
+    "rmdir01",
+    "symlink01",
+    "readlink01",
+    "ftruncate01",
+    "umask01",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
+    "access02",
+    "access03",
+    "access04",
+    "close02",
+    "dup02",
+    "dup03",
+    "fcntl01",
+    "fcntl03",
+    "getcwd01",
+    "getpid02",
+    "getppid01",
+    "getuid01",
+    "geteuid01",
+    "getgid01",
+    "getegid01",
+    "lseek01",
+    "lseek02",
+    "pipe02",
+    "read02",
+    "write02",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_FS_BASIC_CASES: &[&str] = &[
+    "creat01",
+    "creat03",
+    "open02",
+    "open03",
+    "stat02",
+    "lstat01",
+    "chmod01",
+    "fchmod01",
+    "mkdir02",
+    "rmdir01",
+    "link02",
+    "symlink01",
+    "readlink01",
+    "unlink05",
+    "rename01",
+    "ftruncate01",
+    "umask01",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_PROC_BASIC_CASES: &[&str] = &["proc01"];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_TIME_SIGNAL_BASIC_CASES: &[&str] = &[
+    "alarm02",
+    "alarm03",
+    "clock_getres01",
+    "clock_gettime01",
+    "clock_gettime02",
+    "gettimeofday01",
+    "nanosleep01",
+    "nanosleep02",
+    "time01",
+    "times01",
+    "kill02",
+    "kill03",
+    "pause01",
+    "rt_sigaction01",
+    "rt_sigprocmask01",
+    "sigaction01",
+    "sigprocmask01",
+    "sigpending02",
+    "sigsuspend01",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_CASE_BATCHES: &[(&str, &[&str])] = &[
+    ("stable", LTP_STABLE_CASES),
+    ("core", LTP_CORE_CASES),
+    ("syscalls-basic-plus", LTP_SYSCALLS_BASIC_PLUS_CASES),
+    ("fs-basic", LTP_FS_BASIC_CASES),
+    ("proc-basic", LTP_PROC_BASIC_CASES),
+    ("time-signal-basic", LTP_TIME_SIGNAL_BASIC_CASES),
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_CASE_TIMEOUT_ENV: &str = "LTP_CASE_TIMEOUT_SECS";
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const DEFAULT_GROUP_TIMEOUT_SECS: u64 = 60;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -356,6 +485,137 @@ fn run_user_program_argv_in_timeout(
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_CASE_TIMEOUT_SECS: u64 = 10;
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn valid_ltp_case_name(case: &str) -> bool {
+    !case.is_empty()
+        && case
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn push_ltp_case(cases: &mut Vec<String>, case: &str) -> Result<(), String> {
+    if !valid_ltp_case_name(case) {
+        return Err(format!("invalid ltp case name: {case}"));
+    }
+    if !cases.iter().any(|existing| existing == case) {
+        cases.push(case.to_string());
+    }
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn split_ltp_case_list(raw: &str) -> Result<Vec<String>, String> {
+    let mut cases = Vec::new();
+    for line in raw.lines() {
+        let line = line
+            .split_once('#')
+            .map(|(before, _)| before)
+            .unwrap_or(line);
+        for item in line.split(|c: char| c == ',' || c.is_ascii_whitespace()) {
+            let trimmed = item.trim();
+            if !trimmed.is_empty() {
+                push_ltp_case(&mut cases, trimmed)?;
+            }
+        }
+    }
+    Ok(cases)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_cases_from_slice(slice: &[&str]) -> Result<Vec<String>, String> {
+    let mut cases = Vec::new();
+    for case in slice {
+        push_ltp_case(&mut cases, case)?;
+    }
+    Ok(cases)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_static_case_list(name: &str) -> Option<&'static [&'static str]> {
+    LTP_CASE_BATCHES
+        .iter()
+        .find(|(batch, _)| *batch == name)
+        .map(|(_, cases)| *cases)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn selected_ltp_cases() -> Result<(String, Vec<String>), String> {
+    let file_spec = ["/ltp_cases.txt", "/tmp/ltp_cases.txt"]
+        .iter()
+        .find(|path| matches!(fs::metadata(path), Ok(meta) if meta.is_file()))
+        .map(|path| format!("file:{path}"));
+    let spec = file_spec
+        .as_deref()
+        .or(option_env!("LTP_CASES"))
+        .unwrap_or("stable")
+        .trim();
+    if spec.is_empty() || spec == "stable" {
+        return Ok((
+            String::from("stable"),
+            ltp_cases_from_slice(LTP_STABLE_CASES)?,
+        ));
+    }
+    if spec == "core" {
+        return Ok((String::from("core"), ltp_cases_from_slice(LTP_CORE_CASES)?));
+    }
+
+    if let Some(name) = spec.strip_prefix("batch:") {
+        if let Some(cases) = ltp_static_case_list(name.trim()) {
+            return Ok((
+                format!("batch:{}", name.trim()),
+                ltp_cases_from_slice(cases)?,
+            ));
+        }
+        let known = LTP_CASE_BATCHES
+            .iter()
+            .map(|(batch, _)| *batch)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!("unknown ltp batch '{name}' (known: {known})"));
+    } else if let Some(path) = spec.strip_prefix("file:") {
+        let path = path.trim();
+        let raw = fs::read_to_string(path)
+            .map_err(|err| format!("failed to read LTP_CASES file '{path}': {err}"))?;
+        let cases = split_ltp_case_list(&raw)?;
+        if cases.is_empty() {
+            return Err(format!("LTP_CASES file '{path}' did not contain any cases"));
+        }
+        return Ok((format!("file:{path}"), cases));
+    } else {
+        let cases = split_ltp_case_list(spec)?;
+        if !cases.is_empty() {
+            return Ok((String::from("inline"), cases));
+        }
+    }
+
+    Ok((String::from("core"), ltp_cases_from_slice(LTP_CORE_CASES)?))
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_case_timeout_secs() -> u64 {
+    fs::read_to_string("/ltp_case_timeout_secs")
+        .ok()
+        .or_else(|| option_env!("LTP_CASE_TIMEOUT_SECS").map(str::to_string))
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(LTP_CASE_TIMEOUT_SECS)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn selected_official_test_groups() -> Option<Vec<String>> {
+    let file_spec = ["/test_groups.txt", "/tmp/test_groups.txt"]
+        .iter()
+        .find_map(|path| fs::read_to_string(path).ok());
+    let raw = file_spec.or_else(|| option_env!("OSCOMP_TEST_GROUPS").map(str::to_string))?;
+    let groups = split_ltp_case_list(&raw).ok()?;
+    if groups.is_empty() {
+        None
+    } else {
+        Some(groups)
+    }
+}
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn normalize_rel_path(path: &str) -> Option<String> {
@@ -698,7 +958,7 @@ fn rewrite_ltp_case_line(line: &str, busybox_path: &str) -> String {
         // blocking the whole evaluation, and the watchdog kills the whole case
         // process group so helper loops do not leak into following cases.
         return format!(
-            "{indent}({busybox_path} setsid {busybox_path} sh -c 'tools_dir=\"${{TESTSUITE_TOOLS_DIR:-${{0%/*}}}}\"; PATH=\"$tools_dir:${{0%/*}}:$PATH\"; ({busybox_path} sleep 10; {busybox_path} kill -KILL 0 >/dev/null 2>&1) & ltp_timer=$!; \"$0\"; ltp_status=$?; {busybox_path} kill -KILL $ltp_timer >/dev/null 2>&1; exit $ltp_status' \"$file\")"
+            "{indent}({busybox_path} setsid {busybox_path} sh -c 'tools_dir=\"${{TESTSUITE_TOOLS_DIR:-${{0%/*}}}}\"; PATH=\"$tools_dir:${{0%/*}}:$PATH\"; ({busybox_path} sleep \"${{LTP_CASE_TIMEOUT_SECS:-10}}\"; {busybox_path} echo \"TIMEOUT LTP SCRIPT $0\"; {busybox_path} kill -KILL 0 >/dev/null 2>&1) & ltp_timer=$!; \"$0\"; ltp_status=$?; {busybox_path} kill -KILL $ltp_timer >/dev/null 2>&1; exit $ltp_status' \"$file\")"
         );
     }
     line.to_string()
@@ -878,6 +1138,7 @@ fn ltp_case_env(case: &str, helper_dir: &str) -> Vec<String> {
     let mut env = vec![
         format!("PATH={helper_dir}:.:/musl:/glibc"),
         "TMPDIR=/tmp/ltp-work".into(),
+        format!("{LTP_CASE_TIMEOUT_ENV}={}", ltp_case_timeout_secs()),
     ];
     if case == "chdir01" {
         // chdir01 needs an LTP test device only to mount a scratch filesystem.
@@ -889,6 +1150,15 @@ fn ltp_case_env(case: &str, helper_dir: &str) -> Vec<String> {
         env.push("LTP_DEV_FS_TYPE=tmpfs".into());
     }
     env
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn print_ltp_memory_stats(case: &str, phase: &str) {
+    let stats = frame_allocator_stats();
+    println!(
+        "LTP MEMORY {case} {phase}: free_frames={} allocated_frames={}",
+        stats.free_frames, stats.allocated_frames
+    );
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1107,17 +1377,31 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
     let busybox_path = join_path(suite_dir, "busybox");
     let helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
         .map_err(|err| format!("prepare ltp helper bin failed: {err}"))?;
+    let (case_list_name, cases) = selected_ltp_cases()?;
+    let timeout_secs = ltp_case_timeout_secs();
     println!("#### OS COMP TEST GROUP START {label} ####");
+    println!(
+        "ltp case list: {case_list_name} ({} cases, timeout {timeout_secs}s)",
+        cases.len()
+    );
     cleanup_ltp_scratch();
     let mut passed = 0usize;
     let mut failed = 0usize;
-    for case in LTP_CORE_CASES {
+    let mut timed_out = 0usize;
+    for case in cases {
+        let case = case.as_str();
         let path = join_path(&target_dir, case);
         println!("========== START ltp {case} ==========");
         println!("RUN LTP CASE {case}");
+        let case_started_at = Instant::now();
+        print_ltp_memory_stats(case, "before");
         if !matches!(fs::metadata(&path), Ok(meta) if meta.is_file()) {
             println!("FAIL LTP CASE {case} : -1");
             println!("missing ltp testcase: {path}");
+            println!(
+                "LTP CASE RUNTIME {case}: {} ms",
+                case_started_at.elapsed().as_millis()
+            );
             println!("========== END ltp {case} ==========");
             failed += 1;
             cleanup_ltp_scratch();
@@ -1130,7 +1414,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             run_user_program_argv_in_timeout(
                 &target_dir,
                 &[&busybox_path, "sh", "-c", &command],
-                LTP_CASE_TIMEOUT_SECS,
+                timeout_secs,
             )
         } else {
             let mut argv = Vec::with_capacity(env.len() + 3);
@@ -1138,7 +1422,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             argv.push("env");
             argv.extend(env.iter().map(String::as_str));
             argv.push(rel_path.as_str());
-            run_user_program_argv_in_timeout(&target_dir, &argv, LTP_CASE_TIMEOUT_SECS)
+            run_user_program_argv_in_timeout(&target_dir, &argv, timeout_secs)
         };
         match result {
             Ok(0) => {
@@ -1146,28 +1430,45 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
                 println!("Pass!");
                 passed += 1;
             }
+            Ok(status @ (137 | 143)) => {
+                println!("FAIL LTP CASE {case} : {status}");
+                println!("TIMEOUT LTP CASE {case} after {timeout_secs}s");
+                failed += 1;
+                timed_out += 1;
+            }
             Ok(status) => {
                 println!("FAIL LTP CASE {case} : {status}");
                 failed += 1;
             }
             Err(err) => {
                 println!("FAIL LTP CASE {case} : -1");
+                if err.to_ascii_lowercase().contains("timeout") {
+                    println!("TIMEOUT LTP CASE {case} after {timeout_secs}s");
+                    timed_out += 1;
+                }
                 println!("{err}");
                 failed += 1;
             }
         }
+        print_ltp_memory_stats(case, "after_run");
         cleanup_ltp_scratch();
         uspace::cleanup_user_processes();
+        print_ltp_memory_stats(case, "after_cleanup");
+        println!(
+            "LTP CASE RUNTIME {case}: {} ms",
+            case_started_at.elapsed().as_millis()
+        );
         println!("========== END ltp {case} ==========");
     }
     uspace::cleanup_user_processes();
-    println!("ltp cases: {passed} passed, {failed} failed");
+    println!("ltp cases: {passed} passed, {failed} failed, {timed_out} timed out");
     println!("#### OS COMP TEST GROUP END {label} ####");
     Ok(())
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 pub fn maybe_run_official_tests() {
+    let selected_groups = selected_official_test_groups();
     let mut scripts = Vec::new();
     for suite_dir in SUITE_DIRS {
         let Ok(entries) = fs::read_dir(suite_dir) else {
@@ -1207,6 +1508,11 @@ pub fn maybe_run_official_tests() {
     for (suite_dir, script_name) in scripts {
         let script = path_to_str(&script_name);
         let group = script.strip_suffix(SCRIPT_SUFFIX).unwrap_or(script);
+        if let Some(groups) = selected_groups.as_ref() {
+            if !groups.iter().any(|selected| selected == group) {
+                continue;
+            }
+        }
         let staged_dir = match prepare_suite_stage_dir(&suite_dir, script) {
             Ok(dir) => dir,
             Err(err) => {

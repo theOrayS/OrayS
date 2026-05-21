@@ -5,7 +5,7 @@ use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
 use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
+use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
 
 use super::UserProcess;
 use super::linux_abi::{USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
@@ -150,30 +150,44 @@ pub(super) fn sys_mmap(
         Some(align_down(addr, PAGE_SIZE_4K))
     };
     let map_flags = mmap_prot_to_flags(prot as u32);
-    let target = {
-        let mut brk = process.brk.lock();
-        let start = request_addr.unwrap_or_else(|| {
-            let Some(start) = align_up_checked(brk.next_mmap, PAGE_SIZE_4K) else {
-                return usize::MAX;
-            };
-            brk.next_mmap = start
-                .checked_add(size)
-                .and_then(|end| end.checked_add(PAGE_SIZE_4K))
-                .unwrap_or(usize::MAX);
-            start
-        });
+    let mmap_limit_end = USER_STACK_TOP - USER_STACK_SIZE;
+    let target = if let Some(start) = request_addr {
         let Some(end) = start.checked_add(size) else {
             return neg_errno(LinuxError::ENOMEM);
         };
-        if start < USER_MMAP_BASE || end > USER_STACK_TOP - USER_STACK_SIZE {
+        if start < USER_MMAP_BASE || end > mmap_limit_end {
             return neg_errno(LinuxError::ENOMEM);
         }
+        start
+    } else {
+        let mut brk = process.brk.lock();
+        let Some(hint) = align_up_checked(brk.next_mmap, PAGE_SIZE_4K) else {
+            return neg_errno(LinuxError::ENOMEM);
+        };
+        let Some(limit_size) = mmap_limit_end.checked_sub(USER_MMAP_BASE) else {
+            return neg_errno(LinuxError::ENOMEM);
+        };
+        let limit = VirtAddrRange::from_start_size(VirtAddr::from(USER_MMAP_BASE), limit_size);
+        let start = {
+            let aspace = process.aspace.lock();
+            aspace
+                .find_free_area(VirtAddr::from(hint), size, limit)
+                .or_else(|| aspace.find_free_area(VirtAddr::from(USER_MMAP_BASE), size, limit))
+        };
+        let Some(start) = start.map(|addr| addr.as_usize()) else {
+            return neg_errno(LinuxError::ENOMEM);
+        };
+        brk.next_mmap = start
+            .checked_add(size)
+            .and_then(|end| end.checked_add(PAGE_SIZE_4K))
+            .filter(|next| *next < mmap_limit_end)
+            .unwrap_or(USER_MMAP_BASE);
         start
     };
     if anonymous && size <= 0x40000 {
         user_trace!("user-mmap: target={target:#x} len={size:#x} prot={prot:#x} flags={flags:#x}");
     }
-    let populate = !anonymous;
+    let populate = !anonymous || shared;
     {
         let mut aspace = process.aspace.lock();
         if map_fixed {
@@ -225,7 +239,7 @@ pub(super) fn sys_mmap(
             }
         }
     }
-    if shared && !anonymous && map_flags.contains(MappingFlags::WRITE) {
+    if shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, size, map_flags);
     }
     target as isize

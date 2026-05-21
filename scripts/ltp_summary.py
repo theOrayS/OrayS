@@ -21,6 +21,10 @@ GROUP_END_RE = re.compile(r"#### OS COMP TEST GROUP END (.+?) ####")
 CASE_START_RE = re.compile(r"RUN LTP CASE\s+(\S+)")
 CASE_RESULT_RE = re.compile(r"\b(PASS|FAIL) LTP CASE\s+(\S+)\s*:\s*(-?\d+)")
 TIMEOUT_CASE_RE = re.compile(r"\bTIMEOUT LTP CASE\s+(\S+)(?:\s*:\s*(-?\d+))?", re.IGNORECASE)
+CASE_RUNTIME_RE = re.compile(r"\bLTP CASE RUNTIME\s+(\S+):\s+(\d+)\s+ms\b")
+CASE_MEMORY_RE = re.compile(
+    r"\bLTP MEMORY\s+(\S+)\s+(\S+):\s+free_frames=(\d+)\s+allocated_frames=(\d+)\b"
+)
 INTERNAL_RE = re.compile(r"\b(TFAIL|TBROK|TCONF)\b")
 TIMEOUT_RE = re.compile(
     r"\b(TIMEOUT LTP CASE|timed out|timeout reached|timeout expired|killed after timeout)\b",
@@ -31,7 +35,9 @@ PANIC_TRAP_RE = re.compile(
     r"\b(panic|panicked|trap|Unhandled trap|InstructionNotExist|fatal trap|kernel trap)\b",
     re.IGNORECASE,
 )
-SUITE_SUMMARY_RE = re.compile(r"ltp cases:\s+(\d+)\s+passed,\s+(\d+)\s+failed")
+SUITE_SUMMARY_RE = re.compile(
+    r"ltp cases:\s+(\d+)\s+passed,\s+(\d+)\s+failed(?:,\s+(\d+)\s+timed out)?"
+)
 
 
 def strip_ansi(text: str) -> str:
@@ -79,6 +85,8 @@ def new_case_detail(group: str, case: str) -> dict[str, Any]:
         "timeouts": 0,
         "enosys": 0,
         "panic_trap": 0,
+        "runtime_ms": None,
+        "memory": {},
     }
 
 
@@ -144,14 +152,32 @@ def parse_log(text: str) -> dict[str, Any]:
             if code is not None:
                 detail["code"] = int(code)
             current_case = case
+        if match := CASE_RUNTIME_RE.search(line):
+            case, runtime_ms = match.groups()
+            detail = case_bucket(summary, current_group, case)
+            detail["runtime_ms"] = int(runtime_ms)
+            current_case = case
+            continue
+        if match := CASE_MEMORY_RE.search(line):
+            case, phase, free_frames, allocated_frames = match.groups()
+            detail = case_bucket(summary, current_group, case)
+            detail["memory"][phase] = {
+                "free_frames": int(free_frames),
+                "allocated_frames": int(allocated_frames),
+            }
+            current_case = case
+            continue
         if match := SUITE_SUMMARY_RE.search(line):
             record = {
                 "group": current_group,
                 "passed": int(match.group(1)),
                 "failed": int(match.group(2)),
+                "timed_out": int(match.group(3) or 0),
             }
             summary["suite_summaries"].append(record)
             bucket(summary, current_group)["suite_summaries"].append(record)
+            current_case = None
+            continue
         for marker in INTERNAL_RE.findall(line):
             marker = marker.upper()
             summary["internal"][marker] += 1
@@ -208,7 +234,16 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
             "timeouts": detail["timeouts"],
             "enosys": detail["enosys"],
             "panic_trap": detail["panic_trap"],
+            "runtime_ms": detail["runtime_ms"],
+            "memory": detail["memory"],
         }
+        before = row["memory"].get("before")
+        after_cleanup = row["memory"].get("after_cleanup")
+        row["free_frames_delta_after_cleanup"] = (
+            None
+            if before is None or after_cleanup is None
+            else after_cleanup["free_frames"] - before["free_frames"]
+        )
         rows.append(row)
         matrix.setdefault(detail["case"], {}).setdefault(arch, {})[libc] = row
 
@@ -290,19 +325,35 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
     if data["case_matrix_rows"]:
         lines.append("## Case matrix")
         lines.append(
-            "| Case | Arch | Libc | Group | Status | Code | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |"
+            "| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |"
         )
-        lines.append("| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append(
+            "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+        )
         for row in data["case_matrix_rows"]:
             code = "" if row["code"] is None else str(row["code"])
+            runtime_ms = "" if row["runtime_ms"] is None else str(row["runtime_ms"])
+            before = row["memory"].get("before", {})
+            after_cleanup = row["memory"].get("after_cleanup", {})
+            before_free = before.get("free_frames", "")
+            after_cleanup_free = after_cleanup.get("free_frames", "")
+            free_delta = (
+                ""
+                if row["free_frames_delta_after_cleanup"] is None
+                else str(row["free_frames_delta_after_cleanup"])
+            )
             lines.append(
-                "| {case} | {arch} | {libc} | {group} | {status} | {code} | {tfail} | {tbrok} | {tconf} | {timeout} | {enosys} | {panic} |".format(
+                "| {case} | {arch} | {libc} | {group} | {status} | {code} | {runtime_ms} | {before_free} | {after_cleanup_free} | {free_delta} | {tfail} | {tbrok} | {tconf} | {timeout} | {enosys} | {panic} |".format(
                     case=row["case"],
                     arch=row["arch"],
                     libc=row["libc"],
                     group=row["group"],
                     status=row["status"],
                     code=code,
+                    runtime_ms=runtime_ms,
+                    before_free=before_free,
+                    after_cleanup_free=after_cleanup_free,
+                    free_delta=free_delta,
                     tfail=marker_value(row, "TFAIL"),
                     tbrok=marker_value(row, "TBROK"),
                     tconf=marker_value(row, "TCONF"),
