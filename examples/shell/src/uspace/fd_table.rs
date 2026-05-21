@@ -15,30 +15,32 @@ use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME, ST_MODE_CHR, ST_MODE_DIR,
-    ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
+    ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    apply_recorded_path_metadata, canonical_permission_path, dirent_type, fd_entry_path,
-    fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
-    stdio_stat,
+    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dirent_type,
+    fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs,
+    path_inode, stdio_stat, synthetic_char_stat_for_path,
 };
 use super::runtime_paths::{
-    busybox_applet_target_path, normalize_path, push_runtime_candidate, resolve_host_path,
+    busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
 };
 use super::select_fdset::SelectMode;
 use super::synthetic_fs::{
-    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_self_maps_fd_entry,
-    proc_self_maps_is_writable_open, proc_self_maps_path_entry, synthetic_file_is_writable_open,
-    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
+    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_pid_stat_fd_entry,
+    proc_pid_stat_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
+    proc_self_maps_path_entry, synthetic_file_is_writable_open, synthetic_userdb_content,
+    synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer, validate_user_write,
-    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
+    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer,
+    validate_user_write, with_readable_user_buffer, with_writable_user_buffer, write_user_bytes,
+    write_user_value,
 };
 
 pub(super) struct FdTable {
@@ -51,6 +53,7 @@ pub(super) enum FdEntry {
     Stdout,
     Stderr,
     DevNull,
+    BlockDevice(BlockDeviceEntry),
     Rtc,
     File(FileEntry),
     Directory(DirectoryEntry),
@@ -71,6 +74,11 @@ pub(super) struct FileEntry {
 pub(super) struct DirectoryEntry {
     pub(super) dir: Directory,
     pub(super) attr: FileAttr,
+    pub(super) path: String,
+}
+
+#[derive(Clone)]
+pub(super) struct BlockDeviceEntry {
     pub(super) path: String,
 }
 
@@ -141,6 +149,30 @@ pub(super) fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> 
     }
 }
 
+pub(super) fn sys_fallocate(
+    process: &UserProcess,
+    fd: usize,
+    mode: usize,
+    offset: usize,
+    len: usize,
+) -> isize {
+    let offset = offset as isize;
+    let len = len as isize;
+    if offset < 0 || len <= 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if mode != 0 {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
+    let Some(end) = (offset as u64).checked_add(len as u64) else {
+        return neg_errno(LinuxError::EFBIG);
+    };
+    match process.fds.lock().truncate(fd as i32, end) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
 pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().close(fd as i32) {
         Ok(()) => 0,
@@ -201,7 +233,7 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
     };
     let mut written = 0isize;
     for entry in iov_entries {
-        let len = entry.iov_len as usize;
+        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
         if len == 0 {
             continue;
         }
@@ -228,7 +260,7 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
     };
     let mut total = 0isize;
     for entry in iov_entries {
-        let len = entry.iov_len as usize;
+        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
         if len == 0 {
             continue;
         }
@@ -374,14 +406,37 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let cwd = process.cwd();
-    let visible_path = match resolve_host_path(cwd, path.as_str()) {
-        Ok(path) => path,
-        Err(_) => return neg_errno(LinuxError::EINVAL),
+    let visible_path = {
+        let mut table = process.fds.lock();
+        match table.resolve_path(process, general::AT_FDCWD, path.as_str()) {
+            Ok(path) => {
+                let stat = match table.stat_path(process, general::AT_FDCWD, path.as_str()) {
+                    Ok(stat) => stat,
+                    Err(err) => return neg_errno(err),
+                };
+                if stat.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
+                    return neg_errno(LinuxError::ENOTDIR);
+                }
+                let uid = process.uid();
+                let gid = process.gid();
+                let parents_searchable =
+                    match table.parent_dirs_searchable(process, path.as_str(), uid, gid) {
+                        Ok(searchable) => searchable,
+                        Err(err) => return neg_errno(err),
+                    };
+                if uid != 0
+                    && (!parents_searchable || !access_allowed(&stat, ACCESS_X_OK, uid, gid))
+                {
+                    return neg_errno(LinuxError::EACCES);
+                }
+                path
+            }
+            Err(err) => return neg_errno(err),
+        }
     };
     let host_path = process.translate_mount_path(visible_path.as_str());
-    if open_dir_entry(host_path.as_str()).is_err() {
-        return neg_errno(LinuxError::ENOENT);
+    if let Err(err) = open_dir_entry(host_path.as_str()) {
+        return neg_errno(err);
     }
     process.set_cwd(visible_path);
     0
@@ -441,6 +496,11 @@ pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
 }
 
 pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize {
+    const BLKGETSIZE64: u32 = 0x8008_1272;
+    if req as u32 == BLKGETSIZE64 && process.fds.lock().is_block_device(fd as i32) {
+        let size: u64 = 512 * 1024 * 1024;
+        return write_user_value(process, arg, &size);
+    }
     if req as u32 == RTC_RD_TIME && process.fds.lock().is_rtc(fd as i32) {
         let rtc = rtc_time_from_wall_time();
         return write_user_value(process, arg, &rtc);
@@ -490,6 +550,10 @@ impl FdTable {
         matches!(self.entry(fd), Ok(FdEntry::Rtc))
     }
 
+    pub(super) fn is_block_device(&self, fd: i32) -> bool {
+        matches!(self.entry(fd), Ok(FdEntry::BlockDevice(_)))
+    }
+
     pub(super) fn poll(&self, fd: i32, mode: SelectMode) -> bool {
         let Ok(entry) = self.entry(fd) else {
             return matches!(mode, SelectMode::Except);
@@ -499,6 +563,7 @@ impl FdTable {
                 FdEntry::Stdin => false,
                 FdEntry::Stdout | FdEntry::Stderr => false,
                 FdEntry::DevNull
+                | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
                 | FdEntry::Directory(_)
@@ -510,7 +575,11 @@ impl FdTable {
             },
             SelectMode::Write => match entry {
                 FdEntry::Stdin => false,
-                FdEntry::Stdout | FdEntry::Stderr | FdEntry::DevNull | FdEntry::Rtc => true,
+                FdEntry::Stdout
+                | FdEntry::Stderr
+                | FdEntry::DevNull
+                | FdEntry::BlockDevice(_)
+                | FdEntry::Rtc => true,
                 FdEntry::File(_) => true,
                 FdEntry::Directory(_) | FdEntry::Path(_) | FdEntry::MemoryFile(_) => false,
                 FdEntry::Pipe(pipe) => pipe.poll().writable,
@@ -525,6 +594,10 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::Stdin => Ok(0),
             FdEntry::DevNull => Ok(0),
+            FdEntry::BlockDevice(_) => {
+                dst.fill(0);
+                Ok(dst.len())
+            }
             FdEntry::Rtc => Ok(0),
             FdEntry::File(file) => file.file.read(dst).map_err(LinuxError::from),
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
@@ -543,6 +616,7 @@ impl FdTable {
                 Ok(src.len())
             }
             FdEntry::DevNull => Ok(src.len()),
+            FdEntry::BlockDevice(_) => Ok(src.len()),
             FdEntry::Rtc => Ok(src.len()),
             FdEntry::File(file) => file.file.write(src).map_err(LinuxError::from),
             FdEntry::Pipe(pipe) => pipe.write(src),
@@ -617,6 +691,7 @@ impl FdTable {
                 file.file.truncate(size).map_err(LinuxError::from)
             }
             FdEntry::DevNull => Ok(()),
+            FdEntry::BlockDevice(_) => Ok(()),
             FdEntry::Rtc => Ok(()),
             FdEntry::Path(_) | FdEntry::MemoryFile(_) => Err(LinuxError::EBADF),
             _ => Err(LinuxError::EINVAL),
@@ -633,6 +708,7 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => file.file.seek(pos).map_err(LinuxError::from),
             FdEntry::DevNull => Ok(0),
+            FdEntry::BlockDevice(_) => Ok(0),
             FdEntry::Rtc => Ok(0),
             FdEntry::Directory(_) => Err(LinuxError::EISDIR),
             FdEntry::Path(_) => Err(LinuxError::EBADF),
@@ -729,19 +805,16 @@ impl FdTable {
         Ok(out)
     }
 
-    pub(super) fn read_file_at(
+    pub(super) fn read_file_at_into_fd(
         &mut self,
         fd: i32,
         offset: u64,
-        len: usize,
-    ) -> Result<Vec<u8>, LinuxError> {
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
             return Err(LinuxError::EBADF);
         };
-        let mut buf = vec![0u8; len];
-        let filled = read_file_at_into(&file.file, offset, &mut buf)?;
-        buf.truncate(filled);
-        Ok(buf)
+        read_file_at_into(&file.file, offset, dst)
     }
 
     pub(super) fn insert_with_flags(
@@ -867,7 +940,8 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::Stdin => Ok(stdio_stat(true)),
             FdEntry::Stdout | FdEntry::Stderr => Ok(stdio_stat(false)),
-            FdEntry::DevNull => Ok(stdio_stat(false)),
+            FdEntry::DevNull => Ok(dev_null_stat()),
+            FdEntry::BlockDevice(dev) => Ok(PathEntry::synthetic_block(dev.path.as_str()).stat()),
             FdEntry::Rtc => Ok(stdio_stat(false)),
             FdEntry::File(file) => Ok(file_attr_to_stat(
                 &file.file.get_attr().map_err(LinuxError::from)?,
@@ -908,6 +982,9 @@ impl FdTable {
     ) -> Result<general::stat, LinuxError> {
         match open_fd_entry(process, self, dirfd, path, general::O_RDONLY, 0) {
             Ok(FdEntry::DevNull) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
+            Ok(FdEntry::BlockDevice(dev)) => {
+                Ok(PathEntry::synthetic_block(dev.path.as_str()).stat())
+            }
             Ok(FdEntry::File(file)) => Ok(apply_recorded_path_metadata(
                 process,
                 file.path.as_str(),
@@ -1103,7 +1180,19 @@ impl PathEntry {
         }
     }
 
+    pub(super) fn synthetic_block(path: &str) -> Self {
+        Self {
+            path: path.into(),
+            mode: ST_MODE_BLK | 0o660,
+            size: 0,
+            blocks: 0,
+        }
+    }
+
     pub(super) fn stat(&self) -> general::stat {
+        if self.mode & ST_MODE_TYPE_MASK == ST_MODE_CHR {
+            return synthetic_char_stat_for_path(self.path.as_str(), self.mode);
+        }
         let mut st: general::stat = unsafe { core::mem::zeroed() };
         st.st_dev = 1;
         st.st_ino = path_inode(Some(self.path.as_str()));
@@ -1151,6 +1240,7 @@ impl FdEntry {
             Self::Stdout => Ok(Self::Stdout),
             Self::Stderr => Ok(Self::Stderr),
             Self::DevNull => Ok(Self::DevNull),
+            Self::BlockDevice(dev) => Ok(Self::BlockDevice(dev.clone())),
             Self::Rtc => Ok(Self::Rtc),
             Self::File(file) => Ok(Self::File(file.clone())),
             Self::Directory(dir) => Ok(Self::Directory(dir.clone())),
@@ -1291,6 +1381,19 @@ fn open_candidates(
                 proc_self_maps_fd_entry(process)
             });
         }
+        if let Some(entry) = if path_only {
+            proc_pid_stat_path_entry(process, path.as_str())
+        } else {
+            proc_pid_stat_fd_entry(process, path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
         if let Some((synthetic_path, data)) = synthetic_userdb_content(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -1312,6 +1415,16 @@ fn open_candidates(
                 FdEntry::Path(PathEntry::synthetic_char("/dev/null"))
             } else {
                 FdEntry::DevNull
+            });
+        }
+        if is_synthetic_block_device_path(path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_block(path.as_str()))
+            } else {
+                FdEntry::BlockDevice(BlockDeviceEntry { path: path.clone() })
             });
         }
         if path == "/dev/misc/rtc" || path == "/dev/rtc" {
@@ -1371,6 +1484,13 @@ fn open_candidates(
 
 fn path_entry_from_directory(dir: DirectoryEntry) -> FdEntry {
     FdEntry::Path(PathEntry::from_attr(dir.path.as_str(), &dir.attr))
+}
+
+fn is_synthetic_block_device_path(path: &str) -> bool {
+    matches!(
+        normalize_path("/", path).as_deref(),
+        Some("/dev/vda" | "/dev/sda" | "/dev/xvda")
+    )
 }
 
 fn record_missing_candidate(last_err: &mut LinuxError, err: LinuxError) -> Result<(), LinuxError> {

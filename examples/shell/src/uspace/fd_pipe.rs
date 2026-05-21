@@ -6,6 +6,8 @@ use std::sync::Arc;
 
 use super::fd_table::FdEntry;
 use super::linux_abi::fd_cloexec_flag;
+use super::signal_abi::current_unblocked_signal_pending;
+use super::task_context::current_task_ext;
 use super::user_memory::write_user_value;
 use super::{UserProcess, neg_errno};
 
@@ -102,6 +104,13 @@ impl PipeEndpoint {
         Arc::strong_count(&self.buffer) == 1
     }
 
+    fn interrupted() -> bool {
+        current_unblocked_signal_pending()
+            || current_task_ext().is_some_and(|ext| {
+                ext.process.pending_exit_group().is_some() || ext.process.eval_watchdog_expired()
+            })
+    }
+
     pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
         if !self.readable {
             return Err(LinuxError::EBADF);
@@ -115,6 +124,9 @@ impl PipeEndpoint {
                     return Ok(read_len);
                 }
                 drop(ring);
+                if Self::interrupted() {
+                    return Err(LinuxError::EINTR);
+                }
                 axtask::yield_now();
                 continue;
             }
@@ -142,6 +154,9 @@ impl PipeEndpoint {
             let available = ring.available_write();
             if available == 0 {
                 drop(ring);
+                if Self::interrupted() {
+                    return Err(LinuxError::EINTR);
+                }
                 axtask::yield_now();
                 continue;
             }

@@ -10,13 +10,14 @@ use axsync::Mutex;
 use lazyinit::LazyInit;
 use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::collections::BTreeMap;
+use std::vec::Vec;
 
 use super::UserProcess;
 use super::linux_abi::{
     SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET, SYSV_IPC_STAT,
     SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
 };
-use super::memory_map::{align_down, align_up, sys_munmap, user_mapping_flags};
+use super::memory_map::{align_down, align_up_checked, sys_munmap, user_mapping_flags};
 use super::user_memory::clear_user_bytes;
 
 #[derive(Clone)]
@@ -34,6 +35,14 @@ fn table() -> &'static Mutex<BTreeMap<i32, SysvShmSegment>> {
         SYSV_SHM.init_once(Mutex::new(BTreeMap::new()));
     }
     &SYSV_SHM
+}
+
+fn removed_segments() -> &'static Mutex<Vec<SysvShmSegment>> {
+    static REMOVED_SYSV_SHM: LazyInit<Mutex<Vec<SysvShmSegment>>> = LazyInit::new();
+    if !REMOVED_SYSV_SHM.is_inited() {
+        REMOVED_SYSV_SHM.init_once(Mutex::new(Vec::new()));
+    }
+    &REMOVED_SYSV_SHM
 }
 
 fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i32, LinuxError> {
@@ -55,8 +64,8 @@ fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i32, LinuxErr
         }
     }
 
-    let size = align_up(size.max(1), PAGE_SIZE_4K);
-    if size > SYSV_SHM_MAX_SIZE {
+    let size = align_up_checked(size.max(1), PAGE_SIZE_4K).ok_or(LinuxError::ENOMEM)?;
+    if size == 0 || size > SYSV_SHM_MAX_SIZE {
         return Err(LinuxError::ENOMEM);
     }
     let pages = size / PAGE_SIZE_4K;
@@ -90,7 +99,14 @@ fn contains(shmid: i32) -> bool {
 }
 
 fn remove(shmid: i32) {
-    table().lock().remove(&shmid);
+    if let Some(segment) = table().lock().remove(&shmid) {
+        // System V IPC_RMID removes the identifier immediately but keeps the
+        // backing object alive while existing attachments still reference it.
+        // This evaluator does not yet track attachment reference counts, so
+        // retire the segment from future lookups without freeing live mapped
+        // pages out from under parent/child LTP result buffers.
+        removed_segments().lock().push(segment);
+    }
 }
 
 pub(super) fn sys_shmget(_process: &UserProcess, key: usize, size: usize, shmflg: usize) -> isize {
@@ -118,8 +134,13 @@ pub(super) fn sys_shmat(
     let target = {
         let mut brk = process.brk.lock();
         let start = if shmaddr == 0 {
-            let start = align_up(brk.next_mmap, PAGE_SIZE_4K);
-            brk.next_mmap = start + size + PAGE_SIZE_4K;
+            let Some(start) = align_up_checked(brk.next_mmap, PAGE_SIZE_4K) else {
+                return neg_errno(LinuxError::ENOMEM);
+            };
+            brk.next_mmap = start
+                .checked_add(size)
+                .and_then(|end| end.checked_add(PAGE_SIZE_4K))
+                .unwrap_or(usize::MAX);
             start
         } else {
             align_down(shmaddr, PAGE_SIZE_4K)
@@ -127,7 +148,7 @@ pub(super) fn sys_shmat(
         let Some(end) = start.checked_add(size) else {
             return neg_errno(LinuxError::ENOMEM);
         };
-        if start < USER_MMAP_BASE || end >= USER_STACK_TOP - USER_STACK_SIZE {
+        if start < USER_MMAP_BASE || end > USER_STACK_TOP - USER_STACK_SIZE {
             return neg_errno(LinuxError::ENOMEM);
         }
         start

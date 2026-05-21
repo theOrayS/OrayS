@@ -66,6 +66,9 @@ impl AddrSpace {
 
     /// Checks if the address space contains the given address range.
     pub fn contains_range(&self, start: VirtAddr, size: usize) -> bool {
+        if start.as_usize().checked_add(size).is_none() {
+            return false;
+        }
         self.va_range
             .contains_range(VirtAddrRange::from_start_size(start, size))
     }
@@ -115,8 +118,8 @@ impl AddrSpace {
             let mut shared_pages = BTreeMap::new();
             let mut retained_frames = Vec::new();
             let mut parent_protect_pages = Vec::new();
-            let cow_pages = area.flags().contains(MappingFlags::WRITE);
             let alloc_missing = area.backend().alloc_missing_on_fault();
+            let cow_pages = area.flags().contains(MappingFlags::WRITE) && alloc_missing;
             for vaddr in PageIter4K::new(area.start(), area.end())
                 .expect("memory area bounds must be 4K aligned")
             {

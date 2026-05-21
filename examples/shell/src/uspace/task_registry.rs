@@ -5,6 +5,7 @@ use axtask::AxTaskRef;
 use lazyinit::LazyInit;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::vec::Vec;
 
 use super::UserProcess;
 
@@ -29,6 +30,20 @@ pub(super) fn register_user_task(task: AxTaskRef, process: Arc<UserProcess>) {
         .insert(tid, UserThreadEntry { task, process });
 }
 
+pub(super) fn live_user_thread_count() -> usize {
+    user_thread_table().lock().len()
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub(super) fn live_user_thread_entries() -> Vec<UserThreadEntry> {
+    user_thread_table()
+        .lock()
+        .values()
+        .filter(|entry| entry.process.live_threads.load(Ordering::Acquire) != 0)
+        .cloned()
+        .collect()
+}
+
 pub(super) fn unregister_user_task(tid: i32) {
     user_thread_table().lock().remove(&tid);
 }
@@ -48,6 +63,34 @@ pub(super) fn user_thread_entry_by_process_pid(pid: i32) -> Option<UserThreadEnt
             })
             .cloned()
     })
+}
+
+pub(super) fn user_thread_entries_by_process_pid(pid: i32) -> Vec<UserThreadEntry> {
+    let table = user_thread_table().lock();
+    table
+        .values()
+        .filter(|entry| {
+            entry.process.pid() == pid && entry.process.live_threads.load(Ordering::Acquire) != 0
+        })
+        .cloned()
+        .collect()
+}
+
+pub(super) fn user_thread_entries_by_process_group(pgid: i32) -> Vec<UserThreadEntry> {
+    let table = user_thread_table().lock();
+    let mut entries = Vec::new();
+    let mut pids = Vec::new();
+    for entry in table.values() {
+        let pid = entry.process.pid();
+        if entry.process.pgid() == pgid
+            && entry.process.live_threads.load(Ordering::Acquire) != 0
+            && !pids.contains(&pid)
+        {
+            pids.push(pid);
+            entries.push(entry.clone());
+        }
+    }
+    entries
 }
 
 pub(super) fn user_thread_entry_for_process(process: &UserProcess) -> Option<UserThreadEntry> {

@@ -62,10 +62,16 @@ pub(super) fn align_down(value: usize, align: usize) -> usize {
 }
 
 pub(super) fn align_up(value: usize, align: usize) -> usize {
+    align_up_checked(value, align).unwrap_or(usize::MAX)
+}
+
+pub(super) fn align_up_checked(value: usize, align: usize) -> Option<usize> {
     if value == 0 {
-        0
+        Some(0)
     } else {
-        align_down(value + align - 1, align)
+        value
+            .checked_add(align - 1)
+            .map(|aligned| align_down(aligned, align))
     }
 }
 
@@ -126,8 +132,17 @@ pub(super) fn sys_mmap(
     fd: usize,
     offset: usize,
 ) -> isize {
-    let size = align_up(len.max(1), PAGE_SIZE_4K);
+    if len == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let Some(size) = align_up_checked(len, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if size == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
     let anonymous = flags as u32 & general::MAP_ANONYMOUS != 0;
+    let shared = flags as u32 & general::MAP_SHARED != 0;
     let map_fixed = flags as u32 & general::MAP_FIXED != 0;
     let request_addr = if addr == 0 {
         None
@@ -138,11 +153,19 @@ pub(super) fn sys_mmap(
     let target = {
         let mut brk = process.brk.lock();
         let start = request_addr.unwrap_or_else(|| {
-            let start = align_up(brk.next_mmap, PAGE_SIZE_4K);
-            brk.next_mmap = start + size + PAGE_SIZE_4K;
+            let Some(start) = align_up_checked(brk.next_mmap, PAGE_SIZE_4K) else {
+                return usize::MAX;
+            };
+            brk.next_mmap = start
+                .checked_add(size)
+                .and_then(|end| end.checked_add(PAGE_SIZE_4K))
+                .unwrap_or(usize::MAX);
             start
         });
-        if start < USER_MMAP_BASE || start + size >= USER_STACK_TOP - USER_STACK_SIZE {
+        let Some(end) = start.checked_add(size) else {
+            return neg_errno(LinuxError::ENOMEM);
+        };
+        if start < USER_MMAP_BASE || end > USER_STACK_TOP - USER_STACK_SIZE {
             return neg_errno(LinuxError::ENOMEM);
         }
         start
@@ -162,20 +185,48 @@ pub(super) fn sys_mmap(
     }
 
     if !anonymous {
-        let file_bytes = {
-            let mut table = process.fds.lock();
-            match table.read_file_at(fd as i32, offset as u64, len) {
-                Ok(bytes) => bytes,
-                Err(err) => return neg_errno(err),
+        const FILE_MMAP_COPY_CHUNK: usize = PAGE_SIZE_4K;
+        let mut copied = 0usize;
+        let mut buf = [0u8; FILE_MMAP_COPY_CHUNK];
+        while copied < len {
+            let chunk_len = core::cmp::min(len - copied, buf.len());
+            let Some(file_offset) = (offset as u64).checked_add(copied as u64) else {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::EINVAL);
+            };
+            let read = {
+                let mut table = process.fds.lock();
+                match table.read_file_at_into_fd(fd as i32, file_offset, &mut buf[..chunk_len]) {
+                    Ok(read) => read,
+                    Err(err) => {
+                        let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                        return neg_errno(err);
+                    }
+                }
+            };
+            if read == 0 {
+                break;
             }
-        };
-        if let Err(err) = process
-            .aspace
-            .lock()
-            .write(VirtAddr::from(target), &file_bytes)
-        {
-            return neg_errno(LinuxError::from(err));
+            let Some(dst) = target.checked_add(copied) else {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::EINVAL);
+            };
+            if let Err(err) = process
+                .aspace
+                .lock()
+                .write(VirtAddr::from(dst), &buf[..read])
+            {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::from(err));
+            }
+            copied += read;
+            if read < chunk_len {
+                break;
+            }
         }
+    }
+    if shared && !anonymous && map_flags.contains(MappingFlags::WRITE) {
+        process.record_shared_mmap(target, size, map_flags);
     }
     target as isize
 }
@@ -184,8 +235,13 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
     if len == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    let Some(raw_end) = addr.checked_add(len) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
     let start = align_down(addr, PAGE_SIZE_4K);
-    let end = align_up(addr.saturating_add(len), PAGE_SIZE_4K);
+    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
     if end <= start {
         return neg_errno(LinuxError::EINVAL);
     }
@@ -218,6 +274,7 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
             return 0;
         }
     }
+    process.forget_mmap_range(start, end);
     let unmap_result = process
         .aspace
         .lock()
@@ -226,6 +283,40 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
         Ok(()) => 0,
         Err(err) => neg_errno(LinuxError::from(err)),
     }
+}
+
+pub(super) fn sys_msync(process: &UserProcess, addr: usize, len: usize, flags: usize) -> isize {
+    const MS_ASYNC: usize = 0x1;
+    const MS_INVALIDATE: usize = 0x2;
+    const MS_SYNC: usize = 0x4;
+    const SUPPORTED_FLAGS: usize = MS_ASYNC | MS_INVALIDATE | MS_SYNC;
+
+    if addr & (PAGE_SIZE_4K - 1) != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if flags & !SUPPORTED_FLAGS != 0 || flags & (MS_ASYNC | MS_SYNC) == (MS_ASYNC | MS_SYNC) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if len == 0 {
+        return 0;
+    }
+    let Some(raw_end) = addr.checked_add(len) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if end <= addr {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+
+    let aspace = process.aspace.lock();
+    for page in PageIter4K::new(VirtAddr::from(addr), VirtAddr::from(end)).unwrap() {
+        if aspace.page_table().query(page).is_err() {
+            return neg_errno(LinuxError::ENOMEM);
+        }
+    }
+    0
 }
 
 pub(super) fn sys_mprotect(
@@ -237,8 +328,13 @@ pub(super) fn sys_mprotect(
     if _len == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    let Some(raw_end) = _addr.checked_add(_len) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
     let start = align_down(_addr, PAGE_SIZE_4K);
-    let end = align_up(_addr.saturating_add(_len), PAGE_SIZE_4K);
+    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
     if end <= start {
         return neg_errno(LinuxError::EINVAL);
     }

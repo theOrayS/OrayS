@@ -13,6 +13,7 @@ use super::linux_abi::{
 };
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
+use super::task_registry::user_thread_entry_by_process_pid;
 
 fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let exec_path = process.exec_path();
@@ -57,6 +58,91 @@ pub(super) fn proc_self_maps_fd_entry(process: &UserProcess) -> FdEntry {
 pub(super) fn proc_self_maps_path_entry(process: &UserProcess) -> FdEntry {
     let content_len = proc_self_maps_content(process).len();
     FdEntry::Path(PathEntry::synthetic_file(PROC_SELF_MAPS_PATH, content_len))
+}
+
+fn proc_stat_target_process(process: &UserProcess, path: &str) -> Option<(i32, UserProcessStat)> {
+    let normalized = normalize_path("/", path)?;
+    let pid = if normalized == "/proc/self/stat" {
+        process.pid()
+    } else {
+        let rest = normalized.strip_prefix("/proc/")?;
+        let pid_text = rest.strip_suffix("/stat")?;
+        pid_text.parse::<i32>().ok()?
+    };
+    if pid == process.pid() {
+        return Some((pid, UserProcessStat::from(process)));
+    }
+    if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+        return Some((pid, UserProcessStat::from(entry.process.as_ref())));
+    }
+    user_thread_entry_by_process_pid(pid)
+        .map(|entry| (pid, UserProcessStat::from(entry.process.as_ref())))
+}
+
+struct UserProcessStat {
+    ppid: i32,
+    pgid: i32,
+    state: char,
+    comm: String,
+}
+
+impl UserProcessStat {
+    fn from(process: &UserProcess) -> Self {
+        let exec_path = process.exec_path();
+        let comm = exec_path
+            .rsplit('/')
+            .next()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("user")
+            .chars()
+            .take(15)
+            .collect();
+        let state = if process
+            .live_threads
+            .load(core::sync::atomic::Ordering::Acquire)
+            == 0
+        {
+            'Z'
+        } else if process.is_child_wait_blocked() {
+            'S'
+        } else {
+            'R'
+        };
+        Self {
+            ppid: process.ppid(),
+            pgid: process.pgid(),
+            state,
+            comm,
+        }
+    }
+}
+
+fn proc_pid_stat_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
+    let normalized = normalize_path("/", path)?;
+    let (pid, stat) = proc_stat_target_process(process, normalized.as_str())?;
+    let session = stat.pgid;
+    let content = format!(
+        "{pid} ({}) {} {} {} {} 0 -1 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+        stat.comm, stat.state, stat.ppid, stat.pgid, session
+    );
+    Some((normalized, content.into_bytes()))
+}
+
+pub(super) fn proc_pid_stat_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_pid_stat_content(process, path)?;
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path,
+        data: Arc::new(data),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_pid_stat_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_pid_stat_content(process, path)?;
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        path.as_str(),
+        data.len(),
+    )))
 }
 
 pub(super) fn proc_exe_link_target(process: &UserProcess, path: &str) -> Option<String> {

@@ -546,7 +546,7 @@ pub fn sys_listen(
     backlog: c_int, // currently not used
 ) -> c_int {
     debug!("sys_listen <= {} {}", socket_fd, backlog);
-    syscall_body!(sys_listen, {
+    syscall_body!(sys_listen, debug_errors: [LinuxError::EADDRINUSE], {
         Socket::from_fd(socket_fd)?.listen()?;
         Ok(0)
     })

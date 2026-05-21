@@ -3,6 +3,7 @@ use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsiz
 use axalloc::frame_allocator_stats;
 use axerrno::LinuxError;
 use axhal::context::{TrapFrame, UspaceContext};
+use axhal::paging::MappingFlags;
 use axmm::AddrSpace;
 use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
@@ -22,13 +23,21 @@ use super::signal_abi::ensure_user_return_hook_registered;
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, user_pc,
+    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
+    user_pc,
 };
+#[cfg(feature = "auto-run-tests")]
+use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, register_user_task, unregister_user_task, user_thread_entry_by_process_pid,
+    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
-use super::user_memory::{read_cstr, read_execve_argv, write_user_value};
+use super::user_memory::{read_cstr, read_execve_argv, read_execve_envp, write_user_value};
 use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
+
+const MAX_LIVE_USER_THREADS: usize = 512;
+const MIN_FORK_FREE_FRAMES: usize = 8192;
+const USER_TASK_KSTACK_SIZE: usize = 16 * 1024;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -47,7 +56,7 @@ impl ProcessTeardown {
 
     pub(super) fn run(
         &self,
-        pid: i32,
+        _pid: i32,
         aspace: &Mutex<AddrSpace>,
         fds: &Mutex<FdTable>,
         children: &Mutex<Vec<ChildTask>>,
@@ -56,25 +65,14 @@ impl ProcessTeardown {
             return;
         }
 
-        let before = frame_allocator_stats();
         aspace.lock().clear();
-        let after_aspace = frame_allocator_stats();
-        let reclaimed_frames = before
-            .allocated_frames
-            .saturating_sub(after_aspace.allocated_frames);
-        println!(
-            "frame-allocator-diagnostic: process-teardown pid={pid} reclaimed_frames={reclaimed_frames} before_free={} before_allocated={} after_free={} after_allocated={}",
-            before.free_frames,
-            before.allocated_frames,
-            after_aspace.free_frames,
-            after_aspace.allocated_frames,
-        );
         {
             let mut fds = fds.lock();
             fds.close_all();
             *fds = FdTable::new();
         }
         children.lock().clear();
+        axtask::reap_exited_tasks();
     }
 }
 
@@ -88,15 +86,66 @@ pub fn run_user_program(argv: &[&str]) -> Result<i32, String> {
 }
 
 pub fn run_user_program_in(cwd: &str, argv: &[&str]) -> Result<i32, String> {
+    run_user_program_in_with_timeout(cwd, argv, None)
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn run_user_program_in_timeout(
+    cwd: &str,
+    argv: &[&str],
+    timeout_secs: u64,
+) -> Result<i32, String> {
+    run_user_program_in_with_timeout(cwd, argv, Some(timeout_secs))
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn cleanup_user_processes() {
+    for _ in 0..16 {
+        let mut seen = Vec::new();
+        let entries = live_user_thread_entries();
+        if entries.is_empty() {
+            break;
+        }
+        for entry in entries {
+            let pid = entry.process.pid();
+            if seen.contains(&pid) {
+                continue;
+            }
+            seen.push(pid);
+            entry.process.request_exit_group(137);
+        }
+        yield_for_task_gc();
+        if live_user_thread_count() == 0 {
+            break;
+        }
+    }
+    yield_for_task_gc();
+}
+
+fn run_user_program_in_with_timeout(
+    cwd: &str,
+    argv: &[&str],
+    timeout_secs: Option<u64>,
+) -> Result<i32, String> {
     ensure_user_return_hook_registered();
     let loaded = load_program(cwd, argv)?;
     let process = loaded.process.clone();
+    if let Some(timeout_secs) = timeout_secs {
+        let deadline_us = axhal::time::monotonic_time()
+            .as_micros()
+            .try_into()
+            .unwrap_or(u64::MAX)
+            .saturating_add(timeout_secs.saturating_mul(1_000_000));
+        process
+            .eval_watchdog_deadline_us
+            .store(deadline_us, Ordering::Release);
+    }
     let task_process = process.clone();
     let context = loaded.context;
     let mut task = TaskInner::new(
         move || user_task_entry(task_process, context),
         format!("user:{}", argv[0]),
-        64 * 1024,
+        USER_TASK_KSTACK_SIZE,
     );
     let root = loaded.process.aspace.lock().page_table_root();
     task.ctx_mut().set_page_table_root(root);
@@ -104,15 +153,48 @@ pub fn run_user_program_in(cwd: &str, argv: &[&str]) -> Result<i32, String> {
     let task = axtask::spawn_task(task);
     process.set_pid(task.id().as_u64() as i32);
     register_user_task(task.clone(), process.clone());
-    let exit_code = process.wait_for_exit();
-    let _ = task.join();
-    // Reclaim the user address space immediately after exit. Exited tasks may
-    // stay queued for GC a bit longer, and keeping all user pages pinned leaks
-    // enough memory to break later launches.
-    process.teardown();
+    let exit_code = if let Some(timeout_secs) = timeout_secs {
+        match process.wait_for_exit_timeout(core::time::Duration::from_secs(
+            timeout_secs.saturating_add(2),
+        )) {
+            Some(code) => {
+                let _ = task.join();
+                process.teardown();
+                code
+            }
+            None => {
+                process.request_exit_group(137);
+                process.teardown();
+                137
+            }
+        }
+    } else {
+        let code = process.wait_for_exit();
+        let _ = task.join();
+        process.teardown();
+        code
+    };
     drop(task);
-    axtask::yield_now();
+    yield_for_task_gc();
     Ok(exit_code)
+}
+
+fn yield_for_task_gc() {
+    for _ in 0..64 {
+        axtask::reap_exited_tasks();
+        axtask::yield_now();
+    }
+    axtask::reap_exited_tasks();
+}
+
+fn ensure_user_task_capacity() -> Result<(), LinuxError> {
+    if live_user_thread_count() >= MAX_LIVE_USER_THREADS {
+        return Err(LinuxError::EAGAIN);
+    }
+    if frame_allocator_stats().free_frames < MIN_FORK_FREE_FRAMES {
+        return Err(LinuxError::EAGAIN);
+    }
+    Ok(())
 }
 
 fn user_task_entry(_process: Arc<UserProcess>, context: UspaceContext) {
@@ -134,11 +216,12 @@ fn user_thread_entry(process: Arc<UserProcess>, context: UspaceContext, child_ti
 fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
     let mut aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
         .map_err(|err| format!("failed to create user address space: {err}"))?;
-    let image = load_program_image(&mut aspace, cwd, argv)?;
+    let image = load_program_image(&mut aspace, cwd, argv[0], argv, None)?;
 
     let process = Arc::new(UserProcess {
         aspace: Mutex::new(aspace),
         brk: Mutex::new(image.brk),
+        shared_mmap_ranges: Mutex::new(Vec::new()),
         fds: Mutex::new(FdTable::new()),
         cwd: Mutex::new(cwd.into()),
         exec_root: Mutex::new(image.exec_root.clone()),
@@ -159,13 +242,15 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         gid: AtomicU32::new(0),
         saved_gid: AtomicU32::new(0),
         groups: Mutex::new(Vec::new()),
-        created_by_fork: AtomicBool::new(false),
         credential_generation: AtomicUsize::new(0),
         personality: AtomicUsize::new(0),
         real_timer_generation: AtomicU64::new(0),
         real_timer_deadline_us: AtomicU64::new(0),
         real_timer_interval_us: AtomicU64::new(0),
+        eval_watchdog_deadline_us: AtomicU64::new(0),
+        child_wait_blocked: AtomicBool::new(false),
         pid: AtomicI32::new(0),
+        pgid: AtomicI32::new(0),
         ppid: 1,
         live_threads: AtomicUsize::new(1),
         exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
@@ -183,14 +268,17 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
 fn exec_program(
     process: &UserProcess,
     cwd: &str,
+    path: &str,
     argv: &[String],
+    env: &[String],
 ) -> Result<(usize, usize, usize), String> {
     let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
     let image = {
         let mut aspace = process.aspace.lock();
-        load_program_image(&mut aspace, cwd, &argv_refs)?
+        load_program_image(&mut aspace, cwd, path, &argv_refs, Some(env))?
     };
     *process.brk.lock() = image.brk;
+    process.shared_mmap_ranges.lock().clear();
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
     Ok((image.entry, image.stack_ptr, image.argc))
@@ -231,10 +319,17 @@ impl UserProcess {
 
     pub(super) fn set_pid(&self, pid: i32) {
         self.pid.store(pid, Ordering::Release);
+        let _ = self
+            .pgid
+            .compare_exchange(0, pid, Ordering::AcqRel, Ordering::Acquire);
     }
 
-    pub(super) fn created_by_fork(&self) -> bool {
-        self.created_by_fork.load(Ordering::Acquire)
+    pub(super) fn pgid(&self) -> i32 {
+        self.pgid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_pgid(&self, pgid: i32) {
+        self.pgid.store(pgid, Ordering::Release);
     }
 
     pub(super) fn credential_generation(&self) -> usize {
@@ -268,6 +363,16 @@ impl UserProcess {
             Ordering::Acquire,
         );
         self.exit_code.store(code, Ordering::Release);
+        self.child_exit_wait.notify_all(false);
+        self.exit_wait.notify_all(false);
+        for entry in user_thread_entries_by_process_pid(self.pid()) {
+            if let Some(ext) = task_ext(&entry.task) {
+                let futex_wait = ext.futex_wait.load(Ordering::Acquire);
+                if futex_wait != 0 {
+                    futex::wake_task(futex_wait, &entry.task);
+                }
+            }
+        }
     }
 
     pub(super) fn pending_exit_group(&self) -> Option<i32> {
@@ -275,10 +380,60 @@ impl UserProcess {
         (code != NO_EXIT_GROUP_CODE).then_some(code)
     }
 
+    pub(super) fn eval_watchdog_deadline_us(&self) -> u64 {
+        self.eval_watchdog_deadline_us.load(Ordering::Acquire)
+    }
+
+    pub(super) fn eval_watchdog_expired(&self) -> bool {
+        let deadline = self.eval_watchdog_deadline_us();
+        deadline != 0 && axhal::time::monotonic_time().as_micros() >= deadline as u128
+    }
+
+    pub(super) fn eval_watchdog_remaining(&self) -> Option<core::time::Duration> {
+        let deadline = self.eval_watchdog_deadline_us();
+        if deadline == 0 {
+            return None;
+        }
+        let now = axhal::time::monotonic_time()
+            .as_micros()
+            .min(u64::MAX as u128) as u64;
+        Some(super::time_abi::micros_to_duration(
+            deadline.saturating_sub(now),
+        ))
+    }
+
+    pub(super) fn is_child_wait_blocked(&self) -> bool {
+        self.child_wait_blocked.load(Ordering::Acquire)
+    }
+
+    pub(super) fn record_shared_mmap(&self, start: usize, size: usize, flags: MappingFlags) {
+        self.shared_mmap_ranges.lock().push((start, size, flags));
+    }
+
+    pub(super) fn forget_mmap_range(&self, start: usize, end: usize) {
+        self.shared_mmap_ranges
+            .lock()
+            .retain(|(range_start, size, _)| {
+                let range_end = range_start.saturating_add(*size);
+                range_end <= start || *range_start >= end
+            });
+    }
+
+    fn shared_mmap_ranges(&self) -> Vec<(usize, usize, MappingFlags)> {
+        self.shared_mmap_ranges.lock().clone()
+    }
+
     fn wait_for_exit(&self) -> i32 {
         self.exit_wait
             .wait_until(|| self.live_threads.load(Ordering::Acquire) == 0);
         self.exit_code.load(Ordering::Acquire)
+    }
+
+    fn wait_for_exit_timeout(&self, timeout: core::time::Duration) -> Option<i32> {
+        let timed_out = self
+            .exit_wait
+            .wait_timeout_until(timeout, || self.live_threads.load(Ordering::Acquire) == 0);
+        (!timed_out).then(|| self.exit_code.load(Ordering::Acquire))
     }
 
     pub(super) fn fork(&self) -> Result<Arc<UserProcess>, LinuxError> {
@@ -289,11 +444,21 @@ impl UserProcess {
             aspace
                 .clone_user_mappings_from(&mut parent_aspace)
                 .map_err(LinuxError::from)?;
+            for (start, size, flags) in self.shared_mmap_ranges() {
+                let start = VirtAddr::from(start);
+                parent_aspace
+                    .protect(start, size, flags)
+                    .map_err(LinuxError::from)?;
+                aspace
+                    .protect(start, size, flags)
+                    .map_err(LinuxError::from)?;
+            }
         }
 
         Ok(Arc::new(UserProcess {
             aspace: Mutex::new(aspace),
             brk: Mutex::new(*self.brk.lock()),
+            shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
             fds: Mutex::new(self.fds.lock().fork_copy()?),
             cwd: Mutex::new(self.cwd()),
             exec_root: Mutex::new(self.exec_root()),
@@ -314,13 +479,17 @@ impl UserProcess {
             gid: AtomicU32::new(self.gid()),
             saved_gid: AtomicU32::new(self.saved_gid()),
             groups: Mutex::new(self.groups()),
-            created_by_fork: AtomicBool::new(true),
             credential_generation: AtomicUsize::new(self.credential_generation()),
             personality: AtomicUsize::new(self.personality()),
             real_timer_generation: AtomicU64::new(0),
             real_timer_deadline_us: AtomicU64::new(0),
             real_timer_interval_us: AtomicU64::new(0),
+            eval_watchdog_deadline_us: AtomicU64::new(
+                self.eval_watchdog_deadline_us.load(Ordering::Acquire),
+            ),
+            child_wait_blocked: AtomicBool::new(false),
             pid: AtomicI32::new(0),
+            pgid: AtomicI32::new(self.pgid()),
             ppid: axtask::current().id().as_u64() as i32,
             live_threads: AtomicUsize::new(1),
             exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
@@ -369,33 +538,47 @@ impl UserProcess {
                 } else if nohang {
                     return Ok(None);
                 } else {
-                    match pid {
-                        p if p > 0 => {
-                            let index = children
-                                .iter()
-                                .position(|child| child.pid == p)
-                                .ok_or(LinuxError::ECHILD)?;
-                            Some(children.remove(index))
-                        }
-                        -1 => None,
-                        _ => return Err(LinuxError::EINVAL),
+                    if pid > 0 && !children.iter().any(|child| child.pid == pid) {
+                        return Err(LinuxError::ECHILD);
                     }
+                    None
                 }
             };
 
             if let Some(child) = maybe_child {
                 break child;
             }
-            self.child_exit_wait.wait_until(|| {
+            if self.pending_exit_group().is_some() || self.eval_watchdog_expired() {
+                return Err(LinuxError::EINTR);
+            }
+            let wait_condition = || {
                 let children = self.children.lock();
-                children.is_empty() || children.iter().any(is_exited)
-            });
+                children.is_empty()
+                    || children.iter().any(is_exited)
+                    || self.pending_exit_group().is_some()
+                    || self.eval_watchdog_expired()
+            };
+            if let Some(timeout) = self.eval_watchdog_remaining() {
+                self.child_wait_blocked.store(true, Ordering::Release);
+                if self
+                    .child_exit_wait
+                    .wait_timeout_until(timeout, wait_condition)
+                {
+                    self.child_wait_blocked.store(false, Ordering::Release);
+                    return Err(LinuxError::EINTR);
+                }
+                self.child_wait_blocked.store(false, Ordering::Release);
+            } else {
+                self.child_wait_blocked.store(true, Ordering::Release);
+                self.child_exit_wait.wait_until(wait_condition);
+                self.child_wait_blocked.store(false, Ordering::Release);
+            }
         };
-        let status = child.task.join().ok_or(LinuxError::ECHILD)?;
+        let status = child.process.exit_code.load(Ordering::Acquire);
         let child_pid = child.pid;
         child.process.teardown();
         drop(child);
-        axtask::yield_now();
+        yield_for_task_gc();
         Ok(Some((child_pid, status)))
     }
 
@@ -434,11 +617,28 @@ pub(super) fn sys_execve(
         Ok(argv) => argv,
         Err(err) => return neg_errno(err),
     };
-    let cwd = process.cwd();
-    let (entry, stack_ptr, argc) = match exec_program(process, cwd.as_str(), &argv) {
-        Ok(image) => image,
-        Err(_) => return neg_errno(LinuxError::ENOEXEC),
+    let env = match read_execve_envp(process, _envp) {
+        Ok(env) => env,
+        Err(err) => return neg_errno(err),
     };
+    let cwd = process.cwd();
+    let (entry, stack_ptr, argc) =
+        match exec_program(process, cwd.as_str(), path.as_str(), &argv, &env) {
+            Ok(image) => image,
+            Err(err) => {
+                let errno = if err.contains("Entity not found") {
+                    LinuxError::ENOENT
+                } else if err.contains("Not a directory") {
+                    LinuxError::ENOTDIR
+                } else {
+                    LinuxError::ENOEXEC
+                };
+                if errno == LinuxError::ENOEXEC {
+                    println!("execve-load-failure: path={path} err={err}");
+                }
+                return neg_errno(errno);
+            }
+        };
     let context = make_uspace_context(entry, stack_ptr, argc);
     process.fds.lock().close_cloexec();
     let kstack_top = axtask::current()
@@ -479,6 +679,9 @@ pub(super) fn sys_clone(
         && (clone_flags & general::CLONE_VM as usize == 0
             || clone_flags & vfork_flags == vfork_flags);
     if fork_like_flags {
+        if let Err(err) = ensure_user_task_capacity() {
+            return neg_errno(err);
+        }
         if !matches!(exit_signal, 0) && exit_signal != SIGCHLD_NUM as usize {
             return neg_errno(LinuxError::ENOSYS);
         }
@@ -517,7 +720,7 @@ pub(super) fn sys_clone(
         let mut task = TaskInner::new(
             move || user_task_entry(task_process, child_context),
             "user:fork".into(),
-            64 * 1024,
+            USER_TASK_KSTACK_SIZE,
         );
         let pid = task.id().as_u64() as i32;
         child_process.set_pid(pid);
@@ -573,6 +776,10 @@ pub(super) fn sys_clone(
         return neg_errno(LinuxError::ENOSYS);
     }
 
+    if let Err(err) = ensure_user_task_capacity() {
+        return neg_errno(err);
+    }
+
     if clone_flags & general::CLONE_PARENT_SETTID as usize != 0 && ptid == 0 {
         return neg_errno(LinuxError::EFAULT);
     }
@@ -604,7 +811,7 @@ pub(super) fn sys_clone(
     let mut task = TaskInner::new(
         move || user_thread_entry(task_process, child_context, child_set_tid),
         "user:thread".into(),
-        64 * 1024,
+        USER_TASK_KSTACK_SIZE,
     );
     let tid = task.id().as_u64() as i32;
     let root = process.aspace.lock().page_table_root();

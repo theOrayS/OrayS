@@ -129,6 +129,9 @@ pub(super) fn sys_pselect6(
         Err(err) => return neg_errno(err),
     };
     loop {
+        if process.eval_watchdog_expired() {
+            return neg_errno(LinuxError::EINTR);
+        }
         if current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
@@ -284,6 +287,9 @@ fn sys_poll_until(
     deadline: Option<core::time::Duration>,
 ) -> isize {
     loop {
+        if process.eval_watchdog_expired() {
+            return neg_errno(LinuxError::EINTR);
+        }
         if current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }

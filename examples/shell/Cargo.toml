@@ -28,7 +28,7 @@ uspace = [
     "dep:memory_addr",
     "dep:xmas-elf",
 ]
-auto-run-tests = []
+auto-run-tests = ["axtask/sched-rr"]
 default = []
 
 [dependencies]

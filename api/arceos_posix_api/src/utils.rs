@@ -31,6 +31,22 @@ pub fn check_null_mut_ptr<T>(ptr: *mut T) -> LinuxResult {
 }
 
 macro_rules! syscall_body {
+    ($fn: ident, debug_errors: [$($debug_err:path),+ $(,)?], $($stmt: tt)*) => {{
+        #[allow(clippy::redundant_closure_call)]
+        let res = (|| -> axerrno::LinuxResult<_> { $($stmt)* })();
+        match res {
+            Ok(_) | Err(axerrno::LinuxError::EAGAIN $(| $debug_err)+) => {
+                debug!(concat!(stringify!($fn), " => {:?}"),  res)
+            }
+            Err(_) => info!(concat!(stringify!($fn), " => {:?}"), res),
+        }
+        match res {
+            Ok(v) => v as _,
+            Err(e) => {
+                -e.code() as _
+            }
+        }
+    }};
     ($fn: ident, $($stmt: tt)*) => {{
         #[allow(clippy::redundant_closure_call)]
         let res = (|| -> axerrno::LinuxResult<_> { $($stmt)* })();

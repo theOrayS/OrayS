@@ -14,7 +14,7 @@ use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
 use super::addr::UNSPECIFIED_ENDPOINT;
 use super::udp_loopback::{
     UdpLoopbackQueue, is_loopback_endpoint, register_udp_loopback, send_udp_loopback,
-    unregister_udp_loopback,
+    unregister_udp_loopback, update_udp_loopback_peer,
 };
 use super::{SOCKET_SET, SocketSetWrapper};
 
@@ -195,7 +195,11 @@ impl UdpSocket {
             self.bind(SocketAddr::from(UNSPECIFIED_ENDPOINT))?;
         }
 
-        *self_peer_addr = Some(IpEndpoint::from(addr));
+        let peer_endpoint = IpEndpoint::from(addr);
+        *self_peer_addr = Some(peer_endpoint);
+        if let Some(local) = self.local_addr.read().as_ref() {
+            update_udp_loopback_peer(*local, &self.loopback_queue, peer_endpoint);
+        }
         debug!("UDP socket {}: connected to {}", self.handle, addr);
         Ok(())
     }

@@ -1,5 +1,6 @@
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize};
 
+use axhal::paging::MappingFlags;
 use axmm::AddrSpace;
 use axns::AxNamespace;
 use axsync::Mutex;
@@ -43,9 +44,13 @@ mod user_memory;
 use fd_table::FdTable;
 use linux_abi::*;
 use process_lifecycle::ProcessTeardown;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::cleanup_user_processes;
 pub use process_lifecycle::run_user_program;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::run_user_program_in_timeout;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
 
@@ -54,6 +59,7 @@ struct AxNamespaceImpl;
 struct UserProcess {
     aspace: Mutex<AddrSpace>,
     brk: Mutex<BrkState>,
+    shared_mmap_ranges: Mutex<Vec<(usize, usize, MappingFlags)>>,
     fds: Mutex<FdTable>,
     cwd: Mutex<String>,
     exec_root: Mutex<String>,
@@ -74,13 +80,15 @@ struct UserProcess {
     gid: AtomicU32,
     saved_gid: AtomicU32,
     groups: Mutex<Vec<u32>>,
-    created_by_fork: AtomicBool,
     credential_generation: AtomicUsize,
     personality: AtomicUsize,
     real_timer_generation: AtomicU64,
     real_timer_deadline_us: AtomicU64,
     real_timer_interval_us: AtomicU64,
+    eval_watchdog_deadline_us: AtomicU64,
+    child_wait_blocked: AtomicBool,
     pid: AtomicI32,
+    pgid: AtomicI32,
     ppid: i32,
     live_threads: AtomicUsize,
     exit_group_code: AtomicI32,

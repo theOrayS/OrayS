@@ -90,7 +90,7 @@ pub mod trap {
     pub use axcpu::trap::{IRQ, PAGE_FAULT};
     pub use axcpu::trap::{PageFaultFlags, register_trap_handler};
     #[cfg(feature = "uspace")]
-    pub use axcpu::trap::{SYSCALL, register_user_return_handler};
+    pub use axcpu::trap::{SYSCALL, USER_EXCEPTION, register_user_return_handler};
 }
 
 /// CPU register states for context switching.

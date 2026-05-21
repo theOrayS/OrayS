@@ -6,8 +6,9 @@ use linux_raw_sys::general;
 use std::sync::Arc;
 
 use super::linux_abi::SIGALRM_NUM;
+use super::process_lifecycle::terminate_current_thread_for_exit_group;
 use super::signal_abi::deliver_user_signal;
-use super::task_context::current_tid;
+use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
@@ -56,7 +57,7 @@ impl UserProcess {
             return false;
         }
         if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
-            let _ = deliver_user_signal(&entry, SIGALRM_NUM);
+            let _ = deliver_user_signal(&entry, SIGALRM_NUM, 0);
         }
         true
     }
@@ -411,7 +412,7 @@ fn arm_real_itimer(
             }
             if process.take_expired_real_timer(true).is_some() {
                 if let Some(entry) = user_thread_entry_for_process(&process) {
-                    let _ = deliver_user_signal(&entry, SIGALRM_NUM);
+                    let _ = deliver_user_signal(&entry, SIGALRM_NUM, 0);
                 }
             }
             if interval_us == 0 {
@@ -485,6 +486,11 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
     }
     let deadline = axhal::time::wall_time() + duration;
     while axhal::time::wall_time() < deadline {
+        if let Some(ext) = current_task_ext()
+            && let Some(code) = ext.process.pending_exit_group()
+        {
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
+        }
         axtask::yield_now();
     }
 }

@@ -579,22 +579,32 @@ impl AxRunQueue {
 fn gc_entry() {
     loop {
         // Drop all exited tasks and recycle resources.
-        while let Some(task) = EXITED_TASKS.with_current(|exited_tasks| exited_tasks.pop_front()) {
-            // Do not do the slow drops in the critical section.
-            if Arc::strong_count(&task) == 1 {
-                // If I'm the last holder, drop the task to free resources.
-                drop(task);
-            } else {
-                // Otherwise (e.g. `switch_to` is not completed, held by the joiner, etc),
-                // we push it back and wait for them to drop first.
-                EXITED_TASKS.with_current(|exited_tasks| exited_tasks.push_back(task));
-                break;
-            }
-        }
+        reap_exited_tasks();
         // Note: we cannot block current task with preemption disabled,
         // use `current_ref_raw` to get the `WAIT_FOR_EXIT`'s reference here to avoid the use of `NoPreemptGuard`.
         // Since gc task is pinned to the current CPU, there is no affection if the gc task is preempted during the process.
         unsafe { WAIT_FOR_EXIT.current_ref_raw() }.wait();
+    }
+}
+
+pub(crate) fn reap_exited_tasks() {
+    let exited_count = EXITED_TASKS.with_current(|exited_tasks| exited_tasks.len());
+    for _ in 0..exited_count {
+        let Some(task) = EXITED_TASKS.with_current(|exited_tasks| exited_tasks.pop_front()) else {
+            break;
+        };
+        // Do not do the slow drops in the critical section.
+        if Arc::strong_count(&task) == 1 {
+            // If I'm the last holder, drop the task to free resources.
+            drop(task);
+        } else {
+            // Otherwise (e.g. `switch_to` is not completed, held by the joiner, etc),
+            // keep it for a later pass. Do not stop scanning here: one retained
+            // task must not pin all later exited tasks behind it, otherwise a long
+            // user-space test run can accumulate dead task stacks until the kernel
+            // heap exhausts physical frames.
+            EXITED_TASKS.with_current(|exited_tasks| exited_tasks.push_back(task));
+        }
     }
 }
 
