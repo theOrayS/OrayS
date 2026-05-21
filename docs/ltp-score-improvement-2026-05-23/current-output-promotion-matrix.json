@@ -1,0 +1,1729 @@
+{
+  "blocked": [
+    {
+      "blockers": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc",
+          "reasons": [
+            "TCONF=2"
+          ]
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl",
+          "reasons": [
+            "TCONF=2"
+          ]
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc",
+          "reasons": [
+            "TCONF=2"
+          ]
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl",
+          "reasons": [
+            "TCONF=2"
+          ]
+        }
+      ],
+      "case": "read02",
+      "missing": []
+    }
+  ],
+  "blocked_count": 1,
+  "candidate_count": 62,
+  "candidates": [
+    {
+      "case": "access01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 7539,
+      "min_free_frames_delta_after_cleanup": -930
+    },
+    {
+      "case": "access03",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 3175,
+      "min_free_frames_delta_after_cleanup": -57
+    },
+    {
+      "case": "alarm02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2845,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "alarm03",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2904,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "brk01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2754,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "chdir01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2939,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "chmod01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2930,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "clock_gettime02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2822,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "clone01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2928,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "close01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2771,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "close02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2968,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "creat01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2834,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "creat03",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2828,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "dup01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2842,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "dup02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2831,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "exit01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2848,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "exit02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2772,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "exit_group01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 3021,
+      "min_free_frames_delta_after_cleanup": -32
+    },
+    {
+      "case": "fchmod01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2893,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "fcntl01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2907,
+      "min_free_frames_delta_after_cleanup": -12
+    },
+    {
+      "case": "fcntl02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2583,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "fcntl03",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2781,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "fork01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2816,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "ftruncate01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2983,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getcwd01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2963,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getegid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2810,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "geteuid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2720,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getgid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2869,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getpgrp01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2944,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getpid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 6601,
+      "min_free_frames_delta_after_cleanup": -921
+    },
+    {
+      "case": "getpid02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2771,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "getppid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2780,
+      "min_free_frames_delta_after_cleanup": -8206
+    },
+    {
+      "case": "getrlimit01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2800,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getrusage01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2870,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "gettid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2727,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "gettimeofday01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2747,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "getuid01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2892,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "kill03",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2802,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "lseek01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2914,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "lstat01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2655,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "mmap01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2829,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "open01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2796,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "open02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2977,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "open03",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 4011,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "pipe01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2791,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "proc01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2980,
+      "min_free_frames_delta_after_cleanup": -12
+    },
+    {
+      "case": "read01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2769,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "readlink01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2825,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "rmdir01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2699,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "rt_sigaction01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 3114,
+      "min_free_frames_delta_after_cleanup": -12
+    },
+    {
+      "case": "sched_yield01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2806,
+      "min_free_frames_delta_after_cleanup": -12
+    },
+    {
+      "case": "sigaction01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2838,
+      "min_free_frames_delta_after_cleanup": -12
+    },
+    {
+      "case": "stat01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2885,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "stat02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2920,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "symlink01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2871,
+      "min_free_frames_delta_after_cleanup": -12
+    },
+    {
+      "case": "time01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2856,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "times01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2881,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "umask01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2964,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "uname01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2917,
+      "min_free_frames_delta_after_cleanup": -21
+    },
+    {
+      "case": "wait401",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2907,
+      "min_free_frames_delta_after_cleanup": -30
+    },
+    {
+      "case": "write01",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 3751,
+      "min_free_frames_delta_after_cleanup": -49166
+    },
+    {
+      "case": "write02",
+      "combos": [
+        {
+          "arch": "la",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "la",
+          "group": "ltp-musl",
+          "libc": "musl"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-glibc",
+          "libc": "glibc"
+        },
+        {
+          "arch": "rv",
+          "group": "ltp-musl",
+          "libc": "musl"
+        }
+      ],
+      "max_runtime_ms": 2763,
+      "min_free_frames_delta_after_cleanup": -21
+    }
+  ],
+  "required_arches": [
+    "la",
+    "rv"
+  ],
+  "required_combo_count": 4,
+  "required_libcs": [
+    "glibc",
+    "musl"
+  ]
+}
