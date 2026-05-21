@@ -1,10 +1,12 @@
-use core::cmp;
+use core::{cmp, mem::size_of};
 
+use axalloc::global_allocator;
 use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
+use super::task_registry::live_user_thread_count;
 use super::user_memory::{validate_user_write, write_user_bytes, write_user_value};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 pub(super) enum SyslogAction {
     EmptyRead,
@@ -115,6 +117,38 @@ pub(super) fn sys_getrusage(process: &UserProcess, who: i32, usage: usize) -> is
 
 pub(super) fn sys_uname(process: &UserProcess, buf: usize) -> isize {
     write_default_utsname(process, buf)
+}
+
+fn default_sysinfo() -> system::sysinfo {
+    let alloc = global_allocator();
+    let free_pages = alloc.available_pages() as u64;
+    let total_pages = (alloc.used_pages() as u64 + free_pages).max(1);
+    let procs = live_user_thread_count().clamp(1, u16::MAX as usize) as u16;
+    let mut info: system::sysinfo = unsafe { core::mem::zeroed() };
+    info.uptime = axhal::time::monotonic_time().as_secs() as _;
+    info.loads = [0; 3];
+    info.totalram = total_pages as _;
+    info.freeram = free_pages as _;
+    info.sharedram = 0;
+    info.bufferram = 0;
+    info.totalswap = 0;
+    info.freeswap = 0;
+    info.procs = procs;
+    info.totalhigh = 0;
+    info.freehigh = 0;
+    info.mem_unit = 4096;
+    info
+}
+
+pub(super) fn sys_sysinfo(process: &UserProcess, info: usize) -> isize {
+    let value = default_sysinfo();
+    let bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&value as *const system::sysinfo).cast::<u8>(),
+            size_of::<system::sysinfo>(),
+        )
+    };
+    write_user_bytes(process, info, bytes).map_or_else(|err| neg_errno(err), |_| 0)
 }
 
 trait CCharSlot: Copy {

@@ -26,6 +26,7 @@ pub(super) const SIGSEGV_NUM: i32 = 11;
 pub(super) const SIGPIPE_NUM: i32 = 13;
 pub(super) const SIGALRM_NUM: i32 = 14;
 pub(super) const SIGTERM_NUM: i32 = 15;
+pub(super) const SIGSTOP_NUM: i32 = 19;
 pub(super) const SIGCANCEL_NUM: i32 = 33;
 pub(super) const SI_TKILL_CODE: i32 = -6;
 pub(super) const SA_NODEFER_FLAG: u64 = 0x4000_0000;
