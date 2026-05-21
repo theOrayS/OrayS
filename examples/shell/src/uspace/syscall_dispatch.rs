@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{SYSCALL, register_trap_handler};
+use axhal::trap::{register_trap_handler, SYSCALL};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -47,10 +47,10 @@ use super::resource_sched::{
 use super::select_fdset::sys_poll;
 use super::select_fdset::{sys_ppoll, sys_pselect6};
 use super::signal_abi::{
-    sys_kill, sys_rt_sigaction, sys_rt_sigprocmask, sys_rt_sigreturn, sys_rt_sigtimedwait,
-    sys_tgkill, sys_tkill,
+    sys_kill, sys_rt_sigaction, sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigreturn,
+    sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_tgkill, sys_tkill,
 };
-use super::system_info::{sys_getrusage, sys_syslog, sys_uname};
+use super::system_info::{sys_getrusage, sys_sysinfo, sys_syslog, sys_uname};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
     current_process, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
@@ -98,6 +98,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_readv => sys_readv(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_statfs => sys_statfs(&process, tf.arg0(), tf.arg1()),
         general::__NR_fstatfs => sys_fstatfs(&process, tf.arg0(), tf.arg1()),
+        general::__NR_sysinfo => sys_sysinfo(&process, tf.arg0()),
         general::__NR_getcwd => sys_getcwd(&process, tf.arg0(), tf.arg1()),
         general::__NR_chdir => sys_chdir(&process, tf.arg0()),
         general::__NR_openat => sys_openat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
@@ -361,6 +362,8 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_rt_sigtimedwait => {
             sys_rt_sigtimedwait(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
+        general::__NR_rt_sigsuspend => sys_rt_sigsuspend(&process, tf.arg0(), tf.arg1()),
+        general::__NR_rt_sigpending => sys_rt_sigpending(&process, tf.arg0(), tf.arg1()),
         general::__NR_rt_sigaction => {
             sys_rt_sigaction(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }

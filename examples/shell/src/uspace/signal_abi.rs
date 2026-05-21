@@ -16,7 +16,7 @@ use super::futex;
 use super::linux_abi::{
     KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM,
     SIGCANCEL_NUM, SIGCHLD_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
-    SIGQUIT_NUM, SIGSEGV_NUM, SIGTERM_NUM, neg_errno,
+    SIGQUIT_NUM, SIGSEGV_NUM, SIGSTOP_NUM, SIGTERM_NUM, neg_errno,
 };
 #[cfg(target_arch = "loongarch64")]
 use super::linux_abi::{LOONGARCH_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
@@ -39,6 +39,8 @@ macro_rules! user_trace {
     ($($arg:tt)*) => {};
 }
 
+const NO_SIGSUSPEND_RESTORE_MASK: u64 = u64::MAX;
+
 #[cfg(target_arch = "riscv64")]
 use super::linux_abi::{RISCV_SIGNAL_FPSTATE_BYTES, RISCV_SIGNAL_SIGSET_RESERVED_BYTES};
 
@@ -56,6 +58,21 @@ pub(super) fn signal_mask_bit(sig: i32) -> u64 {
         1u64 << ((sig - 1) as u32)
     } else {
         0
+    }
+}
+
+fn unmaskable_signal_bits() -> u64 {
+    signal_mask_bit(SIGKILL_NUM) | signal_mask_bit(SIGSTOP_NUM)
+}
+
+fn take_sigsuspend_restore_mask(ext: &UserTaskExt, current_mask: u64) -> u64 {
+    let saved = ext
+        .sigsuspend_restore_mask
+        .swap(NO_SIGSUSPEND_RESTORE_MASK, Ordering::AcqRel);
+    if saved == NO_SIGSUSPEND_RESTORE_MASK {
+        current_mask
+    } else {
+        saved
     }
 }
 
@@ -261,13 +278,17 @@ fn inject_pending_signal(
     }
     if handler <= 1 {
         ext.pending_signal.store(0, Ordering::Release);
+        let current_mask = ext.signal_mask.load(Ordering::Acquire);
+        let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
         if handler == 0 && default_signal_terminates(sig) {
             ext.process.request_exit_group(128 + sig);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
         }
+        ext.signal_mask.store(restore_mask, Ordering::Release);
         return Ok(());
     }
     let current_mask = ext.signal_mask.load(Ordering::Acquire);
+    let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
     let frame_size = riscv_signal_frame_size();
     let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
@@ -277,7 +298,7 @@ fn inject_pending_signal(
         sig,
         SI_TKILL_CODE,
         sender_pid,
-        current_mask,
+        restore_mask,
         SS_DISABLE,
         RISCV_SIGTRAMP_CODE,
         trap_frame_to_riscv_sigcontext(tf),
@@ -332,14 +353,18 @@ fn inject_pending_signal(
         .unwrap_or(0);
     if handler <= 1 {
         ext.pending_signal.store(0, Ordering::Release);
+        let current_mask = ext.signal_mask.load(Ordering::Acquire);
+        let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
         if handler == 0 && default_signal_terminates(sig) {
             ext.process.request_exit_group(128 + sig);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
         }
+        ext.signal_mask.store(restore_mask, Ordering::Release);
         return Ok(());
     }
 
     let current_mask = ext.signal_mask.load(Ordering::Acquire);
+    let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
     let frame_size = loongarch_signal_frame_size();
     let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
@@ -349,7 +374,7 @@ fn inject_pending_signal(
         sig,
         SI_TKILL_CODE,
         sender_pid,
-        current_mask,
+        restore_mask,
         SS_DISABLE,
         LOONGARCH_SIGTRAMP_CODE,
         trap_frame_to_loongarch_sigcontext(tf),
@@ -526,13 +551,13 @@ pub(super) fn sys_rt_sigprocmask(
         };
         let mut set_bytes = [0u8; KERNEL_SIGSET_BYTES];
         set_bytes.copy_from_slice(&src);
-        let set_mask = u64::from_ne_bytes(set_bytes);
+        let set_mask = u64::from_ne_bytes(set_bytes) & !unmaskable_signal_bits();
         let next_mask = match how {
             SIG_BLOCK_HOW => current_mask | set_mask,
             SIG_UNBLOCK_HOW => current_mask & !set_mask,
             SIG_SETMASK_HOW => set_mask,
             _ => return neg_errno(LinuxError::EINVAL),
-        };
+        } & !unmaskable_signal_bits();
         if (current_mask | set_mask | next_mask) & signal_mask_bit(SIGCANCEL_NUM) != 0 {
             user_trace!(
                 "sigdbg: rt_sigprocmask tid={} how={} set={set_mask:#x} old={current_mask:#x} new={next_mask:#x}",
@@ -543,6 +568,68 @@ pub(super) fn sys_rt_sigprocmask(
         ext.signal_mask.store(next_mask, Ordering::Release);
     }
     0
+}
+
+pub(super) fn sys_rt_sigpending(
+    process: &UserProcess,
+    set: usize,
+    sigsetsize: usize,
+) -> isize {
+    let Some(ext) = current_task_ext() else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    if set == 0 || sigsetsize < KERNEL_SIGSET_BYTES {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = clear_user_bytes(process, set, sigsetsize) {
+        return neg_errno(err);
+    }
+
+    let pending_sig = ext.pending_signal.load(Ordering::Acquire);
+    let pending_mask = signal_mask_bit(pending_sig);
+    write_user_bytes(process, set, &pending_mask.to_ne_bytes())
+        .map(|()| 0)
+        .unwrap_or_else(neg_errno)
+}
+
+pub(super) fn sys_rt_sigsuspend(
+    process: &UserProcess,
+    set: usize,
+    sigsetsize: usize,
+) -> isize {
+    let Some(ext) = current_task_ext() else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    if sigsetsize < KERNEL_SIGSET_BYTES {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let src = match read_user_bytes(process, set, KERNEL_SIGSET_BYTES) {
+        Ok(src) => src,
+        Err(err) => return neg_errno(err),
+    };
+    let mut set_bytes = [0u8; KERNEL_SIGSET_BYTES];
+    set_bytes.copy_from_slice(&src);
+    let old_mask = ext.signal_mask.load(Ordering::Acquire);
+    let suspend_mask = u64::from_ne_bytes(set_bytes) & !unmaskable_signal_bits();
+    ext.sigsuspend_restore_mask
+        .store(old_mask, Ordering::Release);
+    ext.signal_mask.store(suspend_mask, Ordering::Release);
+
+    while !current_unblocked_signal_pending() {
+        if let Some(code) = ext.process.pending_exit_group() {
+            ext.sigsuspend_restore_mask
+                .store(NO_SIGSUSPEND_RESTORE_MASK, Ordering::Release);
+            ext.signal_mask.store(old_mask, Ordering::Release);
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
+        }
+        let _ = ext.process.consume_expired_real_timer();
+        if current_unblocked_signal_pending() {
+            break;
+        }
+        axtask::yield_now();
+    }
+
+    neg_errno(LinuxError::EINTR)
 }
 
 pub(super) fn sys_rt_sigtimedwait(
