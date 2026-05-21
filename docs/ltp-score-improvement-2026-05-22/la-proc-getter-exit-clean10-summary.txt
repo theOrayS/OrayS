@@ -1,0 +1,64 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-22/la-proc-getter-exit-clean10.log`
+
+- PASS LTP CASE: 20
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 10 passed, 0 failed
+- ltp-glibc: 10 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| exit01 | la | glibc | ltp-glibc | PASS | 0 | 2117 | 192199 | 192178 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit01 | la | musl | ltp-musl | PASS | 0 | 1241 | 192363 | 192347 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit02 | la | glibc | ltp-glibc | PASS | 0 | 2079 | 192178 | 192148 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit02 | la | musl | ltp-musl | PASS | 0 | 1109 | 192347 | 192323 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit_group01 | la | glibc | ltp-glibc | PASS | 0 | 2461 | 192148 | 192116 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit_group01 | la | musl | ltp-musl | PASS | 0 | 1350 | 192323 | 192299 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgrp01 | la | glibc | ltp-glibc | PASS | 0 | 2186 | 192116 | 192095 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgrp01 | la | musl | ltp-musl | PASS | 0 | 1216 | 192299 | 192283 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit01 | la | glibc | ltp-glibc | PASS | 0 | 2068 | 187957 | 187936 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit01 | la | musl | ltp-musl | PASS | 0 | 1191 | 192251 | 192235 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage01 | la | glibc | ltp-glibc | PASS | 0 | 2253 | 187936 | 187915 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage01 | la | musl | ltp-musl | PASS | 0 | 1201 | 192235 | 192219 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettid01 | la | glibc | ltp-glibc | PASS | 0 | 2118 | 192095 | 192074 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettid01 | la | musl | ltp-musl | PASS | 0 | 1179 | 192283 | 192267 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| proc01 | la | glibc | ltp-glibc | PASS | 0 | 2152 | 192211 | 192199 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| proc01 | la | musl | ltp-musl | PASS | 0 | 1177 | 194419 | 192363 | -2056 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_yield01 | la | glibc | ltp-glibc | PASS | 0 | 2132 | 187915 | 187903 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_yield01 | la | musl | ltp-musl | PASS | 0 | 1027 | 192219 | 192211 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname01 | la | glibc | ltp-glibc | PASS | 0 | 2283 | 192074 | 187957 | -4117 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname01 | la | musl | ltp-musl | PASS | 0 | 1192 | 192267 | 192251 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 20 (la:glibc:exit01, la:musl:exit01, la:glibc:exit02, la:musl:exit02, la:glibc:exit_group01, la:musl:exit_group01, la:glibc:getpgrp01, la:musl:getpgrp01, la:glibc:getrlimit01, la:musl:getrlimit01, la:glibc:getrusage01, la:musl:getrusage01, la:glibc:gettid01, la:musl:gettid01, la:glibc:proc01, la:musl:proc01, la:glibc:sched_yield01, la:musl:sched_yield01, la:glibc:uname01, la:musl:uname01)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 10
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 10
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

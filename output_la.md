@@ -136,7 +136,7 @@ warning: methods `recv_loopback` and `recv_loopback_from` are never used
 warning: `axnet` (lib) generated 1 warning
 warning: arceos_posix_api@0.2.0: using checked-in src/ctypes_gen.rs; libclang may not support target loongarch64-unknown-none-softfloat
    Compiling arceos-shell v0.1.0 (/root/oskernel2026-orays/examples/shell)
-    Finished `release` profile [optimized] target(s) in 17.82s
+    Finished `release` profile [optimized] target(s) in 23.35s
 [37mrust-objcopy --binary-architecture=loongarch64[0m [90m/root/oskernel2026-orays/build/kernels/loongarch64/shell_loongarch64-qemu-virt.elf --strip-all -O binary /root/oskernel2026-orays/build/kernels/loongarch64/shell_loongarch64-qemu-virt.bin[0m
 make[2]: Leaving directory '/root/oskernel2026-orays'
 cp /root/oskernel2026-orays/build/kernels/loongarch64/shell_loongarch64-qemu-virt.elf /root/oskernel2026-orays/kernel-la
@@ -163,44 +163,44 @@ target = loongarch64-unknown-none-softfloat
 build_mode = release
 log_level = info
 
-[37m[  0.005265 0 axruntime:135] [32mLogging is enabled.[m
-[m[37m[  0.006293 0 axruntime:136] [32mPrimary CPU 0 started, arg = 0x0.[m
-[m[37m[  0.007417 0 axruntime:139] [32mFound physcial memory regions:[m
-[m[37m[  0.013661 0 axruntime:141] [32m  [PA:0x100d0000, PA:0x100d1000) mmio (READ | WRITE | DEVICE | RESERVED)[m
-[m[37m[  0.015904 0 axruntime:141] [32m  [PA:0x100e0000, PA:0x100e1000) mmio (READ | WRITE | DEVICE | RESERVED)[m
-[m[37m[  0.020745 0 axruntime:141] [32m  [PA:0x1fe00000, PA:0x1fe01000) mmio (READ | WRITE | DEVICE | RESERVED)[m
-[m[37m[  0.029221 0 axruntime:141] [32m  [PA:0x20000000, PA:0x30000000) mmio (READ | WRITE | DEVICE | RESERVED)[m
-[m[37m[  0.036077 0 axruntime:141] [32m  [PA:0x40000000, PA:0x40020000) mmio (READ | WRITE | DEVICE | RESERVED)[m
-[m[37m[  0.042630 0 axruntime:141] [32m  [PA:0x80000000, PA:0x80118000) .text (READ | EXECUTE | RESERVED)[m
-[m[37m[  0.047240 0 axruntime:141] [32m  [PA:0x80118000, PA:0x80142000) .rodata (READ | RESERVED)[m
-[m[37m[  0.050798 0 axruntime:141] [32m  [PA:0x80142000, PA:0x80147000) .data .tdata .tbss .percpu (READ | WRITE | RESERVED)[m
-[m[37m[  0.053032 0 axruntime:141] [32m  [PA:0x80147000, PA:0x80187000) boot stack (READ | WRITE | RESERVED)[m
-[m[37m[  0.057769 0 axruntime:141] [32m  [PA:0x80187000, PA:0x801ae000) .bss (READ | WRITE | RESERVED)[m
-[m[37m[  0.060575 0 axruntime:141] [32m  [PA:0x801ae000, PA:0xb0000000) free memory (READ | WRITE | FREE)[m
-[m[37m[  0.066287 0 axruntime:216] [32mInitialize global memory allocator...[m
-[m[37m[  0.067280 0 axruntime:217] [32m  use TLSF allocator.[m
-[m[37m[  0.074307 0 axmm:103] [32mInitialize virtual memory management...[m
-[m[37m[  0.135883 0 axruntime:156] [32mInitialize platform devices...[m
+[37m[  0.004790 0 axruntime:135] [32mLogging is enabled.[m
+[m[37m[  0.006444 0 axruntime:136] [32mPrimary CPU 0 started, arg = 0x0.[m
+[m[37m[  0.008007 0 axruntime:139] [32mFound physcial memory regions:[m
+[m[37m[  0.008517 0 axruntime:141] [32m  [PA:0x100d0000, PA:0x100d1000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.009258 0 axruntime:141] [32m  [PA:0x100e0000, PA:0x100e1000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.009653 0 axruntime:141] [32m  [PA:0x1fe00000, PA:0x1fe01000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.010089 0 axruntime:141] [32m  [PA:0x20000000, PA:0x30000000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.010554 0 axruntime:141] [32m  [PA:0x40000000, PA:0x40020000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.011024 0 axruntime:141] [32m  [PA:0x80000000, PA:0x80120000) .text (READ | EXECUTE | RESERVED)[m
+[m[37m[  0.011572 0 axruntime:141] [32m  [PA:0x80120000, PA:0x8014b000) .rodata (READ | RESERVED)[m
+[m[37m[  0.012050 0 axruntime:141] [32m  [PA:0x8014b000, PA:0x80150000) .data .tdata .tbss .percpu (READ | WRITE | RESERVED)[m
+[m[37m[  0.012545 0 axruntime:141] [32m  [PA:0x80150000, PA:0x80190000) boot stack (READ | WRITE | RESERVED)[m
+[m[37m[  0.012993 0 axruntime:141] [32m  [PA:0x80190000, PA:0x801b7000) .bss (READ | WRITE | RESERVED)[m
+[m[37m[  0.013421 0 axruntime:141] [32m  [PA:0x801b7000, PA:0xb0000000) free memory (READ | WRITE | FREE)[m
+[m[37m[  0.013990 0 axruntime:216] [32mInitialize global memory allocator...[m
+[m[37m[  0.014394 0 axruntime:217] [32m  use TLSF allocator.[m
+[m[37m[  0.018054 0 axmm:103] [32mInitialize virtual memory management...[m
+[m[37m[  0.080188 0 axruntime:156] [32mInitialize platform devices...[m
 [msmp = 1
-[37m[  0.139630 0 axtask::api:73] [32mInitialize scheduling...[m
-[m[37m[  0.144029 0 axtask::api:83] [32m  use Round-robin scheduler.[m
-[m[37m[  0.147370 0 axdriver:152] [32mInitialize device drivers...[m
-[m[37m[  0.150561 0 axdriver:153] [32m  device model: static[m
-[m[37m[  0.162711 0 virtio_drivers::device::blk:63] [32mfound a block device of size 4194304KB[m
-[m[37m[  0.172480 0 axdriver::bus::pci:107] [32mregistered a new Block device at 00:01.0: "virtio-blk"[m
-[m[37m[  0.189829 0 virtio_drivers::device::net::dev_raw:33] [32mnegotiated_features Features(MAC | STATUS | RING_INDIRECT_DESC | RING_EVENT_IDX | VERSION_1)[m
-[m[37m[  0.206142 0 axdriver::bus::pci:107] [32mregistered a new Net device at 00:02.0: "virtio-net"[m
-[m[37m[  0.288719 0 axfs:44] [32mInitialize filesystems...[m
-[m[37m[  0.294091 0 axfs:47] [32m  use block device 0: "virtio-blk"[m
-[m[37m[  0.300147 0 axfs::root:336] [32m  detected root filesystem: Ext4[m
-[m[37m[  0.337040 0 axnet:42] [32mInitialize network subsystem...[m
-[m[37m[  0.342888 0 axnet:45] [32m  use NIC 0: "virtio-net"[m
-[m[37m[  0.352650 0 axnet::smoltcp_impl:335] [32mcreated net interface "eth0":[m
-[m[37m[  0.360107 0 axnet::smoltcp_impl:336] [32m  ether:    52-54-00-12-34-56[m
-[m[37m[  0.366965 0 axnet::smoltcp_impl:337] [32m  ip:       10.0.2.15/24[m
-[m[37m[  0.372853 0 axnet::smoltcp_impl:338] [32m  gateway:  10.0.2.2[m
-[m[37m[  0.373320 0 axruntime:182] [32mInitialize interrupt handlers...[m
-[m[37m[  0.380730 0 axruntime:194] [32mPrimary CPU 0 init OK.[m
+[37m[  0.092832 0 axtask::api:73] [32mInitialize scheduling...[m
+[m[37m[  0.107436 0 axtask::api:83] [32m  use Round-robin scheduler.[m
+[m[37m[  0.117010 0 axdriver:152] [32mInitialize device drivers...[m
+[m[37m[  0.125995 0 axdriver:153] [32m  device model: static[m
+[m[37m[  0.147053 0 virtio_drivers::device::blk:63] [32mfound a block device of size 4194304KB[m
+[m[37m[  0.163456 0 axdriver::bus::pci:107] [32mregistered a new Block device at 00:01.0: "virtio-blk"[m
+[m[37m[  0.186908 0 virtio_drivers::device::net::dev_raw:33] [32mnegotiated_features Features(MAC | STATUS | RING_INDIRECT_DESC | RING_EVENT_IDX | VERSION_1)[m
+[m[37m[  0.215221 0 axdriver::bus::pci:107] [32mregistered a new Net device at 00:02.0: "virtio-net"[m
+[m[37m[  0.327197 0 axfs:44] [32mInitialize filesystems...[m
+[m[37m[  0.340431 0 axfs:47] [32m  use block device 0: "virtio-blk"[m
+[m[37m[  0.351771 0 axfs::root:336] [32m  detected root filesystem: Ext4[m
+[m[37m[  0.389674 0 axnet:42] [32mInitialize network subsystem...[m
+[m[37m[  0.390765 0 axnet:45] [32m  use NIC 0: "virtio-net"[m
+[m[37m[  0.403549 0 axnet::smoltcp_impl:335] [32mcreated net interface "eth0":[m
+[m[37m[  0.417533 0 axnet::smoltcp_impl:336] [32m  ether:    52-54-00-12-34-56[m
+[m[37m[  0.427430 0 axnet::smoltcp_impl:337] [32m  ip:       10.0.2.15/24[m
+[m[37m[  0.435405 0 axnet::smoltcp_impl:338] [32m  gateway:  10.0.2.2[m
+[m[37m[  0.445641 0 axruntime:182] [32mInitialize interrupt handlers...[m
+[m[37m[  0.450854 0 axruntime:194] [32mPrimary CPU 0 init OK.[m
 [m#### OS COMP TEST GROUP START libctest-musl ####
 ========== START entry-static.exe argv ==========
 Pass!
@@ -257,44 +257,6 @@ FAIL libctest entry-static.exe pthread_cond: timeout
 Pass!
 ========== END entry-static.exe pthread_tsd ==========
 ========== START entry-static.exe qsort ==========
-Pass!
-========== END entry-static.exe qsort ==========
-========== START entry-static.exe random ==========
-Pass!
-========== END entry-static.exe random ==========
-========== START entry-static.exe search_hsearch ==========
-Pass!
-========== END entry-static.exe search_hsearch ==========
-========== START entry-static.exe search_insque ==========
-Pass!
-========== END entry-static.exe search_insque ==========
-========== START entry-static.exe search_lsearch ==========
-Pass!
-========== END entry-static.exe search_lsearch ==========
-========== START entry-static.exe search_tsearch ==========
-Pass!
-========== END entry-static.exe search_tsearch ==========
-========== START entry-static.exe setjmp ==========
-Pass!
-========== END entry-static.exe setjmp ==========
-========== START entry-static.exe snprintf ==========
-Pass!
-========== END entry-static.exe snprintf ==========
-========== START entry-static.exe socket ==========
-[37m[113.475329 0:211 axnet::smoltcp_impl::udp:312] [33m[AxError::NotConnected] socket send() failed[m
-[m[37m[113.476318 0:211 arceos_posix_api::imp::net:450] [32msys_sendto => Err(ENOTCONN)[m
-[msrc/functional/socket.c:29: sendto(c, "x", 1, 0, (void *)&sa, sizeof sa)==1 failed: errno = Socket not connected
-src/functional/socket.c:30: recvfrom(s, buf, sizeof buf, 0, (void *)&sa, (socklen_t[]){sizeof sa})==1 failed: errno = Resource temporarily unavailable
-src/functional/socket.c:31: buf[0]=='x' failed: ' '
-FAIL libctest entry-static.exe socket: 1
-========== END entry-static.exe socket ==========
-========== START entry-static.exe sscanf ==========
-Pass!
-========== END entry-static.exe sscanf ==========
-========== START entry-static.exe sscanf_long ==========
-Pass!
-========== END entry-static.exe sscanf_long ==========
-========== START entry-static.exe stat ==========
 autorun: /tmp/testsuite/musl/libctest/libctest_testcode.sh timed out after 120s
 #### OS COMP TEST GROUP START libctest-glibc ####
 ========== START entry-static.exe argv ==========
@@ -689,69 +651,6 @@ Pass!
 Pass!
 ========== END entry-static.exe random ==========
 ========== START entry-static.exe search_hsearch ==========
-Pass!
-========== END entry-static.exe search_hsearch ==========
-========== START entry-static.exe search_insque ==========
-Pass!
-========== END entry-static.exe search_insque ==========
-========== START entry-static.exe search_lsearch ==========
-Pass!
-========== END entry-static.exe search_lsearch ==========
-========== START entry-static.exe search_tsearch ==========
-Pass!
-========== END entry-static.exe search_tsearch ==========
-========== START entry-static.exe setjmp ==========
-Pass!
-========== END entry-static.exe setjmp ==========
-========== START entry-static.exe snprintf ==========
-Pass!
-========== END entry-static.exe snprintf ==========
-========== START entry-static.exe socket ==========
-[37m[223.200811 0:428 axnet::smoltcp_impl::udp:312] [33m[AxError::NotConnected] socket send() failed[m
-[m[37m[223.202177 0:428 arceos_posix_api::imp::net:450] [32msys_sendto => Err(ENOTCONN)[m
-[msrc/functional/socket.c:29: sendto(c, "x", 1, 0, (void *)&sa, sizeof sa)==1 failed: errno = Transport endpoint is not connected
-src/functional/socket.c:30: recvfrom(s, buf, sizeof buf, 0, (void *)&sa, (socklen_t[]){sizeof sa})==1 failed: errno = Resource temporarily unavailable
-src/functional/socket.c:31: buf[0]=='x' failed: ''
-FAIL libctest entry-static.exe socket: 1
-========== END entry-static.exe socket ==========
-========== START entry-static.exe sscanf ==========
-src/functional/sscanf.c:39: sscanf("hello, world\n", "%8c%8c", a, b) failed (2 fields, expected 1)
-src/functional/sscanf.c:66: sscanf(" 0x12 0x34", "%5i%2i", &x, &y) failed (got 2 fields, expected 1)
-src/functional/sscanf.c:83: sscanf("10e", "%lf", &d) failed (got 1 fields, expected no match (0))
-FAIL libctest entry-static.exe sscanf: 1
-========== END entry-static.exe sscanf ==========
-========== START entry-static.exe sscanf_long ==========
-Pass!
-========== END entry-static.exe sscanf_long ==========
-========== START entry-static.exe stat ==========
-Pass!
-========== END entry-static.exe stat ==========
-========== START entry-static.exe strftime ==========
-src/functional/strftime.c:14: "%c": expected "Mon Jan  5 05:17:53 +10009", got "Mon Jan  5 05:17:53 10009"
-src/functional/strftime.c:14: "%c": expected "Wed Feb 23 12:00:00 0000", got "Wed Feb 23 12:00:00 0"
-src/functional/strftime.c:14: "%+3C": expected "+20", got "%+3C"
-src/functional/strftime.c:14: "%C": expected "00", got "0"
-src/functional/strftime.c:14: "%+10F": expected "2016-01-03", got "%+10F"
-src/functional/strftime.c:14: "%+11F": expected "+2016-01-03", got "%+11F"
-src/functional/strftime.c:14: "%F": expected "+10009-01-05", got "10009-01-05"
-src/functional/strftime.c:14: "%F": expected "0000-02-23", got "0-02-23"
-src/functional/strftime.c:14: "%011F": expected "-0123-01-01", got "0-123-01-01"
-src/functional/strftime.c:14: "%+5G": expected "+2015", got "%+5G"
-src/functional/strftime.c:14: "%+4Y": expected "2016", got "%+4Y"
-src/functional/strftime.c:14: "%+5Y": expected "+2016", got "%+5Y"
-src/functional/strftime.c:14: "%Y": expected "+10009", got "10009"
-src/functional/strftime.c:14: "%Y": expected "0000", got "0"
-src/functional/strftime.c:14: "%+5Y": expected "+0000", got "%+5Y"
-src/functional/strftime.c:14: "%+4Y": expected "-123", got "%+4Y"
-src/functional/strftime.c:14: "%+5Y": expected "-0123", got "%+5Y"
-src/functional/strftime.c:14: "%Y": expected "+2147485547", got "-2147481749"
-src/functional/strftime.c:14: "%011Y": expected "02147485547", got "-2147481749"
-FAIL libctest entry-static.exe strftime: 1
-========== END entry-static.exe strftime ==========
-========== START entry-static.exe string ==========
-Pass!
-========== END entry-static.exe string ==========
-========== START entry-static.exe string_memcpy ==========
 autorun: /tmp/testsuite/glibc/libctest/libctest_testcode.sh timed out after 120s
 #### OS COMP TEST GROUP START basic-musl ####
 Testing brk :
@@ -769,7 +668,7 @@ Testing clone :
 ========== START test_clone ==========
   Child says successfully!
 clone process successfully.
-pid:481
+pid:324
 ========== END test_clone ==========
 Testing close :
 ========== START test_close ==========
@@ -817,17 +716,17 @@ getdents success.
 Testing getpid :
 ========== START test_getpid ==========
 getpid success.
-pid = 493
+pid = 336
 ========== END test_getpid ==========
 Testing getppid :
 ========== START test_getppid ==========
-  getppid success. ppid : 477
+  getppid success. ppid : 320
 ========== END test_getppid ==========
 Testing gettimeofday :
 ========== START test_gettimeofday ==========
 gettimeofday success.
-start:255037, end:255084
-interval: 47
+start:263361, end:263431
+interval: 70
 ========== END test_gettimeofday ==========
 Testing mkdir_ :
 ========== START test_mkdir ==========
@@ -866,7 +765,7 @@ syscalls testing success!
 ========== END test_open ==========
 Testing pipe :
 ========== START test_pipe ==========
-cpid: 503
+cpid: 346
 cpid: 0
   Write to pipe successfully.
 
@@ -919,21 +818,21 @@ Hello operating system contest.
 ========== END test_write ==========
 Testing yield :
 ========== START test_yield ==========
-  I am child process: 516. iteration 0.
-  I am child process: 517. iteration 1.
-  I am child process: 518. iteration 2.
-  I am child process: 516. iteration 0.
-  I am child process: 517. iteration 1.
-  I am child process: 518. iteration 2.
-  I am child process: 516. iteration 0.
-  I am child process: 517. iteration 1.
-  I am child process: 518. iteration 2.
-  I am child process: 516. iteration 0.
-  I am child process: 517. iteration 1.
-  I am child process: 518. iteration 2.
-  I am child process: 516. iteration 0.
-  I am child process: 517. iteration 1.
-  I am child process: 518. iteration 2.
+  I am child process: 359. iteration 0.
+  I am child process: 360. iteration 1.
+  I am child process: 361. iteration 2.
+  I am child process: 359. iteration 0.
+  I am child process: 360. iteration 1.
+  I am child process: 361. iteration 2.
+  I am child process: 359. iteration 0.
+  I am child process: 360. iteration 1.
+  I am child process: 361. iteration 2.
+  I am child process: 359. iteration 0.
+  I am child process: 360. iteration 1.
+  I am child process: 361. iteration 2.
+  I am child process: 359. iteration 0.
+  I am child process: 360. iteration 1.
+  I am child process: 361. iteration 2.
 ========== END test_yield ==========
 #### OS COMP TEST GROUP END basic-musl ####
 #### OS COMP TEST GROUP START basic-glibc ####
@@ -952,7 +851,7 @@ Testing clone :
 ========== START test_clone ==========
   Child says successfully!
 clone process successfully.
-pid:528
+pid:371
 ========== END test_clone ==========
 Testing close :
 ========== START test_close ==========
@@ -1000,17 +899,17 @@ getdents success.
 Testing getpid :
 ========== START test_getpid ==========
 getpid success.
-pid = 540
+pid = 383
 ========== END test_getpid ==========
 Testing getppid :
 ========== START test_getppid ==========
-  getppid success. ppid : 524
+  getppid success. ppid : 367
 ========== END test_getppid ==========
 Testing gettimeofday :
 ========== START test_gettimeofday ==========
 gettimeofday success.
-start:275185, end:275232
-interval: 47
+start:294163, end:294247
+interval: 84
 ========== END test_gettimeofday ==========
 Testing mkdir_ :
 ========== START test_mkdir ==========
@@ -1049,7 +948,7 @@ syscalls testing success!
 ========== END test_open ==========
 Testing pipe :
 ========== START test_pipe ==========
-cpid: 550
+cpid: 393
 cpid: 0
   Write to pipe successfully.
 
@@ -1102,21 +1001,21 @@ Hello operating system contest.
 ========== END test_write ==========
 Testing yield :
 ========== START test_yield ==========
-  I am child process: 563. iteration 0.
-  I am child process: 564. iteration 1.
-  I am child process: 565. iteration 2.
-  I am child process: 563. iteration 0.
-  I am child process: 564. iteration 1.
-  I am child process: 565. iteration 2.
-  I am child process: 563. iteration 0.
-  I am child process: 564. iteration 1.
-  I am child process: 565. iteration 2.
-  I am child process: 563. iteration 0.
-  I am child process: 564. iteration 1.
-  I am child process: 565. iteration 2.
-  I am child process: 563. iteration 0.
-  I am child process: 564. iteration 1.
-  I am child process: 565. iteration 2.
+  I am child process: 406. iteration 0.
+  I am child process: 407. iteration 1.
+  I am child process: 408. iteration 2.
+  I am child process: 406. iteration 0.
+  I am child process: 407. iteration 1.
+  I am child process: 408. iteration 2.
+  I am child process: 406. iteration 0.
+  I am child process: 407. iteration 1.
+  I am child process: 408. iteration 2.
+  I am child process: 406. iteration 0.
+  I am child process: 407. iteration 1.
+  I am child process: 408. iteration 2.
+  I am child process: 406. iteration 0.
+  I am child process: 407. iteration 1.
+  I am child process: 408. iteration 2.
 ========== END test_yield ==========
 #### OS COMP TEST GROUP END basic-glibc ####
 #### OS COMP TEST GROUP START busybox-musl ####
@@ -1136,14 +1035,14 @@ Su Mo Tu We Th Fr Sa
                      
 testcase busybox cal success
 [H[Jtestcase busybox clear success
-Thu Jan  1 00:04:51 UTC 1970
+Thu Jan  1 00:05:18 UTC 1970
 testcase busybox date success
 Filesystem           1K-blocks      Used Available Use% Mounted on
-devfs                   784712     86572    698140  11% /dev
-tmpfs                   784712     86572    698140  11% /tmp
-tmpfs                   784712     86572    698140  11% /var
-proc                    784712     86572    698140  11% /proc
-sysfs                   784712     86572    698140  11% /sys
+devfs                   784676     81804    702872  10% /dev
+tmpfs                   784676     81804    702872  10% /tmp
+tmpfs                   784676     81804    702872  10% /var
+proc                    784676     81804    702872  10% /proc
+sysfs                   784676     81804    702872  10% /sys
 testcase busybox df success
 /aaa
 testcase busybox dirname /aaa/bbb success
@@ -1159,7 +1058,7 @@ testcase busybox which ls fail
 return: 1, cmd: which ls
 Linux
 testcase busybox uname success
- 00:05:03 up 0 min,  0 users,  load average: 0.00, 0.00, 0.00
+ 00:05:36 up 0 min,  0 users,  load average: 0.00, 0.00, 0.00
 testcase busybox uptime success
 abc
 testcase busybox printf "abc\n" success
@@ -1168,11 +1067,11 @@ testcase busybox ps success
 /tmp/testsuite/musl/busybox
 testcase busybox pwd success
               total        used        free      shared  buff/cache   available
-Mem:              0           0           0           0           0      781854
+Mem:              0           0           0           0           0      781818
 -/+ buffers/cache:            0           0
 Swap:             0           0           0
 testcase busybox free success
-Thu Jan  1 00:05:09 1970  0.000000 seconds
+Thu Jan  1 00:05:45 1970  0.000000 seconds
 testcase busybox hwclock success
 testcase busybox sh -c 'sleep 5' & /musl/busybox kill $! success
 [0;0mawk[m                  [0;0mkill[m                 [0;0mseq[m
@@ -1281,14 +1180,14 @@ Su Mo Tu We Th Fr Sa
                      
 testcase busybox cal success
 [H[Jtestcase busybox clear success
-Thu Jan  1 00:06:07 UTC 1970
+Thu Jan  1 00:07:15 UTC 1970
 testcase busybox date success
 Filesystem           1K-blocks      Used Available Use% Mounted on
-devfs                   784712    159852    624860  20% /dev
-tmpfs                   784712    159852    624860  20% /tmp
-tmpfs                   784712    159852    624860  20% /var
-proc                    784712    159852    624860  20% /proc
-sysfs                   784712    159852    624860  20% /sys
+devfs                   784676    155084    629592  20% /dev
+tmpfs                   784676    155084    629592  20% /tmp
+tmpfs                   784676    155084    629592  20% /var
+proc                    784676    155084    629592  20% /proc
+sysfs                   784676    155084    629592  20% /sys
 testcase busybox df success
 /aaa
 testcase busybox dirname /aaa/bbb success
@@ -1304,7 +1203,7 @@ testcase busybox which ls fail
 return: 1, cmd: which ls
 Linux
 testcase busybox uname success
- 00:06:26 up 0 min,  0 users,  load average: 0.00, 0.00, 0.00
+ 00:07:44 up 0 min,  0 users,  load average: 0.00, 0.00, 0.00
 testcase busybox uptime success
 abc
 testcase busybox printf "abc\n" success
@@ -1313,11 +1212,11 @@ testcase busybox ps success
 /tmp/testsuite/glibc/busybox
 testcase busybox pwd success
               total        used        free      shared  buff/cache   available
-Mem:              0           0           0           0           0      781854
+Mem:              0           0           0           0           0      781818
 -/+ buffers/cache:            0           0
 Swap:             0           0           0
 testcase busybox free success
-Thu Jan  1 00:06:36 1970  0.000000 seconds
+Thu Jan  1 00:07:58 1970  0.000000 seconds
 testcase busybox hwclock success
 testcase busybox sh -c 'sleep 5' & /glibc/busybox kill $! success
 awk
@@ -1461,8 +1360,10 @@ testcase lua sort.lua success
 testcase lua strings.lua success
 #### OS COMP TEST GROUP END lua-glibc ####
 #### OS COMP TEST GROUP START ltp-musl ####
+ltp case list: stable (63 cases, timeout 10s)
 ========== START ltp access01 ==========
 RUN LTP CASE access01
+LTP MEMORY access01 before: free_frames=157684 allocated_frames=38485
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -1673,40 +1574,44 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[488.389906 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.391019 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.391764 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.392849 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[488.393918 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.394533 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.395125 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.396001 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[488.396906 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.397512 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.398088 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.398752 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[488.399653 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.400234 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.400813 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.401455 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[488.402350 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.402939 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.403550 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.404193 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[488.405072 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.405771 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.406357 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.406992 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[488.407569 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.408125 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.408681 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.409230 0:949 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[488.410015 0:949 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[618.292372 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.293763 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.294563 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.296152 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[618.297646 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.300951 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.305094 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.306076 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[618.308960 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.309956 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.311846 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.314326 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[618.317339 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.318162 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.318865 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.322801 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[618.324248 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.325033 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.325825 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.326696 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[618.328148 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.328986 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.329818 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.331606 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[618.332637 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.333370 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.334100 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.334806 0:792 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[618.335937 0:792 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE access01 : 0
 Pass!
+LTP MEMORY access01 after_run: free_frames=156860 allocated_frames=39309
+LTP MEMORY access01 after_cleanup: free_frames=156860 allocated_frames=39309
+LTP CASE RUNTIME access01: 4985 ms
 ========== END ltp access01 ==========
 ========== START ltp brk01 ==========
 RUN LTP CASE brk01
+LTP MEMORY brk01 before: free_frames=156860 allocated_frames=39309
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -1723,12 +1628,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[489.365694 0:1054 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[619.815412 0:897 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE brk01 : 0
 Pass!
+LTP MEMORY brk01 after_run: free_frames=156836 allocated_frames=39333
+LTP MEMORY brk01 after_cleanup: free_frames=156836 allocated_frames=39333
+LTP CASE RUNTIME brk01: 1483 ms
 ========== END ltp brk01 ==========
 ========== START ltp chdir01 ==========
 RUN LTP CASE chdir01
+LTP MEMORY chdir01 before: free_frames=156836 allocated_frames=39333
 tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
 tst_device.c:317: [1;34mTINFO: [0mUsing test device LTP_DEV='/dev/vda'
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
@@ -1740,7 +1649,7 @@ tst_supported_fs_types.c:49: [1;34mTINFO: [0mmkfs is not needed for tmpfs
 tst_test.c:1693: [1;34mTINFO: [0m=== Testing on tmpfs ===
 tst_test.c:1106: [1;34mTINFO: [0mSkipping mkfs for TMPFS filesystem
 tst_test.c:1087: [1;34mTINFO: [0mLimiting tmpfs size to 32MB
-tst_test.c:1120: [1;34mTINFO: [0mMounting ltp-tmpfs to /tmp/ltp-work/LTP_chdfAAiOK/mntpoint fstyp=tmpfs flags=0
+tst_test.c:1120: [1;34mTINFO: [0mMounting ltp-tmpfs to /tmp/ltp-work/LTP_chdpCdlbK/mntpoint fstyp=tmpfs flags=0
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 chdir01.c:119: [1;34mTINFO: [0mTesting 'testfile'
 chdir01.c:111: [1;32mTPASS: [0mroot: chdir("testfile") returned correct value: ENOTDIR (20)
@@ -1764,30 +1673,35 @@ chdir01.c:119: [1;34mTINFO: [0mTesting 'does_not_exist'
 chdir01.c:111: [1;32mTPASS: [0mroot: chdir("does_not_exist") returned correct value: ENOENT (2)
 chdir01.c:111: [1;32mTPASS: [0mnobody: chdir("does_not_exist") returned correct value: ENOENT (2)
 chdir01.c:119: [1;34mTINFO: [0mTesting 'symloop'
-chdir01.c:122: [1;33mTCONF: [0mSkipping symlink loop test, not supported
+chdir01.c:111: [1;32mTPASS: [0mroot: chdir("symloop") returned correct value: ELOOP (40)
+chdir01.c:111: [1;32mTPASS: [0mnobody: chdir("symloop") returned correct value: ELOOP (40)
 
 Summary:
-passed   14
+passed   16
 failed   0
 broken   0
-skipped  1
+skipped  0
 warnings 0
-[37m[490.354505 0:1061 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[490.360524 0:1061 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[490.367044 0:1061 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[490.372358 0:1061 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[490.377217 0:1061 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[621.546971 0:904 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[621.549403 0:904 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[621.551037 0:904 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[621.552934 0:904 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[621.554705 0:904 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE chdir01 : 0
 Pass!
+LTP MEMORY chdir01 after_run: free_frames=156820 allocated_frames=39349
+LTP MEMORY chdir01 after_cleanup: free_frames=156820 allocated_frames=39349
+LTP CASE RUNTIME chdir01: 1733 ms
 ========== END ltp chdir01 ==========
 ========== START ltp clone01 ==========
 RUN LTP CASE clone01
+LTP MEMORY clone01 before: free_frames=156820 allocated_frames=39349
 tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
-clone01.c:37: [1;32mTPASS: [0mclone returned 1068
+clone01.c:37: [1;32mTPASS: [0mclone returned 911
 clone01.c:43: [1;32mTPASS: [0mChild exited with 0
 
 Summary:
@@ -1796,12 +1710,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[491.436824 0:1065 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[623.007818 0:908 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE clone01 : 0
 Pass!
+LTP MEMORY clone01 after_run: free_frames=156796 allocated_frames=39373
+LTP MEMORY clone01 after_cleanup: free_frames=156796 allocated_frames=39373
+LTP CASE RUNTIME clone01: 1448 ms
 ========== END ltp clone01 ==========
 ========== START ltp close01 ==========
 RUN LTP CASE close01
+LTP MEMORY close01 before: free_frames=156796 allocated_frames=39373
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -1816,19 +1734,23 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[492.422371 0:1070 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[492.425075 0:1070 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[624.509061 0:913 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[624.511269 0:913 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE close01 : 0
 Pass!
+LTP MEMORY close01 after_run: free_frames=156780 allocated_frames=39389
+LTP MEMORY close01 after_cleanup: free_frames=156780 allocated_frames=39389
+LTP CASE RUNTIME close01: 1504 ms
 ========== END ltp close01 ==========
 ========== START ltp dup01 ==========
 RUN LTP CASE dup01
+LTP MEMORY dup01 before: free_frames=156780 allocated_frames=39389
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 dup01.c:24: [1;32mTPASS: [0mdup(fd) returned fd 4
-dup01.c:27: [1;32mTPASS: [0mbuf1.st_ino == buf2.st_ino (7034136155013304451)
+dup01.c:27: [1;32mTPASS: [0mbuf1.st_ino == buf2.st_ino (678513391814680296)
 
 Summary:
 passed   2
@@ -1836,23 +1758,37 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[493.461674 0:1074 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[493.463873 0:1074 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[626.059114 0:917 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[626.062208 0:917 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE dup01 : 0
 Pass!
+LTP MEMORY dup01 after_run: free_frames=156764 allocated_frames=39405
+LTP MEMORY dup01 after_cleanup: free_frames=156764 allocated_frames=39405
+LTP CASE RUNTIME dup01: 1550 ms
 ========== END ltp dup01 ==========
+========== START ltp fcntl01 ==========
+RUN LTP CASE fcntl01
+LTP MEMORY fcntl01 before: free_frames=156764 allocated_frames=39405
+[37m[627.513273 0:921 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE fcntl01 : 0
+Pass!
+LTP MEMORY fcntl01 after_run: free_frames=156756 allocated_frames=39413
+LTP MEMORY fcntl01 after_cleanup: free_frames=156756 allocated_frames=39413
+LTP CASE RUNTIME fcntl01: 1443 ms
+========== END ltp fcntl01 ==========
 ========== START ltp fcntl02 ==========
 RUN LTP CASE fcntl02
+LTP MEMORY fcntl02 before: free_frames=156756 allocated_frames=39413
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
-fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_1080, F_DUPFD, 0) returned 4
-fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_1080, F_DUPFD, 1) returned 4
-fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_1080, F_DUPFD, 2) returned 4
-fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_1080, F_DUPFD, 3) returned 4
-fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_1080, F_DUPFD, 10) returned 10
-fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_1080, F_DUPFD, 100) returned 100
+fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_924, F_DUPFD, 0) returned 4
+fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_924, F_DUPFD, 1) returned 4
+fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_924, F_DUPFD, 2) returned 4
+fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_924, F_DUPFD, 3) returned 4
+fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_924, F_DUPFD, 10) returned 10
+fcntl02.c:41: [1;32mTPASS: [0mfcntl(fcntl02_924, F_DUPFD, 100) returned 100
 
 Summary:
 passed   6
@@ -1860,19 +1796,23 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[494.417888 0:1078 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[494.419683 0:1078 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[629.015356 0:922 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[629.016629 0:922 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE fcntl02 : 0
 Pass!
+LTP MEMORY fcntl02 after_run: free_frames=156740 allocated_frames=39429
+LTP MEMORY fcntl02 after_cleanup: free_frames=156740 allocated_frames=39429
+LTP CASE RUNTIME fcntl02: 1504 ms
 ========== END ltp fcntl02 ==========
 ========== START ltp fork01 ==========
 RUN LTP CASE fork01
+LTP MEMORY fork01 before: free_frames=156740 allocated_frames=39429
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 fork01.c:47: [1;32mTPASS: [0mcorrect child status returned 42
-fork01.c:50: [1;32mTPASS: [0mchild_pid == pid (1085)
+fork01.c:50: [1;32mTPASS: [0mchild_pid == pid (929)
 
 Summary:
 passed   2
@@ -1880,117 +1820,121 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[495.362425 0:1082 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[495.363801 0:1082 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[630.524569 0:926 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[630.526945 0:926 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE fork01 : 0
 Pass!
+LTP MEMORY fork01 after_run: free_frames=156716 allocated_frames=39453
+LTP MEMORY fork01 after_cleanup: free_frames=156716 allocated_frames=39453
+LTP CASE RUNTIME fork01: 1513 ms
 ========== END ltp fork01 ==========
 ========== START ltp getpid01 ==========
 RUN LTP CASE getpid01
+LTP MEMORY getpid01 before: free_frames=156716 allocated_frames=39453
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1090
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1091
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1092
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1093
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1094
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1095
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1096
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1097
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1098
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1099
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1100
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1101
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1102
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1103
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1104
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1105
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1106
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1107
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1108
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1109
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1110
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1111
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1112
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1113
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1114
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1115
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1116
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1117
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1118
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1119
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1120
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1121
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1122
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1123
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1124
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1125
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1126
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1127
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1128
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1129
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1130
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1131
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1132
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1133
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1134
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1135
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1136
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1137
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1138
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1139
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1140
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1141
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1142
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1143
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1144
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1145
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1146
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1147
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1148
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1149
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1150
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1151
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1152
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1153
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1154
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1155
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1156
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1157
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1158
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1159
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1160
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1161
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1162
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1163
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1164
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1165
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1166
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1167
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1168
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1169
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1170
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1171
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1172
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1173
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1174
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1175
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1176
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1177
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1178
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1179
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1180
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1181
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1182
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1183
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1184
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1185
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1186
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1187
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1188
-getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1189
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 934
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 935
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 936
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 937
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 938
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 939
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 940
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 941
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 942
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 943
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 944
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 945
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 946
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 947
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 948
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 949
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 950
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 951
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 952
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 953
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 954
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 955
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 956
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 957
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 958
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 959
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 960
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 961
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 962
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 963
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 964
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 965
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 966
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 967
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 968
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 969
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 970
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 971
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 972
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 973
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 974
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 975
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 976
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 977
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 978
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 979
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 980
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 981
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 982
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 983
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 984
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 985
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 986
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 987
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 988
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 989
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 990
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 991
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 992
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 993
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 994
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 995
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 996
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 997
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 998
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 999
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1000
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1001
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1002
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1003
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1004
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1005
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1006
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1007
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1008
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1009
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1010
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1011
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1012
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1013
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1014
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1015
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1016
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1017
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1018
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1019
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1020
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1021
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1022
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1023
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1024
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1025
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1026
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1027
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1028
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1029
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1030
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1031
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1032
+getpid01.c:34: [1;32mTPASS: [0mgetpid() returns 1033
 
 Summary:
 passed   100
@@ -1998,20 +1942,28 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[498.322747 0:1087 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[634.933487 0:931 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE getpid01 : 0
 Pass!
+LTP MEMORY getpid01 after_run: free_frames=155900 allocated_frames=40269
+LTP MEMORY getpid01 after_cleanup: free_frames=155900 allocated_frames=40269
+LTP CASE RUNTIME getpid01: 4401 ms
 ========== END ltp getpid01 ==========
 ========== START ltp mmap01 ==========
 RUN LTP CASE mmap01
+LTP MEMORY mmap01 before: free_frames=155900 allocated_frames=40269
 mmap01      1  [1;32mTPASS[0m  :  Functionality of mmap() successful
-[37m[499.277357 0:1191 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[499.278468 0:1191 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[636.399059 0:1035 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[636.402216 0:1035 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE mmap01 : 0
 Pass!
+LTP MEMORY mmap01 after_run: free_frames=155884 allocated_frames=40285
+LTP MEMORY mmap01 after_cleanup: free_frames=155884 allocated_frames=40285
+LTP CASE RUNTIME mmap01: 1474 ms
 ========== END ltp mmap01 ==========
 ========== START ltp open01 ==========
 RUN LTP CASE open01
+LTP MEMORY open01 before: free_frames=155884 allocated_frames=40285
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -2025,13 +1977,17 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[500.229566 0:1193 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[500.231376 0:1193 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[637.971424 0:1037 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[637.972572 0:1037 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE open01 : 0
 Pass!
+LTP MEMORY open01 after_run: free_frames=155868 allocated_frames=40301
+LTP MEMORY open01 after_cleanup: free_frames=155868 allocated_frames=40301
+LTP CASE RUNTIME open01: 1556 ms
 ========== END ltp open01 ==========
 ========== START ltp pipe01 ==========
 RUN LTP CASE pipe01
+LTP MEMORY pipe01 before: free_frames=155868 allocated_frames=40301
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -2044,12 +2000,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[501.176925 0:1197 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[639.493510 0:1041 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE pipe01 : 0
 Pass!
+LTP MEMORY pipe01 after_run: free_frames=155852 allocated_frames=40317
+LTP MEMORY pipe01 after_cleanup: free_frames=155852 allocated_frames=40317
+LTP CASE RUNTIME pipe01: 1520 ms
 ========== END ltp pipe01 ==========
 ========== START ltp read01 ==========
 RUN LTP CASE read01
+LTP MEMORY read01 before: free_frames=155852 allocated_frames=40317
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -2062,13 +2022,17 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[502.100206 0:1201 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[502.101509 0:1201 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[640.931251 0:1045 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[640.933114 0:1045 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE read01 : 0
 Pass!
+LTP MEMORY read01 after_run: free_frames=155836 allocated_frames=40333
+LTP MEMORY read01 after_cleanup: free_frames=155836 allocated_frames=40333
+LTP CASE RUNTIME read01: 1440 ms
 ========== END ltp read01 ==========
 ========== START ltp stat01 ==========
 RUN LTP CASE stat01
+LTP MEMORY stat01 before: free_frames=155836 allocated_frames=40333
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -2092,19 +2056,23 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[503.049049 0:1205 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[503.049805 0:1205 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[503.050758 0:1205 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[642.505262 0:1049 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[642.506045 0:1049 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[642.507076 0:1049 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE stat01 : 0
 Pass!
+LTP MEMORY stat01 after_run: free_frames=155820 allocated_frames=40349
+LTP MEMORY stat01 after_cleanup: free_frames=155820 allocated_frames=40349
+LTP CASE RUNTIME stat01: 1571 ms
 ========== END ltp stat01 ==========
 ========== START ltp wait401 ==========
 RUN LTP CASE wait401
+LTP MEMORY wait401 before: free_frames=155820 allocated_frames=40349
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
-wait401.c:40: [1;32mTPASS: [0mwait4() returned correct pid 1212
+wait401.c:40: [1;32mTPASS: [0mwait4() returned correct pid 1056
 wait401.c:49: [1;32mTPASS: [0mWIFEXITED() is set in status
 wait401.c:54: [1;32mTPASS: [0mWEXITSTATUS() == 0
 
@@ -2114,12 +2082,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[504.097211 0:1209 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[644.009243 0:1053 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE wait401 : 0
 Pass!
+LTP MEMORY wait401 after_run: free_frames=155796 allocated_frames=40373
+LTP MEMORY wait401 after_cleanup: free_frames=155796 allocated_frames=40373
+LTP CASE RUNTIME wait401: 1502 ms
 ========== END ltp wait401 ==========
 ========== START ltp write01 ==========
 RUN LTP CASE write01
+LTP MEMORY write01 before: free_frames=155796 allocated_frames=40373
 tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
 tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
@@ -2132,16 +2104,1704 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[505.077496 0:1214 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[505.078734 0:1214 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[645.487171 0:1058 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[645.489035 0:1058 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE write01 : 0
 Pass!
+LTP MEMORY write01 after_run: free_frames=155780 allocated_frames=40389
+LTP MEMORY write01 after_cleanup: free_frames=155780 allocated_frames=40389
+LTP CASE RUNTIME write01: 1478 ms
 ========== END ltp write01 ==========
-ltp cases: 16 passed, 0 failed
+========== START ltp access03 ==========
+RUN LTP CASE access03
+LTP MEMORY access03 before: free_frames=155780 allocated_frames=40389
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+
+Summary:
+passed   8
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[647.186123 0:1062 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE access03 : 0
+Pass!
+LTP MEMORY access03 after_run: free_frames=155732 allocated_frames=40437
+LTP MEMORY access03 after_cleanup: free_frames=155732 allocated_frames=40437
+LTP CASE RUNTIME access03: 1705 ms
+========== END ltp access03 ==========
+========== START ltp close02 ==========
+RUN LTP CASE close02
+LTP MEMORY close02 before: free_frames=155732 allocated_frames=40437
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+close02.c:20: [1;32mTPASS: [0mclose(-1) : EBADF (9)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[648.624206 0:1070 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE close02 : 0
+Pass!
+LTP MEMORY close02 after_run: free_frames=155716 allocated_frames=40453
+LTP MEMORY close02 after_cleanup: free_frames=155716 allocated_frames=40453
+LTP CASE RUNTIME close02: 1432 ms
+========== END ltp close02 ==========
+========== START ltp dup02 ==========
+RUN LTP CASE dup02
+LTP MEMORY dup02 before: free_frames=155716 allocated_frames=40453
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup02.c:29: [1;32mTPASS: [0mdup(-1) : EBADF (9)
+dup02.c:29: [1;32mTPASS: [0mdup(1500) : EBADF (9)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[650.067895 0:1074 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE dup02 : 0
+Pass!
+LTP MEMORY dup02 after_run: free_frames=155700 allocated_frames=40469
+LTP MEMORY dup02 after_cleanup: free_frames=155700 allocated_frames=40469
+LTP CASE RUNTIME dup02: 1448 ms
+========== END ltp dup02 ==========
+========== START ltp fcntl03 ==========
+RUN LTP CASE fcntl03
+LTP MEMORY fcntl03 before: free_frames=155700 allocated_frames=40469
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+fcntl03.c:32: [1;32mTPASS: [0mfcntl(fcntl03_1080, F_GETFD, 0) returned 0
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[651.648368 0:1078 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[651.652852 0:1078 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE fcntl03 : 0
+Pass!
+LTP MEMORY fcntl03 after_run: free_frames=155684 allocated_frames=40485
+LTP MEMORY fcntl03 after_cleanup: free_frames=155684 allocated_frames=40485
+LTP CASE RUNTIME fcntl03: 1585 ms
+========== END ltp fcntl03 ==========
+========== START ltp getcwd01 ==========
+RUN LTP CASE getcwd01
+LTP MEMORY getcwd01 before: free_frames=155684 allocated_frames=40485
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getcwd01.c:48: [1;32mTPASS: [0mtst_syscall(__NR_getcwd, tc->buf, tc->size) : EFAULT (14)
+getcwd01.c:48: [1;32mTPASS: [0mtst_syscall(__NR_getcwd, tc->buf, tc->size) : EFAULT (14)
+getcwd01.c:48: [1;32mTPASS: [0mtst_syscall(__NR_getcwd, tc->buf, tc->size) : ERANGE (34)
+getcwd01.c:48: [1;32mTPASS: [0mtst_syscall(__NR_getcwd, tc->buf, tc->size) : ERANGE (34)
+getcwd01.c:48: [1;32mTPASS: [0mtst_syscall(__NR_getcwd, tc->buf, tc->size) : ERANGE (34)
+
+Summary:
+passed   5
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[653.207191 0:1082 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getcwd01 : 0
+Pass!
+LTP MEMORY getcwd01 after_run: free_frames=155668 allocated_frames=40501
+LTP MEMORY getcwd01 after_cleanup: free_frames=155668 allocated_frames=40501
+LTP CASE RUNTIME getcwd01: 1550 ms
+========== END ltp getcwd01 ==========
+========== START ltp getpid02 ==========
+RUN LTP CASE getpid02
+LTP MEMORY getpid02 before: free_frames=155668 allocated_frames=40501
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getpid02.c:37: [1;32mTPASS: [0mchild getppid() == parent getpid() (1088)
+getpid02.c:50: [1;32mTPASS: [0mchild getpid() == parent fork() (1089)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[654.734407 0:1086 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getpid02 : 0
+Pass!
+LTP MEMORY getpid02 after_run: free_frames=155644 allocated_frames=40525
+LTP MEMORY getpid02 after_cleanup: free_frames=155644 allocated_frames=40525
+LTP CASE RUNTIME getpid02: 1517 ms
+========== END ltp getpid02 ==========
+========== START ltp getppid01 ==========
+RUN LTP CASE getppid01
+LTP MEMORY getppid01 before: free_frames=155644 allocated_frames=40525
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getppid01.c:31: [1;32mTPASS: [0mgetppid() returned 1091
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[656.352221 0:1091 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getppid01 : 0
+Pass!
+LTP MEMORY getppid01 after_run: free_frames=155628 allocated_frames=40541
+LTP MEMORY getppid01 after_cleanup: free_frames=155628 allocated_frames=40541
+LTP CASE RUNTIME getppid01: 1611 ms
+========== END ltp getppid01 ==========
+========== START ltp getuid01 ==========
+RUN LTP CASE getuid01
+LTP MEMORY getuid01 before: free_frames=155628 allocated_frames=40541
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getuid01.c:20: [1;32mTPASS: [0mgetuid() returned 0
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[657.909591 0:1095 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getuid01 : 0
+Pass!
+LTP MEMORY getuid01 after_run: free_frames=155612 allocated_frames=40557
+LTP MEMORY getuid01 after_cleanup: free_frames=155612 allocated_frames=40557
+LTP CASE RUNTIME getuid01: 1560 ms
+========== END ltp getuid01 ==========
+========== START ltp geteuid01 ==========
+RUN LTP CASE geteuid01
+LTP MEMORY geteuid01 before: free_frames=155612 allocated_frames=40557
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+geteuid01.c:21: [1;32mTPASS: [0mgeteuid() returned 0
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[659.381002 0:1099 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE geteuid01 : 0
+Pass!
+LTP MEMORY geteuid01 after_run: free_frames=155596 allocated_frames=40573
+LTP MEMORY geteuid01 after_cleanup: free_frames=155596 allocated_frames=40573
+LTP CASE RUNTIME geteuid01: 1466 ms
+========== END ltp geteuid01 ==========
+========== START ltp getgid01 ==========
+RUN LTP CASE getgid01
+LTP MEMORY getgid01 before: free_frames=155596 allocated_frames=40573
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getgid01.c:26: [1;32mTPASS: [0mgetgid returned as expectedly
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[660.990801 0:1103 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getgid01 : 0
+Pass!
+LTP MEMORY getgid01 after_run: free_frames=155580 allocated_frames=40589
+LTP MEMORY getgid01 after_cleanup: free_frames=155580 allocated_frames=40589
+LTP CASE RUNTIME getgid01: 1590 ms
+========== END ltp getgid01 ==========
+========== START ltp getegid01 ==========
+RUN LTP CASE getegid01
+LTP MEMORY getegid01 before: free_frames=155580 allocated_frames=40589
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getegid01.c:25: [1;32mTPASS: [0mgid == st_egid (0)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[662.472591 0:1107 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getegid01 : 0
+Pass!
+LTP MEMORY getegid01 after_run: free_frames=155564 allocated_frames=40605
+LTP MEMORY getegid01 after_cleanup: free_frames=155564 allocated_frames=40605
+LTP CASE RUNTIME getegid01: 1480 ms
+========== END ltp getegid01 ==========
+========== START ltp lseek01 ==========
+RUN LTP CASE lseek01
+LTP MEMORY lseek01 before: free_frames=155564 allocated_frames=40605
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, 4, SEEK_SET) read correct data
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, -2, SEEK_CUR) read correct data
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, -4, SEEK_END) read correct data
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, 0, SEEK_END) read correct data
+
+Summary:
+passed   4
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[663.917841 0:1111 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[663.920605 0:1111 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE lseek01 : 0
+Pass!
+LTP MEMORY lseek01 after_run: free_frames=155548 allocated_frames=40621
+LTP MEMORY lseek01 after_cleanup: free_frames=155548 allocated_frames=40621
+LTP CASE RUNTIME lseek01: 1458 ms
+========== END ltp lseek01 ==========
+========== START ltp read02 ==========
+RUN LTP CASE read02
+LTP MEMORY read02 before: free_frames=155548 allocated_frames=40621
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+read02.c:84: [1;32mTPASS: [0mread() failed as expected: EBADF (9)
+read02.c:84: [1;32mTPASS: [0mread() failed as expected: EISDIR (21)
+read02.c:84: [1;32mTPASS: [0mread() failed as expected: EFAULT (14)
+read02.c:65: [1;33mTCONF: [0mO_DIRECT not supported on tmpfs filesystem
+read02.c:65: [1;33mTCONF: [0mO_DIRECT not supported on tmpfs filesystem
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  2
+warnings 0
+[37m[665.441233 0:1115 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[665.444089 0:1115 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE read02 : 0
+Pass!
+LTP MEMORY read02 after_run: free_frames=155532 allocated_frames=40637
+LTP MEMORY read02 after_cleanup: free_frames=155532 allocated_frames=40637
+LTP CASE RUNTIME read02: 1527 ms
+========== END ltp read02 ==========
+========== START ltp write02 ==========
+RUN LTP CASE write02
+LTP MEMORY write02 before: free_frames=155532 allocated_frames=40637
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+write02.c:20: [1;32mTPASS: [0mwrite(fd, NULL, 0) returned 0
+write02.c:22: [1;32mTPASS: [0mExpect: write(fd, NULL, 0) == 0
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[666.983920 0:1119 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[666.985898 0:1119 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE write02 : 0
+Pass!
+LTP MEMORY write02 after_run: free_frames=155516 allocated_frames=40653
+LTP MEMORY write02 after_cleanup: free_frames=155516 allocated_frames=40653
+LTP CASE RUNTIME write02: 1524 ms
+========== END ltp write02 ==========
+========== START ltp creat01 ==========
+RUN LTP CASE creat01
+LTP MEMORY creat01 before: free_frames=155516 allocated_frames=40653
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+creat01.c:50: [1;32mTPASS: [0mcreat() truncated file to 0 bytes
+creat01.c:55: [1;32mTPASS: [0mfile was created and written to successfully
+creat01.c:60: [1;32mTPASS: [0mread failed expectedly: EACCES (13)
+creat01.c:50: [1;32mTPASS: [0mcreat() truncated file to 0 bytes
+creat01.c:55: [1;32mTPASS: [0mfile was created and written to successfully
+creat01.c:60: [1;32mTPASS: [0mread failed expectedly: EACCES (13)
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[668.485457 0:1123 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[668.486554 0:1123 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE creat01 : 0
+Pass!
+LTP MEMORY creat01 after_run: free_frames=155500 allocated_frames=40669
+LTP MEMORY creat01 after_cleanup: free_frames=155500 allocated_frames=40669
+LTP CASE RUNTIME creat01: 1498 ms
+========== END ltp creat01 ==========
+========== START ltp creat03 ==========
+RUN LTP CASE creat03
+LTP MEMORY creat03 before: free_frames=155500 allocated_frames=40669
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+creat03.c:36: [1;34mTINFO: [0mCreated file has mode = 0100674
+creat03.c:41: [1;32mTPASS: [0msave text bit cleared
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[669.951411 0:1127 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[669.952698 0:1127 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE creat03 : 0
+Pass!
+LTP MEMORY creat03 after_run: free_frames=155484 allocated_frames=40685
+LTP MEMORY creat03 after_cleanup: free_frames=155484 allocated_frames=40685
+LTP CASE RUNTIME creat03: 1465 ms
+========== END ltp creat03 ==========
+========== START ltp open02 ==========
+RUN LTP CASE open02
+LTP MEMORY open02 before: free_frames=155484 allocated_frames=40685
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+open02.c:49: [1;32mTPASS: [0mopen() new file without O_CREAT : ENOENT (2)
+open02.c:49: [1;32mTPASS: [0mopen() unprivileged O_RDONLY | O_NOATIME : EPERM (1)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[671.545070 0:1131 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[671.547375 0:1131 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE open02 : 0
+Pass!
+LTP MEMORY open02 after_run: free_frames=155468 allocated_frames=40701
+LTP MEMORY open02 after_cleanup: free_frames=155468 allocated_frames=40701
+LTP CASE RUNTIME open02: 1597 ms
+========== END ltp open02 ==========
+========== START ltp open03 ==========
+RUN LTP CASE open03
+LTP MEMORY open03 before: free_frames=155468 allocated_frames=40701
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+open03.c:19: [1;32mTPASS: [0mopen(TEST_FILE, O_RDWR | O_CREAT, 0700) returned fd 3
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[673.042156 0:1135 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE open03 : 0
+Pass!
+LTP MEMORY open03 after_run: free_frames=155452 allocated_frames=40717
+LTP MEMORY open03 after_cleanup: free_frames=155452 allocated_frames=40717
+LTP CASE RUNTIME open03: 1493 ms
+========== END ltp open03 ==========
+========== START ltp stat02 ==========
+RUN LTP CASE stat02
+LTP MEMORY stat02 before: free_frames=155452 allocated_frames=40717
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+stat02.c:67: [1;32mTPASS: [0mFile size reported as expected
+stat02.c:67: [1;32mTPASS: [0mFile size reported as expected
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[674.481539 0:1139 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE stat02 : 0
+Pass!
+LTP MEMORY stat02 after_run: free_frames=155436 allocated_frames=40733
+LTP MEMORY stat02 after_cleanup: free_frames=155436 allocated_frames=40733
+LTP CASE RUNTIME stat02: 1434 ms
+========== END ltp stat02 ==========
+========== START ltp lstat01 ==========
+RUN LTP CASE lstat01
+LTP MEMORY lstat01 before: free_frames=155436 allocated_frames=40733
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+lstat01.c:46: [1;32mTPASS: [0mlstat() reported correct values for the symlink!
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[675.987685 0:1143 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[675.992678 0:1143 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE lstat01 : 0
+Pass!
+LTP MEMORY lstat01 after_run: free_frames=155420 allocated_frames=40749
+LTP MEMORY lstat01 after_cleanup: free_frames=155420 allocated_frames=40749
+LTP CASE RUNTIME lstat01: 1525 ms
+========== END ltp lstat01 ==========
+========== START ltp chmod01 ==========
+RUN LTP CASE chmod01
+LTP MEMORY chmod01 before: free_frames=155420 allocated_frames=40749
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: [1;34mTINFO: [0mTesting variant: verify permissions of file
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0000) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0000
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0007) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0007
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0070) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0070
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0700) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0700
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 2777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=2777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 4777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=4777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 6777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=6777
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: [1;34mTINFO: [0mTesting variant: verify permissions of directory
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0000) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0000
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0007) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0007
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0070) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0070
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0700) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0700
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 2777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=2777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 4777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=4777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 6777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=6777
+
+Summary:
+passed   32
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[677.548458 0:1147 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[677.549235 0:1147 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[677.550037 0:1147 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE chmod01 : 0
+Pass!
+LTP MEMORY chmod01 after_run: free_frames=155396 allocated_frames=40773
+LTP MEMORY chmod01 after_cleanup: free_frames=155396 allocated_frames=40773
+LTP CASE RUNTIME chmod01: 1537 ms
+========== END ltp chmod01 ==========
+========== START ltp fchmod01 ==========
+RUN LTP CASE fchmod01
+LTP MEMORY fchmod01 before: free_frames=155396 allocated_frames=40773
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 0) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 07) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 070) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 0700) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 0777) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 02777) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 04777) successful
+fchmod01.c:40: [1;32mTPASS: [0mFunctionality of fchmod(3, 06777) successful
+
+Summary:
+passed   8
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[679.044056 0:1154 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[679.045923 0:1154 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE fchmod01 : 0
+Pass!
+LTP MEMORY fchmod01 after_run: free_frames=155380 allocated_frames=40789
+LTP MEMORY fchmod01 after_cleanup: free_frames=155380 allocated_frames=40789
+LTP CASE RUNTIME fchmod01: 1496 ms
+========== END ltp fchmod01 ==========
+========== START ltp rmdir01 ==========
+RUN LTP CASE rmdir01
+LTP MEMORY rmdir01 before: free_frames=155380 allocated_frames=40789
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+rmdir01.c:33: [1;32mTPASS: [0mrmdir(testdir) success
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[680.541123 0:1158 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE rmdir01 : 0
+Pass!
+LTP MEMORY rmdir01 after_run: free_frames=155364 allocated_frames=40805
+LTP MEMORY rmdir01 after_cleanup: free_frames=155364 allocated_frames=40805
+LTP CASE RUNTIME rmdir01: 1490 ms
+========== END ltp rmdir01 ==========
+========== START ltp symlink01 ==========
+RUN LTP CASE symlink01
+LTP MEMORY symlink01 before: free_frames=155364 allocated_frames=40805
+symlink01    1  [1;32mTPASS[0m  :  Creation of symbolic link file to no object file is ok
+symlink01    2  [1;32mTPASS[0m  :  Creation of symbolic link file to no object file is ok
+symlink01    3  [1;32mTPASS[0m  :  Creation of symbolic link file and object file via symbolic link is ok
+symlink01    4  [1;32mTPASS[0m  :  Creating an existing symbolic link file error is caught
+symlink01    5  [1;32mTPASS[0m  :  Creating a symbolic link which exceeds maximum pathname error is caught
+[37m[682.070813 0:1162 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE symlink01 : 0
+Pass!
+LTP MEMORY symlink01 after_run: free_frames=155356 allocated_frames=40813
+LTP MEMORY symlink01 after_cleanup: free_frames=155356 allocated_frames=40813
+LTP CASE RUNTIME symlink01: 1527 ms
+========== END ltp symlink01 ==========
+========== START ltp readlink01 ==========
+RUN LTP CASE readlink01
+LTP MEMORY readlink01 before: free_frames=155356 allocated_frames=40813
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+readlink01.c:64: [1;34mTINFO: [0mRunning test as root
+readlink01.c:45: [1;32mTPASS: [0mreadlink() functionality on 'slink_file' was correct
+readlink01.c:55: [1;34mTINFO: [0mRunning test as nobody
+readlink01.c:45: [1;32mTPASS: [0mreadlink() functionality on 'slink_file' was correct
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[683.538177 0:1163 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[683.540856 0:1163 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE readlink01 : 0
+Pass!
+LTP MEMORY readlink01 after_run: free_frames=155332 allocated_frames=40837
+LTP MEMORY readlink01 after_cleanup: free_frames=155332 allocated_frames=40837
+LTP CASE RUNTIME readlink01: 1473 ms
+========== END ltp readlink01 ==========
+========== START ltp ftruncate01 ==========
+RUN LTP CASE ftruncate01
+LTP MEMORY ftruncate01 before: free_frames=155332 allocated_frames=40837
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+ftruncate01.c:65: [1;34mTINFO: [0mTruncated length smaller than file size
+ftruncate01.c:60: [1;32mTPASS: [0mftruncate() succeeded
+ftruncate01.c:74: [1;34mTINFO: [0mTruncated length exceeds file size
+ftruncate01.c:60: [1;32mTPASS: [0mftruncate() succeeded
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[684.972506 0:1168 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[684.973916 0:1168 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE ftruncate01 : 0
+Pass!
+LTP MEMORY ftruncate01 after_run: free_frames=155316 allocated_frames=40853
+LTP MEMORY ftruncate01 after_cleanup: free_frames=155316 allocated_frames=40853
+LTP CASE RUNTIME ftruncate01: 1427 ms
+========== END ltp ftruncate01 ==========
+========== START ltp umask01 ==========
+RUN LTP CASE umask01
+LTP MEMORY umask01 before: free_frames=155316 allocated_frames=40853
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+umask01.c:57: [1;32mTPASS: [0mAll files created with correct mode
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[686.712246 0:1172 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE umask01 : 0
+Pass!
+LTP MEMORY umask01 after_run: free_frames=155300 allocated_frames=40869
+LTP MEMORY umask01 after_cleanup: free_frames=155300 allocated_frames=40869
+LTP CASE RUNTIME umask01: 1741 ms
+========== END ltp umask01 ==========
+========== START ltp alarm02 ==========
+RUN LTP CASE alarm02
+LTP MEMORY alarm02 before: free_frames=155300 allocated_frames=40869
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+alarm02.c:36: [1;32mTPASS: [0malarm(2147483647) passed
+alarm02.c:38: [1;32mTPASS: [0malarm(0) passed
+alarm02.c:36: [1;32mTPASS: [0malarm(2147483647) passed
+alarm02.c:38: [1;32mTPASS: [0malarm(0) passed
+alarm02.c:36: [1;32mTPASS: [0malarm(1073741823) passed
+alarm02.c:38: [1;32mTPASS: [0malarm(0) passed
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[688.189774 0:1177 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE alarm02 : 0
+Pass!
+LTP MEMORY alarm02 after_run: free_frames=155284 allocated_frames=40885
+LTP MEMORY alarm02 after_cleanup: free_frames=155284 allocated_frames=40885
+LTP CASE RUNTIME alarm02: 1486 ms
+========== END ltp alarm02 ==========
+========== START ltp alarm03 ==========
+RUN LTP CASE alarm03
+LTP MEMORY alarm03 before: free_frames=155284 allocated_frames=40885
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+alarm03.c:30: [1;32mTPASS: [0malarm(0) in parent process passed
+alarm03.c:26: [1;32mTPASS: [0malarm(0) in child process passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[689.713891 0:1184 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE alarm03 : 0
+Pass!
+LTP MEMORY alarm03 after_run: free_frames=155260 allocated_frames=40909
+LTP MEMORY alarm03 after_cleanup: free_frames=155260 allocated_frames=40909
+LTP CASE RUNTIME alarm03: 1505 ms
+========== END ltp alarm03 ==========
+========== START ltp clock_gettime02 ==========
+RUN LTP CASE clock_gettime02
+LTP MEMORY clock_gettime02 before: free_frames=155260 allocated_frames=40909
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+clock_gettime02.c:102: [1;34mTINFO: [0mTesting variant: 0: syscall with old kernel spec
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock INVALID/UNKNOWN CLOCK failed as expected: EINVAL (22)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock INVALID/UNKNOWN CLOCK failed as expected: EINVAL (22)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_REALTIME failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_MONOTONIC failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_PROCESS_CPUTIME_ID failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_THREAD_CPUTIME_ID failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_REALTIME_COARSE failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_MONOTONIC_COARSE failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_MONOTONIC_RAW failed as expected: EFAULT (14)
+clock_gettime02.c:130: [1;32mTPASS: [0mclock_gettime(2): clock CLOCK_BOOTTIME failed as expected: EFAULT (14)
+
+Summary:
+passed   10
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[691.328573 0:1191 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE clock_gettime02 : 0
+Pass!
+LTP MEMORY clock_gettime02 after_run: free_frames=155244 allocated_frames=40925
+LTP MEMORY clock_gettime02 after_cleanup: free_frames=155244 allocated_frames=40925
+LTP CASE RUNTIME clock_gettime02: 1615 ms
+========== END ltp clock_gettime02 ==========
+========== START ltp gettimeofday01 ==========
+RUN LTP CASE gettimeofday01
+LTP MEMORY gettimeofday01 before: free_frames=155244 allocated_frames=40925
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+gettimeofday01.c:36: [1;32mTPASS: [0mtst_syscall(__NR_gettimeofday, tc->tv, tc->tz) : EFAULT (14)
+gettimeofday01.c:36: [1;32mTPASS: [0mtst_syscall(__NR_gettimeofday, tc->tv, tc->tz) : EFAULT (14)
+gettimeofday01.c:36: [1;32mTPASS: [0mtst_syscall(__NR_gettimeofday, tc->tv, tc->tz) : EFAULT (14)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[692.983891 0:1195 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE gettimeofday01 : 0
+Pass!
+LTP MEMORY gettimeofday01 after_run: free_frames=155228 allocated_frames=40941
+LTP MEMORY gettimeofday01 after_cleanup: free_frames=155228 allocated_frames=40941
+LTP CASE RUNTIME gettimeofday01: 1641 ms
+========== END ltp gettimeofday01 ==========
+========== START ltp time01 ==========
+RUN LTP CASE time01
+LTP MEMORY time01 before: free_frames=155228 allocated_frames=40941
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+time01.c:36: [1;32mTPASS: [0mtime() returned value 694
+time01.c:38: [1;32mTPASS: [0mtime() returned value 694, stored value 694 are same
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[694.447913 0:1199 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE time01 : 0
+Pass!
+LTP MEMORY time01 after_run: free_frames=155212 allocated_frames=40957
+LTP MEMORY time01 after_cleanup: free_frames=155212 allocated_frames=40957
+LTP CASE RUNTIME time01: 1486 ms
+========== END ltp time01 ==========
+========== START ltp times01 ==========
+RUN LTP CASE times01
+LTP MEMORY times01 before: free_frames=155212 allocated_frames=40957
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+times01.c:25: [1;32mTPASS: [0mtimes(&mytimes) returned 695962
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[695.973787 0:1203 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE times01 : 0
+Pass!
+LTP MEMORY times01 after_run: free_frames=155196 allocated_frames=40973
+LTP MEMORY times01 after_cleanup: free_frames=155196 allocated_frames=40973
+LTP CASE RUNTIME times01: 1497 ms
+========== END ltp times01 ==========
+========== START ltp kill03 ==========
+RUN LTP CASE kill03
+LTP MEMORY kill03 before: free_frames=155196 allocated_frames=40973
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+kill03.c:41: [1;32mTPASS: [0mkill failed as expected: EINVAL (22)
+kill03.c:41: [1;32mTPASS: [0mkill failed as expected: ESRCH (3)
+kill03.c:41: [1;32mTPASS: [0mkill failed as expected: ESRCH (3)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[697.453923 0:1207 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE kill03 : 0
+Pass!
+LTP MEMORY kill03 after_run: free_frames=155180 allocated_frames=40989
+LTP MEMORY kill03 after_cleanup: free_frames=155180 allocated_frames=40989
+LTP CASE RUNTIME kill03: 1479 ms
+========== END ltp kill03 ==========
+========== START ltp rt_sigaction01 ==========
+RUN LTP CASE rt_sigaction01
+LTP MEMORY rt_sigaction01 before: free_frames=155180 allocated_frames=40989
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 35 
+rt_sigaction01    1  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 35 
+rt_sigaction01    2  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 35 
+rt_sigaction01    3  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 35 
+rt_sigaction01    4  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 35 
+rt_sigaction01    5  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 36 
+rt_sigaction01    6  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 36 
+rt_sigaction01    7  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 36 
+rt_sigaction01    8  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 36 
+rt_sigaction01    9  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 36 
+rt_sigaction01   10  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 37 
+rt_sigaction01   11  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 37 
+rt_sigaction01   12  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 37 
+rt_sigaction01   13  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 37 
+rt_sigaction01   14  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 37 
+rt_sigaction01   15  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 38 
+rt_sigaction01   16  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 38 
+rt_sigaction01   17  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 38 
+rt_sigaction01   18  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 38 
+rt_sigaction01   19  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 38 
+rt_sigaction01   20  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 39 
+rt_sigaction01   21  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 39 
+rt_sigaction01   22  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 39 
+rt_sigaction01   23  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 39 
+rt_sigaction01   24  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 39 
+rt_sigaction01   25  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 40 
+rt_sigaction01   26  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 40 
+rt_sigaction01   27  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 40 
+rt_sigaction01   28  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 40 
+rt_sigaction01   29  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 40 
+rt_sigaction01   30  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 41 
+rt_sigaction01   31  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 41 
+rt_sigaction01   32  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 41 
+rt_sigaction01   33  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 41 
+rt_sigaction01   34  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 41 
+rt_sigaction01   35  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 42 
+rt_sigaction01   36  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 42 
+rt_sigaction01   37  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 42 
+rt_sigaction01   38  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 42 
+rt_sigaction01   39  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 42 
+rt_sigaction01   40  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 43 
+rt_sigaction01   41  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 43 
+rt_sigaction01   42  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 43 
+rt_sigaction01   43  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 43 
+rt_sigaction01   44  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 43 
+rt_sigaction01   45  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 44 
+rt_sigaction01   46  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 44 
+rt_sigaction01   47  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 44 
+rt_sigaction01   48  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 44 
+rt_sigaction01   49  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 44 
+rt_sigaction01   50  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 45 
+rt_sigaction01   51  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 45 
+rt_sigaction01   52  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 45 
+rt_sigaction01   53  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 45 
+rt_sigaction01   54  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 45 
+rt_sigaction01   55  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 46 
+rt_sigaction01   56  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 46 
+rt_sigaction01   57  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 46 
+rt_sigaction01   58  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 46 
+rt_sigaction01   59  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 46 
+rt_sigaction01   60  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 47 
+rt_sigaction01   61  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 47 
+rt_sigaction01   62  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 47 
+rt_sigaction01   63  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 47 
+rt_sigaction01   64  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 47 
+rt_sigaction01   65  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 48 
+rt_sigaction01   66  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 48 
+rt_sigaction01   67  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 48 
+rt_sigaction01   68  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 48 
+rt_sigaction01   69  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 48 
+rt_sigaction01   70  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 49 
+rt_sigaction01   71  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 49 
+rt_sigaction01   72  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 49 
+rt_sigaction01   73  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 49 
+rt_sigaction01   74  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 49 
+rt_sigaction01   75  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 50 
+rt_sigaction01   76  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 50 
+rt_sigaction01   77  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 50 
+rt_sigaction01   78  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 50 
+rt_sigaction01   79  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 50 
+rt_sigaction01   80  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 51 
+rt_sigaction01   81  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 51 
+rt_sigaction01   82  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 51 
+rt_sigaction01   83  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 51 
+rt_sigaction01   84  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 51 
+rt_sigaction01   85  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 52 
+rt_sigaction01   86  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 52 
+rt_sigaction01   87  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 52 
+rt_sigaction01   88  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 52 
+rt_sigaction01   89  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 52 
+rt_sigaction01   90  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 53 
+rt_sigaction01   91  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 53 
+rt_sigaction01   92  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 53 
+rt_sigaction01   93  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 53 
+rt_sigaction01   94  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 53 
+rt_sigaction01   95  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 54 
+rt_sigaction01   96  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 54 
+rt_sigaction01   97  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 54 
+rt_sigaction01   98  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 54 
+rt_sigaction01   99  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 54 
+rt_sigaction01  100  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 55 
+rt_sigaction01  101  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 55 
+rt_sigaction01  102  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 55 
+rt_sigaction01  103  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 55 
+rt_sigaction01  104  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 55 
+rt_sigaction01  105  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 56 
+rt_sigaction01  106  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 56 
+rt_sigaction01  107  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 56 
+rt_sigaction01  108  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 56 
+rt_sigaction01  109  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 56 
+rt_sigaction01  110  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 57 
+rt_sigaction01  111  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 57 
+rt_sigaction01  112  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 57 
+rt_sigaction01  113  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 57 
+rt_sigaction01  114  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 57 
+rt_sigaction01  115  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 58 
+rt_sigaction01  116  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 58 
+rt_sigaction01  117  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 58 
+rt_sigaction01  118  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 58 
+rt_sigaction01  119  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 58 
+rt_sigaction01  120  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 59 
+rt_sigaction01  121  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 59 
+rt_sigaction01  122  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 59 
+rt_sigaction01  123  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 59 
+rt_sigaction01  124  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 59 
+rt_sigaction01  125  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 60 
+rt_sigaction01  126  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 60 
+rt_sigaction01  127  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 60 
+rt_sigaction01  128  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 60 
+rt_sigaction01  129  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 60 
+rt_sigaction01  130  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 61 
+rt_sigaction01  131  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 61 
+rt_sigaction01  132  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 61 
+rt_sigaction01  133  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 61 
+rt_sigaction01  134  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 61 
+rt_sigaction01  135  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 62 
+rt_sigaction01  136  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 62 
+rt_sigaction01  137  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 62 
+rt_sigaction01  138  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 62 
+rt_sigaction01  139  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 62 
+rt_sigaction01  140  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 63 
+rt_sigaction01  141  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 63 
+rt_sigaction01  142  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 63 
+rt_sigaction01  143  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 63 
+rt_sigaction01  144  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 63 
+rt_sigaction01  145  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 64 
+rt_sigaction01  146  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 64 
+rt_sigaction01  147  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 64 
+rt_sigaction01  148  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 64 
+rt_sigaction01  149  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  [1;34mTINFO[0m  :  signal: 64 
+rt_sigaction01  150  [1;32mTPASS[0m  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  [1;34mTINFO[0m  :  Signal Handler Called with signal number 64
+[37m[699.222028 0:1211 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE rt_sigaction01 : 0
+Pass!
+LTP MEMORY rt_sigaction01 after_run: free_frames=155172 allocated_frames=40997
+LTP MEMORY rt_sigaction01 after_cleanup: free_frames=155172 allocated_frames=40997
+LTP CASE RUNTIME rt_sigaction01: 1769 ms
+========== END ltp rt_sigaction01 ==========
+========== START ltp sigaction01 ==========
+RUN LTP CASE sigaction01
+LTP MEMORY sigaction01 before: free_frames=155172 allocated_frames=40997
+sigaction01    1  [1;32mTPASS[0m  :  SA_RESETHAND did not cause SA_SIGINFO to be cleared
+sigaction01    2  [1;32mTPASS[0m  :  SA_RESETHAND was masked when handler executed
+sigaction01    3  [1;32mTPASS[0m  :  sig has been masked because sa_mask originally contained sig
+sigaction01    4  [1;32mTPASS[0m  :  siginfo pointer non NULL
+PASS LTP CASE sigaction01 : 0
+Pass!
+LTP MEMORY sigaction01 after_run: free_frames=155164 allocated_frames=41005
+LTP MEMORY sigaction01 after_cleanup: free_frames=155164 allocated_frames=41005
+LTP CASE RUNTIME sigaction01: 1548 ms
+========== END ltp sigaction01 ==========
+========== START ltp proc01 ==========
+RUN LTP CASE proc01
+LTP MEMORY proc01 before: free_frames=155164 allocated_frames=41005
+proc01      1  [1;32mTPASS[0m  :  readproc() completed successfully, total read: 875 bytes, 20 objs
+[37m[702.364319 0:1213 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE proc01 : 0
+Pass!
+LTP MEMORY proc01 after_run: free_frames=155156 allocated_frames=41013
+LTP MEMORY proc01 after_cleanup: free_frames=155156 allocated_frames=41013
+LTP CASE RUNTIME proc01: 1608 ms
+========== END ltp proc01 ==========
+========== START ltp exit01 ==========
+RUN LTP CASE exit01
+LTP MEMORY exit01 before: free_frames=155156 allocated_frames=41013
+exit01      1  [1;32mTPASS[0m  :  exit() test PASSED
+PASS LTP CASE exit01 : 0
+Pass!
+LTP MEMORY exit01 after_run: free_frames=155140 allocated_frames=41029
+LTP MEMORY exit01 after_cleanup: free_frames=155140 allocated_frames=41029
+LTP CASE RUNTIME exit01: 1579 ms
+========== END ltp exit01 ==========
+========== START ltp exit02 ==========
+RUN LTP CASE exit02
+LTP MEMORY exit02 before: free_frames=155140 allocated_frames=41029
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+exit02.c:46: [1;32mTPASS: [0mFile written by child read back correctly
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[705.465130 0:1216 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE exit02 : 0
+Pass!
+LTP MEMORY exit02 after_run: free_frames=155116 allocated_frames=41053
+LTP MEMORY exit02 after_cleanup: free_frames=155116 allocated_frames=41053
+LTP CASE RUNTIME exit02: 1489 ms
+========== END ltp exit02 ==========
+========== START ltp exit_group01 ==========
+RUN LTP CASE exit_group01
+LTP MEMORY exit_group01 before: free_frames=155116 allocated_frames=41053
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+exit_group01.c:98: [1;32mTPASS: [0mExpect: exit_group() succeeded
+exit_group01.c:61: [1;34mTINFO: [0mChecking if threads are still running
+exit_group01.c:77: [1;34mTINFO: [0mThreads counters value didn't change
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[707.197605 0:1221 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[707.203465 0:1221 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE exit_group01 : 0
+Pass!
+LTP MEMORY exit_group01 after_run: free_frames=155092 allocated_frames=41077
+LTP MEMORY exit_group01 after_cleanup: free_frames=155092 allocated_frames=41077
+LTP CASE RUNTIME exit_group01: 1748 ms
+========== END ltp exit_group01 ==========
+========== START ltp getpgrp01 ==========
+RUN LTP CASE getpgrp01
+LTP MEMORY getpgrp01 before: free_frames=155092 allocated_frames=41077
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getpgrp01.c:18: [1;32mTPASS: [0mgetpgrp() returned pid 1230
+getpgrp01.c:19: [1;32mTPASS: [0mTST_RET == SAFE_GETPGID(0) (1230)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[708.808247 0:1228 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getpgrp01 : 0
+Pass!
+LTP MEMORY getpgrp01 after_run: free_frames=155076 allocated_frames=41093
+LTP MEMORY getpgrp01 after_cleanup: free_frames=155076 allocated_frames=41093
+LTP CASE RUNTIME getpgrp01: 1611 ms
+========== END ltp getpgrp01 ==========
+========== START ltp gettid01 ==========
+RUN LTP CASE gettid01
+LTP MEMORY gettid01 before: free_frames=155076 allocated_frames=41093
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+gettid01.c:26: [1;32mTPASS: [0mtst_syscall(__NR_gettid) == tst_syscall(__NR_getpid) (1234)
+gettid01.c:27: [1;32mTPASS: [0mtst_syscall(__NR_gettid) == pid (1234)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[710.207955 0:1232 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE gettid01 : 0
+Pass!
+LTP MEMORY gettid01 after_run: free_frames=155060 allocated_frames=41109
+LTP MEMORY gettid01 after_cleanup: free_frames=155060 allocated_frames=41109
+LTP CASE RUNTIME gettid01: 1386 ms
+========== END ltp gettid01 ==========
+========== START ltp uname01 ==========
+RUN LTP CASE uname01
+LTP MEMORY uname01 before: free_frames=155060 allocated_frames=41109
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+uname01.c:21: [1;32mTPASS: [0muname(&un) passed
+uname01.c:31: [1;32mTPASS: [0msysname set to Linux
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[711.737456 0:1236 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE uname01 : 0
+Pass!
+LTP MEMORY uname01 after_run: free_frames=155044 allocated_frames=41125
+LTP MEMORY uname01 after_cleanup: free_frames=155044 allocated_frames=41125
+LTP CASE RUNTIME uname01: 1523 ms
+========== END ltp uname01 ==========
+========== START ltp getrlimit01 ==========
+RUN LTP CASE getrlimit01
+LTP MEMORY getrlimit01 before: free_frames=155044 allocated_frames=41125
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_CPU passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_FSIZE passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_DATA passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_STACK passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_CORE passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_RSS passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_NPROC passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_NOFILE passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_MEMLOCK passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_AS passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_LOCKS passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_MSGQUEUE passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_NICE passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_RTPRIO passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_SIGPENDING passed
+getrlimit01.c:50: [1;32mTPASS: [0mgetrlimit() test for RLIMIT_RTTIME passed
+
+Summary:
+passed   16
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[713.255137 0:1240 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getrlimit01 : 0
+Pass!
+LTP MEMORY getrlimit01 after_run: free_frames=155028 allocated_frames=41141
+LTP MEMORY getrlimit01 after_cleanup: free_frames=155028 allocated_frames=41141
+LTP CASE RUNTIME getrlimit01: 1501 ms
+========== END ltp getrlimit01 ==========
+========== START ltp getrusage01 ==========
+RUN LTP CASE getrusage01
+LTP MEMORY getrusage01 before: free_frames=155028 allocated_frames=41141
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getrusage01.c:29: [1;32mTPASS: [0mgetrusage(RUSAGE_SELF, 0x10000beef0) passed
+getrusage01.c:29: [1;32mTPASS: [0mgetrusage(RUSAGE_CHILDREN, 0x10000beef0) passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[714.752380 0:1244 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getrusage01 : 0
+Pass!
+LTP MEMORY getrusage01 after_run: free_frames=155012 allocated_frames=41157
+LTP MEMORY getrusage01 after_cleanup: free_frames=155012 allocated_frames=41157
+LTP CASE RUNTIME getrusage01: 1511 ms
+========== END ltp getrusage01 ==========
+========== START ltp sched_yield01 ==========
+RUN LTP CASE sched_yield01
+LTP MEMORY sched_yield01 before: free_frames=155012 allocated_frames=41157
+sched_yield01    1  [1;32mTPASS[0m  :  sched_yield() call succeeded
+PASS LTP CASE sched_yield01 : 0
+Pass!
+LTP MEMORY sched_yield01 after_run: free_frames=155004 allocated_frames=41165
+LTP MEMORY sched_yield01 after_cleanup: free_frames=155004 allocated_frames=41165
+LTP CASE RUNTIME sched_yield01: 1439 ms
+========== END ltp sched_yield01 ==========
+ltp cases: 63 passed, 0 failed, 0 timed out
 #### OS COMP TEST GROUP END ltp-musl ####
 #### OS COMP TEST GROUP START ltp-glibc ####
+ltp case list: stable (63 cases, timeout 10s)
 ========== START ltp access01 ==========
 RUN LTP CASE access01
+LTP MEMORY access01 before: free_frames=155004 allocated_frames=41165
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2352,40 +4012,44 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[510.084333 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.085179 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.085811 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.086882 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[510.088081 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.088748 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.089380 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.090071 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[510.091018 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.091680 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.092435 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.093113 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[510.094051 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.094686 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.095287 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.095971 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[510.096899 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.097535 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.098141 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.098819 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[510.099773 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.100403 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.101023 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.101690 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[510.102379 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.103063 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.103748 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.104327 0:1218 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[510.105087 0:1218 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[723.732105 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.733181 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.734020 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.735745 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[723.737541 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.742524 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.743359 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.744388 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[723.745911 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.746742 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.747597 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.748590 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[723.749978 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.750877 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.751831 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.752795 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[723.754229 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.755126 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.755963 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.756937 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[723.758380 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.759312 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.760159 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.761128 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[723.762005 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.762764 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.763528 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.764335 0:1249 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[723.765461 0:1249 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE access01 : 0
 Pass!
+LTP MEMORY access01 after_run: free_frames=154074 allocated_frames=42095
+LTP MEMORY access01 after_cleanup: free_frames=154074 allocated_frames=42095
+LTP CASE RUNTIME access01: 7539 ms
 ========== END ltp access01 ==========
 ========== START ltp brk01 ==========
 RUN LTP CASE brk01
+LTP MEMORY brk01 before: free_frames=154074 allocated_frames=42095
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2402,12 +4066,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[511.912726 0:1323 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[726.571016 0:1354 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE brk01 : 0
 Pass!
+LTP MEMORY brk01 after_run: free_frames=154044 allocated_frames=42125
+LTP MEMORY brk01 after_cleanup: free_frames=154044 allocated_frames=42125
+LTP CASE RUNTIME brk01: 2754 ms
 ========== END ltp brk01 ==========
 ========== START ltp chdir01 ==========
 RUN LTP CASE chdir01
+LTP MEMORY chdir01 before: free_frames=154044 allocated_frames=42125
 tst_buffers.c:57: TINFO: Test is using guarded buffers
 tst_device.c:317: TINFO: Using test device LTP_DEV='/dev/vda'
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
@@ -2419,7 +4087,7 @@ tst_supported_fs_types.c:49: TINFO: mkfs is not needed for tmpfs
 tst_test.c:1693: TINFO: === Testing on tmpfs ===
 tst_test.c:1106: TINFO: Skipping mkfs for TMPFS filesystem
 tst_test.c:1087: TINFO: Limiting tmpfs size to 32MB
-tst_test.c:1120: TINFO: Mounting ltp-tmpfs to /tmp/ltp-work/LTP_chdPxYxuS/mntpoint fstyp=tmpfs flags=0
+tst_test.c:1120: TINFO: Mounting ltp-tmpfs to /tmp/ltp-work/LTP_chdXfMbYA/mntpoint fstyp=tmpfs flags=0
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 chdir01.c:119: TINFO: Testing 'testfile'
 chdir01.c:111: TPASS: root: chdir("testfile") returned correct value: ENOTDIR (20)
@@ -2443,30 +4111,35 @@ chdir01.c:119: TINFO: Testing 'does_not_exist'
 chdir01.c:111: TPASS: root: chdir("does_not_exist") returned correct value: ENOENT (2)
 chdir01.c:111: TPASS: nobody: chdir("does_not_exist") returned correct value: ENOENT (2)
 chdir01.c:119: TINFO: Testing 'symloop'
-chdir01.c:122: TCONF: Skipping symlink loop test, not supported
+chdir01.c:111: TPASS: root: chdir("symloop") returned correct value: ELOOP (40)
+chdir01.c:111: TPASS: nobody: chdir("symloop") returned correct value: ELOOP (40)
 
 Summary:
-passed   14
+passed   16
 failed   0
 broken   0
-skipped  1
+skipped  0
 warnings 0
-[37m[513.738822 0:1330 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[513.741502 0:1330 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[513.744084 0:1330 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[513.746921 0:1330 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[513.748165 0:1330 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[729.511560 0:1361 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[729.513126 0:1361 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[729.513848 0:1361 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[729.514636 0:1361 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[729.515283 0:1361 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE chdir01 : 0
 Pass!
+LTP MEMORY chdir01 after_run: free_frames=154023 allocated_frames=42146
+LTP MEMORY chdir01 after_cleanup: free_frames=154023 allocated_frames=42146
+LTP CASE RUNTIME chdir01: 2939 ms
 ========== END ltp chdir01 ==========
 ========== START ltp clone01 ==========
 RUN LTP CASE clone01
+LTP MEMORY clone01 before: free_frames=154023 allocated_frames=42146
 tst_buffers.c:57: TINFO: Test is using guarded buffers
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
-clone01.c:37: TPASS: clone returned 1337
+clone01.c:37: TPASS: clone returned 1368
 clone01.c:43: TPASS: Child exited with 0
 
 Summary:
@@ -2475,12 +4148,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[515.582572 0:1334 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[732.445840 0:1365 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE clone01 : 0
 Pass!
+LTP MEMORY clone01 after_run: free_frames=153993 allocated_frames=42176
+LTP MEMORY clone01 after_cleanup: free_frames=153993 allocated_frames=42176
+LTP CASE RUNTIME clone01: 2928 ms
 ========== END ltp clone01 ==========
 ========== START ltp close01 ==========
 RUN LTP CASE close01
+LTP MEMORY close01 before: free_frames=153993 allocated_frames=42176
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2495,19 +4172,23 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[517.449735 0:1339 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[517.451639 0:1339 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[735.207084 0:1370 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[735.208885 0:1370 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE close01 : 0
 Pass!
+LTP MEMORY close01 after_run: free_frames=153972 allocated_frames=42197
+LTP MEMORY close01 after_cleanup: free_frames=153972 allocated_frames=42197
+LTP CASE RUNTIME close01: 2771 ms
 ========== END ltp close01 ==========
 ========== START ltp dup01 ==========
 RUN LTP CASE dup01
+LTP MEMORY dup01 before: free_frames=153972 allocated_frames=42197
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 dup01.c:24: TPASS: dup(fd) returned fd 4
-dup01.c:27: TPASS: buf1.st_ino == buf2.st_ino (13867373987566138326)
+dup01.c:27: TPASS: buf1.st_ino == buf2.st_ino (3277890279393648972)
 
 Summary:
 passed   2
@@ -2515,23 +4196,37 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[519.321889 0:1343 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[519.324118 0:1343 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[738.055330 0:1374 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[738.057784 0:1374 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE dup01 : 0
 Pass!
+LTP MEMORY dup01 after_run: free_frames=153951 allocated_frames=42218
+LTP MEMORY dup01 after_cleanup: free_frames=153951 allocated_frames=42218
+LTP CASE RUNTIME dup01: 2842 ms
 ========== END ltp dup01 ==========
+========== START ltp fcntl01 ==========
+RUN LTP CASE fcntl01
+LTP MEMORY fcntl01 before: free_frames=153951 allocated_frames=42218
+[37m[740.967980 0:1378 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE fcntl01 : 0
+Pass!
+LTP MEMORY fcntl01 after_run: free_frames=153939 allocated_frames=42230
+LTP MEMORY fcntl01 after_cleanup: free_frames=153939 allocated_frames=42230
+LTP CASE RUNTIME fcntl01: 2907 ms
+========== END ltp fcntl01 ==========
 ========== START ltp fcntl02 ==========
 RUN LTP CASE fcntl02
+LTP MEMORY fcntl02 before: free_frames=153939 allocated_frames=42230
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
-fcntl02.c:41: TPASS: fcntl(fcntl02_1349, F_DUPFD, 0) returned 4
-fcntl02.c:41: TPASS: fcntl(fcntl02_1349, F_DUPFD, 1) returned 4
-fcntl02.c:41: TPASS: fcntl(fcntl02_1349, F_DUPFD, 2) returned 4
-fcntl02.c:41: TPASS: fcntl(fcntl02_1349, F_DUPFD, 3) returned 4
-fcntl02.c:41: TPASS: fcntl(fcntl02_1349, F_DUPFD, 10) returned 10
-fcntl02.c:41: TPASS: fcntl(fcntl02_1349, F_DUPFD, 100) returned 100
+fcntl02.c:41: TPASS: fcntl(fcntl02_1381, F_DUPFD, 0) returned 4
+fcntl02.c:41: TPASS: fcntl(fcntl02_1381, F_DUPFD, 1) returned 4
+fcntl02.c:41: TPASS: fcntl(fcntl02_1381, F_DUPFD, 2) returned 4
+fcntl02.c:41: TPASS: fcntl(fcntl02_1381, F_DUPFD, 3) returned 4
+fcntl02.c:41: TPASS: fcntl(fcntl02_1381, F_DUPFD, 10) returned 10
+fcntl02.c:41: TPASS: fcntl(fcntl02_1381, F_DUPFD, 100) returned 100
 
 Summary:
 passed   6
@@ -2539,19 +4234,23 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[521.076751 0:1347 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[521.078219 0:1347 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[743.553667 0:1379 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[743.554814 0:1379 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE fcntl02 : 0
 Pass!
+LTP MEMORY fcntl02 after_run: free_frames=153918 allocated_frames=42251
+LTP MEMORY fcntl02 after_cleanup: free_frames=153918 allocated_frames=42251
+LTP CASE RUNTIME fcntl02: 2583 ms
 ========== END ltp fcntl02 ==========
 ========== START ltp fork01 ==========
 RUN LTP CASE fork01
+LTP MEMORY fork01 before: free_frames=153918 allocated_frames=42251
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 fork01.c:47: TPASS: correct child status returned 42
-fork01.c:50: TPASS: child_pid == pid (1354)
+fork01.c:50: TPASS: child_pid == pid (1386)
 
 Summary:
 passed   2
@@ -2559,49 +4258,21 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[522.878348 0:1351 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[522.879550 0:1351 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[746.356824 0:1383 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[746.361800 0:1383 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE fork01 : 0
 Pass!
+LTP MEMORY fork01 after_run: free_frames=153888 allocated_frames=42281
+LTP MEMORY fork01 after_cleanup: free_frames=153888 allocated_frames=42281
+LTP CASE RUNTIME fork01: 2816 ms
 ========== END ltp fork01 ==========
 ========== START ltp getpid01 ==========
 RUN LTP CASE getpid01
+LTP MEMORY getpid01 before: free_frames=153888 allocated_frames=42281
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
-getpid01.c:34: TPASS: getpid() returns 1359
-getpid01.c:34: TPASS: getpid() returns 1360
-getpid01.c:34: TPASS: getpid() returns 1361
-getpid01.c:34: TPASS: getpid() returns 1362
-getpid01.c:34: TPASS: getpid() returns 1363
-getpid01.c:34: TPASS: getpid() returns 1364
-getpid01.c:34: TPASS: getpid() returns 1365
-getpid01.c:34: TPASS: getpid() returns 1366
-getpid01.c:34: TPASS: getpid() returns 1367
-getpid01.c:34: TPASS: getpid() returns 1368
-getpid01.c:34: TPASS: getpid() returns 1369
-getpid01.c:34: TPASS: getpid() returns 1370
-getpid01.c:34: TPASS: getpid() returns 1371
-getpid01.c:34: TPASS: getpid() returns 1372
-getpid01.c:34: TPASS: getpid() returns 1373
-getpid01.c:34: TPASS: getpid() returns 1374
-getpid01.c:34: TPASS: getpid() returns 1375
-getpid01.c:34: TPASS: getpid() returns 1376
-getpid01.c:34: TPASS: getpid() returns 1377
-getpid01.c:34: TPASS: getpid() returns 1378
-getpid01.c:34: TPASS: getpid() returns 1379
-getpid01.c:34: TPASS: getpid() returns 1380
-getpid01.c:34: TPASS: getpid() returns 1381
-getpid01.c:34: TPASS: getpid() returns 1382
-getpid01.c:34: TPASS: getpid() returns 1383
-getpid01.c:34: TPASS: getpid() returns 1384
-getpid01.c:34: TPASS: getpid() returns 1385
-getpid01.c:34: TPASS: getpid() returns 1386
-getpid01.c:34: TPASS: getpid() returns 1387
-getpid01.c:34: TPASS: getpid() returns 1388
-getpid01.c:34: TPASS: getpid() returns 1389
-getpid01.c:34: TPASS: getpid() returns 1390
 getpid01.c:34: TPASS: getpid() returns 1391
 getpid01.c:34: TPASS: getpid() returns 1392
 getpid01.c:34: TPASS: getpid() returns 1393
@@ -2670,6 +4341,38 @@ getpid01.c:34: TPASS: getpid() returns 1455
 getpid01.c:34: TPASS: getpid() returns 1456
 getpid01.c:34: TPASS: getpid() returns 1457
 getpid01.c:34: TPASS: getpid() returns 1458
+getpid01.c:34: TPASS: getpid() returns 1459
+getpid01.c:34: TPASS: getpid() returns 1460
+getpid01.c:34: TPASS: getpid() returns 1461
+getpid01.c:34: TPASS: getpid() returns 1462
+getpid01.c:34: TPASS: getpid() returns 1463
+getpid01.c:34: TPASS: getpid() returns 1464
+getpid01.c:34: TPASS: getpid() returns 1465
+getpid01.c:34: TPASS: getpid() returns 1466
+getpid01.c:34: TPASS: getpid() returns 1467
+getpid01.c:34: TPASS: getpid() returns 1468
+getpid01.c:34: TPASS: getpid() returns 1469
+getpid01.c:34: TPASS: getpid() returns 1470
+getpid01.c:34: TPASS: getpid() returns 1471
+getpid01.c:34: TPASS: getpid() returns 1472
+getpid01.c:34: TPASS: getpid() returns 1473
+getpid01.c:34: TPASS: getpid() returns 1474
+getpid01.c:34: TPASS: getpid() returns 1475
+getpid01.c:34: TPASS: getpid() returns 1476
+getpid01.c:34: TPASS: getpid() returns 1477
+getpid01.c:34: TPASS: getpid() returns 1478
+getpid01.c:34: TPASS: getpid() returns 1479
+getpid01.c:34: TPASS: getpid() returns 1480
+getpid01.c:34: TPASS: getpid() returns 1481
+getpid01.c:34: TPASS: getpid() returns 1482
+getpid01.c:34: TPASS: getpid() returns 1483
+getpid01.c:34: TPASS: getpid() returns 1484
+getpid01.c:34: TPASS: getpid() returns 1485
+getpid01.c:34: TPASS: getpid() returns 1486
+getpid01.c:34: TPASS: getpid() returns 1487
+getpid01.c:34: TPASS: getpid() returns 1488
+getpid01.c:34: TPASS: getpid() returns 1489
+getpid01.c:34: TPASS: getpid() returns 1490
 
 Summary:
 passed   100
@@ -2677,20 +4380,28 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[527.206982 0:1356 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[752.975656 0:1388 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE getpid01 : 0
 Pass!
+LTP MEMORY getpid01 after_run: free_frames=152967 allocated_frames=43202
+LTP MEMORY getpid01 after_cleanup: free_frames=152967 allocated_frames=43202
+LTP CASE RUNTIME getpid01: 6601 ms
 ========== END ltp getpid01 ==========
 ========== START ltp mmap01 ==========
 RUN LTP CASE mmap01
-[37m[528.973221 0:1460 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[528.974288 0:1460 axfs::root:433] [33m[AxError::IsADirectory][m
+LTP MEMORY mmap01 before: free_frames=152967 allocated_frames=43202
+[37m[755.772393 0:1492 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[755.775614 0:1492 axfs::root:433] [33m[AxError::IsADirectory][m
 [mmmap01      1  TPASS  :  Functionality of mmap() successful
 PASS LTP CASE mmap01 : 0
 Pass!
+LTP MEMORY mmap01 after_run: free_frames=152946 allocated_frames=43223
+LTP MEMORY mmap01 after_cleanup: free_frames=152946 allocated_frames=43223
+LTP CASE RUNTIME mmap01: 2829 ms
 ========== END ltp mmap01 ==========
 ========== START ltp open01 ==========
 RUN LTP CASE open01
+LTP MEMORY open01 before: free_frames=152946 allocated_frames=43223
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2704,13 +4415,17 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[530.845763 0:1462 axfs::root:433] [33m[AxError::IsADirectory][m
-[m[37m[530.847033 0:1462 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[758.592849 0:1494 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[758.594827 0:1494 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE open01 : 0
 Pass!
+LTP MEMORY open01 after_run: free_frames=152925 allocated_frames=43244
+LTP MEMORY open01 after_cleanup: free_frames=152925 allocated_frames=43244
+LTP CASE RUNTIME open01: 2796 ms
 ========== END ltp open01 ==========
 ========== START ltp pipe01 ==========
 RUN LTP CASE pipe01
+LTP MEMORY pipe01 before: free_frames=152925 allocated_frames=43244
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2723,12 +4438,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[532.663116 0:1466 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[761.399950 0:1498 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE pipe01 : 0
 Pass!
+LTP MEMORY pipe01 after_run: free_frames=152904 allocated_frames=43265
+LTP MEMORY pipe01 after_cleanup: free_frames=152904 allocated_frames=43265
+LTP CASE RUNTIME pipe01: 2791 ms
 ========== END ltp pipe01 ==========
 ========== START ltp read01 ==========
 RUN LTP CASE read01
+LTP MEMORY read01 before: free_frames=152904 allocated_frames=43265
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2741,13 +4460,17 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[534.385904 0:1470 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[534.387822 0:1470 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[764.149070 0:1502 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[764.153756 0:1502 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE read01 : 0
 Pass!
+LTP MEMORY read01 after_run: free_frames=152883 allocated_frames=43286
+LTP MEMORY read01 after_cleanup: free_frames=152883 allocated_frames=43286
+LTP CASE RUNTIME read01: 2769 ms
 ========== END ltp read01 ==========
 ========== START ltp stat01 ==========
 RUN LTP CASE stat01
+LTP MEMORY stat01 before: free_frames=152883 allocated_frames=43286
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2771,19 +4494,23 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[536.132620 0:1474 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[536.133355 0:1474 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[536.134644 0:1474 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[767.056581 0:1506 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[767.058819 0:1506 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[767.061168 0:1506 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE stat01 : 0
 Pass!
+LTP MEMORY stat01 after_run: free_frames=152862 allocated_frames=43307
+LTP MEMORY stat01 after_cleanup: free_frames=152862 allocated_frames=43307
+LTP CASE RUNTIME stat01: 2885 ms
 ========== END ltp stat01 ==========
 ========== START ltp wait401 ==========
 RUN LTP CASE wait401
+LTP MEMORY wait401 before: free_frames=152862 allocated_frames=43307
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
-wait401.c:40: TPASS: wait4() returned correct pid 1481
+wait401.c:40: TPASS: wait4() returned correct pid 1513
 wait401.c:49: TPASS: WIFEXITED() is set in status
 wait401.c:54: TPASS: WEXITSTATUS() == 0
 
@@ -2793,12 +4520,16 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[538.001664 0:1478 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[769.962186 0:1510 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE wait401 : 0
 Pass!
+LTP MEMORY wait401 after_run: free_frames=152832 allocated_frames=43337
+LTP MEMORY wait401 after_cleanup: free_frames=152832 allocated_frames=43337
+LTP CASE RUNTIME wait401: 2907 ms
 ========== END ltp wait401 ==========
 ========== START ltp write01 ==========
 RUN LTP CASE write01
+LTP MEMORY write01 before: free_frames=152832 allocated_frames=43337
 tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
 tst_test.c:1733: TINFO: LTP version: 20240524
 tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
@@ -2811,249 +4542,1955 @@ failed   0
 broken   0
 skipped  0
 warnings 0
-[37m[540.237456 0:1484 axfs::fops:297] [33m[AxError::NotADirectory][m
-[m[37m[540.238616 0:1484 axfs::root:433] [33m[AxError::IsADirectory][m
+[37m[773.693337 0:1515 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[773.701942 0:1515 axfs::root:433] [33m[AxError::IsADirectory][m
 [mPASS LTP CASE write01 : 0
 Pass!
+LTP MEMORY write01 after_run: free_frames=120043 allocated_frames=76126
+LTP MEMORY write01 after_cleanup: free_frames=120043 allocated_frames=76126
+LTP CASE RUNTIME write01: 3751 ms
 ========== END ltp write01 ==========
-ltp cases: 16 passed, 0 failed
+========== START ltp access03 ==========
+RUN LTP CASE access03
+LTP MEMORY access03 before: free_frames=120043 allocated_frames=76126
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+access03.c:37: TPASS: invalid address as root : EFAULT (14)
+access03.c:46: TPASS: invalid address as nobody : EFAULT (14)
+access03.c:37: TPASS: invalid address as root : EFAULT (14)
+access03.c:46: TPASS: invalid address as nobody : EFAULT (14)
+access03.c:37: TPASS: invalid address as root : EFAULT (14)
+access03.c:46: TPASS: invalid address as nobody : EFAULT (14)
+access03.c:37: TPASS: invalid address as root : EFAULT (14)
+access03.c:46: TPASS: invalid address as nobody : EFAULT (14)
+
+Summary:
+passed   8
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[776.904144 0:1519 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE access03 : 0
+Pass!
+LTP MEMORY access03 after_run: free_frames=119986 allocated_frames=76183
+LTP MEMORY access03 after_cleanup: free_frames=119986 allocated_frames=76183
+LTP CASE RUNTIME access03: 3175 ms
+========== END ltp access03 ==========
+========== START ltp close02 ==========
+RUN LTP CASE close02
+LTP MEMORY close02 before: free_frames=119986 allocated_frames=76183
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+close02.c:20: TPASS: close(-1) : EBADF (9)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[779.868875 0:1528 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE close02 : 0
+Pass!
+LTP MEMORY close02 after_run: free_frames=119965 allocated_frames=76204
+LTP MEMORY close02 after_cleanup: free_frames=119965 allocated_frames=76204
+LTP CASE RUNTIME close02: 2968 ms
+========== END ltp close02 ==========
+========== START ltp dup02 ==========
+RUN LTP CASE dup02
+LTP MEMORY dup02 before: free_frames=119965 allocated_frames=76204
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup02.c:29: TPASS: dup(-1) : EBADF (9)
+dup02.c:29: TPASS: dup(1500) : EBADF (9)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[782.696043 0:1532 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE dup02 : 0
+Pass!
+LTP MEMORY dup02 after_run: free_frames=119944 allocated_frames=76225
+LTP MEMORY dup02 after_cleanup: free_frames=119944 allocated_frames=76225
+LTP CASE RUNTIME dup02: 2831 ms
+========== END ltp dup02 ==========
+========== START ltp fcntl03 ==========
+RUN LTP CASE fcntl03
+LTP MEMORY fcntl03 before: free_frames=119944 allocated_frames=76225
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+fcntl03.c:32: TPASS: fcntl(fcntl03_1538, F_GETFD, 0) returned 0
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[785.498895 0:1536 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[785.500093 0:1536 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE fcntl03 : 0
+Pass!
+LTP MEMORY fcntl03 after_run: free_frames=119923 allocated_frames=76246
+LTP MEMORY fcntl03 after_cleanup: free_frames=119923 allocated_frames=76246
+LTP CASE RUNTIME fcntl03: 2781 ms
+========== END ltp fcntl03 ==========
+========== START ltp getcwd01 ==========
+RUN LTP CASE getcwd01
+LTP MEMORY getcwd01 before: free_frames=119923 allocated_frames=76246
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getcwd01.c:48: TPASS: tst_syscall(__NR_getcwd, tc->buf, tc->size) : EFAULT (14)
+getcwd01.c:48: TPASS: tst_syscall(__NR_getcwd, tc->buf, tc->size) : EFAULT (14)
+getcwd01.c:48: TPASS: tst_syscall(__NR_getcwd, tc->buf, tc->size) : ERANGE (34)
+getcwd01.c:48: TPASS: tst_syscall(__NR_getcwd, tc->buf, tc->size) : ERANGE (34)
+getcwd01.c:48: TPASS: tst_syscall(__NR_getcwd, tc->buf, tc->size) : ERANGE (34)
+
+Summary:
+passed   5
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[788.454567 0:1540 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getcwd01 : 0
+Pass!
+LTP MEMORY getcwd01 after_run: free_frames=119902 allocated_frames=76267
+LTP MEMORY getcwd01 after_cleanup: free_frames=119902 allocated_frames=76267
+LTP CASE RUNTIME getcwd01: 2963 ms
+========== END ltp getcwd01 ==========
+========== START ltp getpid02 ==========
+RUN LTP CASE getpid02
+LTP MEMORY getpid02 before: free_frames=119902 allocated_frames=76267
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getpid02.c:37: TPASS: child getppid() == parent getpid() (1546)
+getpid02.c:50: TPASS: child getpid() == parent fork() (1547)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[791.218263 0:1544 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getpid02 : 0
+Pass!
+LTP MEMORY getpid02 after_run: free_frames=119872 allocated_frames=76297
+LTP MEMORY getpid02 after_cleanup: free_frames=119872 allocated_frames=76297
+LTP CASE RUNTIME getpid02: 2771 ms
+========== END ltp getpid02 ==========
+========== START ltp getppid01 ==========
+RUN LTP CASE getppid01
+LTP MEMORY getppid01 before: free_frames=119872 allocated_frames=76297
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getppid01.c:31: TPASS: getppid() returned 1549
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[794.021583 0:1549 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getppid01 : 0
+Pass!
+LTP MEMORY getppid01 after_run: free_frames=119851 allocated_frames=76318
+LTP MEMORY getppid01 after_cleanup: free_frames=119851 allocated_frames=76318
+LTP CASE RUNTIME getppid01: 2780 ms
+========== END ltp getppid01 ==========
+========== START ltp getuid01 ==========
+RUN LTP CASE getuid01
+LTP MEMORY getuid01 before: free_frames=119851 allocated_frames=76318
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getuid01.c:20: TPASS: getuid() returned 0
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[796.914417 0:1553 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getuid01 : 0
+Pass!
+LTP MEMORY getuid01 after_run: free_frames=119830 allocated_frames=76339
+LTP MEMORY getuid01 after_cleanup: free_frames=119830 allocated_frames=76339
+LTP CASE RUNTIME getuid01: 2892 ms
+========== END ltp getuid01 ==========
+========== START ltp geteuid01 ==========
+RUN LTP CASE geteuid01
+LTP MEMORY geteuid01 before: free_frames=119830 allocated_frames=76339
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+geteuid01.c:21: TPASS: geteuid() returned 0
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[799.622147 0:1557 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE geteuid01 : 0
+Pass!
+LTP MEMORY geteuid01 after_run: free_frames=119809 allocated_frames=76360
+LTP MEMORY geteuid01 after_cleanup: free_frames=119809 allocated_frames=76360
+LTP CASE RUNTIME geteuid01: 2720 ms
+========== END ltp geteuid01 ==========
+========== START ltp getgid01 ==========
+RUN LTP CASE getgid01
+LTP MEMORY getgid01 before: free_frames=119809 allocated_frames=76360
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getgid01.c:26: TPASS: getgid returned as expectedly
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[802.513615 0:1561 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getgid01 : 0
+Pass!
+LTP MEMORY getgid01 after_run: free_frames=119788 allocated_frames=76381
+LTP MEMORY getgid01 after_cleanup: free_frames=119788 allocated_frames=76381
+LTP CASE RUNTIME getgid01: 2869 ms
+========== END ltp getgid01 ==========
+========== START ltp getegid01 ==========
+RUN LTP CASE getegid01
+LTP MEMORY getegid01 before: free_frames=119788 allocated_frames=76381
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getegid01.c:25: TPASS: gid == st_egid (0)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[805.296053 0:1565 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getegid01 : 0
+Pass!
+LTP MEMORY getegid01 after_run: free_frames=119767 allocated_frames=76402
+LTP MEMORY getegid01 after_cleanup: free_frames=119767 allocated_frames=76402
+LTP CASE RUNTIME getegid01: 2810 ms
+========== END ltp getegid01 ==========
+========== START ltp lseek01 ==========
+RUN LTP CASE lseek01
+LTP MEMORY lseek01 before: free_frames=119767 allocated_frames=76402
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+lseek01.c:67: TPASS: lseek(tfile, 4, SEEK_SET) read correct data
+lseek01.c:67: TPASS: lseek(tfile, -2, SEEK_CUR) read correct data
+lseek01.c:67: TPASS: lseek(tfile, -4, SEEK_END) read correct data
+lseek01.c:67: TPASS: lseek(tfile, 0, SEEK_END) read correct data
+
+Summary:
+passed   4
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[808.227941 0:1569 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[808.229768 0:1569 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE lseek01 : 0
+Pass!
+LTP MEMORY lseek01 after_run: free_frames=119746 allocated_frames=76423
+LTP MEMORY lseek01 after_cleanup: free_frames=119746 allocated_frames=76423
+LTP CASE RUNTIME lseek01: 2914 ms
+========== END ltp lseek01 ==========
+========== START ltp read02 ==========
+RUN LTP CASE read02
+LTP MEMORY read02 before: free_frames=119746 allocated_frames=76423
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+read02.c:84: TPASS: read() failed as expected: EBADF (9)
+read02.c:84: TPASS: read() failed as expected: EISDIR (21)
+read02.c:84: TPASS: read() failed as expected: EFAULT (14)
+read02.c:65: TCONF: O_DIRECT not supported on tmpfs filesystem
+read02.c:65: TCONF: O_DIRECT not supported on tmpfs filesystem
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  2
+warnings 0
+[37m[810.983867 0:1573 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[810.984861 0:1573 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE read02 : 0
+Pass!
+LTP MEMORY read02 after_run: free_frames=119725 allocated_frames=76444
+LTP MEMORY read02 after_cleanup: free_frames=119725 allocated_frames=76444
+LTP CASE RUNTIME read02: 2741 ms
+========== END ltp read02 ==========
+========== START ltp write02 ==========
+RUN LTP CASE write02
+LTP MEMORY write02 before: free_frames=119725 allocated_frames=76444
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+write02.c:20: TPASS: write(fd, NULL, 0) returned 0
+write02.c:22: TPASS: Expect: write(fd, NULL, 0) == 0
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[813.732722 0:1577 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[813.735391 0:1577 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE write02 : 0
+Pass!
+LTP MEMORY write02 after_run: free_frames=119704 allocated_frames=76465
+LTP MEMORY write02 after_cleanup: free_frames=119704 allocated_frames=76465
+LTP CASE RUNTIME write02: 2763 ms
+========== END ltp write02 ==========
+========== START ltp creat01 ==========
+RUN LTP CASE creat01
+LTP MEMORY creat01 before: free_frames=119704 allocated_frames=76465
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+creat01.c:50: TPASS: creat() truncated file to 0 bytes
+creat01.c:55: TPASS: file was created and written to successfully
+creat01.c:60: TPASS: read failed expectedly: EACCES (13)
+creat01.c:50: TPASS: creat() truncated file to 0 bytes
+creat01.c:55: TPASS: file was created and written to successfully
+creat01.c:60: TPASS: read failed expectedly: EACCES (13)
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[816.585199 0:1581 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[816.586604 0:1581 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE creat01 : 0
+Pass!
+LTP MEMORY creat01 after_run: free_frames=119683 allocated_frames=76486
+LTP MEMORY creat01 after_cleanup: free_frames=119683 allocated_frames=76486
+LTP CASE RUNTIME creat01: 2834 ms
+========== END ltp creat01 ==========
+========== START ltp creat03 ==========
+RUN LTP CASE creat03
+LTP MEMORY creat03 before: free_frames=119683 allocated_frames=76486
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+creat03.c:36: TINFO: Created file has mode = 0100674
+creat03.c:41: TPASS: save text bit cleared
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[819.395188 0:1585 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[819.396833 0:1585 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE creat03 : 0
+Pass!
+LTP MEMORY creat03 after_run: free_frames=119662 allocated_frames=76507
+LTP MEMORY creat03 after_cleanup: free_frames=119662 allocated_frames=76507
+LTP CASE RUNTIME creat03: 2828 ms
+========== END ltp creat03 ==========
+========== START ltp open02 ==========
+RUN LTP CASE open02
+LTP MEMORY open02 before: free_frames=119662 allocated_frames=76507
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+open02.c:49: TPASS: open() new file without O_CREAT : ENOENT (2)
+open02.c:49: TPASS: open() unprivileged O_RDONLY | O_NOATIME : EPERM (1)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[822.300768 0:1589 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[822.326610 0:1589 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE open02 : 0
+Pass!
+LTP MEMORY open02 after_run: free_frames=119641 allocated_frames=76528
+LTP MEMORY open02 after_cleanup: free_frames=119641 allocated_frames=76528
+LTP CASE RUNTIME open02: 2977 ms
+========== END ltp open02 ==========
+========== START ltp open03 ==========
+RUN LTP CASE open03
+LTP MEMORY open03 before: free_frames=119641 allocated_frames=76528
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+open03.c:19: TPASS: open(TEST_FILE, O_RDWR | O_CREAT, 0700) returned fd 3
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[826.394838 0:1593 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE open03 : 0
+Pass!
+LTP MEMORY open03 after_run: free_frames=119620 allocated_frames=76549
+LTP MEMORY open03 after_cleanup: free_frames=119620 allocated_frames=76549
+LTP CASE RUNTIME open03: 4011 ms
+========== END ltp open03 ==========
+========== START ltp stat02 ==========
+RUN LTP CASE stat02
+LTP MEMORY stat02 before: free_frames=119620 allocated_frames=76549
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+stat02.c:67: TPASS: File size reported as expected
+stat02.c:67: TPASS: File size reported as expected
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[829.296876 0:1597 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE stat02 : 0
+Pass!
+LTP MEMORY stat02 after_run: free_frames=119599 allocated_frames=76570
+LTP MEMORY stat02 after_cleanup: free_frames=119599 allocated_frames=76570
+LTP CASE RUNTIME stat02: 2920 ms
+========== END ltp stat02 ==========
+========== START ltp lstat01 ==========
+RUN LTP CASE lstat01
+LTP MEMORY lstat01 before: free_frames=119599 allocated_frames=76570
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+lstat01.c:46: TPASS: lstat() reported correct values for the symlink!
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[831.984592 0:1601 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[831.985883 0:1601 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE lstat01 : 0
+Pass!
+LTP MEMORY lstat01 after_run: free_frames=119578 allocated_frames=76591
+LTP MEMORY lstat01 after_cleanup: free_frames=119578 allocated_frames=76591
+LTP CASE RUNTIME lstat01: 2655 ms
+========== END ltp lstat01 ==========
+========== START ltp chmod01 ==========
+RUN LTP CASE chmod01
+LTP MEMORY chmod01 before: free_frames=119578 allocated_frames=76591
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: TINFO: Testing variant: verify permissions of file
+chmod01.c:40: TPASS: chmod(testfile, 0000) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0000
+chmod01.c:40: TPASS: chmod(testfile, 0007) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0007
+chmod01.c:40: TPASS: chmod(testfile, 0070) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0070
+chmod01.c:40: TPASS: chmod(testfile, 0700) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0700
+chmod01.c:40: TPASS: chmod(testfile, 0777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0777
+chmod01.c:40: TPASS: chmod(testfile, 2777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=2777
+chmod01.c:40: TPASS: chmod(testfile, 4777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=4777
+chmod01.c:40: TPASS: chmod(testfile, 6777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=6777
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: TINFO: Testing variant: verify permissions of directory
+chmod01.c:40: TPASS: chmod(testdir_1, 0000) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0000
+chmod01.c:40: TPASS: chmod(testdir_1, 0007) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0007
+chmod01.c:40: TPASS: chmod(testdir_1, 0070) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0070
+chmod01.c:40: TPASS: chmod(testdir_1, 0700) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0700
+chmod01.c:40: TPASS: chmod(testdir_1, 0777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0777
+chmod01.c:40: TPASS: chmod(testdir_1, 2777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=2777
+chmod01.c:40: TPASS: chmod(testdir_1, 4777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=4777
+chmod01.c:40: TPASS: chmod(testdir_1, 6777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=6777
+
+Summary:
+passed   32
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[834.875942 0:1605 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[834.877072 0:1605 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[834.878171 0:1605 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE chmod01 : 0
+Pass!
+LTP MEMORY chmod01 after_run: free_frames=119548 allocated_frames=76621
+LTP MEMORY chmod01 after_cleanup: free_frames=119548 allocated_frames=76621
+LTP CASE RUNTIME chmod01: 2930 ms
+========== END ltp chmod01 ==========
+========== START ltp fchmod01 ==========
+RUN LTP CASE fchmod01
+LTP MEMORY fchmod01 before: free_frames=119548 allocated_frames=76621
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 0) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 07) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 070) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 0700) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 0777) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 02777) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 04777) successful
+fchmod01.c:40: TPASS: Functionality of fchmod(3, 06777) successful
+
+Summary:
+passed   8
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[837.807781 0:1612 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[837.810224 0:1612 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE fchmod01 : 0
+Pass!
+LTP MEMORY fchmod01 after_run: free_frames=119527 allocated_frames=76642
+LTP MEMORY fchmod01 after_cleanup: free_frames=119527 allocated_frames=76642
+LTP CASE RUNTIME fchmod01: 2893 ms
+========== END ltp fchmod01 ==========
+========== START ltp rmdir01 ==========
+RUN LTP CASE rmdir01
+LTP MEMORY rmdir01 before: free_frames=119527 allocated_frames=76642
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+rmdir01.c:33: TPASS: rmdir(testdir) success
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[840.520149 0:1616 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE rmdir01 : 0
+Pass!
+LTP MEMORY rmdir01 after_run: free_frames=119506 allocated_frames=76663
+LTP MEMORY rmdir01 after_cleanup: free_frames=119506 allocated_frames=76663
+LTP CASE RUNTIME rmdir01: 2699 ms
+========== END ltp rmdir01 ==========
+========== START ltp symlink01 ==========
+RUN LTP CASE symlink01
+LTP MEMORY symlink01 before: free_frames=119506 allocated_frames=76663
+[37m[843.376264 0:1620 axfs::root:433] [33m[AxError::IsADirectory][m
+[msymlink01    1  TPASS  :  Creation of symbolic link file to no object file is ok
+symlink01    2  TPASS  :  Creation of symbolic link file to no object file is ok
+symlink01    3  TPASS  :  Creation of symbolic link file and object file via symbolic link is ok
+symlink01    4  TPASS  :  Creating an existing symbolic link file error is caught
+symlink01    5  TPASS  :  Creating a symbolic link which exceeds maximum pathname error is caught
+PASS LTP CASE symlink01 : 0
+Pass!
+LTP MEMORY symlink01 after_run: free_frames=119494 allocated_frames=76675
+LTP MEMORY symlink01 after_cleanup: free_frames=119494 allocated_frames=76675
+LTP CASE RUNTIME symlink01: 2871 ms
+========== END ltp symlink01 ==========
+========== START ltp readlink01 ==========
+RUN LTP CASE readlink01
+LTP MEMORY readlink01 before: free_frames=119494 allocated_frames=76675
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+readlink01.c:64: TINFO: Running test as root
+readlink01.c:45: TPASS: readlink() functionality on 'slink_file' was correct
+readlink01.c:55: TINFO: Running test as nobody
+readlink01.c:45: TPASS: readlink() functionality on 'slink_file' was correct
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[846.198716 0:1621 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[846.201796 0:1621 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE readlink01 : 0
+Pass!
+LTP MEMORY readlink01 after_run: free_frames=119464 allocated_frames=76705
+LTP MEMORY readlink01 after_cleanup: free_frames=119464 allocated_frames=76705
+LTP CASE RUNTIME readlink01: 2825 ms
+========== END ltp readlink01 ==========
+========== START ltp ftruncate01 ==========
+RUN LTP CASE ftruncate01
+LTP MEMORY ftruncate01 before: free_frames=119464 allocated_frames=76705
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+ftruncate01.c:65: TINFO: Truncated length smaller than file size
+ftruncate01.c:60: TPASS: ftruncate() succeeded
+ftruncate01.c:74: TINFO: Truncated length exceeds file size
+ftruncate01.c:60: TPASS: ftruncate() succeeded
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[849.182233 0:1626 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[849.186842 0:1626 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE ftruncate01 : 0
+Pass!
+LTP MEMORY ftruncate01 after_run: free_frames=119443 allocated_frames=76726
+LTP MEMORY ftruncate01 after_cleanup: free_frames=119443 allocated_frames=76726
+LTP CASE RUNTIME ftruncate01: 2983 ms
+========== END ltp ftruncate01 ==========
+========== START ltp umask01 ==========
+RUN LTP CASE umask01
+LTP MEMORY umask01 before: free_frames=119443 allocated_frames=76726
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+umask01.c:57: TPASS: All files created with correct mode
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[852.175801 0:1630 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE umask01 : 0
+Pass!
+LTP MEMORY umask01 after_run: free_frames=119422 allocated_frames=76747
+LTP MEMORY umask01 after_cleanup: free_frames=119422 allocated_frames=76747
+LTP CASE RUNTIME umask01: 2964 ms
+========== END ltp umask01 ==========
+========== START ltp alarm02 ==========
+RUN LTP CASE alarm02
+LTP MEMORY alarm02 before: free_frames=119422 allocated_frames=76747
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+alarm02.c:36: TPASS: alarm(2147483647) passed
+alarm02.c:38: TPASS: alarm(0) passed
+alarm02.c:36: TPASS: alarm(2147483647) passed
+alarm02.c:38: TPASS: alarm(0) passed
+alarm02.c:36: TPASS: alarm(1073741823) passed
+alarm02.c:38: TPASS: alarm(0) passed
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[855.030833 0:1634 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE alarm02 : 0
+Pass!
+LTP MEMORY alarm02 after_run: free_frames=119401 allocated_frames=76768
+LTP MEMORY alarm02 after_cleanup: free_frames=119401 allocated_frames=76768
+LTP CASE RUNTIME alarm02: 2845 ms
+========== END ltp alarm02 ==========
+========== START ltp alarm03 ==========
+RUN LTP CASE alarm03
+LTP MEMORY alarm03 before: free_frames=119401 allocated_frames=76768
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+alarm03.c:30: TPASS: alarm(0) in parent process passed
+alarm03.c:26: TPASS: alarm(0) in child process passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[857.928117 0:1641 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE alarm03 : 0
+Pass!
+LTP MEMORY alarm03 after_run: free_frames=119371 allocated_frames=76798
+LTP MEMORY alarm03 after_cleanup: free_frames=119371 allocated_frames=76798
+LTP CASE RUNTIME alarm03: 2904 ms
+========== END ltp alarm03 ==========
+========== START ltp clock_gettime02 ==========
+RUN LTP CASE clock_gettime02
+LTP MEMORY clock_gettime02 before: free_frames=119371 allocated_frames=76798
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+clock_gettime02.c:102: TINFO: Testing variant: 0: syscall with old kernel spec
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock INVALID/UNKNOWN CLOCK failed as expected: EINVAL (22)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock INVALID/UNKNOWN CLOCK failed as expected: EINVAL (22)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_REALTIME failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_MONOTONIC failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_PROCESS_CPUTIME_ID failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_THREAD_CPUTIME_ID failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_REALTIME_COARSE failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_MONOTONIC_COARSE failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_MONOTONIC_RAW failed as expected: EFAULT (14)
+clock_gettime02.c:130: TPASS: clock_gettime(2): clock CLOCK_BOOTTIME failed as expected: EFAULT (14)
+
+Summary:
+passed   10
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[860.686548 0:1647 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE clock_gettime02 : 0
+Pass!
+LTP MEMORY clock_gettime02 after_run: free_frames=119350 allocated_frames=76819
+LTP MEMORY clock_gettime02 after_cleanup: free_frames=119350 allocated_frames=76819
+LTP CASE RUNTIME clock_gettime02: 2822 ms
+========== END ltp clock_gettime02 ==========
+========== START ltp gettimeofday01 ==========
+RUN LTP CASE gettimeofday01
+LTP MEMORY gettimeofday01 before: free_frames=119350 allocated_frames=76819
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+gettimeofday01.c:36: TPASS: tst_syscall(__NR_gettimeofday, tc->tv, tc->tz) : EFAULT (14)
+gettimeofday01.c:36: TPASS: tst_syscall(__NR_gettimeofday, tc->tv, tc->tz) : EFAULT (14)
+gettimeofday01.c:36: TPASS: tst_syscall(__NR_gettimeofday, tc->tv, tc->tz) : EFAULT (14)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[863.513910 0:1651 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE gettimeofday01 : 0
+Pass!
+LTP MEMORY gettimeofday01 after_run: free_frames=119329 allocated_frames=76840
+LTP MEMORY gettimeofday01 after_cleanup: free_frames=119329 allocated_frames=76840
+LTP CASE RUNTIME gettimeofday01: 2747 ms
+========== END ltp gettimeofday01 ==========
+========== START ltp time01 ==========
+RUN LTP CASE time01
+LTP MEMORY time01 before: free_frames=119329 allocated_frames=76840
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+time01.c:36: TPASS: time() returned value 866
+time01.c:38: TPASS: time() returned value 866, stored value 866 are same
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[866.345235 0:1655 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE time01 : 0
+Pass!
+LTP MEMORY time01 after_run: free_frames=119308 allocated_frames=76861
+LTP MEMORY time01 after_cleanup: free_frames=119308 allocated_frames=76861
+LTP CASE RUNTIME time01: 2856 ms
+========== END ltp time01 ==========
+========== START ltp times01 ==========
+RUN LTP CASE times01
+LTP MEMORY times01 before: free_frames=119308 allocated_frames=76861
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+times01.c:25: TPASS: times(&mytimes) returned 869212
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[869.245633 0:1659 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE times01 : 0
+Pass!
+LTP MEMORY times01 after_run: free_frames=119287 allocated_frames=76882
+LTP MEMORY times01 after_cleanup: free_frames=119287 allocated_frames=76882
+LTP CASE RUNTIME times01: 2881 ms
+========== END ltp times01 ==========
+========== START ltp kill03 ==========
+RUN LTP CASE kill03
+LTP MEMORY kill03 before: free_frames=119287 allocated_frames=76882
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+kill03.c:41: TPASS: kill failed as expected: EINVAL (22)
+kill03.c:41: TPASS: kill failed as expected: ESRCH (3)
+kill03.c:41: TPASS: kill failed as expected: ESRCH (3)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[872.060844 0:1663 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE kill03 : 0
+Pass!
+LTP MEMORY kill03 after_run: free_frames=119266 allocated_frames=76903
+LTP MEMORY kill03 after_cleanup: free_frames=119266 allocated_frames=76903
+LTP CASE RUNTIME kill03: 2802 ms
+========== END ltp kill03 ==========
+========== START ltp rt_sigaction01 ==========
+RUN LTP CASE rt_sigaction01
+LTP MEMORY rt_sigaction01 before: free_frames=119266 allocated_frames=76903
+rt_sigaction01    0  TINFO  :  signal: 34 
+rt_sigaction01    1  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 34
+rt_sigaction01    0  TINFO  :  signal: 34 
+rt_sigaction01    2  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 34
+rt_sigaction01    0  TINFO  :  signal: 34 
+rt_sigaction01    3  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 34
+rt_sigaction01    0  TINFO  :  signal: 34 
+rt_sigaction01    4  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 34
+rt_sigaction01    0  TINFO  :  signal: 34 
+rt_sigaction01    5  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 34
+rt_sigaction01    0  TINFO  :  signal: 35 
+rt_sigaction01    6  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  TINFO  :  signal: 35 
+rt_sigaction01    7  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  TINFO  :  signal: 35 
+rt_sigaction01    8  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  TINFO  :  signal: 35 
+rt_sigaction01    9  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  TINFO  :  signal: 35 
+rt_sigaction01   10  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 35
+rt_sigaction01    0  TINFO  :  signal: 36 
+rt_sigaction01   11  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  TINFO  :  signal: 36 
+rt_sigaction01   12  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  TINFO  :  signal: 36 
+rt_sigaction01   13  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  TINFO  :  signal: 36 
+rt_sigaction01   14  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  TINFO  :  signal: 36 
+rt_sigaction01   15  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 36
+rt_sigaction01    0  TINFO  :  signal: 37 
+rt_sigaction01   16  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  TINFO  :  signal: 37 
+rt_sigaction01   17  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  TINFO  :  signal: 37 
+rt_sigaction01   18  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  TINFO  :  signal: 37 
+rt_sigaction01   19  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  TINFO  :  signal: 37 
+rt_sigaction01   20  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 37
+rt_sigaction01    0  TINFO  :  signal: 38 
+rt_sigaction01   21  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  TINFO  :  signal: 38 
+rt_sigaction01   22  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  TINFO  :  signal: 38 
+rt_sigaction01   23  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  TINFO  :  signal: 38 
+rt_sigaction01   24  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  TINFO  :  signal: 38 
+rt_sigaction01   25  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 38
+rt_sigaction01    0  TINFO  :  signal: 39 
+rt_sigaction01   26  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  TINFO  :  signal: 39 
+rt_sigaction01   27  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  TINFO  :  signal: 39 
+rt_sigaction01   28  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  TINFO  :  signal: 39 
+rt_sigaction01   29  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  TINFO  :  signal: 39 
+rt_sigaction01   30  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 39
+rt_sigaction01    0  TINFO  :  signal: 40 
+rt_sigaction01   31  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  TINFO  :  signal: 40 
+rt_sigaction01   32  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  TINFO  :  signal: 40 
+rt_sigaction01   33  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  TINFO  :  signal: 40 
+rt_sigaction01   34  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  TINFO  :  signal: 40 
+rt_sigaction01   35  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 40
+rt_sigaction01    0  TINFO  :  signal: 41 
+rt_sigaction01   36  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  TINFO  :  signal: 41 
+rt_sigaction01   37  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  TINFO  :  signal: 41 
+rt_sigaction01   38  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  TINFO  :  signal: 41 
+rt_sigaction01   39  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  TINFO  :  signal: 41 
+rt_sigaction01   40  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 41
+rt_sigaction01    0  TINFO  :  signal: 42 
+rt_sigaction01   41  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  TINFO  :  signal: 42 
+rt_sigaction01   42  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  TINFO  :  signal: 42 
+rt_sigaction01   43  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  TINFO  :  signal: 42 
+rt_sigaction01   44  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  TINFO  :  signal: 42 
+rt_sigaction01   45  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 42
+rt_sigaction01    0  TINFO  :  signal: 43 
+rt_sigaction01   46  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  TINFO  :  signal: 43 
+rt_sigaction01   47  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  TINFO  :  signal: 43 
+rt_sigaction01   48  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  TINFO  :  signal: 43 
+rt_sigaction01   49  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  TINFO  :  signal: 43 
+rt_sigaction01   50  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 43
+rt_sigaction01    0  TINFO  :  signal: 44 
+rt_sigaction01   51  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  TINFO  :  signal: 44 
+rt_sigaction01   52  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  TINFO  :  signal: 44 
+rt_sigaction01   53  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  TINFO  :  signal: 44 
+rt_sigaction01   54  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  TINFO  :  signal: 44 
+rt_sigaction01   55  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 44
+rt_sigaction01    0  TINFO  :  signal: 45 
+rt_sigaction01   56  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  TINFO  :  signal: 45 
+rt_sigaction01   57  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  TINFO  :  signal: 45 
+rt_sigaction01   58  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  TINFO  :  signal: 45 
+rt_sigaction01   59  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  TINFO  :  signal: 45 
+rt_sigaction01   60  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 45
+rt_sigaction01    0  TINFO  :  signal: 46 
+rt_sigaction01   61  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  TINFO  :  signal: 46 
+rt_sigaction01   62  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  TINFO  :  signal: 46 
+rt_sigaction01   63  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  TINFO  :  signal: 46 
+rt_sigaction01   64  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  TINFO  :  signal: 46 
+rt_sigaction01   65  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 46
+rt_sigaction01    0  TINFO  :  signal: 47 
+rt_sigaction01   66  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  TINFO  :  signal: 47 
+rt_sigaction01   67  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  TINFO  :  signal: 47 
+rt_sigaction01   68  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  TINFO  :  signal: 47 
+rt_sigaction01   69  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  TINFO  :  signal: 47 
+rt_sigaction01   70  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 47
+rt_sigaction01    0  TINFO  :  signal: 48 
+rt_sigaction01   71  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  TINFO  :  signal: 48 
+rt_sigaction01   72  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  TINFO  :  signal: 48 
+rt_sigaction01   73  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  TINFO  :  signal: 48 
+rt_sigaction01   74  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  TINFO  :  signal: 48 
+rt_sigaction01   75  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 48
+rt_sigaction01    0  TINFO  :  signal: 49 
+rt_sigaction01   76  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  TINFO  :  signal: 49 
+rt_sigaction01   77  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  TINFO  :  signal: 49 
+rt_sigaction01   78  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  TINFO  :  signal: 49 
+rt_sigaction01   79  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  TINFO  :  signal: 49 
+rt_sigaction01   80  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 49
+rt_sigaction01    0  TINFO  :  signal: 50 
+rt_sigaction01   81  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  TINFO  :  signal: 50 
+rt_sigaction01   82  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  TINFO  :  signal: 50 
+rt_sigaction01   83  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  TINFO  :  signal: 50 
+rt_sigaction01   84  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  TINFO  :  signal: 50 
+rt_sigaction01   85  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 50
+rt_sigaction01    0  TINFO  :  signal: 51 
+rt_sigaction01   86  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  TINFO  :  signal: 51 
+rt_sigaction01   87  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  TINFO  :  signal: 51 
+rt_sigaction01   88  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  TINFO  :  signal: 51 
+rt_sigaction01   89  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  TINFO  :  signal: 51 
+rt_sigaction01   90  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 51
+rt_sigaction01    0  TINFO  :  signal: 52 
+rt_sigaction01   91  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  TINFO  :  signal: 52 
+rt_sigaction01   92  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  TINFO  :  signal: 52 
+rt_sigaction01   93  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  TINFO  :  signal: 52 
+rt_sigaction01   94  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  TINFO  :  signal: 52 
+rt_sigaction01   95  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 52
+rt_sigaction01    0  TINFO  :  signal: 53 
+rt_sigaction01   96  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  TINFO  :  signal: 53 
+rt_sigaction01   97  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  TINFO  :  signal: 53 
+rt_sigaction01   98  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  TINFO  :  signal: 53 
+rt_sigaction01   99  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  TINFO  :  signal: 53 
+rt_sigaction01  100  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 53
+rt_sigaction01    0  TINFO  :  signal: 54 
+rt_sigaction01  101  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  TINFO  :  signal: 54 
+rt_sigaction01  102  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  TINFO  :  signal: 54 
+rt_sigaction01  103  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  TINFO  :  signal: 54 
+rt_sigaction01  104  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  TINFO  :  signal: 54 
+rt_sigaction01  105  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 54
+rt_sigaction01    0  TINFO  :  signal: 55 
+rt_sigaction01  106  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  TINFO  :  signal: 55 
+rt_sigaction01  107  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  TINFO  :  signal: 55 
+rt_sigaction01  108  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  TINFO  :  signal: 55 
+rt_sigaction01  109  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  TINFO  :  signal: 55 
+rt_sigaction01  110  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 55
+rt_sigaction01    0  TINFO  :  signal: 56 
+rt_sigaction01  111  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  TINFO  :  signal: 56 
+rt_sigaction01  112  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  TINFO  :  signal: 56 
+rt_sigaction01  113  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  TINFO  :  signal: 56 
+rt_sigaction01  114  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  TINFO  :  signal: 56 
+rt_sigaction01  115  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 56
+rt_sigaction01    0  TINFO  :  signal: 57 
+rt_sigaction01  116  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  TINFO  :  signal: 57 
+rt_sigaction01  117  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  TINFO  :  signal: 57 
+rt_sigaction01  118  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  TINFO  :  signal: 57 
+rt_sigaction01  119  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  TINFO  :  signal: 57 
+rt_sigaction01  120  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 57
+rt_sigaction01    0  TINFO  :  signal: 58 
+rt_sigaction01  121  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  TINFO  :  signal: 58 
+rt_sigaction01  122  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  TINFO  :  signal: 58 
+rt_sigaction01  123  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  TINFO  :  signal: 58 
+rt_sigaction01  124  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  TINFO  :  signal: 58 
+rt_sigaction01  125  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 58
+rt_sigaction01    0  TINFO  :  signal: 59 
+rt_sigaction01  126  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  TINFO  :  signal: 59 
+rt_sigaction01  127  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  TINFO  :  signal: 59 
+rt_sigaction01  128  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  TINFO  :  signal: 59 
+rt_sigaction01  129  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  TINFO  :  signal: 59 
+rt_sigaction01  130  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 59
+rt_sigaction01    0  TINFO  :  signal: 60 
+rt_sigaction01  131  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  TINFO  :  signal: 60 
+rt_sigaction01  132  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  TINFO  :  signal: 60 
+rt_sigaction01  133  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  TINFO  :  signal: 60 
+rt_sigaction01  134  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  TINFO  :  signal: 60 
+rt_sigaction01  135  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 60
+rt_sigaction01    0  TINFO  :  signal: 61 
+rt_sigaction01  136  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  TINFO  :  signal: 61 
+rt_sigaction01  137  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  TINFO  :  signal: 61 
+rt_sigaction01  138  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  TINFO  :  signal: 61 
+rt_sigaction01  139  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  TINFO  :  signal: 61 
+rt_sigaction01  140  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 61
+rt_sigaction01    0  TINFO  :  signal: 62 
+rt_sigaction01  141  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  TINFO  :  signal: 62 
+rt_sigaction01  142  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  TINFO  :  signal: 62 
+rt_sigaction01  143  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  TINFO  :  signal: 62 
+rt_sigaction01  144  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  TINFO  :  signal: 62 
+rt_sigaction01  145  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 62
+rt_sigaction01    0  TINFO  :  signal: 63 
+rt_sigaction01  146  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  TINFO  :  signal: 63 
+rt_sigaction01  147  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  TINFO  :  signal: 63 
+rt_sigaction01  148  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  TINFO  :  signal: 63 
+rt_sigaction01  149  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  TINFO  :  signal: 63 
+rt_sigaction01  150  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 63
+rt_sigaction01    0  TINFO  :  signal: 64 
+rt_sigaction01  151  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  TINFO  :  signal: 64 
+rt_sigaction01  152  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  TINFO  :  signal: 64 
+rt_sigaction01  153  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  TINFO  :  signal: 64 
+rt_sigaction01  154  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 64
+rt_sigaction01    0  TINFO  :  signal: 64 
+rt_sigaction01  155  TPASS  :  rt_sigaction call succeeded: result = 0 
+rt_sigaction01    0  TINFO  : [37m[875.169169 0:1667 axfs::root:433] [33m[AxError::IsADirectory][m
+[m sa.sa_flags = SA_NOMASK 
+rt_sigaction01    0  TINFO  :  Signal Handler Called with signal number 64
+PASS LTP CASE rt_sigaction01 : 0
+Pass!
+LTP MEMORY rt_sigaction01 after_run: free_frames=119254 allocated_frames=76915
+LTP MEMORY rt_sigaction01 after_cleanup: free_frames=119254 allocated_frames=76915
+LTP CASE RUNTIME rt_sigaction01: 3114 ms
+========== END ltp rt_sigaction01 ==========
+========== START ltp sigaction01 ==========
+RUN LTP CASE sigaction01
+LTP MEMORY sigaction01 before: free_frames=119254 allocated_frames=76915
+sigaction01    1  TPASS  :  SA_RESETHAND did not cause SA_SIGINFO to be cleared
+sigaction01    2  TPASS  :  SA_RESETHAND was masked when handler executed
+sigaction01    3  TPASS  :  sig has been masked because sa_mask originally contained sig
+sigaction01    4  TPASS  :  siginfo pointer non NULL
+PASS LTP CASE sigaction01 : 0
+Pass!
+LTP MEMORY sigaction01 after_run: free_frames=119242 allocated_frames=76927
+LTP MEMORY sigaction01 after_cleanup: free_frames=119242 allocated_frames=76927
+LTP CASE RUNTIME sigaction01: 2838 ms
+========== END ltp sigaction01 ==========
+========== START ltp proc01 ==========
+RUN LTP CASE proc01
+LTP MEMORY proc01 before: free_frames=119242 allocated_frames=76927
+[37m[880.991371 0:1669 axfs::root:433] [33m[AxError::IsADirectory][m
+[mproc01      1  TPASS  :  readproc() completed successfully, total read: 875 bytes, 20 objs
+PASS LTP CASE proc01 : 0
+Pass!
+LTP MEMORY proc01 after_run: free_frames=119230 allocated_frames=76939
+LTP MEMORY proc01 after_cleanup: free_frames=119230 allocated_frames=76939
+LTP CASE RUNTIME proc01: 2980 ms
+========== END ltp proc01 ==========
+========== START ltp exit01 ==========
+RUN LTP CASE exit01
+LTP MEMORY exit01 before: free_frames=119230 allocated_frames=76939
+exit01      1  TPASS  :  exit() test PASSED
+PASS LTP CASE exit01 : 0
+Pass!
+LTP MEMORY exit01 after_run: free_frames=119209 allocated_frames=76960
+LTP MEMORY exit01 after_cleanup: free_frames=119209 allocated_frames=76960
+LTP CASE RUNTIME exit01: 2848 ms
+========== END ltp exit01 ==========
+========== START ltp exit02 ==========
+RUN LTP CASE exit02
+LTP MEMORY exit02 before: free_frames=119209 allocated_frames=76960
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+exit02.c:46: TPASS: File written by child read back correctly
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[886.616522 0:1672 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE exit02 : 0
+Pass!
+LTP MEMORY exit02 after_run: free_frames=119179 allocated_frames=76990
+LTP MEMORY exit02 after_cleanup: free_frames=119179 allocated_frames=76990
+LTP CASE RUNTIME exit02: 2772 ms
+========== END ltp exit02 ==========
+========== START ltp exit_group01 ==========
+RUN LTP CASE exit_group01
+LTP MEMORY exit_group01 before: free_frames=119179 allocated_frames=76990
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+exit_group01.c:98: TPASS: Expect: exit_group() succeeded
+exit_group01.c:61: TINFO: Checking if threads are still running
+exit_group01.c:77: TINFO: Threads counters value didn't change
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[889.638664 0:1677 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[889.640480 0:1677 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE exit_group01 : 0
+Pass!
+LTP MEMORY exit_group01 after_run: free_frames=119147 allocated_frames=77022
+LTP MEMORY exit_group01 after_cleanup: free_frames=119147 allocated_frames=77022
+LTP CASE RUNTIME exit_group01: 3021 ms
+========== END ltp exit_group01 ==========
+========== START ltp getpgrp01 ==========
+RUN LTP CASE getpgrp01
+LTP MEMORY getpgrp01 before: free_frames=119147 allocated_frames=77022
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getpgrp01.c:18: TPASS: getpgrp() returned pid 1686
+getpgrp01.c:19: TPASS: TST_RET == SAFE_GETPGID(0) (1686)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[892.585311 0:1684 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getpgrp01 : 0
+Pass!
+LTP MEMORY getpgrp01 after_run: free_frames=119126 allocated_frames=77043
+LTP MEMORY getpgrp01 after_cleanup: free_frames=119126 allocated_frames=77043
+LTP CASE RUNTIME getpgrp01: 2944 ms
+========== END ltp getpgrp01 ==========
+========== START ltp gettid01 ==========
+RUN LTP CASE gettid01
+LTP MEMORY gettid01 before: free_frames=119126 allocated_frames=77043
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+gettid01.c:26: TPASS: tst_syscall(__NR_gettid) == tst_syscall(__NR_getpid) (1690)
+gettid01.c:27: TPASS: tst_syscall(__NR_gettid) == pid (1690)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[895.292017 0:1688 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE gettid01 : 0
+Pass!
+LTP MEMORY gettid01 after_run: free_frames=119105 allocated_frames=77064
+LTP MEMORY gettid01 after_cleanup: free_frames=119105 allocated_frames=77064
+LTP CASE RUNTIME gettid01: 2727 ms
+========== END ltp gettid01 ==========
+========== START ltp uname01 ==========
+RUN LTP CASE uname01
+LTP MEMORY uname01 before: free_frames=119105 allocated_frames=77064
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+uname01.c:21: TPASS: uname(&un) passed
+uname01.c:31: TPASS: sysname set to Linux
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[898.164886 0:1692 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE uname01 : 0
+Pass!
+LTP MEMORY uname01 after_run: free_frames=119084 allocated_frames=77085
+LTP MEMORY uname01 after_cleanup: free_frames=119084 allocated_frames=77085
+LTP CASE RUNTIME uname01: 2917 ms
+========== END ltp uname01 ==========
+========== START ltp getrlimit01 ==========
+RUN LTP CASE getrlimit01
+LTP MEMORY getrlimit01 before: free_frames=119084 allocated_frames=77085
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_CPU passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_FSIZE passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_DATA passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_STACK passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_CORE passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_RSS passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_NPROC passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_NOFILE passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_MEMLOCK passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_AS passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_LOCKS passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_MSGQUEUE passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_NICE passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_RTPRIO passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_SIGPENDING passed
+getrlimit01.c:50: TPASS: getrlimit() test for RLIMIT_RTTIME passed
+
+Summary:
+passed   16
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[901.055725 0:1696 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getrlimit01 : 0
+Pass!
+LTP MEMORY getrlimit01 after_run: free_frames=119063 allocated_frames=77106
+LTP MEMORY getrlimit01 after_cleanup: free_frames=119063 allocated_frames=77106
+LTP CASE RUNTIME getrlimit01: 2800 ms
+========== END ltp getrlimit01 ==========
+========== START ltp getrusage01 ==========
+RUN LTP CASE getrusage01
+LTP MEMORY getrusage01 before: free_frames=119063 allocated_frames=77106
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getrusage01.c:29: TPASS: getrusage(RUSAGE_SELF, 0x1000223f70) passed
+getrusage01.c:29: TPASS: getrusage(RUSAGE_CHILDREN, 0x1000223f70) passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[903.907798 0:1700 axfs::root:433] [33m[AxError::IsADirectory][m
+[mPASS LTP CASE getrusage01 : 0
+Pass!
+LTP MEMORY getrusage01 after_run: free_frames=119042 allocated_frames=77127
+LTP MEMORY getrusage01 after_cleanup: free_frames=119042 allocated_frames=77127
+LTP CASE RUNTIME getrusage01: 2870 ms
+========== END ltp getrusage01 ==========
+========== START ltp sched_yield01 ==========
+RUN LTP CASE sched_yield01
+LTP MEMORY sched_yield01 before: free_frames=119042 allocated_frames=77127
+sched_yield01    1  TPASS  :  sched_yield() call succeeded
+PASS LTP CASE sched_yield01 : 0
+Pass!
+LTP MEMORY sched_yield01 after_run: free_frames=119030 allocated_frames=77139
+LTP MEMORY sched_yield01 after_cleanup: free_frames=119030 allocated_frames=77139
+LTP CASE RUNTIME sched_yield01: 2806 ms
+========== END ltp sched_yield01 ==========
+ltp cases: 63 passed, 0 failed, 0 timed out
 #### OS COMP TEST GROUP END ltp-glibc ####
 #### OS COMP TEST GROUP START libcbench-musl ####
 b_malloc_sparse (0)
-  time: 1.565413460, virt: 0, res: 0, dirty: 0
+  time: 1.858284810, virt: 0, res: 0, dirty: 0
 
 b_malloc_bubble (0)
-  time: 1.513273810, virt: 0, res: 0, dirty: 0
+  time: 1.783211600, virt: 0, res: 0, dirty: 0
 
 b_malloc_tiny1 (0)
-  time: 0.026236940, virt: 0, res: 0, dirty: 0
+  time: 0.074924000, virt: 0, res: 0, dirty: 0
 
 b_malloc_tiny2 (0)
-  time: 0.022904120, virt: 0, res: 0, dirty: 0
+  time: 0.020889930, virt: 0, res: 0, dirty: 0
 
 b_malloc_big1 (0)
-  time: 0.642027120, virt: 0, res: 0, dirty: 0
+  time: 0.612436440, virt: 0, res: 0, dirty: 0
 
 b_malloc_big2 (0)
-  time: 0.474488440, virt: 0, res: 0, dirty: 0
+  time: 0.650003760, virt: 0, res: 0, dirty: 0
 
 b_malloc_thread_stress (0)
-  time: 0.205791980, virt: 0, res: 0, dirty: 0
+  time: 0.153398770, virt: 0, res: 0, dirty: 0
 
 b_malloc_thread_local (0)
-  time: 0.123546180, virt: 0, res: 0, dirty: 0
+  time: 0.172562450, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("abcdefghijklmnopqrstuvwxyz")
-  time: 0.027988210, virt: 0, res: 0, dirty: 0
+  time: 0.052325870, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("azbycxdwevfugthsirjqkplomn")
-  time: 0.040853740, virt: 0, res: 0, dirty: 0
+  time: 0.076411550, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("aaaaaaaaaaaaaacccccccccccc")
-  time: 0.026759510, virt: 0, res: 0, dirty: 0
+  time: 0.052205340, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("aaaaaaaaaaaaaaaaaaaaaaaaac")
-  time: 0.026630040, virt: 0, res: 0, dirty: 0
+  time: 0.027848230, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac")
-  time: 0.033213680, virt: 0, res: 0, dirty: 0
+  time: 0.033708760, virt: 0, res: 0, dirty: 0
 
 b_string_memset (0)
-  time: 0.020294500, virt: 0, res: 0, dirty: 0
+  time: 0.020912260, virt: 0, res: 0, dirty: 0
 
 b_string_strchr (0)
-  time: 0.038434460, virt: 0, res: 0, dirty: 0
+  time: 0.036684270, virt: 0, res: 0, dirty: 0
 
 b_string_strlen (0)
-  time: 0.030291060, virt: 0, res: 0, dirty: 0
+  time: 0.047132340, virt: 0, res: 0, dirty: 0
 
 b_pthread_createjoin_serial1 (0)
-  time: 0.006080510, virt: 0, res: 0, dirty: 0
+  time: 0.009926740, virt: 0, res: 0, dirty: 0
 
 b_pthread_createjoin_serial2 (0)
-  time: 0.835112690, virt: 0, res: 0, dirty: 0
+  time: 1.282777360, virt: 0, res: 0, dirty: 0
 
 b_pthread_create_serial1 (0)
-  time: 0.001466520, virt: 0, res: 0, dirty: 0
+  time: 0.001691650, virt: 0, res: 0, dirty: 0
 
 b_pthread_uselesslock (0)
-  time: 0.106207400, virt: 0, res: 0, dirty: 0
+  time: 0.108820130, virt: 0, res: 0, dirty: 0
 
 b_utf8_bigbuf (0)
-  time: 0.091633540, virt: 0, res: 0, dirty: 0
+  time: 0.137168140, virt: 0, res: 0, dirty: 0
 
 b_utf8_onebyone (0)
-  time: 0.289838210, virt: 0, res: 0, dirty: 0
+  time: 0.322090030, virt: 0, res: 0, dirty: 0
 
 b_stdio_putcgetc (0)
-  time: 0.497655840, virt: 0, res: 0, dirty: 0
+  time: 0.738418990, virt: 0, res: 0, dirty: 0
 
 b_stdio_putcgetc_unlocked (0)
-  time: 0.469348250, virt: 0, res: 0, dirty: 0
+  time: 0.602696210, virt: 0, res: 0, dirty: 0
 
 b_regex_compile ("(a|b|c)*d*b")
-  time: 0.656213350, virt: 0, res: 0, dirty: 0
+  time: 0.865281430, virt: 0, res: 0, dirty: 0
 
 b_regex_search ("(a|b|c)*d*b")
-  time: 0.270164200, virt: 0, res: 0, dirty: 0
+  time: 0.265730130, virt: 0, res: 0, dirty: 0
 
 b_regex_search ("a{25}b")
-  time: 0.445176950, virt: 0, res: 0, dirty: 0
+  time: 0.632143110, virt: 0, res: 0, dirty: 0
 
 #### OS COMP TEST GROUP END libcbench-musl ####
 #### OS COMP TEST GROUP START libcbench-glibc ####
 b_malloc_sparse (0)
-  time: 1.299624250, virt: 0, res: 0, dirty: 0
+  time: 1.610559160, virt: 0, res: 0, dirty: 0
 
 b_malloc_bubble (0)
-  time: 1.385794070, virt: 0, res: 0, dirty: 0
+  time: 1.522607560, virt: 0, res: 0, dirty: 0
 
 b_malloc_tiny1 (0)
-  time: 0.021145430, virt: 0, res: 0, dirty: 0
+  time: 0.033432380, virt: 0, res: 0, dirty: 0
 
 b_malloc_tiny2 (0)
-  time: 0.021278390, virt: 0, res: 0, dirty: 0
+  time: 0.036804860, virt: 0, res: 0, dirty: 0
 
 b_malloc_big1 (0)
-  time: 0.287105870, virt: 0, res: 0, dirty: 0
+  time: 0.323382630, virt: 0, res: 0, dirty: 0
 
 b_malloc_big2 (0)
-  time: 0.383525170, virt: 0, res: 0, dirty: 0
+  time: 0.280331920, virt: 0, res: 0, dirty: 0
 
 The futex facility returned an unexpected error code.
 The futex facility returned an unexpected error code.
 b_string_strstr ("abcdefghijklmnopqrstuvwxyz")
-  time: 0.023924190, virt: 0, res: 0, dirty: 0
+  time: 0.037714080, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("azbycxdwevfugthsirjqkplomn")
-  time: 0.022933280, virt: 0, res: 0, dirty: 0
+  time: 0.063435200, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("aaaaaaaaaaaaaacccccccccccc")
-  time: 0.042136730, virt: 0, res: 0, dirty: 0
+  time: 0.059036290, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("aaaaaaaaaaaaaaaaaaaaaaaaac")
-  time: 0.023092950, virt: 0, res: 0, dirty: 0
+  time: 0.024186670, virt: 0, res: 0, dirty: 0
 
 b_string_strstr ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac")
-  time: 0.026534880, virt: 0, res: 0, dirty: 0
+  time: 0.026733340, virt: 0, res: 0, dirty: 0
 
 b_string_memset (0)
-  time: 0.020036640, virt: 0, res: 0, dirty: 0
+  time: 0.038862160, virt: 0, res: 0, dirty: 0
 
 b_string_strchr (0)
-  time: 0.033087290, virt: 0, res: 0, dirty: 0
+  time: 0.062097090, virt: 0, res: 0, dirty: 0
 
 b_string_strlen (0)
-  time: 0.028455000, virt: 0, res: 0, dirty: 0
+  time: 0.050093730, virt: 0, res: 0, dirty: 0
 
 The futex facility returned an unexpected error code.
 b_pthread_create_serial1 (0)
-  time: 0.004961460, virt: 0, res: 0, dirty: 0
+  time: 0.005090060, virt: 0, res: 0, dirty: 0
 
 The futex facility returned an unexpected error code.
 b_utf8_bigbuf (0)
-  time: 0.077150280, virt: 0, res: 0, dirty: 0
+  time: 0.111604810, virt: 0, res: 0, dirty: 0
 
 b_utf8_onebyone (0)
-  time: 0.063720800, virt: 0, res: 0, dirty: 0
+  time: 0.112415510, virt: 0, res: 0, dirty: 0
 
 b_regex_compile ("(a|b|c)*d*b")
-  time: 0.065157500, virt: 0, res: 0, dirty: 0
+  time: 0.069208390, virt: 0, res: 0, dirty: 0
 
 b_regex_search ("(a|b|c)*d*b")
-  time: 0.026797260, virt: 0, res: 0, dirty: 0
+  time: 0.025412960, virt: 0, res: 0, dirty: 0
 
 b_regex_search ("a{25}b")
-  time: 0.318940030, virt: 0, res: 0, dirty: 0
+  time: 0.300342190, virt: 0, res: 0, dirty: 0
 
 #### OS COMP TEST GROUP END libcbench-glibc ####
 #### OS COMP TEST GROUP START iperf-musl ####
 ====== iperf BASIC_UDP begin ======
 Connecting to host 127.0.0.1, port 5001
-[  5] local 0.0.0.0 port 49154 connected to 127.0.0.1 port 5001
+[  5] local 0.0.0.0 port 49152 connected to 127.0.0.1 port 5001
 [ ID] Interval           Transfer     Bitrate         Total Datagrams
-[  5]   0.00-2.00   sec  3.09 MBytes  12.9 Mbits/sec  2216  
+[  5]   0.00-2.00   sec  2.34 MBytes  9.83 Mbits/sec  1684  
 - - - - - - - - - - - - - - - - - - - - - - - - -
 [ ID] Interval           Transfer     Bitrate         Jitter    Lost/Total Datagrams
-[  5]   0.00-2.00   sec  3.09 MBytes  12.9 Mbits/sec  0.000 ms  0/2216 (0%)  sender
-[  5]   0.00-2.00   sec  3.09 MBytes  12.9 Mbits/sec  0.090 ms  0/2216 (0%)  receiver
+[  5]   0.00-2.00   sec  2.34 MBytes  9.83 Mbits/sec  0.000 ms  0/1684 (0%)  sender
+[  5]   0.00-2.00   sec  2.34 MBytes  9.81 Mbits/sec  0.084 ms  0/1684 (0%)  receiver
 
 iperf Done.
 ====== iperf BASIC_UDP end: success ======
 
 ====== iperf BASIC_TCP begin ======
 Connecting to host 127.0.0.1, port 5001
-[  5] local 127.0.0.1 port 49158 connected to 127.0.0.1 port 5001
+[  5] local 127.0.0.1 port 49154 connected to 127.0.0.1 port 5001
 [ ID] Interval           Transfer     Bitrate         Retr  Cwnd
-[  5]   0.00-2.00   sec  69.2 MBytes   290 Mbits/sec    0   0.00 Bytes       
+[  5]   0.00-2.00   sec  51.2 MBytes   215 Mbits/sec    0   0.00 Bytes       
 - - - - - - - - - - - - - - - - - - - - - - - - -
 [ ID] Interval           Transfer     Bitrate         Retr
-[  5]   0.00-2.00   sec  69.2 MBytes   290 Mbits/sec    0             sender
-[  5]   0.00-2.01   sec  68.4 MBytes   286 Mbits/sec                  receiver
+[  5]   0.00-2.00   sec  51.2 MBytes   215 Mbits/sec    0             sender
+[  5]   0.00-2.01   sec  50.4 MBytes   210 Mbits/sec                  receiver
 
 iperf Done.
 ====== iperf BASIC_TCP end: success ======
 
 ====== iperf PARALLEL_UDP begin ======
 Connecting to host 127.0.0.1, port 5001
-[  5] local 0.0.0.0 port 49155 connected to 127.0.0.1 port 5001
-[  7] local 0.0.0.0 port 49156 connected to 127.0.0.1 port 5001
-[  9] local 0.0.0.0 port 49157 connected to 127.0.0.1 port 5001
-[ 11] local 0.0.0.0 port 49158 connected to 127.0.0.1 port 5001
-[ 13] local 0.0.0.0 port 49159 connected to 127.0.0.1 port 5001
+[  5] local 0.0.0.0 port 49153 connected to 127.0.0.1 port 5001
+[  7] local 0.0.0.0 port 49154 connected to 127.0.0.1 port 5001
+[  9] local 0.0.0.0 port 49155 connected to 127.0.0.1 port 5001
+[ 11] local 0.0.0.0 port 49156 connected to 127.0.0.1 port 5001
+[ 13] local 0.0.0.0 port 49157 connected to 127.0.0.1 port 5001
 [ ID] Interval           Transfer     Bitrate         Total Datagrams
-[  5]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  577  
-[  7]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  577  
-[  9]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  577  
-[ 11]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  577  
-[ 13]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  577  
-[SUM]   0.00-2.00   sec  4.02 MBytes  16.8 Mbits/sec  2885  
+[  5]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  459  
+[  7]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  459  
+[  9]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  459  
+[ 11]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  459  
+[ 13]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  459  
+[SUM]   0.00-2.00   sec  3.20 MBytes  13.4 Mbits/sec  2295  
 - - - - - - - - - - - - - - - - - - - - - - - - -
 [ ID] Interval           Transfer     Bitrate         Jitter    Lost/Total Datagrams
-[  5]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  0.000 ms  0/577 (0%)  sender
-[  5]   0.00-2.00   sec   823 KBytes  3.36 Mbits/sec  0.061 ms  0/577 (0%)  receiver
-[  7]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  0.000 ms  0/577 (0%)  sender
-[  7]   0.00-2.00   sec   823 KBytes  3.36 Mbits/sec  0.049 ms  0/577 (0%)  receiver
-[  9]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  0.000 ms  0/577 (0%)  sender
-[  9]   0.00-2.00   sec   823 KBytes  3.36 Mbits/sec  0.100 ms  0/577 (0%)  receiver
-[ 11]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  0.000 ms  0/577 (0%)  sender
-[ 11]   0.00-2.00   sec   823 KBytes  3.36 Mbits/sec  0.072 ms  0/577 (0%)  receiver
-[ 13]   0.00-2.00   sec   823 KBytes  3.37 Mbits/sec  0.000 ms  0/577 (0%)  sender
-[ 13]   0.00-2.00   sec   823 KBytes  3.36 Mbits/sec  0.136 ms  0/577 (0%)  receiver
-[SUM]   0.00-2.00   sec  4.02 MBytes  16.8 Mbits/sec  0.000 ms  0/2885 (0%)  sender
-[SUM]   0.00-2.00   sec  4.02 MBytes  16.8 Mbits/sec  0.083 ms  0/2885 (0%)  receiver
+[  5]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  0.000 ms  0/459 (0%)  sender
+[  5]   0.00-2.01   sec   654 KBytes  2.67 Mbits/sec  0.924 ms  0/459 (0%)  receiver
+[  7]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  0.000 ms  0/459 (0%)  sender
+[  7]   0.00-2.01   sec   654 KBytes  2.67 Mbits/sec  0.635 ms  0/459 (0%)  receiver
+[  9]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  0.000 ms  0/459 (0%)  sender
+[  9]   0.00-2.01   sec   654 KBytes  2.67 Mbits/sec  0.447 ms  0/459 (0%)  receiver
+[ 11]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  0.000 ms  0/459 (0%)  sender
+[ 11]   0.00-2.01   sec   654 KBytes  2.67 Mbits/sec  1.500 ms  0/459 (0%)  receiver
+[ 13]   0.00-2.00   sec   654 KBytes  2.68 Mbits/sec  0.000 ms  0/459 (0%)  sender
+[ 13]   0.00-2.01   sec   654 KBytes  2.67 Mbits/sec  1.195 ms  0/459 (0%)  receiver
+[SUM]   0.00-2.00   sec  3.20 MBytes  13.4 Mbits/sec  0.000 ms  0/2295 (0%)  sender
+[SUM]   0.00-2.01   sec  3.20 MBytes  13.3 Mbits/sec  0.940 ms  0/2295 (0%)  receiver
 
 iperf Done.
 ====== iperf PARALLEL_UDP end: success ======
 
 ====== iperf PARALLEL_TCP begin ======
 Connecting to host 127.0.0.1, port 5001
-[  5] local 127.0.0.1 port 49161 connected to 127.0.0.1 port 5001
-[  7] local 127.0.0.1 port 49162 connected to 127.0.0.1 port 5001
-[  9] local 127.0.0.1 port 49163 connected to 127.0.0.1 port 5001
-[ 11] local 127.0.0.1 port 49164 connected to 127.0.0.1 port 5001
-[ 13] local 127.0.0.1 port 49165 connected to 127.0.0.1 port 5001
+[  5] local 127.0.0.1 port 49157 connected to 127.0.0.1 port 5001
+[  7] local 127.0.0.1 port 49158 connected to 127.0.0.1 port 5001
+[  9] local 127.0.0.1 port 49159 connected to 127.0.0.1 port 5001
+[ 11] local 127.0.0.1 port 49160 connected to 127.0.0.1 port 5001
+[ 13] local 127.0.0.1 port 49161 connected to 127.0.0.1 port 5001
 [ ID] Interval           Transfer     Bitrate         Retr  Cwnd
-[  5]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0   0.00 Bytes       
-[  7]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0   0.00 Bytes       
-[  9]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0   0.00 Bytes       
-[ 11]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0   0.00 Bytes       
-[ 13]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0   0.00 Bytes       
-[SUM]   0.00-2.02   sec  85.0 MBytes   353 Mbits/sec    0             
+[  5]   0.00-2.00   sec  12.5 MBytes  52.3 Mbits/sec    0   0.00 Bytes       
+[  7]   0.00-2.01   sec  12.5 MBytes  52.3 Mbits/sec    0   0.00 Bytes       
+[  9]   0.00-2.01   sec  12.5 MBytes  52.3 Mbits/sec    0   0.00 Bytes       
+[ 11]   0.00-2.01   sec  12.5 MBytes  52.3 Mbits/sec    0   0.00 Bytes       
+[ 13]   0.00-2.01   sec  12.5 MBytes  52.3 Mbits/sec    0   0.00 Bytes       
+[SUM]   0.00-2.00   sec  62.5 MBytes   262 Mbits/sec    0             
 - - - - - - - - - - - - - - - - - - - - - - - - -
 [ ID] Interval           Transfer     Bitrate         Retr
-[  5]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0             sender
-[  5]   0.00-2.03   sec  16.1 MBytes  66.6 Mbits/sec                  receiver
-[  7]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0             sender
-[  7]   0.00-2.03   sec  16.1 MBytes  66.6 Mbits/sec                  receiver
-[  9]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0             sender
-[  9]   0.00-2.03   sec  16.1 MBytes  66.6 Mbits/sec                  receiver
-[ 11]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0             sender
-[ 11]   0.00-2.03   sec  16.1 MBytes  66.6 Mbits/sec                  receiver
-[ 13]   0.00-2.02   sec  17.0 MBytes  70.5 Mbits/sec    0             sender
-[ 13]   0.00-2.03   sec  16.1 MBytes  66.6 Mbits/sec                  receiver
-[SUM]   0.00-2.02   sec  85.0 MBytes   353 Mbits/sec    0             sender
-[SUM]   0.00-2.03   sec  80.6 MBytes   333 Mbits/sec                  receiver
+[  5]   0.00-2.00   sec  12.5 MBytes  52.3 Mbits/sec    0             sender
+[  5]   0.00-2.01   sec  11.6 MBytes  48.4 Mbits/sec                  receiver
+[  7]   0.00-2.00   sec  12.5 MBytes  52.3 Mbits/sec    0             sender
+[  7]   0.00-2.01   sec  11.6 MBytes  48.4 Mbits/sec                  receiver
+[  9]   0.00-2.00   sec  12.5 MBytes  52.3 Mbits/sec    0             sender
+[  9]   0.00-2.01   sec  11.6 MBytes  48.4 Mbits/sec                  receiver
+[ 11]   0.00-2.00   sec  12.5 MBytes  52.3 Mbits/sec    0             sender
+[ 11]   0.00-2.01   sec  11.6 MBytes  48.4 Mbits/sec                  receiver
+[ 13]   0.00-2.00   sec  12.5 MBytes  52.3 Mbits/sec    0             sender
+[ 13]   0.00-2.01   sec  11.6 MBytes  48.4 Mbits/sec                  receiver
+[SUM]   0.00-2.00   sec  62.5 MBytes   262 Mbits/sec    0             sender
+[SUM]   0.00-2.01   sec  58.1 MBytes   242 Mbits/sec                  receiver
 
 iperf Done.
 ====== iperf PARALLEL_TCP end: success ======
@@ -3061,13 +6498,13 @@ iperf Done.
 ====== iperf REVERSE_UDP begin ======
 Connecting to host 127.0.0.1, port 5001
 Reverse mode, remote host 127.0.0.1 is sending
-[  5] local 0.0.0.0 port 49160 connected to 127.0.0.1 port 5001
+[  5] local 0.0.0.0 port 49158 connected to 127.0.0.1 port 5001
 [ ID] Interval           Transfer     Bitrate         Jitter    Lost/Total Datagrams
-[  5]   0.00-2.00   sec  3.15 MBytes  13.2 Mbits/sec  0.120 ms  0/2265 (0%)  
+[  5]   0.00-2.00   sec  2.36 MBytes  9.90 Mbits/sec  0.558 ms  0/1696 (0%)  
 - - - - - - - - - - - - - - - - - - - - - - - - -
 [ ID] Interval           Transfer     Bitrate         Jitter    Lost/Total Datagrams
-[  5]   0.00-2.01   sec  3.16 MBytes  13.2 Mbits/sec  0.000 ms  0/2266 (0%)  sender
-[  5]   0.00-2.00   sec  3.15 MBytes  13.2 Mbits/sec  0.120 ms  0/2265 (0%)  receiver
+[  5]   0.00-2.01   sec  2.36 MBytes  9.88 Mbits/sec  0.000 ms  0/1697 (0%)  sender
+[  5]   0.00-2.00   sec  2.36 MBytes  9.90 Mbits/sec  0.558 ms  0/1696 (0%)  receiver
 
 iperf Done.
 ====== iperf REVERSE_UDP end: success ======
@@ -3075,13 +6512,13 @@ iperf Done.
 ====== iperf REVERSE_TCP begin ======
 Connecting to host 127.0.0.1, port 5001
 Reverse mode, remote host 127.0.0.1 is sending
-[  5] local 127.0.0.1 port 49168 connected to 127.0.0.1 port 5001
+[  5] local 127.0.0.1 port 49164 connected to 127.0.0.1 port 5001
 [ ID] Interval           Transfer     Bitrate         Retr  Cwnd
-[  5]   0.00-2.01   sec  69.4 MBytes   290 Mbits/sec                  
+[  5]   0.00-2.00   sec  53.8 MBytes   225 Mbits/sec                  
 - - - - - - - - - - - - - - - - - - - - - - - - -
 [ ID] Interval           Transfer     Bitrate         Retr
-[  5]   0.00-2.04   sec  70.2 MBytes   289 Mbits/sec    0             sender
-[  5]   0.00-2.01   sec  69.4 MBytes   290 Mbits/sec                  receiver
+[  5]   0.00-2.02   sec  54.8 MBytes   227 Mbits/sec    0             sender
+[  5]   0.00-2.00   sec  53.8 MBytes   225 Mbits/sec                  receiver
 
 iperf Done.
 ====== iperf REVERSE_TCP end: success ======
@@ -3093,65 +6530,57 @@ iperf3: error - control socket has closed unexpectedly
 ====== iperf BASIC_UDP end: fail ======
 
 ====== iperf BASIC_TCP begin ======
-[37m[587.406970 0:4149 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
-[m[37m[587.407815 0:4149 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
+[37m[968.018521 0:4365 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
+[m[37m[968.020592 0:4365 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
 [miperf3: error - unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection refused
 ====== iperf BASIC_TCP end: fail ======
 
 ====== iperf PARALLEL_UDP begin ======
-[37m[587.501703 0:4150 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
-[m[37m[587.502365 0:4150 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
+[37m[968.110190 0:4366 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
+[m[37m[968.110845 0:4366 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
 [miperf3: error - unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection refused
 ====== iperf PARALLEL_UDP end: fail ======
 
 ====== iperf PARALLEL_TCP begin ======
-[37m[587.640983 0:4151 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
-[m[37m[587.641599 0:4151 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
+[37m[968.228766 0:4367 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
+[m[37m[968.229427 0:4367 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
 [miperf3: error - unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection refused
 ====== iperf PARALLEL_TCP end: fail ======
 
 ====== iperf REVERSE_UDP begin ======
-[37m[587.783206 0:4152 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
-[m[37m[587.783906 0:4152 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
+[37m[968.380439 0:4368 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
+[m[37m[968.386899 0:4368 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
 [miperf3: error - unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection refused
 ====== iperf REVERSE_UDP end: fail ======
 
 ====== iperf REVERSE_TCP begin ======
-[37m[587.871919 0:4153 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
-[m[37m[587.872585 0:4153 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
+[37m[968.469856 0:4369 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
+[m[37m[968.470499 0:4369 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
 [miperf3: error - unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection refused
 ====== iperf REVERSE_TCP end: fail ======
 
 #### OS COMP TEST GROUP END iperf-glibc ####
 #### OS COMP TEST GROUP START lmbench-musl ####
 latency measurements
-Simple syscall: 1.4084 microseconds
-Simple read: 7.0013 microseconds
-Simple write: 5.0426 microseconds
-[37m[594.404322 0:4167 axfs::root:423] [33m[AxError::AlreadyExists][m
-[m[37m[594.406739 0:4167 axfs::root:423] [33m[AxError::AlreadyExists][m
-[mSimple stat: 101.7084 microseconds
-Simple fstat: 13.9136 microseconds
-Simple open/close: 87.1094 microseconds
-Select on 100 fd's: 144.6842 microseconds
-Signal handler installation: 5.8174 microseconds
-Signal handler overhead: 44.2625 microseconds
+Simple syscall: 2.5250 microseconds
+Simple read: 11.2090 microseconds
+Simple write: 9.7721 microseconds
+[37m[987.598478 0:4383 axfs::root:423] [33m[AxError::AlreadyExists][m
+[m[37m[987.600545 0:4383 axfs::root:423] [33m[AxError::AlreadyExists][m
+[mSimple stat: 179.1754 microseconds
+Simple fstat: 16.3730 microseconds
+Simple open/close: 192.7571 microseconds
+Select on 100 fd's: 273.7218 microseconds
 autorun: /tmp/testsuite/musl/lmbench/lmbench_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START lmbench-glibc ####
 latency measurements
-Simple syscall: 1.3872 microseconds
-Simple read: 6.8135 microseconds
-Simple write: 4.6709 microseconds
-[37m[659.900546 0:4207 axfs::root:423] [33m[AxError::AlreadyExists][m
-[m[37m[659.901545 0:4207 axfs::root:423] [33m[AxError::AlreadyExists][m
-[m[37m[659.902103 0:4207 axfs::root:423] [33m[AxError::AlreadyExists][m
-[mSimple stat: 114.4153 microseconds
-Simple fstat: 8.0684 microseconds
-Simple open/close: 84.8500 microseconds
-Select on 100 fd's: 143.9726 microseconds
-Signal handler installation: 6.2803 microseconds
-Signal handler overhead: 60.8675 microseconds
-autorun: /tmp/testsuite/glibc/lmbench/lmbench_testcode.sh timed out after 60s
+Simple syscall: 1.7287 microseconds
+Simple read: 12.0918 microseconds
+Simple write: 8.6212 microseconds
+[37m[1081.002471 0:4410 axfs::root:423] [33m[AxError::AlreadyExists][m
+[m[37m[1081.003517 0:4410 axfs::root:423] [33m[AxError::AlreadyExists][m
+[m[37m[1081.004144 0:4410 axfs::root:423] [33m[AxError::AlreadyExists][m
+[mautorun: /tmp/testsuite/glibc/lmbench/lmbench_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START netperf-musl ####
 ====== netperf UDP_STREAM begin ======
 Starting netserver with host '127.0.0.1' port '12865' and family AF_UNSPEC
@@ -3160,8 +6589,8 @@ Socket  Message  Elapsed      Messages
 Size    Size     Time         Okay Errors   Throughput
 bytes   bytes    secs            #      #   10^6bits/sec
 
- 65536    1000   1.00         1828      0      14.56
- 65536           1.00         1828             14.56
+ 65536    1000   1.01         1352      0      10.76
+ 65536           1.01         1352             10.76
 
 ====== netperf UDP_STREAM end: success ======
 ====== netperf TCP_STREAM begin ======
@@ -3171,7 +6600,7 @@ Socket Socket  Message  Elapsed
 Size   Size    Size     Time     Throughput  
 bytes  bytes   bytes    secs.    10^6bits/sec  
 
- 65536  65536   1000    0.05      169.21   
+ 65536  65536   1000    0.10       83.69   
 ====== netperf TCP_STREAM end: success ======
 ====== netperf UDP_RR begin ======
 MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 127.0.0.1 (127.0.0) port 0 AF_INET : first burst 0
@@ -3180,7 +6609,7 @@ Socket Size   Request  Resp.   Elapsed  Trans.
 Send   Recv   Size     Size    Time     Rate         
 bytes  Bytes  bytes    bytes   secs.    per sec   
 
-65536  65536  64       64      1.00     1518.08   
+65536  65536  64       64      1.01     1143.49   
 65536  65536 
 ====== netperf UDP_RR end: success ======
 ====== netperf TCP_RR begin ======
@@ -3190,7 +6619,7 @@ Socket Size   Request  Resp.   Elapsed  Trans.
 Send   Recv   Size     Size    Time     Rate         
 bytes  Bytes  bytes    bytes   secs.    per sec   
 
-65536  65536  64       64      1.00     1470.59   
+65536  65536  64       64      1.00     1234.40   
 65536  65536 
 ====== netperf TCP_RR end: success ======
 ====== netperf TCP_CRR begin ======
@@ -3200,23 +6629,18 @@ Socket Size   Request  Resp.   Elapsed  Trans.
 Send   Recv   Size     Size    Time     Rate         
 bytes  Bytes  bytes    bytes   secs.    per sec   
 
-65536  65536  64       64      1.00     1054.37   
+65536  65536  64       64      1.00      808.19   
 65536  65536 
 ====== netperf TCP_CRR end: success ======
 #### OS COMP TEST GROUP END netperf-musl ####
 #### OS COMP TEST GROUP START netperf-glibc ####
 ====== netperf UDP_STREAM begin ======
-Starting netserver with host '127.0.0.1' port '12865' and family AF_UNSPEC
-MIGRATED UDP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 127.0.0.1 () port 0 AF_INET
-enable_enobufs failed: getprotobyname
-Socket  Message  Elapsed      Messages                
-Size    Size     Time         Okay Errors   Throughput
-bytes   bytes    secs            #      #   10^6bits/sec
-
- 65536    1000   1.00         1797      0      14.33
- 65536           1.00         1797             14.33
-
-====== netperf UDP_STREAM end: success ======
+[37m[1133.810644 0:4445 axnet::smoltcp_impl::listen_table:107] [33m[AxError::ConnectionRefused] loopback socket connect() failed[m
+[m[37m[1133.817291 0:4445 arceos_posix_api::imp::net:422] [32msys_connect => Err(ECONNREFUSED)[m
+[mStarting netserver with host '127.0.0.1' port '12865' and family AF_UNSPEC
+establish control: are you sure there is a netserver listening on 127.0.0.1 at port 12865?
+establish_control could not establish the control connection from 0.0.0.0 port 0 address family AF_UNSPEC to 127.0.0.1 port 12865 address family AF_INET
+====== netperf UDP_STREAM end: fail ======
 ====== netperf TCP_STREAM begin ======
 MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 127.0.0.1 () port 0 AF_INET
 Recv   Send    Send                          
@@ -3224,7 +6648,7 @@ Socket Socket  Message  Elapsed
 Size   Size    Size     Time     Throughput  
 bytes  bytes   bytes    secs.    10^6bits/sec  
 
- 65536  65536   1000    0.05      155.60   
+ 65536  65536   1000    0.08       98.79   
 ====== netperf TCP_STREAM end: success ======
 ====== netperf UDP_RR begin ======
 MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 127.0.0.1 () port 0 AF_INET : first burst 0
@@ -3233,7 +6657,7 @@ Socket Size   Request  Resp.   Elapsed  Trans.
 Send   Recv   Size     Size    Time     Rate         
 bytes  Bytes  bytes    bytes   secs.    per sec   
 
-65536  65536  64       64      1.00     1561.12   
+65536  65536  64       64      1.00     1113.52   
 65536  65536 
 ====== netperf UDP_RR end: success ======
 ====== netperf TCP_RR begin ======
@@ -3243,7 +6667,7 @@ Socket Size   Request  Resp.   Elapsed  Trans.
 Send   Recv   Size     Size    Time     Rate         
 bytes  Bytes  bytes    bytes   secs.    per sec   
 
-65536  65536  64       64      1.00     1781.20   
+65536  65536  64       64      1.00     1165.72   
 65536  65536 
 ====== netperf TCP_RR end: success ======
 ====== netperf TCP_CRR begin ======
@@ -3253,79 +6677,77 @@ Socket Size   Request  Resp.   Elapsed  Trans.
 Send   Recv   Size     Size    Time     Rate         
 bytes  Bytes  bytes    bytes   secs.    per sec   
 
-65536  65536  64       64      1.00     1106.82   
+65536  65536  64       64      1.00      819.59   
 65536  65536 
 ====== netperf TCP_CRR end: success ======
 #### OS COMP TEST GROUP END netperf-glibc ####
 #### OS COMP TEST GROUP START cyclictest-musl ####
 ====== cyclictest NO_STRESS_P1 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 4294) P:99 I:1000 C:    968 Min:      2 Act:    2 Avg:   48 Max:   12923
+T: 0 ( 4469) P:99 I:1000 C:    957 Min:      2 Act: 4438 Avg:   78 Max:    7289
 ====== cyclictest NO_STRESS_P1 end: success ======
 ====== cyclictest NO_STRESS_P8 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 4296) P:99 I:1000 C:    987 Min:      2 Act:    9 Avg:   23 Max:    7402
-T: 1 ( 4297) P:99 I:1500 C:    660 Min:      2 Act:  349 Avg:   28 Max:    7592
-T: 2 ( 4298) P:99 I:2000 C:    496 Min:      2 Act:  402 Avg:   32 Max:    8099
-T: 3 ( 4299) P:99 I:2500 C:    398 Min:      2 Act:  425 Avg:   34 Max:    6583
-T: 4 ( 4300) P:99 I:3000 C:    332 Min:      2 Act:   52 Avg:   30 Max:    6066
-T: 5 ( 4301) P:99 I:3500 C:    284 Min:      2 Act:  110 Avg:   40 Max:    8050
-T: 6 ( 4302) P:99 I:4000 C:    249 Min:      2 Act:  357 Avg:   32 Max:    6035
-T: 7 ( 4303) P:99 I:4500 C:    222 Min:      2 Act:   46 Avg:   47 Max:    6020
+T: 0 ( 4471) P:99 I:1000 C:    945 Min:      2 Act:   19 Avg:   84 Max:   12792
+T: 1 ( 4472) P:99 I:1500 C:    637 Min:      2 Act:  120 Avg:  110 Max:   12839
+T: 2 ( 4473) P:99 I:2000 C:    483 Min:      2 Act:  635 Avg:  135 Max:   11323
+T: 3 ( 4474) P:99 I:2500 C:    389 Min:      2 Act:  631 Avg:  158 Max:   12274
+T: 4 ( 4475) P:99 I:3000 C:    325 Min:      2 Act:   81 Avg:  176 Max:   11224
+T: 5 ( 4476) P:99 I:3500 C:    278 Min:      2 Act:  134 Avg:  178 Max:   11674
+T: 6 ( 4477) P:99 I:4000 C:    248 Min:      2 Act:  490 Avg:  168 Max:   11125
+T: 7 ( 4478) P:99 I:4500 C:    219 Min:      2 Act:   36 Avg:  169 Max:   11074
 ====== cyclictest NO_STRESS_P8 end: success ======
 ====== start hackbench ======
 Running in process mode with 10 groups using 40 file descriptors each (== 400 tasks)
 Each sender will pass 100000000 messages of 100 bytes
 ====== cyclictest STRESS_P1 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 4707) P:99 I:1000 C:      5 Min: 191528 Act:317301 Avg:234453 Max:  317301
+T: 0 ( 4882) P:99 I:1000 C:      4 Min: 233081 Act:323198 Avg:290846 Max:  323198
 ====== cyclictest STRESS_P1 end: success ======
 ====== cyclictest STRESS_P8 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 4709) P:99 I:1000 C:      7 Min:     81 Act:190520 Avg:157628 Max:  315989
-T: 1 ( 4710) P:99 I:1500 C:      5 Min: 190512 Act:190512 Avg:220606 Max:  314953
-T: 2 ( 4711) P:99 I:2000 C:      5 Min: 191004 Act:191030 Avg:220292 Max:  314941
-T: 3 ( 4712) P:99 I:2500 C:      5 Min: 189535 Act:189535 Avg:219776 Max:  315929
-T: 4 ( 4713) P:99 I:3000 C:      5 Min: 189043 Act:189043 Avg:219662 Max:  314918
-T: 5 ( 4714) P:99 I:3500 C:      5 Min: 189433 Act:190044 Avg:219047 Max:  315407
-T: 6 ( 4715) P:99 I:4000 C:      5 Min: 188907 Act:191043 Avg:219429 Max:  314896
-T: 7 ( 4716) P:99 I:4500 C:      5 Min: 188379 Act:189039 Avg:219608 Max:  314881
-====== cyclictest STRESS_P8 end: success ======
+T: 0 ( 4884) P:99 I:1000 C:      4 Min: 269273 Act:330983 Avg:299553 Max:  330983
+T: 1 ( 4885) P:99 I:1500 C:      4 Min: 268920 Act:331682 Avg:299296 Max:  331682
+T: 2 ( 4886) P:99 I:2000 C:      4 Min: 268372 Act:331703 Avg:299134 Max:  331703
+T: 3 ( 4887) P:99 I:2500 C:      4 Min: 267809 Act:331687 Avg:298578 Max:  331687
+T: 4 ( 4888) P:99 I:3000 C:      4 Min: 267246 Act:331688 Avg:298027 Max:  331688
+T: 5 ( 4889) P:99 I:3500 C:      4 Min: 266679 Act:330182 Avg:297971 Max:  330182
+T: 6 ( 4890) P:99 I:4000 C:      4 Min: 266143 Act:329681 Avg:297427 Max:  329681
+T: 7 ( 4891) P:99 I:4500 C:      4 Min: 265585 Act:328680 Avg:296380 Max:  328680
 autorun: /tmp/testsuite/musl/cyclictest/cyclictest_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START cyclictest-glibc ####
 ====== cyclictest NO_STRESS_P1 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 4723) P:99 I:1000 C:    988 Min:      2 Act:    2 Avg:   24 Max:    7931
+T: 0 ( 4897) P:99 I:1000 C:    887 Min:      2 Act:   13 Avg:  160 Max:   23991
 ====== cyclictest NO_STRESS_P1 end: success ======
 ====== cyclictest NO_STRESS_P8 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 4725) P:99 I:1000 C:    996 Min:      2 Act:    3 Avg:   22 Max:    3077
-T: 1 ( 4726) P:99 I:1500 C:    666 Min:      2 Act:  318 Avg:   26 Max:    2956
-T: 2 ( 4727) P:99 I:2000 C:    499 Min:      2 Act:  346 Avg:   23 Max:    2913
-T: 3 ( 4728) P:99 I:2500 C:    399 Min:      2 Act:  345 Avg:   26 Max:    2867
-T: 4 ( 4729) P:99 I:3000 C:    334 Min:      2 Act:   47 Avg:   28 Max:    2785
-T: 5 ( 4730) P:99 I:3500 C:    286 Min:      2 Act:   49 Avg:   36 Max:    2239
-T: 6 ( 4731) P:99 I:4000 C:    250 Min:      2 Act:  180 Avg:   23 Max:    2695
-T: 7 ( 4732) P:99 I:4500 C:    223 Min:      2 Act:   57 Avg:   30 Max:    2654
+T: 0 ( 4899) P:99 I:1000 C:    959 Min:      2 Act:   13 Avg:   69 Max:    6053
+T: 1 ( 4900) P:99 I:1500 C:    647 Min:      2 Act:   50 Avg:   86 Max:    5660
+T: 2 ( 4901) P:99 I:2000 C:    487 Min:      2 Act:  525 Avg:   99 Max:    6563
+T: 3 ( 4902) P:99 I:2500 C:    392 Min:      2 Act:  428 Avg:  121 Max:    5705
+T: 4 ( 4903) P:99 I:3000 C:    332 Min:      2 Act:   72 Avg:  100 Max:    5134
+T: 5 ( 4904) P:99 I:3500 C:    283 Min:      2 Act:  121 Avg:  133 Max:    5045
+T: 6 ( 4905) P:99 I:4000 C:    249 Min:      2 Act:  155 Avg:  146 Max:    5961
+T: 7 ( 4906) P:99 I:4500 C:    221 Min:      2 Act: 1112 Avg:  107 Max:    4876
 ====== cyclictest NO_STRESS_P8 end: success ======
 ====== start hackbench ======
 Running in process mode with 10 groups using 40 file descriptors each (== 400 tasks)
 Each sender will pass 100000000 messages of 100 bytes
 ====== cyclictest STRESS_P1 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 5136) P:99 I:1000 C:      5 Min: 197842 Act:200844 Avg:228302 Max:  334549
+T: 0 ( 5310) P:99 I:1000 C:      4 Min: 246304 Act:273476 Avg:304873 Max:  356659
 ====== cyclictest STRESS_P1 end: success ======
 ====== cyclictest STRESS_P8 begin ======
 WARN: stat /dev/cpu_dma_latency failed: No such file or directory
-T: 0 ( 5138) P:99 I:1000 C:      5 Min: 197379 Act:204016 Avg:228299 Max:  274132
-T: 1 ( 5139) P:99 I:1500 C:      5 Min: 197023 Act:204916 Avg:228292 Max:  273521
-T: 2 ( 5140) P:99 I:2000 C:      5 Min: 196248 Act:203428 Avg:227474 Max:  273005
-T: 3 ( 5141) P:99 I:2500 C:      5 Min: 195959 Act:202924 Avg:227353 Max:  272989
-T: 4 ( 5142) P:99 I:3000 C:      5 Min: 195424 Act:203423 Avg:227032 Max:  271974
-T: 5 ( 5143) P:99 I:3500 C:      5 Min: 194688 Act:203919 Avg:226612 Max:  273460
-T: 6 ( 5144) P:99 I:4000 C:      5 Min: 194355 Act:201412 Avg:226186 Max:  272939
-T: 7 ( 5145) P:99 I:4500 C:      5 Min: 193825 Act:204910 Avg:226368 Max:  270424
-====== cyclictest STRESS_P8 end: success ======
+T: 0 ( 5312) P:99 I:1000 C:      5 Min:    404 Act:384532 Avg:239170 Max:  384532
+T: 1 ( 5313) P:99 I:1500 C:      4 Min: 248764 Act:385899 Avg:299181 Max:  385899
+T: 2 ( 5314) P:99 I:2000 C:      4 Min: 248241 Act:384461 Avg:298555 Max:  384461
+T: 3 ( 5315) P:99 I:2500 C:      4 Min: 247726 Act:385507 Avg:298305 Max:  385507
+T: 4 ( 5316) P:99 I:3000 C:      4 Min: 247211 Act:384552 Avg:298054 Max:  384552
+T: 5 ( 5317) P:99 I:3500 C:      4 Min: 246694 Act:385084 Avg:297672 Max:  385084
+T: 6 ( 5318) P:99 I:4000 C:      4 Min: 246178 Act:384612 Avg:297539 Max:  384612
+T: 7 ( 5319) P:99 I:4500 C:      4 Min: 245634 Act:386118 Avg:298381 Max:  386118
 autorun: /tmp/testsuite/glibc/cyclictest/cyclictest_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START iozone-musl ####
 iozone automatic measurements
@@ -3344,22 +6766,22 @@ iozone automatic measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:14:43 1970
+	Run began: Thu Jan  1 00:21:30 1970
 
 	Auto Mode
 	Record Size 1 kB
 	File size set to 4096 kB
 	Command line used: ./iozone -a -r 1k -s 4m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000004 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
                                                                     random    random      bkwd     record     stride                                        
               kB  reclen    write    rewrite      read    reread      read     write      read    rewrite       read    fwrite  frewrite     fread   freread
-            4096       1     69745    126697    103544    104794     45647     53754[37m[884.780949 0:5152 axfs::fops:269] [33m[AxError::InvalidInput][m
-[m[37m[884.841239 0:5152 axfs::fops:269] [33m[AxError::InvalidInput][m
-[m     48797     109756      83590     90762     93288     55640     57553
+            4096       1     44559     46155     45727     47515     48148     86938[37m[1292.093595 0:5325 axfs::fops:269] [33m[AxError::InvalidInput][m
+[m[37m[1292.164100 0:5325 axfs::fops:269] [33m[AxError::InvalidInput][m
+[m     80561      59764      37189     47552     81083     49376     43262
 
 iozone test complete.
 iozone throughput write/read measurements
@@ -3378,45 +6800,45 @@ iozone throughput write/read measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:14:45 1970
+	Run began: Thu Jan  1 00:21:33 1970
 
 	Record Size 1 kB
 	File size set to 1024 kB
 	Command line used: ./iozone -t 4 -i 0 -i 1 -r 1k -s 1m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000008 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
 	Throughput test with 4 processes
 	Each process writes a 1024 kByte file in 1 kByte records
 
-	Children see throughput for  4 initial writers 	=  104907.28 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2916.25 kB/sec
+	Children see throughput for  4 initial writers 	=   60228.21 kB/sec
+	Parent sees throughput for  4 initial writers 	=    2057.07 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  104907.28 kB/sec
-	Avg throughput per process 			=   26226.82 kB/sec
+	Max throughput per process 			=   60228.21 kB/sec
+	Avg throughput per process 			=   15057.05 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 rewriters 	=   75100.84 kB/sec
-	Parent sees throughput for  4 rewriters 	=    2524.30 kB/sec
+	Children see throughput for  4 rewriters 	=  122400.20 kB/sec
+	Parent sees throughput for  4 rewriters 	=    2104.93 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   75100.84 kB/sec
-	Avg throughput per process 			=   18775.21 kB/sec
+	Max throughput per process 			=  122400.20 kB/sec
+	Avg throughput per process 			=   30600.05 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 readers 		=  106400.67 kB/sec
-	Parent sees throughput for  4 readers 		=    2546.88 kB/sec
+	Children see throughput for  4 readers 		=  104012.20 kB/sec
+	Parent sees throughput for  4 readers 		=    2278.59 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  106400.67 kB/sec
-	Avg throughput per process 			=   26600.17 kB/sec
+	Max throughput per process 			=  104012.20 kB/sec
+	Avg throughput per process 			=   26003.05 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for 4 re-readers 	=  106059.04 kB/sec
-	Parent sees throughput for 4 re-readers 	=    3120.41 kB/sec
+	Children see throughput for 4 re-readers 	=   61813.35 kB/sec
+	Parent sees throughput for 4 re-readers 	=    2319.76 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  106059.04 kB/sec
-	Avg throughput per process 			=   26514.76 kB/sec
+	Max throughput per process 			=   61813.35 kB/sec
+	Avg throughput per process 			=   15453.34 kB/sec
 	Min xfer 					=       0.00 kB
 
 
@@ -3438,45 +6860,45 @@ iozone throughput random-read measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:15:02 1970
+	Run began: Thu Jan  1 00:21:52 1970
 
 	Record Size 1 kB
 	File size set to 1024 kB
 	Command line used: ./iozone -t 4 -i 0 -i 2 -r 1k -s 1m
 	Output is in kBytes/sec
-	Time Resolution = 0.000004 seconds.
+	Time Resolution = 0.000007 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
 	Throughput test with 4 processes
 	Each process writes a 1024 kByte file in 1 kByte records
 
-	Children see throughput for  4 initial writers 	=  114631.14 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2974.46 kB/sec
+	Children see throughput for  4 initial writers 	=   62049.32 kB/sec
+	Parent sees throughput for  4 initial writers 	=    1966.01 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  114631.14 kB/sec
-	Avg throughput per process 			=   28657.79 kB/sec
+	Max throughput per process 			=   62049.32 kB/sec
+	Avg throughput per process 			=   15512.33 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 rewriters 	=   75627.77 kB/sec
-	Parent sees throughput for  4 rewriters 	=    2444.83 kB/sec
+	Children see throughput for  4 rewriters 	=  121759.80 kB/sec
+	Parent sees throughput for  4 rewriters 	=    1882.31 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   75627.77 kB/sec
-	Avg throughput per process 			=   18906.94 kB/sec
+	Max throughput per process 			=  121759.80 kB/sec
+	Avg throughput per process 			=   30439.95 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for 4 random readers 	=   81360.24 kB/sec
-	Parent sees throughput for 4 random readers 	=    2755.76 kB/sec
+	Children see throughput for 4 random readers 	=   51292.32 kB/sec
+	Parent sees throughput for 4 random readers 	=    2216.96 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   81360.24 kB/sec
-	Avg throughput per process 			=   20340.06 kB/sec
+	Max throughput per process 			=   51292.32 kB/sec
+	Avg throughput per process 			=   12823.08 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for 4 random writers 	=   97840.62 kB/sec
-	Parent sees throughput for 4 random writers 	=    2888.84 kB/sec
+	Children see throughput for 4 random writers 	=   90933.30 kB/sec
+	Parent sees throughput for 4 random writers 	=    2107.59 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   97840.62 kB/sec
-	Avg throughput per process 			=   24460.16 kB/sec
+	Max throughput per process 			=   90933.30 kB/sec
+	Avg throughput per process 			=   22733.33 kB/sec
 	Min xfer 					=       0.00 kB
 
 
@@ -3498,78 +6920,39 @@ iozone throughput read-backwards measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:15:23 1970
+	Run began: Thu Jan  1 00:22:15 1970
 
 	Record Size 1 kB
 	File size set to 1024 kB
 	Command line used: ./iozone -t 4 -i 0 -i 3 -r 1k -s 1m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000008 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
 	Throughput test with 4 processes
 	Each process writes a 1024 kByte file in 1 kByte records
 
-	Children see throughput for  4 initial writers 	=  112986.88 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2993.25 kB/sec
+	Children see throughput for  4 initial writers 	=  107371.29 kB/sec
+	Parent sees throughput for  4 initial writers 	=    1891.18 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  112986.88 kB/sec
-	Avg throughput per process 			=   28246.72 kB/sec
+	Max throughput per process 			=  107371.29 kB/sec
+	Avg throughput per process 			=   26842.82 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 rewriters 	=  129048.52 kB/sec
-	Parent sees throughput for  4 rewriters 	=    2174.52 kB/sec
+	Children see throughput for  4 rewriters 	=   99630.28 kB/sec
+	Parent sees throughput for  4 rewriters 	=    2631.25 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  129048.52 kB/sec
-	Avg throughput per process 			=   32262.13 kB/sec
+	Max throughput per process 			=   99630.28 kB/sec
+	Avg throughput per process 			=   24907.57 kB/sec
 	Min xfer 					=       0.00 kB
-[37m[932.278688 0:5207 axfs::fops:269] [33m[AxError::InvalidInput][m
+[37m[1344.192523 0:5380 axfs::fops:269] [33m[AxError::InvalidInput][m
 [m
-	Children see throughput for 4 reverse readers 	=   70562.30 kB/sec
-	Parent sees throughput for 4 reverse readers 	=    2734.79 kB/sec
+	Children see throughput for 4 reverse readers 	=   43822.48 kB/sec
+	Parent sees throughput for 4 reverse readers 	=    1935.58 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   70562.30 kB/sec
-	Avg throughput per process 			=   17640.57 kB/sec
-	Min xfer 					=       0.00 kB
-
-
-
-iozone test complete.
-iozone throughput stride-read measurements
-	Iozone: Performance Test of File I/O
-	        Version $Revision: 3.506 $
-		Compiled for 64 bit mode.
-		Build: linux 
-
-	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
-	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
-	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
-	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
-	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
-	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
-	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
-	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
-	             Alexey Skidanov, Sudhir Kumar.
-
-	Run began: Thu Jan  1 00:15:40 1970
-
-	Record Size 1 kB
-	File size set to 1024 kB
-	Command line used: ./iozone -t 4 -i 0 -i 5 -r 1k -s 1m
-	Output is in kBytes/sec
-	Time Resolution = 0.000005 seconds.
-	Processor cache size set to 1024 kBytes.
-	Processor cache line size set to 32 bytes.
-	File stride size set to 17 * record size.
-	Throughput test with 4 processes
-	Each process writes a 1024 kByte file in 1 kByte records
-
-	Children see throughput for  4 initial writers 	=  112676.05 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2942.69 kB/sec
-	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  112676.05 kB/sec
-	Avg throughput per process 			=   28169.01 kB/sec
+	Max throughput per process 			=   43822.48 kB/sec
+	Avg throughput per process 			=   10955.62 kB/sec
 	Min xfer 					=       0.00 kB
 autorun: /tmp/testsuite/musl/iozone/iozone_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START iozone-glibc ####
@@ -3589,22 +6972,22 @@ iozone automatic measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:15:51 1970
+	Run began: Thu Jan  1 00:22:41 1970
 
 	Auto Mode
 	Record Size 1 kB
 	File size set to 4096 kB
 	Command line used: ./iozone -a -r 1k -s 4m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000004 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
                                                                     random    random      bkwd     record     stride                                        
               kB  reclen    write    rewrite      read    reread      read     write      read    rewrite       read    fwrite  frewrite     fread   freread
-            4096       1     77127    140615    102320    108491     79884     92615[37m[952.622427 0:5226 axfs::fops:269] [33m[AxError::InvalidInput][m
-[m[37m[952.710832 0:5226 axfs::fops:269] [33m[AxError::InvalidInput][m
-[m     49294      58734      70537    135070    135899    106020    108093
+            4096       1     63395    120406     57892     56638     37632     63523[37m[1364.018168 0:5389 axfs::fops:269] [33m[AxError::InvalidInput][m
+[m[37m[1364.070370 0:5389 axfs::fops:269] [33m[AxError::InvalidInput][m
+[m     77370     101789      46492     69396     47205     50562     98338
 
 iozone test complete.
 iozone throughput write/read measurements
@@ -3623,45 +7006,45 @@ iozone throughput write/read measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:15:54 1970
+	Run began: Thu Jan  1 00:22:47 1970
 
 	Record Size 1 kB
 	File size set to 1024 kB
 	Command line used: ./iozone -t 4 -i 0 -i 1 -r 1k -s 1m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000004 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
 	Throughput test with 4 processes
 	Each process writes a 1024 kByte file in 1 kByte records
 
-	Children see throughput for  4 initial writers 	=  103080.34 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2727.44 kB/sec
+	Children see throughput for  4 initial writers 	=   62351.58 kB/sec
+	Parent sees throughput for  4 initial writers 	=    1764.28 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  103080.34 kB/sec
-	Avg throughput per process 			=   25770.08 kB/sec
+	Max throughput per process 			=   62351.58 kB/sec
+	Avg throughput per process 			=   15587.89 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 rewriters 	=  124392.61 kB/sec
-	Parent sees throughput for  4 rewriters 	=    3065.96 kB/sec
+	Children see throughput for  4 rewriters 	=  103612.27 kB/sec
+	Parent sees throughput for  4 rewriters 	=    2006.33 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  124392.61 kB/sec
-	Avg throughput per process 			=   31098.15 kB/sec
+	Max throughput per process 			=  103612.27 kB/sec
+	Avg throughput per process 			=   25903.07 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 readers 		=   53338.89 kB/sec
-	Parent sees throughput for  4 readers 		=    2272.84 kB/sec
+	Children see throughput for  4 readers 		=   89604.48 kB/sec
+	Parent sees throughput for  4 readers 		=    2102.79 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   53338.89 kB/sec
-	Avg throughput per process 			=   13334.72 kB/sec
+	Max throughput per process 			=   89604.48 kB/sec
+	Avg throughput per process 			=   22401.12 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for 4 re-readers 	=   99572.15 kB/sec
-	Parent sees throughput for 4 re-readers 	=    2126.98 kB/sec
+	Children see throughput for 4 re-readers 	=  102955.96 kB/sec
+	Parent sees throughput for 4 re-readers 	=    2053.43 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   99572.15 kB/sec
-	Avg throughput per process 			=   24893.04 kB/sec
+	Max throughput per process 			=  102955.96 kB/sec
+	Avg throughput per process 			=   25738.99 kB/sec
 	Min xfer 					=       0.00 kB
 
 
@@ -3683,45 +7066,45 @@ iozone throughput random-read measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:16:13 1970
+	Run began: Thu Jan  1 00:23:07 1970
 
 	Record Size 1 kB
 	File size set to 1024 kB
 	Command line used: ./iozone -t 4 -i 0 -i 2 -r 1k -s 1m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000004 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
 	Throughput test with 4 processes
 	Each process writes a 1024 kByte file in 1 kByte records
 
-	Children see throughput for  4 initial writers 	=   97775.23 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2106.15 kB/sec
+	Children see throughput for  4 initial writers 	=   94169.58 kB/sec
+	Parent sees throughput for  4 initial writers 	=    1960.37 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   97775.23 kB/sec
-	Avg throughput per process 			=   24443.81 kB/sec
+	Max throughput per process 			=   94169.58 kB/sec
+	Avg throughput per process 			=   23542.39 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for  4 rewriters 	=  117579.51 kB/sec
-	Parent sees throughput for  4 rewriters 	=    2645.03 kB/sec
+	Children see throughput for  4 rewriters 	=  100127.11 kB/sec
+	Parent sees throughput for  4 rewriters 	=    1927.49 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  117579.51 kB/sec
-	Avg throughput per process 			=   29394.88 kB/sec
+	Max throughput per process 			=  100127.11 kB/sec
+	Avg throughput per process 			=   25031.78 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for 4 random readers 	=   80477.84 kB/sec
-	Parent sees throughput for 4 random readers 	=    2880.39 kB/sec
+	Children see throughput for 4 random readers 	=   56999.72 kB/sec
+	Parent sees throughput for 4 random readers 	=    2068.21 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   80477.84 kB/sec
-	Avg throughput per process 			=   20119.46 kB/sec
+	Max throughput per process 			=   56999.72 kB/sec
+	Avg throughput per process 			=   14249.93 kB/sec
 	Min xfer 					=       0.00 kB
 
-	Children see throughput for 4 random writers 	=   41654.80 kB/sec
-	Parent sees throughput for 4 random writers 	=    2591.62 kB/sec
+	Children see throughput for 4 random writers 	=   55270.69 kB/sec
+	Parent sees throughput for 4 random writers 	=    1974.49 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   41654.80 kB/sec
-	Avg throughput per process 			=   10413.70 kB/sec
+	Max throughput per process 			=   55270.69 kB/sec
+	Avg throughput per process 			=   13817.67 kB/sec
 	Min xfer 					=       0.00 kB
 
 
@@ -3743,52 +7126,36 @@ iozone throughput read-backwards measurements
 	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
 	             Alexey Skidanov, Sudhir Kumar.
 
-	Run began: Thu Jan  1 00:16:35 1970
+	Run began: Thu Jan  1 00:23:32 1970
 
 	Record Size 1 kB
 	File size set to 1024 kB
 	Command line used: ./iozone -t 4 -i 0 -i 3 -r 1k -s 1m
 	Output is in kBytes/sec
-	Time Resolution = 0.000003 seconds.
+	Time Resolution = 0.000007 seconds.
 	Processor cache size set to 1024 kBytes.
 	Processor cache line size set to 32 bytes.
 	File stride size set to 17 * record size.
 	Throughput test with 4 processes
 	Each process writes a 1024 kByte file in 1 kByte records
 
-	Children see throughput for  4 initial writers 	=  107834.88 kB/sec
-	Parent sees throughput for  4 initial writers 	=    2789.76 kB/sec
+	Children see throughput for  4 initial writers 	=   60495.07 kB/sec
+	Parent sees throughput for  4 initial writers 	=    1680.00 kB/sec
 	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=  107834.88 kB/sec
-	Avg throughput per process 			=   26958.72 kB/sec
-	Min xfer 					=       0.00 kB
-
-	Children see throughput for  4 rewriters 	=   69983.60 kB/sec
-	Parent sees throughput for  4 rewriters 	=    2479.35 kB/sec
-	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   69983.60 kB/sec
-	Avg throughput per process 			=   17495.90 kB/sec
-	Min xfer 					=       0.00 kB
-[37m[1004.312708 0:5281 axfs::fops:269] [33m[AxError::InvalidInput][m
-[m
-	Children see throughput for 4 reverse readers 	=   73069.79 kB/sec
-	Parent sees throughput for 4 reverse readers 	=    2394.02 kB/sec
-	Min throughput per process 			=       0.00 kB/sec 
-	Max throughput per process 			=   73069.79 kB/sec
-	Avg throughput per process 			=   18267.45 kB/sec
+	Max throughput per process 			=   60495.07 kB/sec
+	Avg throughput per process 			=   15123.77 kB/sec
 	Min xfer 					=       0.00 kB
 autorun: /tmp/testsuite/glibc/iozone/iozone_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START unixbench-musl ####
-Unixbench DHRY2 test(lps): 20254454
-Unixbench WHETSTONE test(MFLOPS): 202.039
-Unixbench SYSCALL test(lps): 729072
-Unixbench CONTEXT test(lps): 16694
+Unixbench DHRY2 test(lps): 13753374
+Unixbench WHETSTONE test(MFLOPS): 142.045
+Unixbench SYSCALL test(lps): 465180
+Unixbench CONTEXT test(lps): 10614
 autorun: /tmp/testsuite/musl/unixbench/unixbench_testcode.sh timed out after 60s
 #### OS COMP TEST GROUP START unixbench-glibc ####
-Unixbench DHRY2 test(lps): 28855035
-Unixbench WHETSTONE test(MFLOPS): 218.986
-Unixbench SYSCALL test(lps): 763638
-Unixbench CONTEXT test(lps): 14190
+Unixbench DHRY2 test(lps): 21810716
+Unixbench WHETSTONE test(MFLOPS): 163.917
+Unixbench SYSCALL test(lps): 532683
 autorun: /tmp/testsuite/glibc/unixbench/unixbench_testcode.sh timed out after 60s
-[37m[1134.127725 0:2 axplat_loongarch64_qemu_virt::power:23] [32mShutting down...[m
+[37m[1547.070013 0:2 axplat_loongarch64_qemu_virt::power:23] [32mShutting down...[m
 [m

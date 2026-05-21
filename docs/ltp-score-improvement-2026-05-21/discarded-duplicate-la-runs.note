@@ -1,0 +1,13 @@
+discarded: duplicate parallel LA run attempt killed before clean rerun
+discarded: duplicate LA attempts caused qemu-img/output contention; final-run-eval-la.status before clean rerun invalid if nonzero
+discarded: duplicate LA instance pgid 115680 killed; only earlier pgid 115404 retained if still running
+discarded: retained LA pgid 115404 also stopped because output was contaminated by concurrent writer
+discarded: all LA instances pgid 117944 and 118192 killed because two writers contaminated output
+discarded: pgid 121527 and 121929 killed due duplicate final LA writers
+2026-05-21 11:20:37 discarded LA full validation: final-run-eval-la.status=0 but output_la.md was absent, so no final summary artifact could be generated. No residual run-eval/qemu processes were present before rerun.
+
+2026-05-21 11:20:40 LA final run exited 0 but output_la.md was absent after completion; evidence rejected and a clean locked LA rerun is required for final gate.
+2026-05-21 11:21:19 discarded LA rerun pgid 153912: output_la.md was not visible while tee was active, so the file descriptor was likely unlinked and final evidence would be unavailable. Terminating before clean background rerun.
+2026-05-21 11:22:08 discarded background LA wrapper: qemu exited early after boot/libctest start with no final-run-eval-la.status, likely because qemu -nographic cannot be backgrounded with closed stdin. Evidence rejected.
+2026-05-21 11:22:09 discarded LA background wrapper: qemu/nohup run stopped at early libctest output, no status file was produced; output_la.md is partial and rejected.
+2026-05-21 11:22:53 discarded LA foreground rerun pgid 156684: follow-up cleanup unlinked output_la.md while tee was active; evidence rejected. Terminating before one clean monitored rerun.

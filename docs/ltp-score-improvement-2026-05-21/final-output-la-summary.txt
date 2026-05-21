@@ -1,0 +1,282 @@
+# LTP summary: `output_la.md`
+
+- PASS LTP CASE: 62
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 6 ({'TCONF': 6})
+- timeout matches: 10
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 31 passed, 0 failed
+- ltp-glibc: 31 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| access01 | la | glibc | ltp-glibc | PASS | 0 | 4774 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access01 | la | musl | ltp-musl | PASS | 0 | 3416 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access03 | la | glibc | ltp-glibc | PASS | 0 | 1966 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access03 | la | musl | ltp-musl | PASS | 0 | 1039 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brk01 | la | glibc | ltp-glibc | PASS | 0 | 1801 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brk01 | la | musl | ltp-musl | PASS | 0 | 1011 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chdir01 | la | glibc | ltp-glibc | PASS | 0 | 1841 | 0 | 0 | 1 | 0 | 0 | 0 |
+| chdir01 | la | musl | ltp-musl | PASS | 0 | 990 | 0 | 0 | 1 | 0 | 0 | 0 |
+| clone01 | la | glibc | ltp-glibc | PASS | 0 | 1894 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone01 | la | musl | ltp-musl | PASS | 0 | 924 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close01 | la | glibc | ltp-glibc | PASS | 0 | 1681 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close01 | la | musl | ltp-musl | PASS | 0 | 923 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close02 | la | glibc | ltp-glibc | PASS | 0 | 1785 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close02 | la | musl | ltp-musl | PASS | 0 | 1040 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup01 | la | glibc | ltp-glibc | PASS | 0 | 1755 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup01 | la | musl | ltp-musl | PASS | 0 | 984 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup02 | la | glibc | ltp-glibc | PASS | 0 | 1702 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup02 | la | musl | ltp-musl | PASS | 0 | 943 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl01 | la | glibc | ltp-glibc | PASS | 0 | 1768 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl01 | la | musl | ltp-musl | PASS | 0 | 940 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl02 | la | glibc | ltp-glibc | PASS | 0 | 1759 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl02 | la | musl | ltp-musl | PASS | 0 | 958 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl03 | la | glibc | ltp-glibc | PASS | 0 | 1837 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl03 | la | musl | ltp-musl | PASS | 0 | 985 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork01 | la | glibc | ltp-glibc | PASS | 0 | 1816 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork01 | la | musl | ltp-musl | PASS | 0 | 964 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcwd01 | la | glibc | ltp-glibc | PASS | 0 | 1819 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcwd01 | la | musl | ltp-musl | PASS | 0 | 897 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01 | la | glibc | ltp-glibc | PASS | 0 | 1743 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01 | la | musl | ltp-musl | PASS | 0 | 935 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid01 | la | glibc | ltp-glibc | PASS | 0 | 1805 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid01 | la | musl | ltp-musl | PASS | 0 | 1001 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid01 | la | glibc | ltp-glibc | PASS | 0 | 1775 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid01 | la | musl | ltp-musl | PASS | 0 | 951 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid01 | la | glibc | ltp-glibc | PASS | 0 | 4315 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid01 | la | musl | ltp-musl | PASS | 0 | 3375 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid02 | la | glibc | ltp-glibc | PASS | 0 | 1859 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid02 | la | musl | ltp-musl | PASS | 0 | 992 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid01 | la | glibc | ltp-glibc | PASS | 0 | 1726 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid01 | la | musl | ltp-musl | PASS | 0 | 935 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid01 | la | glibc | ltp-glibc | PASS | 0 | 1702 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid01 | la | musl | ltp-musl | PASS | 0 | 970 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek01 | la | glibc | ltp-glibc | PASS | 0 | 1670 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek01 | la | musl | ltp-musl | PASS | 0 | 940 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap01 | la | glibc | ltp-glibc | PASS | 0 | 1769 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap01 | la | musl | ltp-musl | PASS | 0 | 982 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open01 | la | glibc | ltp-glibc | PASS | 0 | 1781 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open01 | la | musl | ltp-musl | PASS | 0 | 974 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe01 | la | glibc | ltp-glibc | PASS | 0 | 1726 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe01 | la | musl | ltp-musl | PASS | 0 | 992 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read01 | la | glibc | ltp-glibc | PASS | 0 | 1811 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read01 | la | musl | ltp-musl | PASS | 0 | 959 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read02 | la | glibc | ltp-glibc | PASS | 0 | 1802 | 0 | 0 | 2 | 0 | 0 | 0 |
+| read02 | la | musl | ltp-musl | PASS | 0 | 952 | 0 | 0 | 2 | 0 | 0 | 0 |
+| stat01 | la | glibc | ltp-glibc | PASS | 0 | 1816 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat01 | la | musl | ltp-musl | PASS | 0 | 1014 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait401 | la | glibc | ltp-glibc | PASS | 0 | 1772 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait401 | la | musl | ltp-musl | PASS | 0 | 1011 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write01 | la | glibc | ltp-glibc | PASS | 0 | 2320 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write01 | la | musl | ltp-musl | PASS | 0 | 928 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write02 | la | glibc | ltp-glibc | PASS | 0 | 1802 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write02 | la | musl | ltp-musl | PASS | 0 | 888 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 58 (la:glibc:access01, la:musl:access01, la:glibc:access03, la:musl:access03, la:glibc:brk01, la:musl:brk01, la:glibc:clone01, la:musl:clone01, la:glibc:close01, la:musl:close01, la:glibc:close02, la:musl:close02, la:glibc:dup01, la:musl:dup01, la:glibc:dup02, la:musl:dup02, la:glibc:fcntl01, la:musl:fcntl01, la:glibc:fcntl02, la:musl:fcntl02, la:glibc:fcntl03, la:musl:fcntl03, la:glibc:fork01, la:musl:fork01, la:glibc:getcwd01, la:musl:getcwd01, la:glibc:getegid01, la:musl:getegid01, la:glibc:geteuid01, la:musl:geteuid01, la:glibc:getgid01, la:musl:getgid01, la:glibc:getpid01, la:musl:getpid01, la:glibc:getpid02, la:musl:getpid02, la:glibc:getppid01, la:musl:getppid01, la:glibc:getuid01, la:musl:getuid01, la:glibc:lseek01, la:musl:lseek01, la:glibc:mmap01, la:musl:mmap01, la:glibc:open01, la:musl:open01, la:glibc:pipe01, la:musl:pipe01, la:glibc:read01, la:musl:read01, la:glibc:stat01, la:musl:stat01, la:glibc:wait401, la:musl:wait401, la:glibc:write01, la:musl:write01, la:glibc:write02, la:musl:write02)
+- pass_with_tconf: 4 (la:glibc:chdir01, la:musl:chdir01, la:glibc:read02, la:musl:read02)
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### libctest-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### libctest-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### basic-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### basic-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### busybox-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### busybox-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### lua-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### lua-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-musl
+- PASS: 31
+- FAIL: 0
+- Internal: {'TCONF': 3}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 31
+- FAIL: 0
+- Internal: {'TCONF': 3}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### libcbench-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### libcbench-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### iperf-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### iperf-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### lmbench-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### lmbench-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### netperf-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### netperf-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### cyclictest-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### cyclictest-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### iozone-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### iozone-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### unixbench-musl
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### unixbench-glibc
+- PASS: 0
+- FAIL: 0
+- Internal: {}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0

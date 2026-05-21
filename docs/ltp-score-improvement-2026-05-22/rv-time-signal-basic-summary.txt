@@ -1,0 +1,104 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-22/rv-time-signal-basic.log`
+
+- PASS LTP CASE: 20
+- FAIL LTP CASE: 18
+- Internal TFAIL/TBROK/TCONF: 28 ({'TCONF': 20, 'TFAIL': 8})
+- timeout matches: 8
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 10 passed, 9 failed
+- ltp-glibc: 10 passed, 9 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| alarm02 | rv | glibc | ltp-glibc | PASS | 0 | 1088 | 252413 | 252399 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm02 | rv | musl | ltp-musl | PASS | 0 | 1408 | 258865 | 256803 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm03 | rv | glibc | ltp-glibc | PASS | 0 | 1124 | 252399 | 252378 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm03 | rv | musl | ltp-musl | PASS | 0 | 814 | 256803 | 256782 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_getres01 | rv | glibc | ltp-glibc | PASS | 0 | 1133 | 252378 | 252343 | -35 | 0 | 0 | 8 | 0 | 0 | 0 |
+| clock_getres01 | rv | musl | ltp-musl | PASS | 0 | 916 | 256782 | 256747 | -35 | 0 | 0 | 8 | 0 | 0 | 0 |
+| clock_gettime01 | rv | glibc | ltp-glibc | FAIL | 137 | 8331 | 252343 | 252329 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 8272 | 256747 | 256733 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime02 | rv | glibc | ltp-glibc | PASS | 0 | 1059 | 252329 | 252315 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_gettime02 | rv | musl | ltp-musl | PASS | 0 | 1000 | 256733 | 256719 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday01 | rv | glibc | ltp-glibc | PASS | 0 | 1161 | 252315 | 252301 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday01 | rv | musl | ltp-musl | PASS | 0 | 735 | 256719 | 256705 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | rv | glibc | ltp-glibc | FAIL | 137 | 11146 | 252231 | 252196 | -35 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill02 | rv | musl | ltp-musl | FAIL | 137 | 10842 | 256635 | 252504 | -4131 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill03 | rv | glibc | ltp-glibc | PASS | 0 | 1157 | 252196 | 252182 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill03 | rv | musl | ltp-musl | PASS | 0 | 703 | 252504 | 252490 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep01 | rv | glibc | ltp-glibc | FAIL | 137 | 8728 | 252301 | 252280 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| nanosleep01 | rv | musl | ltp-musl | FAIL | 137 | 8511 | 256705 | 256684 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| nanosleep02 | rv | glibc | ltp-glibc | FAIL | 1 | 6097 | 252280 | 252259 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep02 | rv | musl | ltp-musl | FAIL | 1 | 5822 | 256684 | 256663 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| pause01 | rv | glibc | ltp-glibc | FAIL | 137 | 8317 | 252182 | 252161 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| pause01 | rv | musl | ltp-musl | FAIL | 137 | 8373 | 252490 | 252469 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| rt_sigaction01 | rv | glibc | ltp-glibc | PASS | 0 | 1174 | 252161 | 252154 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction01 | rv | musl | ltp-musl | PASS | 0 | 974 | 252469 | 252462 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigprocmask01 | rv | glibc | ltp-glibc | FAIL | 32 | 998 | 252154 | 252147 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| rt_sigprocmask01 | rv | musl | ltp-musl | FAIL | 32 | 668 | 252462 | 252455 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| sigaction01 | rv | glibc | ltp-glibc | PASS | 0 | 1353 | 252147 | 252140 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sigaction01 | rv | musl | ltp-musl | PASS | 0 | 780 | 252455 | 252448 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sigpending02 | rv | glibc | ltp-glibc | FAIL | 1 | 1083 | 252133 | 252119 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sigpending02 | rv | musl | ltp-musl | FAIL | 1 | 825 | 252441 | 252427 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sigprocmask01 | rv | glibc | ltp-glibc | FAIL | 1 | 1015 | 252140 | 252133 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sigprocmask01 | rv | musl | ltp-musl | FAIL | 1 | 708 | 252448 | 252441 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sigsuspend01 | rv | glibc | ltp-glibc | FAIL | 1 | 1035 | 252119 | 252105 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| sigsuspend01 | rv | musl | ltp-musl | FAIL | 1 | 793 | 252427 | 252413 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| time01 | rv | glibc | ltp-glibc | PASS | 0 | 1088 | 252259 | 252245 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| time01 | rv | musl | ltp-musl | PASS | 0 | 793 | 256663 | 256649 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| times01 | rv | glibc | ltp-glibc | PASS | 0 | 1073 | 252245 | 252231 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| times01 | rv | musl | ltp-musl | PASS | 0 | 807 | 256649 | 256635 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 18 (rv:glibc:alarm02, rv:musl:alarm02, rv:glibc:alarm03, rv:musl:alarm03, rv:glibc:clock_gettime02, rv:musl:clock_gettime02, rv:glibc:gettimeofday01, rv:musl:gettimeofday01, rv:glibc:kill03, rv:musl:kill03, rv:glibc:rt_sigaction01, rv:musl:rt_sigaction01, rv:glibc:sigaction01, rv:musl:sigaction01, rv:glibc:time01, rv:musl:time01, rv:glibc:times01, rv:musl:times01)
+- pass_with_tconf: 2 (rv:glibc:clock_getres01, rv:musl:clock_getres01)
+- fail_wrapper: 18 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:glibc:kill02, rv:musl:kill02, rv:glibc:nanosleep01, rv:musl:nanosleep01, rv:glibc:nanosleep02, rv:musl:nanosleep02, rv:glibc:pause01, rv:musl:pause01, rv:glibc:rt_sigprocmask01, rv:musl:rt_sigprocmask01, rv:glibc:sigpending02, rv:musl:sigpending02, rv:glibc:sigprocmask01, rv:musl:sigprocmask01, rv:glibc:sigsuspend01, rv:musl:sigsuspend01)
+- internal_tfail: 8 (rv:glibc:nanosleep02, rv:musl:nanosleep02, rv:glibc:sigpending02, rv:musl:sigpending02, rv:glibc:sigprocmask01, rv:musl:sigprocmask01, rv:glibc:sigsuspend01, rv:musl:sigsuspend01)
+- internal_tbrok: 0
+- timeout: 8 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:glibc:kill02, rv:musl:kill02, rv:glibc:nanosleep01, rv:musl:nanosleep01, rv:glibc:pause01, rv:musl:pause01)
+- enosys: 2 (rv:glibc:sigsuspend01, rv:musl:sigsuspend01)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:clock_gettime01
+- ltp-musl:nanosleep01
+- ltp-musl:nanosleep02
+- ltp-musl:kill02
+- ltp-musl:pause01
+- ltp-musl:rt_sigprocmask01
+- ltp-musl:sigprocmask01
+- ltp-musl:sigpending02
+- ltp-musl:sigsuspend01
+- ltp-glibc:clock_gettime01
+- ltp-glibc:nanosleep01
+- ltp-glibc:nanosleep02
+- ltp-glibc:kill02
+- ltp-glibc:pause01
+- ltp-glibc:rt_sigprocmask01
+- ltp-glibc:sigprocmask01
+- ltp-glibc:sigpending02
+- ltp-glibc:sigsuspend01
+
+## Groups
+### ltp-musl
+- PASS: 10
+- FAIL: 9
+- Internal: {'TCONF': 10, 'TFAIL': 4}
+- timeout: 4
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: clock_gettime01, nanosleep01, nanosleep02, kill02, pause01, rt_sigprocmask01, sigprocmask01, sigpending02, sigsuspend01
+
+### ltp-glibc
+- PASS: 10
+- FAIL: 9
+- Internal: {'TCONF': 10, 'TFAIL': 4}
+- timeout: 4
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: clock_gettime01, nanosleep01, nanosleep02, kill02, pause01, rt_sigprocmask01, sigprocmask01, sigpending02, sigsuspend01
