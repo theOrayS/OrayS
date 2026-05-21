@@ -20,7 +20,7 @@ GROUP_START_RE = re.compile(r"#### OS COMP TEST GROUP START (.+?) ####")
 GROUP_END_RE = re.compile(r"#### OS COMP TEST GROUP END (.+?) ####")
 CASE_START_RE = re.compile(r"RUN LTP CASE\s+(\S+)")
 CASE_RESULT_RE = re.compile(r"\b(PASS|FAIL) LTP CASE\s+(\S+)\s*:\s*(-?\d+)")
-TIMEOUT_CASE_RE = re.compile(r"\bTIMEOUT LTP CASE\s+(\S+)(?:\s*:\s*(-?\d+))?", re.IGNORECASE)
+TIMEOUT_CASE_RE = re.compile(r"\bTIMEOUT LTP CASE\s+([^\s:]+)(?:\s*:\s*(-?\d+))?", re.IGNORECASE)
 CASE_RUNTIME_RE = re.compile(r"\bLTP CASE RUNTIME\s+(\S+):\s+(\d+)\s+ms\b")
 CASE_MEMORY_RE = re.compile(
     r"\bLTP MEMORY\s+(\S+)\s+(\S+):\s+free_frames=(\d+)\s+allocated_frames=(\d+)\b"
@@ -306,6 +306,172 @@ def marker_value(row: dict[str, Any], marker: str) -> int:
     return int(row["internal"].get(marker, 0))
 
 
+def parse_csv_set(value: str) -> set[str]:
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
+def row_problem_markers(row: dict[str, Any]) -> list[str]:
+    problems = []
+    for marker in ("TFAIL", "TBROK", "TCONF"):
+        count = marker_value(row, marker)
+        if count:
+            problems.append(f"{marker}={count}")
+    for key, label in (
+        ("timeouts", "timeout"),
+        ("enosys", "ENOSYS"),
+        ("panic_trap", "panic/trap"),
+        ("event_failures", "event-failures"),
+    ):
+        count = int(row.get(key, 0))
+        if count:
+            problems.append(f"{label}={count}")
+    if row["status"] != "PASS":
+        problems.append(f"status={row['status']}")
+    return problems
+
+
+def promotion_report(
+    rows: list[dict[str, Any]], required_arches: set[str], required_libcs: set[str]
+) -> dict[str, Any]:
+    required_combos = {(arch, libc) for arch in required_arches for libc in required_libcs}
+    by_case: dict[str, dict[tuple[str, str], list[dict[str, Any]]]] = {}
+    for row in rows:
+        by_case.setdefault(row["case"], {}).setdefault((row["arch"], row["libc"]), []).append(row)
+
+    candidates = []
+    blocked = []
+    for case, combos in sorted(by_case.items()):
+        missing = sorted(required_combos - set(combos))
+        blockers = []
+        for arch, libc in sorted(required_combos & set(combos)):
+            for row in combos[(arch, libc)]:
+                problems = row_problem_markers(row)
+                if problems:
+                    blockers.append(
+                        {
+                            "arch": arch,
+                            "libc": libc,
+                            "group": row["group"],
+                            "reasons": problems,
+                        }
+                    )
+        if missing or blockers:
+            blocked.append(
+                {
+                    "case": case,
+                    "missing": [
+                        {"arch": arch, "libc": libc}
+                        for arch, libc in missing
+                    ],
+                    "blockers": blockers,
+                }
+            )
+            continue
+
+        candidate_rows = [row for combo in sorted(required_combos) for row in combos[combo]]
+        candidates.append(
+            {
+                "case": case,
+                "combos": [
+                    {"arch": row["arch"], "libc": row["libc"], "group": row["group"]}
+                    for row in candidate_rows
+                ],
+                "max_runtime_ms": max(
+                    (row["runtime_ms"] for row in candidate_rows if row["runtime_ms"] is not None),
+                    default=None,
+                ),
+                "min_free_frames_delta_after_cleanup": min(
+                    (
+                        row["free_frames_delta_after_cleanup"]
+                        for row in candidate_rows
+                        if row["free_frames_delta_after_cleanup"] is not None
+                    ),
+                    default=None,
+                ),
+            }
+        )
+
+    return {
+        "required_arches": sorted(required_arches),
+        "required_libcs": sorted(required_libcs),
+        "required_combo_count": len(required_combos),
+        "candidate_count": len(candidates),
+        "blocked_count": len(blocked),
+        "candidates": candidates,
+        "blocked": blocked,
+    }
+
+
+def promotion_rows(raw_summary: dict[str, Any], data: dict[str, Any], arch: str) -> list[dict[str, Any]]:
+    event_failures = Counter(
+        (event["case"], arch, infer_libc(event["group"]))
+        for event in raw_summary["case_events"]
+        if event["status"] != "PASS"
+    )
+    rows = []
+    for row in data["case_matrix_rows"]:
+        item = dict(row)
+        item["event_failures"] = event_failures[(row["case"], row["arch"], row["libc"])]
+        rows.append(item)
+    return rows
+
+
+def render_promotion_markdown(report: dict[str, Any], paths: list[Path]) -> str:
+    lines = ["# LTP promotion-candidate report", ""]
+    lines += [
+        "- Inputs: " + ", ".join(f"`{path}`" for path in paths),
+        "- Required arches: " + ", ".join(report["required_arches"]),
+        "- Required libcs: " + ", ".join(report["required_libcs"]),
+        f"- Required arch/libc combos: {report['required_combo_count']}",
+        f"- Promotion candidates: {report['candidate_count']}",
+        f"- Blocked/incomplete cases: {report['blocked_count']}",
+        "",
+    ]
+
+    lines.append("## Candidates")
+    if report["candidates"]:
+        lines.append(
+            "| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |"
+        )
+        lines.append("| --- | --- | ---: | ---: |")
+        for item in report["candidates"]:
+            combos = ", ".join(
+                f"{combo['arch']}:{combo['libc']}:{combo['group']}"
+                for combo in item["combos"]
+            )
+            max_runtime = "" if item["max_runtime_ms"] is None else str(item["max_runtime_ms"])
+            min_delta = (
+                ""
+                if item["min_free_frames_delta_after_cleanup"] is None
+                else str(item["min_free_frames_delta_after_cleanup"])
+            )
+            lines.append(f"| {item['case']} | {combos} | {max_runtime} | {min_delta} |")
+    else:
+        lines.append("- None")
+    lines.append("")
+
+    lines.append("## Blocked or incomplete")
+    if report["blocked"]:
+        lines.append("| Case | Reason |")
+        lines.append("| --- | --- |")
+        for item in report["blocked"]:
+            reasons = []
+            if item["missing"]:
+                reasons.append(
+                    "missing "
+                    + ", ".join(f"{miss['arch']}:{miss['libc']}" for miss in item["missing"])
+                )
+            for blocker in item["blockers"]:
+                reasons.append(
+                    f"{blocker['arch']}:{blocker['libc']}:{blocker['group']} "
+                    + "/".join(blocker["reasons"])
+                )
+            lines.append(f"| {item['case']} | {'; '.join(reasons)} |")
+    else:
+        lines.append("- None")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render_markdown(path: Path, data: dict[str, Any]) -> str:
     lines = [f"# LTP summary: `{path}`", ""]
     lines += [
@@ -390,16 +556,59 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("log", type=Path, help="Evaluator output log/Markdown file")
+    parser.add_argument("log", type=Path, nargs="+", help="Evaluator output log/Markdown file")
     parser.add_argument("--json", action="store_true", help="Emit compact JSON instead of Markdown")
+    parser.add_argument(
+        "--promotion-candidates",
+        action="store_true",
+        help=(
+            "Emit a clean-pass promotion-candidate report across the required arch/libc matrix. "
+            "The normal one-log summary output is unchanged when this flag is not used."
+        ),
+    )
+    parser.add_argument(
+        "--promotion-arches",
+        default="rv,la",
+        help="Comma-separated required arches for --promotion-candidates (default: rv,la)",
+    )
+    parser.add_argument(
+        "--promotion-libcs",
+        default="musl,glibc",
+        help="Comma-separated required libc variants for --promotion-candidates (default: musl,glibc)",
+    )
     args = parser.parse_args()
 
-    text = args.log.read_text(errors="ignore")
-    data = compact(parse_log(text), infer_arch(args.log))
+    if not args.promotion_candidates and len(args.log) != 1:
+        parser.error("multiple logs require --promotion-candidates")
+
+    summaries = []
+    for path in args.log:
+        arch = infer_arch(path)
+        raw_summary = parse_log(path.read_text(errors="ignore"))
+        summaries.append((path, raw_summary, compact(raw_summary, arch), arch))
+
+    if args.promotion_candidates:
+        rows = [
+            row
+            for _path, raw_summary, data, arch in summaries
+            for row in promotion_rows(raw_summary, data, arch)
+        ]
+        report = promotion_report(
+            rows,
+            parse_csv_set(args.promotion_arches),
+            parse_csv_set(args.promotion_libcs),
+        )
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(render_promotion_markdown(report, [path for path, _raw, _data, _arch in summaries]), end="")
+        return 0
+
+    path, _raw_summary, data, _arch = summaries[0]
     if args.json:
         print(json.dumps(data, indent=2, sort_keys=True))
     else:
-        print(render_markdown(args.log, data), end="")
+        print(render_markdown(path, data), end="")
     return 0
 
 
