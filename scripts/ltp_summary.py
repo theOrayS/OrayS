@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Summarize OSKernel evaluator LTP core output.
 
-Counts wrapper-level LTP case PASS/FAIL lines and internal LTP quality signals
+Counts wrapper-level LTP case result lines and internal LTP quality signals
 (TFAIL/TBROK/TCONF, timeouts, ENOSYS) so RUN_EVAL_DEFAULT_STATUS=0 is not
-mistaken for a clean LTP result.
+mistaken for a clean LTP result.  The evaluator's stable wire format may print
+`FAIL LTP CASE <case> : 0` for a successful case, so the numeric status is the
+source of truth for wrapper pass/fail classification.
 """
 
 from __future__ import annotations
@@ -103,6 +105,20 @@ def case_bucket(summary: dict[str, Any], group: str, case: str) -> dict[str, Any
     return cases[key]
 
 
+def normalize_wrapper_status(raw_status: str, code: int) -> str:
+    """Return the semantic wrapper status for an LTP result line.
+
+    The official score parser-compatible harness line is historically
+    `FAIL LTP CASE <case> : 0` even when the test program exited cleanly.  Treat
+    exit status 0 as PASS while preserving non-zero FAIL/TIMEOUT evidence via
+    the numeric code and internal markers.
+    """
+
+    if code == 0:
+        return "PASS"
+    return raw_status
+
+
 def parse_log(text: str) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "pass_cases": [],
@@ -134,15 +150,17 @@ def parse_log(text: str) -> dict[str, Any]:
             case_bucket(summary, current_group, current_case)
             continue
         if match := CASE_RESULT_RE.search(line):
-            status, case, code = match.groups()
-            record = {"group": current_group, "case": case, "code": int(code)}
+            raw_status, case, code_text = match.groups()
+            code = int(code_text)
+            status = normalize_wrapper_status(raw_status, code)
+            record = {"group": current_group, "case": case, "code": code}
             target = "pass_cases" if status == "PASS" else "fail_cases"
             summary[target].append(record)
             bucket(summary, current_group)[target].append(record)
             detail = case_bucket(summary, current_group, case)
             detail["status"] = status
-            detail["code"] = int(code)
-            summary["case_events"].append({"status": status, **record})
+            detail["code"] = code
+            summary["case_events"].append({"status": status, "raw_status": raw_status, **record})
             current_case = case
             continue
         if match := TIMEOUT_CASE_RE.search(line):
