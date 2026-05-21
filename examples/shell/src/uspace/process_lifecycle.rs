@@ -253,6 +253,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         child_wait_blocked: AtomicBool::new(false),
         pid: AtomicI32::new(0),
         pgid: AtomicI32::new(0),
+        sid: AtomicI32::new(0),
         ppid: 1,
         live_threads: AtomicUsize::new(1),
         exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
@@ -324,6 +325,9 @@ impl UserProcess {
         let _ = self
             .pgid
             .compare_exchange(0, pid, Ordering::AcqRel, Ordering::Acquire);
+        let _ = self
+            .sid
+            .compare_exchange(0, pid, Ordering::AcqRel, Ordering::Acquire);
     }
 
     pub(super) fn pgid(&self) -> i32 {
@@ -332,6 +336,14 @@ impl UserProcess {
 
     pub(super) fn set_pgid(&self, pgid: i32) {
         self.pgid.store(pgid, Ordering::Release);
+    }
+
+    pub(super) fn sid(&self) -> i32 {
+        self.sid.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_sid(&self, sid: i32) {
+        self.sid.store(sid, Ordering::Release);
     }
 
     pub(super) fn credential_generation(&self) -> usize {
@@ -494,6 +506,7 @@ impl UserProcess {
             child_wait_blocked: AtomicBool::new(false),
             pid: AtomicI32::new(0),
             pgid: AtomicI32::new(self.pgid()),
+            sid: AtomicI32::new(self.sid()),
             ppid: axtask::current().id().as_u64() as i32,
             live_threads: AtomicUsize::new(1),
             exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
@@ -580,6 +593,7 @@ impl UserProcess {
         };
         let status = child.process.exit_code.load(Ordering::Acquire);
         let child_pid = child.pid;
+        let _ = child.task.join();
         child.process.teardown();
         drop(child);
         yield_for_task_gc();

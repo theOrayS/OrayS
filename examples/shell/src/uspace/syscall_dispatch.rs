@@ -29,7 +29,7 @@ use super::metadata::{
     sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat, sys_umask, sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
-use super::process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
+use super::process_abi::{sys_getpgid, sys_getsid, sys_personality, sys_setpgid, sys_setsid};
 use super::process_lifecycle::{
     sys_clone, sys_execve, sys_exit, sys_exit_group, sys_wait4,
     terminate_current_thread_for_exit_group,
@@ -348,6 +348,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_prctl => 0,
         general::__NR_setpgid => sys_setpgid(&process, tf.arg0(), tf.arg1()),
         general::__NR_getpgid => sys_getpgid(&process, tf.arg0()),
+        general::__NR_getsid => sys_getsid(&process, tf.arg0()),
         general::__NR_setsid => sys_setsid(&process),
         general::__NR_kill => sys_kill(&process, tf.arg0() as i32, tf.arg1() as i32),
         general::__NR_tkill => sys_tkill(&process, tf.arg0() as i32, tf.arg1() as i32),

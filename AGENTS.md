@@ -88,6 +88,23 @@ make docker
 - `make testsuite-sdcard` expects the sibling testsuite checkout configured by
   `TESTSUITE_DIR` (default `../testsuits-for-oskernel`).
 
+## Local and Remote Evaluation Branches
+
+- This checkout, `/root/oskernel2026-orays`, is the **local QEMU branch**. It is
+  the primary working tree for local development, debugging, and validation.
+- The sibling checkout, `/root/oskernel2026-orays-remote`, is the branch used for
+  the **remote evaluator**. Treat it as a separate target environment, not as an
+  interchangeable copy of the local QEMU setup.
+- The remote evaluator's QEMU address mapping differs from the local QEMU address
+  mapping. Keep address-mapping logic environment-specific and explicitly
+  distinguish local-only mapping from remote-evaluator mapping when editing,
+  syncing, reviewing, or reporting changes.
+- After a local-branch task goal is implemented and validated, mirror the local
+  branch's code into `/root/oskernel2026-orays-remote` before final handoff,
+  preserving only the remote evaluator's address-mapping differences. Do not let
+  generated artifacts, local logs, disk images, or unrelated dirty files become
+  part of that sync unless the task explicitly requires them.
+
 ## Toolchain
 
 - Rust toolchain is pinned in `rust-toolchain.toml` to `nightly-2025-05-20`.
@@ -172,6 +189,12 @@ make docker
 
 Pick the smallest check set that proves the change:
 
+- For local-branch code tasks, do not claim the target is delivered until both
+  `./run-eval.sh` (the default RV path) and `./run-eval.sh la` have been run
+  successfully from `/root/oskernel2026-orays`, unless a required host tool,
+  image, or external dependency is unavailable. If either command cannot be run
+  or fails, report the exact blocker/output instead of substituting build-only or
+  smoke-only evidence.
 - Documentation-only changes: inspect the rendered Markdown structure manually or
   run a lightweight text check; no kernel build is required unless examples or
   commands changed in a way that needs proof.
@@ -255,6 +278,8 @@ When reporting completed work, include:
 - intent of each change;
 - validation commands actually run;
 - checks that could not be run, if any;
+- for local-branch code tasks, whether `/root/oskernel2026-orays-remote` was
+  synced and which remote-only address-mapping differences were preserved;
 - any user-visible behavior change;
 - any syscall / errno / ABI-visible change, or an explicit statement that there
   was no intended visible ABI/POSIX behavior change.
