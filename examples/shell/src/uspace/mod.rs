@@ -71,6 +71,8 @@ struct UserProcess {
     signal_actions: Mutex<BTreeMap<usize, general::kernel_sigaction>>,
     path_modes: Mutex<BTreeMap<String, u32>>,
     path_owners: Mutex<BTreeMap<String, (u32, u32)>>,
+    path_symlinks: Mutex<BTreeMap<String, String>>,
+    umask: AtomicU32,
     mount_points: Arc<Mutex<BTreeMap<String, String>>>,
     shm_attachments: Mutex<BTreeMap<usize, (i32, usize)>>,
     real_uid: AtomicU32,

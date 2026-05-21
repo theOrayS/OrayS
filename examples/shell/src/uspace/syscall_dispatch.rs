@@ -26,7 +26,7 @@ use super::memory_map::{sys_brk, sys_mmap, sys_mprotect, sys_msync, sys_munmap};
 use super::memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use super::metadata::{
     sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fstat, sys_fstatfs,
-    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_utimensat,
+    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat, sys_umask, sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
 use super::process_abi::{sys_getpgid, sys_personality, sys_setpgid, sys_setsid};
@@ -103,6 +103,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_openat => sys_openat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_mkdirat => sys_mkdirat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_unlinkat => sys_unlinkat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_symlinkat => sys_symlinkat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_mount => sys_mount(
             &process,
             tf.arg0(),
@@ -342,7 +343,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_setfsgid => sys_setfsgid(&process, tf.arg0()),
         general::__NR_getgroups => sys_getgroups(&process, tf.arg0(), tf.arg1()),
         general::__NR_setgroups => sys_setgroups(&process, tf.arg0(), tf.arg1()),
-        general::__NR_umask => 0,
+        general::__NR_umask => sys_umask(&process, tf.arg0()),
         general::__NR_personality => sys_personality(&process, tf.arg0()),
         general::__NR_prctl => 0,
         general::__NR_setpgid => sys_setpgid(&process, tf.arg0(), tf.arg1()),

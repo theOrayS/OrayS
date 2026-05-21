@@ -1,7 +1,7 @@
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 use memory_addr::PAGE_SIZE_4K;
-use std::string::String;
+use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
@@ -139,6 +139,76 @@ pub(super) fn proc_pid_stat_fd_entry(process: &UserProcess, path: &str) -> Optio
 
 pub(super) fn proc_pid_stat_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
     let (path, data) = proc_pid_stat_content(process, path)?;
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        path.as_str(),
+        data.len(),
+    )))
+}
+
+fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
+    let normalized = normalize_path("/", path)?;
+    let (pid, stat) = if normalized == "/proc/self/status" {
+        (process.pid(), UserProcessStat::from(process))
+    } else {
+        let rest = normalized.strip_prefix("/proc/")?;
+        let pid_text = rest.strip_suffix("/status")?;
+        let pid = pid_text.parse::<i32>().ok()?;
+        if pid == process.pid() {
+            (pid, UserProcessStat::from(process))
+        } else if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+            (pid, UserProcessStat::from(entry.process.as_ref()))
+        } else {
+            let entry = user_thread_entry_by_process_pid(pid)?;
+            (pid, UserProcessStat::from(entry.process.as_ref()))
+        }
+    };
+    let groups = process
+        .groups()
+        .into_iter()
+        .map(|gid| gid.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let groups = if groups.is_empty() {
+        process.gid().to_string()
+    } else {
+        groups
+    };
+    let content = format!(
+        "Name:\t{}\n\
+         State:\t{} ({})\n\
+         Tgid:\t{pid}\n\
+         Pid:\t{pid}\n\
+         PPid:\t{}\n\
+         Uid:\t{}\t{}\t{}\t{}\n\
+         Gid:\t{}\t{}\t{}\t{}\n\
+         Groups:\t{groups}\n",
+        stat.comm,
+        stat.state,
+        stat.state,
+        stat.ppid,
+        process.real_uid(),
+        process.uid(),
+        process.saved_uid(),
+        process.uid(),
+        process.real_gid(),
+        process.gid(),
+        process.saved_gid(),
+        process.gid(),
+    );
+    Some((normalized, content.into_bytes()))
+}
+
+pub(super) fn proc_pid_status_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_pid_status_content(process, path)?;
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path,
+        data: Arc::new(data),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_pid_status_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_pid_status_content(process, path)?;
     Some(FdEntry::Path(PathEntry::synthetic_file(
         path.as_str(),
         data.len(),

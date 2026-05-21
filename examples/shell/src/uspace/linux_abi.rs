@@ -3,7 +3,7 @@ use linux_raw_sys::general;
 use std::string::String;
 
 pub(super) const USER_ASPACE_BASE: usize = 0x1_0000;
-pub(super) const USER_ASPACE_SIZE: usize = 0x20_0000_0000;
+pub(super) const USER_ASPACE_SIZE: usize = 0x3f_0000_0000;
 pub(super) const USER_STACK_SIZE: usize = 8 * 1024 * 1024;
 pub(super) const USER_STACK_GUARD: usize = 0x1_0000;
 pub(super) const USER_STACK_TOP: usize = USER_ASPACE_BASE + USER_ASPACE_SIZE - USER_STACK_GUARD;
@@ -54,6 +54,7 @@ pub(super) const LOONGARCH_SIGTRAMP_CODE: [u32; 3] = [0x0282_2c0b, 0x002b_0000, 
 
 pub(super) const ST_MODE_DIR: u32 = 0o040000;
 pub(super) const ST_MODE_FILE: u32 = 0o100000;
+pub(super) const ST_MODE_LNK: u32 = 0o120000;
 pub(super) const ST_MODE_CHR: u32 = 0o020000;
 pub(super) const ST_MODE_BLK: u32 = 0o060000;
 pub(super) const ST_MODE_SOCKET: u32 = 0o140000;

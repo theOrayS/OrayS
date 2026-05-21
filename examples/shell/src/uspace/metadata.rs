@@ -1,4 +1,5 @@
 use core::cmp;
+use core::sync::atomic::Ordering;
 
 use axalloc::global_allocator;
 use axerrno::LinuxError;
@@ -12,14 +13,15 @@ use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
     FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, PIPEFS_MAGIC, PROC_SUPER_MAGIC,
-    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC,
-    TMPFS_MAGIC, neg_errno, neg_errno_code,
+    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
+    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
 use super::user_memory::{read_cstr, write_user_bytes, write_user_value};
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
+const LINUX_PATH_MAX: usize = 4096;
 
 pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general::stat {
     let st_mode = file_type_mode(attr.file_type()) | attr.perm().bits() as u32;
@@ -49,6 +51,16 @@ impl UserProcess {
         self.path_modes.lock().get(path).copied()
     }
 
+    pub(super) fn apply_umask(&self, mode: u32) -> u32 {
+        mode & !self.umask.load(Ordering::Acquire)
+    }
+
+    pub(super) fn replace_umask(&self, mask: u32) -> u32 {
+        self.umask
+            .swap(mask & FILE_MODE_PERMISSION_MASK, Ordering::AcqRel)
+            & FILE_MODE_PERMISSION_MASK
+    }
+
     pub(super) fn set_path_owner(&self, path: String, owner: Option<u32>, group: Option<u32>) {
         let mut path_owners = self.path_owners.lock();
         let (current_owner, current_group) =
@@ -66,6 +78,43 @@ impl UserProcess {
         self.path_owners.lock().get(path).copied()
     }
 
+    pub(super) fn set_path_symlink(&self, path: String, target: String) {
+        self.path_symlinks.lock().insert(path, target);
+    }
+
+    pub(super) fn remove_path_symlink(&self, path: &str) -> bool {
+        self.path_symlinks.lock().remove(path).is_some()
+    }
+
+    pub(super) fn path_symlink(&self, path: &str) -> Option<String> {
+        self.path_symlinks.lock().get(path).cloned()
+    }
+
+    pub(super) fn resolve_path_symlink(&self, path: &str) -> Result<Option<String>, LinuxError> {
+        let mut current = path.to_string();
+        for _ in 0..40 {
+            let Some(target) = self.path_symlink(current.as_str()) else {
+                return Ok((current != path).then_some(current));
+            };
+            current = normalize_symlink_target(current.as_str(), target.as_str())
+                .ok_or(LinuxError::EINVAL)?;
+        }
+        Err(LinuxError::ELOOP)
+    }
+
+    pub(super) fn path_symlink_stat(&self, path: &str) -> Option<general::stat> {
+        let target = self.path_symlink(path)?;
+        let mut st: general::stat = unsafe { core::mem::zeroed() };
+        st.st_dev = 1;
+        st.st_ino = path_inode(Some(path));
+        st.st_mode = ST_MODE_LNK | 0o777;
+        st.st_nlink = 1;
+        st.st_size = target.len() as _;
+        st.st_blksize = 512;
+        st.st_blocks = 0;
+        Some(st)
+    }
+
     pub(super) fn clear_path_chown_special_bits(&self, path: &str, current_mode: u32) {
         let mode = self
             .path_mode(path)
@@ -75,6 +124,19 @@ impl UserProcess {
             updated_mode &= !FILE_MODE_SET_GID;
         }
         self.set_path_mode(path.to_string(), updated_mode);
+    }
+}
+
+fn normalize_symlink_target(link_path: &str, target: &str) -> Option<String> {
+    if target.starts_with('/') {
+        normalize_path("/", target)
+    } else {
+        let parent = link_path
+            .rsplit_once('/')
+            .map(|(parent, _)| parent)
+            .unwrap_or("/");
+        let parent = if parent.is_empty() { "/" } else { parent };
+        normalize_path(parent, target)
     }
 }
 
@@ -139,6 +201,46 @@ pub(super) fn sys_faccessat(
     } else {
         neg_errno_code(LINUX_EACCES)
     }
+}
+
+pub(super) fn sys_symlinkat(
+    process: &UserProcess,
+    target: usize,
+    newdirfd: usize,
+    linkpath: usize,
+) -> isize {
+    let target = match read_cstr(process, target) {
+        Ok(target) => target,
+        Err(err) => return neg_errno(err),
+    };
+    let linkpath = match read_cstr(process, linkpath) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    if target.is_empty() || linkpath.is_empty() {
+        return neg_errno(LinuxError::ENOENT);
+    }
+    if target.len() >= LINUX_PATH_MAX || linkpath.len() >= LINUX_PATH_MAX {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
+    let resolved_path = {
+        let table = process.fds.lock();
+        match resolve_dirfd_path(process, &table, newdirfd as i32, linkpath.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    if process.path_symlink(resolved_path.as_str()).is_some()
+        || axfs::api::metadata(resolved_path.as_str()).is_ok()
+    {
+        return neg_errno(LinuxError::EEXIST);
+    }
+    process.set_path_symlink(resolved_path, target);
+    0
+}
+
+pub(super) fn sys_umask(process: &UserProcess, mask: usize) -> isize {
+    process.replace_umask(mask as u32) as isize
 }
 
 pub(super) fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize {
@@ -432,13 +534,35 @@ pub(super) fn sys_newfstatat(
             Err(err) => return neg_errno(err),
         }
     } else {
-        match process
-            .fds
-            .lock()
-            .stat_path(process, dirfd as i32, path.as_str())
-        {
-            Ok(st) => st,
-            Err(err) => return neg_errno(err),
+        if flags & general::AT_SYMLINK_NOFOLLOW != 0 {
+            let resolved_path = {
+                let table = process.fds.lock();
+                match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
+                    Ok(path) => path,
+                    Err(err) => return neg_errno(err),
+                }
+            };
+            if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
+                st
+            } else {
+                match process
+                    .fds
+                    .lock()
+                    .stat_path(process, dirfd as i32, path.as_str())
+                {
+                    Ok(st) => st,
+                    Err(err) => return neg_errno(err),
+                }
+            }
+        } else {
+            match process
+                .fds
+                .lock()
+                .stat_path(process, dirfd as i32, path.as_str())
+            {
+                Ok(st) => st,
+                Err(err) => return neg_errno(err),
+            }
         }
     };
     write_user_value(process, statbuf, &st)
@@ -512,6 +636,26 @@ pub(super) fn sys_statx(
                 Ok(st) => st,
                 Err(err) => return neg_errno(err),
             }
+        } else if flags & general::AT_SYMLINK_NOFOLLOW != 0 {
+            let resolved_path = {
+                let table = process.fds.lock();
+                match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
+                    Ok(path) => path,
+                    Err(err) => return neg_errno(err),
+                }
+            };
+            if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
+                st
+            } else {
+                match process
+                    .fds
+                    .lock()
+                    .stat_path(process, dirfd as i32, path.as_str())
+                {
+                    Ok(st) => st,
+                    Err(err) => return neg_errno(err),
+                }
+            }
         } else {
             match process
                 .fds
@@ -563,6 +707,12 @@ pub(super) fn sys_readlinkat(
         }
     };
     if let Some(target) = proc_exe_link_target(process, resolved_path.as_str()) {
+        let bytes = target.as_bytes();
+        let copy_len = cmp::min(bytes.len(), bufsiz);
+        return write_user_bytes(process, buf, &bytes[..copy_len])
+            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
+    }
+    if let Some(target) = process.path_symlink(resolved_path.as_str()) {
         let bytes = target.as_bytes();
         let copy_len = cmp::min(bytes.len(), bufsiz);
         return write_user_bytes(process, buf, &bytes[..copy_len])
