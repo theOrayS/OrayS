@@ -82,6 +82,7 @@ fn proc_stat_target_process(process: &UserProcess, path: &str) -> Option<(i32, U
 struct UserProcessStat {
     ppid: i32,
     pgid: i32,
+    sid: i32,
     state: char,
     comm: String,
 }
@@ -111,6 +112,7 @@ impl UserProcessStat {
         Self {
             ppid: process.ppid(),
             pgid: process.pgid(),
+            sid: process.sid(),
             state,
             comm,
         }
@@ -120,10 +122,9 @@ impl UserProcessStat {
 fn proc_pid_stat_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
     let normalized = normalize_path("/", path)?;
     let (pid, stat) = proc_stat_target_process(process, normalized.as_str())?;
-    let session = stat.pgid;
     let content = format!(
         "{pid} ({}) {} {} {} {} 0 -1 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
-        stat.comm, stat.state, stat.ppid, stat.pgid, session
+        stat.comm, stat.state, stat.ppid, stat.pgid, stat.sid
     );
     Some((normalized, content.into_bytes()))
 }

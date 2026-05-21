@@ -53,26 +53,45 @@ pub(super) fn sys_setpgid(process: &UserProcess, pid: usize, pgid: usize) -> isi
     0
 }
 
-pub(super) fn sys_getpgid(process: &UserProcess, pid: usize) -> isize {
+fn visible_process_group_and_session(
+    process: &UserProcess,
+    pid: usize,
+) -> Result<(i32, i32), LinuxError> {
     let pid = pid as i32;
     if pid < 0 {
-        return neg_errno(LinuxError::EINVAL);
+        return Err(LinuxError::ESRCH);
     }
 
     let current = process.pid();
     let target = if pid == 0 { current } else { pid };
     if target == current {
-        return process.pgid() as isize;
+        return Ok((process.pgid(), process.sid()));
     }
     let Some(entry) = user_thread_entry_by_process_pid(target) else {
-        return neg_errno(LinuxError::ESRCH);
+        return Err(LinuxError::ESRCH);
     };
-    entry.process.pgid() as isize
+    Ok((entry.process.pgid(), entry.process.sid()))
+}
+
+pub(super) fn sys_getpgid(process: &UserProcess, pid: usize) -> isize {
+    match visible_process_group_and_session(process, pid) {
+        Ok((pgid, _)) => pgid as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_getsid(process: &UserProcess, pid: usize) -> isize {
+    match visible_process_group_and_session(process, pid) {
+        Ok((_, sid)) => sid as isize,
+        Err(err) => neg_errno(err),
+    }
 }
 
 pub(super) fn sys_setsid(process: &UserProcess) -> isize {
-    process.set_pgid(process.pid());
-    process.pid() as isize
+    let sid = process.pid();
+    process.set_pgid(sid);
+    process.set_sid(sid);
+    sid as isize
 }
 
 pub(super) fn sys_personality(process: &UserProcess, persona: usize) -> isize {

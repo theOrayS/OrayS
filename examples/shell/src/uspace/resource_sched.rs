@@ -85,6 +85,10 @@ pub(super) fn rlimit_is_valid(limit: UserRlimit) -> bool {
     limit.rlim_cur <= limit.rlim_max
 }
 
+fn resource_is_valid(resource: u32) -> bool {
+    resource <= general::RLIMIT_RTTIME
+}
+
 pub(super) fn prlimit_target_valid(pid: i32) -> bool {
     pid == 0 || pid == current_tid()
 }
@@ -345,6 +349,9 @@ pub(super) fn sys_prlimit64(
 ) -> isize {
     if !prlimit_target_valid(pid) {
         return neg_errno(LinuxError::ESRCH);
+    }
+    if !resource_is_valid(resource) {
+        return neg_errno(LinuxError::EINVAL);
     }
 
     if old_limit != 0 {

@@ -91,6 +91,7 @@ struct UserProcess {
     child_wait_blocked: AtomicBool,
     pid: AtomicI32,
     pgid: AtomicI32,
+    sid: AtomicI32,
     ppid: i32,
     live_threads: AtomicUsize,
     exit_group_code: AtomicI32,
