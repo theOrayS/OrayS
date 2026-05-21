@@ -1,0 +1,1591 @@
+make test_build ARCH=riscv64 BUS=mmio \
+	KERNEL_FEATURES="alloc,paging,irq,multitask,fs,net" \
+	APP_FEATURES="auto-run-tests,uspace" \
+	AXCONFIG_WRITES="-w plat.phys-memory-size=0x4000_0000" \
+	OUT_DIR=/root/oskernel2026-orays/build/kernels/riscv64 \
+	OUT_CONFIG=/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml \
+	TARGET_DIR=/root/oskernel2026-orays/build/kernels/target/riscv64
+make[1]: Entering directory '/root/oskernel2026-orays'
+make A=examples/shell MODE=release LOG=info SMP=1 FEATURES=alloc,paging,irq,multitask,fs,net \
+	ARCH=riscv64 BUS=mmio \
+	APP_FEATURES="auto-run-tests,uspace" \
+	AXCONFIG_WRITES="-w plat.phys-memory-size=0x4000_0000" \
+	OUT_DIR=/root/oskernel2026-orays/build/kernels/riscv64 \
+	OUT_CONFIG=/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml \
+	TARGET_DIR=/root/oskernel2026-orays/build/kernels/target/riscv64 \
+	build
+make[2]: Entering directory '/root/oskernel2026-orays'
+[37maxconfig-gen[0m [90mconfigs/defconfig.toml /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axplat-riscv64-qemu-virt-0.4.1/axconfig.toml  -w arch=riscv64 -w platform=riscv64-qemu-virt -o "/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml" -w plat.phys-memory-size=0x4000_0000 -w plat.max-cpu-num=1 -c "/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml"[0m
+    [92;1mBuilding[0m App: shell, Arch: riscv64, Platform: riscv64-qemu-virt, App type: rust
+[37mcargo -C examples/shell build[0m [90m-Z unstable-options --target riscv64gc-unknown-none-elf --target-dir /root/oskernel2026-orays/build/kernels/target/riscv64 --release  --features "axstd/defplat axstd/log-level-info axstd/bus-mmio axstd/alloc axstd/paging axstd/irq axstd/multitask axstd/fs axstd/net auto-run-tests uspace"[0m
+   Compiling axconfig v0.2.0 (/root/oskernel2026-orays/kernel/config/axconfig)
+   Compiling axplat-riscv64-qemu-virt v0.4.1
+   Compiling axhal v0.2.0 (/root/oskernel2026-orays/kernel/arch/axhal)
+warning: unused import: `super::fragmentation::PacketAssemblerSet`
+  --> vendor/smoltcp/src/iface/interface/mod.rs:35:5
+   |
+35 | use super::fragmentation::PacketAssemblerSet;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `IFACE_MAX_SIXLOWPAN_ADDRESS_CONTEXT_COUNT`
+  --> vendor/smoltcp/src/iface/interface/mod.rs:41:43
+   |
+41 | use crate::config::{IFACE_MAX_ADDR_COUNT, IFACE_MAX_SIXLOWPAN_ADDRESS_CONTEXT_COUNT};
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `frag`
+  --> vendor/smoltcp/src/iface/interface/ipv4.rs:91:9
+   |
+91 |         frag: &'a mut FragmentsBuffer,
+   |         ^^^^ help: if this is intentional, prefix it with an underscore: `_frag`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unreachable pattern
+    --> vendor/smoltcp/src/iface/interface/mod.rs:1177:13
+     |
+1171 |             Medium::Ethernet => {
+     |             ---------------- matches all the relevant values
+...
+1177 |             _ => (EthernetAddress([0; 6]), tx_token),
+     |             ^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` on by default
+
+warning: unreachable pattern
+    --> vendor/smoltcp/src/iface/interface/mod.rs:1174:21
+     |
+1173 |                     (HardwareAddress::Ethernet(addr), tx_token) => (addr, tx_token),
+     |                     ------------------------------------------- matches all the relevant values
+1174 |                     (_, _) => unreachable!(),
+     |                     ^^^^^^ no value can reach this
+
+warning: unused variable: `repr`
+    --> vendor/smoltcp/src/iface/interface/mod.rs:1211:26
+     |
+1211 |             IpRepr::Ipv4(repr) => {
+     |                          ^^^^ help: if this is intentional, prefix it with an underscore: `_repr`
+
+warning: variable does not need to be mutable
+   --> vendor/smoltcp/src/socket/dns.rs:249:13
+    |
+249 |         let mut mdns = MulticastDns::Disabled;
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: methods `link_local_ipv6_address` and `mldv2_report_packet` are never used
+   --> vendor/smoltcp/src/iface/interface/ipv6.rs:171:8
+    |
+21  | impl InterfaceInner {
+    | ------------------- methods in this implementation
+...
+171 |     fn link_local_ipv6_address(&self) -> Option<Ipv6Address> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+536 |     pub(super) fn mldv2_report_packet<'any>(
+    |                   ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: variant `HopByHopIcmpv6` is never constructed
+   --> vendor/smoltcp/src/iface/packet.rs:215:5
+    |
+207 | pub(crate) enum IpPayload<'p> {
+    |                 --------- variant in this enum
+...
+215 |     HopByHopIcmpv6(Ipv6HopByHopRepr<'p>, Icmpv6Repr<'p>),
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `IpPayload` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `is_solicited_node_multicast` is never used
+   --> vendor/smoltcp/src/wire/ipv6.rs:131:8
+    |
+79  | pub(crate) trait AddressExt {
+    |                  ---------- method in this trait
+...
+131 |     fn is_solicited_node_multicast(&self) -> bool;
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `emit_header` is never used
+   --> vendor/smoltcp/src/wire/udp.rs:275:19
+    |
+232 | impl Repr {
+    | --------- method in this implementation
+...
+275 |     pub(crate) fn emit_header<T>(&self, packet: &mut Packet<&mut T>, payload_len: usize)
+    |                   ^^^^^^^^^^^
+
+warning: `smoltcp` (lib) generated 11 warnings (run `cargo fix --lib -p smoltcp` to apply 3 suggestions)
+   Compiling axtask v0.2.0 (/root/oskernel2026-orays/kernel/task/axtask)
+   Compiling axdriver v0.2.0 (/root/oskernel2026-orays/kernel/drivers/axdriver)
+   Compiling axsync v0.2.0 (/root/oskernel2026-orays/kernel/sync/axsync)
+   Compiling axfs v0.2.0 (/root/oskernel2026-orays/kernel/fs/axfs)
+   Compiling axnet v0.2.0 (/root/oskernel2026-orays/kernel/net/axnet)
+warning: methods `recv_loopback` and `recv_loopback_from` are never used
+   --> kernel/net/axnet/src/smoltcp_impl/udp.rs:319:8
+    |
+276 | impl UdpSocket {
+    | -------------- methods in this implementation
+...
+319 |     fn recv_loopback(&self, buf: &mut [u8], remote: Option<IpEndpoint>) -> AxResult<usize> {
+    |        ^^^^^^^^^^^^^
+...
+323 |     fn recv_loopback_from(
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+   Compiling axmm v0.2.0 (/root/oskernel2026-orays/kernel/memory/axmm)
+warning: `axnet` (lib) generated 1 warning
+   Compiling axruntime v0.2.0 (/root/oskernel2026-orays/kernel/runtime/axruntime)
+   Compiling axfeat v0.2.0 (/root/oskernel2026-orays/api/axfeat)
+   Compiling arceos_api v0.2.0 (/root/oskernel2026-orays/api/arceos_api)
+   Compiling axstd v0.2.0 (/root/oskernel2026-orays/ulib/axstd)
+   Compiling arceos_posix_api v0.2.0 (/root/oskernel2026-orays/api/arceos_posix_api)
+   Compiling arceos-shell v0.1.0 (/root/oskernel2026-orays/examples/shell)
+    Finished `release` profile [optimized] target(s) in 5m 27s
+[37mrust-objcopy --binary-architecture=riscv64[0m [90m/root/oskernel2026-orays/build/kernels/riscv64/shell_riscv64-qemu-virt.elf --strip-all -O binary /root/oskernel2026-orays/build/kernels/riscv64/shell_riscv64-qemu-virt.bin[0m
+make[2]: Leaving directory '/root/oskernel2026-orays'
+rust-objcopy -I binary -O elf64-littleriscv --rename-section .data=.text,alloc,load,readonly,code /root/oskernel2026-orays/build/kernels/riscv64/shell_riscv64-qemu-virt.bin /root/oskernel2026-orays/build/kernels/kernel-rv.wrap.o
+rust-lld -flavor gnu -m elf64lriscv -T scripts/make/riscv64-kernel-wrap.lds /root/oskernel2026-orays/build/kernels/kernel-rv.wrap.o -o /root/oskernel2026-orays/kernel-rv
+make[1]: Leaving directory '/root/oskernel2026-orays'
+rm -f /tmp/arceos-sdcard-rv.run.qcow2
+qemu-img create -f qcow2 -F raw -b /root/oskernel2026-orays/sdcard-rv.img /tmp/arceos-sdcard-rv.run.qcow2
+Formatting '/tmp/arceos-sdcard-rv.run.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=4294967296 backing_file=/root/oskernel2026-orays/sdcard-rv.img backing_fmt=raw lazy_refcounts=off refcount_bits=16
+qemu-system-riscv64 -machine virt -kernel /root/oskernel2026-orays/kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=/tmp/arceos-sdcard-rv.run.qcow2,if=none,format=qcow2,id=x0 \
+	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
+	-rtc base=utc
+
+OpenSBI v1.3
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|___ /_____|
+        | |
+        |_|
+
+Platform Name             : riscv-virtio,qemu
+Platform Features         : medeleg
+Platform HART Count       : 1
+Platform IPI Device       : aclint-mswi
+Platform Timer Device     : aclint-mtimer @ 10000000Hz
+Platform Console Device   : semihosting
+Platform HSM Device       : ---
+Platform PMU Device       : ---
+Platform Reboot Device    : sifive_test
+Platform Shutdown Device  : sifive_test
+Platform Suspend Device   : ---
+Platform CPPC Device      : ---
+Firmware Base             : 0x80000000
+Firmware Size             : 194 KB
+Firmware RW Offset        : 0x20000
+Firmware RW Size          : 66 KB
+Firmware Heap Offset      : 0x28000
+Firmware Heap Size        : 34 KB (total), 2 KB (reserved), 9 KB (used), 22 KB (free)
+Firmware Scratch Size     : 4096 B (total), 760 B (used), 3336 B (free)
+Runtime SBI Version       : 1.0
+
+Domain0 Name              : root
+Domain0 Boot HART         : 0
+Domain0 HARTs             : 0*
+Domain0 Region00          : 0x0000000002000000-0x000000000200ffff M: (I,R,W) S/U: ()
+Domain0 Region01          : 0x0000000080000000-0x000000008001ffff M: (R,X) S/U: ()
+Domain0 Region02          : 0x0000000080020000-0x000000008003ffff M: (R,W) S/U: ()
+Domain0 Region03          : 0x0000000000000000-0xffffffffffffffff M: (R,W,X) S/U: (R,W,X)
+Domain0 Next Address      : 0x0000000080200000
+Domain0 Next Arg1         : 0x00000000bf000000
+Domain0 Next Mode         : S-mode
+Domain0 SysReset          : yes
+Domain0 SysSuspend        : yes
+
+Boot HART ID              : 0
+Boot HART Domain          : root
+Boot HART Priv Version    : v1.10
+Boot HART Base ISA        : rv64imafdc
+Boot HART ISA Extensions  : time
+Boot HART PMP Count       : 16
+Boot HART PMP Granularity : 4
+Boot HART PMP Address Bits: 54
+Boot HART MHPM Count      : 0
+Boot HART MIDELEG         : 0x0000000000000222
+Boot HART MEDELEG         : 0x000000000000b109
+
+       d8888                            .d88888b.   .d8888b.
+      d88888                           d88P" "Y88b d88P  Y88b
+     d88P888                           888     888 Y88b.
+    d88P 888 888d888  .d8888b  .d88b.  888     888  "Y888b.
+   d88P  888 888P"   d88P"    d8P  Y8b 888     888     "Y88b.
+  d88P   888 888     888      88888888 888     888       "888
+ d8888888888 888     Y88b.    Y8b.     Y88b. .d88P Y88b  d88P
+d88P     888 888      "Y8888P  "Y8888   "Y88888P"   "Y8888P"
+
+arch = riscv64
+platform = riscv64-qemu-virt
+target = riscv64gc-unknown-none-elf
+build_mode = release
+log_level = info
+
+[37m[  0.383380 0 axruntime:135] [32mLogging is enabled.[m
+[m[37m[  0.421403 0 axruntime:136] [32mPrimary CPU 0 started, arg = 0xbf000000.[m
+[m[37m[  0.436738 0 axruntime:139] [32mFound physcial memory regions:[m
+[m[37m[  0.455971 0 axruntime:141] [32m  [PA:0x101000, PA:0x102000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.470889 0 axruntime:141] [32m  [PA:0xc000000, PA:0xc210000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.482119 0 axruntime:141] [32m  [PA:0x10000000, PA:0x10001000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.496047 0 axruntime:141] [32m  [PA:0x10001000, PA:0x10009000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.499339 0 axruntime:141] [32m  [PA:0x30000000, PA:0x40000000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.508274 0 axruntime:141] [32m  [PA:0x40000000, PA:0x80000000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.520142 0 axruntime:141] [32m  [PA:0x80200000, PA:0x802e2000) .text (READ | EXECUTE | RESERVED)[m
+[m[37m[  0.527612 0 axruntime:141] [32m  [PA:0x802e2000, PA:0x8030d000) .rodata (READ | RESERVED)[m
+[m[37m[  0.538487 0 axruntime:141] [32m  [PA:0x8030d000, PA:0x80311000) .data .tdata .tbss .percpu (READ | WRITE | RESERVED)[m
+[m[37m[  0.540351 0 axruntime:141] [32m  [PA:0x80311000, PA:0x80351000) boot stack (READ | WRITE | RESERVED)[m
+[m[37m[  0.542508 0 axruntime:141] [32m  [PA:0x80351000, PA:0x8037a000) .bss (READ | WRITE | RESERVED)[m
+[m[37m[  0.552627 0 axruntime:141] [32m  [PA:0x8037a000, PA:0xc0000000) free memory (READ | WRITE | FREE)[m
+[m[37m[  0.571098 0 axruntime:216] [32mInitialize global memory allocator...[m
+[m[37m[  0.572957 0 axruntime:217] [32m  use TLSF allocator.[m
+[m[37m[  0.611164 0 axmm:103] [32mInitialize virtual memory management...[m
+[m[37m[  1.632299 0 axruntime:156] [32mInitialize platform devices...[m
+[msmp = 1
+[37m[  1.636586 0 axtask::api:73] [32mInitialize scheduling...[m
+[m[37m[  1.666451 0 axtask::api:83] [32m  use Round-robin scheduler.[m
+[m[37m[  1.680333 0 axdriver:152] [32mInitialize device drivers...[m
+[m[37m[  1.688586 0 axdriver:153] [32m  device model: static[m
+[m[37m[  1.692600 0 virtio_drivers::device::blk:63] [32mfound a block device of size 4194304KB[m
+[m[37m[  1.727516 0 axdriver::bus::mmio:11] [32mregistered a new Block device at [PA:0x10001000, PA:0x10002000): "virtio-blk"[m
+[m[37m[  1.740182 0 virtio_drivers::device::net::dev_raw:33] [32mnegotiated_features Features(MAC | STATUS | RING_INDIRECT_DESC | RING_EVENT_IDX)[m
+[m[37m[  1.773717 0 axdriver::bus::mmio:11] [32mregistered a new Net device at [PA:0x10008000, PA:0x10009000): "virtio-net"[m
+[m[37m[  1.794960 0 axfs:44] [32mInitialize filesystems...[m
+[m[37m[  1.800427 0 axfs:47] [32m  use block device 0: "virtio-blk"[m
+[m[37m[  1.839586 0 axfs::root:336] [32m  detected root filesystem: Ext4[m
+[m[37m[  2.129263 0 axnet:42] [32mInitialize network subsystem...[m
+[m[37m[  2.150911 0 axnet:45] [32m  use NIC 0: "virtio-net"[m
+[m[37m[  2.180375 0 axnet::smoltcp_impl:335] [32mcreated net interface "eth0":[m
+[m[37m[  2.196164 0 axnet::smoltcp_impl:336] [32m  ether:    52-54-00-12-34-56[m
+[m[37m[  2.204580 0 axnet::smoltcp_impl:337] [32m  ip:       10.0.2.15/24[m
+[m[37m[  2.214774 0 axnet::smoltcp_impl:338] [32m  gateway:  10.0.2.2[m
+[m[37m[  2.225348 0 axruntime:182] [32mInitialize interrupt handlers...[m
+[m[37m[  2.227961 0 axruntime:194] [32mPrimary CPU 0 init OK.[m
+[m#### OS COMP TEST GROUP START ltp-musl ####
+ltp case list: inline (12 cases, timeout 15s)
+========== START ltp sched_get_priority_max01 ==========
+RUN LTP CASE sched_get_priority_max01
+LTP MEMORY sched_get_priority_max01 before: free_frames=258865 allocated_frames=2389
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+sched_get_priority_max01.c:42: [1;33mTCONF: [0msyscall(125) __NR_sched_get_priority_max not supported on your arch
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+[37m[  8.913598 0:4 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE sched_get_priority_max01 : 32
+LTP MEMORY sched_get_priority_max01 after_run: free_frames=256803 allocated_frames=4451
+LTP MEMORY sched_get_priority_max01 after_cleanup: free_frames=256803 allocated_frames=4451
+LTP CASE RUNTIME sched_get_priority_max01: 6241 ms
+========== END ltp sched_get_priority_max01 ==========
+========== START ltp sched_get_priority_min01 ==========
+RUN LTP CASE sched_get_priority_min01
+LTP MEMORY sched_get_priority_min01 before: free_frames=256803 allocated_frames=4451
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+sched_get_priority_min01.c:42: [1;33mTCONF: [0msyscall(126) __NR_sched_get_priority_min not supported on your arch
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+[37m[ 16.910669 0:8 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE sched_get_priority_min01 : 32
+LTP MEMORY sched_get_priority_min01 after_run: free_frames=256789 allocated_frames=4465
+LTP MEMORY sched_get_priority_min01 after_cleanup: free_frames=256789 allocated_frames=4465
+LTP CASE RUNTIME sched_get_priority_min01: 7924 ms
+========== END ltp sched_get_priority_min01 ==========
+========== START ltp sched_getscheduler01 ==========
+RUN LTP CASE sched_getscheduler01
+LTP MEMORY sched_getscheduler01 before: free_frames=256789 allocated_frames=4465
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+sched_getscheduler01.c:58: [1;34mTINFO: [0mTesting libc variant
+sched_getscheduler01.c:51: [1;32mTPASS: [0mgot expected policy 2
+sched_getscheduler01.c:51: [1;32mTPASS: [0mgot expected policy 0
+sched_getscheduler01.c:51: [1;32mTPASS: [0mgot expected policy 1
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+sched_getscheduler01.c:58: [1;34mTINFO: [0mTesting syscall variant
+sched_getscheduler01.c:51: [1;32mTPASS: [0mgot expected policy 2
+sched_getscheduler01.c:51: [1;32mTPASS: [0mgot expected policy 0
+sched_getscheduler01.c:51: [1;32mTPASS: [0mgot expected policy 1
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 25.847873 0:12 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE sched_getscheduler01 : 0
+Pass!
+LTP MEMORY sched_getscheduler01 after_run: free_frames=256768 allocated_frames=4486
+LTP MEMORY sched_getscheduler01 after_cleanup: free_frames=256768 allocated_frames=4486
+LTP CASE RUNTIME sched_getscheduler01: 8924 ms
+========== END ltp sched_getscheduler01 ==========
+========== START ltp uname04 ==========
+RUN LTP CASE uname04
+LTP MEMORY uname04 before: free_frames=256768 allocated_frames=4486
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+uname04.c:70: [1;34mTINFO: [0mCalling uname with default personality
+uname04.c:62: [1;32mTPASS: [0mNo bytes leaked
+uname04.c:73: [1;34mTINFO: [0mCalling uname with UNAME26 personality
+uname04.c:62: [1;32mTPASS: [0mNo bytes leaked
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 32.730657 0:19 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE uname04 : 0
+Pass!
+LTP MEMORY uname04 after_run: free_frames=256754 allocated_frames=4500
+LTP MEMORY uname04 after_cleanup: free_frames=256754 allocated_frames=4500
+LTP CASE RUNTIME uname04: 6981 ms
+========== END ltp uname04 ==========
+========== START ltp clock_gettime03 ==========
+RUN LTP CASE clock_gettime03
+LTP MEMORY clock_gettime03 before: free_frames=256754 allocated_frames=4500
+tst_kconfig.c:71: [1;34mTINFO: [0mCouldn't locate kernel config!
+tst_kconfig.c:207: [1;31mTBROK: [0mCannot parse kernel .config
+FAIL LTP CASE clock_gettime03 : 2
+LTP MEMORY clock_gettime03 after_run: free_frames=256747 allocated_frames=4507
+LTP MEMORY clock_gettime03 after_cleanup: free_frames=256747 allocated_frames=4507
+LTP CASE RUNTIME clock_gettime03: 6810 ms
+========== END ltp clock_gettime03 ==========
+========== START ltp clock_gettime04 ==========
+RUN LTP CASE clock_gettime04
+LTP MEMORY clock_gettime04 before: free_frames=256747 allocated_frames=4507
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+vdso_helpers.c:27: [1;34mTINFO: [0mCouldn't find AT_SYSINFO_EHDR
+vdso_helpers.c:72: [1;34mTINFO: [0mCouldn't find vdso_gettime()
+vdso_helpers.c:76: [1;34mTINFO: [0mCouldn't find vdso_gettime64()
+clock_gettime04.c:176: [1;31mTFAIL: [0mCLOCK_REALTIME(gettimeofday): Difference between successive readings greater than 5 ms (3): 30
+clock_gettime04.c:176: [1;31mTFAIL: [0mCLOCK_REALTIME_COARSE(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 34
+clock_gettime04.c:176: [1;31mTFAIL: [0mCLOCK_MONOTONIC(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 31
+clock_gettime04.c:176: [1;31mTFAIL: [0mCLOCK_MONOTONIC_COARSE(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 58
+clock_gettime04.c:176: [1;31mTFAIL: [0mCLOCK_MONOTONIC_RAW(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 36
+clock_gettime04.c:176: [1;31mTFAIL: [0mCLOCK_BOOTTIME(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 58
+
+[1;33mHINT: [0mYou _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=5b43bd184530
+
+Summary:
+passed   0
+failed   6
+broken   0
+skipped  0
+warnings 0
+[37m[ 48.422165 0:24 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE clock_gettime04 : 1
+LTP MEMORY clock_gettime04 after_run: free_frames=256726 allocated_frames=4528
+LTP MEMORY clock_gettime04 after_cleanup: free_frames=256726 allocated_frames=4528
+LTP CASE RUNTIME clock_gettime04: 8798 ms
+========== END ltp clock_gettime04 ==========
+========== START ltp clock_nanosleep01 ==========
+RUN LTP CASE clock_nanosleep01
+LTP MEMORY clock_nanosleep01 before: free_frames=256726 allocated_frames=4528
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+clock_nanosleep01.c:124: [1;34mTINFO: [0mTesting variant: vDSO or syscall with libc spec
+clock_nanosleep01.c:139: [1;34mTINFO: [0mcase NORMAL
+clock_nanosleep01.c:218: [1;32mTPASS: [0mclock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: [1;34mTINFO: [0mcase NORMAL
+clock_nanosleep01.c:218: [1;32mTPASS: [0mclock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: [1;34mTINFO: [0mcase NORMAL
+clock_nanosleep01.c:218: [1;32mTPASS: [0mclock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: [1;34mTINFO: [0mcase SEND_SIGINT
+FAIL LTP CASE clock_nanosleep01 : 137
+TIMEOUT LTP CASE clock_nanosleep01 after 15s
+LTP MEMORY clock_nanosleep01 after_run: free_frames=256705 allocated_frames=4549
+LTP MEMORY clock_nanosleep01 after_cleanup: free_frames=256705 allocated_frames=4549
+LTP CASE RUNTIME clock_nanosleep01: 17336 ms
+========== END ltp clock_nanosleep01 ==========
+========== START ltp clock_nanosleep02 ==========
+RUN LTP CASE clock_nanosleep02
+LTP MEMORY clock_nanosleep02 before: free_frames=256705 allocated_frames=4549
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_timer_test.c:357: [1;34mTINFO: [0mCLOCK_MONOTONIC resolution 1ns
+tst_timer_test.c:369: [1;34mTINFO: [0mprctl(PR_GET_TIMERSLACK) = 0us
+tst_test.c:1625: [1;34mTINFO: [0mUpdating max runtime to 0h 00m 09s
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 39s
+tst_timer_test.c:379: [1;34mTINFO: [0mFailed to set zero latency constraint: No such file or directory
+tst_timer_test.c:263: [1;34mTINFO: [0mclock_nanosleep() sleeping for 1000us 500 iterations, threshold 401.01us
+tst_timer_test.c:285: [1;34mTINFO: [0mFound 108 outliners in [52745,10156] range
+tst_timer_test.c:305: [1;34mTINFO: [0mmin 1026us, max 52745us, median 2147us, trunc mean 4880.65us (discarded 25)
+tst_timer_test.c:314: [1;31mTFAIL: [0mclock_nanosleep() slept for too long
+
+ Time: us | Frequency
+--------------------------------------------------------------------------------
+     1026 | ********************************************************************
+     3749 | ************-
+     6472 | *******+
+     9195 | *******
+    11918 | *******+
+    14641 | ****
+    17364 | **-
+    20087 | **
+    22810 | *
+    25533 | *
+    28256 | -
+    30979 | +
+    33702 | +
+    36425 |
+    39148 | .
+    41871 | .
+    44594 |
+    47317 |
+    50040 | -
+--------------------------------------------------------------------------------
+   2723us | 1 sample = 0.23448 '*', 0.46897 '+', 0.93793 '-', non-zero '.'
+
+tst_timer_test.c:263: [1;34mTINFO: [0mclock_nanosleep() sleeping for 2000us 500 iterations, threshold 402.01us
+tst_timer_test.c:285: [1;34mTINFO: [0mFound 55 outliners in [57962,20140] range
+tst_timer_test.c:305: [1;34mTINFO: [0mmin 2030us, max 57962us, median 6304us, trunc mean 8003.63us (discarded 25)
+tst_timer_test.c:314: [1;31mTFAIL: [0mclock_nanosleep() slept for too long
+
+ Time: us | Frequency
+--------------------------------------------------------------------------------
+     2030 | ********************************************************************
+     4974 | ************************-
+     7918 | *****************+
+    10862 | **********-
+    13806 | **********+
+    16750 | *********
+    19694 | ******
+    22638 | ****-
+    25582 | **
+    28526 | *+
+    31470 | *+
+    34414 | +
+    37358 | +
+    40302 |
+    43246 |
+    46190 |
+    49134 |
+    52078 | -
+    55022 | -
+--------------------------------------------------------------------------------
+   2944us | 1 sample = 0.31776 '*', 0.63551 '+', 1.27103 '-', non-zero '.'
+
+tst_timer_test.c:263: [1;34mTINFO: [0mclock_nanosleep() sleeping for 5000us 300 iterations, threshold 405.04us
+FAIL LTP CASE clock_nanosleep02 : 137
+TIMEOUT LTP CASE clock_nanosleep02 after 15s
+LTP MEMORY clock_nanosleep02 after_run: free_frames=256684 allocated_frames=4570
+LTP MEMORY clock_nanosleep02 after_cleanup: free_frames=256684 allocated_frames=4570
+LTP CASE RUNTIME clock_nanosleep02: 16523 ms
+========== END ltp clock_nanosleep02 ==========
+========== START ltp sigaction02 ==========
+RUN LTP CASE sigaction02
+LTP MEMORY sigaction02 before: free_frames=256684 allocated_frames=4570
+sigaction02    1  [1;31mTFAIL[0m  :  sigaction02.c:125: sigaction() succeeded, should have failed
+sigaction02    2  [1;31mTFAIL[0m  :  sigaction02.c:128: sigaction set incorrect errno. Expected EINVAL, got: 0
+sigaction02    3  [1;31mTFAIL[0m  :  sigaction02.c:141: sigaction() succeeded, should have failed
+sigaction02    4  [1;31mTFAIL[0m  :  sigaction02.c:144: sigaction set incorrect errno. Expected EINVAL, got: 0
+sigaction02    5  [1;32mTPASS[0m  :  call failed with expected EINVAL error
+FAIL LTP CASE sigaction02 : 1
+LTP MEMORY sigaction02 after_run: free_frames=256677 allocated_frames=4577
+LTP MEMORY sigaction02 after_cleanup: free_frames=256677 allocated_frames=4577
+LTP CASE RUNTIME sigaction02: 5239 ms
+========== END ltp sigaction02 ==========
+========== START ltp rt_sigaction02 ==========
+RUN LTP CASE rt_sigaction02
+LTP MEMORY rt_sigaction02 before: free_frames=256677 allocated_frames=4577
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 35
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    1  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02    2  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    3  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    4  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02    5  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 36
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    6  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02    7  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    8  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    9  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   10  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 37
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   11  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   12  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   13  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   14  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   15  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 38
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   16  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   17  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   18  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   19  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   20  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 39
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   21  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   22  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   23  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   24  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   25  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 40
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   26  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   27  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   28  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   29  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   30  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 41
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   31  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   32  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   33  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   34  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   35  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 42
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   36  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   37  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   38  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   39  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   40  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 43
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   41  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   42  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   43  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   44  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   45  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 44
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   46  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   47  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   48  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   49  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   50  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 45
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   51  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   52  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   53  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   54  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   55  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 46
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   56  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   57  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   58  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   59  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   60  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 47
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   61  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   62  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   63  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   64  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   65  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 48
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   66  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   67  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   68  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   69  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   70  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 49
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   71  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   72  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   73  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   74  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   75  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 50
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   76  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   77  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   78  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   79  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   80  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 51
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   81  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   82  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   83  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   84  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   85  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 52
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   86  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   87  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   88  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   89  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   90  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 53
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   91  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   92  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   93  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   94  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   95  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 54
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   96  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   97  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   98  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   99  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  100  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 55
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  101  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  102  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  103  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  104  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  105  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 56
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  106  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  107  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  108  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  109  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  110  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 57
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  111  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  112  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  113  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  114  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  115  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 58
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  116  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  117  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  118  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  119  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  120  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 59
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  121  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  122  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  123  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  124  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  125  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 60
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  126  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  127  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  128  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  129  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  130  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 61
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  131  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  132  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  133  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  134  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  135  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 62
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  136  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  137  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  138  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  139  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  140  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 63
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  141  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  142  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  143  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  144  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  145  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  Signal 64
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  146  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  147  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  148  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  149  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  [1;34mTINFO[0m  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  150  [1;32mTPASS[0m  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+[37m[ 93.899083 0:38 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE rt_sigaction02 : 0
+Pass!
+LTP MEMORY rt_sigaction02 after_run: free_frames=256670 allocated_frames=4584
+LTP MEMORY rt_sigaction02 after_cleanup: free_frames=256670 allocated_frames=4584
+LTP CASE RUNTIME rt_sigaction02: 6309 ms
+========== END ltp rt_sigaction02 ==========
+========== START ltp kill05 ==========
+RUN LTP CASE kill05
+LTP MEMORY kill05 before: free_frames=256670 allocated_frames=4584
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+kill05.c:66: [1;31mTFAIL: [0mkill succeeded unexpectedly
+tst_test.c:405: [1;31mTBROK: [0mInvalid child (42) exit value 1
+
+Summary:
+passed   0
+failed   1
+broken   1
+skipped  0
+warnings 0
+[37m[101.049326 0:39 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE kill05 : 3
+LTP MEMORY kill05 after_run: free_frames=256641 allocated_frames=4613
+LTP MEMORY kill05 after_cleanup: free_frames=256641 allocated_frames=4613
+LTP CASE RUNTIME kill05: 7163 ms
+========== END ltp kill05 ==========
+========== START ltp getrusage02 ==========
+RUN LTP CASE getrusage02
+LTP MEMORY getrusage02 before: free_frames=256641 allocated_frames=4613
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getrusage02.c:72: [1;34mTINFO: [0mTesting variant: libc getrusage()
+getrusage02.c:64: [1;32mTPASS: [0mgetrusage(-2, 0x37cb0) : EINVAL (22)
+getrusage02.c:60: [1;33mTCONF: [0mEFAULT is skipped for libc variant
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getrusage02.c:72: [1;34mTINFO: [0mTesting variant: __NR_getrusage syscall
+getrusage02.c:64: [1;32mTPASS: [0mgetrusage(-2, 0x37cb0) : EINVAL (22)
+getrusage02.c:64: [1;32mTPASS: [0mgetrusage(0, 0xffffffffffffffff) : EFAULT (14)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  1
+warnings 0
+[37m[108.822908 0:45 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE getrusage02 : 0
+Pass!
+LTP MEMORY getrusage02 after_run: free_frames=256620 allocated_frames=4634
+LTP MEMORY getrusage02 after_cleanup: free_frames=256620 allocated_frames=4634
+LTP CASE RUNTIME getrusage02: 7780 ms
+========== END ltp getrusage02 ==========
+ltp cases: 4 passed, 8 failed, 2 timed out
+#### OS COMP TEST GROUP END ltp-musl ####
+#### OS COMP TEST GROUP START ltp-glibc ####
+ltp case list: inline (12 cases, timeout 15s)
+========== START ltp sched_get_priority_max01 ==========
+RUN LTP CASE sched_get_priority_max01
+LTP MEMORY sched_get_priority_max01 before: free_frames=256620 allocated_frames=4634
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+sched_get_priority_max01.c:42: TCONF: syscall(125) __NR_sched_get_priority_max not supported on your arch
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+[37m[118.892644 0:52 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE sched_get_priority_max01 : 32
+LTP MEMORY sched_get_priority_max01 after_run: free_frames=256606 allocated_frames=4648
+LTP MEMORY sched_get_priority_max01 after_cleanup: free_frames=256606 allocated_frames=4648
+LTP CASE RUNTIME sched_get_priority_max01: 9793 ms
+========== END ltp sched_get_priority_max01 ==========
+========== START ltp sched_get_priority_min01 ==========
+RUN LTP CASE sched_get_priority_min01
+LTP MEMORY sched_get_priority_min01 before: free_frames=256606 allocated_frames=4648
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+sched_get_priority_min01.c:42: TCONF: syscall(126) __NR_sched_get_priority_min not supported on your arch
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+[37m[125.905944 0:56 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE sched_get_priority_min01 : 32
+LTP MEMORY sched_get_priority_min01 after_run: free_frames=256592 allocated_frames=4662
+LTP MEMORY sched_get_priority_min01 after_cleanup: free_frames=256592 allocated_frames=4662
+LTP CASE RUNTIME sched_get_priority_min01: 7041 ms
+========== END ltp sched_get_priority_min01 ==========
+========== START ltp sched_getscheduler01 ==========
+RUN LTP CASE sched_getscheduler01
+LTP MEMORY sched_getscheduler01 before: free_frames=256592 allocated_frames=4662
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+sched_getscheduler01.c:58: TINFO: Testing libc variant
+sched_getscheduler01.c:51: TPASS: got expected policy 2
+sched_getscheduler01.c:51: TPASS: got expected policy 0
+sched_getscheduler01.c:51: TPASS: got expected policy 1
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+sched_getscheduler01.c:58: TINFO: Testing syscall variant
+sched_getscheduler01.c:51: TPASS: got expected policy 2
+sched_getscheduler01.c:51: TPASS: got expected policy 0
+sched_getscheduler01.c:51: TPASS: got expected policy 1
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[133.927190 0:60 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE sched_getscheduler01 : 0
+Pass!
+LTP MEMORY sched_getscheduler01 after_run: free_frames=256571 allocated_frames=4683
+LTP MEMORY sched_getscheduler01 after_cleanup: free_frames=256571 allocated_frames=4683
+LTP CASE RUNTIME sched_getscheduler01: 8044 ms
+========== END ltp sched_getscheduler01 ==========
+========== START ltp uname04 ==========
+RUN LTP CASE uname04
+LTP MEMORY uname04 before: free_frames=256571 allocated_frames=4683
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+uname04.c:70: TINFO: Calling uname with default personality
+uname04.c:62: TPASS: No bytes leaked
+uname04.c:73: TINFO: Calling uname with UNAME26 personality
+uname04.c:62: TPASS: No bytes leaked
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[140.554410 0:67 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE uname04 : 0
+Pass!
+LTP MEMORY uname04 after_run: free_frames=256557 allocated_frames=4697
+LTP MEMORY uname04 after_cleanup: free_frames=256557 allocated_frames=4697
+LTP CASE RUNTIME uname04: 6595 ms
+========== END ltp uname04 ==========
+========== START ltp clock_gettime03 ==========
+RUN LTP CASE clock_gettime03
+LTP MEMORY clock_gettime03 before: free_frames=256557 allocated_frames=4697
+tst_kconfig.c:71: TINFO: Couldn't locate kernel config!
+tst_kconfig.c:207: TBROK: Cannot parse kernel .config
+FAIL LTP CASE clock_gettime03 : 2
+LTP MEMORY clock_gettime03 after_run: free_frames=256550 allocated_frames=4704
+LTP MEMORY clock_gettime03 after_cleanup: free_frames=256550 allocated_frames=4704
+LTP CASE RUNTIME clock_gettime03: 5008 ms
+========== END ltp clock_gettime03 ==========
+========== START ltp clock_gettime04 ==========
+RUN LTP CASE clock_gettime04
+LTP MEMORY clock_gettime04 before: free_frames=256550 allocated_frames=4704
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+vdso_helpers.c:27: TINFO: Couldn't find AT_SYSINFO_EHDR
+vdso_helpers.c:72: TINFO: Couldn't find vdso_gettime()
+vdso_helpers.c:76: TINFO: Couldn't find vdso_gettime64()
+clock_gettime04.c:176: TFAIL: CLOCK_REALTIME(vDSO or syscall with libc spec): Difference between successive readings greater than 5 ms (0): 49
+clock_gettime04.c:176: TFAIL: CLOCK_REALTIME_COARSE(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 8
+clock_gettime04.c:176: TFAIL: CLOCK_MONOTONIC(vDSO or syscall with libc spec): Difference between successive readings greater than 5 ms (0): 36
+clock_gettime04.c:176: TFAIL: CLOCK_MONOTONIC_COARSE(vDSO or syscall with libc spec): Difference between successive readings greater than 5 ms (0): 10
+clock_gettime04.c:176: TFAIL: CLOCK_MONOTONIC_RAW(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 24
+clock_gettime04.c:176: TFAIL: CLOCK_BOOTTIME(syscall with old kernel spec): Difference between successive readings greater than 5 ms (1): 22
+
+HINT: You _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=5b43bd184530
+
+Summary:
+passed   0
+failed   6
+broken   0
+skipped  0
+warnings 0
+[37m[152.837034 0:72 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE clock_gettime04 : 1
+LTP MEMORY clock_gettime04 after_run: free_frames=256529 allocated_frames=4725
+LTP MEMORY clock_gettime04 after_cleanup: free_frames=256529 allocated_frames=4725
+LTP CASE RUNTIME clock_gettime04: 7297 ms
+========== END ltp clock_gettime04 ==========
+========== START ltp clock_nanosleep01 ==========
+RUN LTP CASE clock_nanosleep01
+LTP MEMORY clock_nanosleep01 before: free_frames=256529 allocated_frames=4725
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+clock_nanosleep01.c:124: TINFO: Testing variant: vDSO or syscall with libc spec
+clock_nanosleep01.c:139: TINFO: case NORMAL
+clock_nanosleep01.c:218: TPASS: clock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: TINFO: case NORMAL
+clock_nanosleep01.c:218: TPASS: clock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: TINFO: case NORMAL
+clock_nanosleep01.c:218: TPASS: clock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: TINFO: case SEND_SIGINT
+clock_nanosleep01.c:195: TFAIL: The clock_nanosleep() haven't updated timespec or it's not valid: SUCCESS (0)
+clock_nanosleep01.c:139: TINFO: case BAD_TS_ADDR_REQ
+clock_nanosleep01.c:143: TCONF: The libc wrapper may dereference req or rem
+clock_nanosleep01.c:139: TINFO: case BAD_TS_ADDR_REM
+clock_nanosleep01.c:143: TCONF: The libc wrapper may dereference req or rem
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+clock_nanosleep01.c:124: TINFO: Testing variant: syscall with old kernel spec
+clock_nanosleep01.c:139: TINFO: case NORMAL
+clock_nanosleep01.c:218: TPASS: clock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: TINFO: case NORMAL
+clock_nanosleep01.c:218: TPASS: clock_nanosleep() failed with: EINVAL (22)
+clock_nanosleep01.c:139: TINFO: case NORMAL
+FAIL LTP CASE clock_nanosleep01 : 137
+TIMEOUT LTP CASE clock_nanosleep01 after 15s
+LTP MEMORY clock_nanosleep01 after_run: free_frames=256501 allocated_frames=4753
+LTP MEMORY clock_nanosleep01 after_cleanup: free_frames=256501 allocated_frames=4753
+LTP CASE RUNTIME clock_nanosleep01: 17921 ms
+========== END ltp clock_nanosleep01 ==========
+========== START ltp clock_nanosleep02 ==========
+RUN LTP CASE clock_nanosleep02
+LTP MEMORY clock_nanosleep02 before: free_frames=256501 allocated_frames=4753
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_timer_test.c:357: TINFO: CLOCK_MONOTONIC resolution 1ns
+tst_timer_test.c:369: TINFO: prctl(PR_GET_TIMERSLACK) = 0us
+tst_test.c:1625: TINFO: Updating max runtime to 0h 00m 09s
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 39s
+tst_timer_test.c:379: TINFO: Failed to set zero latency constraint: No such file or directory
+tst_timer_test.c:263: TINFO: clock_nanosleep() sleeping for 1000us 500 iterations, threshold 401.01us
+tst_timer_test.c:285: TINFO: Found 65 outliners in [40215,10345] range
+tst_timer_test.c:305: TINFO: min 1025us, max 40215us, median 1054us, trunc mean 3358.51us (discarded 25)
+tst_timer_test.c:314: TFAIL: clock_nanosleep() slept for too long
+
+ Time: us | Frequency
+--------------------------------------------------------------------------------
+     1025 | ********************************************************************
+     3088 | ***********
+     5151 | *****+
+     7214 | *****+
+     9277 | ****-
+    11340 | **+
+    13403 | *+
+    15466 | *-
+    17529 | **
+    19592 | -
+    21655 | +
+    23718 | *
+    25781 |
+    27844 | .
+    29907 | -
+    31970 |
+    34033 |
+    36096 |
+    38159 | .
+--------------------------------------------------------------------------------
+   2063us | 1 sample = 0.21250 '*', 0.42500 '+', 0.85000 '-', non-zero '.'
+
+tst_timer_test.c:263: TINFO: clock_nanosleep() sleeping for 2000us 500 iterations, threshold 402.01us
+tst_timer_test.c:285: TINFO: Found 16 outliners in [62630,21624] range
+tst_timer_test.c:305: TINFO: min 2029us, max 62630us, median 5391us, trunc mean 6234.83us (discarded 25)
+tst_timer_test.c:314: TFAIL: clock_nanosleep() slept for too long
+
+ Time: us | Frequency
+--------------------------------------------------------------------------------
+     2029 | ********************************************************************
+     5219 | ****************************-
+     8409 | ********************+
+    11599 | *********+
+    14789 | ********
+    17979 | *-
+    21169 | *-
+    24359 | -
+    27549 | *
+    30739 | +
+    33929 | -
+    37119 | -
+    40309 |
+    43499 |
+    46689 |
+    49879 |
+    53069 |
+    56259 |
+    59449 | -
+--------------------------------------------------------------------------------
+   3190us | 1 sample = 0.28099 '*', 0.56198 '+', 1.12397 '-', non-zero '.'
+
+tst_timer_test.c:263: TINFO: clock_nanosleep() sleeping for 5000us 300 iterations, threshold 405.04us
+FAIL LTP CASE clock_nanosleep02 : 137
+TIMEOUT LTP CASE clock_nanosleep02 after 15s
+LTP MEMORY clock_nanosleep02 after_run: free_frames=256480 allocated_frames=4774
+LTP MEMORY clock_nanosleep02 after_cleanup: free_frames=256480 allocated_frames=4774
+LTP CASE RUNTIME clock_nanosleep02: 16837 ms
+========== END ltp clock_nanosleep02 ==========
+========== START ltp sigaction02 ==========
+RUN LTP CASE sigaction02
+LTP MEMORY sigaction02 before: free_frames=256480 allocated_frames=4774
+sigaction02    1  TFAIL  :  sigaction02.c:125: sigaction() succeeded, should have failed
+sigaction02    2  TFAIL  :  sigaction02.c:128: sigaction set incorrect errno. Expected EINVAL, got: 0
+sigaction02    3  TFAIL  :  sigaction02.c:141: sigaction() succeeded, should have failed
+sigaction02    4  TFAIL  :  sigaction02.c:144: sigaction set incorrect errno. Expected EINVAL, got: 0
+sigaction02    5  TPASS  :  call failed with expected EINVAL error
+FAIL LTP CASE sigaction02 : 1
+LTP MEMORY sigaction02 after_run: free_frames=256473 allocated_frames=4781
+LTP MEMORY sigaction02 after_cleanup: free_frames=256473 allocated_frames=4781
+LTP CASE RUNTIME sigaction02: 5724 ms
+========== END ltp sigaction02 ==========
+========== START ltp rt_sigaction02 ==========
+RUN LTP CASE rt_sigaction02
+LTP MEMORY rt_sigaction02 before: free_frames=256473 allocated_frames=4781
+rt_sigaction02    0  TINFO  :  Signal 34
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    1  TPASS  :  rt_sigaction02 failure with sig: 34 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02    2  TPASS  :  rt_sigaction02 failure with sig: 34 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    3  TPASS  :  rt_sigaction02 failure with sig: 34 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    4  TPASS  :  rt_sigaction02 failure with sig: 34 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02    5  TPASS  :  rt_sigaction02 failure with sig: 34 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 35
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    6  TPASS  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02    7  TPASS  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    8  TPASS  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02    9  TPASS  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   10  TPASS  :  rt_sigaction02 failure with sig: 35 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 36
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   11  TPASS  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   12  TPASS  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   13  TPASS  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   14  TPASS  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   15  TPASS  :  rt_sigaction02 failure with sig: 36 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 37
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   16  TPASS  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   17  TPASS  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   18  TPASS  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   19  TPASS  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   20  TPASS  :  rt_sigaction02 failure with sig: 37 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 38
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   21  TPASS  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   22  TPASS  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   23  TPASS  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   24  TPASS  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   25  TPASS  :  rt_sigaction02 failure with sig: 38 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 39
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   26  TPASS  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   27  TPASS  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   28  TPASS  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   29  TPASS  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   30  TPASS  :  rt_sigaction02 failure with sig: 39 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 40
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   31  TPASS  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   32  TPASS  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   33  TPASS  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   34  TPASS  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   35  TPASS  :  rt_sigaction02 failure with sig: 40 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 41
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   36  TPASS  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   37  TPASS  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   38  TPASS  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   39  TPASS  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   40  TPASS  :  rt_sigaction02 failure with sig: 41 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 42
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   41  TPASS  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   42  TPASS  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   43  TPASS  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   44  TPASS  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   45  TPASS  :  rt_sigaction02 failure with sig: 42 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 43
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   46  TPASS  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   47  TPASS  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   48  TPASS  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   49  TPASS  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   50  TPASS  :  rt_sigaction02 failure with sig: 43 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 44
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   51  TPASS  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   52  TPASS  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   53  TPASS  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   54  TPASS  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   55  TPASS  :  rt_sigaction02 failure with sig: 44 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 45
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   56  TPASS  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   57  TPASS  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   58  TPASS  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   59  TPASS  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   60  TPASS  :  rt_sigaction02 failure with sig: 45 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 46
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   61  TPASS  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   62  TPASS  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   63  TPASS  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   64  TPASS  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   65  TPASS  :  rt_sigaction02 failure with sig: 46 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 47
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   66  TPASS  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   67  TPASS  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   68  TPASS  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   69  TPASS  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   70  TPASS  :  rt_sigaction02 failure with sig: 47 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 48
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   71  TPASS  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   72  TPASS  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   73  TPASS  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   74  TPASS  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   75  TPASS  :  rt_sigaction02 failure with sig: 48 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 49
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   76  TPASS  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   77  TPASS  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   78  TPASS  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   79  TPASS  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   80  TPASS  :  rt_sigaction02 failure with sig: 49 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 50
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   81  TPASS  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   82  TPASS  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   83  TPASS  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   84  TPASS  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   85  TPASS  :  rt_sigaction02 failure with sig: 50 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 51
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   86  TPASS  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   87  TPASS  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   88  TPASS  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   89  TPASS  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   90  TPASS  :  rt_sigaction02 failure with sig: 51 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 52
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   91  TPASS  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   92  TPASS  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   93  TPASS  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   94  TPASS  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02   95  TPASS  :  rt_sigaction02 failure with sig: 52 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 53
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   96  TPASS  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02   97  TPASS  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   98  TPASS  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02   99  TPASS  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  100  TPASS  :  rt_sigaction02 failure with sig: 53 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 54
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  101  TPASS  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  102  TPASS  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  103  TPASS  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  104  TPASS  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  105  TPASS  :  rt_sigaction02 failure with sig: 54 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 55
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  106  TPASS  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  107  TPASS  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  108  TPASS  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  109  TPASS  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  110  TPASS  :  rt_sigaction02 failure with sig: 55 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 56
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  111  TPASS  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  112  TPASS  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  113  TPASS  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  114  TPASS  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  115  TPASS  :  rt_sigaction02 failure with sig: 56 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 57
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  116  TPASS  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  117  TPASS  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  118  TPASS  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  119  TPASS  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  120  TPASS  :  rt_sigaction02 failure with sig: 57 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 58
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  121  TPASS  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  122  TPASS  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  123  TPASS  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  124  TPASS  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  125  TPASS  :  rt_sigaction02 failure with sig: 58 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 59
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  126  TPASS  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  127  TPASS  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  128  TPASS  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  129  TPASS  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  130  TPASS  :  rt_sigaction02 failure with sig: 59 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 60
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  131  TPASS  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  132  TPASS  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  133  TPASS  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  134  TPASS  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  135  TPASS  :  rt_sigaction02 failure with sig: 60 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 61
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  136  TPASS  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  137  TPASS  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  138  TPASS  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  139  TPASS  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  140  TPASS  :  rt_sigaction02 failure with sig: 61 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 62
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  141  TPASS  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  142  TPASS  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  143  TPASS  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  144  TPASS  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  145  TPASS  :  rt_sigaction02 failure with sig: 62 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 63
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  146  TPASS  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  147  TPASS  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  148  TPASS  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  149  TPASS  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  150  TPASS  :  rt_sigaction02 failure with sig: 63 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  Signal 64
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  151  TPASS  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND
+rt_sigaction02  152  TPASS  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  153  TPASS  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_RESETHAND|SA_SIGINFO
+rt_sigaction02  154  TPASS  :  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+rt_sigaction02    0  TINFO  :  sa.sa_flags = SA_NOMASK
+rt_sigaction02  155  TPASS  [37m[199.945311 0:90 axfs::root:433] [33m[AxError::IsADirectory][m
+[m:  rt_sigaction02 failure with sig: 64 as expected errno  = EFAULT : Bad address
+FAIL LTP CASE rt_sigaction02 : 0
+Pass!
+LTP MEMORY rt_sigaction02 after_run: free_frames=256466 allocated_frames=4788
+LTP MEMORY rt_sigaction02 after_cleanup: free_frames=256466 allocated_frames=4788
+LTP CASE RUNTIME rt_sigaction02: 6574 ms
+========== END ltp rt_sigaction02 ==========
+========== START ltp kill05 ==========
+RUN LTP CASE kill05
+LTP MEMORY kill05 before: free_frames=256466 allocated_frames=4788
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+kill05.c:66: TFAIL: kill succeeded unexpectedly
+tst_test.c:405: TBROK: Invalid child (94) exit value 1
+
+Summary:
+passed   0
+failed   1
+broken   1
+skipped  0
+warnings 0
+[37m[209.097663 0:91 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE kill05 : 3
+LTP MEMORY kill05 after_run: free_frames=256437 allocated_frames=4817
+LTP MEMORY kill05 after_cleanup: free_frames=256437 allocated_frames=4817
+LTP CASE RUNTIME kill05: 9154 ms
+========== END ltp kill05 ==========
+========== START ltp getrusage02 ==========
+RUN LTP CASE getrusage02
+LTP MEMORY getrusage02 before: free_frames=256437 allocated_frames=4817
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getrusage02.c:72: TINFO: Testing variant: libc getrusage()
+getrusage02.c:64: TPASS: getrusage(-2, 0x39cc0) : EINVAL (22)
+getrusage02.c:60: TCONF: EFAULT is skipped for libc variant
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getrusage02.c:72: TINFO: Testing variant: __NR_getrusage syscall
+getrusage02.c:64: TPASS: getrusage(-2, 0x39cc0) : EINVAL (22)
+getrusage02.c:64: TPASS: getrusage(0, 0xffffffffffffffff) : EFAULT (14)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  1
+warnings 0
+[37m[214.682244 0:97 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE getrusage02 : 0
+Pass!
+LTP MEMORY getrusage02 after_run: free_frames=256416 allocated_frames=4838
+LTP MEMORY getrusage02 after_cleanup: free_frames=256416 allocated_frames=4838
+LTP CASE RUNTIME getrusage02: 5572 ms
+========== END ltp getrusage02 ==========
+ltp cases: 4 passed, 8 failed, 2 timed out
+#### OS COMP TEST GROUP END ltp-glibc ####
+[37m[214.809099 0:2 axplat_riscv64_qemu_virt::power:28] [32mShutting down...[m
+[m
