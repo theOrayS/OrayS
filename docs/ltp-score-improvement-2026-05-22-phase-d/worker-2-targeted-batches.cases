@@ -1,0 +1,39 @@
+# Batch 1: low-risk regression/proof candidates
+getpgrp01
+getpgid02
+getgroups03
+getrlimit01
+getrusage01
+gettimeofday01
+wait401
+sched_getscheduler02
+getrlimit03
+
+# Batch 2: proc / priority blockers
+getpgid01
+getgroups02
+getpriority03
+setpriority01
+setpriority02
+setpriority03
+
+# Batch 3: wait blockers
+waitpid01
+waitpid02
+waitpid04
+waitpid05
+waitpid10
+waitpid11
+waitpid12
+waitpid13
+wait402
+
+# Batch 4: resource/time write and invalid-input blockers
+getrusage02
+getrusage03
+gettimeofday02
+gettimeofday03
+setrlimit01
+setrlimit03
+prlimit01
+prlimit02
