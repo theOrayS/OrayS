@@ -9,7 +9,7 @@ use super::linux_abi::fd_cloexec_flag;
 use super::signal_abi::current_unblocked_signal_pending;
 use super::task_context::current_task_ext;
 use super::user_memory::write_user_value;
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum RingBufferStatus {

@@ -3,7 +3,7 @@ use core::mem::size_of;
 use axerrno::LinuxError;
 
 use super::user_memory::{clear_user_bytes, validate_user_read, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 fn nodemask_len(maxnode: usize) -> usize {
     if maxnode == 0 {

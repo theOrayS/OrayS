@@ -5,6 +5,7 @@ use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry};
 use super::linux_abi::{
     DEFAULT_GROUP_CONTENT, DEFAULT_PASSWD_CONTENT, ETC_GROUP_PATH, ETC_PASSWD_PATH,
@@ -13,7 +14,6 @@ use super::linux_abi::{
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
 use super::task_registry::user_thread_entry_by_process_pid;
-use super::UserProcess;
 
 fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let exec_path = process.exec_path();

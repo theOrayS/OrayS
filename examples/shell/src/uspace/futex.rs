@@ -10,11 +10,11 @@ use linux_raw_sys::general;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::linux_abi::{neg_errno, USER_MMAP_BASE};
+use super::UserProcess;
+use super::linux_abi::{USER_MMAP_BASE, neg_errno};
 use super::signal_abi::current_sigcancel_pending;
 use super::task_context::current_task_ext;
 use super::user_memory::read_user_value;
-use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
