@@ -1,0 +1,13 @@
+{
+  "goal": {
+    "threadId": "019e4f32-d6e4-7261-84eb-ddb3f1767582",
+    "objective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",
+    "status": "active",
+    "tokensUsed": 244594,
+    "timeUsedSeconds": 1839,
+    "createdAt": 1779445270,
+    "updatedAt": 1779447109
+  },
+  "remainingTokens": null,
+  "completionBudgetReport": null
+}

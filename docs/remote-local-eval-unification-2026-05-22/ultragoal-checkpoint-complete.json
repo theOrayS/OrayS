@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "createdAt": "2026-05-22T10:21:02.800Z",
+    "updatedAt": "2026-05-22T10:52:19.160Z",
+    "briefPath": ".omx/ultragoal/brief.md",
+    "goalsPath": ".omx/ultragoal/goals.json",
+    "ledgerPath": ".omx/ultragoal/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-moss-kernel-like-ltp",
+        "title": "目标：只维护 moss_kernel_like 一个分支，同时让代码可按不同规则支持本地评测和远程评测；远程评测地址映射与 LTP 输出格...",
+        "objective": "目标：只维护 moss_kernel_like 一个分支，同时让代码可按不同规则支持本地评测和远程评测；远程评测地址映射与 LTP 输出格式参考 refactor/moss_kernel_like_remote，但禁止修改该分支。完成代码改造、文档、AGENTS.md 更新、终端报告，并运行 ./run-eval.sh la 与 ./run-eval.sh 验证。\n要求：本地 ./run-eval.sh la 和 ./run-eval.sh 仍用于本地评测；避免未实现和硬编码结果，保持系统逻辑等价；cmd.rs LTP 输出改为远程可计分格式；LTP 成绩不能下降；保存详细修复方案到包含任务简要描述和 2026-05-22 日期的 docs 目录。",
+        "status": "complete",
+        "attempt": 1,
+        "createdAt": "2026-05-22T10:21:02.800Z",
+        "updatedAt": "2026-05-22T10:52:19.160Z",
+        "startedAt": "2026-05-22T10:21:06.831Z",
+        "evidence": "Single-branch local/remote evaluator mode implemented. make all builds remote-submission kernel-rv/kernel-la with remote LA config; local ./run-eval.sh la and ./run-eval.sh passed; ltp_summary reports RV/LA ltp-musl and ltp-glibc 157 passed, 0 failed, 0 timed out; final ai-slop-cleaner and code review gates passed.",
+        "completedAt": "2026-05-22T10:52:19.160Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 1,
+    "pending": 0,
+    "inProgress": 0,
+    "complete": 1,
+    "failed": 0,
+    "reviewBlocked": 0,
+    "needsUserDecision": 0,
+    "superseded": 0,
+    "steeringBlocked": 0,
+    "aggregateComplete": false
+  }
+}
