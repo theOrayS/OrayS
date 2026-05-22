@@ -156,3 +156,25 @@ Then repeat with `LA_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-la.img ./run-
 ## Decision
 
 No source-code patch is recommended from the currently available evidence. The existing tree already contains the rlimit wrapper/dispatch shape that phase-b showed was needed for `getrlimit03`; remaining red cases need fresh failure logs before a safe ABI patch can be scoped. The safest next action is targeted evidence collection by the leader or a dedicated runner lane, then a narrow syscall/ABI patch only for cases that still show a real failure signature.
+
+## Worker execution evidence
+
+- Subagents spawned: 2 (`Jason` / `019e5042-3d7a-7f70-b674-57aee7b944fc`, `Bacon` / `019e5042-5a0b-7bd2-8d59-28c41fbc7d6a`).
+- Subagent model: `gpt-5.4-mini`.
+- Findings integrated:
+  - Phase-c clean rows for `getpgrp01`, `getrlimit01`, `getrusage01`, `gettimeofday01`, and `wait401`.
+  - Phase-b `getrlimit03` before/after evidence and remaining `setrlimit01` timeout/TFAIL blocker.
+  - Static implementation map across `process_abi.rs`, `credentials.rs`, `process_lifecycle.rs`, `resource_sched.rs`, `time_abi.rs`, `system_info.rs`, and `syscall_dispatch.rs`.
+  - `waitid*` has no implementation evidence in `examples/shell/src/uspace`; keep report-only until a concrete failing case is assigned.
+- Serial searches before spawn: 3.
+
+## Verification evidence
+
+- PASS `git diff --check` before commit: no whitespace errors in staged docs.
+- PASS `python3 -m py_compile scripts/ltp_summary.py`.
+- PASS `python3 scripts/ltp_summary.py --promotion-candidates output_rv.md output_la.md`: produced 62 candidates and 1 blocked/incomplete case, matching cited phase-c candidate evidence.
+- PASS report reference smoke: required phase-b/phase-c evidence files exist and guardrails are present in this report.
+- PASS `make kernel-rv`: release RV kernel build completed and produced `kernel-rv`.
+- PASS post-commit `git status --short --branch`: clean detached HEAD.
+- NOT RUN fresh targeted LTP batches: leader correction asked this lane to first deliver evidence reports/candidate matrix and targeted batch recommendations; no direct promotion was performed.
+- NOTE `cargo fmt --all -- --check` was attempted but failed before formatting because the OMX worktree is nested under `/root/oskernel2026-orays` and `vendor/rust-fatfs` resolves the parent workspace. No Rust files were modified; modified-file lint is covered by `git diff --check`.
