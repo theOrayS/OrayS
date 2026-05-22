@@ -4,41 +4,86 @@ Scope: `scripts/ltp_summary.py`, `examples/shell/src/cmd.rs`, plus quick output 
 
 ## Findings
 
-- **Numeric status is the source of truth; fake PASS token is intentionally preserved for compatibility.**
-  - `scripts/ltp_summary.py:4-8` — docstring says wrapper logs may print `FAIL LTP CASE <case> : 0` for a successful case and that the numeric status is the source of truth.
-  - `scripts/ltp_summary.py:108-118` — `normalize_wrapper_status()` returns PASS only when `code == 0`, otherwise FAIL.
-  - `examples/shell/src/cmd.rs:1475-1489` — success prints `FAIL LTP CASE {case} : 0` and timeout prints both `FAIL ... : 137/143` and `TIMEOUT LTP CASE ...`.
-  - **Risk:** downstream consumers that key off the literal `FAIL` token instead of the numeric status can misread healthy cases as failures.
+- **Numeric status is the source of truth; legacy `FAIL ... : 0` is compatibility output, not fake PASS.**
+  - `scripts/ltp_summary.py:4-8` states wrapper logs may print `FAIL LTP CASE <case> : 0` for a successful case and that numeric status is the source of truth.
+  - `scripts/ltp_summary.py:108-118` makes `normalize_wrapper_status()` return PASS only for `code == 0`, otherwise FAIL.
+  - `examples/shell/src/cmd.rs:1475-1485` intentionally prints `FAIL LTP CASE {case} : 0` for successful LTP cases to preserve the evaluator wire format.
+  - Risk: downstream consumers that key off the literal `FAIL` token instead of the numeric status can misread healthy cases as failures.
 
 - **Case-name hardcode guardrails are present.**
-  - `examples/shell/src/cmd.rs:44-49` — core and stable LTP case sets are explicit constants, not ad hoc string literals at the call site.
-  - `examples/shell/src/cmd.rs:533-549` — `valid_ltp_case_name()` rejects invalid names and `push_ltp_case()` dedupes accepted cases.
-  - `examples/shell/src/cmd.rs:588-637` — selection supports `stable`, `core`, `batch:<name>`, `file:<path>`, and inline lists; no single-case hardcode path found.
-  - **Risk:** the shipped default sets are still static lists, so coverage changes require source edits by design.
+  - `examples/shell/src/cmd.rs:44-49` declares core/stable LTP case sets as explicit batch data.
+  - `examples/shell/src/cmd.rs:534-548` rejects invalid case names and deduplicates accepted cases.
+  - `examples/shell/src/cmd.rs:588-637` supports `stable`, `core`, `batch:<name>`, `file:<path>`, and inline lists; no single-case success hardcode path was found.
+  - Risk: default stable coverage still changes through source-controlled static lists by design.
 
-- **Silent SKIP was not found in the LTP runner path; the only visible skip is explicit.**
-  - `examples/shell/src/cmd.rs:1570-1572` — disabled official groups emit `autorun: skip disabled test group ...`.
-  - **Risk:** this is an explicit skip message, not a silent one; I did not find an LTP-specific silent skip path in this pass.
+- **Silent LTP SKIP was not found in this pass.**
+  - Missing LTP binaries fail visibly at `examples/shell/src/cmd.rs:1446-1456`.
+  - The only explicit skip found in this runner area is for disabled non-LTP official groups at `examples/shell/src/cmd.rs:1570-1572`.
 
 - **Timeout is not treated as PASS.**
-  - `scripts/ltp_summary.py:25, 31-33, 165-170, 204-218, 267-301, 330-346, 492-567` — timeout markers are tracked separately and surfaced in categories / tables.
-  - `examples/shell/src/cmd.rs:1487-1501` — timeout cases print a failure status plus `TIMEOUT LTP CASE` and increment timeout counters.
-  - **Risk:** if a consumer ignores timeout fields and reads only top-level pass/fail counts, it can underreport failures.
+  - `examples/shell/src/cmd.rs:1487-1504` prints a failure status plus `TIMEOUT LTP CASE` for timeout exits/errors and increments timeout/failed counters.
+  - `examples/shell/src/cmd.rs:1517-1519` reports `passed`, `failed`, and `timed out` separately.
+  - `scripts/ltp_summary.py:25,31-33,198-218,267-301,330-347,492-567` tracks timeout/internal/ENOSYS/panic markers separately from clean PASS.
+  - Risk: consumers that ignore timeout fields and read only top-level wrapper counts can still underreport failures.
 
-- **Promotion-candidate filtering is conservative and blocks on hidden issues.**
-  - `scripts/ltp_summary.py:267-303` — categories separate clean passes from `pass_with_tconf`, wrapper fail, `TFAIL`, `TBROK`, timeout, `ENOSYS`, panic/trap, and unknown.
-  - `scripts/ltp_summary.py:330-347` — row-level blockers include `TFAIL`, `TBROK`, `TCONF`, timeout, `ENOSYS`, panic/trap, and non-PASS status.
-  - `scripts/ltp_summary.py:350-419` — a case only becomes a candidate when every required arch/libc combo is present and no blockers remain.
-  - **Risk:** this is intentionally strict; it will exclude cases with caveats even if the wrapper count looks green.
+- **Promotion-candidate filtering is conservative.**
+  - `scripts/ltp_summary.py:267-303` separates `pass_clean` from `pass_with_tconf`, wrapper fail, TFAIL/TBROK, timeout, ENOSYS, panic/trap, and unknown.
+  - `scripts/ltp_summary.py:330-347` makes TFAIL/TBROK/TCONF, timeout, ENOSYS, panic/trap, event failures, and non-PASS status blockers.
+  - `scripts/ltp_summary.py:350-419` promotes a case only when every required arch/libc combo is present and all blocker lists are empty.
+  - Risk: strict filtering will intentionally exclude caveated cases even when wrapper counts look green.
 
-## Output scan notes
+## Current stable85 source of truth
 
-- `output_la.md:632-644` — repeated futex warnings: `The futex facility returned an unexpected error code.`
-- `output_la.md:6004-6159` — iperf split is clear: `iperf-musl` succeeds (`... end: success`), while `iperf-glibc` fails with `control socket has closed unexpectedly` and repeated `Connection refused`.
-- `output_rv.md:975-982, 5956-5987, 6004-6159` — LTP section shows `oom_score_adj does not exist, skipping the adjustment`; libcbench also has futex warnings; iperf-musl succeeds and iperf-glibc fails with `ECONNREFUSED` / loopback connect errors.
-- `output_rv.md:6162-6165` — `lmbench-musl` timed out; `lmbench-glibc` continued afterward.
-- **Quick scan result:** I did not find obvious `panic`, `crash01`, `free_frames=0`, or `memory-pressure` markers in the visible RV scan; the most obvious non-LTP signals here were futex warnings, iperf failures, and the `oom_score_adj` TINFO lines.
+Use phase-d summaries as the current stable85 baseline; root `output_la.md` / `output_rv.md` in this worktree are older stable63 logs.
+
+| Source | PASS LTP CASE | FAIL LTP CASE | ltp-musl | ltp-glibc | Internal | timeout | ENOSYS | panic/trap |
+| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: |
+| `docs/ltp-score-improvement-2026-05-21-phase-d/final-gate-output-la-summary.txt:4-12` | 170 | 0 | 85/0 | 85/0 | TCONF=4 | 0 | 0 | 0 |
+| `docs/ltp-score-improvement-2026-05-21-phase-d/final-gate-output-rv-summary.txt:4-12` | 170 | 0 | 85/0 | 85/0 | TCONF=4 | 0 | 0 | 0 |
+| `docs/ltp-score-improvement-2026-05-21-phase-d/stable85-targeted-la-summary.txt:4-12` | 170 | 0 | 85/0 | 85/0 | TCONF=4 | 0 | 0 | 0 |
+| `docs/ltp-score-improvement-2026-05-21-phase-d/stable85-targeted-rv-summary.txt:4-12` | 170 | 0 | 85/0 | 85/0 | TCONF=4 | 0 | 0 | 0 |
+
+Phase-d final report records the key guardrail explicitly: `read02` accounts for TCONF=4 per arch and no timeout was counted as PASS (`docs/ltp-score-improvement-2026-05-21-phase-d/final-gate-report.md:24-34`).
+
+## Root output scan notes
+
+`python3 -B scripts/ltp_summary.py output_la.md` and `python3 -B scripts/ltp_summary.py output_rv.md` both parse as older stable63 logs: 126/0 wrapper cases, `ltp-musl 63/0`, `ltp-glibc 63/0`, TCONF=4, total timeout matches=10, LTP-group timeout=0, ENOSYS=0, panic/trap=0.
+
+Visible non-LTP/runtime markers in those older root outputs:
+
+- LA libctest timeout/futex markers: `output_la.md:248-260`, `output_la.md:632-654`, and `output_la.md:6360-6390`.
+- RV libctest timeout/futex markers: `output_rv.md:263-266` and `output_rv.md:5956-5987`.
+- LA iperf failures: `output_la.md:6530-6560`.
+- RV iperf failures: `output_rv.md:6127-6157`.
+- LA non-LTP benchmark timeouts: `output_la.md:6574-7159`.
+- RV non-LTP benchmark timeouts: `output_rv.md:6162-6808`.
+
+These markers are visible follow-up runtime evidence, not stable85 LTP promotion blockers unless future targeted LTP evidence links them to LTP failure.
+
+## Verification performed by this worker
+
+- `python3 -B scripts/ltp_summary.py output_la.md` -> PASS parser execution; old root LA output summarized as stable63-era LTP 126/0 with LTP-group timeout 0.
+- `python3 -B scripts/ltp_summary.py output_rv.md` -> PASS parser execution; old root RV output summarized as stable63-era LTP 126/0 with LTP-group timeout 0.
+- `git diff --check -- docs/ltp-score-improvement-2026-05-22-phase-a/verification-guardrail-audit.md` -> PASS before commit.
+- `cargo metadata --locked --offline --format-version 1 --no-deps --manifest-path ./Cargo.toml` -> PASS (manifest/dependency metadata parse).
+- `cargo fmt --manifest-path ./Cargo.toml --all -- --check` -> FAIL due nested team-worktree/vendor workspace discovery, not due this docs-only change.
+- `cargo check --workspace --locked --offline --manifest-path ./Cargo.toml` -> stopped after leader instructed workers to stop duplicate long build/eval and continue static analysis/reporting only.
+
+## Subagent evidence
+
+- Subagents spawned: 2 total in this worker session.
+  - `019e4d1e-068b-7ee2-8f09-68904b020907`: read-only report-pattern lookup; integrated the concise Scope / Result / Evidence / Worker-boundary pattern into `worker-5-ultragoal-mutation-guard-report.md`.
+  - `019e4d24-50c6-7aa2-a48a-948412f4f2ab`: guardrail helper; it produced the first committed audit artifact, then this worker corrected/expanded evidence line references in a follow-up commit.
+- Subagent model: `gpt-5.4-mini` for both.
+- Serial searches before first spawn: 2.
+
+## `.omx/ultragoal` mutation check
+
+- `test ! -e .omx/ultragoal` reported `PASS no .omx/ultragoal directory`.
+- `git status --short -- .omx` reported no `.omx` changes.
+- `git diff --name-only -- .omx/ultragoal` reported no tracked diff under `.omx/ultragoal`.
+- `git ls-files .omx/ultragoal` reported no tracked `.omx/ultragoal` files in this worker worktree.
 
 ## Conclusion
 
-The two main LTP guardrails are already in place: numeric-status truth for wrapper classification and explicit separation of timeout / internal-error / panic markers from clean PASS. The main residual risk is downstream misinterpretation of the legacy `FAIL ... : 0` compatibility line or top-level counts without consulting the detailed markers.
+The audited LTP runner/parser paths preserve the required guardrails: numeric-status truth, no silent LTP skip found, timeout remains failure/timeout evidence, and promotion candidates are blocked by internal markers, timeout, ENOSYS, panic/trap, event failures, missing arch/libc combos, or non-PASS status. Keep using `scripts/ltp_summary.py` for every targeted/promotion/full gate and keep non-LTP iperf/futex/runtime markers visible in final reporting.
