@@ -1,0 +1,50 @@
+{
+  "stable_count": 157,
+  "candidate_union_count": 271,
+  "wave_a_selected_count": 180,
+  "batch_counts": {
+    "wave-a-batch1-stable-core.cases": 45,
+    "wave-a-batch2-stable-mid.cases": 45,
+    "wave-a-batch3-stable-recent.cases": 45,
+    "wave-a-batch4-stable180-newcases.cases": 45
+  },
+  "selected_new_count": 23,
+  "selected_new_cases": [
+    "fcntl29",
+    "fstatat01",
+    "personality01",
+    "personality02",
+    "pipe09",
+    "pipe10",
+    "pipe14",
+    "readv01",
+    "write03",
+    "write06",
+    "writev02",
+    "setegid01",
+    "setfsgid01",
+    "setfsuid01",
+    "setgid01",
+    "setgid03",
+    "setpgid01",
+    "setpgid02",
+    "setpgrp01",
+    "setpgrp02",
+    "setregid01",
+    "setresgid01",
+    "setresuid01"
+  ],
+  "held_clean_alternates": [
+    "setgroups01",
+    "setgroups02",
+    "setreuid01",
+    "setuid01",
+    "statx02"
+  ],
+  "source_phase_c": "/root/oskernel2026-orays/docs/ltp-score-improvement-2026-05-22-phase-c",
+  "guardrails": [
+    "no .omx/ultragoal edit",
+    "no LTP_STABLE_CASES edit",
+    "no fake PASS/skip/timeout-as-PASS"
+  ]
+}
