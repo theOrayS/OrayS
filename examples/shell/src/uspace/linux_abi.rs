@@ -166,7 +166,11 @@ pub(super) fn neg_errno_code(code: u32) -> isize {
 }
 
 pub(super) fn fd_cloexec_flag(enabled: bool) -> u32 {
-    if enabled { general::FD_CLOEXEC } else { 0 }
+    if enabled {
+        general::FD_CLOEXEC
+    } else {
+        0
+    }
 }
 
 pub(super) fn str_err(err: &'static str) -> String {

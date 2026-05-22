@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use super::futex;
-use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
+use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::current_cwd;
@@ -23,17 +23,17 @@ use super::signal_abi::ensure_user_return_hook_registered;
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
-    user_pc,
+    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
+    UserTaskExt,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
+    live_user_thread_count, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{read_cstr, read_execve_argv, read_execve_envp, write_user_value};
-use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
+use super::{ChildTask, FdTable, UserProcess, NO_EXIT_GROUP_CODE};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -258,6 +258,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         live_threads: AtomicUsize::new(1),
         exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
         exit_code: AtomicI32::new(0),
+        term_signal: AtomicI32::new(0),
         exit_wait: WaitQueue::new(),
         teardown: ProcessTeardown::new(),
     });
@@ -370,12 +371,28 @@ impl UserProcess {
     }
 
     pub(super) fn request_exit_group(&self, code: i32) {
+        self.request_exit_group_inner(code, 0);
+    }
+
+    pub(super) fn request_signal_exit_group(&self, sig: i32) {
+        self.request_exit_group_inner(128 + sig, sig);
+    }
+
+    fn request_exit_group_inner(&self, code: i32, term_signal: i32) {
         let _ = self.exit_group_code.compare_exchange(
             NO_EXIT_GROUP_CODE,
             code,
             Ordering::AcqRel,
             Ordering::Acquire,
         );
+        if term_signal != 0 {
+            let _ = self.term_signal.compare_exchange(
+                0,
+                term_signal,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+        }
         self.exit_code.store(code, Ordering::Release);
         self.child_exit_wait.notify_all(false);
         self.exit_wait.notify_all(false);
@@ -511,6 +528,7 @@ impl UserProcess {
             live_threads: AtomicUsize::new(1),
             exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
             exit_code: AtomicI32::new(0),
+            term_signal: AtomicI32::new(0),
             exit_wait: WaitQueue::new(),
             teardown: ProcessTeardown::new(),
         }))
@@ -591,13 +609,22 @@ impl UserProcess {
                 self.child_wait_blocked.store(false, Ordering::Release);
             }
         };
-        let status = child.process.exit_code.load(Ordering::Acquire);
+        let status = child.process.wait_status();
         let child_pid = child.pid;
         let _ = child.task.join();
         child.process.teardown();
         drop(child);
         yield_for_task_gc();
         Ok(Some((child_pid, status)))
+    }
+
+    fn wait_status(&self) -> i32 {
+        let sig = self.term_signal.load(Ordering::Acquire);
+        if sig != 0 {
+            sig & 0x7f
+        } else {
+            (self.exit_code.load(Ordering::Acquire) & 0xff) << 8
+        }
     }
 
     pub(super) fn child_thread_entry_by_pid(&self, pid: i32) -> Option<UserThreadEntry> {
@@ -880,7 +907,7 @@ pub(super) fn sys_wait4(
     };
     user_trace!("user-wait4: requested pid={pid}, child={child_pid}, exit={exit_code}");
     if status != 0 {
-        let wait_status = (exit_code & 0xff) << 8;
+        let wait_status = exit_code;
         let ret = write_user_value(process, status, &wait_status);
         if ret != 0 {
             return ret;

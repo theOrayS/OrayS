@@ -6,13 +6,14 @@ use axhal::context::TrapFrame;
 use linux_raw_sys::general;
 
 use super::linux_abi::{
-    DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE, neg_errno,
+    neg_errno, DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE,
 };
+use super::task_registry::user_thread_entry_by_process_pid;
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{UserProcess, task_context::current_tid};
+use super::{task_context::current_tid, UserProcess};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -123,8 +124,37 @@ pub(super) fn sched_param_accepts_policy(policy: i32, param: UserSchedParam) -> 
     }
 }
 
+fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {
+    if pid < 0 {
+        return Err(LinuxError::ESRCH);
+    }
+    if pid == 0 || pid == current_tid() || pid == process.pid() {
+        return Ok(process.get_sched_state());
+    }
+    user_thread_entry_by_process_pid(pid)
+        .map(|entry| entry.process.get_sched_state())
+        .ok_or(LinuxError::ESRCH)
+}
+
+fn set_sched_target_state(
+    process: &UserProcess,
+    pid: i32,
+    state: UserSchedState,
+) -> Result<(), LinuxError> {
+    if pid < 0 {
+        return Err(LinuxError::ESRCH);
+    }
+    if pid == 0 || pid == current_tid() || pid == process.pid() {
+        process.set_sched_state(state);
+        return Ok(());
+    }
+    let entry = user_thread_entry_by_process_pid(pid).ok_or(LinuxError::ESRCH)?;
+    entry.process.set_sched_state(state);
+    Ok(())
+}
+
 pub(super) fn is_same_sched_target(process: &UserProcess, pid: i32) -> bool {
-    pid == 0 || pid == current_tid() || pid == process.pid()
+    sched_target_state(process, pid).is_ok()
 }
 
 pub(super) fn sched_affinity_accepts_current_cpu(first_mask_byte: u8) -> bool {
@@ -141,18 +171,20 @@ pub(super) fn sys_sched_yield(_tf: &TrapFrame) -> isize {
 }
 
 pub(super) fn sys_sched_setparam(process: &UserProcess, pid: i32, param: usize) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
     if param == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    let mut state = match sched_target_state(process, pid) {
+        Ok(state) => state,
+        Err(err) => return neg_errno(err),
+    };
     match read_user_value::<UserSchedParam>(process, param) {
-        Ok(value) if sched_param_accepts_policy(process.get_sched_state().policy, value) => {
-            let mut state = process.get_sched_state();
+        Ok(value) if sched_param_accepts_policy(state.policy, value) => {
             state.param = value;
-            process.set_sched_state(state);
-            0
+            match set_sched_target_state(process, pid, state) {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            }
         }
         Ok(_) => neg_errno(LinuxError::EINVAL),
         Err(err) => neg_errno(err),
@@ -160,13 +192,13 @@ pub(super) fn sys_sched_setparam(process: &UserProcess, pid: i32, param: usize) 
 }
 
 pub(super) fn sys_sched_getparam(process: &UserProcess, pid: i32, param: usize) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
     if param == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    let value = process.get_sched_state().param;
+    let value = match sched_target_state(process, pid) {
+        Ok(state) => state.param,
+        Err(err) => return neg_errno(err),
+    };
     write_user_value(process, param, &value)
 }
 
@@ -176,29 +208,31 @@ pub(super) fn sys_sched_setscheduler(
     policy: i32,
     param: usize,
 ) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
     if param == 0 {
         return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = sched_target_state(process, pid) {
+        return neg_errno(err);
     }
     let param = match read_user_value::<UserSchedParam>(process, param) {
         Ok(param) => param,
         Err(err) => return neg_errno(err),
     };
     if sched_param_accepts_policy(policy, param) {
-        process.set_sched_state(UserSchedState { policy, param });
-        0
+        match set_sched_target_state(process, pid, UserSchedState { policy, param }) {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        }
     } else {
         neg_errno(LinuxError::EINVAL)
     }
 }
 
 pub(super) fn sys_sched_getscheduler(process: &UserProcess, pid: i32) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
+    match sched_target_state(process, pid) {
+        Ok(state) => state.policy as isize,
+        Err(err) => neg_errno(err),
     }
-    process.get_sched_state().policy as isize
 }
 
 fn sched_attr_from_state(state: UserSchedState) -> UserSchedAttr {
@@ -234,16 +268,17 @@ pub(super) fn sys_sched_getattr(
     size: usize,
     flags: usize,
 ) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
+    let state = match sched_target_state(process, pid) {
+        Ok(state) => state,
+        Err(err) => return neg_errno(err),
+    };
     if flags != 0 || attr == 0 || size < SCHED_ATTR_BASE_SIZE {
         return neg_errno(LinuxError::EINVAL);
     }
     if let Err(err) = validate_user_write(process, attr, size) {
         return neg_errno(err);
     }
-    let value = sched_attr_from_state(process.get_sched_state());
+    let value = sched_attr_from_state(state);
     let bytes = unsafe {
         core::slice::from_raw_parts(
             &value as *const UserSchedAttr as *const u8,
@@ -266,8 +301,8 @@ pub(super) fn sys_sched_setattr(
     attr: usize,
     flags: usize,
 ) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
+    if let Err(err) = sched_target_state(process, pid) {
+        return neg_errno(err);
     }
     if flags != 0 || attr == 0 {
         return neg_errno(LinuxError::EINVAL);
@@ -289,10 +324,10 @@ pub(super) fn sys_sched_setattr(
     let sched_attr =
         unsafe { core::ptr::read_unaligned(attr_bytes.as_ptr() as *const UserSchedAttr) };
     match sched_state_from_attr(sched_attr) {
-        Ok(state) => {
-            process.set_sched_state(state);
-            0
-        }
+        Ok(state) => match set_sched_target_state(process, pid, state) {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        },
         Err(err) => neg_errno(err),
     }
 }
