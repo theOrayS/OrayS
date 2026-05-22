@@ -104,6 +104,11 @@ make docker
   match the remote evaluator's LoongArch address map; do not use that remote
   config for local `run-la` unless specifically testing remote-submission build
   behavior.
+- LoongArch boot page-table setup must derive the L0 slot from
+  `KERNEL_BASE_VADDR`, not assume high-half index `0`. Local QEMU currently uses
+  `0xffff_0000_8000_0000`, while the remote evaluator uses
+  `0xffff_8000_8000_0000`; hardcoding `BOOT_PT_L0[0]` can boot locally but loop
+  on remote instruction-fetch faults.
 - Treat the remote evaluator as network-unreliable/offline. Submission builds
   must not depend on `cargo install` or downloading crates during `make all`.
   Keep repo-local build helpers under `tools/bin/`, platform config fallbacks
