@@ -104,6 +104,11 @@ make docker
   match the remote evaluator's LoongArch address map; do not use that remote
   config for local `run-la` unless specifically testing remote-submission build
   behavior.
+- Treat the remote evaluator as network-unreliable/offline. Submission builds
+  must not depend on `cargo install` or downloading crates during `make all`.
+  Keep repo-local build helpers under `tools/bin/`, platform config fallbacks
+  under `configs/platforms/`, and the non-hidden Cargo home `cargo-home/` plus
+  `vendor/cargo-vendor.tar.gz` source archive in sync when dependency closure changes; `scripts/ensure-cargo-vendor.sh` restores the working `vendor/cargo/` directory during builds.
 - The historical `refactor/moss_kernel_like_remote` branch and sibling checkout
   may be used only as read-only references for remote-evaluator behavior. Do not
   modify that branch or sync source into it for normal local-branch tasks.
@@ -123,6 +128,11 @@ make docker
   - `loongarch64-unknown-none-softfloat`
 - Build helpers used by the Makefile include `cargo-binutils`/`rust-objcopy`,
   `axconfig-gen`, and `cargo-axplat`.
+- For remote/offline submission builds, prefer the checked-in helper shims
+  `tools/bin/cargo-axplat`, `tools/bin/axconfig-gen`, and
+  `tools/bin/rust-objcopy` before any user-installed tools. If helper behavior
+  is extended, validate both `make all` and an offline build with
+  `CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true PATH=$PWD/tools/bin:$PATH`.
 - C formatting follows the repository `.clang-format`; there is no repo-local
   `rustfmt.toml`, so use the pinned toolchain's formatter.
 
@@ -148,7 +158,8 @@ make docker
 - Do not perform repository-wide search/replace, mechanical renames, import
   normalization, or bulk formatting unless the task explicitly requires it.
 - Avoid modifying `vendor/` unless the change is explicitly about a vendored
-  crate or the local patch is necessary and documented.
+  crate, the remote/offline Cargo source archive `vendor/cargo-vendor.tar.gz`,
+  or a local patch is necessary and documented.
 
 ### Rust
 

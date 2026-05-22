@@ -9,7 +9,9 @@ endif
 define resolve_config
   $(if $(wildcard $(PLAT_CONFIG)),\
     $(PLAT_CONFIG),\
-    $(shell cargo axplat info -C $(cargo_manifest_dir) -c $(PLAT_PACKAGE)))
+    $(if $(wildcard $(PLATFORM_CONFIG_DIR)/$(PLAT_PACKAGE).toml),\
+      $(PLATFORM_CONFIG_DIR)/$(PLAT_PACKAGE).toml,\
+      $(shell cargo axplat info -C $(cargo_manifest_dir) --config-path $(PLAT_PACKAGE))))
 endef
 
 define validate_config

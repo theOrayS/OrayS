@@ -40,6 +40,7 @@
 ARCH ?= x86_64
 MYPLAT ?=
 PLAT_CONFIG ?=
+PLATFORM_CONFIG_DIR ?= $(CURDIR)/configs/platforms
 # Remote official evaluation invokes `make all` without extra arguments.
 # Keep local QEMU targets (`kernel-la`, `run-la`, `./run-eval.sh la`) on the
 # package default platform config, but build the submission `kernel-la` with the
@@ -100,6 +101,23 @@ else
 LA_NETDEV_ARGS ?= user,id=net0,$(LA_HOSTFWD_ARGS)
 endif
 DOCKER_IMAGE ?= orays-arceos-dev
+
+# Remote evaluators may have no network/DNS, so prefer repo-provided helper
+# shims before falling back to user-installed Cargo helpers.
+export PATH := $(CURDIR)/tools/bin:$(PATH)
+
+ifneq ($(wildcard $(CURDIR)/cargo-home/config.toml),)
+  # The official grader filters hidden directories and may have no network.
+  # Use a non-hidden Cargo home with vendored sources for submission builds.
+  CARGO_HOME ?= $(CURDIR)/cargo-home
+  export CARGO_HOME
+  ifneq ($(wildcard $(CURDIR)/scripts/ensure-cargo-vendor.sh),)
+    _CARGO_VENDOR_READY := $(shell "$(CURDIR)/scripts/ensure-cargo-vendor.sh" >/dev/null && echo ok || echo fail)
+    ifneq ($(_CARGO_VENDOR_READY),ok)
+      $(error unable to restore vendor/cargo from vendor/cargo-vendor.tar.gz)
+    endif
+  endif
+endif
 
 # App options
 A ?= examples/helloworld
