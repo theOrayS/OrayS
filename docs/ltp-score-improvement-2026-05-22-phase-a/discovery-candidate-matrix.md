@@ -110,3 +110,9 @@ python3 -B scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,l
 
 - Russell confirmed `LTP_STABLE_CASES`, `selected_ltp_cases`, timeout selection, and `scripts/ltp_summary.py --promotion-candidates` as the correct local surfaces.
 - Mendel confirmed stable85 baseline evidence from phase-d summaries and the hard blocker for `sched_getscheduler02`; it also pointed to current-output promotion matrix semantics.
+
+## Worker-1 completion evidence (2026-05-22)
+
+- Static discovery validation passed: `raw/discovery-inventory.json` reports stable count 85, 68 ranked candidate-pool entries, 13 Wave 1 cases, and 18 Wave 2 cases.
+- `wave1-targeted-cases.txt` is aligned with `wave1-cases.txt`; `waitpid02` is intentionally excluded because current RV/LA x musl/glibc image inventory does not contain that exact binary.
+- Leader message `7b52ade2-dd5d-44a0-a923-f88023716a8f` stopped worker-side eval/build; this lane did not continue `run-eval` after that instruction and remains static Discovery/Matrix only.
