@@ -109,16 +109,32 @@ DOCKER_IMAGE ?= orays-arceos-dev
 VENDOR_BIN := $(CURDIR)/vendor/bin
 export PATH := $(VENDOR_BIN):$(CURDIR)/tools/bin:$(PATH)
 
-ifneq ($(wildcard $(VENDOR_BIN)/axconfig-gen),)
+SCRIPT_AXCONFIG_GEN := $(CURDIR)/scripts/axconfig-gen.py
+SCRIPT_RUST_OBJCOPY := $(CURDIR)/scripts/rust-objcopy.sh
+SCRIPT_CARGO_AXPLAT := $(CURDIR)/scripts/cargo-axplat.sh
+
+ifneq ($(wildcard $(SCRIPT_AXCONFIG_GEN)),)
+  AXCONFIG_GEN ?= python3 $(SCRIPT_AXCONFIG_GEN)
+else ifneq ($(wildcard $(VENDOR_BIN)/axconfig-gen),)
   AXCONFIG_GEN ?= python3 $(VENDOR_BIN)/axconfig-gen
 else
   AXCONFIG_GEN ?= axconfig-gen
 endif
 
-ifneq ($(wildcard $(VENDOR_BIN)/rust-objcopy),)
+ifneq ($(wildcard $(SCRIPT_RUST_OBJCOPY)),)
+  RUST_OBJCOPY ?= sh $(SCRIPT_RUST_OBJCOPY)
+else ifneq ($(wildcard $(VENDOR_BIN)/rust-objcopy),)
   RUST_OBJCOPY ?= sh $(VENDOR_BIN)/rust-objcopy
 else
   RUST_OBJCOPY ?= rust-objcopy
+endif
+
+ifneq ($(wildcard $(SCRIPT_CARGO_AXPLAT)),)
+  CARGO_AXPLAT ?= sh $(SCRIPT_CARGO_AXPLAT)
+else ifneq ($(wildcard $(VENDOR_BIN)/cargo-axplat),)
+  CARGO_AXPLAT ?= sh $(VENDOR_BIN)/cargo-axplat
+else
+  CARGO_AXPLAT ?= cargo axplat
 endif
 
 ifneq ($(wildcard $(CURDIR)/cargo-home/config.toml),)

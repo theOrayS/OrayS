@@ -11,7 +11,7 @@ define resolve_config
     $(PLAT_CONFIG),\
     $(if $(wildcard $(PLATFORM_CONFIG_DIR)/$(PLAT_PACKAGE).toml),\
       $(PLATFORM_CONFIG_DIR)/$(PLAT_PACKAGE).toml,\
-      $(shell cargo axplat info -C $(cargo_manifest_dir) --config-path $(PLAT_PACKAGE))))
+      $(shell $(CARGO_AXPLAT) info -C $(cargo_manifest_dir) --config-path $(PLAT_PACKAGE))))
 endef
 
 define validate_config
