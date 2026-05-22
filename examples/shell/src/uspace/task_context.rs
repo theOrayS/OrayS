@@ -8,14 +8,14 @@ use axtask::AxTaskRef;
 use std::sync::Arc;
 
 #[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{Sstatus, FS};
+use riscv::register::sstatus::{FS, Sstatus};
 
+use super::UserProcess;
 use super::linux_abi::neg_errno;
 use super::task_registry::user_thread_entry_by_tid;
 #[cfg(target_arch = "riscv64")]
 use super::user_memory::read_user_value;
 use super::user_memory::write_user_value;
-use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};

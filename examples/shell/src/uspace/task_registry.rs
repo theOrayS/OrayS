@@ -93,6 +93,20 @@ pub(super) fn user_thread_entries_by_process_group(pgid: i32) -> Vec<UserThreadE
     entries
 }
 
+pub(super) fn live_user_process_entries() -> Vec<UserThreadEntry> {
+    let table = user_thread_table().lock();
+    let mut entries = Vec::new();
+    let mut pids = Vec::new();
+    for entry in table.values() {
+        let pid = entry.process.pid();
+        if entry.process.live_threads.load(Ordering::Acquire) != 0 && !pids.contains(&pid) {
+            pids.push(pid);
+            entries.push(entry.clone());
+        }
+    }
+    entries
+}
+
 pub(super) fn user_thread_entry_for_process(process: &UserProcess) -> Option<UserThreadEntry> {
     let pid = process.pid();
     let table = user_thread_table().lock();

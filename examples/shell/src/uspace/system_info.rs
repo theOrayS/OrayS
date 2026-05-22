@@ -6,7 +6,7 @@ use linux_raw_sys::{general, system};
 
 use super::task_registry::live_user_thread_count;
 use super::user_memory::{validate_user_write, write_user_bytes, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 pub(super) enum SyslogAction {
     EmptyRead,

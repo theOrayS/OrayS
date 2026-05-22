@@ -8,18 +8,17 @@ use axhal::context::TrapFrame;
 use axhal::mem::virt_to_phys;
 use axsync::Mutex;
 use lazyinit::LazyInit;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::collections::BTreeMap;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::linux_abi::{
-    neg_errno, SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET,
-    SYSV_IPC_STAT, SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, USER_MMAP_BASE, USER_STACK_SIZE,
-    USER_STACK_TOP,
+    SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET, SYSV_IPC_STAT,
+    SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
 };
 use super::memory_map::{align_down, align_up_checked, sys_munmap, user_mapping_flags};
 use super::user_memory::clear_user_bytes;
-use super::UserProcess;
 
 #[derive(Clone)]
 struct SysvShmSegment {

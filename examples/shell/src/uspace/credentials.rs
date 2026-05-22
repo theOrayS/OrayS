@@ -8,7 +8,7 @@ use std::vec::Vec;
 
 use super::linux_abi::{ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CHOWN_ID_UNCHANGED};
 use super::user_memory::{read_user_value, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 impl UserProcess {
     pub(super) fn real_uid(&self) -> u32 {

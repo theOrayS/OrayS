@@ -7,18 +7,18 @@ use axfs::fops::{FileAttr, FileType};
 use linux_raw_sys::general;
 use std::string::{String, ToString};
 
+use super::UserProcess;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{resolve_dirfd_path, FdEntry};
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    neg_errno, neg_errno_code, ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
-    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE,
-    ST_MODE_LNK, SYSFS_MAGIC, TMPFS_MAGIC,
+    ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
+    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, PIPEFS_MAGIC, PROC_SUPER_MAGIC,
+    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
+    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
 use super::user_memory::{read_cstr, write_user_bytes, write_user_value};
-use super::UserProcess;
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 const LINUX_PATH_MAX: usize = 4096;

@@ -10,12 +10,13 @@ use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG,
-    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK,
+    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
+    ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -38,11 +39,10 @@ use super::synthetic_fs::{
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer, validate_user_write,
-    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
-    MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer,
+    validate_user_write, with_readable_user_buffer, with_writable_user_buffer, write_user_bytes,
+    write_user_value,
 };
-use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,

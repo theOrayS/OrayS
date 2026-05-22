@@ -4,16 +4,20 @@ use core::mem::size_of;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use linux_raw_sys::general;
+use std::vec::Vec;
 
 use super::linux_abi::{
-    neg_errno, DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE,
+    DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE, neg_errno,
 };
-use super::task_registry::user_thread_entry_by_process_pid;
+use super::task_registry::{
+    live_user_process_entries, user_thread_entries_by_process_group,
+    user_thread_entry_by_process_pid,
+};
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{task_context::current_tid, UserProcess};
+use super::{UserProcess, task_context::current_tid};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -113,6 +117,127 @@ impl UserProcess {
     pub(super) fn set_sched_state(&self, state: UserSchedState) {
         *self.sched_state.lock() = state;
     }
+
+    pub(super) fn nice(&self) -> i32 {
+        self.nice.load(core::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(super) fn set_nice(&self, nice: i32) {
+        self.nice.store(
+            nice.clamp(MIN_NICE, MAX_NICE),
+            core::sync::atomic::Ordering::Release,
+        );
+    }
+}
+
+const MIN_NICE: i32 = -20;
+const MAX_NICE: i32 = 19;
+const DEFAULT_NICE: i32 = 0;
+
+fn clamp_nice(nice: i32) -> i32 {
+    nice.clamp(MIN_NICE, MAX_NICE)
+}
+
+fn linux_priority_from_nice(nice: i32) -> isize {
+    (20 - clamp_nice(nice)) as isize
+}
+
+fn priority_targets(
+    process: &UserProcess,
+    which: u32,
+    who: i32,
+) -> Result<Vec<UserProcessRef>, LinuxError> {
+    let mut targets = Vec::new();
+    match which {
+        general::PRIO_PROCESS => {
+            let target = if who == 0 { process.pid() } else { who };
+            if target < 0 {
+                return Err(LinuxError::ESRCH);
+            }
+            if target == process.pid() {
+                targets.push(UserProcessRef::Borrowed(process));
+            } else if let Some(entry) = user_thread_entry_by_process_pid(target) {
+                targets.push(UserProcessRef::Owned(entry.process));
+            }
+        }
+        general::PRIO_PGRP => {
+            let target = if who == 0 { process.pgid() } else { who };
+            if target < 0 {
+                return Err(LinuxError::ESRCH);
+            }
+            for entry in user_thread_entries_by_process_group(target) {
+                targets.push(UserProcessRef::Owned(entry.process));
+            }
+        }
+        general::PRIO_USER => {
+            let target = if who == 0 { process.uid() } else { who as u32 };
+            if who < 0 {
+                return Err(LinuxError::ESRCH);
+            }
+            if process.uid() == target {
+                targets.push(UserProcessRef::Borrowed(process));
+            }
+            for entry in live_user_process_entries() {
+                if entry.process.pid() != process.pid() && entry.process.uid() == target {
+                    targets.push(UserProcessRef::Owned(entry.process));
+                }
+            }
+        }
+        _ => return Err(LinuxError::EINVAL),
+    }
+    if targets.is_empty() {
+        Err(LinuxError::ESRCH)
+    } else {
+        Ok(targets)
+    }
+}
+
+enum UserProcessRef<'a> {
+    Borrowed(&'a UserProcess),
+    Owned(std::sync::Arc<UserProcess>),
+}
+
+impl UserProcessRef<'_> {
+    fn process(&self) -> &UserProcess {
+        match self {
+            UserProcessRef::Borrowed(process) => process,
+            UserProcessRef::Owned(process) => process.as_ref(),
+        }
+    }
+}
+
+pub(super) fn sys_getpriority(process: &UserProcess, which: u32, who: i32) -> isize {
+    let targets = match priority_targets(process, which, who) {
+        Ok(targets) => targets,
+        Err(err) => return neg_errno(err),
+    };
+    let best = targets
+        .iter()
+        .map(|target| target.process().nice())
+        .min()
+        .unwrap_or(DEFAULT_NICE);
+    linux_priority_from_nice(best)
+}
+
+pub(super) fn sys_setpriority(process: &UserProcess, which: u32, who: i32, nice: i32) -> isize {
+    let targets = match priority_targets(process, which, who) {
+        Ok(targets) => targets,
+        Err(err) => return neg_errno(err),
+    };
+    let nice = clamp_nice(nice);
+    for target in &targets {
+        let target = target.process();
+        if process.uid() != 0 && process.uid() != target.uid() {
+            return neg_errno(LinuxError::EPERM);
+        }
+        if process.uid() != 0 && nice < target.nice() {
+            return neg_errno(LinuxError::EACCES);
+        }
+    }
+    for target in targets {
+        target.process().set_nice(nice);
+    }
+    0
 }
 
 pub(super) fn sched_param_accepts_policy(policy: i32, param: UserSchedParam) -> bool {

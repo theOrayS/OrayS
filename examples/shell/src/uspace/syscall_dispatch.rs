@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{SYSCALL, register_trap_handler};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -35,9 +35,9 @@ use super::process_lifecycle::{
     terminate_current_thread_for_exit_group,
 };
 use super::resource_sched::{
-    sys_prlimit64, sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam,
+    sys_getpriority, sys_prlimit64, sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam,
     sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
-    sys_sched_setscheduler, sys_sched_yield,
+    sys_sched_setscheduler, sys_sched_yield, sys_setpriority,
 };
 #[cfg(not(any(
     target_arch = "riscv64",
@@ -248,6 +248,13 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_setitimer => sys_setitimer(&process, tf.arg0() as i32, tf.arg1(), tf.arg2()),
         general::__NR_times => sys_times(&process, tf.arg0()),
         general::__NR_getrusage => sys_getrusage(&process, tf.arg0() as i32, tf.arg1()),
+        general::__NR_setpriority => sys_setpriority(
+            &process,
+            tf.arg0() as u32,
+            tf.arg1() as i32,
+            tf.arg2() as i32,
+        ),
+        general::__NR_getpriority => sys_getpriority(&process, tf.arg0() as u32, tf.arg1() as i32),
         general::__NR_uname => sys_uname(&process, tf.arg0()),
         general::__NR_nanosleep => sys_nanosleep(&process, tf.arg0(), tf.arg1()),
         general::__NR_clock_nanosleep => {

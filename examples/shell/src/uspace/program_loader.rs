@@ -7,16 +7,16 @@ use axmm::AddrSpace;
 use linux_raw_sys::auxvec;
 #[cfg(target_arch = "loongarch64")]
 use linux_raw_sys::general;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::string::{String, ToString};
 use std::vec::Vec;
+use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::sections::SectionData;
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::symbol_table::Entry;
-use xmas_elf::ElfFile;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, USER_BRK_GROW_SIZE,
@@ -26,7 +26,7 @@ use super::memory_map::{align_down, align_up, user_mapping_flags};
 use super::runtime_paths::{
     derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
 };
-use super::{str_err, BrkState};
+use super::{BrkState, str_err};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,

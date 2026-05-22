@@ -1,4 +1,4 @@
-use core::mem::{size_of, MaybeUninit};
+use core::mem::{MaybeUninit, size_of};
 use core::ptr;
 
 use axerrno::LinuxError;
@@ -10,7 +10,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
 

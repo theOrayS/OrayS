@@ -4,7 +4,7 @@ use axerrno::LinuxError;
 
 use super::linux_abi::{LINUX_PERSONALITY_MASK, LINUX_PERSONALITY_QUERY};
 use super::task_registry::user_thread_entry_by_process_pid;
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 impl UserProcess {
     pub(super) fn personality(&self) -> usize {
