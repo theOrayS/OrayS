@@ -103,8 +103,23 @@ endif
 DOCKER_IMAGE ?= orays-arceos-dev
 
 # Remote evaluators may have no network/DNS, so prefer repo-provided helper
-# shims before falling back to user-installed Cargo helpers.
-export PATH := $(CURDIR)/tools/bin:$(PATH)
+# shims before falling back to user-installed Cargo helpers. Keep the primary
+# submission helpers under vendor/ because the grader expects dependencies to be
+# submitted with the project source.
+VENDOR_BIN := $(CURDIR)/vendor/bin
+export PATH := $(VENDOR_BIN):$(CURDIR)/tools/bin:$(PATH)
+
+ifneq ($(wildcard $(VENDOR_BIN)/axconfig-gen),)
+  AXCONFIG_GEN ?= python3 $(VENDOR_BIN)/axconfig-gen
+else
+  AXCONFIG_GEN ?= axconfig-gen
+endif
+
+ifneq ($(wildcard $(VENDOR_BIN)/rust-objcopy),)
+  RUST_OBJCOPY ?= sh $(VENDOR_BIN)/rust-objcopy
+else
+  RUST_OBJCOPY ?= rust-objcopy
+endif
 
 ifneq ($(wildcard $(CURDIR)/cargo-home/config.toml),)
   # The official grader filters hidden directories and may have no network.
@@ -206,7 +221,7 @@ RANLIB := $(CROSS_COMPILE)ranlib
 LD := rust-lld -flavor gnu
 
 OBJDUMP ?= rust-objdump -d --print-imm-hex --x86-asm-syntax=intel
-OBJCOPY ?= rust-objcopy --binary-architecture=$(ARCH)
+OBJCOPY ?= $(RUST_OBJCOPY) --binary-architecture=$(ARCH)
 GDB ?= gdb-multiarch
 
 # Paths
@@ -292,7 +307,7 @@ test_build:
 		build
 ifeq ($(ARCH),riscv64)
 	@mkdir -p $(dir $(KERNEL_RV))
-	rust-objcopy -I binary -O elf64-littleriscv --rename-section .data=.text,alloc,load,readonly,code $(KERNEL_RV_BIN) $(KERNEL_RV_WRAP_OBJ)
+	$(RUST_OBJCOPY) -I binary -O elf64-littleriscv --rename-section .data=.text,alloc,load,readonly,code $(KERNEL_RV_BIN) $(KERNEL_RV_WRAP_OBJ)
 	rust-lld -flavor gnu -m elf64lriscv -T scripts/make/riscv64-kernel-wrap.lds $(KERNEL_RV_WRAP_OBJ) -o $(KERNEL_RV)
 else ifeq ($(ARCH),loongarch64)
 	@mkdir -p $(dir $(KERNEL_LA))
