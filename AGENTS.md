@@ -270,6 +270,20 @@ regression.
   progress and network loopback behavior; update them when changing the behavior
   they describe.
 
+## LTP Documentation Naming
+
+- For LTP score-improvement campaigns, save durable artifacts under
+  `docs/ltp-score-improvement-YYYY-MM-DD-phase-x/`.
+- Use the local calendar date for the day the document is created. The first
+  campaign/document set of that day uses `phase-a`; later same-day sets continue
+  with `phase-b`, `phase-c`, and so on.
+- Do not create future-dated LTP documentation directories. Keep historical
+  evidence in its original date/phase directory and reference it from new plans
+  instead of renaming old evidence forward.
+- When a prompt or plan is moved to a new date/phase directory, update all
+  self-references, OMX brief paths, and follow-up prompt text to the same
+  date/phase naming.
+
 ## Change Summary Requirements
 
 When reporting completed work, include:

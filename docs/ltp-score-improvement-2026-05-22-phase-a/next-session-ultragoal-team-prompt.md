@@ -7,7 +7,7 @@ $ultragoal $team
 
 目标：继续提高 `/root/oskernel2026-orays` 的 LTP stable 测试成绩。请读取并遵循仓库 AGENTS.md，继续使用 Ultragoal + Team 分阶段执行；Leader 维护 `.omx/ultragoal/goals.json` / `ledger.jsonl`，Team workers 只提供任务结果和证据，不直接 checkpoint Ultragoal。
 
-今天是 2026-05-22，本轮新文档保存到 `docs/ltp-score-improvement-2026-05-22/`。昨天/历史证据目录保留为 `docs/ltp-score-improvement-2026-05-21-phase-*`；不要把历史证据目录改成今天，也不要新建未来日期目录。
+今天是 2026-05-22，本轮新文档保存到 `docs/ltp-score-improvement-2026-05-22-phase-a/`；同一天后续文档继续使用 `phase-b`, `phase-c`。昨天/历史证据目录保留为 `docs/ltp-score-improvement-2026-05-21-phase-*`；不要把历史证据目录改成今天，也不要新建未来日期目录。
 
 如果这是同一个 Codex thread 延续旧 Ultragoal，请先确认旧 Codex goal 已 clear；新 session 通常可直接创建新的 Ultragoal plan。
 
@@ -41,7 +41,7 @@ $ultragoal $team
 - `AGENTS.md`
 - `.omx/ultragoal/goals.json`
 - `.omx/ultragoal/ledger.jsonl`
-- `docs/ltp-score-improvement-2026-05-22/plan-stable85-to-110.md`
+- `docs/ltp-score-improvement-2026-05-22-phase-a/plan-stable85-to-110.md`
 - `docs/ltp-score-improvement-2026-05-21-phase-d/final-gate-report.md`
 - `docs/ltp-score-improvement-2026-05-21-phase-d/final-gate-quality-gate.json`
 - `docs/ltp-score-improvement-2026-05-21-phase-d/final-gate-output-la-summary.txt`
@@ -105,8 +105,8 @@ Team 分工建议（激进版）：
   - 最终做 code-review + quality gate。
 
 建议执行顺序：
-1. 创建 `.omx/context/ltp-score-improvement-stable85-to-110-*.md`，总结当前 85-case baseline、约束、候选与风险；今天的新文档使用 `docs/ltp-score-improvement-2026-05-22/`。
-2. `omx ultragoal create-goals --brief-file docs/ltp-score-improvement-2026-05-22/plan-stable85-to-110.md` 创建新 plan；检查 `.omx/ultragoal/goals.json`。
+1. 创建 `.omx/context/ltp-score-improvement-stable85-to-110-*.md`，总结当前 85-case baseline、约束、候选与风险；今天的新文档使用 `docs/ltp-score-improvement-2026-05-22-phase-a/`。
+2. `omx ultragoal create-goals --brief-file docs/ltp-score-improvement-2026-05-22-phase-a/plan-stable85-to-110.md` 创建新 plan；检查 `.omx/ultragoal/goals.json`。
 3. 启动 Team：
    - 首选：`omx team 7:executor "aggressively continue LTP stable score improvement from stable85 toward stable100/110 with two targeted promotion waves; Ultragoal state is leader-owned only"`
    - 资源不足 fallback：`omx team 6:executor "aggressively continue LTP stable score improvement from stable85 toward stable100/110 with targeted validation first; Ultragoal state is leader-owned only"`
@@ -141,5 +141,5 @@ Team 分工建议（激进版）：
 - 是否有 syscall / errno / ABI-visible 行为变化；如果没有，明确说明没有
 
 保存本轮新文档到：
-- `docs/ltp-score-improvement-2026-05-22/`
+- `docs/ltp-score-improvement-2026-05-22-phase-a/`
 ```
