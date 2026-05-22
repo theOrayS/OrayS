@@ -3,11 +3,13 @@ use axio::PollState;
 use axsync::Mutex;
 use linux_raw_sys::general;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::fd_table::FdEntry;
-use super::linux_abi::fd_cloexec_flag;
-use super::signal_abi::current_unblocked_signal_pending;
-use super::task_context::current_task_ext;
+use super::linux_abi::{SIGPIPE_NUM, fd_cloexec_flag};
+use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal};
+use super::task_context::{current_task_ext, current_tid};
+use super::task_registry::user_thread_entry_by_tid;
 use super::user_memory::{validate_user_write, write_user_value};
 use super::{UserProcess, neg_errno};
 
@@ -27,10 +29,42 @@ struct PipeRingBuffer {
     status: RingBufferStatus,
 }
 
-#[derive(Clone)]
+struct PipePeerCounts {
+    readers: AtomicUsize,
+    writers: AtomicUsize,
+}
+
 pub(super) struct PipeEndpoint {
     readable: bool,
     buffer: Arc<Mutex<PipeRingBuffer>>,
+    status_flags: Arc<Mutex<u32>>,
+    peers: Arc<PipePeerCounts>,
+}
+
+impl Clone for PipeEndpoint {
+    fn clone(&self) -> Self {
+        if self.readable {
+            self.peers.readers.fetch_add(1, Ordering::AcqRel);
+        } else {
+            self.peers.writers.fetch_add(1, Ordering::AcqRel);
+        }
+        Self {
+            readable: self.readable,
+            buffer: self.buffer.clone(),
+            status_flags: self.status_flags.clone(),
+            peers: self.peers.clone(),
+        }
+    }
+}
+
+impl Drop for PipeEndpoint {
+    fn drop(&mut self) {
+        if self.readable {
+            self.peers.readers.fetch_sub(1, Ordering::AcqRel);
+        } else {
+            self.peers.writers.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
 }
 
 impl PipeRingBuffer {
@@ -82,16 +116,26 @@ impl PipeRingBuffer {
 }
 
 impl PipeEndpoint {
-    pub(super) fn new_pair() -> (Self, Self) {
+    pub(super) fn new_pair(status_flags: u32) -> (Self, Self) {
         let buffer = Arc::new(Mutex::new(PipeRingBuffer::new()));
+        let peers = Arc::new(PipePeerCounts {
+            readers: AtomicUsize::new(1),
+            writers: AtomicUsize::new(1),
+        });
         (
             Self {
                 readable: true,
                 buffer: buffer.clone(),
+                status_flags: Arc::new(Mutex::new(status_flags & !general::O_ACCMODE)),
+                peers: peers.clone(),
             },
             Self {
                 readable: false,
                 buffer,
+                status_flags: Arc::new(Mutex::new(
+                    general::O_WRONLY | (status_flags & !general::O_ACCMODE),
+                )),
+                peers,
             },
         )
     }
@@ -101,7 +145,32 @@ impl PipeEndpoint {
     }
 
     fn peer_closed(&self) -> bool {
-        Arc::strong_count(&self.buffer) == 1
+        if self.readable {
+            self.peers.writers.load(Ordering::Acquire) == 0
+        } else {
+            self.peers.readers.load(Ordering::Acquire) == 0
+        }
+    }
+
+    fn nonblocking(&self) -> bool {
+        *self.status_flags.lock() & general::O_NONBLOCK != 0
+    }
+
+    pub(super) fn status_flags(&self) -> u32 {
+        *self.status_flags.lock()
+    }
+
+    pub(super) fn set_status_flags(&self, flags: u32) {
+        let access = self.status_flags() & general::O_ACCMODE;
+        *self.status_flags.lock() = access | (flags & general::O_NONBLOCK);
+    }
+
+    fn raise_sigpipe() {
+        if let Some(ext) = current_task_ext() {
+            if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
+                let _ = deliver_user_signal(&entry, SIGPIPE_NUM, ext.process.pid());
+            }
+        }
     }
 
     fn interrupted() -> bool {
@@ -124,6 +193,9 @@ impl PipeEndpoint {
                     return Ok(read_len);
                 }
                 drop(ring);
+                if self.nonblocking() {
+                    return Err(LinuxError::EAGAIN);
+                }
                 if Self::interrupted() {
                     return Err(LinuxError::EINTR);
                 }
@@ -150,10 +222,25 @@ impl PipeEndpoint {
         }
         let mut written = 0usize;
         while written < src.len() {
+            if self.peer_closed() {
+                Self::raise_sigpipe();
+                return if written > 0 {
+                    Ok(written)
+                } else {
+                    Err(LinuxError::EPIPE)
+                };
+            }
             let mut ring = self.buffer.lock();
             let available = ring.available_write();
             if available == 0 {
                 drop(ring);
+                if self.nonblocking() {
+                    return if written > 0 {
+                        Ok(written)
+                    } else {
+                        Err(LinuxError::EAGAIN)
+                    };
+                }
                 if Self::interrupted() {
                     return Err(LinuxError::EINTR);
                 }
@@ -191,14 +278,16 @@ impl PipeEndpoint {
 
 pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
     let flags = flags as u32;
-    if flags & !general::O_CLOEXEC != 0 {
+    let supported_flags = general::O_CLOEXEC | general::O_NONBLOCK;
+    if flags & !supported_flags != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
     if let Err(err) = validate_user_write(process, pipefd, core::mem::size_of::<[i32; 2]>()) {
         return neg_errno(err);
     }
     let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
-    let (read_end, write_end) = PipeEndpoint::new_pair();
+    let status_flags = flags & general::O_NONBLOCK;
+    let (read_end, write_end) = PipeEndpoint::new_pair(status_flags);
     let fds = {
         let mut table = process.fds.lock();
         let read_fd = match table.insert_with_flags(FdEntry::Pipe(read_end), fd_flags) {

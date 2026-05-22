@@ -1174,12 +1174,17 @@ impl FdTable {
             general::F_SETFD => self.set_fd_flags(fd, arg as u32),
             general::F_GETFL => match self.entry(fd)? {
                 FdEntry::File(file) => Ok(file.status_flags as i32),
+                FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
                 _ => Ok(0),
             },
             general::F_SETFL => match self.entry_mut(fd)? {
                 FdEntry::File(file) => {
                     file.status_flags =
                         (file.status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::Pipe(pipe) => {
+                    pipe.set_status_flags(arg as u32);
                     Ok(0)
                 }
                 _ => Ok(0),
