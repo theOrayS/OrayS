@@ -1,0 +1,199 @@
+--- docs/ltp-score-improvement-2026-05-22-phase-c/task8-output-rv-summary.txt ---
+17: | access01 | rv | glibc | ltp-glibc | PASS | 0 | 4679 | 240120 | 239399 | -721 | 0 | 0 | 0 | 0 | 0 | 0 |
+18: | access01 | rv | musl | ltp-musl | PASS | 0 | 4111 | 250657 | 249936 | -721 | 0 | 0 | 0 | 0 | 0 | 0 |
+19: | access03 | rv | glibc | ltp-glibc | PASS | 0 | 1203 | 189300 | 189258 | -42 | 0 | 0 | 0 | 0 | 0 | 0 |
+20: | access03 | rv | musl | ltp-musl | PASS | 0 | 964 | 248991 | 248949 | -42 | 0 | 0 | 0 | 0 | 0 | 0 |
+55: | fcntl01 | rv | glibc | ltp-glibc | PASS | 0 | 1068 | 239313 | 239306 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+56: | fcntl01 | rv | musl | ltp-musl | PASS | 0 | 970 | 249852 | 249845 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+57: | fcntl02 | rv | glibc | ltp-glibc | PASS | 0 | 1125 | 239306 | 239292 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+58: | fcntl02 | rv | musl | ltp-musl | PASS | 0 | 936 | 249845 | 249831 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+59: | fcntl03 | rv | glibc | ltp-glibc | PASS | 0 | 1059 | 189230 | 189216 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+60: | fcntl03 | rv | musl | ltp-musl | PASS | 0 | 823 | 248921 | 248907 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+63: | ftruncate01 | rv | glibc | ltp-glibc | PASS | 0 | 1128 | 188908 | 188894 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+64: | ftruncate01 | rv | musl | ltp-musl | PASS | 0 | 804 | 240407 | 240393 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+99: | open01 | rv | glibc | ltp-glibc | PASS | 0 | 1080 | 238543 | 238529 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+100: | open01 | rv | musl | ltp-musl | PASS | 0 | 811 | 249082 | 249068 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+101: | open02 | rv | glibc | ltp-glibc | PASS | 0 | 1139 | 189041 | 189027 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+102: | open02 | rv | musl | ltp-musl | PASS | 0 | 900 | 240540 | 240526 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+103: | open03 | rv | glibc | ltp-glibc | PASS | 0 | 1150 | 189027 | 189013 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+104: | open03 | rv | musl | ltp-musl | PASS | 0 | 908 | 240526 | 240512 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+105: | pipe01 | rv | glibc | ltp-glibc | PASS | 0 | 1067 | 238529 | 238515 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+106: | pipe01 | rv | musl | ltp-musl | PASS | 0 | 804 | 249068 | 249054 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+113: | readlink01 | rv | glibc | ltp-glibc | PASS | 0 | 1161 | 188929 | 188908 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+114: | readlink01 | rv | musl | ltp-musl | PASS | 0 | 899 | 240428 | 240407 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+127: | symlink01 | rv | glibc | ltp-glibc | PASS | 0 | 1184 | 188936 | 188929 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+128: | symlink01 | rv | musl | ltp-musl | PASS | 0 | 970 | 240435 | 240428 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+145: - pass_clean: 124 (rv:glibc:access01, rv:musl:access01, rv:glibc:access03, rv:musl:access03, rv:glibc:alarm02, rv:musl:alarm02, rv:glibc:alarm03, rv:musl:alarm03, rv:glibc:brk01, rv:musl:brk01, rv:glibc:chdir01, rv:musl:chdir01, rv:glibc:chmod01, rv:musl:chmod01, rv:glibc:clock_gettime02, rv:musl:clock_gettime02, rv:glibc:clone01, rv:musl:clone01, rv:glibc:close01, rv:musl:close01, rv:glibc:close02, rv:musl:close02, rv:glibc:creat01, rv:musl:creat01, rv:glibc:creat03, rv:musl:creat03, rv:glibc:dup01, rv:musl:dup01, rv:glibc:dup02, rv:musl:dup02, rv:glibc:exit01, rv:musl:exit01, rv:glibc:exit02, rv:musl:exit02, rv:glibc:exit_group01, rv:musl:exit_group01, rv:glibc:fchmod01, rv:musl:fchmod01, rv:glibc:fcntl01, rv:musl:fcntl01, rv:glibc:fcntl02, rv:musl:fcntl02, rv:glibc:fcntl03, rv:musl:fcntl03, rv:glibc:fork01, rv:musl:fork01, rv:glibc:ftruncate01, rv:musl:ftruncate01, rv:glibc:getcwd01, rv:musl:getcwd01, rv:glibc:getegid01, rv:musl:getegid01, rv:glibc:geteuid01, rv:musl:geteuid01, rv:glibc:getgid01, rv:musl:getgid01, rv:glibc:getpgrp01, rv:musl:getpgrp01, rv:glibc:getpid01, rv:musl:getpid01, rv:glibc:getpid02, rv:musl:getpid02, rv:glibc:getppid01, rv:musl:getppid01, rv:glibc:getrlimit01, rv:musl:getrlimit01, rv:glibc:getrusage01, rv:musl:getrusage01, rv:glibc:gettid01, rv:musl:gettid01, rv:glibc:gettimeofday01, rv:musl:gettimeofday01, rv:glibc:getuid01, rv:musl:getuid01, rv:glibc:kill03, rv:musl:kill03, rv:glibc:lseek01, rv:musl:lseek01, rv:glibc:lstat01, rv:musl:lstat01, rv:glibc:mmap01, rv:musl:mmap01, rv:glibc:open01, rv:musl:open01, rv:glibc:open02, rv:musl:open02, rv:glibc:open03, rv:musl:open03, rv:glibc:pipe01, rv:musl:pipe01, rv:glibc:proc01, rv:musl:proc01, rv:glibc:read01, rv:musl:read01, rv:glibc:readlink01, rv:musl:readlink01, rv:glibc:rmdir01, rv:musl:rmdir01, rv:glibc:rt_sigaction01, rv:musl:rt_sigaction01, rv:glibc:sched_yield01, rv:musl:sched_yield01, rv:glibc:sigaction01, rv:musl:sigaction01, rv:glibc:stat01, rv:musl:stat01, rv:glibc:stat02, rv:musl:stat02, rv:glibc:symlink01, rv:musl:symlink01, rv:glibc:time01, rv:musl:time01, rv:glibc:times01, rv:musl:times01, rv:glibc:umask01, rv:musl:umask01, rv:glibc:uname01, rv:musl:uname01, rv:glibc:wait401, rv:musl:wait401, rv:glibc:write01, rv:musl:write01, rv:glibc:write02, rv:musl:write02)
+
+--- docs/ltp-score-improvement-2026-05-22-phase-c/task8-output-la-summary.txt ---
+17: | access01 | la | glibc | ltp-glibc | PASS | 0 | 7539 | 155004 | 154074 | -930 | 0 | 0 | 0 | 0 | 0 | 0 |
+18: | access01 | la | musl | ltp-musl | PASS | 0 | 4985 | 157684 | 156860 | -824 | 0 | 0 | 0 | 0 | 0 | 0 |
+19: | access03 | la | glibc | ltp-glibc | PASS | 0 | 3175 | 120043 | 119986 | -57 | 0 | 0 | 0 | 0 | 0 | 0 |
+20: | access03 | la | musl | ltp-musl | PASS | 0 | 1705 | 155780 | 155732 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+55: | fcntl01 | la | glibc | ltp-glibc | PASS | 0 | 2907 | 153951 | 153939 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+56: | fcntl01 | la | musl | ltp-musl | PASS | 0 | 1443 | 156764 | 156756 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+57: | fcntl02 | la | glibc | ltp-glibc | PASS | 0 | 2583 | 153939 | 153918 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+58: | fcntl02 | la | musl | ltp-musl | PASS | 0 | 1504 | 156756 | 156740 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+59: | fcntl03 | la | glibc | ltp-glibc | PASS | 0 | 2781 | 119944 | 119923 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+60: | fcntl03 | la | musl | ltp-musl | PASS | 0 | 1585 | 155700 | 155684 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+63: | ftruncate01 | la | glibc | ltp-glibc | PASS | 0 | 2983 | 119464 | 119443 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+64: | ftruncate01 | la | musl | ltp-musl | PASS | 0 | 1427 | 155332 | 155316 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+99: | open01 | la | glibc | ltp-glibc | PASS | 0 | 2796 | 152946 | 152925 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+100: | open01 | la | musl | ltp-musl | PASS | 0 | 1556 | 155884 | 155868 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+101: | open02 | la | glibc | ltp-glibc | PASS | 0 | 2977 | 119662 | 119641 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+102: | open02 | la | musl | ltp-musl | PASS | 0 | 1597 | 155484 | 155468 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+103: | open03 | la | glibc | ltp-glibc | PASS | 0 | 4011 | 119641 | 119620 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+104: | open03 | la | musl | ltp-musl | PASS | 0 | 1493 | 155468 | 155452 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+105: | pipe01 | la | glibc | ltp-glibc | PASS | 0 | 2791 | 152925 | 152904 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+106: | pipe01 | la | musl | ltp-musl | PASS | 0 | 1520 | 155868 | 155852 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+113: | readlink01 | la | glibc | ltp-glibc | PASS | 0 | 2825 | 119494 | 119464 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+114: | readlink01 | la | musl | ltp-musl | PASS | 0 | 1473 | 155356 | 155332 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+127: | symlink01 | la | glibc | ltp-glibc | PASS | 0 | 2871 | 119506 | 119494 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+128: | symlink01 | la | musl | ltp-musl | PASS | 0 | 1527 | 155364 | 155356 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+145: - pass_clean: 124 (la:glibc:access01, la:musl:access01, la:glibc:access03, la:musl:access03, la:glibc:alarm02, la:musl:alarm02, la:glibc:alarm03, la:musl:alarm03, la:glibc:brk01, la:musl:brk01, la:glibc:chdir01, la:musl:chdir01, la:glibc:chmod01, la:musl:chmod01, la:glibc:clock_gettime02, la:musl:clock_gettime02, la:glibc:clone01, la:musl:clone01, la:glibc:close01, la:musl:close01, la:glibc:close02, la:musl:close02, la:glibc:creat01, la:musl:creat01, la:glibc:creat03, la:musl:creat03, la:glibc:dup01, la:musl:dup01, la:glibc:dup02, la:musl:dup02, la:glibc:exit01, la:musl:exit01, la:glibc:exit02, la:musl:exit02, la:glibc:exit_group01, la:musl:exit_group01, la:glibc:fchmod01, la:musl:fchmod01, la:glibc:fcntl01, la:musl:fcntl01, la:glibc:fcntl02, la:musl:fcntl02, la:glibc:fcntl03, la:musl:fcntl03, la:glibc:fork01, la:musl:fork01, la:glibc:ftruncate01, la:musl:ftruncate01, la:glibc:getcwd01, la:musl:getcwd01, la:glibc:getegid01, la:musl:getegid01, la:glibc:geteuid01, la:musl:geteuid01, la:glibc:getgid01, la:musl:getgid01, la:glibc:getpgrp01, la:musl:getpgrp01, la:glibc:getpid01, la:musl:getpid01, la:glibc:getpid02, la:musl:getpid02, la:glibc:getppid01, la:musl:getppid01, la:glibc:getrlimit01, la:musl:getrlimit01, la:glibc:getrusage01, la:musl:getrusage01, la:glibc:gettid01, la:musl:gettid01, la:glibc:gettimeofday01, la:musl:gettimeofday01, la:glibc:getuid01, la:musl:getuid01, la:glibc:kill03, la:musl:kill03, la:glibc:lseek01, la:musl:lseek01, la:glibc:lstat01, la:musl:lstat01, la:glibc:mmap01, la:musl:mmap01, la:glibc:open01, la:musl:open01, la:glibc:open02, la:musl:open02, la:glibc:open03, la:musl:open03, la:glibc:pipe01, la:musl:pipe01, la:glibc:proc01, la:musl:proc01, la:glibc:read01, la:musl:read01, la:glibc:readlink01, la:musl:readlink01, la:glibc:rmdir01, la:musl:rmdir01, la:glibc:rt_sigaction01, la:musl:rt_sigaction01, la:glibc:sched_yield01, la:musl:sched_yield01, la:glibc:sigaction01, la:musl:sigaction01, la:glibc:stat01, la:musl:stat01, la:glibc:stat02, la:musl:stat02, la:glibc:symlink01, la:musl:symlink01, la:glibc:time01, la:musl:time01, la:glibc:times01, la:musl:times01, la:glibc:umask01, la:musl:umask01, la:glibc:uname01, la:musl:uname01, la:glibc:wait401, la:musl:wait401, la:glibc:write01, la:musl:write01, la:glibc:write02, la:musl:write02)
+
+--- docs/ltp-score-improvement-2026-05-22-phase-c/task8-current-final-promotion-candidates.txt ---
+13: | access01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7539 | -930 |
+14: | access03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3175 | -57 |
+32: | fcntl01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2907 | -12 |
+33: | fcntl02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2583 | -21 |
+34: | fcntl03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2781 | -21 |
+36: | ftruncate01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2983 | -21 |
+54: | open01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2796 | -21 |
+55: | open02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2977 | -21 |
+56: | open03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4011 | -21 |
+57: | pipe01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2791 | -21 |
+60: | readlink01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2825 | -30 |
+67: | symlink01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2871 | -12 |
+
+--- docs/ltp-score-improvement-2026-05-22-phase-c/wave-a-targeted.cases ---
+36: access02
+37: access04
+38: faccessat02
+39: open04
+40: open05
+41: open06
+42: openat02
+48: pipe02
+49: pipe06
+50: pipe07
+55: readlink02
+56: readlink03
+57: readlinkat01
+58: readlinkat02
+59: readlinkat03
+60: link01
+61: link02
+62: link03
+63: linkat01
+64: linkat02
+65: unlink01
+66: unlink02
+67: unlink05
+68: unlinkat01
+69: unlinkat02
+70: rename01
+71: rename02
+72: renameat01
+73: renameat02
+82: statfs01
+83: statfs02
+84: fstatfs01
+85: fstatfs02
+86: statvfs01
+87: fstatvfs01
+93: truncate01
+94: truncate02
+95: ftruncate02
+96: ftruncate03
+
+--- docs/ltp-score-improvement-2026-05-22-phase-c/next-session-prompt-stable115-to-150.md ---
+47: openat01
+48: pipe04
+49: pipe05
+53: faccessat01
+112: - `examples/shell/src/uspace/fd_pipe.rs`
+121: unlinkat01         # RV clean; LA glibc TBROK/order pollution
+123: access02           # TFAIL, execute-file setup/ENOENT semantics
+124: access04           # TBROK, tmpfs mount EINVAL in harness
+128: pipe02             # TFAIL, child signal/pipe kill semantics
+130: readlinkat01
+131: readlinkat02       # invalid input / ENOTDIR semantics still failing
+134: truncate01
+135: truncate02
+136: ftruncate03
+212: ### fd/pipe/dup/lseek/open/access/readlink
+215: access02
+216: access04
+217: faccessat02
+218: open04
+219: open05
+220: open06
+221: openat02
+227: pipe02
+228: pipe06
+229: pipe07
+234: readlink02
+235: readlink03
+236: readlinkat01
+237: readlinkat02
+238: readlinkat03
+241: ### fs metadata/link/rename/statfs/sysinfo/chmod/truncate
+244: link01
+245: link02
+246: link03
+247: linkat01
+248: linkat02
+249: unlink01
+250: unlink02
+251: unlink05
+252: unlinkat01
+253: unlinkat02
+254: rename01
+255: rename02
+256: renameat01
+257: renameat02
+266: statfs01
+267: statfs02
+268: fstatfs01
+269: fstatfs02
+270: statvfs01
+271: fstatvfs01
+277: truncate01
+278: truncate02
+279: ftruncate02
+280: ftruncate03
+315: unlinkat01
+319: open04
+320: open05
+324: pipe06
+329: link01
+330: unlink01
+331: rename01
+334: ftruncate02
+340: access02
+341: access04
+342: readlinkat01
+343: readlinkat02
+345: pipe02
+348: truncate01
+349: truncate02
+350: ftruncate03
+351: statfs01
+352: statvfs01
+353: fstatfs01
+418: FD/Pipe/Open/Access lane：
+420: - 优先 `dup03`, `dup201`, `pipe02`, `pipe06`, `lseek02/03`, `access02/04`, open/close 近邻。
+425: - 优先 `unlinkat01`, link/rename/mkdir/stat/fstat/lstat/statfs/statvfs/fstatfs/sysinfo/chmod/truncate。
+518: - FS/sysinfo/statfs 只能靠伪造数据通过，而非真实 ABI/语义修复。
+
+--- docs/ltp-score-improvement-2026-05-22-phase-c/plan-stable115-to-150.md ---
+38: `dup202`, `mkdirat01`, `openat01`, `pipe04`, `pipe05`, `pread01`, `pwrite01`, `sysinfo01`, `faccessat01`, `getgroups01`, `setrlimit02`, `sched_get_priority_max01`, `sched_get_priority_min01`, `sched_rr_get_interval01`.
+42: `getrlimit03`, `unlinkat01`, `sched_getscheduler02`, `access02`, `access04`, `setrlimit01`, `dup03`, `pipe02`, `lseek02`, `readlinkat01`, `readlinkat02`, `chmod02`, `fchmod02`, `truncate01`, `truncate02`, `ftruncate03`, `waitpid01`, `waitpid04`, `waitpid05`, `waitpid10`, `waitpid11`, `waitpid12`, `waitpid13`, `kill02`, `kill05`, `pause01`, `sigpending02`, `rt_sigpending01`, `sigaltstack01`, `sigaltstack02`, `sigwait01`, `sigtimedwait01`, `setitimer01`, `getitimer01`, `nanosleep01`, `nanosleep02`, `clock_nanosleep02`, `clock_gettime01`, `clock_gettime03`, `clock_gettime04`, `clock_getres01`, `getrusage02`, `gettimeofday02`.
+50: FD/pipe/dup/lseek/open/access/readlink:
+52: ` access02 access04 faccessat02 open04 open05 open06 openat02 close08 close09 dup03 dup05 dup201 pipe02 pipe06 pipe07 lseek02 lseek03 pread02 pwrite02 readlink02 readlink03 readlinkat01 readlinkat02 readlinkat03 `
+54: FS metadata/link/rename/statfs/sysinfo/chmod/truncate:
+56: ` link01 link02 link03 linkat01 linkat02 unlink01 unlink02 unlink05 unlinkat01 unlinkat02 rename01 rename02 renameat01 renameat02 mkdir01 mkdir02 rmdir02 stat03 stat04 fstat01 fstat02 lstat02 statfs01 statfs02 fstatfs01 fstatfs02 statvfs01 fstatvfs01 sysinfo02 chmod02 chmod03 fchmod02 fchmodat01 truncate01 truncate02 ftruncate02 ftruncate03 `
+66: 3. FD/Pipe/Open/Access: dup03/dup201/pipe02/pipe06/lseek/access/open/close.
+67: 4. FS/Metadata: unlinkat/link/rename/mkdir/stat/fstat/lstat/statfs/statvfs/sysinfo/chmod/truncate.
+
