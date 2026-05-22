@@ -27,6 +27,7 @@ It does not edit source, runner behavior, evaluator scripts, or leader-owned `.o
 | `phase-b-baseline-artifact.md` | Stable101 source-of-truth baseline, guardrails, candidate waves, and known blocker categories for Phase B workers. |
 | `artifact-index.md` | Directory map, artifact ownership summary, and evidence rules for this docs root. |
 | `task3-worker-artifact-report.md` | Worker lifecycle, verification, and delegation compliance evidence for task 3. |
+| `final-report-skeleton.md` | Fill-in template for the Phase B final report, including commands, summaries, internal signal accounting, blocked cases, remote sync, ABI changes, and quality gate. |
 
 ## Expected follow-up artifacts
 
