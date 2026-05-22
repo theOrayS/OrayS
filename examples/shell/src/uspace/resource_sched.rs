@@ -539,3 +539,13 @@ pub(super) fn sys_prlimit64(
 
     0
 }
+
+#[cfg(target_arch = "riscv64")]
+pub(super) fn sys_getrlimit(process: &UserProcess, resource: u32, old_limit: usize) -> isize {
+    sys_prlimit64(process, 0, resource, 0, old_limit)
+}
+
+#[cfg(target_arch = "riscv64")]
+pub(super) fn sys_setrlimit(process: &UserProcess, resource: u32, new_limit: usize) -> isize {
+    sys_prlimit64(process, 0, resource, new_limit, 0)
+}

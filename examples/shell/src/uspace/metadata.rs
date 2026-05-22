@@ -175,9 +175,14 @@ pub(super) fn sys_faccessat(
     dirfd: usize,
     pathname: usize,
     mode: usize,
-    _flags: usize,
+    flags: usize,
 ) -> isize {
     if mode & !ACCESS_MODE_MASK != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let supported_flags =
+        (general::AT_EACCESS | general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH) as usize;
+    if flags & !supported_flags != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
     let path = match read_cstr(process, pathname) {
@@ -185,17 +190,37 @@ pub(super) fn sys_faccessat(
         Err(err) => return neg_errno(err),
     };
     let mut fds = process.fds.lock();
-    let (resolved_path, stat) = match fds.path_stat(process, dirfd as i32, path.as_str()) {
-        Ok(result) => result,
-        Err(err) => return neg_errno(err),
+    let (resolved_path, stat, parents_already_reached) = if path.is_empty() {
+        if flags & general::AT_EMPTY_PATH as usize == 0 {
+            return neg_errno(LinuxError::ENOENT);
+        }
+        if dirfd as i32 == general::AT_FDCWD {
+            match fds.path_stat(process, general::AT_FDCWD, ".") {
+                Ok((path, stat)) => (path, stat, false),
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            match fds.stat_with_recorded_path(process, dirfd as i32) {
+                Ok((path, stat)) => (path.unwrap_or_default(), stat, true),
+                Err(err) => return neg_errno(err),
+            }
+        }
+    } else {
+        match fds.path_stat(process, dirfd as i32, path.as_str()) {
+            Ok((path, stat)) => (path, stat, false),
+            Err(err) => return neg_errno(err),
+        }
     };
     let uid = process.uid();
     let gid = process.gid();
-    let parents_searchable =
+    let parents_searchable = if parents_already_reached || resolved_path.is_empty() {
+        true
+    } else {
         match fds.parent_dirs_searchable(process, resolved_path.as_str(), uid, gid) {
             Ok(searchable) => searchable,
             Err(err) => return neg_errno(err),
-        };
+        }
+    };
     if parents_searchable && access_allowed(&stat, mode, uid, gid) {
         0
     } else {
