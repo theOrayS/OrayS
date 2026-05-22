@@ -3,7 +3,7 @@ use core::mem::size_of;
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 
-use super::linux_abi::{BITS_PER_USIZE, FD_SET_WORDS, FD_SETSIZE, neg_errno};
+use super::linux_abi::{neg_errno, BITS_PER_USIZE, FD_SETSIZE, FD_SET_WORDS};
 use super::signal_abi::current_unblocked_signal_pending;
 use super::user_memory::{read_user_value, write_user_value};
 use super::{FdTable, UserProcess};

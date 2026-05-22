@@ -3,15 +3,15 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
+use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
+use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
 
-use super::UserProcess;
-use super::linux_abi::{USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
+use super::linux_abi::{neg_errno, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP};
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::task_context::current_process;
 use super::task_context::current_task_ext;
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};

@@ -6,17 +6,16 @@ use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use axhal::trap::PageFaultFlags;
-use axhal::trap::{USER_EXCEPTION, register_trap_handler, register_user_return_handler};
+use axhal::trap::{register_trap_handler, register_user_return_handler, USER_EXCEPTION};
 use linux_raw_sys::general;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 
-use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
-    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM,
-    SIGCANCEL_NUM, SIGCHLD_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
-    SIGQUIT_NUM, SIGSEGV_NUM, SIGSTOP_NUM, SIGTERM_NUM, neg_errno,
+    neg_errno, KERNEL_SIGSET_BYTES, SIGABRT_NUM, SIGALRM_NUM, SIGCANCEL_NUM, SIGCHLD_NUM,
+    SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM, SIGQUIT_NUM, SIGSEGV_NUM,
+    SIGSTOP_NUM, SIGTERM_NUM, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW,
 };
 #[cfg(target_arch = "loongarch64")]
 use super::linux_abi::{LOONGARCH_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
@@ -26,14 +25,15 @@ use super::linux_abi::{RISCV_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_D
 use super::memory_map::{align_down, align_up, user_mapping_flags};
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
-use super::task_context::{UserTaskExt, current_task_ext, current_tid};
+use super::task_context::{current_task_ext, current_tid, UserTaskExt};
 use super::task_registry::{
-    UserThreadEntry, user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
-    user_thread_entry_by_tid, user_thread_entry_for_process,
+    user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
+    user_thread_entry_by_tid, user_thread_entry_for_process, UserThreadEntry,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
 };
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -124,7 +124,7 @@ pub(super) fn deliver_user_signal(
     }
     let ext = super::task_context::task_ext(&entry.task).ok_or(LinuxError::ESRCH)?;
     if sig == SIGKILL_NUM {
-        ext.process.request_exit_group(128 + sig);
+        ext.process.request_signal_exit_group(sig);
     }
     ext.pending_signal_sender
         .store(sender_pid, Ordering::Release);
@@ -175,7 +175,7 @@ fn user_exception(_tf: &TrapFrame, signal: usize) -> bool {
         SIGILL_NUM | SIGSEGV_NUM => signal as i32,
         _ => SIGSEGV_NUM,
     };
-    ext.process.request_exit_group(128 + signal);
+    ext.process.request_signal_exit_group(signal);
     terminate_current_thread(ext.process.as_ref(), 128 + signal)
 }
 
@@ -200,7 +200,7 @@ fn user_return_hook(tf: &mut TrapFrame) {
     if eval_deadline_us != 0
         && (axhal::time::monotonic_time().as_micros() as u64) >= eval_deadline_us
     {
-        ext.process.request_exit_group(137);
+        ext.process.request_signal_exit_group(SIGKILL_NUM);
         terminate_current_thread_for_exit_group(ext.process.as_ref(), 137);
     }
     if let Some(code) = ext.process.pending_exit_group() {
@@ -281,7 +281,7 @@ fn inject_pending_signal(
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
         if handler == 0 && default_signal_terminates(sig) {
-            ext.process.request_exit_group(128 + sig);
+            ext.process.request_signal_exit_group(sig);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
         }
         ext.signal_mask.store(restore_mask, Ordering::Release);
@@ -356,7 +356,7 @@ fn inject_pending_signal(
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
         if handler == 0 && default_signal_terminates(sig) {
-            ext.process.request_exit_group(128 + sig);
+            ext.process.request_signal_exit_group(sig);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + sig);
         }
         ext.signal_mask.store(restore_mask, Ordering::Release);

@@ -12,22 +12,22 @@ use std::vec::Vec;
 
 use super::fd_table::FdEntry;
 use super::linux_abi::{
-    AF_UNIX_DOMAIN, DEFAULT_SOCKET_BUFFER_SIZE, DEFAULT_TCP_MAXSEG,
-    INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IP_RECVERR_OPT, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
-    LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT,
-    MCAST_LEAVE_GROUP_OPT, SO_BROADCAST_OPT, SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT,
+    fd_cloexec_flag, neg_errno_code, posix_errno_from_ret, AF_UNIX_DOMAIN,
+    DEFAULT_SOCKET_BUFFER_SIZE, DEFAULT_TCP_MAXSEG, INTERRUPTIBLE_SOCKET_RECV_QUANTUM,
+    IPPROTO_IP_LEVEL, IP_RECVERR_OPT, LINUX_EAFNOSUPPORT, LINUX_EPROTONOSUPPORT,
+    LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT, MCAST_LEAVE_GROUP_OPT,
+    SOL_SOCKET_LEVEL, SO_BROADCAST_OPT, SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT,
     SO_RCVBUF_OPT, SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT,
-    SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
-    TCP_INFO_OPT, TCP_MAXSEG_OPT, TCP_NODELAY_OPT, fd_cloexec_flag, neg_errno_code,
-    posix_errno_from_ret,
+    SO_SNDTIMEO_OPT, SO_TYPE_OPT, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, TCP_INFO_OPT,
+    TCP_MAXSEG_OPT, TCP_NODELAY_OPT,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, clear_user_bytes, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, write_user_bytes, write_user_value,
+    clear_user_bytes, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
+    validate_user_write, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
-use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
+use super::{neg_errno, posix_ret_i32, posix_ret_usize, SelectMode, UserProcess};
 
 macro_rules! socket_entry_or_return {
     ($process:expr, $fd:expr) => {
