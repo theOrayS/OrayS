@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::fd_table::FdEntry;
 use super::linux_abi::{SIGPIPE_NUM, fd_cloexec_flag};
-use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal};
+use super::process_lifecycle::terminate_current_thread_for_exit_group;
+use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal, signal_is_blocked};
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::user_thread_entry_by_tid;
 use super::user_memory::{validate_user_write, write_user_value};
@@ -20,7 +21,7 @@ enum RingBufferStatus {
     Normal,
 }
 
-const PIPE_BUF_SIZE: usize = 256;
+const PIPE_BUF_SIZE: usize = 4096;
 
 struct PipeRingBuffer {
     data: [u8; PIPE_BUF_SIZE],
@@ -166,10 +167,24 @@ impl PipeEndpoint {
     }
 
     fn raise_sigpipe() {
-        if let Some(ext) = current_task_ext() {
-            if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
-                let _ = deliver_user_signal(&entry, SIGPIPE_NUM, ext.process.pid());
-            }
+        let Some(ext) = current_task_ext() else {
+            return;
+        };
+        if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
+            let _ = deliver_user_signal(&entry, SIGPIPE_NUM, ext.process.pid());
+        }
+
+        let handler = ext
+            .process
+            .signal_actions
+            .lock()
+            .get(&(SIGPIPE_NUM as usize))
+            .copied()
+            .and_then(|action| action.sa_handler_kernel.map(|func| func as usize))
+            .unwrap_or(0);
+        if handler == 0 && !signal_is_blocked(ext, SIGPIPE_NUM) {
+            ext.process.request_signal_exit_group(SIGPIPE_NUM);
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + SIGPIPE_NUM);
         }
     }
 
