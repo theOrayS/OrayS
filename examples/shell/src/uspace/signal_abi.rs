@@ -413,6 +413,9 @@ pub(super) fn sys_rt_sigaction(
     if signum == 0 || signum >= 65 {
         return neg_errno(LinuxError::EINVAL);
     }
+    if signum as i32 == SIGKILL_NUM || signum as i32 == SIGSTOP_NUM {
+        return neg_errno(LinuxError::EINVAL);
+    }
 
     let new_action = if act != 0 {
         match read_user_value::<general::kernel_sigaction>(process, act) {

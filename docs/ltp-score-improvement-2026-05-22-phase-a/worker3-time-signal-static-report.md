@@ -11,10 +11,9 @@ Scope: Task 3 updated inbox assigned this worker to the Time/Signal lane only. T
 ## Artifacts produced in this worktree
 
 - `docs/ltp-score-improvement-2026-05-22-phase-a/worker3-time-signal-cases.txt` — exact lane case list used for planned targeted classification.
-- `docs/ltp-score-improvement-2026-05-22-phase-a/raw/worker3-rv-time-signal-targeted.log` — aborted RV targeted attempt stopped before any LTP case executed, per leader resource-budget instruction.
 - `docs/ltp-score-improvement-2026-05-22-phase-a/raw/worker3-rv-time-signal-targeted.status` — status `143`, stopped by termination rather than a test result.
 - `docs/ltp-score-improvement-2026-05-22-phase-a/raw/worker3-rv-time-signal-targeted.stopped` — explicit stop marker.
-- `docs/ltp-score-improvement-2026-05-22-phase-a/worker3-rv-time-signal-targeted-summary.txt` — `ltp_summary.py` confirms the aborted run contains `PASS LTP CASE: 0`, `FAIL LTP CASE: 0`, timeout `0`, ENOSYS `0`, panic/trap `0`; do not use it as promotion evidence.
+- `docs/ltp-score-improvement-2026-05-22-phase-a/worker3-rv-time-signal-targeted-summary.txt` — preserved summary for the aborted attempt showing `PASS LTP CASE: 0`, `FAIL LTP CASE: 0`, timeout `0`, ENOSYS `0`, panic/trap `0`; do not use it as promotion evidence. The raw log is not present in this checkout, so only the status/stop marker and summary are used as evidence.
 
 ## Existing evidence incorporated
 
@@ -59,5 +58,33 @@ Historical phase-d and phase-b evidence still classifies several Time/Signal cas
 
 ## Verification evidence for this report
 
-- `python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-22-phase-a/raw/worker3-rv-time-signal-targeted.log` -> exit 0; PASS=0, FAIL=0, timeout=0, ENOSYS=0, panic/trap=0 because the run was stopped before LTP execution.
+- `cat docs/ltp-score-improvement-2026-05-22-phase-a/worker3-rv-time-signal-targeted-summary.txt` -> preserved summary shows PASS=0, FAIL=0, timeout=0, ENOSYS=0, panic/trap=0 because the run was stopped before LTP execution.
 - Static inspected files: `examples/shell/src/uspace/time_abi.rs`, `examples/shell/src/uspace/signal_abi.rs`, `examples/shell/src/uspace/syscall_dispatch.rs`, and historical summaries under `docs/ltp-score-improvement-2026-05-21-phase-b/` and `docs/ltp-score-improvement-2026-05-21-phase-d/`.
+
+## Worker-1 continuation update (2026-05-22)
+
+After the new inbox assignment for Task 3, this worker continued the Time/Signal lane under the leader instruction not to launch more `run-eval`.
+
+### Semantic fix applied
+
+- `examples/shell/src/uspace/signal_abi.rs::sys_rt_sigaction` now rejects attempts to install handlers for uncatchable `SIGKILL` and `SIGSTOP` with `EINVAL`.
+- Rationale: Linux signal semantics do not allow changing dispositions for `SIGKILL`/`SIGSTOP`; this is a real ABI fix relevant to `sigaction02`, not a case-name hardcode or fake pass.
+- Existing signal-mask code already treats the same two signals as unmaskable via `unmaskable_signal_bits`, so this aligns action-disposition validation with mask semantics.
+
+### Current blocker classification remains honest
+
+- No Time/Signal case is promoted from this worker lane.
+- `clock_getres01` remains non-clean while TCONF evidence exists.
+- Timeout-risk cases (`clock_nanosleep01`, `clock_nanosleep02`, `nanosleep01`, `pause01`) still require fresh targeted LA/RV x musl/glibc evidence before any promotion decision; timeout must remain separate from PASS.
+- `sigpending02`, `sigprocmask01`, `rt_sigprocmask01`, and `sigsuspend01` still require fresh targeted evidence because older failures may be partly stale after prior dispatcher work.
+
+### Additional verification after the continuation
+
+- `rustfmt --check examples/shell/src/uspace/signal_abi.rs` -> PASS.
+- `cargo fmt --all -- --check` -> FAIL before formatting because this team worktree's vendored `rust-fatfs` package still points at the leader workspace `/root/oskernel2026-orays/Cargo.toml`; this is a worktree/workspace metadata issue, not a formatting diagnostic for the edited file.
+- `git diff --check` -> PASS.
+
+### Delegation evidence
+
+- Attempted 2 read-only native subagents with model `gpt-5.4-mini`: Goodall (`019e4d2f-5df0-7e51-84c8-a43cf59b4cbf`) for signal surfaces failed with model-capacity error; Bohr (`019e4d2f-5fc2-7542-be20-4717dcb2b1d1`) for time surfaces was shut down after timing out because local completion evidence was sufficient.
+- Integrated local findings instead of waiting on unavailable child output: dispatcher coverage exists for all task-3 syscall families; the safe local semantic fix is the uncatchable-signal `rt_sigaction` rejection, while sleep/pending-mask blockers need fresh targeted evidence before broader changes.
