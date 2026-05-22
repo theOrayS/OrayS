@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{SYSCALL, register_trap_handler};
+use axhal::trap::{register_trap_handler, SYSCALL};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -39,6 +39,8 @@ use super::resource_sched::{
     sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
     sys_sched_setscheduler, sys_sched_yield, sys_setpriority,
 };
+#[cfg(target_arch = "riscv64")]
+use super::resource_sched::{sys_getrlimit, sys_setrlimit};
 #[cfg(not(any(
     target_arch = "riscv64",
     target_arch = "aarch64",
@@ -385,6 +387,10 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg2(),
             tf.arg3(),
         ),
+        #[cfg(target_arch = "riscv64")]
+        general::__NR_getrlimit => sys_getrlimit(&process, tf.arg0() as u32, tf.arg1()),
+        #[cfg(target_arch = "riscv64")]
+        general::__NR_setrlimit => sys_setrlimit(&process, tf.arg0() as u32, tf.arg1()),
         general::__NR_getpid => process.pid() as isize,
         general::__NR_getppid => process.ppid() as isize,
         #[cfg(not(target_arch = "loongarch64"))]

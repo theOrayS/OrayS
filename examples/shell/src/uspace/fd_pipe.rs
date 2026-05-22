@@ -8,7 +8,7 @@ use super::fd_table::FdEntry;
 use super::linux_abi::fd_cloexec_flag;
 use super::signal_abi::current_unblocked_signal_pending;
 use super::task_context::current_task_ext;
-use super::user_memory::write_user_value;
+use super::user_memory::{validate_user_write, write_user_value};
 use super::{UserProcess, neg_errno};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -193,6 +193,9 @@ pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> i
     let flags = flags as u32;
     if flags & !general::O_CLOEXEC != 0 {
         return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_user_write(process, pipefd, core::mem::size_of::<[i32; 2]>()) {
+        return neg_errno(err);
     }
     let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
     let (read_end, write_end) = PipeEndpoint::new_pair();

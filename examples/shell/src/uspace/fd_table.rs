@@ -702,7 +702,12 @@ impl FdTable {
 
     pub(super) fn lseek(&mut self, fd: i32, offset: i64, whence: u32) -> Result<u64, LinuxError> {
         let pos = match whence {
-            general::SEEK_SET => SeekFrom::Start(offset.max(0) as u64),
+            general::SEEK_SET => {
+                if offset < 0 {
+                    return Err(LinuxError::EINVAL);
+                }
+                SeekFrom::Start(offset as u64)
+            }
             general::SEEK_CUR => SeekFrom::Current(offset),
             general::SEEK_END => SeekFrom::End(offset),
             _ => return Err(LinuxError::EINVAL),
