@@ -8,7 +8,9 @@ use std::vec::Vec;
 
 use super::linux_abi::{ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CHOWN_ID_UNCHANGED};
 use super::user_memory::{read_user_value, write_user_value};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
+
+const NGROUPS_MAX: usize = 65_536;
 
 impl UserProcess {
     pub(super) fn real_uid(&self) -> u32 {
@@ -183,6 +185,9 @@ pub(super) fn write_getgroups_response(
     list: usize,
     groups: &[u32],
 ) -> isize {
+    if size > NGROUPS_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
     if size == 0 {
         return groups.len() as isize;
     }
@@ -288,7 +293,7 @@ pub(super) fn sys_setgroups(process: &UserProcess, size: usize, list: usize) -> 
     if process.uid() != 0 {
         return neg_errno(LinuxError::EPERM);
     }
-    if size > 65_536 {
+    if size > NGROUPS_MAX {
         return neg_errno(LinuxError::EINVAL);
     }
     let groups = match read_group_list(process, size, list) {

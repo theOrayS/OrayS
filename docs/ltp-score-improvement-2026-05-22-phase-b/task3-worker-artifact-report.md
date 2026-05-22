@@ -39,7 +39,9 @@ A read-only subagent unexpectedly transitioned task 3 to `completed` with a read
 - PASS: `git diff --check -- docs/ltp-score-improvement-2026-05-22-phase-b` produced no whitespace errors.
 - PASS: docs-root assertion script confirmed required Phase B files exist and `LTP_STABLE_CASES` remains 101.
 - PASS: `python3 -m py_compile scripts/ltp_summary.py` completed successfully; no parser syntax regression from this doc-only task.
-- BLOCKED/ENV: `cargo fmt --all -- --check` from the nested worktree hit the known parent-workspace discovery issue for `vendor/rust-fatfs`; this task changed Markdown only.
+- PASS: `cargo fmt --manifest-path .../examples/shell/Cargo.toml -- --check` completed successfully for the evaluator shell package.
+- PASS: `cargo check --manifest-path .../examples/shell/Cargo.toml` completed successfully for the evaluator shell package.
+- GAP/ENV: workspace-wide `cargo fmt --all -- --check` from the nested worktree hit parent-workspace discovery for `vendor/rust-fatfs`; workspace-wide `cargo check --workspace --all-targets` exceeded the 180s bound after compiling dependencies. This task changed Markdown only.
 
 ## Stop condition
 
