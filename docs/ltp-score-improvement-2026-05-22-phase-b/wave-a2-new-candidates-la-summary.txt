@@ -1,0 +1,69 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-22-phase-b/wave-a2-new-candidates-la.log`
+
+- PASS LTP CASE: 18
+- FAIL LTP CASE: 2
+- Internal TFAIL/TBROK/TCONF: 4 ({'TFAIL': 3, 'TBROK': 1})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 3
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 10 passed, 0 failed
+- ltp-glibc: 8 passed, 2 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| dup202 | la | glibc | ltp-glibc | PASS | 0 | 12557 | 192224 | 192203 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup202 | la | musl | ltp-musl | PASS | 0 | 6712 | 194416 | 192352 | -2064 | 0 | 0 | 0 | 0 | 0 | 0 |
+| faccessat01 | la | glibc | ltp-glibc | FAIL | 1 | 8910 | 192203 | 192182 | -21 | 3 | 0 | 0 | 0 | 3 | 0 |
+| faccessat01 | la | musl | ltp-musl | PASS | 0 | 8134 | 192352 | 192336 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdirat01 | la | glibc | ltp-glibc | PASS | 0 | 9019 | 192182 | 192170 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdirat01 | la | musl | ltp-musl | PASS | 0 | 5894 | 192336 | 192328 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| openat01 | la | glibc | ltp-glibc | PASS | 0 | 13281 | 192170 | 192149 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| openat01 | la | musl | ltp-musl | PASS | 0 | 7944 | 192328 | 192312 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe04 | la | glibc | ltp-glibc | PASS | 0 | 8385 | 192149 | 192119 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe04 | la | musl | ltp-musl | PASS | 0 | 7372 | 192312 | 192288 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe05 | la | glibc | ltp-glibc | PASS | 0 | 8595 | 192119 | 192107 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe05 | la | musl | ltp-musl | PASS | 0 | 4138 | 192288 | 192280 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread01 | la | glibc | ltp-glibc | PASS | 0 | 8152 | 192107 | 192086 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread01 | la | musl | ltp-musl | PASS | 0 | 6233 | 192280 | 192264 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite01 | la | glibc | ltp-glibc | PASS | 0 | 15140 | 192086 | 192065 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite01 | la | musl | ltp-musl | PASS | 0 | 8504 | 192264 | 192248 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sysinfo01 | la | glibc | ltp-glibc | PASS | 0 | 10941 | 192065 | 192053 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sysinfo01 | la | musl | ltp-musl | PASS | 0 | 4576 | 192248 | 192240 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlinkat01 | la | glibc | ltp-glibc | FAIL | 6 | 7260 | 192053 | 192032 | -21 | 0 | 1 | 0 | 0 | 0 | 0 |
+| unlinkat01 | la | musl | ltp-musl | PASS | 0 | 6150 | 192240 | 192224 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 18 (la:glibc:dup202, la:musl:dup202, la:musl:faccessat01, la:glibc:mkdirat01, la:musl:mkdirat01, la:glibc:openat01, la:musl:openat01, la:glibc:pipe04, la:musl:pipe04, la:glibc:pipe05, la:musl:pipe05, la:glibc:pread01, la:musl:pread01, la:glibc:pwrite01, la:musl:pwrite01, la:glibc:sysinfo01, la:musl:sysinfo01, la:musl:unlinkat01)
+- pass_with_tconf: 0
+- fail_wrapper: 2 (la:glibc:faccessat01, la:glibc:unlinkat01)
+- internal_tfail: 1 (la:glibc:faccessat01)
+- internal_tbrok: 1 (la:glibc:unlinkat01)
+- timeout: 0
+- enosys: 1 (la:glibc:faccessat01)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-glibc:faccessat01
+- ltp-glibc:unlinkat01
+
+## Groups
+### ltp-musl
+- PASS: 10
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 8
+- FAIL: 2
+- Internal: {'TFAIL': 3, 'TBROK': 1}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: faccessat01, unlinkat01

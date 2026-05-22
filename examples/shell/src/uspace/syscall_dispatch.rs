@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{SYSCALL, register_trap_handler};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -35,8 +35,9 @@ use super::process_lifecycle::{
     terminate_current_thread_for_exit_group,
 };
 use super::resource_sched::{
-    sys_getpriority, sys_prlimit64, sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam,
-    sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
+    sys_getpriority, sys_prlimit64, sys_sched_get_priority_max, sys_sched_get_priority_min,
+    sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam, sys_sched_getscheduler,
+    sys_sched_rr_get_interval, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
     sys_sched_setscheduler, sys_sched_yield, sys_setpriority,
 };
 #[cfg(target_arch = "riscv64")]
@@ -135,7 +136,8 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg3(),
             tf.arg4(),
         ),
-        general::__NR_faccessat => {
+        general::__NR_faccessat => sys_faccessat(&process, tf.arg0(), tf.arg1(), tf.arg2(), 0),
+        general::__NR_faccessat2 => {
             sys_faccessat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
         general::__NR_utimensat => {
@@ -269,6 +271,11 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             sys_sched_setscheduler(&process, tf.arg0() as i32, tf.arg1() as i32, tf.arg2())
         }
         general::__NR_sched_getscheduler => sys_sched_getscheduler(&process, tf.arg0() as i32),
+        general::__NR_sched_get_priority_max => sys_sched_get_priority_max(tf.arg0() as i32),
+        general::__NR_sched_get_priority_min => sys_sched_get_priority_min(tf.arg0() as i32),
+        general::__NR_sched_rr_get_interval => {
+            sys_sched_rr_get_interval(&process, tf.arg0() as i32, tf.arg1())
+        }
         general::__NR_sched_setattr => {
             sys_sched_setattr(&process, tf.arg0() as i32, tf.arg1(), tf.arg2())
         }

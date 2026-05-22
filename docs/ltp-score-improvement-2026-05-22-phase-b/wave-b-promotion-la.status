@@ -1,0 +1,5 @@
+command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=faccessat01,getgroups01,getrlimit03,setrlimit02 LTP_CASE_TIMEOUT_SECS=20 ./run-eval.sh la
+started_at: 2026-05-22T04:36:12Z
+run_eval_exit: 0
+tee_exit: 0
+finished_at: 2026-05-22T04:37:00Z

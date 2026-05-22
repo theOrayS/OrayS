@@ -1,0 +1,5 @@
+command: RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img OSCOMP_TEST_GROUPS=ltp LTP_CASES=waitpid01,waitpid04,waitpid10,waitpid11,waitpid12,waitpid13 LTP_CASE_TIMEOUT_SECS=20 ./run-eval.sh
+started_at: 2026-05-22T03:53:56Z
+run_eval_exit: 0
+tee_exit: 0
+finished_at: 2026-05-22T03:59:16Z
