@@ -15,8 +15,9 @@ use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    ACCESS_X_OK, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME,
+    ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag,
+    neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -48,6 +49,8 @@ pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
     pub(super) fd_flags: Vec<u32>,
 }
+
+const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
 
 pub(super) enum FdEntry {
     Stdin,
@@ -743,6 +746,9 @@ impl FdTable {
         if min_fd < 0 {
             return Err(LinuxError::EINVAL);
         }
+        if min_fd as usize >= FD_TABLE_LIMIT {
+            return Err(LinuxError::EINVAL);
+        }
         let entry = self.entry(fd)?.duplicate_for_fork()?;
         self.insert_min_with_flags(entry, min_fd as usize, fd_flags & general::FD_CLOEXEC)
     }
@@ -759,6 +765,9 @@ impl FdTable {
             return Err(LinuxError::EBADF);
         }
         let newfd = newfd as usize;
+        if newfd >= FD_TABLE_LIMIT {
+            return Err(LinuxError::EBADF);
+        }
         if self.entries.len() <= newfd {
             self.entries.resize_with(newfd + 1, || None);
             self.fd_flags.resize(newfd + 1, 0);
@@ -838,6 +847,9 @@ impl FdTable {
         min_fd: usize,
         fd_flags: u32,
     ) -> Result<i32, LinuxError> {
+        if min_fd >= FD_TABLE_LIMIT {
+            return Err(LinuxError::EMFILE);
+        }
         if self.entries.len() < min_fd {
             self.entries.resize_with(min_fd, || None);
             self.fd_flags.resize(min_fd, 0);
@@ -849,12 +861,16 @@ impl FdTable {
             .entries
             .iter_mut()
             .enumerate()
+            .take(FD_TABLE_LIMIT)
             .skip(min_fd)
             .find(|(_, slot)| slot.is_none())
         {
             *slot = Some(entry);
             self.fd_flags[idx] = fd_flags & general::FD_CLOEXEC;
             return Ok(idx as i32);
+        }
+        if self.entries.len() >= FD_TABLE_LIMIT {
+            return Err(LinuxError::EMFILE);
         }
         self.entries.push(Some(entry));
         self.fd_flags.push(fd_flags & general::FD_CLOEXEC);

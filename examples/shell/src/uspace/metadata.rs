@@ -3,7 +3,7 @@ use core::sync::atomic::Ordering;
 
 use axalloc::global_allocator;
 use axerrno::LinuxError;
-use axfs::fops::{FileAttr, FileType};
+use axfs::fops::{FileAttr, FileType, OpenOptions};
 use linux_raw_sys::general;
 use std::string::{String, ToString};
 
@@ -12,9 +12,9 @@ use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
 use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
-    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, PIPEFS_MAGIC, PROC_SUPER_MAGIC,
-    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
-    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
+    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
+    PROC_SUPER_MAGIC, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, STATFS_BLOCK_SIZE,
+    STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -226,6 +226,51 @@ pub(super) fn sys_faccessat(
     } else {
         neg_errno_code(LINUX_EACCES)
     }
+}
+
+pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize) -> isize {
+    let length = length as isize;
+    if length < 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let length = length as u64;
+    if length > MAX_IN_MEMORY_FILE_SIZE {
+        return neg_errno(LinuxError::ENOSPC);
+    }
+
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    if path.is_empty() {
+        return neg_errno(LinuxError::ENOENT);
+    }
+    if path.len() >= LINUX_PATH_MAX {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
+
+    let resolved_path = {
+        let table = process.fds.lock();
+        match resolve_dirfd_path(process, &table, general::AT_FDCWD, path.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    let target_path = match process.resolve_path_symlink(resolved_path.as_str()) {
+        Ok(Some(target)) => target,
+        Ok(None) => resolved_path,
+        Err(err) => return neg_errno(err),
+    };
+    let target_path = dev_shm_host_path(target_path.as_str()).unwrap_or(target_path);
+
+    let mut opts = OpenOptions::new();
+    opts.write(true);
+    let file = match axfs::fops::File::open(target_path.as_str(), &opts) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(LinuxError::from(err)),
+    };
+    file.truncate(length)
+        .map_or_else(|err| neg_errno(LinuxError::from(err)), |_| 0)
 }
 
 pub(super) fn sys_symlinkat(

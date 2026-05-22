@@ -26,7 +26,8 @@ use super::memory_map::{sys_brk, sys_mmap, sys_mprotect, sys_msync, sys_munmap};
 use super::memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use super::metadata::{
     sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fstat, sys_fstatfs,
-    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat, sys_umask, sys_utimensat,
+    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat, sys_truncate, sys_umask,
+    sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
 use super::process_abi::{sys_getpgid, sys_getsid, sys_personality, sys_setpgid, sys_setsid};
@@ -40,7 +41,7 @@ use super::resource_sched::{
     sys_sched_rr_get_interval, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
     sys_sched_setscheduler, sys_sched_yield, sys_setpriority,
 };
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::resource_sched::{sys_getrlimit, sys_setrlimit};
 #[cfg(not(any(
     target_arch = "riscv64",
@@ -64,6 +65,11 @@ use super::time_abi::{
     sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_times,
 };
 use super::user_memory::sys_getrandom;
+
+#[cfg(target_arch = "loongarch64")]
+const LOONGARCH_LEGACY_GETRLIMIT: u32 = 163;
+#[cfg(target_arch = "loongarch64")]
+const LOONGARCH_LEGACY_SETRLIMIT: u32 = 164;
 
 #[register_trap_handler(SYSCALL)]
 fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
@@ -121,6 +127,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_fallocate => {
             sys_fallocate(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
+        general::__NR_truncate => sys_truncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_ftruncate => sys_ftruncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchmod => sys_fchmod(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchmodat => sys_fchmodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), 0),
@@ -398,6 +405,10 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_getrlimit => sys_getrlimit(&process, tf.arg0() as u32, tf.arg1()),
         #[cfg(target_arch = "riscv64")]
         general::__NR_setrlimit => sys_setrlimit(&process, tf.arg0() as u32, tf.arg1()),
+        #[cfg(target_arch = "loongarch64")]
+        LOONGARCH_LEGACY_GETRLIMIT => sys_getrlimit(&process, tf.arg0() as u32, tf.arg1()),
+        #[cfg(target_arch = "loongarch64")]
+        LOONGARCH_LEGACY_SETRLIMIT => sys_setrlimit(&process, tf.arg0() as u32, tf.arg1()),
         general::__NR_getpid => process.pid() as isize,
         general::__NR_getppid => process.ppid() as isize,
         #[cfg(not(target_arch = "loongarch64"))]

@@ -551,6 +551,22 @@ impl UserProcess {
             child.process.live_threads.load(Ordering::Acquire) == 0
         }
 
+        fn wait_pid_matches(child: &ChildTask, pid: i32, current_pgid: i32) -> bool {
+            match pid {
+                -1 => true,
+                0 => child.process.pgid() == current_pgid,
+                p if p > 0 => child.pid == p,
+                p => p
+                    .checked_neg()
+                    .is_some_and(|target_pgid| child.process.pgid() == target_pgid),
+            }
+        }
+
+        if pid < -1 && pid.checked_neg().is_none() {
+            return Err(LinuxError::ESRCH);
+        }
+        let current_pgid = self.pgid();
+
         let child = loop {
             let maybe_child = {
                 let mut children = self.children.lock();
@@ -558,26 +574,21 @@ impl UserProcess {
                     return Err(LinuxError::ECHILD);
                 }
 
-                let exited_index = match pid {
-                    -1 => children.iter().position(is_exited),
-                    p if p > 0 => {
-                        let index = children
-                            .iter()
-                            .position(|child| child.pid == p)
-                            .ok_or(LinuxError::ECHILD)?;
-                        is_exited(&children[index]).then_some(index)
-                    }
-                    _ => return Err(LinuxError::EINVAL),
-                };
+                if !children
+                    .iter()
+                    .any(|child| wait_pid_matches(child, pid, current_pgid))
+                {
+                    return Err(LinuxError::ECHILD);
+                }
+                let exited_index = children.iter().position(|child| {
+                    wait_pid_matches(child, pid, current_pgid) && is_exited(child)
+                });
 
                 if let Some(index) = exited_index {
                     Some(children.remove(index))
                 } else if nohang {
                     return Ok(None);
                 } else {
-                    if pid > 0 && !children.iter().any(|child| child.pid == pid) {
-                        return Err(LinuxError::ECHILD);
-                    }
                     None
                 }
             };
@@ -591,7 +602,12 @@ impl UserProcess {
             let wait_condition = || {
                 let children = self.children.lock();
                 children.is_empty()
-                    || children.iter().any(is_exited)
+                    || !children
+                        .iter()
+                        .any(|child| wait_pid_matches(child, pid, current_pgid))
+                    || children
+                        .iter()
+                        .any(|child| wait_pid_matches(child, pid, current_pgid) && is_exited(child))
                     || self.pending_exit_group().is_some()
                     || self.eval_watchdog_expired()
             };

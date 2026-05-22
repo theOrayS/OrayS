@@ -383,13 +383,16 @@ pub(super) fn sys_sched_get_priority_min(policy: i32) -> isize {
 }
 
 pub(super) fn sys_sched_rr_get_interval(process: &UserProcess, pid: i32, interval: usize) -> isize {
-    if let Err(err) = sched_target_state(process, pid) {
-        return neg_errno(err);
-    }
-    let quantum = general::timespec {
-        tv_sec: 0,
-        tv_nsec: 10_000_000,
+    let state = match sched_target_state(process, pid) {
+        Ok(state) => state,
+        Err(err) => return neg_errno(err),
     };
+    let tv_nsec = if state.policy as u32 == general::SCHED_FIFO {
+        0
+    } else {
+        10_000_000
+    };
+    let quantum = general::timespec { tv_sec: 0, tv_nsec };
     write_user_value(process, interval, &quantum)
 }
 
@@ -573,12 +576,12 @@ pub(super) fn sys_prlimit64(
     0
 }
 
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 pub(super) fn sys_getrlimit(process: &UserProcess, resource: u32, old_limit: usize) -> isize {
     sys_prlimit64(process, 0, resource, 0, old_limit)
 }
 
-#[cfg(target_arch = "riscv64")]
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 pub(super) fn sys_setrlimit(process: &UserProcess, resource: u32, new_limit: usize) -> isize {
     sys_prlimit64(process, 0, resource, new_limit, 0)
 }

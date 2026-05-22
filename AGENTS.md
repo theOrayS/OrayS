@@ -40,7 +40,8 @@ Run commands from the repository root (`/root/oskernel2026-orays` in this
 container) unless a task clearly spans a sibling checkout.
 
 ```bash
-# Default target: build the fork's riscv64 and loongarch64 evaluator kernels
+# Default target: build remote-submission kernels (kernel-rv and kernel-la).
+# The LoongArch kernel built by `make all` uses the remote evaluator address map.
 make
 
 # Build a Rust example for one architecture
@@ -88,22 +89,27 @@ make docker
 - `make testsuite-sdcard` expects the sibling testsuite checkout configured by
   `TESTSUITE_DIR` (default `../testsuits-for-oskernel`).
 
-## Local and Remote Evaluation Branches
+## Local and Remote Evaluation Modes
 
-- This checkout, `/root/oskernel2026-orays`, is the **local QEMU branch**. It is
-  the primary working tree for local development, debugging, and validation.
-- The sibling checkout, `/root/oskernel2026-orays-remote`, is the branch used for
-  the **remote evaluator**. Treat it as a separate target environment, not as an
-  interchangeable copy of the local QEMU setup.
-- The remote evaluator's QEMU address mapping differs from the local QEMU address
-  mapping. Keep address-mapping logic environment-specific and explicitly
-  distinguish local-only mapping from remote-evaluator mapping when editing,
-  syncing, reviewing, or reporting changes.
-- After a local-branch task goal is implemented and validated, mirror the local
-  branch's code into `/root/oskernel2026-orays-remote` before final handoff,
-  preserving only the remote evaluator's address-mapping differences. Do not let
-  generated artifacts, local logs, disk images, or unrelated dirty files become
-  part of that sync unless the task explicitly requires them.
+- This checkout, `/root/oskernel2026-orays`, is the single maintained working
+  branch for both local QEMU validation and remote-evaluator submission builds.
+  Do not maintain a separate remote branch as the delivery target unless a newer
+  user request explicitly reintroduces that workflow.
+- Local validation remains `./run-eval.sh` for RISC-V and `./run-eval.sh la` for
+  LoongArch. These targets use the local QEMU command lines and the package
+  default LoongArch platform address map.
+- Remote submission validation is represented by `make all`, which must generate
+  root-level ELF-format `kernel-rv` and `kernel-la`. The `kernel-la` produced by
+  `make all` uses `configs/remote-eval/axplat-loongarch64-qemu-virt.toml` to
+  match the remote evaluator's LoongArch address map; do not use that remote
+  config for local `run-la` unless specifically testing remote-submission build
+  behavior.
+- The historical `refactor/moss_kernel_like_remote` branch and sibling checkout
+  may be used only as read-only references for remote-evaluator behavior. Do not
+  modify that branch or sync source into it for normal local-branch tasks.
+- Keep local-only and remote-submission address mapping rules explicitly named in
+  code, docs, and reports. Do not hide real evaluator failures with fake PASS,
+  case-name hardcoding, or converting real failures into SKIP/TCONF.
 
 ## Toolchain
 
@@ -292,8 +298,9 @@ When reporting completed work, include:
 - intent of each change;
 - validation commands actually run;
 - checks that could not be run, if any;
-- for local-branch code tasks, whether `/root/oskernel2026-orays-remote` was
-  synced and which remote-only address-mapping differences were preserved;
+- for evaluator-mode changes, whether local `./run-eval.sh` and
+  `./run-eval.sh la` passed, and whether `make all` still builds the
+  remote-submission `kernel-rv`/`kernel-la` outputs;
 - any user-visible behavior change;
 - any syscall / errno / ABI-visible change, or an explicit statement that there
   was no intended visible ABI/POSIX behavior change.

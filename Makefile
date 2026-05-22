@@ -40,6 +40,11 @@
 ARCH ?= x86_64
 MYPLAT ?=
 PLAT_CONFIG ?=
+# Remote official evaluation invokes `make all` without extra arguments.
+# Keep local QEMU targets (`kernel-la`, `run-la`, `./run-eval.sh la`) on the
+# package default platform config, but build the submission `kernel-la` with the
+# remote LoongArch address map that matches the official evaluator.
+REMOTE_LA_PLAT_CONFIG ?= $(CURDIR)/configs/remote-eval/axplat-loongarch64-qemu-virt.toml
 SMP ?=
 MODE ?= release
 LOG ?= warn
@@ -233,6 +238,7 @@ all:
 		OUT_CONFIG=$(KERNEL_RV_CONFIG) \
 		TARGET_DIR=$(KERNEL_RV_TARGET_DIR)
 	$(MAKE) test_build ARCH=loongarch64 BUS=pci \
+		PLAT_CONFIG="$(REMOTE_LA_PLAT_CONFIG)" \
 		KERNEL_FEATURES="$(KERNEL_LA_FEATURES)" \
 		APP_FEATURES="$(KERNEL_LA_APP_FEATURES)" \
 		AXCONFIG_WRITES="$(KERNEL_LA_AXCONFIG_WRITES)" \
@@ -259,7 +265,7 @@ build: $(OUT_DIR) $(FINAL_IMG)
 
 test_build:
 	$(MAKE) $(kernel_build_args) \
-		ARCH=$(ARCH) BUS=$(BUS) \
+		ARCH=$(ARCH) BUS=$(BUS) $(if $(strip $(PLAT_CONFIG)),PLAT_CONFIG="$(PLAT_CONFIG)") \
 		APP_FEATURES="$(APP_FEATURES)" \
 		AXCONFIG_WRITES="$(AXCONFIG_WRITES)" \
 		OUT_DIR=$(OUT_DIR) \
