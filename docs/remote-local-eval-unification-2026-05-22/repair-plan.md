@@ -296,3 +296,55 @@ Makefile 新规则：
 - 日志无 `axconfig-gen is unavailable`、`cargo-axplat is unavailable`、在线安装、crates 下载、DNS 失败或 registry 更新标记。
 - `CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true cargo fmt --all -- --check`：通过。
 
+
+## 追加：远程 LoongArch 高半区取指异常修复（2026-05-22）
+
+### 远程失败现象
+
+远程评测机的 LoongArch QEMU 与本地 QEMU 地址映射不同：本地 LoongArch 默认内核高半区入口为 `0xffff_0000_8000_0000`，远程评测配置要求 `0xffff_8000_8000_0000`。虽然 `configs/remote-eval/axplat-loongarch64-qemu-virt.toml` 已经把远程 `kernel-base-vaddr`、`phys-virt-offset` 和 `kernel-aspace-*` 改到 `0xffff_8000...`，但 vendored 平台包的启动页表仍固定写入 `BOOT_PT_L0[0]`。该硬编码刚好匹配本地 `0xffff_0000...` 的 L0 index 0，却不匹配远程 `0xffff_8000...` 的 L0 index 256，导致远程 LoongArch 启动后取指异常并循环，无法进入测评。
+
+### 修改文件与函数
+
+#### `vendor/cargo-vendor.tar.gz` 内 `cargo/axplat-loongarch64-qemu-virt/src/boot.rs`
+
+- 修改函数：`init_boot_page_table`
+- 参考只读分支 `refactor/moss_kernel_like_remote` 的等价实现，但未修改该分支。
+- 将固定页表槽位：
+
+```rust
+BOOT_PT_L0[0] = LA64PTE::new_table(axplat::mem::virt_to_phys(l1_va));
+```
+
+替换为根据当前平台配置计算：
+
+```rust
+let l0_index = (KERNEL_BASE_VADDR >> 39) & 0x1ff;
+BOOT_PT_L0[l0_index] = LA64PTE::new_table(axplat::mem::virt_to_phys(l1_va));
+```
+
+- 预期行为：同一启动代码可同时支持本地 `0xffff_0000_8000_0000` 与远程 `0xffff_8000_8000_0000`，不再依赖本地地址恰好落在 L0 index 0。
+- 同步更新 vendored crate 的 `.cargo-checksum.json` 中 `src/boot.rs` 校验值，并重新打包 `vendor/cargo-vendor.tar.gz`；最终工作树不提交展开的 `vendor/cargo/`。
+
+### 追加验证结果
+
+- 归档内容检查：`tar -xOzf vendor/cargo-vendor.tar.gz cargo/axplat-loongarch64-qemu-virt/src/boot.rs` 可见 `KERNEL_BASE_VADDR` 导入和动态 `l0_index` 计算。
+- 远程 LoongArch 构建检查：
+  - 命令：`CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true make test_build ARCH=loongarch64 BUS=pci PLAT_CONFIG="$PWD/configs/remote-eval/axplat-loongarch64-qemu-virt.toml" ...`
+  - 结果：通过，生成 `/tmp/oskernel-remote-la-fix/kernel-la`。
+  - `rust-readobj -h /tmp/oskernel-remote-la-fix/kernel-la` 显示入口 `0xFFFF800080000000`。
+  - `scripts/axconfig-gen.py ... -r plat.kernel-base-vaddr` 显示 `"0xffff_8000_8000_0000"`。
+- 本地 LoongArch 构建回归检查：
+  - 命令：`CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true make test_build ARCH=loongarch64 BUS=pci ...`
+  - 结果：通过，生成 `/tmp/oskernel-local-la-fix/kernel-la`。
+  - `rust-readobj -h /tmp/oskernel-local-la-fix/kernel-la` 显示入口 `0xFFFF000080000000`。
+  - `scripts/axconfig-gen.py ... -r plat.kernel-base-vaddr` 显示 `"0xffff_0000_8000_0000"`。
+- 本地最终门禁（高半区修复后重跑）：
+  - `./run-eval.sh la`：通过；`ltp-musl` 157 passed / 0 failed，`ltp-glibc` 157 passed / 0 failed；`scripts/ltp_summary.py` 统计 PASS LTP CASE 314、FAIL 0、timeout 0、ENOSYS 0、panic/trap 0。
+  - `./run-eval.sh`：通过；`ltp-musl` 157 passed / 0 failed，`ltp-glibc` 157 passed / 0 failed；`scripts/ltp_summary.py` 统计 PASS LTP CASE 314、FAIL 0、timeout 0、ENOSYS 0、panic/trap 0。
+
+### 行为边界
+
+- 本次修复只改变 LoongArch 启动页表索引选择，使其匹配实际 `KERNEL_BASE_VADDR`。
+- 没有修改 syscall、errno、ABI 可见结构或 LTP case 判定逻辑。
+- 没有引入 fake PASS、case-name hardcoding 或把真实失败改写为 SKIP/TCONF。
+- `refactor/moss_kernel_like_remote` 分支未被修改，仅作为只读参考。
