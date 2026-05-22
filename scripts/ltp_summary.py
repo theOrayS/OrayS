@@ -217,7 +217,40 @@ def parse_log(text: str) -> dict[str, Any]:
             if current_case:
                 case_bucket(summary, current_group, current_case)["panic_trap"] += 1
 
+    reconcile_timeout_statuses(summary)
     return summary
+
+
+def remove_case_records(records: list[dict[str, Any]], group: str, case: str) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if not (record["group"] == group and record["case"] == case)
+    ]
+
+
+def reconcile_timeout_statuses(summary: dict[str, Any]) -> None:
+    """Keep timeout evidence separate and never count timed-out cases as PASS.
+
+    Normal runner output emits a non-zero `FAIL LTP CASE` line before
+    `TIMEOUT LTP CASE`, but this parser is also used on hand-captured and
+    remote logs.  If a timeout marker appears after a parser-compatible
+    zero-status result line, the timeout evidence wins: remove that case from
+    wrapper pass lists and expose its per-case status as `TIMEOUT`.
+    """
+
+    for detail in summary["case_details"].values():
+        if not detail["timeouts"] or detail["status"] != "PASS":
+            continue
+        group = detail["group"]
+        case = detail["case"]
+        detail["status"] = "TIMEOUT"
+        summary["pass_cases"] = remove_case_records(summary["pass_cases"], group, case)
+        summary["case_events"] = remove_case_records(summary["case_events"], group, case)
+        if group in summary["groups"]:
+            summary["groups"][group]["pass_cases"] = remove_case_records(
+                summary["groups"][group]["pass_cases"], group, case
+            )
 
 
 def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
