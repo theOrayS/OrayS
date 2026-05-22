@@ -1,0 +1,99 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-22-phase-b/wave-a-targeted-rv.log`
+
+- PASS LTP CASE: 5
+- FAIL LTP CASE: 29
+- Internal TFAIL/TBROK/TCONF: 98 ({'TCONF': 13, 'TFAIL': 82, 'TBROK': 3})
+- timeout matches: 5
+- ENOSYS/not implemented matches: 17
+- panic/trap matches: 0
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clock_getres01 | rv | musl | ltp-musl | PASS | 0 | 6046 | 251620 | 251585 | -35 | 0 | 0 | 8 | 0 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 21137 | 251662 | 251648 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime03 | rv | musl | ltp-musl | FAIL | 2 | 3801 | 251648 | 251641 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| clock_gettime04 | rv | musl | ltp-musl | FAIL | 1 | 5306 | 251641 | 251620 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| clock_nanosleep01 | rv | musl | ltp-musl | FAIL | 137 | 21750 | 251585 | 251564 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_nanosleep02 | rv | musl | ltp-musl | FAIL | 137 | 21560 | 251564 | 251543 | -21 | 4 | 0 | 0 | 1 | 0 | 0 |
+| getgroups01 | rv | musl | ltp-musl | FAIL | 1 | 5127 | 256725 | 256718 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 4388 | 256746 | 256725 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpriority03 | rv | musl | ltp-musl | FAIL | -1 | 34 | 256003 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit03 | rv | musl | ltp-musl | FAIL | 1 | 3403 | 255940 | 255926 | -14 | 16 | 0 | 0 | 0 | 16 | 0 |
+| getrusage02 | rv | musl | ltp-musl | PASS | 0 | 3720 | 256052 | 256031 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage03 | rv | musl | ltp-musl | FAIL | 2 | 6159 | 256031 | 256017 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| gettid02 | rv | musl | ltp-musl | PASS | 0 | 9666 | 256718 | 256703 | -15 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | musl | ltp-musl | FAIL | 137 | 22512 | 256017 | 256003 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| gettimeofday03 | rv | musl | ltp-musl | FAIL | -1 | 110 | 256003 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep01 | rv | musl | ltp-musl | UNKNOWN |  |  | 251543 |  |  | 4 | 0 | 0 | 0 | 0 | 0 |
+| sched_get_priority_max01 | rv | musl | ltp-musl | FAIL | 32 | 5615 | 256795 | 256781 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sched_get_priority_min01 | rv | musl | ltp-musl | FAIL | 32 | 5660 | 256781 | 256767 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sched_getparam02 | rv | musl | ltp-musl | FAIL | -1 | 39 | 256795 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getscheduler02 | rv | musl | ltp-musl | PASS | 0 | 9061 | 258864 | 256795 | -2069 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_rr_get_interval01 | rv | musl | ltp-musl | FAIL | 33 | 7499 | 256767 | 256746 | -21 | 2 | 0 | 1 | 0 | 1 | 0 |
+| setpriority01 | rv | musl | ltp-musl | PASS | 0 | 5336 | 256003 | 255975 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setpriority02 | rv | musl | ltp-musl | FAIL | 1 | 7237 | 255975 | 255940 | -35 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | musl | ltp-musl | FAIL | -1 | 40 | 255940 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit01 | rv | musl | ltp-musl | FAIL | 137 | 23057 | 255926 | 251676 | -4250 | 1 | 0 | 0 | 1 | 0 | 0 |
+| setrlimit02 | rv | musl | ltp-musl | FAIL | 1 | 3508 | 251676 | 251662 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| times02 | rv | musl | ltp-musl | FAIL | -1 | 28 | 255940 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitpid01 | rv | musl | ltp-musl | FAIL | 1 | 19548 | 256703 | 256388 | -315 | 40 | 0 | 0 | 0 | 0 | 0 |
+| waitpid02 | rv | musl | ltp-musl | FAIL | -1 | 53 | 256388 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitpid04 | rv | musl | ltp-musl | FAIL | 1 | 3828 | 256388 | 256374 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| waitpid05 | rv | musl | ltp-musl | FAIL | -1 | 33 | 256374 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitpid10 | rv | musl | ltp-musl | FAIL | 1 | 9474 | 256374 | 256283 | -91 | 1 | 0 | 0 | 0 | 0 | 0 |
+| waitpid11 | rv | musl | ltp-musl | FAIL | 1 | 8297 | 256283 | 256206 | -77 | 1 | 0 | 0 | 0 | 0 | 0 |
+| waitpid12 | rv | musl | ltp-musl | FAIL | 1 | 7518 | 256206 | 256129 | -77 | 1 | 0 | 0 | 0 | 0 | 0 |
+| waitpid13 | rv | musl | ltp-musl | FAIL | 1 | 6618 | 256129 | 256052 | -77 | 1 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:musl:gettid02, rv:musl:sched_getscheduler02)
+- pass_with_tconf: 3 (rv:musl:clock_getres01, rv:musl:getrusage02, rv:musl:setpriority01)
+- fail_wrapper: 29 (rv:musl:clock_gettime01, rv:musl:clock_gettime03, rv:musl:clock_gettime04, rv:musl:clock_nanosleep01, rv:musl:clock_nanosleep02, rv:musl:getgroups01, rv:musl:getpgid01, rv:musl:getpriority03, rv:musl:getrlimit03, rv:musl:getrusage03, rv:musl:gettimeofday02, rv:musl:gettimeofday03, rv:musl:sched_get_priority_max01, rv:musl:sched_get_priority_min01, rv:musl:sched_getparam02, rv:musl:sched_rr_get_interval01, rv:musl:setpriority02, rv:musl:setpriority03, rv:musl:setrlimit01, rv:musl:setrlimit02, rv:musl:times02, rv:musl:waitpid01, rv:musl:waitpid02, rv:musl:waitpid04, rv:musl:waitpid05, rv:musl:waitpid10, rv:musl:waitpid11, rv:musl:waitpid12, rv:musl:waitpid13)
+- internal_tfail: 16 (rv:musl:clock_gettime04, rv:musl:clock_nanosleep02, rv:musl:getgroups01, rv:musl:getpgid01, rv:musl:getrlimit03, rv:musl:nanosleep01, rv:musl:sched_rr_get_interval01, rv:musl:setpriority02, rv:musl:setrlimit01, rv:musl:setrlimit02, rv:musl:waitpid01, rv:musl:waitpid04, rv:musl:waitpid10, rv:musl:waitpid11, rv:musl:waitpid12, rv:musl:waitpid13)
+- internal_tbrok: 3 (rv:musl:clock_gettime03, rv:musl:getpgid01, rv:musl:getrusage03)
+- timeout: 5 (rv:musl:clock_gettime01, rv:musl:clock_nanosleep01, rv:musl:clock_nanosleep02, rv:musl:gettimeofday02, rv:musl:setrlimit01)
+- enosys: 2 (rv:musl:getrlimit03, rv:musl:sched_rr_get_interval01)
+- panic_trap: 0
+- unknown: 1 (rv:musl:nanosleep01)
+
+## FAIL LTP CASE
+- ltp-musl:sched_getparam02
+- ltp-musl:sched_get_priority_max01
+- ltp-musl:sched_get_priority_min01
+- ltp-musl:sched_rr_get_interval01
+- ltp-musl:getpgid01
+- ltp-musl:getgroups01
+- ltp-musl:waitpid01
+- ltp-musl:waitpid02
+- ltp-musl:waitpid04
+- ltp-musl:waitpid05
+- ltp-musl:waitpid10
+- ltp-musl:waitpid11
+- ltp-musl:waitpid12
+- ltp-musl:waitpid13
+- ltp-musl:getrusage03
+- ltp-musl:gettimeofday02
+- ltp-musl:gettimeofday03
+- ltp-musl:getpriority03
+- ltp-musl:setpriority02
+- ltp-musl:setpriority03
+- ltp-musl:times02
+- ltp-musl:getrlimit03
+- ltp-musl:setrlimit01
+- ltp-musl:setrlimit02
+- ltp-musl:clock_gettime01
+- ltp-musl:clock_gettime03
+- ltp-musl:clock_gettime04
+- ltp-musl:clock_nanosleep01
+- ltp-musl:clock_nanosleep02
+
+## Groups
+### ltp-musl
+- PASS: 5
+- FAIL: 29
+- Internal: {'TCONF': 13, 'TFAIL': 82, 'TBROK': 3}
+- timeout: 5
+- ENOSYS/not implemented: 17
+- panic/trap: 0
+- Fail cases: sched_getparam02, sched_get_priority_max01, sched_get_priority_min01, sched_rr_get_interval01, getpgid01, getgroups01, waitpid01, waitpid02, waitpid04, waitpid05, waitpid10, waitpid11, waitpid12, waitpid13, getrusage03, gettimeofday02, gettimeofday03, getpriority03, setpriority02, setpriority03, times02, getrlimit03, setrlimit01, setrlimit02, clock_gettime01, clock_gettime03, clock_gettime04, clock_nanosleep01, clock_nanosleep02

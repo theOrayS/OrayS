@@ -7,7 +7,7 @@ use linux_raw_sys::general;
 use std::vec::Vec;
 
 use super::linux_abi::{
-    neg_errno, DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE,
+    DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, USER_STACK_SIZE, neg_errno,
 };
 use super::task_registry::{
     live_user_process_entries, user_thread_entries_by_process_group,
@@ -17,7 +17,7 @@ use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{task_context::current_tid, UserProcess};
+use super::{UserProcess, task_context::current_tid};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -249,6 +249,14 @@ pub(super) fn sched_param_accepts_policy(policy: i32, param: UserSchedParam) -> 
     }
 }
 
+fn sched_priority_bounds(policy: i32) -> Option<(i32, i32)> {
+    match policy as u32 {
+        0 | general::SCHED_BATCH | general::SCHED_IDLE | general::SCHED_DEADLINE => Some((0, 0)),
+        general::SCHED_FIFO | general::SCHED_RR => Some((1, 99)),
+        _ => None,
+    }
+}
+
 fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {
     if pid < 0 {
         return Err(LinuxError::ESRCH);
@@ -358,6 +366,31 @@ pub(super) fn sys_sched_getscheduler(process: &UserProcess, pid: i32) -> isize {
         Ok(state) => state.policy as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn sys_sched_get_priority_max(policy: i32) -> isize {
+    match sched_priority_bounds(policy) {
+        Some((_, max)) => max as isize,
+        None => neg_errno(LinuxError::EINVAL),
+    }
+}
+
+pub(super) fn sys_sched_get_priority_min(policy: i32) -> isize {
+    match sched_priority_bounds(policy) {
+        Some((min, _)) => min as isize,
+        None => neg_errno(LinuxError::EINVAL),
+    }
+}
+
+pub(super) fn sys_sched_rr_get_interval(process: &UserProcess, pid: i32, interval: usize) -> isize {
+    if let Err(err) = sched_target_state(process, pid) {
+        return neg_errno(err);
+    }
+    let quantum = general::timespec {
+        tv_sec: 0,
+        tv_nsec: 10_000_000,
+    };
+    write_user_value(process, interval, &quantum)
 }
 
 fn sched_attr_from_state(state: UserSchedState) -> UserSchedAttr {
