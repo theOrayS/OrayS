@@ -5,18 +5,15 @@ CARGO_BINUTILS_VERSION ?= 0.4.0
 
 # Tool to parse information about the target package
 ifeq ($(shell cargo axplat --version 2>/dev/null),)
-  $(info Installing cargo-axplat...)
-  $(shell cargo install --locked cargo-axplat --version $(CARGO_AXPLAT_VERSION))
+  $(error cargo-axplat is unavailable. Expected repo-local tools/bin/cargo-axplat or a preinstalled cargo-axplat; remote builds must not install from the network)
 endif
 
 # Tool to generate platform configuration files
 ifeq ($(shell axconfig-gen --version 2>/dev/null),)
-  $(info Installing axconfig-gen...)
-  $(shell cargo install --locked axconfig-gen --version $(AXCONFIG_GEN_VERSION))
+  $(error axconfig-gen is unavailable. Expected repo-local tools/bin/axconfig-gen or a preinstalled axconfig-gen; remote builds must not install from the network)
 endif
 
 # Cargo binutils
 ifeq ($(shell rust-objcopy --version 2>/dev/null),)
-  $(info Installing cargo-binutils...)
-  $(shell cargo install --locked cargo-binutils --version $(CARGO_BINUTILS_VERSION))
+  $(error rust-objcopy is unavailable. Expected repo-local tools/bin/rust-objcopy or rust llvm-tools; remote builds must not install from the network)
 endif
