@@ -15,9 +15,9 @@ use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK,
-    fd_cloexec_flag, neg_errno, posix_ret_i32,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE,
+    O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR,
+    ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -431,8 +431,8 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
                 if stat.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
                     return neg_errno(LinuxError::ENOTDIR);
                 }
-                let uid = process.uid();
-                let gid = process.gid();
+                let uid = process.fs_uid();
+                let gid = process.fs_gid();
                 let parents_searchable =
                     match table.parent_dirs_searchable(process, path.as_str(), uid, gid) {
                         Ok(searchable) => searchable,
@@ -1045,7 +1045,7 @@ impl FdTable {
         dirfd: i32,
         path: &str,
     ) -> Result<general::stat, LinuxError> {
-        match open_fd_entry(process, self, dirfd, path, general::O_RDONLY, 0) {
+        match open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0) {
             Ok(FdEntry::DevNull) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
             Ok(FdEntry::BlockDevice(dev)) => {
                 Ok(PathEntry::synthetic_block(dev.path.as_str()).stat())
@@ -1433,6 +1433,40 @@ fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {
     }
 }
 
+fn open_permission_mode(flags: u32) -> usize {
+    match flags & general::O_ACCMODE {
+        general::O_WRONLY => ACCESS_W_OK,
+        general::O_RDWR => ACCESS_R_OK | ACCESS_W_OK,
+        _ => ACCESS_R_OK,
+    }
+}
+
+fn check_open_permission(process: &UserProcess, path: &str, flags: u32) -> Result<(), LinuxError> {
+    if flags & O_PATH_FLAG != 0 {
+        return Ok(());
+    }
+    let attr = match axfs::api::metadata(path) {
+        Ok(attr) => attr,
+        Err(_) => return Ok(()),
+    };
+    let mut st: general::stat = unsafe { core::mem::zeroed() };
+    st.st_dev = 1;
+    st.st_ino = path_inode(Some(path));
+    st.st_mode = file_type_mode(attr.file_type()) | attr.permissions().bits() as u32;
+    st.st_nlink = 1;
+    st.st_size = attr.size() as _;
+    st.st_blksize = 512;
+    st.st_blocks = attr.blocks() as _;
+    let st = apply_recorded_path_metadata(process, path, st);
+    let uid = process.fs_uid();
+    let gid = process.fs_gid();
+    if access_allowed(&st, open_permission_mode(flags), uid, gid) {
+        Ok(())
+    } else {
+        Err(LinuxError::EACCES)
+    }
+}
+
 fn fcntl_status_flags(open_flags: u32) -> u32 {
     open_flags
         & (general::O_ACCMODE
@@ -1572,6 +1606,9 @@ fn open_candidates(
                 return Err(LinuxError::EPERM);
             }
         }
+        if !created_by_this_open {
+            check_open_permission(process, path.as_str(), flags)?;
+        }
         match File::open(path.as_str(), file_opts) {
             Ok(file) if path_only => {
                 let attr = file.get_attr().map_err(LinuxError::from)?;
@@ -1580,7 +1617,11 @@ fn open_candidates(
             Ok(file) => {
                 if created_by_this_open {
                     process.set_path_mode(path.clone(), process.apply_umask(mode));
-                    process.set_path_owner(path.clone(), Some(process.uid()), Some(process.gid()));
+                    process.set_path_owner(
+                        path.clone(),
+                        Some(process.fs_uid()),
+                        Some(process.fs_gid()),
+                    );
                 }
                 return Ok(FdEntry::File(FileEntry {
                     file,
