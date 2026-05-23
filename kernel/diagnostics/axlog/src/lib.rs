@@ -129,6 +129,18 @@ pub trait LogIf {
 
 struct Logger;
 
+fn print_colored_log_line(args: fmt::Arguments) {
+    // Keep the trailing newline outside the ANSI-colored fragment so the reset
+    // code cannot be emitted at the start of the following console line. Remote
+    // evaluator parsers match result-marker lines such as `FAIL LTP CASE ...`
+    // from the line start; leaking `\x1b[m` onto the next line can make real
+    // passing LTP cases invisible to that scorer.
+    __print_impl(format_args!(
+        "{}\n",
+        with_color!(ColorCode::White, "{}", args)
+    ));
+}
+
 impl Write for Logger {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         cfg_if::cfg_if! {
@@ -166,9 +178,8 @@ impl Log for Logger {
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "std")] {
-                __print_impl(with_color!(
-                    ColorCode::White,
-                    "[{time} {path}:{line}] {args}\n",
+                print_colored_log_line(format_args!(
+                    "[{time} {path}:{line}] {args}",
                     time = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.6f"),
                     path = path,
                     line = line,
@@ -181,9 +192,8 @@ impl Log for Logger {
                 if let Some(cpu_id) = cpu_id {
                     if let Some(tid) = tid {
                         // show CPU ID and task ID
-                        __print_impl(with_color!(
-                            ColorCode::White,
-                            "[{:>3}.{:06} {cpu_id}:{tid} {path}:{line}] {args}\n",
+                        print_colored_log_line(format_args!(
+                            "[{:>3}.{:06} {cpu_id}:{tid} {path}:{line}] {args}",
                             now.as_secs(),
                             now.subsec_micros(),
                             cpu_id = cpu_id,
@@ -194,9 +204,8 @@ impl Log for Logger {
                         ));
                     } else {
                         // show CPU ID only
-                        __print_impl(with_color!(
-                            ColorCode::White,
-                            "[{:>3}.{:06} {cpu_id} {path}:{line}] {args}\n",
+                        print_colored_log_line(format_args!(
+                            "[{:>3}.{:06} {cpu_id} {path}:{line}] {args}",
                             now.as_secs(),
                             now.subsec_micros(),
                             cpu_id = cpu_id,
@@ -207,9 +216,8 @@ impl Log for Logger {
                     }
                 } else {
                     // neither CPU ID nor task ID is shown
-                    __print_impl(with_color!(
-                        ColorCode::White,
-                        "[{:>3}.{:06} {path}:{line}] {args}\n",
+                    print_colored_log_line(format_args!(
+                        "[{:>3}.{:06} {path}:{line}] {args}",
                         now.as_secs(),
                         now.subsec_micros(),
                         path = path,
