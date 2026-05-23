@@ -190,11 +190,11 @@ fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String,
         process.real_uid(),
         process.uid(),
         process.saved_uid(),
-        process.uid(),
+        process.fs_uid(),
         process.real_gid(),
         process.gid(),
         process.saved_gid(),
-        process.gid(),
+        process.fs_gid(),
     );
     Some((normalized, content.into_bytes()))
 }

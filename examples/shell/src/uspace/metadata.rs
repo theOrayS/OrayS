@@ -211,8 +211,17 @@ pub(super) fn sys_faccessat(
             Err(err) => return neg_errno(err),
         }
     };
-    let uid = process.uid();
-    let gid = process.gid();
+    let use_effective_ids = flags & general::AT_EACCESS as usize != 0;
+    let uid = if use_effective_ids {
+        process.uid()
+    } else {
+        process.real_uid()
+    };
+    let gid = if use_effective_ids {
+        process.gid()
+    } else {
+        process.real_gid()
+    };
     let parents_searchable = if parents_already_reached || resolved_path.is_empty() {
         true
     } else {
