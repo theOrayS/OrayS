@@ -7,6 +7,7 @@ use axsync::Mutex;
 use axtask::{AxTaskRef, WaitQueue};
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
+use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -33,10 +34,22 @@ fn table() -> &'static Mutex<BTreeMap<usize, Arc<FutexState>>> {
     &FUTEXES
 }
 
-fn state(uaddr: usize) -> Arc<FutexState> {
+fn futex_key(process: &UserProcess, uaddr: usize) -> Result<usize, LinuxError> {
+    // Futex wait queues are keyed by the backing frame, not just the user
+    // virtual address: independent LTP processes commonly reuse the same mmap
+    // addresses, while forked MAP_SHARED checkpoint pages retain the same
+    // physical frame and must still rendezvous across parent/child processes.
+    let query = process.aspace.lock().query_address(VirtAddr::from(uaddr));
+    if !query.pte_mapped {
+        return Err(LinuxError::EFAULT);
+    }
+    Ok(query.paddr | (uaddr & 0xfff))
+}
+
+fn state(key: usize) -> Arc<FutexState> {
     let mut table = table().lock();
     table
-        .entry(uaddr)
+        .entry(key)
         .or_insert_with(|| {
             Arc::new(FutexState {
                 seq: AtomicU32::new(0),
@@ -46,9 +59,14 @@ fn state(uaddr: usize) -> Arc<FutexState> {
         .clone()
 }
 
-pub(super) fn wake_addr(uaddr: usize, count: usize) -> usize {
-    let Some(state) = table().lock().get(&uaddr).cloned() else {
-        return 0;
+fn wake_addr_checked(
+    process: &UserProcess,
+    uaddr: usize,
+    count: usize,
+) -> Result<usize, LinuxError> {
+    let key = futex_key(process, uaddr)?;
+    let Some(state) = table().lock().get(&key).cloned() else {
+        return Ok(0);
     };
     state.seq.fetch_add(1, Ordering::Release);
     let mut woken = 0usize;
@@ -58,11 +76,21 @@ pub(super) fn wake_addr(uaddr: usize, count: usize) -> usize {
         }
         woken += 1;
     }
-    woken
+    Ok(woken)
 }
 
-pub(super) fn wake_task(uaddr: usize, task: &AxTaskRef) {
-    if let Some(state) = table().lock().get(&uaddr).cloned() {
+pub(super) fn wake_addr(process: &UserProcess, uaddr: usize, count: usize) -> usize {
+    // Best-effort kernel-internal wake path for teardown/cancellation cleanup:
+    // if the user address has already been unmapped, there is no futex queue to
+    // wake and no syscall return value to report.
+    wake_addr_checked(process, uaddr, count).unwrap_or(0)
+}
+
+pub(super) fn wake_task(process: &UserProcess, uaddr: usize, task: &AxTaskRef) {
+    let Ok(key) = futex_key(process, uaddr) else {
+        return;
+    };
+    if let Some(state) = table().lock().get(&key).cloned() {
         state.seq.fetch_add(1, Ordering::Release);
         let _ = state.queue.notify_task(true, task);
     }
@@ -102,7 +130,11 @@ pub(super) fn sys_futex(
             if current != val as u32 {
                 return neg_errno(LinuxError::EAGAIN);
             }
-            let state = state(uaddr);
+            let key = match futex_key(process, uaddr) {
+                Ok(key) => key,
+                Err(err) => return neg_errno(err),
+            };
+            let state = state(key);
             let seq = state.seq.load(Ordering::Acquire);
             if let Some(ext) = current_task_ext() {
                 ext.futex_wait.store(uaddr, Ordering::Release);
@@ -160,7 +192,10 @@ pub(super) fn sys_futex(
             }
             0
         }
-        general::FUTEX_WAKE => wake_addr(uaddr, val) as isize,
+        general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val) {
+            Ok(woken) => woken as isize,
+            Err(err) => neg_errno(err),
+        },
         _ => neg_errno(LinuxError::ENOSYS),
     }
 }

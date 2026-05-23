@@ -401,7 +401,7 @@ impl UserProcess {
             if let Some(ext) = task_ext(&entry.task) {
                 let futex_wait = ext.futex_wait.load(Ordering::Acquire);
                 if futex_wait != 0 {
-                    futex::wake_task(futex_wait, &entry.task);
+                    futex::wake_task(ext.process.as_ref(), futex_wait, &entry.task);
                 }
             }
         }
@@ -587,6 +587,13 @@ impl UserProcess {
                 if let Some(index) = exited_index {
                     Some(children.remove(index))
                 } else if nohang {
+                    // WNOHANG must not block, but yielding before reporting
+                    // "no child changed state" avoids monopolizing a
+                    // single-core cooperative/preempt-limited run when user
+                    // code polls waitpid() in a tight loop while child tasks
+                    // need CPU time to reach exit.
+                    drop(children);
+                    axtask::yield_now();
                     return Ok(None);
                 } else {
                     None
@@ -992,7 +999,7 @@ fn clear_current_tid_and_wake() {
     );
     let zero: i32 = 0;
     let _ = write_user_value(ext.process.as_ref(), clear_tid, &zero);
-    let _ = futex::wake_addr(clear_tid, 1);
+    let _ = futex::wake_addr(ext.process.as_ref(), clear_tid, 1);
 }
 
 fn perform_deferred_self_unmap() {

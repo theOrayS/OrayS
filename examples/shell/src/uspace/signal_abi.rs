@@ -140,7 +140,7 @@ pub(super) fn deliver_user_signal(
     if sig == SIGCANCEL_NUM && !signal_is_blocked(ext, sig) {
         let futex_wait = ext.futex_wait.load(Ordering::Acquire);
         if futex_wait != 0 {
-            futex::wake_task(futex_wait, &entry.task);
+            futex::wake_task(ext.process.as_ref(), futex_wait, &entry.task);
         }
     }
     Ok(())
