@@ -6,6 +6,14 @@ if command -v rustup >/dev/null 2>&1; then
     exec "$tool" "$@"
   fi
 fi
+if command -v rustc >/dev/null 2>&1; then
+  sysroot=$(rustc --print sysroot 2>/dev/null || true)
+  host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')
+  tool="$sysroot/lib/rustlib/$host/bin/llvm-objcopy"
+  if [ -n "$sysroot" ] && [ -n "$host" ] && [ -x "$tool" ]; then
+    exec "$tool" "$@"
+  fi
+fi
 if command -v llvm-objcopy >/dev/null 2>&1; then
   exec llvm-objcopy "$@"
 fi
