@@ -15,9 +15,9 @@ use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RTC_RD_TIME,
-    ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag,
-    neg_errno, posix_ret_i32,
+    ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_TYPE_MASK,
+    fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -211,8 +211,12 @@ pub(super) fn sys_pread64(
 }
 
 pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
+    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     with_readable_user_buffer(process, buf, count, |src| {
-        process.fds.lock().write(fd as i32, src)
+        process
+            .fds
+            .lock()
+            .write(fd as i32, src, Some(file_size_limit))
     })
 }
 
@@ -246,7 +250,12 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
             Ok(bytes) => bytes,
             Err(err) => return if written > 0 { written } else { neg_errno(err) },
         };
-        let n = match process.fds.lock().write(fd as i32, &src) {
+        let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+        let n = match process
+            .fds
+            .lock()
+            .write(fd as i32, &src, Some(file_size_limit))
+        {
             Ok(v) => v,
             Err(err) => return if written > 0 { written } else { neg_errno(err) },
         };
@@ -614,7 +623,12 @@ impl FdTable {
         }
     }
 
-    pub(super) fn write(&mut self, fd: i32, src: &[u8]) -> Result<usize, LinuxError> {
+    pub(super) fn write(
+        &mut self,
+        fd: i32,
+        src: &[u8],
+        file_size_limit: Option<u64>,
+    ) -> Result<usize, LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::Stdout | FdEntry::Stderr => {
                 axhal::console::write_bytes(src);
@@ -623,7 +637,10 @@ impl FdTable {
             FdEntry::DevNull => Ok(src.len()),
             FdEntry::BlockDevice(_) => Ok(src.len()),
             FdEntry::Rtc => Ok(src.len()),
-            FdEntry::File(file) => file.file.write(src).map_err(LinuxError::from),
+            FdEntry::File(file) => {
+                let src = limit_file_write_len(file, src, file_size_limit)?;
+                file.file.write(src).map_err(LinuxError::from)
+            }
             FdEntry::Pipe(pipe) => pipe.write(src),
             FdEntry::Socket(socket) => socket.write(src),
             FdEntry::LocalSocket(socket) => socket.write(src),
@@ -905,6 +922,28 @@ impl FdTable {
             .and_then(|entry| entry.as_mut())
             .ok_or(LinuxError::EBADF)
     }
+}
+
+fn limit_file_write_len<'a>(
+    file: &mut FileEntry,
+    src: &'a [u8],
+    file_size_limit: Option<u64>,
+) -> Result<&'a [u8], LinuxError> {
+    let Some(limit) = file_size_limit else {
+        return Ok(src);
+    };
+    if limit == u64::MAX {
+        return Ok(src);
+    }
+    let offset = file
+        .file
+        .seek(SeekFrom::Current(0))
+        .map_err(LinuxError::from)?;
+    if offset >= limit {
+        return Err(LinuxError::EFBIG);
+    }
+    let allowed = limit.saturating_sub(offset) as usize;
+    Ok(&src[..src.len().min(allowed)])
 }
 
 impl FdTable {
