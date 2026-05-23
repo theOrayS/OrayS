@@ -3,8 +3,9 @@
 
 Counts wrapper-level LTP case result lines and internal LTP quality signals
 (TFAIL/TBROK/TCONF, timeouts, ENOSYS) so RUN_EVAL_DEFAULT_STATUS=0 is not
-mistaken for a clean LTP result.  The evaluator's stable wire format may print
-`FAIL LTP CASE <case> : 0` for a successful case, so the numeric status is the
+mistaken for a clean LTP result.  Current runner output uses
+`PASS LTP CASE <case> : 0` for successful wrapper exits; the parser also accepts
+legacy `FAIL LTP CASE <case> : 0` logs and keeps the numeric status as the
 source of truth for wrapper pass/fail classification.
 """
 
@@ -108,11 +109,11 @@ def case_bucket(summary: dict[str, Any], group: str, case: str) -> dict[str, Any
 def normalize_wrapper_status(raw_status: str, code: int) -> str:
     """Return the semantic wrapper status for an LTP result line.
 
-    The official score parser-compatible harness line is historically
-    `FAIL LTP CASE <case> : 0` even when the test program exited cleanly.  The
-    numeric exit status is the source of truth: only status 0 is PASS, and every
-    non-zero status remains FAIL even if an input log ever contains a misleading
-    PASS token.
+    Current runner output uses `PASS LTP CASE <case> : 0` for clean exits, but
+    historical logs may contain `FAIL LTP CASE <case> : 0`.  The numeric exit
+    status is the source of truth: only status 0 is PASS, and every non-zero
+    status remains FAIL even if an input log ever contains a misleading PASS
+    token.
     """
 
     return "PASS" if code == 0 else "FAIL"

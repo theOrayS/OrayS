@@ -35,6 +35,7 @@ pub(super) const SIG_BLOCK_HOW: usize = 0;
 pub(super) const SIG_UNBLOCK_HOW: usize = 1;
 pub(super) const SIG_SETMASK_HOW: usize = 2;
 pub(super) const RLIMIT_STACK_RESOURCE: u32 = 3;
+pub(super) const RLIMIT_FSIZE_RESOURCE: u32 = 1;
 pub(super) const RLIMIT_NOFILE_RESOURCE: u32 = 7;
 pub(super) const DEFAULT_NOFILE_LIMIT: u64 = 1024;
 pub(super) const NR_OPEN_LIMIT: u64 = 1024 * 1024;
@@ -167,11 +168,7 @@ pub(super) fn neg_errno_code(code: u32) -> isize {
 }
 
 pub(super) fn fd_cloexec_flag(enabled: bool) -> u32 {
-    if enabled {
-        general::FD_CLOEXEC
-    } else {
-        0
-    }
+    if enabled { general::FD_CLOEXEC } else { 0 }
 }
 
 pub(super) fn str_err(err: &'static str) -> String {

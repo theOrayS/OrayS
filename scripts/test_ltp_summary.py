@@ -15,7 +15,23 @@ class LtpSummarySemanticsTest(unittest.TestCase):
     def compact(self, log: str) -> dict:
         return ltp_summary.compact(ltp_summary.parse_log(log), arch="rv")
 
-    def test_zero_status_fail_token_is_real_pass_for_wire_format(self) -> None:
+    def test_zero_status_pass_token_is_real_pass_for_current_wire_format(self) -> None:
+        data = self.compact(
+            "\n".join(
+                [
+                    "#### OS COMP TEST GROUP START ltp-musl ####",
+                    "RUN LTP CASE access01",
+                    "PASS LTP CASE access01 : 0",
+                    "#### OS COMP TEST GROUP END ltp-musl ####",
+                ]
+            )
+        )
+
+        self.assertEqual(data["pass_count"], 1)
+        self.assertEqual(data["fail_count"], 0)
+        self.assertEqual(data["case_matrix"]["access01"]["rv"]["musl"]["status"], "PASS")
+
+    def test_zero_status_fail_token_remains_legacy_pass_compatible(self) -> None:
         data = self.compact(
             "\n".join(
                 [
