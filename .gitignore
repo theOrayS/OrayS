@@ -1,5 +1,10 @@
 /target
+/vendor/cargo
 /.vscode
+/cargo-home/.global-cache
+/cargo-home/.package-cache*
+/cargo-home/git/
+/cargo-home/registry/
 .DS_Store
 *.asm
 *.img
