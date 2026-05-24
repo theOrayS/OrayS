@@ -1396,9 +1396,9 @@ fn file_has_shebang(path: &str) -> bool {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ltp_case_env(case: &str, helper_dir: &str) -> Vec<String> {
+fn ltp_case_env(case: &str, helper_dir: &str, target_dir: &str) -> Vec<String> {
     let mut env = vec![
-        format!("PATH={helper_dir}:.:/musl:/glibc"),
+        format!("PATH={helper_dir}:{target_dir}:.:/musl:/glibc"),
         "TMPDIR=/tmp/ltp-work".into(),
         format!("{LTP_CASE_TIMEOUT_ENV}={}", ltp_case_timeout_secs()),
     ];
@@ -1670,7 +1670,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             continue;
         }
         let rel_path = format!("./{case}");
-        let env = ltp_case_env(case, &helper_dir);
+        let env = ltp_case_env(case, &helper_dir, &target_dir);
         let result = if file_has_shebang(&path) {
             let command = format!("{}{rel_path}", ltp_env_shell_prefix(&env));
             run_user_program_argv_in_timeout(
@@ -1683,8 +1683,8 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             argv.push(busybox_path.as_str());
             argv.push("env");
             argv.extend(env.iter().map(String::as_str));
-            argv.push(rel_path.as_str());
-            run_user_program_argv_in_timeout(&target_dir, &argv, timeout_secs)
+            argv.push(path.as_str());
+            run_user_program_argv_in_timeout("/tmp/ltp-work", &argv, timeout_secs)
         };
         match result {
             Ok(0) => {
