@@ -1,8 +1,8 @@
 # Worker 2 VFS / permission static report (worker-1 reassignment)
 
-Date: 2026-05-25  
-Worker: worker-1  
-Task: task-2, permissions/VFS/errno/metadata lane  
+Date: 2026-05-25
+Worker: worker-1
+Task: task-2, permissions/VFS/errno/metadata lane
 Scope actually executed: static/root-cause report only, using existing leader/worker logs and source inspection. No QEMU/eval was started. No `.omx/ultragoal`, `LTP_STABLE_CASES`, or shared source file was edited.
 
 ## Executive outcome

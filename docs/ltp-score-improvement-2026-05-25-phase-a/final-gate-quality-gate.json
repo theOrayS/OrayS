@@ -1,0 +1,43 @@
+{
+  "status": "blocked",
+  "target": "stable350",
+  "deliveredStableCases": 300,
+  "uniqueStableCases": 300,
+  "duplicates": 0,
+  "stable350Achieved": false,
+  "reason": "No RV+LA x musl+glibc clean promotion tranche was established; post-Team targeted attempts were aborted/untrusted and excluded from evidence.",
+  "verification": {
+    "passed": [
+      "cargo fmt --all -- --check",
+      "python3 -B scripts/test_ltp_summary.py",
+      "git diff --check",
+      "make A=examples/shell ARCH=riscv64",
+      "live LTP_STABLE_CASES count: 300 total / 300 unique / 0 duplicates"
+    ],
+    "notRunOrNotCredited": [
+      "RV final stable350 aggregate gate",
+      "LA final stable350 aggregate gate",
+      "post-Team targeted RV clean/clean2/clean3 logs, marked aborted/untrusted"
+    ]
+  },
+  "ltpSemantics": {
+    "fakePass": false,
+    "caseNameHardcode": false,
+    "timeoutAsPass": false,
+    "failureLaundering": false,
+    "knownRead02TconfDisclosed": true
+  },
+  "markerPrefix": {
+    "badMarkerLinesCurrentRawScan": 0,
+    "evidence": "raw/marker-prefix-check-current.txt"
+  },
+  "codeReview": {
+    "recommendation": "BLOCK",
+    "architectStatus": "BLOCKED",
+    "evidence": "final-gate-code-review-report.md"
+  },
+  "aiSlopCleaner": {
+    "status": "blocked-no-cleanup-applied",
+    "evidence": "final-gate-ai-slop-cleaner-report.md"
+  }
+}
