@@ -61,3 +61,10 @@ make A=examples/shell ARCH=riscv64
 ```
 
 Run `make all` if remote-submission behavior or build wrappers are affected.
+
+## Execution update (leader closeout)
+
+- Stage 1 stable270 completed and verified on RV + LA stable aggregate gates.
+- Stage 2 stable285 was not reached: only four additional fully clean post270 candidates were found after stable270.
+- Stage 3 stable300 was not delivered; final stable300 gates were intentionally not run because the live stable list is not 300.
+- Highest trusted result for this phase is stable270. See `stable270-promotion-gate-report.md`, `stable285-promotion-gate-report.md`, and `stable300-delivery-report.md`.

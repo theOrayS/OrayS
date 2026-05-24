@@ -1,0 +1,58 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-waitid-kill-la-confirm-20260524T104354+0800.log`
+
+- PASS LTP CASE: 14
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 7 passed, 0 failed
+- ltp-glibc: 7 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| kill07 | la | glibc | ltp-glibc | PASS | 0 | 7624 | 192060 | 192038 | -22 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill07 | la | musl | ltp-musl | PASS | 0 | 4689 | 192269 | 192252 | -17 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill08 | la | glibc | ltp-glibc | PASS | 0 | 7774 | 192038 | 191972 | -66 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill08 | la | musl | ltp-musl | PASS | 0 | 4269 | 192252 | 192196 | -56 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill09 | la | glibc | ltp-glibc | PASS | 0 | 8000 | 191972 | 191951 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill09 | la | musl | ltp-musl | PASS | 0 | 3080 | 192196 | 192180 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid05 | la | glibc | ltp-glibc | PASS | 0 | 7093 | 192180 | 192150 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid05 | la | musl | ltp-musl | PASS | 0 | 3665 | 194413 | 192341 | -2072 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid06 | la | glibc | ltp-glibc | PASS | 0 | 6503 | 192150 | 192120 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid06 | la | musl | ltp-musl | PASS | 0 | 2941 | 192341 | 192317 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid09 | la | glibc | ltp-glibc | PASS | 0 | 6933 | 192120 | 192090 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid09 | la | musl | ltp-musl | PASS | 0 | 3593 | 192317 | 192293 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid11 | la | glibc | ltp-glibc | PASS | 0 | 7036 | 192090 | 192060 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid11 | la | musl | ltp-musl | PASS | 0 | 3366 | 192293 | 192269 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 14 (la:glibc:kill07, la:musl:kill07, la:glibc:kill08, la:musl:kill08, la:glibc:kill09, la:musl:kill09, la:glibc:waitid05, la:musl:waitid05, la:glibc:waitid06, la:musl:waitid06, la:glibc:waitid09, la:musl:waitid09, la:glibc:waitid11, la:musl:waitid11)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 7
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 7
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

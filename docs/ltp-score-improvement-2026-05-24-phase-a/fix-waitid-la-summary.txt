@@ -1,0 +1,52 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitid-la-20260524T101630+0800.log`
+
+- PASS LTP CASE: 8
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 0 failed
+- ltp-glibc: 4 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| waitid01 | la | glibc | ltp-glibc | PASS | 0 | 7928 | 192285 | 192255 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid01 | la | musl | ltp-musl | PASS | 0 | 4542 | 194413 | 192341 | -2072 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid02 | la | glibc | ltp-glibc | PASS | 0 | 8886 | 192255 | 192234 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid02 | la | musl | ltp-musl | PASS | 0 | 3996 | 192341 | 192325 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid03 | la | glibc | ltp-glibc | PASS | 0 | 5686 | 192234 | 192213 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid03 | la | musl | ltp-musl | PASS | 0 | 4747 | 192325 | 192309 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid04 | la | glibc | ltp-glibc | PASS | 0 | 7177 | 192213 | 192183 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid04 | la | musl | ltp-musl | PASS | 0 | 4207 | 192309 | 192285 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (la:glibc:waitid01, la:musl:waitid01, la:glibc:waitid02, la:musl:waitid02, la:glibc:waitid03, la:musl:waitid03, la:glibc:waitid04, la:musl:waitid04)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

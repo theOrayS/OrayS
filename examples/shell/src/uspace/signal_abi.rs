@@ -77,18 +77,28 @@ fn take_sigsuspend_restore_mask(ext: &UserTaskExt, current_mask: u64) -> u64 {
 }
 
 fn default_signal_terminates(sig: i32) -> bool {
+    // Linux default actions for standard signals: 1..=16 terminate or dump
+    // core, 17/18/23/28 are ignored by default, 19..=22 stop, and 24..=31
+    // terminate or dump core.  Keep this independent of test names so wait
+    // status reflects the signal that actually ended the process.
     matches!(
         sig,
-        SIGINT_NUM
+        1 | SIGINT_NUM
             | SIGQUIT_NUM
             | SIGILL_NUM
+            | 5
             | SIGABRT_NUM
+            | 7
             | SIGFPE_NUM
             | SIGKILL_NUM
+            | 10
             | SIGSEGV_NUM
+            | 12
             | SIGPIPE_NUM
             | SIGALRM_NUM
             | SIGTERM_NUM
+            | 16
+            | 24..=31
     )
 }
 
@@ -123,7 +133,18 @@ pub(super) fn deliver_user_signal(
         return Ok(());
     }
     let ext = super::task_context::task_ext(&entry.task).ok_or(LinuxError::ESRCH)?;
-    if sig == SIGKILL_NUM {
+    let action = ext
+        .process
+        .signal_actions
+        .lock()
+        .get(&(sig as usize))
+        .copied()
+        .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+    let handler = action
+        .sa_handler_kernel
+        .map(|func| func as usize)
+        .unwrap_or(0);
+    if handler == 0 && default_signal_terminates(sig) && !signal_is_blocked(ext, sig) {
         ext.process.request_signal_exit_group(sig);
     }
     ext.pending_signal_sender

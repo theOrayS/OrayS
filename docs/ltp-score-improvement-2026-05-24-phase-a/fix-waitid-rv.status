@@ -1,0 +1,2 @@
+run-eval rc=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitid-rv-20260524T101338+0800.log

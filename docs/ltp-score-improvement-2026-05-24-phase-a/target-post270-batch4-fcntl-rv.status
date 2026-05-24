@@ -1,0 +1,3 @@
+run-eval rc=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch4-fcntl-rv-20260524T130633+0800.log
+cases=fcntl17,fcntl18,fcntl19,fcntl20,fcntl21,fcntl22,fcntl23,fcntl24,fcntl25,fcntl26,fcntl27
