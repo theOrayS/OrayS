@@ -1,0 +1,22 @@
+{
+  "status": "pending",
+  "target": "stable300",
+  "liveStableCases": {
+    "entries": 250,
+    "unique": 250,
+    "duplicates": 0
+  },
+  "verification": {
+    "status": "pending",
+    "commands": []
+  },
+  "aiSlopCleaner": {
+    "status": "pending",
+    "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-ai-slop-cleaner-report.md"
+  },
+  "codeReview": {
+    "recommendation": "pending",
+    "architectStatus": "pending",
+    "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-code-review-report.md"
+  }
+}

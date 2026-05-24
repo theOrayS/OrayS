@@ -1,0 +1,4 @@
+ultragoal plan created: 19 goal(s)
+brief: .omx/ultragoal/brief.md
+goals: .omx/ultragoal/goals.json
+ledger: .omx/ultragoal/ledger.jsonl
