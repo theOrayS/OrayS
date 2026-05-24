@@ -148,6 +148,124 @@ make docker
   code, docs, and reports. Do not hide real evaluator failures with fake PASS,
   case-name hardcoding, or converting real failures into SKIP/TCONF.
 
+## LTP Contest-Oriented Test Selection Policy
+
+LTP work in this repository is contest-score oriented. The current objective is
+not maximum upstream Linux LTP coverage; it is maximizing OS contest score per
+unit of development time while preserving honest Linux-compatible behavior.
+Prioritize high-score, high-yield tests that are strongly related to subsystems
+already implemented or recently repaired. Do not blindly run, triage, or repair
+all LTP cases with equal effort.
+
+When choosing LTP cases, sort candidates in this order:
+
+1. Existing gaps in the current contest score table where `pass < all`.
+2. Same-subsystem expansion cases near already high-scoring passes, especially
+   `access`, `chmod`, `stat`, `open`, `pipe`, `signal`, `wait`, `read`, and
+   `write` families.
+3. Not-yet-run upstream LTP cases whose source contains many internal cases,
+   loops, variants, or forked child processes.
+4. Hidden-test defense cases for common Linux compatibility semantics, such as
+   `mmap`, `mprotect`, `statx`, `openat`, and `waitid`.
+5. Complex, heavy, or low-yield families only after the higher-yield groups are
+   exhausted or specifically required. Examples include `bpf`, `fanotify`,
+   `inotify`, `keyctl`, `landlock`, `io_uring`, `perf_event_open`, `ptrace`,
+   `mount`/`swap`, `quota`, and broad `xattr` coverage.
+
+Before recommending an LTP candidate, inspect all of the following:
+
+- the current contest score table's `pass`/`all`/score data;
+- upstream LTP `runtest/syscalls`;
+- the matching upstream source under
+  `testcases/kernel/syscalls/<syscall>/`;
+- source-level yield signals such as `tcases[]`, `ARRAY_SIZE`,
+  `.test_variants`, `for` loops, forked children, `TST_EXP_PASS`,
+  `TST_EXP_FAIL`, and `tst_res(TPASS)` counts;
+- required subsystems such as syscall dispatch, VFS, permissions, file
+  descriptors, pipes, process lifecycle, wait/fork, signals, memory management,
+  and user-memory access checks.
+
+Rank candidates with this model:
+
+```text
+priority_score =
+  potential_score_or_case_count
+  * relevance_to_existing_work
+  * hidden_test_value
+  / implementation_cost
+  / regression_risk
+```
+
+Interpret the factors as follows:
+
+- `potential_score_or_case_count`: use the current contest score table or the
+  upstream LTP source's internal case count, loop count, variant count, and fork
+  fan-out.
+- `relevance_to_existing_work`: raise priority when the case can reuse existing
+  `access`, `chmod`, `stat`, `pipe`, `fork`, `signal`, `read`, or `write`
+  logic.
+- `hidden_test_value`: raise priority when the case covers common hidden
+  evaluator semantics.
+- `implementation_cost`: keep priority high for errno, flag, and boundary
+  repairs; lower it for work requiring broad VM, scheduler, networking,
+  permission-model, or filesystem redesign.
+- `regression_risk`: lower priority when a change could break proven high-score
+  cases such as `access01`, `getpid01`, `pipe11`, `chmod01`, `signal03`, or
+  `signal04`.
+
+Once the following high-yield case families pass, treat them as regression
+protection targets:
+
+- `access01` and the broader `access` family;
+- `getpid01`, `fork`, and `wait` families;
+- `pipe11` and the broader `pipe` family;
+- `chmod01`, `stat`, and `statx` families;
+- `signal03`, `signal04`, and the broader `signal` family;
+- `read02`, `read`, `write`, `readv`, and `writev` families.
+
+Any change to VFS, permissions, file descriptors, pipes, process lifecycle,
+signals, user-memory checks, memory mappings, or errno return values must
+consider whether these high-score families can regress.
+
+LTP contest work must not:
+
+- hardcode LTP test names;
+- return fixed results based on test path, filename, or process name;
+- modify LTP test source to pass;
+- modify evaluator scripts to bypass real testing;
+- make test programs fake-print `TPASS`;
+- break general Linux semantics for one LTP case;
+- chase a single-case pass without running the relevant high-score regression
+  cases.
+
+Every LTP analysis or fix report must include:
+
+A. Current gap summary
+
+- case name;
+- `pass`/`all`;
+- remaining gap;
+- involved subsystem;
+- whether it should be prioritized.
+
+B. Not-yet-run cases worth adding to self-test
+
+- case name;
+- upstream LTP source evidence;
+- internal case, loop, variant, and fork counts;
+- related syscalls;
+- recommendation rationale;
+- estimated cost;
+- regression risk.
+
+C. Next minimal execution plan
+
+- which cases to run individually first;
+- if they fail, which syscalls, errno values, flags, and boundary conditions to
+  inspect first;
+- which regression cases to run after the fix;
+- how to finish with RISC-V/LoongArch plus glibc/musl comparison.
+
 ## Toolchain
 
 - Rust toolchain is pinned in `rust-toolchain.toml` to `nightly-2025-05-20`.
