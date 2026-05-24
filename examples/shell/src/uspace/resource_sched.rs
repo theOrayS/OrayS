@@ -101,8 +101,8 @@ fn resource_is_valid(resource: u32) -> bool {
     resource <= general::RLIMIT_RTTIME
 }
 
-pub(super) fn prlimit_target_valid(pid: i32) -> bool {
-    pid == 0 || pid == current_tid()
+pub(super) fn prlimit_target_valid(process: &UserProcess, pid: i32) -> bool {
+    pid == 0 || pid == current_tid() || pid == process.pid()
 }
 
 pub(super) fn default_sched_param() -> UserSchedParam {
@@ -569,7 +569,7 @@ pub(super) fn sys_prlimit64(
     new_limit: usize,
     old_limit: usize,
 ) -> isize {
-    if !prlimit_target_valid(pid) {
+    if !prlimit_target_valid(process, pid) {
         return neg_errno(LinuxError::ESRCH);
     }
     if !resource_is_valid(resource) {

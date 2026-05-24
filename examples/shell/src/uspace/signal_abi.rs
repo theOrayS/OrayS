@@ -167,6 +167,34 @@ pub(super) fn deliver_user_signal(
     Ok(())
 }
 
+fn request_pending_default_terminate_signal(ext: &UserTaskExt) {
+    let sig = ext.pending_signal.load(Ordering::Acquire);
+    if sig == 0 || signal_is_blocked(ext, sig) {
+        return;
+    }
+    let action = ext
+        .process
+        .signal_actions
+        .lock()
+        .get(&(sig as usize))
+        .copied()
+        .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+    let handler = action
+        .sa_handler_kernel
+        .map(|func| func as usize)
+        .unwrap_or(0);
+    if handler == 0 && default_signal_terminates(sig) {
+        ext.process.request_signal_exit_group(sig);
+    }
+}
+
+fn terminate_current_if_exit_group_pending(process: &UserProcess) -> ! {
+    if let Some(code) = process.pending_exit_group() {
+        terminate_current_thread_for_exit_group(process, code);
+    }
+    unreachable!("exit-group termination requested before synchronous signal termination");
+}
+
 fn deliver_user_signal_result(entry: &UserThreadEntry, sig: i32, sender_pid: i32) -> isize {
     match deliver_user_signal(entry, sig, sender_pid) {
         Ok(()) => 0,
@@ -590,6 +618,10 @@ pub(super) fn sys_rt_sigprocmask(
             );
         }
         ext.signal_mask.store(next_mask, Ordering::Release);
+        request_pending_default_terminate_signal(ext);
+        if ext.process.pending_exit_group().is_some() {
+            terminate_current_if_exit_group_pending(ext.process.as_ref());
+        }
     }
     0
 }
@@ -685,7 +717,11 @@ pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
         let Some(entry) = user_thread_entry_for_process(process) else {
             return neg_errno(LinuxError::ESRCH);
         };
-        return deliver_user_signal_result(&entry, sig, process.pid());
+        let ret = deliver_user_signal_result(&entry, sig, process.pid());
+        if ret == 0 && process.pending_exit_group().is_some() {
+            terminate_current_if_exit_group_pending(process);
+        }
+        return ret;
     }
     let Some(entry) = process
         .child_thread_entry_by_pid(pid)
@@ -716,7 +752,11 @@ pub(super) fn sys_tkill(process: &UserProcess, tid: i32, sig: i32) -> isize {
             current_tid()
         );
     }
-    deliver_user_signal_result(&entry, sig, process.pid())
+    let ret = deliver_user_signal_result(&entry, sig, process.pid());
+    if ret == 0 && tid == current_tid() && process.pending_exit_group().is_some() {
+        terminate_current_if_exit_group_pending(process);
+    }
+    ret
 }
 
 pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -> isize {
@@ -737,7 +777,11 @@ pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -
             tgid,
         );
     }
-    deliver_user_signal_result(&entry, sig, process.pid())
+    let ret = deliver_user_signal_result(&entry, sig, process.pid());
+    if ret == 0 && tid == current_tid() && process.pending_exit_group().is_some() {
+        terminate_current_if_exit_group_pending(process);
+    }
+    ret
 }
 
 #[cfg(target_arch = "riscv64")]
