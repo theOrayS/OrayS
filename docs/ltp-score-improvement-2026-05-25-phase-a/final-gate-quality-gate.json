@@ -5,19 +5,35 @@
   "uniqueStableCases": 300,
   "duplicates": 0,
   "stable350Achieved": false,
-  "reason": "No RV+LA x musl+glibc clean promotion tranche was established; post-Team targeted attempts were aborted/untrusted and excluded from evidence.",
+  "reason": "Fresh follow-up gates found only 5 RV+LA x musl+glibc clean cases, below the +15 stable315 tranche threshold.",
+  "freshFollowupEvidence": {
+    "rvTargeted": "raw/followup-rv-targeted-001-summary.txt: PASS LTP CASE 13, FAIL LTP CASE 3; pipe2_02 TBROK both libc; waitpid01 musl TFAIL=40; timeout/ENOSYS/panic/trap 0",
+    "laTargeted": "raw/followup-la-targeted-004-summary.txt: PASS LTP CASE 11, FAIL LTP CASE 1; sched_getscheduler02 LA/musl TFAIL=1; timeout/ENOSYS/panic/trap 0",
+    "fourWayCleanSeeds": [
+      "prctl05",
+      "sethostname01",
+      "setrlimit01",
+      "signal03",
+      "signal04"
+    ],
+    "excluded": "raw/followup-la-targeted-001/002/003-aborted-untrusted.log and raw/post-team-candidate*.status/log are not promotion evidence"
+  },
   "verification": {
     "passed": [
       "cargo fmt --all -- --check",
       "python3 -B scripts/test_ltp_summary.py",
       "git diff --check",
       "make A=examples/shell ARCH=riscv64",
-      "live LTP_STABLE_CASES count: 300 total / 300 unique / 0 duplicates"
+      "live LTP_STABLE_CASES count: 300 total / 300 unique / 0 duplicates",
+      "python3 -B scripts/ltp_summary.py raw/followup-rv-targeted-001.log",
+      "python3 -B scripts/ltp_summary.py raw/followup-la-targeted-004.log",
+      "follow-up marker-prefix scan: TOTAL markers=28 bad=0"
     ],
     "notRunOrNotCredited": [
       "RV final stable350 aggregate gate",
       "LA final stable350 aggregate gate",
-      "post-Team targeted RV clean/clean2/clean3 logs, marked aborted/untrusted"
+      "stable315 aggregate gate, because only 5 new four-way clean cases are available",
+      "followup-la-targeted-001/002/003, marked aborted/untrusted"
     ]
   },
   "ltpSemantics": {
@@ -28,8 +44,8 @@
     "knownRead02TconfDisclosed": true
   },
   "markerPrefix": {
-    "badMarkerLinesCurrentRawScan": 0,
-    "evidence": "raw/marker-prefix-check-current.txt"
+    "badMarkerLinesFollowupScan": 0,
+    "evidence": "raw/followup-marker-prefix-check.txt"
   },
   "codeReview": {
     "recommendation": "BLOCK",

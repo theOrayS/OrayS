@@ -1,0 +1,3 @@
+followup-rv-targeted-001.log: markers=16 bad=0
+followup-la-targeted-004.log: markers=12 bad=0
+TOTAL markers=28 bad=0
