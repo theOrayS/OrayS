@@ -1396,9 +1396,14 @@ fn file_has_shebang(path: &str) -> bool {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ltp_case_env(case: &str, helper_dir: &str, target_dir: &str) -> Vec<String> {
+fn ltp_case_env(case: &str, suite_dir: &str, helper_dir: &str, target_dir: &str) -> Vec<String> {
     let mut env = vec![
-        format!("PATH={helper_dir}:{target_dir}:.:/musl:/glibc"),
+        // Keep the testsuite bin directory in PATH for execlp()-based helper
+        // binaries, while preserving the current working directory first after
+        // helper applets. Some LTP cases copy resource helpers into their temp
+        // dir and then exec them by basename.
+        format!("PATH={helper_dir}:.:{target_dir}:/musl:/glibc"),
+        format!("LTPROOT={}/ltp", suite_dir.trim_end_matches('/')),
         "TMPDIR=/tmp/ltp-work".into(),
         format!("{LTP_CASE_TIMEOUT_ENV}={}", ltp_case_timeout_secs()),
     ];
@@ -1421,6 +1426,32 @@ fn print_ltp_memory_stats(case: &str, phase: &str) {
         "LTP MEMORY {case} {phase}: free_frames={} allocated_frames={}",
         stats.free_frames, stats.allocated_frames
     );
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_case_has_resource_helper(target_dir: &str, case: &str) -> bool {
+    let prefix = format!("{case}_");
+    let Ok(entries) = fs::read_dir(target_dir) else {
+        return false;
+    };
+    entries.filter_map(Result::ok).any(|entry| {
+        let name = String::from(path_to_str(&entry.file_name()));
+        name.starts_with(&prefix) && matches!(entry.metadata(), Ok(metadata) if metadata.is_file())
+    })
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn prepare_ltp_case_run_dir(target_dir: &str, case: &str) -> io::Result<String> {
+    if !ltp_case_has_resource_helper(target_dir, case) {
+        return Ok(target_dir.into());
+    }
+
+    let run_dir = join_path("/tmp/ltp-work", &format!("{case}-run"));
+    if matches!(fs::metadata(&run_dir), Ok(meta) if meta.is_dir()) {
+        remove_dir_all(&run_dir)?;
+    }
+    ensure_dir_all(&run_dir)?;
+    Ok(run_dir)
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1669,12 +1700,26 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             cleanup_ltp_scratch();
             continue;
         }
-        let rel_path = format!("./{case}");
-        let env = ltp_case_env(case, &helper_dir, &target_dir);
+        let run_dir = match prepare_ltp_case_run_dir(&target_dir, case) {
+            Ok(run_dir) => run_dir,
+            Err(err) => {
+                println!("FAIL LTP CASE {case} : -1");
+                println!("prepare ltp case run dir failed: {err}");
+                failed += 1;
+                cleanup_ltp_scratch();
+                continue;
+            }
+        };
+        let program_arg = if run_dir == target_dir {
+            format!("./{case}")
+        } else {
+            path.clone()
+        };
+        let env = ltp_case_env(case, suite_dir, &helper_dir, &target_dir);
         let result = if file_has_shebang(&path) {
-            let command = format!("{}{rel_path}", ltp_env_shell_prefix(&env));
+            let command = format!("{}{program_arg}", ltp_env_shell_prefix(&env));
             run_user_program_argv_in_timeout(
-                &target_dir,
+                &run_dir,
                 &[&busybox_path, "sh", "-c", &command],
                 timeout_secs,
             )
@@ -1683,8 +1728,8 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             argv.push(busybox_path.as_str());
             argv.push("env");
             argv.extend(env.iter().map(String::as_str));
-            argv.push(path.as_str());
-            run_user_program_argv_in_timeout("/tmp/ltp-work", &argv, timeout_secs)
+            argv.push(program_arg.as_str());
+            run_user_program_argv_in_timeout(&run_dir, &argv, timeout_secs)
         };
         match result {
             Ok(0) => {
