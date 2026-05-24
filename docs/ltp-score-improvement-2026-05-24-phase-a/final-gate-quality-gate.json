@@ -1,22 +1,70 @@
 {
-  "status": "pending",
-  "target": "stable300",
+  "status": "partial_delivery_blocked_before_stable285",
+  "requestedTarget": "stable300",
+  "highestTrustedStable": 270,
   "liveStableCases": {
-    "entries": 250,
-    "unique": 250,
-    "duplicates": 0
+    "entries": 270,
+    "unique": 270,
+    "duplicates": 0,
+    "snapshot": "docs/ltp-score-improvement-2026-05-24-phase-a/stable270-live.cases"
   },
-  "verification": {
-    "status": "pending",
-    "commands": []
+  "stable270": {
+    "status": "pass",
+    "rv": {
+      "summary": "docs/ltp-score-improvement-2026-05-24-phase-a/stable270-rv-aggregate-summary.txt",
+      "rawLog": "docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable270-rv-aggregate-20260524T112750+0800.log",
+      "passLtpCase": 540,
+      "failLtpCase": 0,
+      "ltpMusl": "270/0",
+      "ltpGlibc": "270/0",
+      "internalTfail": 0,
+      "internalTbrok": 0,
+      "knownTconf": "read02 only",
+      "timeout": 0,
+      "enosys": 0,
+      "panicTrap": 0
+    },
+    "la": {
+      "summary": "docs/ltp-score-improvement-2026-05-24-phase-a/stable270-la-aggregate-summary.txt",
+      "rawLog": "docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable270-la-aggregate-20260524T120322+0800.log",
+      "passLtpCase": 540,
+      "failLtpCase": 0,
+      "ltpMusl": "270/0",
+      "ltpGlibc": "270/0",
+      "internalTfail": 0,
+      "internalTbrok": 0,
+      "knownTconf": "read02 only",
+      "timeout": 0,
+      "enosys": 0,
+      "panicTrap": 0
+    }
   },
-  "aiSlopCleaner": {
-    "status": "pending",
-    "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-ai-slop-cleaner-report.md"
+  "stable285": {
+    "status": "not_reached",
+    "reason": "only four additional fully clean post270 targeted candidates were found"
+  },
+  "stable300": {
+    "status": "not_delivered",
+    "reason": "insufficient RV+LA musl+glibc clean candidates; final stable300 gates were not run"
+  },
+  "post270CleanNotPromoted": [
+    "sched_getattr02",
+    "open09",
+    "fcntl23",
+    "getegid01_16"
+  ],
+  "markerPrefix": {
+    "status": "pass",
+    "markerLinesChecked": 1118,
+    "badMarkerLines": 0,
+    "report": "docs/ltp-score-improvement-2026-05-24-phase-a/remote-marker-regression-check.md"
   },
   "codeReview": {
-    "recommendation": "pending",
-    "architectStatus": "pending",
+    "recommendation": "approve_stable270_only",
     "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-code-review-report.md"
+  },
+  "aiSlopCleaner": {
+    "status": "pass_stable270_only",
+    "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-ai-slop-cleaner-report.md"
   }
 }

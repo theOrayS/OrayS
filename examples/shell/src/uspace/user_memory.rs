@@ -175,10 +175,20 @@ pub(super) fn read_iovec_entries(
         .checked_mul(size_of::<general::iovec>())
         .ok_or(LinuxError::EINVAL)?;
     let iov_bytes = read_user_bytes(process, iov, iov_bytes_len)?;
-    Ok(iov_bytes
+    let entries: Vec<general::iovec> = iov_bytes
         .chunks_exact(size_of::<general::iovec>())
         .map(|chunk| unsafe { ptr::read_unaligned(chunk.as_ptr() as *const general::iovec) })
-        .collect())
+        .collect();
+    let mut total_len = 0usize;
+    for entry in &entries {
+        total_len = total_len
+            .checked_add(entry.iov_len as usize)
+            .ok_or(LinuxError::EINVAL)?;
+        if total_len > isize::MAX as usize {
+            return Err(LinuxError::EINVAL);
+        }
+    }
+    Ok(entries)
 }
 
 pub(super) fn write_user_bytes(

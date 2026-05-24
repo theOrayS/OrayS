@@ -32,7 +32,9 @@ use super::task_registry::{
     UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
-use super::user_memory::{read_cstr, read_execve_argv, read_execve_envp, write_user_value};
+use super::user_memory::{
+    read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
+};
 use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
@@ -378,7 +380,7 @@ impl UserProcess {
     }
 
     pub(super) fn request_signal_exit_group(&self, sig: i32) {
-        self.request_exit_group_inner(128 + sig, sig);
+        self.request_exit_group_inner(128 + sig, signal_wait_status(sig));
     }
 
     fn request_exit_group_inner(&self, code: i32, term_signal: i32) {
@@ -650,7 +652,7 @@ impl UserProcess {
     fn wait_status(&self) -> i32 {
         let sig = self.term_signal.load(Ordering::Acquire);
         if sig != 0 {
-            sig & 0x7f
+            sig
         } else {
             (self.exit_code.load(Ordering::Acquire) & 0xff) << 8
         }
@@ -943,6 +945,90 @@ pub(super) fn sys_wait4(
         }
     }
     child_pid as isize
+}
+
+fn waitid_pid_filter(idtype: u32, id: i32) -> Result<i32, LinuxError> {
+    match idtype {
+        general::P_ALL => Ok(-1),
+        general::P_PID => Ok(id),
+        general::P_PGID => {
+            if id == 0 {
+                Ok(0)
+            } else if id > 0 {
+                id.checked_neg().ok_or(LinuxError::ESRCH)
+            } else {
+                Err(LinuxError::EINVAL)
+            }
+        }
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn waitid_siginfo(child_pid: i32, status: i32) -> [u8; 128] {
+    let mut info = [0u8; 128];
+    let signal_status = status & 0x7f;
+    let (code, child_status) = if signal_status != 0 {
+        let code = if status & 0x80 != 0 {
+            general::CLD_DUMPED as i32
+        } else {
+            general::CLD_KILLED as i32
+        };
+        (code, signal_status)
+    } else {
+        (general::CLD_EXITED as i32, (status >> 8) & 0xff)
+    };
+
+    info[0..4].copy_from_slice(&(general::SIGCHLD as i32).to_ne_bytes());
+    info[4..8].copy_from_slice(&0i32.to_ne_bytes());
+    info[8..12].copy_from_slice(&code.to_ne_bytes());
+    info[16..20].copy_from_slice(&child_pid.to_ne_bytes());
+    info[20..24].copy_from_slice(&0u32.to_ne_bytes());
+    info[24..28].copy_from_slice(&child_status.to_ne_bytes());
+    info
+}
+
+fn signal_wait_status(sig: i32) -> i32 {
+    let core_dumped = matches!(sig, 3 | 4 | 5 | 6 | 7 | 8 | 11 | 24 | 25 | 31);
+    (sig & 0x7f) | if core_dumped { 0x80 } else { 0 }
+}
+
+pub(super) fn sys_waitid(
+    process: &UserProcess,
+    idtype: u32,
+    id: i32,
+    infop: usize,
+    options: usize,
+    _rusage: usize,
+) -> isize {
+    const SUPPORTED_WAITID_OPTIONS: u32 =
+        general::WNOHANG | general::WEXITED | general::__WNOTHREAD | general::__WALL;
+
+    let options = options as u32;
+    if options & !SUPPORTED_WAITID_OPTIONS != 0 || options & general::WEXITED == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let pid_filter = match waitid_pid_filter(idtype, id) {
+        Ok(pid_filter) => pid_filter,
+        Err(err) => return neg_errno(err),
+    };
+    let nohang = options & general::WNOHANG != 0;
+    let wait_result = match process.wait_child(pid_filter, nohang) {
+        Ok(result) => result,
+        Err(err) => return neg_errno(err),
+    };
+
+    let info = if let Some((child_pid, status)) = wait_result {
+        waitid_siginfo(child_pid, status)
+    } else {
+        [0u8; 128]
+    };
+    if infop != 0 {
+        if let Err(err) = write_user_bytes(process, infop, &info) {
+            return neg_errno(err);
+        }
+    }
+    0
 }
 
 pub(super) fn sys_exit(process: &UserProcess, _tf: &TrapFrame, code: i32) -> ! {

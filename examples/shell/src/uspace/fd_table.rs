@@ -308,6 +308,99 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
     total
 }
 
+pub(super) fn sys_preadv(
+    process: &UserProcess,
+    fd: usize,
+    iov: usize,
+    iovcnt: usize,
+    offset: usize,
+) -> isize {
+    let offset = offset as isize;
+    if offset < 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let iov_entries = match read_iovec_entries(process, iov, iovcnt) {
+        Ok(iov_entries) => iov_entries,
+        Err(err) => return neg_errno(err),
+    };
+    let mut total = 0isize;
+    let mut next_offset = offset as u64;
+    for entry in iov_entries {
+        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
+        if len == 0 {
+            continue;
+        }
+        let base = entry.iov_base as usize;
+        if let Err(err) = validate_user_write(process, base, len) {
+            return if total > 0 { total } else { neg_errno(err) };
+        }
+        let mut bytes = match user_io_buffer(len) {
+            Ok(bytes) => bytes,
+            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+        };
+        let n = match process
+            .fds
+            .lock()
+            .read_file_at_into_fd(fd as i32, next_offset, &mut bytes)
+        {
+            Ok(v) => v,
+            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+        };
+        if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
+            return if total > 0 { total } else { neg_errno(err) };
+        }
+        total += n as isize;
+        next_offset = next_offset.saturating_add(n as u64);
+        if n < len {
+            break;
+        }
+    }
+    total
+}
+
+pub(super) fn sys_pwritev(
+    process: &UserProcess,
+    fd: usize,
+    iov: usize,
+    iovcnt: usize,
+    offset: usize,
+) -> isize {
+    let offset = offset as isize;
+    if offset < 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let iov_entries = match read_iovec_entries(process, iov, iovcnt) {
+        Ok(iov_entries) => iov_entries,
+        Err(err) => return neg_errno(err),
+    };
+    let mut total = 0isize;
+    let mut next_offset = offset as u64;
+    for entry in iov_entries {
+        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
+        if len == 0 {
+            continue;
+        }
+        let src = match read_user_bytes(process, entry.iov_base as usize, len) {
+            Ok(bytes) => bytes,
+            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+        };
+        let n = match process
+            .fds
+            .lock()
+            .write_file_at(fd as i32, next_offset, &src)
+        {
+            Ok(v) => v,
+            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+        };
+        total += n as isize;
+        next_offset = next_offset.saturating_add(n as u64);
+        if n < len {
+            break;
+        }
+    }
+    total
+}
+
 pub(super) fn sys_getdents64(process: &UserProcess, fd: usize, dirp: usize, count: usize) -> isize {
     if let Err(err) = validate_user_write(process, dirp, count) {
         return neg_errno(err);
@@ -613,7 +706,12 @@ impl FdTable {
                 Ok(dst.len())
             }
             FdEntry::Rtc => Ok(0),
-            FdEntry::File(file) => file.file.read(dst).map_err(LinuxError::from),
+            FdEntry::File(file) => {
+                if !file_is_readable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                file.file.read(dst).map_err(LinuxError::from)
+            }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
             FdEntry::Directory(_) => Err(LinuxError::EISDIR),
             FdEntry::Pipe(pipe) => pipe.read(dst),
@@ -638,6 +736,9 @@ impl FdTable {
             FdEntry::BlockDevice(_) => Ok(src.len()),
             FdEntry::Rtc => Ok(src.len()),
             FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
                 let src = limit_file_write_len(file, src, file_size_limit)?;
                 file.file.write(src).map_err(LinuxError::from)
             }
@@ -655,8 +756,17 @@ impl FdTable {
         src: &[u8],
     ) -> Result<usize, LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return Err(LinuxError::EBADF);
+            return match self.entry(fd)? {
+                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                    Err(LinuxError::ESPIPE)
+                }
+                _ => Err(LinuxError::EBADF),
+            };
         };
+        if !file_is_writable(file.status_flags) {
+            return Err(LinuxError::EBADF);
+        }
         let mut written = 0usize;
         while written < src.len() {
             let count = file
@@ -845,8 +955,17 @@ impl FdTable {
         dst: &mut [u8],
     ) -> Result<usize, LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return Err(LinuxError::EBADF);
+            return match self.entry(fd)? {
+                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                    Err(LinuxError::ESPIPE)
+                }
+                _ => Err(LinuxError::EBADF),
+            };
         };
+        if !file_is_readable(file.status_flags) {
+            return Err(LinuxError::EBADF);
+        }
         read_file_at_into(&file.file, offset, dst)
     }
 
@@ -1360,6 +1479,9 @@ fn open_fd_entry(
     }
     if flags & general::O_CREAT != 0 {
         opts.create(true);
+        if access == general::O_RDONLY {
+            opts.write(true);
+        }
     }
     if flags & general::O_EXCL != 0 {
         opts.create_new(true);
@@ -1425,6 +1547,17 @@ fn busybox_applet_alias_allowed(flags: u32, access: u32) -> bool {
     access != general::O_WRONLY
         && access != general::O_RDWR
         && flags & (general::O_CREAT | general::O_TRUNC | general::O_APPEND) == 0
+}
+
+fn file_is_readable(status_flags: u32) -> bool {
+    (status_flags & general::O_ACCMODE) != general::O_WRONLY
+}
+
+fn file_is_writable(status_flags: u32) -> bool {
+    matches!(
+        status_flags & general::O_ACCMODE,
+        general::O_WRONLY | general::O_RDWR
+    )
 }
 
 fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {

@@ -1,0 +1,3 @@
+run-eval rc=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch1-rv-20260524T125344+0800.log
+cases=sched_getattr02,getpgid01,times03,setsid01,open07,open09,open10,open11,open12,openat03,read03,write04,write05,getcwd02,gethostname02
