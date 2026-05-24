@@ -228,6 +228,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         cwd: Mutex::new(cwd.into()),
         exec_root: Mutex::new(image.exec_root.clone()),
         exec_path: Mutex::new(image.exec_path.clone()),
+        hostname: Mutex::new(String::from("arceos")),
+        prctl_name: Mutex::new(String::from("arceos")),
         children: Mutex::new(Vec::new()),
         child_exit_wait: WaitQueue::new(),
         rlimits: Mutex::new(BTreeMap::new()),
@@ -251,11 +253,13 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         groups: Mutex::new(Vec::new()),
         credential_generation: AtomicUsize::new(0),
         personality: AtomicUsize::new(0),
+        parent_death_signal: AtomicI32::new(0),
         real_timer_generation: AtomicU64::new(0),
         real_timer_deadline_us: AtomicU64::new(0),
         real_timer_interval_us: AtomicU64::new(0),
         eval_watchdog_deadline_us: AtomicU64::new(0),
         child_wait_blocked: AtomicBool::new(false),
+        syscall_wait_blocked: AtomicBool::new(false),
         pid: AtomicI32::new(0),
         pgid: AtomicI32::new(0),
         sid: AtomicI32::new(0),
@@ -304,6 +308,22 @@ impl UserProcess {
 
     pub(super) fn exec_path(&self) -> String {
         self.exec_path.lock().clone()
+    }
+
+    pub(super) fn hostname(&self) -> String {
+        self.hostname.lock().clone()
+    }
+
+    pub(super) fn set_hostname(&self, hostname: String) {
+        *self.hostname.lock() = hostname;
+    }
+
+    pub(super) fn prctl_name(&self) -> String {
+        self.prctl_name.lock().clone()
+    }
+
+    pub(super) fn set_prctl_name(&self, name: String) {
+        *self.prctl_name.lock() = name;
     }
 
     pub(super) fn set_cwd(&self, cwd: String) {
@@ -442,6 +462,14 @@ impl UserProcess {
         self.child_wait_blocked.load(Ordering::Acquire)
     }
 
+    pub(super) fn set_syscall_wait_blocked(&self, blocked: bool) {
+        self.syscall_wait_blocked.store(blocked, Ordering::Release);
+    }
+
+    pub(super) fn is_syscall_wait_blocked(&self) -> bool {
+        self.syscall_wait_blocked.load(Ordering::Acquire)
+    }
+
     pub(super) fn record_shared_mmap(&self, start: usize, size: usize, flags: MappingFlags) {
         self.shared_mmap_ranges.lock().push((start, size, flags));
     }
@@ -499,6 +527,8 @@ impl UserProcess {
             cwd: Mutex::new(self.cwd()),
             exec_root: Mutex::new(self.exec_root()),
             exec_path: Mutex::new(self.exec_path()),
+            hostname: Mutex::new(self.hostname()),
+            prctl_name: Mutex::new(self.prctl_name()),
             children: Mutex::new(Vec::new()),
             child_exit_wait: WaitQueue::new(),
             rlimits: Mutex::new(self.rlimits.lock().clone()),
@@ -522,6 +552,7 @@ impl UserProcess {
             groups: Mutex::new(self.groups()),
             credential_generation: AtomicUsize::new(self.credential_generation()),
             personality: AtomicUsize::new(self.personality()),
+            parent_death_signal: AtomicI32::new(self.parent_death_signal.load(Ordering::Acquire)),
             real_timer_generation: AtomicU64::new(0),
             real_timer_deadline_us: AtomicU64::new(0),
             real_timer_interval_us: AtomicU64::new(0),
@@ -529,6 +560,7 @@ impl UserProcess {
                 self.eval_watchdog_deadline_us.load(Ordering::Acquire),
             ),
             child_wait_blocked: AtomicBool::new(false),
+            syscall_wait_blocked: AtomicBool::new(false),
             pid: AtomicI32::new(0),
             pgid: AtomicI32::new(self.pgid()),
             sid: AtomicI32::new(self.sid()),

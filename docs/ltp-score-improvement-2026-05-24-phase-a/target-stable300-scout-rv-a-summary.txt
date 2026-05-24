@@ -1,0 +1,118 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-stable300-scout-rv-a-20260524T185037+0800.log`
+
+- PASS LTP CASE: 10
+- FAIL LTP CASE: 30
+- Internal TFAIL/TBROK/TCONF: 61 ({'TFAIL': 41, 'TCONF': 12, 'TBROK': 8})
+- timeout matches: 4
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 16 failed
+- ltp-glibc: 6 passed, 14 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clock_gettime01 | rv | glibc | ltp-glibc | FAIL | 137 | 60925 | 256468 | 256454 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 61067 | 258859 | 256797 | -2062 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_nanosleep01 | rv | glibc | ltp-glibc | FAIL | 1 | 35552 | 256440 | 256398 | -42 | 3 | 0 | 2 | 0 | 0 | 0 |
+| clock_nanosleep01 | rv | musl | ltp-musl | FAIL | 137 | 60944 | 256783 | 256741 | -42 | 3 | 0 | 2 | 1 | 0 | 0 |
+| clock_nanosleep02 | rv | glibc | ltp-glibc | FAIL | 1 | 19170 | 256398 | 256377 | -21 | 7 | 0 | 0 | 0 | 0 | 0 |
+| clock_nanosleep02 | rv | musl | ltp-musl | FAIL | 1 | 18605 | 256741 | 256720 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| clock_nanosleep03 | rv | glibc | ltp-glibc | FAIL | 2 | 4152 | 256377 | 256370 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| clock_nanosleep03 | rv | musl | ltp-musl | FAIL | 2 | 3221 | 256720 | 256713 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| clock_nanosleep04 | rv | glibc | ltp-glibc | PASS | 0 | 3496 | 256370 | 256349 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_nanosleep04 | rv | musl | ltp-musl | PASS | 0 | 3454 | 256713 | 256692 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 4845 | 256293 | 256272 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 3520 | 256636 | 256615 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | glibc | ltp-glibc | PASS | 0 | 14064 | 256454 | 256440 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | musl | ltp-musl | FAIL | 137 | 60621 | 256797 | 256783 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| nanosleep01 | rv | glibc | ltp-glibc | FAIL | 1 | 18898 | 256349 | 256328 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep01 | rv | musl | ltp-musl | FAIL | 1 | 16330 | 256692 | 256671 | -21 | 7 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep02 | rv | glibc | ltp-glibc | FAIL | 1 | 10264 | 256328 | 256307 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep02 | rv | musl | ltp-musl | FAIL | 1 | 8441 | 256671 | 256650 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep04 | rv | glibc | ltp-glibc | PASS | 0 | 4329 | 256307 | 256293 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep04 | rv | musl | ltp-musl | PASS | 0 | 2732 | 256650 | 256636 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nice03 | rv | glibc | ltp-glibc | PASS | 0 | 4038 | 256244 | 256223 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nice03 | rv | musl | ltp-musl | PASS | 0 | 2642 | 256587 | 256566 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nice04 | rv | glibc | ltp-glibc | PASS | 0 | 4275 | 256223 | 256209 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nice04 | rv | musl | ltp-musl | FAIL | 1 | 2538 | 256566 | 256552 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| nice05 | rv | glibc | ltp-glibc | FAIL | 2 | 7140 | 256209 | 256193 | -16 | 0 | 1 | 0 | 0 | 0 | 0 |
+| nice05 | rv | musl | ltp-musl | FAIL | 2 | 6978 | 256552 | 256538 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| prctl02 | rv | glibc | ltp-glibc | FAIL | 32 | 4475 | 256193 | 256179 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl02 | rv | musl | ltp-musl | FAIL | 32 | 2774 | 256538 | 256524 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl03 | rv | glibc | ltp-glibc | FAIL | 32 | 5150 | 256179 | 256165 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl03 | rv | musl | ltp-musl | FAIL | 32 | 2514 | 256524 | 256510 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl04 | rv | glibc | ltp-glibc | FAIL | 32 | 4237 | 256165 | 256151 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl04 | rv | musl | ltp-musl | FAIL | 32 | 2763 | 256510 | 256496 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl05 | rv | glibc | ltp-glibc | FAIL | 1 | 5366 | 256151 | 256137 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| prctl05 | rv | musl | ltp-musl | FAIL | 1 | 2666 | 256496 | 256482 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| read03 | rv | glibc | ltp-glibc | FAIL | 6 | 4329 | 256137 | 256123 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| read03 | rv | musl | ltp-musl | FAIL | 6 | 2200 | 256482 | 256468 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| setpriority01 | rv | glibc | ltp-glibc | PASS | 0 | 4867 | 256272 | 256244 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setpriority01 | rv | musl | ltp-musl | PASS | 0 | 3756 | 256615 | 256587 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| umask02 | rv | glibc | ltp-glibc | FAIL | -1 | 30 | 256137 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask02 | rv | musl | ltp-musl | FAIL | -1 | 37 | 256482 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (rv:glibc:clock_nanosleep04, rv:musl:clock_nanosleep04, rv:glibc:gettimeofday02, rv:glibc:nanosleep04, rv:musl:nanosleep04, rv:glibc:nice03, rv:musl:nice03, rv:glibc:nice04)
+- pass_with_tconf: 2 (rv:glibc:setpriority01, rv:musl:setpriority01)
+- fail_wrapper: 30 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:glibc:clock_nanosleep01, rv:musl:clock_nanosleep01, rv:glibc:clock_nanosleep02, rv:musl:clock_nanosleep02, rv:glibc:clock_nanosleep03, rv:musl:clock_nanosleep03, rv:glibc:getpgid01, rv:musl:getpgid01, rv:musl:gettimeofday02, rv:glibc:nanosleep01, rv:musl:nanosleep01, rv:glibc:nanosleep02, rv:musl:nanosleep02, rv:musl:nice04, rv:glibc:nice05, rv:musl:nice05, rv:glibc:prctl02, rv:musl:prctl02, rv:glibc:prctl03, rv:musl:prctl03, rv:glibc:prctl04, rv:musl:prctl04, rv:glibc:prctl05, rv:musl:prctl05, rv:glibc:read03, rv:musl:read03, rv:glibc:umask02, rv:musl:umask02)
+- internal_tfail: 13 (rv:glibc:clock_nanosleep01, rv:musl:clock_nanosleep01, rv:glibc:clock_nanosleep02, rv:musl:clock_nanosleep02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:nanosleep01, rv:musl:nanosleep01, rv:glibc:nanosleep02, rv:musl:nanosleep02, rv:musl:nice04, rv:glibc:prctl05, rv:musl:prctl05)
+- internal_tbrok: 8 (rv:glibc:clock_nanosleep03, rv:musl:clock_nanosleep03, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:nice05, rv:musl:nice05, rv:glibc:read03, rv:musl:read03)
+- timeout: 4 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:musl:clock_nanosleep01, rv:musl:gettimeofday02)
+- enosys: 2 (rv:glibc:read03, rv:musl:read03)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:clock_gettime01
+- ltp-musl:gettimeofday02
+- ltp-musl:clock_nanosleep01
+- ltp-musl:clock_nanosleep02
+- ltp-musl:clock_nanosleep03
+- ltp-musl:nanosleep01
+- ltp-musl:nanosleep02
+- ltp-musl:getpgid01
+- ltp-musl:nice04
+- ltp-musl:nice05
+- ltp-musl:prctl02
+- ltp-musl:prctl03
+- ltp-musl:prctl04
+- ltp-musl:prctl05
+- ltp-musl:umask02
+- ltp-musl:read03
+- ltp-glibc:clock_gettime01
+- ltp-glibc:clock_nanosleep01
+- ltp-glibc:clock_nanosleep02
+- ltp-glibc:clock_nanosleep03
+- ltp-glibc:nanosleep01
+- ltp-glibc:nanosleep02
+- ltp-glibc:getpgid01
+- ltp-glibc:nice05
+- ltp-glibc:prctl02
+- ltp-glibc:prctl03
+- ltp-glibc:prctl04
+- ltp-glibc:prctl05
+- ltp-glibc:umask02
+- ltp-glibc:read03
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 16
+- Internal: {'TFAIL': 21, 'TCONF': 6, 'TBROK': 4}
+- timeout: 3
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: clock_gettime01, gettimeofday02, clock_nanosleep01, clock_nanosleep02, clock_nanosleep03, nanosleep01, nanosleep02, getpgid01, nice04, nice05, prctl02, prctl03, prctl04, prctl05, umask02, read03
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 14
+- Internal: {'TFAIL': 20, 'TCONF': 6, 'TBROK': 4}
+- timeout: 1
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: clock_gettime01, clock_nanosleep01, clock_nanosleep02, clock_nanosleep03, nanosleep01, nanosleep02, getpgid01, nice05, prctl02, prctl03, prctl04, prctl05, umask02, read03

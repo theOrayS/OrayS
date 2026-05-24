@@ -1,0 +1,108 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post285-scout6-rv.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 30
+- Internal TFAIL/TBROK/TCONF: 58 ({'TCONF': 2, 'TFAIL': 38, 'TBROK': 18})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 38
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 15 failed
+- ltp-glibc: 0 passed, 15 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ftruncate03 | rv | glibc | ltp-glibc | FAIL | 1 | 3043 | 231974 | 231960 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate03 | rv | musl | ltp-musl | FAIL | 1 | 2890 | 256711 | 256697 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | glibc | ltp-glibc | FAIL | 2 | 3763 | 231960 | 231953 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | musl | ltp-musl | FAIL | 2 | 2126 | 256697 | 256690 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 3930 | 232058 | 232044 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 3033 | 256795 | 256781 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link04 | rv | glibc | ltp-glibc | FAIL | 1 | 5998 | 232044 | 232030 | -14 | 14 | 0 | 0 | 0 | 14 | 0 |
+| link04 | rv | musl | ltp-musl | FAIL | 1 | 2748 | 256781 | 256767 | -14 | 14 | 0 | 0 | 0 | 14 | 0 |
+| link05 | rv | glibc | ltp-glibc | FAIL | 1 | 5187 | 232030 | 232016 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link05 | rv | musl | ltp-musl | FAIL | 1 | 2763 | 256767 | 256753 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link08 | rv | glibc | ltp-glibc | FAIL | 2 | 4099 | 232016 | 232009 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| link08 | rv | musl | ltp-musl | FAIL | 2 | 2444 | 256753 | 256746 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| lseek11 | rv | glibc | ltp-glibc | FAIL | 32 | 4499 | 232072 | 232058 | -14 | 0 | 0 | 1 | 0 | 1 | 0 |
+| lseek11 | rv | musl | ltp-musl | FAIL | 32 | 2910 | 258857 | 256795 | -2062 | 0 | 0 | 1 | 0 | 1 | 0 |
+| read03 | rv | glibc | ltp-glibc | FAIL | 6 | 4297 | 231925 | 231911 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| read03 | rv | musl | ltp-musl | FAIL | 6 | 2915 | 232086 | 232072 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 3969 | 232009 | 232002 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 3051 | 256746 | 256739 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename03 | rv | glibc | ltp-glibc | FAIL | 6 | 4763 | 232002 | 231995 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename03 | rv | musl | ltp-musl | FAIL | 6 | 3112 | 256739 | 256732 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename04 | rv | glibc | ltp-glibc | FAIL | 6 | 4127 | 231995 | 231988 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename04 | rv | musl | ltp-musl | FAIL | 6 | 2671 | 256732 | 256725 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename05 | rv | glibc | ltp-glibc | FAIL | 6 | 3887 | 231988 | 231981 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename05 | rv | musl | ltp-musl | FAIL | 6 | 2714 | 256725 | 256718 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename06 | rv | glibc | ltp-glibc | FAIL | 6 | 3465 | 231981 | 231974 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename06 | rv | musl | ltp-musl | FAIL | 6 | 2880 | 256718 | 256711 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| truncate03 | rv | glibc | ltp-glibc | FAIL | 1 | 3696 | 231953 | 231939 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| truncate03 | rv | musl | ltp-musl | FAIL | 1 | 3178 | 256690 | 232100 | -24590 | 2 | 0 | 0 | 0 | 0 | 0 |
+| write04 | rv | glibc | ltp-glibc | FAIL | 2 | 3958 | 231939 | 231925 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| write04 | rv | musl | ltp-musl | FAIL | 2 | 3413 | 232100 | 232086 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 30 (rv:glibc:ftruncate03, rv:musl:ftruncate03, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:link02, rv:musl:link02, rv:glibc:link04, rv:musl:link04, rv:glibc:link05, rv:musl:link05, rv:glibc:link08, rv:musl:link08, rv:glibc:lseek11, rv:musl:lseek11, rv:glibc:read03, rv:musl:read03, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename03, rv:musl:rename03, rv:glibc:rename04, rv:musl:rename04, rv:glibc:rename05, rv:musl:rename05, rv:glibc:rename06, rv:musl:rename06, rv:glibc:truncate03, rv:musl:truncate03, rv:glibc:write04, rv:musl:write04)
+- internal_tfail: 10 (rv:glibc:ftruncate03, rv:musl:ftruncate03, rv:glibc:link02, rv:musl:link02, rv:glibc:link04, rv:musl:link04, rv:glibc:link05, rv:musl:link05, rv:glibc:truncate03, rv:musl:truncate03)
+- internal_tbrok: 18 (rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:link08, rv:musl:link08, rv:glibc:read03, rv:musl:read03, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename03, rv:musl:rename03, rv:glibc:rename04, rv:musl:rename04, rv:glibc:rename05, rv:musl:rename05, rv:glibc:rename06, rv:musl:rename06, rv:glibc:write04, rv:musl:write04)
+- timeout: 0
+- enosys: 12 (rv:glibc:link02, rv:musl:link02, rv:glibc:link04, rv:musl:link04, rv:glibc:link05, rv:musl:link05, rv:glibc:lseek11, rv:musl:lseek11, rv:glibc:read03, rv:musl:read03, rv:glibc:write04, rv:musl:write04)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:lseek11
+- ltp-musl:link02
+- ltp-musl:link04
+- ltp-musl:link05
+- ltp-musl:link08
+- ltp-musl:rename01
+- ltp-musl:rename03
+- ltp-musl:rename04
+- ltp-musl:rename05
+- ltp-musl:rename06
+- ltp-musl:ftruncate03
+- ltp-musl:ftruncate04
+- ltp-musl:truncate03
+- ltp-musl:write04
+- ltp-musl:read03
+- ltp-glibc:lseek11
+- ltp-glibc:link02
+- ltp-glibc:link04
+- ltp-glibc:link05
+- ltp-glibc:link08
+- ltp-glibc:rename01
+- ltp-glibc:rename03
+- ltp-glibc:rename04
+- ltp-glibc:rename05
+- ltp-glibc:rename06
+- ltp-glibc:ftruncate03
+- ltp-glibc:ftruncate04
+- ltp-glibc:truncate03
+- ltp-glibc:write04
+- ltp-glibc:read03
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 15
+- Internal: {'TCONF': 1, 'TFAIL': 19, 'TBROK': 9}
+- timeout: 0
+- ENOSYS/not implemented: 19
+- panic/trap: 0
+- Fail cases: lseek11, link02, link04, link05, link08, rename01, rename03, rename04, rename05, rename06, ftruncate03, ftruncate04, truncate03, write04, read03
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 15
+- Internal: {'TCONF': 1, 'TFAIL': 19, 'TBROK': 9}
+- timeout: 0
+- ENOSYS/not implemented: 19
+- panic/trap: 0
+- Fail cases: lseek11, link02, link04, link05, link08, rename01, rename03, rename04, rename05, rename06, ftruncate03, ftruncate04, truncate03, write04, read03

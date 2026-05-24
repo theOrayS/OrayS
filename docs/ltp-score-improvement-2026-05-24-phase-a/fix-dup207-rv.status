@@ -1,0 +1,4 @@
+command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=dup207\ LTP_CASE_TIMEOUT_SECS=60\ ./run-eval.sh\ rv
+exit=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-dup207-rv-20260524T134008+0800.log
+cases=dup207

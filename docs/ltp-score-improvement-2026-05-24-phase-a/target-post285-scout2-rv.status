@@ -1,0 +1,4 @@
+command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=fchdir01\,fchdir02\,fchdir03\,fchmod02\,fchmod05\,fchmod06\,fstat02\,fstat03\,symlink03\,symlink04\,truncate03\,mkdir03\,mkdir04\,mkdir05\,mkdir09\,rmdir03\,unlink07\,unlink08\,unlink09\,dup05\ LTP_CASE_TIMEOUT_SECS=60\ ./run-eval.sh\ rv
+exit=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post285-scout2-rv-20260524T160001+0800.log
+cases=fchdir01,fchdir02,fchdir03,fchmod02,fchmod05,fchmod06,fstat02,fstat03,symlink03,symlink04,truncate03,mkdir03,mkdir04,mkdir05,mkdir09,rmdir03,unlink07,unlink08,unlink09,dup05

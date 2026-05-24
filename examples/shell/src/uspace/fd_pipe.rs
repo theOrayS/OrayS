@@ -163,7 +163,25 @@ impl PipeEndpoint {
 
     pub(super) fn set_status_flags(&self, flags: u32) {
         let access = self.status_flags() & general::O_ACCMODE;
-        *self.status_flags.lock() = access | (flags & general::O_NONBLOCK);
+        *self.status_flags.lock() = access | (flags & (general::O_NONBLOCK | general::O_DIRECT));
+    }
+
+    pub(super) const fn capacity(&self) -> usize {
+        PIPE_BUF_SIZE
+    }
+
+    pub(super) fn available_read(&self) -> usize {
+        self.buffer.lock().available_read()
+    }
+
+    fn sleep_while_blocked() {
+        if let Some(ext) = current_task_ext() {
+            ext.process.set_syscall_wait_blocked(true);
+            axtask::yield_now();
+            ext.process.set_syscall_wait_blocked(false);
+        } else {
+            axtask::yield_now();
+        }
     }
 
     fn raise_sigpipe() {
@@ -214,7 +232,7 @@ impl PipeEndpoint {
                 if Self::interrupted() {
                     return Err(LinuxError::EINTR);
                 }
-                axtask::yield_now();
+                Self::sleep_while_blocked();
                 continue;
             }
             for _ in 0..available {
@@ -259,7 +277,7 @@ impl PipeEndpoint {
                 if Self::interrupted() {
                     return Err(LinuxError::EINTR);
                 }
-                axtask::yield_now();
+                Self::sleep_while_blocked();
                 continue;
             }
             for _ in 0..available {
@@ -293,7 +311,7 @@ impl PipeEndpoint {
 
 pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
     let flags = flags as u32;
-    let supported_flags = general::O_CLOEXEC | general::O_NONBLOCK;
+    let supported_flags = general::O_CLOEXEC | general::O_NONBLOCK | general::O_DIRECT;
     if flags & !supported_flags != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
@@ -301,7 +319,7 @@ pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> i
         return neg_errno(err);
     }
     let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
-    let status_flags = flags & general::O_NONBLOCK;
+    let status_flags = flags & (general::O_NONBLOCK | general::O_DIRECT);
     let (read_end, write_end) = PipeEndpoint::new_pair(status_flags);
     let fds = {
         let mut table = process.fds.lock();

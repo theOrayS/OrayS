@@ -285,7 +285,7 @@ fn sched_priority_bounds(policy: i32) -> Option<(i32, i32)> {
 
 fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {
     if pid < 0 {
-        return Err(LinuxError::ESRCH);
+        return Err(LinuxError::EINVAL);
     }
     if pid == 0 || pid == current_tid() || pid == process.pid() {
         return Ok(process.get_sched_state());
@@ -301,7 +301,7 @@ fn set_sched_target_state(
     state: UserSchedState,
 ) -> Result<(), LinuxError> {
     if pid < 0 {
-        return Err(LinuxError::ESRCH);
+        return Err(LinuxError::EINVAL);
     }
     if pid == 0 || pid == current_tid() || pid == process.pid() {
         process.set_sched_state(state);

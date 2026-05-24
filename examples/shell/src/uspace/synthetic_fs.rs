@@ -13,7 +13,7 @@ use super::linux_abi::{
 };
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
-use super::task_registry::user_thread_entry_by_process_pid;
+use super::task_registry::{user_thread_entry_by_process_pid, user_thread_entry_by_tid};
 
 fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let exec_path = process.exec_path();
@@ -104,7 +104,7 @@ impl UserProcessStat {
             == 0
         {
             'Z'
-        } else if process.is_child_wait_blocked() {
+        } else if process.is_child_wait_blocked() || process.is_syscall_wait_blocked() {
             'S'
         } else {
             'R'
@@ -210,6 +210,78 @@ pub(super) fn proc_pid_status_fd_entry(process: &UserProcess, path: &str) -> Opt
 
 pub(super) fn proc_pid_status_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
     let (path, data) = proc_pid_status_content(process, path)?;
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        path.as_str(),
+        data.len(),
+    )))
+}
+
+fn proc_comm_target_process(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
+    let normalized = normalize_path("/", path)?;
+    let process_comm_content = |target: &UserProcess| {
+        let mut content = target.prctl_name();
+        content.push('\n');
+        Some((normalized.clone(), content.into_bytes()))
+    };
+    if normalized == "/proc/self/comm" {
+        return process_comm_content(process);
+    }
+    let task_rest = if let Some(rest) = normalized.strip_prefix("/proc/self/task/") {
+        Some(rest)
+    } else if let Some(rest) = normalized.strip_prefix("/proc/") {
+        if let Some((pid_text, rest)) = rest.split_once("/task/") {
+            let pid = pid_text.parse::<i32>().ok()?;
+            if pid != process.pid() {
+                let entry = user_thread_entry_by_process_pid(pid)?;
+                if entry.process.pid() != pid {
+                    return None;
+                }
+            }
+            Some(rest)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    if let Some(rest) = task_rest {
+        let tid_text = rest.strip_suffix("/comm")?;
+        let tid = tid_text.parse::<i32>().ok()?;
+        let target_name = if tid == process.pid() {
+            Some(process.prctl_name())
+        } else if let Some(entry) = user_thread_entry_by_tid(tid) {
+            (entry.process.pid() == process.pid()).then(|| entry.process.prctl_name())
+        } else {
+            None
+        }?;
+        let mut content = target_name;
+        content.push('\n');
+        return Some((normalized, content.into_bytes()));
+    }
+    if let Some(rest) = normalized.strip_prefix("/proc/") {
+        if let Some(pid_text) = rest.strip_suffix("/comm") {
+            let pid = pid_text.parse::<i32>().ok()?;
+            if pid == process.pid() {
+                return process_comm_content(process);
+            }
+            let entry = user_thread_entry_by_process_pid(pid)?;
+            return process_comm_content(entry.process.as_ref());
+        }
+    }
+    None
+}
+
+pub(super) fn proc_comm_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_comm_target_process(process, path)?;
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path,
+        data: Arc::new(data),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_comm_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_comm_target_process(process, path)?;
     Some(FdEntry::Path(PathEntry::synthetic_file(
         path.as_str(),
         data.len(),

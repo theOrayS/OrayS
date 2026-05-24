@@ -1,0 +1,100 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-stable300-scout-rv-d.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 26
+- Internal TFAIL/TBROK/TCONF: 38 ({'TFAIL': 28, 'TCONF': 6, 'TBROK': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 13 failed
+- ltp-glibc: 0 passed, 13 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| link01 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 252301 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link01 | rv | musl | ltp-musl | FAIL | -1 | 6 | 252511 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 4419 | 252301 | 252294 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 2866 | 252511 | 252504 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| sched_getparam03 | rv | glibc | ltp-glibc | FAIL | 1 | 4478 | 252504 | 252483 | -21 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_getparam03 | rv | musl | ltp-musl | FAIL | 1 | 2381 | 258858 | 256789 | -2069 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_rr_get_interval03 | rv | glibc | ltp-glibc | FAIL | 1 | 4303 | 252483 | 252462 | -21 | 2 | 0 | 1 | 0 | 0 | 0 |
+| sched_rr_get_interval03 | rv | musl | ltp-musl | FAIL | 1 | 2669 | 256789 | 256768 | -21 | 2 | 0 | 1 | 0 | 0 | 0 |
+| sched_setparam04 | rv | glibc | ltp-glibc | FAIL | 1 | 4699 | 252462 | 252441 | -21 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam04 | rv | musl | ltp-musl | FAIL | 1 | 3138 | 256768 | 256747 | -21 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam05 | rv | glibc | ltp-glibc | FAIL | 1 | 4122 | 252441 | 252406 | -35 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam05 | rv | musl | ltp-musl | FAIL | 1 | 3455 | 256747 | 256712 | -35 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler01 | rv | glibc | ltp-glibc | FAIL | 1 | 4649 | 252406 | 252385 | -21 | 4 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler01 | rv | musl | ltp-musl | FAIL | 1 | 3122 | 256712 | 256691 | -21 | 4 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler02 | rv | glibc | ltp-glibc | FAIL | 1 | 4049 | 252385 | 252350 | -35 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler02 | rv | musl | ltp-musl | FAIL | 1 | 2825 | 256691 | 256656 | -35 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler04 | rv | glibc | ltp-glibc | FAIL | 32 | 4171 | 252350 | 252329 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| sched_setscheduler04 | rv | musl | ltp-musl | FAIL | 32 | 2504 | 256656 | 256635 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| setpgid03 | rv | glibc | ltp-glibc | FAIL | 2 | 14395 | 252329 | 252301 | -28 | 0 | 1 | 0 | 0 | 0 | 0 |
+| setpgid03 | rv | musl | ltp-musl | FAIL | 2 | 12759 | 256635 | 252511 | -4124 | 0 | 1 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | glibc | ltp-glibc | FAIL | -1 | 72 | 252301 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | musl | ltp-musl | FAIL | -1 | 18 | 252511 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| truncate01 | rv | glibc | ltp-glibc | FAIL | -1 | 20 | 252294 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| truncate01 | rv | musl | ltp-musl | FAIL | -1 | 14 | 252504 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask02 | rv | glibc | ltp-glibc | FAIL | -1 | 16 | 252301 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask02 | rv | musl | ltp-musl | FAIL | -1 | 5 | 252511 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 26 (rv:glibc:link01, rv:musl:link01, rv:glibc:rename01, rv:musl:rename01, rv:glibc:sched_getparam03, rv:musl:sched_getparam03, rv:glibc:sched_rr_get_interval03, rv:musl:sched_rr_get_interval03, rv:glibc:sched_setparam04, rv:musl:sched_setparam04, rv:glibc:sched_setparam05, rv:musl:sched_setparam05, rv:glibc:sched_setscheduler01, rv:musl:sched_setscheduler01, rv:glibc:sched_setscheduler02, rv:musl:sched_setscheduler02, rv:glibc:sched_setscheduler04, rv:musl:sched_setscheduler04, rv:glibc:setpgid03, rv:musl:setpgid03, rv:glibc:setpriority03, rv:musl:setpriority03, rv:glibc:truncate01, rv:musl:truncate01, rv:glibc:umask02, rv:musl:umask02)
+- internal_tfail: 12 (rv:glibc:sched_getparam03, rv:musl:sched_getparam03, rv:glibc:sched_rr_get_interval03, rv:musl:sched_rr_get_interval03, rv:glibc:sched_setparam04, rv:musl:sched_setparam04, rv:glibc:sched_setparam05, rv:musl:sched_setparam05, rv:glibc:sched_setscheduler01, rv:musl:sched_setscheduler01, rv:glibc:sched_setscheduler02, rv:musl:sched_setscheduler02)
+- internal_tbrok: 4 (rv:glibc:rename01, rv:musl:rename01, rv:glibc:setpgid03, rv:musl:setpgid03)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:sched_getparam03
+- ltp-musl:sched_rr_get_interval03
+- ltp-musl:sched_setparam04
+- ltp-musl:sched_setparam05
+- ltp-musl:sched_setscheduler01
+- ltp-musl:sched_setscheduler02
+- ltp-musl:sched_setscheduler04
+- ltp-musl:setpgid03
+- ltp-musl:setpriority03
+- ltp-musl:umask02
+- ltp-musl:link01
+- ltp-musl:rename01
+- ltp-musl:truncate01
+- ltp-glibc:sched_getparam03
+- ltp-glibc:sched_rr_get_interval03
+- ltp-glibc:sched_setparam04
+- ltp-glibc:sched_setparam05
+- ltp-glibc:sched_setscheduler01
+- ltp-glibc:sched_setscheduler02
+- ltp-glibc:sched_setscheduler04
+- ltp-glibc:setpgid03
+- ltp-glibc:setpriority03
+- ltp-glibc:umask02
+- ltp-glibc:link01
+- ltp-glibc:rename01
+- ltp-glibc:truncate01
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 13
+- Internal: {'TFAIL': 14, 'TCONF': 3, 'TBROK': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sched_getparam03, sched_rr_get_interval03, sched_setparam04, sched_setparam05, sched_setscheduler01, sched_setscheduler02, sched_setscheduler04, setpgid03, setpriority03, umask02, link01, rename01, truncate01
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 13
+- Internal: {'TFAIL': 14, 'TCONF': 3, 'TBROK': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sched_getparam03, sched_rr_get_interval03, sched_setparam04, sched_setparam05, sched_setscheduler01, sched_setscheduler02, sched_setscheduler04, setpgid03, setpriority03, umask02, link01, rename01, truncate01

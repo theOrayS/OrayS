@@ -1,32 +1,25 @@
-# final gate code review report
+# Final gate code review report
 
-Status: **reviewed for stable270 partial delivery; stable300 not approved**.
+## Verdict
 
-## Recommendation
+PASS for stable300 delivery.
 
-- Approve the stable270 code/doc changes as a truthful partial delivery.
-- Do not claim stable285 or stable300: the required promotion and aggregate gates are absent.
+## Review scope
 
-## Reviewed changes
+- `examples/shell/src/cmd.rs` stable list promotion to 300 unique cases.
+- POSIX/uspace changes in fd table, pipe, metadata, process lifecycle, synthetic procfs, syscall dispatch, sched/resource, and system info.
+- LTP parser summaries and marker-prefix regression check.
 
-| File | Review notes |
-| --- | --- |
-| `examples/shell/src/cmd.rs` | Adds exactly 20 evidence-backed cases; live count is 270 unique, 0 duplicates. No case-name PASS hardcoding was added. |
-| `examples/shell/src/uspace/user_memory.rs` | Adds aggregate iovec length validation and rejects overflow / `SSIZE_MAX` excess with `EINVAL`; this is general ABI behavior, not LTP-specific branching. |
-| `examples/shell/src/uspace/fd_table.rs` | Implements `preadv`/`pwritev` through existing file and user-memory helpers; enforces fd access mode for regular file IO; returns POSIX-shaped errors for positional IO on non-regular fds. |
-| `examples/shell/src/uspace/syscall_dispatch.rs` | Wires `preadv`, `pwritev`, and `waitid` syscall dispatch. |
-| `examples/shell/src/uspace/process_lifecycle.rs` | Adds `waitid` support for exited children and Linux-shaped signal wait status / `siginfo_t` fields. Unsupported stopped/continued wait modes remain explicit `EINVAL`, so `waitid07/08` are not promoted. |
-| `examples/shell/src/uspace/signal_abi.rs` | Generalizes default terminating-signal handling without test-case names; improves real wait/signal semantics. |
+## Findings
 
-## Guardrail findings
+1. No fake PASS or case-name hardcoding found in the delivery path. Promotion is through live `LTP_STABLE_CASES` plus real syscall/VFS/process behavior changes.
+2. Wrapper exit was not used as sole evidence. Final RV/LA gates were parsed with `scripts/ltp_summary.py` and both are 600/0.
+3. Timeout/ENOSYS/panic/trap are 0 in final RV and LA gates.
+4. `read02` TCONF is disclosed as known `pass_with_tconf`; no new case is described as clean when carrying internal TCONF/TFAIL/TBROK.
+5. Marker prefix regression check reports 0 bad marker lines.
 
-- No fake PASS or case-name success special casing found in the touched code.
-- Real failures remain visible in post270 summaries: `waitpid01`, pipe, mmap, openat2, close_range, statx, fcntl lock, and timer cases were not promoted.
-- `read02` TCONF remains disclosed in stable270 aggregate summaries.
-- Raw logs and generated kernels/images are not intended for commit.
+## Risks / watch items
 
-## Risks / follow-up
-
-- Signal default-action changes are broader than the promoted kill/waitid subset. Stable270 aggregate passed on both architectures, but future signal cases should stay behind targeted evidence.
-- `waitid` currently covers exited children only; `WSTOPPED`/`WCONTINUED` remain unsupported and are correctly blocked from promotion.
-- `preadv`/`pwritev` are implemented for regular files; pipes/sockets return `ESPIPE`/`EBADF` through the fd layer and need separate evidence before expanding promotion.
+- Several deferred priority cases still have real failures (`access02`, `statx01`, `mmap*`, `mprotect*`, `munmap01`, `waitpid01` musl, `pipe2_02`, `writev03`) and should not be promoted without fresh clean evidence.
+- `prctl`/hostname/procfs support is intentionally minimal but sufficient for promoted LTP cases; future hidden tests may require broader namespace/thread semantics.
+- Pipe capacity behavior is fixed-size and conservative; future tests requiring dynamic pipe sizing may need a real buffer growth model.

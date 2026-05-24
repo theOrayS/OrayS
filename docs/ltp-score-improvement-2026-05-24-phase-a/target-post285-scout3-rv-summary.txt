@@ -1,0 +1,121 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post285-scout3-rv-20260524T161446+0800.log`
+
+- PASS LTP CASE: 7
+- FAIL LTP CASE: 33
+- Internal TFAIL/TBROK/TCONF: 38 ({'TBROK': 15, 'TFAIL': 23})
+- timeout matches: 2
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 2 passed, 18 failed
+- ltp-glibc: 5 passed, 15 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| chdir02 | rv | glibc | ltp-glibc | FAIL | -1 | 10 | 256308 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| chdir02 | rv | musl | ltp-musl | FAIL | -1 | 6 | 256595 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchdir01 | rv | glibc | ltp-glibc | FAIL | 1 | 5953 | 256308 | 256294 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fchdir01 | rv | musl | ltp-musl | FAIL | 1 | 2569 | 256595 | 256581 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fchdir03 | rv | glibc | ltp-glibc | FAIL | 2 | 4880 | 256294 | 256280 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchdir03 | rv | musl | ltp-musl | FAIL | 2 | 2706 | 256581 | 256567 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | glibc | ltp-glibc | FAIL | 1 | 4403 | 256280 | 256266 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | musl | ltp-musl | FAIL | 1 | 3054 | 256567 | 256553 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | rv | glibc | ltp-glibc | FAIL | 2 | 3623 | 256266 | 256259 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl07 | rv | musl | ltp-musl | FAIL | 2 | 3081 | 256553 | 256546 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fstatfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 4441 | 256532 | 256525 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | musl | ltp-musl | FAIL | 6 | 3480 | 258860 | 256805 | -2055 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs02 | rv | glibc | ltp-glibc | PASS | 0 | 4773 | 256525 | 256497 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs02 | rv | musl | ltp-musl | FAIL | 1 | 3565 | 256805 | 256777 | -28 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 4511 | 256399 | 256378 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 3409 | 256679 | 256658 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | glibc | ltp-glibc | PASS | 0 | 14400 | 256322 | 256308 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | musl | ltp-musl | FAIL | 137 | 60768 | 256609 | 256595 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| gettimeofday03 | rv | glibc | ltp-glibc | FAIL | -1 | 51 | 256308 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday03 | rv | musl | ltp-musl | FAIL | -1 | 34 | 256595 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | glibc | ltp-glibc | FAIL | 1 | 3873 | 256259 | 256245 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | musl | ltp-musl | FAIL | 2 | 2929 | 256546 | 256532 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| setsid01 | rv | glibc | ltp-glibc | PASS | 0 | 6237 | 256378 | 256350 | -28 | 3 | 0 | 0 | 0 | 0 | 0 |
+| setsid01 | rv | musl | ltp-musl | PASS | 0 | 4605 | 256658 | 256630 | -28 | 2 | 0 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 4142 | 256497 | 256490 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 2535 | 256777 | 256770 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs02 | rv | glibc | ltp-glibc | PASS | 0 | 4961 | 256490 | 256434 | -56 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs02 | rv | musl | ltp-musl | FAIL | 1 | 4008 | 256770 | 256714 | -56 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statfs03 | rv | glibc | ltp-glibc | FAIL | 1 | 4463 | 256434 | 256420 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statfs03 | rv | musl | ltp-musl | FAIL | 1 | 3401 | 256714 | 256700 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 3731 | 256420 | 256413 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | musl | ltp-musl | FAIL | 6 | 3419 | 256700 | 256693 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs02 | rv | glibc | ltp-glibc | PASS | 0 | 4756 | 256413 | 256399 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statvfs02 | rv | musl | ltp-musl | PASS | 0 | 2994 | 256693 | 256679 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| time02 | rv | glibc | ltp-glibc | FAIL | -1 | 36 | 256322 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| time02 | rv | musl | ltp-musl | FAIL | -1 | 55 | 256609 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| times02 | rv | glibc | ltp-glibc | FAIL | -1 | 41 | 256350 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| times02 | rv | musl | ltp-musl | FAIL | -1 | 35 | 256630 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| times03 | rv | glibc | ltp-glibc | FAIL | 1 | 11569 | 256350 | 256322 | -28 | 6 | 0 | 0 | 0 | 0 | 0 |
+| times03 | rv | musl | ltp-musl | FAIL | 137 | 60725 | 256630 | 256609 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+
+## Categories
+- pass_clean: 5 (rv:glibc:fstatfs02, rv:glibc:gettimeofday02, rv:glibc:statfs02, rv:glibc:statvfs02, rv:musl:statvfs02)
+- pass_with_tconf: 0
+- fail_wrapper: 33 (rv:glibc:chdir02, rv:musl:chdir02, rv:glibc:fchdir01, rv:musl:fchdir01, rv:glibc:fchdir03, rv:musl:fchdir03, rv:glibc:fcntl05, rv:musl:fcntl05, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:musl:fstatfs02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:musl:gettimeofday02, rv:glibc:gettimeofday03, rv:musl:gettimeofday03, rv:glibc:mkdir02, rv:musl:mkdir02, rv:glibc:statfs01, rv:musl:statfs01, rv:musl:statfs02, rv:glibc:statfs03, rv:musl:statfs03, rv:glibc:statvfs01, rv:musl:statvfs01, rv:glibc:time02, rv:musl:time02, rv:glibc:times02, rv:musl:times02, rv:glibc:times03, rv:musl:times03)
+- internal_tfail: 14 (rv:glibc:fchdir01, rv:musl:fchdir01, rv:glibc:fcntl05, rv:musl:fcntl05, rv:musl:fstatfs02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:mkdir02, rv:glibc:setsid01, rv:musl:setsid01, rv:musl:statfs02, rv:glibc:statfs03, rv:musl:statfs03, rv:glibc:times03)
+- internal_tbrok: 13 (rv:glibc:fchdir03, rv:musl:fchdir03, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:getpgid01, rv:musl:getpgid01, rv:musl:mkdir02, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statvfs01, rv:musl:statvfs01)
+- timeout: 2 (rv:musl:gettimeofday02, rv:musl:times03)
+- enosys: 2 (rv:glibc:fcntl07, rv:musl:fcntl07)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:fstatfs01
+- ltp-musl:fstatfs02
+- ltp-musl:statfs01
+- ltp-musl:statfs02
+- ltp-musl:statfs03
+- ltp-musl:statvfs01
+- ltp-musl:getpgid01
+- ltp-musl:times02
+- ltp-musl:times03
+- ltp-musl:time02
+- ltp-musl:gettimeofday02
+- ltp-musl:gettimeofday03
+- ltp-musl:chdir02
+- ltp-musl:fchdir01
+- ltp-musl:fchdir03
+- ltp-musl:fcntl05
+- ltp-musl:fcntl07
+- ltp-musl:mkdir02
+- ltp-glibc:fstatfs01
+- ltp-glibc:statfs01
+- ltp-glibc:statfs03
+- ltp-glibc:statvfs01
+- ltp-glibc:getpgid01
+- ltp-glibc:times02
+- ltp-glibc:times03
+- ltp-glibc:time02
+- ltp-glibc:gettimeofday03
+- ltp-glibc:chdir02
+- ltp-glibc:fchdir01
+- ltp-glibc:fchdir03
+- ltp-glibc:fcntl05
+- ltp-glibc:fcntl07
+- ltp-glibc:mkdir02
+
+## Groups
+### ltp-musl
+- PASS: 2
+- FAIL: 18
+- Internal: {'TBROK': 8, 'TFAIL': 8}
+- timeout: 2
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: fstatfs01, fstatfs02, statfs01, statfs02, statfs03, statvfs01, getpgid01, times02, times03, time02, gettimeofday02, gettimeofday03, chdir02, fchdir01, fchdir03, fcntl05, fcntl07, mkdir02
+
+### ltp-glibc
+- PASS: 5
+- FAIL: 15
+- Internal: {'TBROK': 7, 'TFAIL': 15}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: fstatfs01, statfs01, statfs03, statvfs01, getpgid01, times02, times03, time02, gettimeofday03, chdir02, fchdir01, fchdir03, fcntl05, fcntl07, mkdir02
