@@ -1,11 +1,11 @@
 # Final gate code-review report
 
-Recommendation: **BLOCK stable350 / PASS narrow waitpid01 signal-mask fix**
+Recommendation: **BLOCK stable350 / PASS narrow waitpid01 and /bin/sh exec compatibility fixes**
 Architect status: **BLOCKED for stable350**
 
 ## Reason
 
-Final stable350 acceptance is still blocked by missing clean promotion evidence: only 7 RV+LA × musl+glibc clean seed cases are available, below the +15 stable315 tranche gate, and no stable aggregate gate was run.
+Final stable350 acceptance is still blocked by missing clean promotion evidence: only 8 RV+LA × musl+glibc clean seed cases are available, below the +15 stable315 tranche gate, and no stable aggregate gate was run.
 
 ## Narrow fix review
 
@@ -23,6 +23,22 @@ Review findings:
 - The behavior is scoped to process clone/fork inheritance and signal-mask state; it does not change the stable case list.
 - The code preserves signal mask behavior for non-all-mask `rt_sigprocmask()` calls by clearing the restore sentinel.
 - Risk remains moderate because this is Linux/POSIX-visible signal inheritance behavior and uses a libc-pattern heuristic; therefore it is not enough for broad promotion without targeted regression guards.
+
+## Additional /bin/sh compatibility fix review
+
+Reviewed follow-up changes in `examples/shell/src/uspace/process_lifecycle.rs` for `execve("/bin/sh", ...)` compatibility. LTP resource helpers call libc `system()`, which requires a shell at `/bin/sh`; this tree provides suite-local busybox binaries instead of a root-level `/bin/sh`. The fix falls back to the current process exec root's busybox, preserving argv shell dispatch, with musl/glibc fallback ordering.
+
+Review findings:
+
+- This is not case-name hardcoding; it is a general `/bin/sh`/busybox exec compatibility path.
+- It enables real `system("cp ...")` execution for LTP resource copying instead of bypassing test behavior.
+- It does not alter marker output or stable case membership.
+
+Evidence reviewed:
+
+- RV `pipe2_02`: `raw/followup-rv-pipe2_02-binsh-001-summary.txt` PASS 2 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
+- LA `pipe2_02`: `raw/followup-la-pipe2_02-binsh-001-summary.txt` PASS 2 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
+- Marker prefix: `raw/followup-pipe2-binsh-marker-prefix-check.txt` reports `TOTAL markers=4 bad=0`.
 
 ## Evidence reviewed
 

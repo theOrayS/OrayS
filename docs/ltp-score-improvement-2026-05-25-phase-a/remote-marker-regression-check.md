@@ -31,7 +31,15 @@ followup-rv-pipe2_02-resource-prestage-003.log: markers=2 bad=0
 TOTAL markers=42 bad=0
 ```
 
-Evidence: `raw/followup-marker-prefix-check.txt` and `raw/followup-waitpid-marker-prefix-check.txt`.
+Pipe2 `/bin/sh` follow-up scan:
+
+```text
+followup-rv-pipe2_02-binsh-001.log: markers=2 bad=0
+followup-la-pipe2_02-binsh-001.log: markers=2 bad=0
+TOTAL markers=4 bad=0
+```
+
+Evidence: `raw/followup-marker-prefix-check.txt`, `raw/followup-waitpid-marker-prefix-check.txt`, and `raw/followup-pipe2-binsh-marker-prefix-check.txt`.
 
 ## Final decision
 

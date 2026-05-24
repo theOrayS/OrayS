@@ -6,7 +6,7 @@ Result: **NOT PROMOTED**
 
 ## Outcome
 
-`LTP_STABLE_CASES` remains **300 total / 300 unique / 0 duplicates**. No 15-case clean tranche was found; after the follow-up `sched_getscheduler02` and `waitpid01` fixes there are 7 clean seeds, still below +15.
+`LTP_STABLE_CASES` remains **300 total / 300 unique / 0 duplicates**. No 15-case clean tranche was found; after the follow-up `sched_getscheduler02` and `waitpid01` fixes there are 8 clean seeds, still below +15.
 
 ## Fresh follow-up evidence
 
@@ -27,7 +27,10 @@ Result: **NOT PROMOTED**
 - Follow-up waitpid/signal guard gates:
   - RV `raw/followup-rv-waitpid-signal-guard-001-summary.txt`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
   - LA `raw/followup-la-waitpid-signal-guard-001-summary.txt`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
-- `pipe2_02` follow-up `raw/followup-rv-pipe2_02-resource-prestage-003-summary.txt`: PASS 0 / FAIL 2, both libc `TBROK=1` from helper copy/resource setup; not promotion evidence.
+- `pipe2_02` pre-fix follow-up `raw/followup-rv-pipe2_02-resource-prestage-003-summary.txt`: PASS 0 / FAIL 2, both libc `TBROK=1` from helper copy/resource setup; superseded by the `/bin/sh` fix.
+- `pipe2_02` after `/bin/sh` compatibility fix:
+  - RV `raw/followup-rv-pipe2_02-binsh-001-summary.txt`: PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0.
+  - LA `raw/followup-la-pipe2_02-binsh-001-summary.txt`: PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0.
 - Marker-prefix follow-up checks: `raw/followup-marker-prefix-check.txt` and `raw/followup-waitpid-marker-prefix-check.txt` report no bad marker prefixes.
 - LA attempts `followup-la-targeted-001/002/003` were aborted/untrusted due duplicated starts and are excluded from promotion evidence.
 
@@ -39,4 +42,4 @@ Result: **NOT PROMOTED**
 
 ## Gate decision
 
-Blocked. There are only 7 fresh RV+LA x musl+glibc clean candidate cases (`prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01`), below the +15 stable315 tranche threshold. No stable aggregate gate was run and no stable list entry was added.
+Blocked. There are only 8 fresh RV+LA x musl+glibc clean candidate cases (`prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01,pipe2_02`), below the +15 stable315 tranche threshold. No stable aggregate gate was run and no stable list entry was added.
