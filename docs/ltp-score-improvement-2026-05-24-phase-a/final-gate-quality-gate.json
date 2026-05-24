@@ -1,70 +1,54 @@
 {
-  "status": "partial_delivery_blocked_before_stable285",
-  "requestedTarget": "stable300",
-  "highestTrustedStable": 270,
-  "liveStableCases": {
-    "entries": 270,
-    "unique": 270,
-    "duplicates": 0,
-    "snapshot": "docs/ltp-score-improvement-2026-05-24-phase-a/stable270-live.cases"
+  "date": "2026-05-24",
+  "target": "stable300",
+  "stable_cases": {
+    "total": 300,
+    "unique": 300,
+    "duplicates": []
   },
-  "stable270": {
-    "status": "pass",
+  "final_gates": {
     "rv": {
-      "summary": "docs/ltp-score-improvement-2026-05-24-phase-a/stable270-rv-aggregate-summary.txt",
-      "rawLog": "docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable270-rv-aggregate-20260524T112750+0800.log",
-      "passLtpCase": 540,
-      "failLtpCase": 0,
-      "ltpMusl": "270/0",
-      "ltpGlibc": "270/0",
-      "internalTfail": 0,
-      "internalTbrok": 0,
-      "knownTconf": "read02 only",
+      "summary": "stable300-rv-final-summary.txt",
+      "pass_ltp_case": 600,
+      "fail_ltp_case": 0,
+      "ltp_musl": "300/0",
+      "ltp_glibc": "300/0",
+      "internal_tfail": 0,
+      "internal_tbrok": 0,
+      "internal_tconf": 4,
+      "known_tconf": "read02 musl+glibc only",
       "timeout": 0,
       "enosys": 0,
-      "panicTrap": 0
+      "panic_trap": 0
     },
     "la": {
-      "summary": "docs/ltp-score-improvement-2026-05-24-phase-a/stable270-la-aggregate-summary.txt",
-      "rawLog": "docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable270-la-aggregate-20260524T120322+0800.log",
-      "passLtpCase": 540,
-      "failLtpCase": 0,
-      "ltpMusl": "270/0",
-      "ltpGlibc": "270/0",
-      "internalTfail": 0,
-      "internalTbrok": 0,
-      "knownTconf": "read02 only",
+      "summary": "stable300-la-final-summary.txt",
+      "pass_ltp_case": 600,
+      "fail_ltp_case": 0,
+      "ltp_musl": "300/0",
+      "ltp_glibc": "300/0",
+      "internal_tfail": 0,
+      "internal_tbrok": 0,
+      "internal_tconf": 4,
+      "known_tconf": "read02 musl+glibc only",
       "timeout": 0,
       "enosys": 0,
-      "panicTrap": 0
+      "panic_trap": 0
     }
   },
-  "stable285": {
-    "status": "not_reached",
-    "reason": "only four additional fully clean post270 targeted candidates were found"
+  "marker_prefix": {
+    "bad_marker_lines": 0,
+    "checked_glob": "docs/ltp-score-improvement-2026-05-24-phase-a/raw/*.log"
   },
-  "stable300": {
-    "status": "not_delivered",
-    "reason": "insufficient RV+LA musl+glibc clean candidates; final stable300 gates were not run"
-  },
-  "post270CleanNotPromoted": [
-    "sched_getattr02",
-    "open09",
-    "fcntl23",
-    "getegid01_16"
+  "build_validation": [
+    "cargo fmt --all -- --check",
+    "make A=examples/shell ARCH=riscv64",
+    "make all"
   ],
-  "markerPrefix": {
-    "status": "pass",
-    "markerLinesChecked": 1118,
-    "badMarkerLines": 0,
-    "report": "docs/ltp-score-improvement-2026-05-24-phase-a/remote-marker-regression-check.md"
+  "disk_after_cleanup": {
+    "root_used_percent": "35%",
+    "root_available": "38G",
+    "codex_size": "654M"
   },
-  "codeReview": {
-    "recommendation": "approve_stable270_only",
-    "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-code-review-report.md"
-  },
-  "aiSlopCleaner": {
-    "status": "pass_stable270_only",
-    "evidence": "docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-ai-slop-cleaner-report.md"
-  }
+  "decision": "PASS"
 }

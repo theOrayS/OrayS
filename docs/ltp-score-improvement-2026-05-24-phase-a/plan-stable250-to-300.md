@@ -1,70 +1,23 @@
-# LTP stable250 -> stable300 plan (2026-05-24 phase-a)
+# stable250 -> stable300 Ultragoal plan
 
-## Target
+Date: 2026-05-24. Mode: Ultragoal + Team-style lane split, leader-owned final `LTP_STABLE_CASES` and promotion decisions.
 
-Promote `examples/shell/src/cmd.rs::LTP_STABLE_CASES` from the live stable250 baseline to exactly 300 unique LTP cases.
+## Success criteria
 
-## Live baseline refreshed
+- live `examples/shell/src/cmd.rs::LTP_STABLE_CASES`: exactly 300 unique cases.
+- RV final stable gate: PASS LTP CASE 600, FAIL 0; ltp-musl 300/0; ltp-glibc 300/0.
+- LA final stable gate: PASS LTP CASE 600, FAIL 0; ltp-musl 300/0; ltp-glibc 300/0.
+- Internal TFAIL=0, TBROK=0; only disclosed known `read02` TCONF remains as `pass_with_tconf`.
+- timeout/ENOSYS/panic/trap: 0.
+- LTP marker lines start at column 0; 0 bad marker lines.
 
-- Source: `examples/shell/src/cmd.rs::LTP_STABLE_CASES`
-- Refreshed at: 2026-05-24 Asia/Shanghai
-- Entries: 250
-- Unique cases: 250
-- Duplicates: 0
-- Baseline case snapshot: `stable250-live.cases`
-- Previous final gate evidence: `docs/ltp-score-improvement-2026-05-22-phase-d/stable250-post-ansi-*-summary.txt`
+## Phases
 
-## Hard constraints
+1. Refresh baseline from live code and current summaries; do not rely on memory.
+2. Targeted batches of 5-15 cases; only promote cases that are clean across RV+LA and musl+glibc.
+3. Promotion gates: stable270 -> stable285 -> stable300 with aggregate parser summaries.
+4. Final gate: RV+LA stable aggregate, marker prefix check, fmt/build/make all, code review, ai-slop audit, quality JSON, auto commit.
 
-- No fake PASS, no case-name hardcoding, no hiding real failures as SKIP/TCONF/PASS.
-- Timeout, ENOSYS, panic/trap, TFAIL, and TBROK block promotion.
-- Wrapper success is not enough; every gate must be parsed with `python3 -B scripts/ltp_summary.py` or an equivalent case matrix.
-- `read02` remains transparent as known `pass_with_tconf`; new promoted cases must be clean.
-- Remote marker regression must not return: `PASS LTP CASE` / `FAIL LTP CASE` lines must start at column 0.
-- Root-level kernels, sdcard/disk images, large raw logs, and user `Riscv输出.txt` / `LoongArch输出.txt` are not committed by default.
+## Evidence parser
 
-## Promotion stages
-
-### Stage 1: stable270
-
-1. Discover and classify at least 20 clean candidates.
-2. Run targeted batches of 5-15 cases, first RV when risk is unknown, then LA.
-3. Require RV + LA, musl + glibc clean targeted evidence for each promoted case.
-4. Leader updates `LTP_STABLE_CASES` only after evidence is clean.
-5. Run stable aggregate gate and write `stable270-promotion-gate-report.md`.
-
-### Stage 2: stable285
-
-Same gate as stable270 for +15 additional cases. Write `stable285-promotion-gate-report.md`.
-
-### Stage 3: stable300
-
-Same gate as stable270 for +15 additional cases. Write `stable300-delivery-report.md`, quality gate JSON, code review report, ai-slop-cleaner report, and remote marker regression report.
-
-## Team lanes
-
-1. Discovery + promotion matrix: candidate pool 250->330 and classification.
-2. proc/sched/wait/rlimit/process lane.
-3. fd/pipe/open/access/fcntl/fsuid/permission lane.
-4. fs/metadata/stat/statfs/link/rename/truncate lane.
-5. time/signal/timer/memory/mmap + verification guardrail lane.
-
-## Final gate commands
-
-```bash
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la
-python3 -B scripts/ltp_summary.py <rv-log>
-python3 -B scripts/ltp_summary.py <la-log>
-cargo fmt --all -- --check
-make A=examples/shell ARCH=riscv64
-```
-
-Run `make all` if remote-submission behavior or build wrappers are affected.
-
-## Execution update (leader closeout)
-
-- Stage 1 stable270 completed and verified on RV + LA stable aggregate gates.
-- Stage 2 stable285 was not reached: only four additional fully clean post270 candidates were found after stable270.
-- Stage 3 stable300 was not delivered; final stable300 gates were intentionally not run because the live stable list is not 300.
-- Highest trusted result for this phase is stable270. See `stable270-promotion-gate-report.md`, `stable285-promotion-gate-report.md`, and `stable300-delivery-report.md`.
+All promotion/final decisions use `python3 -B scripts/ltp_summary.py <log>` summaries, not wrapper exit alone.

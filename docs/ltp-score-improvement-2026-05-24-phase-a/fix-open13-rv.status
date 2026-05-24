@@ -1,0 +1,4 @@
+command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=open13\ LTP_CASE_TIMEOUT_SECS=60\ ./run-eval.sh\ rv
+exit=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-open13-rv-20260524T152635+0800.log
+cases=open13

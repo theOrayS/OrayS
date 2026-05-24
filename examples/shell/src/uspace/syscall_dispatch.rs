@@ -25,9 +25,9 @@ use super::linux_abi::neg_errno;
 use super::memory_map::{sys_brk, sys_mmap, sys_mprotect, sys_msync, sys_munmap};
 use super::memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use super::metadata::{
-    sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fstat, sys_fstatfs,
-    sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat, sys_truncate, sys_umask,
-    sys_utimensat,
+    sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fgetxattr, sys_fstat,
+    sys_fstatfs, sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat,
+    sys_truncate, sys_umask, sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
 use super::process_abi::{sys_getpgid, sys_getsid, sys_personality, sys_setpgid, sys_setsid};
@@ -54,7 +54,9 @@ use super::signal_abi::{
     sys_kill, sys_rt_sigaction, sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigreturn,
     sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_tgkill, sys_tkill,
 };
-use super::system_info::{sys_getrusage, sys_sysinfo, sys_syslog, sys_uname};
+use super::system_info::{
+    sys_getrusage, sys_prctl, sys_sethostname, sys_sysinfo, sys_syslog, sys_uname,
+};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
     current_process, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
@@ -132,6 +134,9 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_truncate => sys_truncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_ftruncate => sys_ftruncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchmod => sys_fchmod(&process, tf.arg0(), tf.arg1()),
+        general::__NR_fgetxattr => {
+            sys_fgetxattr(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
         general::__NR_fchmodat => sys_fchmodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), 0),
         general::__NR_fchmodat2 => {
             sys_fchmodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
@@ -371,7 +376,15 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_setgroups => sys_setgroups(&process, tf.arg0(), tf.arg1()),
         general::__NR_umask => sys_umask(&process, tf.arg0()),
         general::__NR_personality => sys_personality(&process, tf.arg0()),
-        general::__NR_prctl => 0,
+        general::__NR_prctl => sys_prctl(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_sethostname => sys_sethostname(&process, tf.arg0(), tf.arg1()),
         general::__NR_setpgid => sys_setpgid(&process, tf.arg0(), tf.arg1()),
         general::__NR_getpgid => sys_getpgid(&process, tf.arg0()),
         general::__NR_getsid => sys_getsid(&process, tf.arg0()),

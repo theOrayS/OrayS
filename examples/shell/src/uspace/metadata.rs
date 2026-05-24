@@ -11,14 +11,15 @@ use super::UserProcess;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
 use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    ACCESS_MODE_MASK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
+    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
     FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, STATFS_BLOCK_SIZE,
-    STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
+    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK,
+    ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC, neg_errno,
+    neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
-use super::user_memory::{read_cstr, write_user_bytes, write_user_value};
+use super::user_memory::{read_cstr, validate_user_write, write_user_bytes, write_user_value};
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 const LINUX_PATH_MAX: usize = 4096;
@@ -243,6 +244,9 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
         return neg_errno(LinuxError::EINVAL);
     }
     let length = length as u64;
+    if length > process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current() {
+        return neg_errno(LinuxError::EFBIG);
+    }
     if length > MAX_IN_MEMORY_FILE_SIZE {
         return neg_errno(LinuxError::ENOSPC);
     }
@@ -271,6 +275,19 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
         Err(err) => return neg_errno(err),
     };
     let target_path = dev_shm_host_path(target_path.as_str()).unwrap_or(target_path);
+    let st = match {
+        let mut fds = process.fds.lock();
+        fds.stat_path(process, general::AT_FDCWD, target_path.as_str())
+    } {
+        Ok(st) => st,
+        Err(err) => return neg_errno(err),
+    };
+    if st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
+        return neg_errno(LinuxError::EISDIR);
+    }
+    if !access_allowed(&st, ACCESS_W_OK, process.fs_uid(), process.fs_gid()) {
+        return neg_errno(LinuxError::EACCES);
+    }
 
     let mut opts = OpenOptions::new();
     opts.write(true);
@@ -323,14 +340,18 @@ pub(super) fn sys_umask(process: &UserProcess, mask: usize) -> isize {
 }
 
 pub(super) fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize {
-    let path = match process.fds.lock().entry(fd as i32) {
-        Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
-        Err(err) => {
-            return neg_errno(err);
+    let (path, st) = {
+        let mut fds = process.fds.lock();
+        if matches!(fds.entry(fd as i32), Ok(FdEntry::Path(_))) {
+            return neg_errno(LinuxError::EBADF);
+        }
+        match fds.stat_with_recorded_path(process, fd as i32) {
+            Ok((path, st)) => (path, st),
+            Err(err) => return neg_errno(err),
         }
     };
     if let Some(path) = path {
-        process.set_path_mode(path, mode as u32);
+        process.set_path_mode(path, chmod_effective_mode(process, &st, mode as u32));
     }
     0
 }
@@ -353,7 +374,24 @@ pub(super) fn sys_fchmodat(
         Err(err) => return neg_errno(err),
     };
     let mode = mode as u32;
+    if let Some(fd) = proc_self_fd_number(path.as_str()) {
+        let mut fds = process.fds.lock();
+        if matches!(fds.entry(fd), Ok(FdEntry::Path(_))) {
+            return neg_errno(LinuxError::EBADF);
+        }
+        let (path, st) = match fds.stat_with_recorded_path(process, fd) {
+            Ok((path, st)) => (path, st),
+            Err(err) => return neg_errno(err),
+        };
+        if let Some(path) = path {
+            process.set_path_mode(path, chmod_effective_mode(process, &st, mode));
+        }
+        return 0;
+    }
     if path.is_empty() {
+        if matches!(process.fds.lock().entry(dirfd as i32), Ok(FdEntry::Path(_))) {
+            return neg_errno(LinuxError::EBADF);
+        }
         if flags & general::AT_EMPTY_PATH == 0 {
             return neg_errno(LinuxError::ENOENT);
         }
@@ -361,21 +399,31 @@ pub(super) fn sys_fchmodat(
             let cwd = process.cwd();
             return match axfs::api::metadata(cwd.as_str()) {
                 Ok(_) => {
-                    process.set_path_mode(cwd, mode);
+                    let mut fds = process.fds.lock();
+                    let st = match fds.stat_path(process, general::AT_FDCWD, ".") {
+                        Ok(st) => st,
+                        Err(err) => return neg_errno(err),
+                    };
+                    process.set_path_mode(cwd, chmod_effective_mode(process, &st, mode));
                     0
                 }
                 Err(err) => neg_errno(LinuxError::from(err)),
             };
         }
-        return match process.fds.lock().entry(dirfd as i32) {
-            Ok(entry) => {
-                if let Some(path) = fd_entry_path(entry) {
-                    process.set_path_mode(path.to_string(), mode);
-                }
-                0
+        let (path, st) = {
+            let mut fds = process.fds.lock();
+            if matches!(fds.entry(dirfd as i32), Ok(FdEntry::Path(_))) {
+                return neg_errno(LinuxError::EBADF);
             }
-            Err(err) => neg_errno(err),
+            match fds.stat_with_recorded_path(process, dirfd as i32) {
+                Ok((path, st)) => (path, st),
+                Err(err) => return neg_errno(err),
+            }
         };
+        if let Some(path) = path {
+            process.set_path_mode(path, chmod_effective_mode(process, &st, mode));
+        }
+        return 0;
     }
 
     let mut fds = process.fds.lock();
@@ -386,16 +434,32 @@ pub(super) fn sys_fchmodat(
         }
     };
     if axfs::api::metadata(resolved_path.as_str()).is_ok() {
-        process.set_path_mode(resolved_path, mode);
+        let st = match fds.stat_path(process, dirfd as i32, path.as_str()) {
+            Ok(st) => st,
+            Err(err) => return neg_errno(err),
+        };
+        process.set_path_mode(resolved_path, chmod_effective_mode(process, &st, mode));
         return 0;
     }
     match fds.stat_path(process, dirfd as i32, path.as_str()) {
-        Ok(_) => {
-            process.set_path_mode(resolved_path, mode);
+        Ok(st) => {
+            process.set_path_mode(resolved_path, chmod_effective_mode(process, &st, mode));
             0
         }
         Err(err) => neg_errno(err),
     }
+}
+
+fn chmod_effective_mode(process: &UserProcess, st: &general::stat, mode: u32) -> u32 {
+    let mut mode = mode;
+    if process.uid() != 0
+        && st.st_mode & ST_MODE_DIR != 0
+        && mode & FILE_MODE_SET_GID != 0
+        && !process.has_group(st.st_gid)
+    {
+        mode &= !FILE_MODE_SET_GID;
+    }
+    mode
 }
 
 pub(super) fn sys_fchown(process: &UserProcess, fd: usize, owner: usize, group: usize) -> isize {
@@ -403,15 +467,39 @@ pub(super) fn sys_fchown(process: &UserProcess, fd: usize, owner: usize, group: 
         Ok(ids) => ids,
         Err(err) => return neg_errno(err),
     };
-    let (path, st) = match process
-        .fds
-        .lock()
-        .stat_with_recorded_path(process, fd as i32)
-    {
-        Ok((path, st)) => (path, st),
-        Err(err) => return neg_errno(err),
+    let (path, st) = {
+        let mut fds = process.fds.lock();
+        if matches!(fds.entry(fd as i32), Ok(FdEntry::Path(_))) {
+            return neg_errno(LinuxError::EBADF);
+        }
+        match fds.stat_with_recorded_path(process, fd as i32) {
+            Ok((path, st)) => (path, st),
+            Err(err) => return neg_errno(err),
+        }
     };
     apply_chown_metadata(process, path, &st, owner, group)
+}
+
+pub(super) fn sys_fgetxattr(
+    process: &UserProcess,
+    fd: usize,
+    name: usize,
+    value: usize,
+    size: usize,
+) -> isize {
+    if name == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    if value != 0 && size != 0 {
+        if let Err(err) = validate_user_write(process, value, size) {
+            return neg_errno(err);
+        }
+    }
+    match process.fds.lock().entry(fd as i32) {
+        Ok(FdEntry::Path(_)) => neg_errno(LinuxError::EBADF),
+        Ok(_) => neg_errno(LinuxError::ENODATA),
+        Err(err) => neg_errno(err),
+    }
 }
 
 pub(super) fn sys_fchownat(
@@ -438,7 +526,21 @@ pub(super) fn sys_fchownat(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
+    if let Some(fd) = proc_self_fd_number(path.as_str()) {
+        let mut fds = process.fds.lock();
+        if matches!(fds.entry(fd), Ok(FdEntry::Path(_))) {
+            return neg_errno(LinuxError::EBADF);
+        }
+        let (path, st) = match fds.stat_with_recorded_path(process, fd) {
+            Ok((path, st)) => (path, st),
+            Err(err) => return neg_errno(err),
+        };
+        return apply_chown_metadata(process, path, &st, owner, group);
+    }
     let (record_path, st) = if path.is_empty() {
+        if matches!(process.fds.lock().entry(dirfd as i32), Ok(FdEntry::Path(_))) {
+            return neg_errno(LinuxError::EBADF);
+        }
         if flags & general::AT_EMPTY_PATH == 0 {
             return neg_errno(LinuxError::ENOENT);
         }
@@ -472,6 +574,16 @@ pub(super) fn sys_fchownat(
         (Some(resolved_path), st)
     };
     apply_chown_metadata(process, record_path, &st, owner, group)
+}
+
+fn proc_self_fd_number(path: &str) -> Option<i32> {
+    let rest = path
+        .strip_prefix("/proc/self/fd/")
+        .or_else(|| path.strip_prefix("/dev/fd/"))?;
+    if rest.is_empty() || rest.contains('/') {
+        return None;
+    }
+    rest.parse().ok()
 }
 
 pub(super) fn fd_entry_statfs_path(entry: &FdEntry) -> Option<&str> {
@@ -785,6 +897,22 @@ pub(super) fn sys_readlinkat(
             Err(err) => return neg_errno(err),
         }
     };
+    if let Some(fd) = proc_self_fd_number(resolved_path.as_str()) {
+        let target = {
+            let table = process.fds.lock();
+            match table.entry(fd) {
+                Ok(entry) => match fd_entry_path(entry) {
+                    Some(path) => path.to_string(),
+                    None => return neg_errno(LinuxError::EINVAL),
+                },
+                Err(err) => return neg_errno(err),
+            }
+        };
+        let bytes = target.as_bytes();
+        let copy_len = cmp::min(bytes.len(), bufsiz);
+        return write_user_bytes(process, buf, &bytes[..copy_len])
+            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
+    }
     if let Some(target) = proc_exe_link_target(process, resolved_path.as_str()) {
         let bytes = target.as_bytes();
         let copy_len = cmp::min(bytes.len(), bufsiz);

@@ -1,11 +1,14 @@
 use core::{cmp, mem::size_of};
+use std::string::String;
 
 use axalloc::global_allocator;
 use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
 use super::task_registry::live_user_thread_count;
-use super::user_memory::{validate_user_write, write_user_bytes, write_user_value};
+use super::user_memory::{
+    read_user_bytes, validate_user_write, write_user_bytes, write_user_value,
+};
 use super::{UserProcess, neg_errno};
 
 pub(super) enum SyslogAction {
@@ -89,7 +92,9 @@ fn default_utsname() -> system::new_utsname {
 }
 
 pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize {
-    let value = default_utsname();
+    let mut value = default_utsname();
+    let hostname = process.hostname();
+    write_c_string(&mut value.nodename, hostname.as_bytes());
     write_user_value(process, buf, &value)
 }
 
@@ -117,6 +122,92 @@ pub(super) fn sys_getrusage(process: &UserProcess, who: i32, usage: usize) -> is
 
 pub(super) fn sys_uname(process: &UserProcess, buf: usize) -> isize {
     write_default_utsname(process, buf)
+}
+
+const HOST_NAME_MAX: usize = 64;
+const TASK_COMM_LEN: usize = 16;
+const PR_SET_PDEATHSIG: usize = 1;
+const PR_GET_PDEATHSIG: usize = 2;
+const PR_SET_NAME: usize = 15;
+const PR_GET_NAME: usize = 16;
+
+pub(super) fn sys_sethostname(process: &UserProcess, name: usize, len: usize) -> isize {
+    if len > HOST_NAME_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if process.uid() != 0 {
+        return neg_errno(LinuxError::EPERM);
+    }
+    if len > 0 && name == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let hostname = if len > 0 {
+        let Ok(bytes) = read_user_bytes(process, name, len) else {
+            return neg_errno(LinuxError::EFAULT);
+        };
+        String::from_utf8_lossy(&bytes).into_owned()
+    } else {
+        String::new()
+    };
+    process.set_hostname(hostname);
+    0
+}
+
+pub(super) fn sys_prctl(
+    process: &UserProcess,
+    option: usize,
+    arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+) -> isize {
+    match option {
+        PR_SET_PDEATHSIG => {
+            if arg2 > 64 {
+                return neg_errno(LinuxError::EINVAL);
+            }
+            process
+                .parent_death_signal
+                .store(arg2 as i32, core::sync::atomic::Ordering::Release);
+            0
+        }
+        PR_GET_PDEATHSIG => {
+            if arg2 == 0 {
+                return neg_errno(LinuxError::EFAULT);
+            }
+            let value = process
+                .parent_death_signal
+                .load(core::sync::atomic::Ordering::Acquire);
+            write_user_value(process, arg2, &value)
+        }
+        PR_SET_NAME => {
+            if arg2 == 0 {
+                return neg_errno(LinuxError::EFAULT);
+            }
+            let bytes = match read_user_bytes(process, arg2, TASK_COMM_LEN) {
+                Ok(bytes) => bytes,
+                Err(err) => return neg_errno(err),
+            };
+            let name_len = bytes
+                .iter()
+                .position(|&byte| byte == 0)
+                .unwrap_or(TASK_COMM_LEN - 1)
+                .min(TASK_COMM_LEN - 1);
+            process.set_prctl_name(String::from_utf8_lossy(&bytes[..name_len]).into_owned());
+            0
+        }
+        PR_GET_NAME => {
+            if arg2 == 0 {
+                return neg_errno(LinuxError::EFAULT);
+            }
+            let name = process.prctl_name();
+            let mut bytes = [0u8; TASK_COMM_LEN];
+            let copy_len = cmp::min(name.as_bytes().len(), TASK_COMM_LEN - 1);
+            bytes[..copy_len].copy_from_slice(&name.as_bytes()[..copy_len]);
+            write_user_bytes(process, arg2, &bytes).map_or_else(|err| neg_errno(err), |_| 0)
+        }
+        _ => neg_errno(LinuxError::EINVAL),
+    }
 }
 
 fn default_sysinfo() -> system::sysinfo {

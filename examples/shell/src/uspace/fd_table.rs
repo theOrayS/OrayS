@@ -7,7 +7,7 @@ use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
 use linux_raw_sys::{general, ioctl};
 use std::string::{String, ToString};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
 use super::UserProcess;
@@ -31,18 +31,18 @@ use super::runtime_paths::{
 };
 use super::select_fdset::SelectMode;
 use super::synthetic_fs::{
-    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_pid_stat_fd_entry,
-    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
-    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    synthetic_file_is_writable_open, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry,
+    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
+    proc_comm_path_entry, proc_pid_stat_fd_entry, proc_pid_stat_path_entry,
+    proc_pid_status_fd_entry, proc_pid_status_path_entry, proc_self_maps_fd_entry,
+    proc_self_maps_is_writable_open, proc_self_maps_path_entry, synthetic_file_is_writable_open,
+    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
     MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer,
-    validate_user_write, with_readable_user_buffer, with_writable_user_buffer, write_user_bytes,
-    write_user_value,
+    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
+    write_user_bytes, write_user_value,
 };
 
 pub(super) struct FdTable {
@@ -51,6 +51,8 @@ pub(super) struct FdTable {
 }
 
 const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
+const LINUX_PATH_MAX: usize = 4096;
+const LINUX_NAME_MAX: usize = 255;
 
 pub(super) enum FdEntry {
     Stdin,
@@ -73,6 +75,7 @@ pub(super) struct FileEntry {
     pub(super) file: File,
     pub(super) path: String,
     pub(super) status_flags: u32,
+    offset: Arc<Mutex<u64>>,
 }
 
 #[derive(Clone)]
@@ -148,7 +151,12 @@ pub(super) fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> 
     if length < 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    match process.fds.lock().truncate(fd as i32, length as u64) {
+    let length = length as u64;
+    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+    if length > file_size_limit {
+        return neg_errno(LinuxError::EFBIG);
+    }
+    match process.fds.lock().truncate(fd as i32, length) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -172,6 +180,10 @@ pub(super) fn sys_fallocate(
     let Some(end) = (offset as u64).checked_add(len as u64) else {
         return neg_errno(LinuxError::EFBIG);
     };
+    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+    if end > file_size_limit {
+        return neg_errno(LinuxError::EFBIG);
+    }
     match process.fds.lock().truncate(fd as i32, end) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
@@ -242,26 +254,32 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
     };
     let mut written = 0isize;
     for entry in iov_entries {
-        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        if len == 0 {
-            continue;
+        let mut base = entry.iov_base as usize;
+        let mut remaining = entry.iov_len as usize;
+        if let Err(err) = validate_user_read(process, base, remaining) {
+            return if written > 0 { written } else { neg_errno(err) };
         }
-        let src = match read_user_bytes(process, entry.iov_base as usize, len) {
-            Ok(bytes) => bytes,
-            Err(err) => return if written > 0 { written } else { neg_errno(err) },
-        };
-        let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
-        let n = match process
-            .fds
-            .lock()
-            .write(fd as i32, &src, Some(file_size_limit))
-        {
-            Ok(v) => v,
-            Err(err) => return if written > 0 { written } else { neg_errno(err) },
-        };
-        written += n as isize;
-        if n < len {
-            break;
+        while remaining > 0 {
+            let len = remaining.min(MAX_USER_IO_CHUNK);
+            let src = match read_user_bytes(process, base, len) {
+                Ok(bytes) => bytes,
+                Err(err) => return if written > 0 { written } else { neg_errno(err) },
+            };
+            let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+            let n = match process
+                .fds
+                .lock()
+                .write(fd as i32, &src, Some(file_size_limit))
+            {
+                Ok(v) => v,
+                Err(err) => return if written > 0 { written } else { neg_errno(err) },
+            };
+            written += n as isize;
+            if n < len {
+                return written;
+            }
+            base = base.saturating_add(n);
+            remaining -= n;
         }
     }
     written
@@ -274,35 +292,37 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
     };
     let mut total = 0isize;
     for entry in iov_entries {
-        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        if len == 0 {
-            continue;
-        }
-        let base = entry.iov_base as usize;
-        if let Err(err) = validate_user_write(process, base, len) {
+        let mut base = entry.iov_base as usize;
+        let mut remaining = entry.iov_len as usize;
+        if let Err(err) = validate_user_write(process, base, remaining) {
             return if total > 0 { total } else { neg_errno(err) };
         }
-        let mut bytes = match user_io_buffer(len) {
-            Ok(bytes) => bytes,
-            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-        };
-        let n = match process.fds.lock().read(fd as i32, &mut bytes) {
-            Ok(v) => v,
-            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-        };
-        if n > len {
-            return if total > 0 {
-                total
-            } else {
-                neg_errno(LinuxError::EINVAL)
+        while remaining > 0 {
+            let len = remaining.min(MAX_USER_IO_CHUNK);
+            let mut bytes = match user_io_buffer(len) {
+                Ok(bytes) => bytes,
+                Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
-        }
-        if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
-            return if total > 0 { total } else { neg_errno(err) };
-        }
-        total += n as isize;
-        if n < len {
-            break;
+            let n = match process.fds.lock().read(fd as i32, &mut bytes) {
+                Ok(v) => v,
+                Err(err) => return if total > 0 { total } else { neg_errno(err) },
+            };
+            if n > len {
+                return if total > 0 {
+                    total
+                } else {
+                    neg_errno(LinuxError::EINVAL)
+                };
+            }
+            if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
+                return if total > 0 { total } else { neg_errno(err) };
+            }
+            total += n as isize;
+            if n < len {
+                return total;
+            }
+            base = base.saturating_add(n);
+            remaining -= n;
         }
     }
     total
@@ -326,33 +346,36 @@ pub(super) fn sys_preadv(
     let mut total = 0isize;
     let mut next_offset = offset as u64;
     for entry in iov_entries {
-        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        if len == 0 {
-            continue;
-        }
-        let base = entry.iov_base as usize;
-        if let Err(err) = validate_user_write(process, base, len) {
+        let mut base = entry.iov_base as usize;
+        let mut remaining = entry.iov_len as usize;
+        if let Err(err) = validate_user_write(process, base, remaining) {
             return if total > 0 { total } else { neg_errno(err) };
         }
-        let mut bytes = match user_io_buffer(len) {
-            Ok(bytes) => bytes,
-            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-        };
-        let n = match process
-            .fds
-            .lock()
-            .read_file_at_into_fd(fd as i32, next_offset, &mut bytes)
-        {
-            Ok(v) => v,
-            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-        };
-        if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
-            return if total > 0 { total } else { neg_errno(err) };
-        }
-        total += n as isize;
-        next_offset = next_offset.saturating_add(n as u64);
-        if n < len {
-            break;
+        while remaining > 0 {
+            let len = remaining.min(MAX_USER_IO_CHUNK);
+            let mut bytes = match user_io_buffer(len) {
+                Ok(bytes) => bytes,
+                Err(err) => return if total > 0 { total } else { neg_errno(err) },
+            };
+            let n =
+                match process
+                    .fds
+                    .lock()
+                    .read_file_at_into_fd(fd as i32, next_offset, &mut bytes)
+                {
+                    Ok(v) => v,
+                    Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                };
+            if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
+                return if total > 0 { total } else { neg_errno(err) };
+            }
+            total += n as isize;
+            next_offset = next_offset.saturating_add(n as u64);
+            if n < len {
+                return total;
+            }
+            base = base.saturating_add(n);
+            remaining -= n;
         }
     }
     total
@@ -376,26 +399,32 @@ pub(super) fn sys_pwritev(
     let mut total = 0isize;
     let mut next_offset = offset as u64;
     for entry in iov_entries {
-        let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        if len == 0 {
-            continue;
+        let mut base = entry.iov_base as usize;
+        let mut remaining = entry.iov_len as usize;
+        if let Err(err) = validate_user_read(process, base, remaining) {
+            return if total > 0 { total } else { neg_errno(err) };
         }
-        let src = match read_user_bytes(process, entry.iov_base as usize, len) {
-            Ok(bytes) => bytes,
-            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-        };
-        let n = match process
-            .fds
-            .lock()
-            .write_file_at(fd as i32, next_offset, &src)
-        {
-            Ok(v) => v,
-            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-        };
-        total += n as isize;
-        next_offset = next_offset.saturating_add(n as u64);
-        if n < len {
-            break;
+        while remaining > 0 {
+            let len = remaining.min(MAX_USER_IO_CHUNK);
+            let src = match read_user_bytes(process, base, len) {
+                Ok(bytes) => bytes,
+                Err(err) => return if total > 0 { total } else { neg_errno(err) },
+            };
+            let n = match process
+                .fds
+                .lock()
+                .write_file_at(fd as i32, next_offset, &src)
+            {
+                Ok(v) => v,
+                Err(err) => return if total > 0 { total } else { neg_errno(err) },
+            };
+            total += n as isize;
+            next_offset = next_offset.saturating_add(n as u64);
+            if n < len {
+                return total;
+            }
+            base = base.saturating_add(n);
+            remaining -= n;
         }
     }
     total
@@ -604,9 +633,17 @@ pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
 
 pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize {
     const BLKGETSIZE64: u32 = 0x8008_1272;
+    const FIONREAD: u32 = 0x541b;
     if req as u32 == BLKGETSIZE64 && process.fds.lock().is_block_device(fd as i32) {
         let size: u64 = 512 * 1024 * 1024;
         return write_user_value(process, arg, &size);
+    }
+    if req as u32 == FIONREAD {
+        let available = match process.fds.lock().pipe_available_read(fd as i32) {
+            Ok(available) => available as i32,
+            Err(err) => return neg_errno(err),
+        };
+        return write_user_value(process, arg, &available);
     }
     if req as u32 == RTC_RD_TIME && process.fds.lock().is_rtc(fd as i32) {
         let rtc = rtc_time_from_wall_time();
@@ -661,6 +698,20 @@ impl FdTable {
         matches!(self.entry(fd), Ok(FdEntry::BlockDevice(_)))
     }
 
+    pub(super) fn pipe_available_read(&self, fd: i32) -> Result<usize, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) => Ok(pipe.available_read()),
+            _ => Err(LinuxError::ENOTTY),
+        }
+    }
+
+    pub(super) fn pipe_capacity(&self, fd: i32) -> Result<usize, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) => Ok(pipe.capacity()),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
     pub(super) fn poll(&self, fd: i32, mode: SelectMode) -> bool {
         let Ok(entry) = self.entry(fd) else {
             return matches!(mode, SelectMode::Except);
@@ -710,7 +761,7 @@ impl FdTable {
                 if !file_is_readable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
-                file.file.read(dst).map_err(LinuxError::from)
+                file_entry_read(file, dst)
             }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
             FdEntry::Directory(_) => Err(LinuxError::EISDIR),
@@ -740,7 +791,7 @@ impl FdTable {
                     return Err(LinuxError::EBADF);
                 }
                 let src = limit_file_write_len(file, src, file_size_limit)?;
-                file.file.write(src).map_err(LinuxError::from)
+                file_entry_write(file, src)
             }
             FdEntry::Pipe(pipe) => pipe.write(src),
             FdEntry::Socket(socket) => socket.write(src),
@@ -817,6 +868,9 @@ impl FdTable {
     pub(super) fn truncate(&mut self, fd: i32, size: u64) -> Result<(), LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EINVAL);
+                }
                 if size > MAX_IN_MEMORY_FILE_SIZE {
                     return Err(LinuxError::ENOSPC);
                 }
@@ -843,7 +897,7 @@ impl FdTable {
             _ => return Err(LinuxError::EINVAL),
         };
         match self.entry_mut(fd)? {
-            FdEntry::File(file) => file.file.seek(pos).map_err(LinuxError::from),
+            FdEntry::File(file) => file_entry_seek(file, pos),
             FdEntry::DevNull => Ok(0),
             FdEntry::BlockDevice(_) => Ok(0),
             FdEntry::Rtc => Ok(0),
@@ -1272,6 +1326,8 @@ impl FdTable {
     }
 
     pub(super) fn fcntl(&mut self, fd: i32, cmd: u32, arg: usize) -> Result<i32, LinuxError> {
+        const F_SETPIPE_SZ: u32 = 1031;
+        const F_GETPIPE_SZ: u32 = 1032;
         if matches!(self.entry(fd)?, FdEntry::Path(_)) && cmd == general::F_GETFL {
             return Ok(O_PATH_FLAG as i32);
         }
@@ -1334,6 +1390,18 @@ impl FdTable {
                 FdEntry::File(file) => Ok(file.status_flags as i32),
                 FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
                 _ => Ok(0),
+            },
+            F_GETPIPE_SZ => Ok(self.pipe_capacity(fd)? as i32),
+            F_SETPIPE_SZ => match self.entry(fd)? {
+                FdEntry::Pipe(pipe) => {
+                    let capacity = pipe.capacity();
+                    if arg <= capacity {
+                        Ok(capacity as i32)
+                    } else {
+                        Err(LinuxError::EPERM)
+                    }
+                }
+                _ => Err(LinuxError::EBADF),
             },
             general::F_SETFL => match self.entry_mut(fd)? {
                 FdEntry::File(file) => {
@@ -1461,6 +1529,14 @@ fn open_fd_entry(
     flags: u32,
     mode: u32,
 ) -> Result<FdEntry, LinuxError> {
+    if path.len() >= LINUX_PATH_MAX
+        || path
+            .split('/')
+            .any(|component| component.len() > LINUX_NAME_MAX)
+    {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+
     let mut opts = OpenOptions::new();
     let access = flags & general::O_ACCMODE;
     if access == general::O_WRONLY {
@@ -1558,6 +1634,41 @@ fn file_is_writable(status_flags: u32) -> bool {
         status_flags & general::O_ACCMODE,
         general::O_WRONLY | general::O_RDWR
     )
+}
+
+fn file_entry_read(file: &mut FileEntry, dst: &mut [u8]) -> Result<usize, LinuxError> {
+    let mut offset = file.offset.lock();
+    let read = file.file.read_at(*offset, dst).map_err(LinuxError::from)?;
+    *offset = (*offset).saturating_add(read as u64);
+    Ok(read)
+}
+
+fn file_entry_write(file: &mut FileEntry, src: &[u8]) -> Result<usize, LinuxError> {
+    let mut offset = file.offset.lock();
+    let write_offset = if file.status_flags & general::O_APPEND != 0 {
+        file.file.get_attr().map_err(LinuxError::from)?.size()
+    } else {
+        *offset
+    };
+    let written = file
+        .file
+        .write_at(write_offset, src)
+        .map_err(LinuxError::from)?;
+    *offset = write_offset.saturating_add(written as u64);
+    Ok(written)
+}
+
+fn file_entry_seek(file: &mut FileEntry, pos: SeekFrom) -> Result<u64, LinuxError> {
+    let size = file.file.get_attr().map_err(LinuxError::from)?.size();
+    let mut offset = file.offset.lock();
+    let next = match pos {
+        SeekFrom::Start(pos) => Some(pos),
+        SeekFrom::Current(off) => (*offset).checked_add_signed(off),
+        SeekFrom::End(off) => size.checked_add_signed(off),
+    }
+    .ok_or(LinuxError::EINVAL)?;
+    *offset = next;
+    Ok(next)
 }
 
 fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {
@@ -1673,6 +1784,19 @@ fn open_candidates(
             }
             return Ok(entry);
         }
+        if let Some(entry) = if path_only {
+            proc_comm_path_entry(process, path.as_str())
+        } else {
+            proc_comm_fd_entry(process, path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
         if let Some((synthetic_path, data)) = synthetic_userdb_content(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -1727,6 +1851,15 @@ fn open_candidates(
             }
             continue;
         }
+        if flags & O_PATH_FLAG == 0
+            && matches!(
+                flags & general::O_ACCMODE,
+                general::O_WRONLY | general::O_RDWR
+            )
+            && matches!(open_dir_entry(path.as_str()), Ok(FdEntry::Directory(_)))
+        {
+            return Err(LinuxError::EISDIR);
+        }
         let created_by_this_open = !path_only
             && flags & general::O_CREAT != 0
             && axfs::api::metadata(path.as_str()).is_err();
@@ -1760,6 +1893,7 @@ fn open_candidates(
                     file,
                     path: path.clone(),
                     status_flags: fcntl_status_flags(flags),
+                    offset: Arc::new(Mutex::new(0)),
                 }));
             }
             Err(err) => {

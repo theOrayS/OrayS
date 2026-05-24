@@ -1,32 +1,52 @@
 # stable300 delivery report
 
-Status: **NOT DELIVERED**.
+## Delivered state
 
-## Delivery outcome
+- live stable cases: total=300, unique=300, duplicates=0.
+- stable300 final tranche: `nice01, nice02, prctl01, sethostname01, sethostname02, sethostname03, clock_nanosleep04, nanosleep04, nice03, fcntl23_64, setuid03, prctl05, ftruncate03, truncate03, lseek07`.
+- Final RV log: `raw/stable300-rv-final-yield.log`.
+- Final LA log: `raw/stable300-la-final-yield.log`.
 
-- Requested target: stable300.
-- Delivered, verified target in this run: **stable270**.
-- Live `LTP_STABLE_CASES`: 270 entries, 270 unique, 0 duplicates.
-- Stable300 final gates were **not run**, because the live stable list is not 300 and promotion evidence is insufficient.
+## Final RV parser summary
 
-## Why stable300 is blocked
+- PASS LTP CASE: 600
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 4 ({'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+- ltp-musl: 300 passed, 0 failed
+- ltp-glibc: 300 passed, 0 failed
 
-The run produced a real stable270 promotion with RV+LA aggregate proof. Post270 discovery did not find enough clean candidates for stable285/300:
+## Final LA parser summary
 
-- only four additional fully clean targeted candidates were found (`sched_getattr02`, `open09`, `fcntl23`, `getegid01_16`);
-- user-priority permission/pipe/mmap groups still contain real failures, timeouts, ENOSYS, TCONF, or TBROK and cannot be promoted truthfully;
-- wait/fork expansion promoted the clean `waitid*` subset, but `waitpid01` and several harder waitid/kill cases still fail;
-- timer/openat2/close_range/statx discovery exposed missing or incomplete syscall/device semantics, not clean candidates.
+- PASS LTP CASE: 600
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 4 ({'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+- ltp-musl: 300 passed, 0 failed
+- ltp-glibc: 300 passed, 0 failed
 
-## Stable270 final evidence retained as highest trusted gate
+## `read02` caveat
 
-| Arch | Summary | Result |
-| --- | --- | --- |
-| RV | `stable270-rv-aggregate-summary.txt` | PASS LTP CASE 540, FAIL 0; ltp-musl 270/0; ltp-glibc 270/0; TFAIL/TBROK 0; known `read02` TCONF only; timeout/ENOSYS/panic-trap 0 |
-| LA | `stable270-la-aggregate-summary.txt` | PASS LTP CASE 540, FAIL 0; ltp-musl 270/0; ltp-glibc 270/0; TFAIL/TBROK 0; known `read02` TCONF only; timeout/ENOSYS/panic-trap 0 |
+`read02` remains in stable as transparent `pass_with_tconf`: 2 entries per architecture aggregate (musl+glibc). It is not described as clean. No other stable case introduced TFAIL/TBROK/TCONF.
 
-## Not run
+## Remote marker regression check
 
-- stable285 aggregate gate: not run because stable285 was not promoted.
-- stable300 aggregate gate: not run because stable300 was not promoted.
-- remote submission `make all`: not run as a final remote gate in this run; `run-eval.sh` builds produced fresh root `kernel-rv`/`kernel-la` artifacts but those generated files are not committed.
+`remote-marker-regression-check.md` records 0 bad marker lines; every `PASS LTP CASE` / `FAIL LTP CASE` marker found in phase raw logs starts at column 0.
+
+## Validation commands
+
+- `python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable300-rv-final-yield.log`
+- `python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable300-la-final-yield.log`
+- `cargo fmt --all -- --check`
+- `make A=examples/shell ARCH=riscv64`
+- `make all`
+- marker-prefix scanner over `docs/ltp-score-improvement-2026-05-24-phase-a/raw/*.log`
+- `df -h / /root && du -sh /root/.codex`
+
+## User-visible / ABI/POSIX behavior
+
+This delivery intentionally changes POSIX-observable syscall behavior for LTP compatibility: iovec validation and vector I/O semantics, shared fd offset and append behavior, pipe `pipe2`/fcntl/ioctl behavior, `/proc/*/comm`, `prctl` name/PDEATHSIG support, sethostname/gethostname UTS nodename behavior, ftruncate/truncate RLIMIT/errno behavior, selected `O_PATH` metadata errno behavior, and `/proc/self/fd` readlink handling.
