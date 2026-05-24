@@ -14,30 +14,31 @@ Delivered state: **stable300 retained**
 
 ## What was completed
 
-- Team mode launched and shut down; terminal team state reached `pending=0`, `in_progress=0`, `failed=0` before shutdown.
+- Team state prompt was rechecked during this handoff; `omx team status ltp-stable300-to-stab-7c9de325` now reports no team state and the referenced leader mailbox is missing, so the worker prompts are stale.
 - Discovery/report lanes produced candidate matrices for permissions/VFS, fd/pipe/iovec, process/wait/signal/rlimit, and mmap/mprotect/munmap.
-- Two real implementation changes were integrated by Team checkpoints:
+- Earlier Team-integrated implementation changes remained in place:
   - LTP runner environment/cwd handling for resource-helper cases (`LTPROOT`, `PATH`, per-case `/tmp/ltp-work/<case>-run`).
   - Linux-visible `prlimit64(current pid)` acceptance plus default-fatal signal delivery/exit handling.
-- Validation completed before the follow-up targeted gates:
+  - LoongArch musl scheduler wrapper patch preserving libc errno semantics for `sched_getscheduler02`.
+- This follow-up added a real wait/signal fix: fork-like process children restore the pre-libc-fork all-application signal mask when libc temporarily blocks every maskable signal around fork.
+- Validation completed before or during follow-up gates:
   - `cargo fmt --all -- --check` passed.
-  - `python3 -B scripts/test_ltp_summary.py` passed.
+  - `python3 -B scripts/test_ltp_summary.py` passed earlier in this phase.
   - `git diff --check` passed.
-  - `make A=examples/shell ARCH=riscv64` passed and regenerated remote-submission `kernel-rv`/`kernel-la` outputs through the Makefile path.
-- Fresh follow-up targeted evidence was collected:
-  - RV `followup-rv-targeted-001`: `PASS LTP CASE 13`, `FAIL LTP CASE 3`; `pipe2_02` TBROK on both libc and `waitpid01` musl TFAIL=40.
-  - LA `followup-la-targeted-004`: `PASS LTP CASE 11`, `FAIL LTP CASE 1`; `sched_getscheduler02` LA/musl TFAIL=1.
-  - Follow-up `sched_getscheduler02` LA afterfix: parser semantic PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0.
-  - Follow-up marker-prefix scan: `TOTAL markers=30 bad=0`.
+  - `make A=examples/shell ARCH=riscv64` passed.
+  - RV targeted `followup-rv-waitpid01-maskrestore-001`: PASS 2 / FAIL 0; `ltp-musl 1/0`, `ltp-glibc 1/0`; internal TFAIL/TBROK/TCONF=0.
+  - LA targeted `followup-la-waitpid01-maskrestore-001`: PASS 2 / FAIL 0; `ltp-musl 1/0`, `ltp-glibc 1/0`; internal TFAIL/TBROK/TCONF=0.
+  - RV guard `followup-rv-waitpid-signal-guard-001`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0.
+  - LA guard `followup-la-waitpid-signal-guard-001`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0.
+  - Follow-up marker-prefix scan over new waitpid/pipe logs: `TOTAL markers=42 bad=0`.
 
 ## Why stable350 was not delivered
 
-Fresh candidate evidence now contains six four-way clean cases after the serialized `sched_getscheduler02` LA/musl fix: `prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04`. This is useful but still below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
+Fresh candidate evidence now contains seven four-way clean cases: `prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01`. This is useful but still below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
 
-Current high-value blockers:
+Current high-value blocker:
 
-- `pipe2_02`: fresh RV targeted still TBROK on both libc from helper/resource setup.
-- `waitpid01`: fresh RV targeted still musl TFAIL=40 in wait-status/signal semantics.
+- `pipe2_02`: fresh RV targeted still TBROK on both libc from helper/resource setup; latest leader workaround was reverted because it did not fix LTP's resource copy path.
 
 Post-Team LA attempts `followup-la-targeted-001/002/003` were aborted/untrusted due duplicated starts and are not used as evidence.
 
@@ -50,4 +51,5 @@ No timeout, ENOSYS, panic/trap, TFAIL, TBROK, or TCONF was converted to PASS. No
 - LTP runner behavior: cases with `<case>_*` resource helpers may run from a per-case work directory with `LTPROOT` and adjusted `PATH`; this is harness/environment behavior for executing real LTP binaries, not a PASS shim.
 - POSIX/Linux-visible behavior: `prlimit64` now accepts the current process pid as a valid current target; default-fatal self/pending signals are handled more synchronously when unblocked or delivered.
 - LoongArch musl loader behavior: ENOSYS-only exported musl scheduler wrappers are patched to issue the real syscall and tail-call musl `__syscall_ret`, preserving libc errno semantics while raw syscall paths still return raw `-errno`.
+- POSIX/Linux-visible behavior added by this follow-up: fork-like process creation now avoids leaking libc's transient all-application-signal mask into the child, so default-fatal child signals are reported through wait status instead of being spuriously blocked until normal exit.
 - `LTP_STABLE_CASES` and visible stable score did not change.
