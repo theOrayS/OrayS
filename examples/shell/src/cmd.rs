@@ -1436,7 +1436,8 @@ fn ltp_case_has_resource_helper(target_dir: &str, case: &str) -> bool {
     };
     entries.filter_map(Result::ok).any(|entry| {
         let name = String::from(path_to_str(&entry.file_name()));
-        name.starts_with(&prefix) && matches!(entry.metadata(), Ok(metadata) if metadata.is_file())
+        name.starts_with(&prefix)
+            && matches!(fs::metadata(&join_path(target_dir, &name)), Ok(metadata) if metadata.is_file())
     })
 }
 
