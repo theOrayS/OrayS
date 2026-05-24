@@ -27,15 +27,15 @@ Delivered state: **stable300 retained**
 - Fresh follow-up targeted evidence was collected:
   - RV `followup-rv-targeted-001`: `PASS LTP CASE 13`, `FAIL LTP CASE 3`; `pipe2_02` TBROK on both libc and `waitpid01` musl TFAIL=40.
   - LA `followup-la-targeted-004`: `PASS LTP CASE 11`, `FAIL LTP CASE 1`; `sched_getscheduler02` LA/musl TFAIL=1.
-  - Follow-up marker-prefix scan: `TOTAL markers=28 bad=0`.
+  - Follow-up `sched_getscheduler02` LA afterfix: parser semantic PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0.
+  - Follow-up marker-prefix scan: `TOTAL markers=30 bad=0`.
 
 ## Why stable350 was not delivered
 
-Fresh candidate evidence produced only five four-way clean cases: `prctl05,sethostname01,setrlimit01,signal03,signal04`. This is useful but below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
+Fresh candidate evidence now contains six four-way clean cases after the serialized `sched_getscheduler02` LA/musl fix: `prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04`. This is useful but still below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
 
 Current high-value blockers:
 
-- `sched_getscheduler02`: RV clean and LA/glibc clean, but LA/musl has internal `TFAIL=1` (`sched_getscheduler(4194304)` libc variant expected ESRCH).
 - `pipe2_02`: fresh RV targeted still TBROK on both libc from helper/resource setup.
 - `waitpid01`: fresh RV targeted still musl TFAIL=40 in wait-status/signal semantics.
 
@@ -49,4 +49,5 @@ No timeout, ENOSYS, panic/trap, TFAIL, TBROK, or TCONF was converted to PASS. No
 
 - LTP runner behavior: cases with `<case>_*` resource helpers may run from a per-case work directory with `LTPROOT` and adjusted `PATH`; this is harness/environment behavior for executing real LTP binaries, not a PASS shim.
 - POSIX/Linux-visible behavior: `prlimit64` now accepts the current process pid as a valid current target; default-fatal self/pending signals are handled more synchronously when unblocked or delivered.
+- LoongArch musl loader behavior: ENOSYS-only exported musl scheduler wrappers are patched to issue the real syscall and tail-call musl `__syscall_ret`, preserving libc errno semantics while raw syscall paths still return raw `-errno`.
 - `LTP_STABLE_CASES` and visible stable score did not change.

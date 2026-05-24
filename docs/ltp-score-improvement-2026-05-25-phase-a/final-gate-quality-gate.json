@@ -5,18 +5,20 @@
   "uniqueStableCases": 300,
   "duplicates": 0,
   "stable350Achieved": false,
-  "reason": "Fresh follow-up gates found only 5 RV+LA x musl+glibc clean cases, below the +15 stable315 tranche threshold.",
+  "reason": "Fresh follow-up gates found only 6 RV+LA x musl+glibc clean cases, below the +15 stable315 tranche threshold.",
   "freshFollowupEvidence": {
     "rvTargeted": "raw/followup-rv-targeted-001-summary.txt: PASS LTP CASE 13, FAIL LTP CASE 3; pipe2_02 TBROK both libc; waitpid01 musl TFAIL=40; timeout/ENOSYS/panic/trap 0",
     "laTargeted": "raw/followup-la-targeted-004-summary.txt: PASS LTP CASE 11, FAIL LTP CASE 1; sched_getscheduler02 LA/musl TFAIL=1; timeout/ENOSYS/panic/trap 0",
     "fourWayCleanSeeds": [
       "prctl05",
+      "sched_getscheduler02",
       "sethostname01",
       "setrlimit01",
       "signal03",
       "signal04"
     ],
-    "excluded": "raw/followup-la-targeted-001/002/003-aborted-untrusted.log and raw/post-team-candidate*.status/log are not promotion evidence"
+    "excluded": "raw/followup-la-targeted-001/002/003-aborted-untrusted.log and raw/post-team-candidate*.status/log are not promotion evidence",
+    "laSchedGetschedulerAfterfix": "raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt: PASS LTP CASE 2, FAIL 0; ltp-musl 1/0; ltp-glibc 1/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0"
   },
   "verification": {
     "passed": [
@@ -27,12 +29,17 @@
       "live LTP_STABLE_CASES count: 300 total / 300 unique / 0 duplicates",
       "python3 -B scripts/ltp_summary.py raw/followup-rv-targeted-001.log",
       "python3 -B scripts/ltp_summary.py raw/followup-la-targeted-004.log",
-      "follow-up marker-prefix scan: TOTAL markers=28 bad=0"
+      "follow-up marker-prefix scan: TOTAL markers=30 bad=0",
+      "python3 -B scripts/ltp_summary.py raw/followup-la-sched_getscheduler02-afterfix-001.log",
+      "follow-up marker-prefix scan including sched_getscheduler02 afterfix: TOTAL markers=30 bad=0",
+      "make A=examples/shell ARCH=loongarch64 build",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=sched_getscheduler02 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la",
+      "afterfix marker-prefix scan: followup-la-sched_getscheduler02-afterfix-001.log markers=2 bad=0"
     ],
     "notRunOrNotCredited": [
       "RV final stable350 aggregate gate",
       "LA final stable350 aggregate gate",
-      "stable315 aggregate gate, because only 5 new four-way clean cases are available",
+      "stable315 aggregate gate, because only 6 new four-way clean cases are available",
       "followup-la-targeted-001/002/003, marked aborted/untrusted"
     ]
   },
@@ -45,15 +52,17 @@
   },
   "markerPrefix": {
     "badMarkerLinesFollowupScan": 0,
-    "evidence": "raw/followup-marker-prefix-check.txt"
+    "evidence": "raw/followup-marker-prefix-check.txt plus raw/followup-la-sched_getscheduler02-afterfix-001.log scan",
+    "badMarkerLinesAfterfixSchedGetscheduler02": 0
   },
   "codeReview": {
-    "recommendation": "BLOCK",
+    "recommendation": "BLOCK stable350, PASS narrow sched_getscheduler02 fix",
     "architectStatus": "BLOCKED",
-    "evidence": "final-gate-code-review-report.md"
+    "evidence": "final-gate-code-review-report.md",
+    "note": "New LoongArch musl scheduler wrapper patch reviewed as narrow syscall/errno semantics fix; final recommendation remains BLOCK because stable315/stable350 gates are not achieved."
   },
   "aiSlopCleaner": {
-    "status": "blocked-no-cleanup-applied",
+    "status": "blocked-no-stable-cleanup-applied; narrow scheduler wrapper patch accepted",
     "evidence": "final-gate-ai-slop-cleaner-report.md"
   }
 }

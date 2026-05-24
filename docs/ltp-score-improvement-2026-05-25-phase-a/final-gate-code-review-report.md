@@ -1,23 +1,32 @@
 # Final gate code-review report
 
-Recommendation: **BLOCK**
-Architect status: **BLOCKED**
+Recommendation: **BLOCK stable350 / PASS narrow sched_getscheduler02 fix**
+Architect status: **BLOCKED for stable350**
 
 ## Reason
 
-The code changes may be reasonable, but final stable350 acceptance is blocked by missing clean promotion evidence. The branch has not demonstrated RV+LA x musl+glibc clean targeted gates for any new stable tranche after Team integration, and no stable aggregate gate was run.
+Final stable350 acceptance is still blocked by missing clean promotion evidence: only 6 RV+LA × musl+glibc clean seed cases are available, below the +15 stable315 tranche gate, and no stable aggregate gate was run.
 
-## Review notes
+## Narrow fix review
 
-- No fake PASS, case-name hardcoding, or marker-prefix code change was found in the integrated lane summaries.
-- `LTP_STABLE_CASES` was not edited, which is correct because no clean evidence exists.
-- The LTP runner helper-cwd change affects execution environment for resource-helper cases and should be regression-tested against stable aggregate before promotion.
-- Signal/prlimit changes are POSIX/Linux-visible and need targeted signal/wait/rlimit guard runs before any stable case promotion.
-- Aborted/untrusted targeted logs must remain excluded from evidence.
+Reviewed `examples/shell/src/uspace/program_loader.rs` after the follow-up fix:
 
-## Required before APPROVE
+- The LoongArch musl scheduler patch remains architecture- and interpreter-scoped (`/musl` + `ld-musl`).
+- It patches exported scheduler libc wrappers by issuing the real syscall and tail-branching to the wrapper's existing `__syscall_ret` target, preserving libc `errno`/`-1` semantics.
+- Raw syscall tests still bypass the libc symbol and keep raw `-errno` behavior through `syscall_dispatch`.
+- No LTP case name hardcoding, fake PASS, timeout laundering, or marker-output change was introduced.
 
-1. Clean serialized RV targeted gate for a small candidate set, parsed with `scripts/ltp_summary.py`.
+## Evidence reviewed
+
+- `cargo fmt --all -- --check` passed.
+- `git diff --check` passed.
+- `python3 -B scripts/test_ltp_summary.py` passed.
+- `make A=examples/shell ARCH=loongarch64 build` passed.
+- `OSCOMP_TEST_GROUPS=ltp LTP_CASES=sched_getscheduler02 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la` passed and was parsed by `scripts/ltp_summary.py` as `PASS LTP CASE 2`, `FAIL 0`, with internal TFAIL/TBROK/TCONF=0 and timeout/ENOSYS/panic/trap=0.
+
+## Required before final APPROVE
+
+1. Clean serialized RV targeted gate for a >=15-case candidate tranche.
 2. Clean serialized LA targeted gate for exactly the same subset.
 3. Stable aggregate gate after editing `LTP_STABLE_CASES`.
 4. Marker prefix check on final RV/LA logs.
