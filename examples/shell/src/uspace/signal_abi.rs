@@ -65,6 +65,10 @@ fn unmaskable_signal_bits() -> u64 {
     signal_mask_bit(SIGKILL_NUM) | signal_mask_bit(SIGSTOP_NUM)
 }
 
+pub(super) fn all_application_signal_mask() -> u64 {
+    !unmaskable_signal_bits()
+}
+
 fn take_sigsuspend_restore_mask(ext: &UserTaskExt, current_mask: u64) -> u64 {
     let saved = ext
         .sigsuspend_restore_mask
@@ -616,6 +620,17 @@ pub(super) fn sys_rt_sigprocmask(
                 current_tid(),
                 how,
             );
+        }
+        if next_mask == all_application_signal_mask() {
+            // musl's fork path temporarily blocks every maskable signal before
+            // cloning. A process child should not inherit that transient mask
+            // as its long-lived runtime state, or default-fatal self-signals
+            // can be delayed until the child exits normally.
+            ext.fork_signal_mask_restore
+                .store(current_mask, Ordering::Release);
+        } else {
+            ext.fork_signal_mask_restore
+                .store(u64::MAX, Ordering::Release);
         }
         ext.signal_mask.store(next_mask, Ordering::Release);
         request_pending_default_terminate_signal(ext);

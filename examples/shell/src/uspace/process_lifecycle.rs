@@ -19,7 +19,7 @@ use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errn
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::current_cwd;
-use super::signal_abi::ensure_user_return_hook_registered;
+use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_registered};
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
@@ -774,9 +774,14 @@ pub(super) fn sys_clone(
         tf.regs.sp,
         tf.regs.tp,
     );
-    let inherited_signal_mask = current_task_ext()
-        .map(|ext| ext.signal_mask.load(Ordering::Acquire))
-        .unwrap_or(0);
+    let (inherited_signal_mask, fork_signal_mask_restore) = current_task_ext()
+        .map(|ext| {
+            (
+                ext.signal_mask.load(Ordering::Acquire),
+                ext.fork_signal_mask_restore.load(Ordering::Acquire),
+            )
+        })
+        .unwrap_or((0, u64::MAX));
     let vfork_flags = general::CLONE_VM as usize | general::CLONE_VFORK as usize;
     let process_allowed_flags = vfork_flags
         | general::CLONE_SETTLS as usize
@@ -851,10 +856,20 @@ pub(super) fn sys_clone(
         };
         let root = child_process.aspace.lock().page_table_root();
         task.ctx_mut().set_page_table_root(root);
+        // Fork-like process children should inherit the caller's stable signal
+        // mask, not libc's transient all-signals-blocked fork critical section.
+        // Thread clones keep the live mask through the thread path above.
+        let child_signal_mask = if inherited_signal_mask == all_application_signal_mask()
+            && fork_signal_mask_restore != u64::MAX
+        {
+            fork_signal_mask_restore
+        } else {
+            inherited_signal_mask
+        };
         task.init_task_ext(UserTaskExt::new(
             child_process.clone(),
             child_clear_tid,
-            inherited_signal_mask,
+            child_signal_mask,
         ));
         let task = axtask::spawn_task(task);
         register_user_task(task.clone(), child_process.clone());

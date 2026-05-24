@@ -6,7 +6,7 @@ Result: **NOT PROMOTED**
 
 ## Outcome
 
-`LTP_STABLE_CASES` remains **300 total / 300 unique / 0 duplicates**. No 15-case clean tranche was found; after the follow-up scheduler fix there are 6 clean seeds, still below +15.
+`LTP_STABLE_CASES` remains **300 total / 300 unique / 0 duplicates**. No 15-case clean tranche was found; after the follow-up `sched_getscheduler02` and `waitpid01` fixes there are 7 clean seeds, still below +15.
 
 ## Fresh follow-up evidence
 
@@ -21,7 +21,14 @@ Result: **NOT PROMOTED**
   - Internal `TFAIL=1` in `sched_getscheduler02` on LA/musl; timeout/ENOSYS/panic/trap 0.
   - Pre-fix four-way clean subset: `prctl05,sethostname01,setrlimit01,signal03,signal04`.
 - Follow-up LA targeted `raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt`: parser semantic PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
-- Marker-prefix follow-up check: `raw/followup-marker-prefix-check.txt` reports `TOTAL markers=30 bad=0`.
+- Follow-up waitpid targeted gates:
+  - RV `raw/followup-rv-waitpid01-maskrestore-001-summary.txt`: PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
+  - LA `raw/followup-la-waitpid01-maskrestore-001-summary.txt`: PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
+- Follow-up waitpid/signal guard gates:
+  - RV `raw/followup-rv-waitpid-signal-guard-001-summary.txt`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
+  - LA `raw/followup-la-waitpid-signal-guard-001-summary.txt`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
+- `pipe2_02` follow-up `raw/followup-rv-pipe2_02-resource-prestage-003-summary.txt`: PASS 0 / FAIL 2, both libc `TBROK=1` from helper copy/resource setup; not promotion evidence.
+- Marker-prefix follow-up checks: `raw/followup-marker-prefix-check.txt` and `raw/followup-waitpid-marker-prefix-check.txt` report no bad marker prefixes.
 - LA attempts `followup-la-targeted-001/002/003` were aborted/untrusted due duplicated starts and are excluded from promotion evidence.
 
 ## Baseline and earlier discovery
@@ -32,4 +39,4 @@ Result: **NOT PROMOTED**
 
 ## Gate decision
 
-Blocked. There are only 6 fresh RV+LA x musl+glibc clean candidate cases (`prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04`), below the +15 stable315 tranche threshold. No stable aggregate gate was run and no stable list entry was added.
+Blocked. There are only 7 fresh RV+LA x musl+glibc clean candidate cases (`prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01`), below the +15 stable315 tranche threshold. No stable aggregate gate was run and no stable list entry was added.

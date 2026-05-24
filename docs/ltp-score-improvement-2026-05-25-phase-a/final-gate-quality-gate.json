@@ -5,20 +5,26 @@
   "uniqueStableCases": 300,
   "duplicates": 0,
   "stable350Achieved": false,
-  "reason": "Fresh follow-up gates found only 6 RV+LA x musl+glibc clean cases, below the +15 stable315 tranche threshold.",
+  "reason": "Fresh follow-up gates found only 7 RV+LA x musl+glibc clean cases, below the +15 stable315 tranche threshold.",
   "freshFollowupEvidence": {
     "rvTargeted": "raw/followup-rv-targeted-001-summary.txt: PASS LTP CASE 13, FAIL LTP CASE 3; pipe2_02 TBROK both libc; waitpid01 musl TFAIL=40; timeout/ENOSYS/panic/trap 0",
     "laTargeted": "raw/followup-la-targeted-004-summary.txt: PASS LTP CASE 11, FAIL LTP CASE 1; sched_getscheduler02 LA/musl TFAIL=1; timeout/ENOSYS/panic/trap 0",
+    "laSchedGetschedulerAfterfix": "raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt: PASS LTP CASE 2, FAIL 0; ltp-musl 1/0; ltp-glibc 1/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0",
+    "rvWaitpidAfterfix": "raw/followup-rv-waitpid01-maskrestore-001-summary.txt: PASS LTP CASE 2, FAIL 0; ltp-musl 1/0; ltp-glibc 1/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0",
+    "laWaitpidAfterfix": "raw/followup-la-waitpid01-maskrestore-001-summary.txt: PASS LTP CASE 2, FAIL 0; ltp-musl 1/0; ltp-glibc 1/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0",
+    "rvWaitpidSignalGuard": "raw/followup-rv-waitpid-signal-guard-001-summary.txt: PASS LTP CASE 16, FAIL 0; ltp-musl 8/0; ltp-glibc 8/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0",
+    "laWaitpidSignalGuard": "raw/followup-la-waitpid-signal-guard-001-summary.txt: PASS LTP CASE 16, FAIL 0; ltp-musl 8/0; ltp-glibc 8/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0",
+    "pipe2StillBlocked": "raw/followup-rv-pipe2_02-resource-prestage-003-summary.txt: PASS 0, FAIL 2; both libc TBROK on resource copy; timeout/ENOSYS/panic/trap 0",
     "fourWayCleanSeeds": [
       "prctl05",
       "sched_getscheduler02",
       "sethostname01",
       "setrlimit01",
       "signal03",
-      "signal04"
+      "signal04",
+      "waitpid01"
     ],
-    "excluded": "raw/followup-la-targeted-001/002/003-aborted-untrusted.log and raw/post-team-candidate*.status/log are not promotion evidence",
-    "laSchedGetschedulerAfterfix": "raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt: PASS LTP CASE 2, FAIL 0; ltp-musl 1/0; ltp-glibc 1/0; internal TFAIL/TBROK/TCONF 0; timeout/ENOSYS/panic/trap 0"
+    "excluded": "raw/followup-la-targeted-001/002/003-aborted-untrusted.log and raw/post-team-candidate*.status/log are not promotion evidence"
   },
   "verification": {
     "passed": [
@@ -31,16 +37,25 @@
       "python3 -B scripts/ltp_summary.py raw/followup-la-targeted-004.log",
       "follow-up marker-prefix scan: TOTAL markers=30 bad=0",
       "python3 -B scripts/ltp_summary.py raw/followup-la-sched_getscheduler02-afterfix-001.log",
-      "follow-up marker-prefix scan including sched_getscheduler02 afterfix: TOTAL markers=30 bad=0",
+      "afterfix marker-prefix scan: followup-la-sched_getscheduler02-afterfix-001.log markers=2 bad=0",
       "make A=examples/shell ARCH=loongarch64 build",
       "OSCOMP_TEST_GROUPS=ltp LTP_CASES=sched_getscheduler02 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la",
-      "afterfix marker-prefix scan: followup-la-sched_getscheduler02-afterfix-001.log markers=2 bad=0"
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=waitpid01 LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=waitpid01 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=waitpid01,rt_sigprocmask01,sigprocmask01,rt_sigsuspend01,sigsuspend01,signal03,signal04,waitpid10 LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=waitpid01,rt_sigprocmask01,sigprocmask01,rt_sigsuspend01,sigsuspend01,signal03,signal04,waitpid10 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la",
+      "python3 -B scripts/ltp_summary.py raw/followup-rv-waitpid01-maskrestore-001.log",
+      "python3 -B scripts/ltp_summary.py raw/followup-la-waitpid01-maskrestore-001.log",
+      "python3 -B scripts/ltp_summary.py raw/followup-rv-waitpid-signal-guard-001.log",
+      "python3 -B scripts/ltp_summary.py raw/followup-la-waitpid-signal-guard-001.log",
+      "follow-up waitpid/pipe marker-prefix scan: TOTAL markers=42 bad=0"
     ],
     "notRunOrNotCredited": [
       "RV final stable350 aggregate gate",
       "LA final stable350 aggregate gate",
-      "stable315 aggregate gate, because only 6 new four-way clean cases are available",
-      "followup-la-targeted-001/002/003, marked aborted/untrusted"
+      "stable315 aggregate gate, because only 7 new four-way clean cases are available",
+      "followup-la-targeted-001/002/003, marked aborted/untrusted",
+      "make all after this follow-up, because stable list/remote submission build behavior was not changed"
     ]
   },
   "ltpSemantics": {
@@ -52,17 +67,17 @@
   },
   "markerPrefix": {
     "badMarkerLinesFollowupScan": 0,
-    "evidence": "raw/followup-marker-prefix-check.txt plus raw/followup-la-sched_getscheduler02-afterfix-001.log scan",
-    "badMarkerLinesAfterfixSchedGetscheduler02": 0
+    "evidence": "raw/followup-marker-prefix-check.txt plus raw/followup-waitpid-marker-prefix-check.txt",
+    "badMarkerLinesWaitpidAndPipeFollowup": 0
   },
   "codeReview": {
-    "recommendation": "BLOCK stable350, PASS narrow sched_getscheduler02 fix",
+    "recommendation": "BLOCK stable350, PASS narrow waitpid01 signal-mask fix",
     "architectStatus": "BLOCKED",
     "evidence": "final-gate-code-review-report.md",
-    "note": "New LoongArch musl scheduler wrapper patch reviewed as narrow syscall/errno semantics fix; final recommendation remains BLOCK because stable315/stable350 gates are not achieved."
+    "note": "New fork-time signal mask restore reviewed as narrow syscall/signal semantics fix; final recommendation remains BLOCK because stable315/stable350 gates are not achieved."
   },
   "aiSlopCleaner": {
-    "status": "blocked-no-stable-cleanup-applied; narrow scheduler wrapper patch accepted",
+    "status": "blocked-no-stable-cleanup-applied; narrow signal mask restore patch accepted",
     "evidence": "final-gate-ai-slop-cleaner-report.md"
   }
 }

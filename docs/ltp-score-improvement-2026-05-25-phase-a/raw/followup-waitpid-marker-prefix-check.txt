@@ -1,0 +1,8 @@
+followup-rv-waitpid01-maskrestore-001.log: markers=2 bad=0
+followup-la-waitpid01-maskrestore-001.log: markers=2 bad=0
+followup-rv-waitpid-signal-guard-001.log: markers=16 bad=0
+followup-la-waitpid-signal-guard-001.log: markers=16 bad=0
+followup-rv-pipe2_02-resource-prestage-001.log: markers=2 bad=0
+followup-rv-pipe2_02-resource-prestage-002.log: markers=2 bad=0
+followup-rv-pipe2_02-resource-prestage-003.log: markers=2 bad=0
+TOTAL markers=42 bad=0
