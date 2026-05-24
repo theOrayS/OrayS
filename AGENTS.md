@@ -34,6 +34,33 @@ Important generated or local-only root files can include `kernel-rv`, `kernel-la
 is explicitly about those artifacts. `run-eval` is a local symlink to
 `run-eval.sh` when present.
 
+## Disk Space and Commit Hygiene
+
+- Check disk space at the start and end of long-running tasks, and before/after
+  commands that can create large artifacts such as full evaluator runs, `make
+  all`, QEMU logs, Docker builds, vendoring, or broad test sweeps. Use at least
+  `df -h / /root` and, when Codex state/cache growth is relevant, `du -sh
+  /root/.codex`.
+- If `/` is near full (roughly 85%+ used or less than 10 GiB free), pause new
+  heavy builds/tests and clean low-value generated content first: stale build
+  outputs, old raw logs, temporary files, abandoned worktree artifacts, and
+  disposable `.codex`/OMX caches or logs. Preserve user-supplied evidence,
+  memory files, active `.omx` state, source files, and anything needed to
+  reproduce current validation unless the user explicitly says otherwise.
+- When cleaning `.codex`, prefer old rollout summaries, transient logs, caches,
+  and inactive session artifacts. Do not delete installed skills, prompts,
+  agents, memory entries, credentials, or active session state unless the user
+  explicitly requests that exact cleanup.
+- After completing and verifying a task that changes tracked source,
+  documentation, or durable project state, create a Git commit automatically
+  unless the user explicitly says not to, validation is still failing, or the
+  worktree contains unrelated changes that cannot be safely separated. Stage
+  only agent-owned changes; leave user-provided logs, generated kernels, disk
+  images, and unrelated dirty files uncommitted by default.
+- Automatic commits must follow the Lore Commit Protocol below and must report
+  the commit SHA in the final response. If a task cannot be committed safely,
+  report the exact blocker and the files left uncommitted.
+
 ## Build and Run
 
 Run commands from the repository root (`/root/oskernel2026-orays` in this
