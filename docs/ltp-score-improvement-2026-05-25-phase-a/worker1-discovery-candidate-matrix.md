@@ -1,7 +1,7 @@
 # Worker 1 discovery candidate matrix: stable300 -> stable350/380
 
-Date: 2026-05-25  
-Worker: `worker-1`  
+Date: 2026-05-25
+Worker: `worker-1`
 Scope: discovery only. No `.omx/ultragoal` mutation, no `examples/shell/src/cmd.rs::LTP_STABLE_CASES` edit, and no QEMU/eval promotion gate was run from this worker lane.
 
 ## Source-of-truth refresh
