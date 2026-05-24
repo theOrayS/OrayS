@@ -397,7 +397,7 @@ fn patch_loongarch_musl_syscall_stubs(
     drop(elf);
 
     for (offset, syscall_nr) in offsets {
-        patch_loongarch_enosys_stub(image, offset, syscall_nr)?;
+        patch_loongarch_musl_syscall_wrapper(image, offset, syscall_nr)?;
     }
     if let Some(offset) = brk_offset {
         patch_loongarch_musl_brk_stub(image, offset)?;
@@ -517,41 +517,101 @@ fn patch_loongarch_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), 
 }
 
 #[cfg(target_arch = "loongarch64")]
-fn patch_loongarch_enosys_stub(
+fn patch_loongarch_musl_syscall_wrapper(
     image: &mut [u8],
     offset: usize,
     syscall_nr: u32,
 ) -> Result<(), String> {
     const ENOSYS_STUB_PREFIX: [u8; 8] = [0x63, 0xc0, 0xff, 0x02, 0x04, 0x68, 0xbf, 0x02];
     const SYSCALL: u32 = 0x002b_0000;
-    const SIGN_EXTEND_A0: u32 = 0x0040_8084;
     const RET: u32 = 0x4c00_0020;
     const PATCH_LEN: usize = 16;
 
     let end = offset
         .checked_add(PATCH_LEN)
-        .ok_or_else(|| "musl sched stub patch range overflow".to_string())?;
+        .ok_or_else(|| "musl sched wrapper patch range overflow".to_string())?;
     if end > image.len() {
-        return Err("musl sched stub patch exceeds image".into());
+        return Err("musl sched wrapper patch exceeds image".into());
     }
     let known_stub = image
         .get(offset..offset + ENOSYS_STUB_PREFIX.len())
-        .is_some_and(|prefix| prefix == ENOSYS_STUB_PREFIX)
-        || image
-            .get(offset..offset + 4)
-            .is_some_and(|prefix| prefix == [0x63, 0xc0, 0xff, 0x02]);
+        .is_some_and(|prefix| prefix == ENOSYS_STUB_PREFIX);
     if known_stub {
+        // These exported musl libc wrappers originally call __syscall_ret with
+        // -ENOSYS.  Keep that errno-normalizing tail after replacing the ENOSYS
+        // immediate with a real syscall, so libc calls return -1 and set errno
+        // while raw syscall tests still observe raw -errno.
+        let original_call_offset = offset + 12;
+        let original_call = read_u32_le(image, original_call_offset)?;
+        let syscall_ret_offset =
+            loongarch_branch_target_offset(original_call_offset, original_call)?;
+        let tail_call = loongarch_b(offset + 8, syscall_ret_offset)?;
         let load_syscall_nr = loongarch_addi_w_a7(syscall_nr)?;
         let patch = [
             load_syscall_nr.to_le_bytes(),
             SYSCALL.to_le_bytes(),
-            SIGN_EXTEND_A0.to_le_bytes(),
+            tail_call.to_le_bytes(),
             RET.to_le_bytes(),
         ]
         .concat();
         image[offset..end].copy_from_slice(&patch);
     }
     Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn read_u32_le(image: &[u8], offset: usize) -> Result<u32, String> {
+    let end = offset
+        .checked_add(size_of::<u32>())
+        .ok_or_else(|| "LoongArch instruction read range overflow".to_string())?;
+    let bytes = image
+        .get(offset..end)
+        .ok_or_else(|| "LoongArch instruction read exceeds image".to_string())?;
+    Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_branch_target_offset(branch_offset: usize, instruction: u32) -> Result<usize, String> {
+    const BL_OPCODE: u32 = 0x15;
+    if instruction >> 26 != BL_OPCODE {
+        return Err(format!(
+            "expected LoongArch bl in musl ENOSYS stub at {branch_offset:#x}, got {instruction:#x}"
+        ));
+    }
+    let raw = ((instruction >> 10) & 0xffff) | ((instruction & 0x3ff) << 16);
+    let signed = sign_extend_i64(raw as i64, 26)
+        .checked_shl(2)
+        .ok_or_else(|| "LoongArch branch offset overflow".to_string())?;
+    let target = (branch_offset as i64)
+        .checked_add(signed)
+        .ok_or_else(|| "LoongArch branch target overflow".to_string())?;
+    if target < 0 {
+        return Err("LoongArch branch target is negative".into());
+    }
+    Ok(target as usize)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_b(from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    const B_OPCODE: u32 = 0x14;
+    let delta = (to_offset as i64)
+        .checked_sub(from_offset as i64)
+        .ok_or_else(|| "LoongArch branch delta overflow".to_string())?;
+    if delta % 4 != 0 {
+        return Err(format!("unaligned LoongArch branch delta: {delta}"));
+    }
+    let words = delta / 4;
+    if !(-(1 << 25)..(1 << 25)).contains(&words) {
+        return Err(format!("LoongArch branch delta out of range: {delta}"));
+    }
+    let raw = (words as u32) & 0x03ff_ffff;
+    Ok((B_OPCODE << 26) | ((raw & 0xffff) << 10) | ((raw >> 16) & 0x3ff))
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn sign_extend_i64(value: i64, bits: u32) -> i64 {
+    let shift = 64 - bits;
+    (value << shift) >> shift
 }
 
 #[cfg(target_arch = "loongarch64")]

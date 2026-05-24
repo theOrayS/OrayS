@@ -20,35 +20,28 @@
   - `raw/followup-rv-targeted-001-summary.txt`
   - `raw/followup-la-targeted-004-summary.txt`
   - `raw/followup-marker-prefix-check.txt`
+  - `raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt`
 - Worker 不拥有 `.omx/ultragoal` 或最终 `LTP_STABLE_CASES` 修改。
 
 ## 当前可信候选状态
 
-Fresh RV+LA x musl+glibc clean seeds（只有 5 个，不足 stable315）：
+Fresh RV+LA x musl+glibc clean seeds（现有 6 个，不足 stable315）：
 
 ```text
-prctl05,sethostname01,setrlimit01,signal03,signal04
+prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04
 ```
 
 Near-clean blocker：
 
-1. `sched_getscheduler02`
-   - RV musl+glibc clean；LA glibc clean；LA musl `TFAIL=1`。
-   - 优先检查 LA/musl libc wrapper vs syscall path 的 ESRCH/errno 语义。
-2. `pipe2_02`
+1. `pipe2_02`
    - Fresh RV both libc `TBROK=1`，helper copy/resource setup 仍失败。
    - 先修 helper/resource cwd/LTPROOT/PATH，再 RV targeted。
-3. `waitpid01`
+2. `waitpid01`
    - Fresh RV glibc PASS，musl `TFAIL=40`，`WIFSIGNALED()` 不符合预期。
    - 先查 musl wait-status / default-fatal signal delivery。
 
 ## 最小下一步
 
-不要先改 `LTP_STABLE_CASES`。优先修一个 near-clean blocker，推荐从 `sched_getscheduler02` 开始，因为只差 LA/musl：
+不要先改 `LTP_STABLE_CASES`。`sched_getscheduler02` 已经通过 follow-up LA afterfix gate，可作为第 6 个 clean seed。下一步优先从 `pipe2_02` 或 `waitpid01` 继续，先 RV targeted，只有 RV musl+glibc clean 后再串行 LA targeted。
 
-```bash
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=sched_getscheduler02 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la 2>&1 | tee docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-la-sched_getscheduler02-afterfix-001.log
-python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-la-sched_getscheduler02-afterfix-001.log | tee docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt
-```
-
-若修复后 `sched_getscheduler02` 四路 clean，可加入 5 个 clean seeds，但仍需继续找满至少 15 个 clean case 后再跑 stable315 aggregate gate。
+若新修复带来更多 clean seed，必须累计至少 15 个 fresh RV+LA x musl+glibc clean case 后，再修改 stable list 并跑 stable315 aggregate gate。

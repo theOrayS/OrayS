@@ -6,7 +6,7 @@ Result: **NOT PROMOTED**
 
 ## Outcome
 
-`LTP_STABLE_CASES` remains **300 total / 300 unique / 0 duplicates**. No 15-case clean tranche was found.
+`LTP_STABLE_CASES` remains **300 total / 300 unique / 0 duplicates**. No 15-case clean tranche was found; after the follow-up scheduler fix there are 6 clean seeds, still below +15.
 
 ## Fresh follow-up evidence
 
@@ -19,8 +19,9 @@ Result: **NOT PROMOTED**
   - `PASS LTP CASE 11`, `FAIL LTP CASE 1`.
   - `ltp-musl 5/1`, `ltp-glibc 6/0`.
   - Internal `TFAIL=1` in `sched_getscheduler02` on LA/musl; timeout/ENOSYS/panic/trap 0.
-  - Four-way clean subset: `prctl05,sethostname01,setrlimit01,signal03,signal04`.
-- Marker-prefix follow-up check: `raw/followup-marker-prefix-check.txt` reports `TOTAL markers=28 bad=0`.
+  - Pre-fix four-way clean subset: `prctl05,sethostname01,setrlimit01,signal03,signal04`.
+- Follow-up LA targeted `raw/followup-la-sched_getscheduler02-afterfix-001-summary.txt`: parser semantic PASS 2 / FAIL 0, `ltp-musl 1/0`, `ltp-glibc 1/0`, internal TFAIL/TBROK/TCONF=0, timeout/ENOSYS/panic/trap=0.
+- Marker-prefix follow-up check: `raw/followup-marker-prefix-check.txt` reports `TOTAL markers=30 bad=0`.
 - LA attempts `followup-la-targeted-001/002/003` were aborted/untrusted due duplicated starts and are excluded from promotion evidence.
 
 ## Baseline and earlier discovery
@@ -31,4 +32,4 @@ Result: **NOT PROMOTED**
 
 ## Gate decision
 
-Blocked. There are only 5 fresh RV+LA x musl+glibc clean candidate cases, below the +15 stable315 tranche threshold. No stable aggregate gate was run and no stable list entry was added.
+Blocked. There are only 6 fresh RV+LA x musl+glibc clean candidate cases (`prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04`), below the +15 stable315 tranche threshold. No stable aggregate gate was run and no stable list entry was added.
