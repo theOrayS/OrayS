@@ -67,7 +67,7 @@ RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img \
 ./run-eval.sh rv
 ```
 
-The attempt was terminated during the first cargo build before any LTP case emitted `RUN/PASS/FAIL LTP CASE` markers. `scripts/ltp_summary.py` therefore reports zero wrappers and zero internal signals. This is explicitly not counted as PASS, not counted as a timeout result, and not used as promotion evidence.
+The attempt was terminated during the first cargo build before any LTP case emitted `RUN/PASS/FAIL LTP CASE` markers. After the leader guardrail about shared `/tmp/arceos-sdcard-*.run.qcow2` runner names, this attempted run is marked aborted/untrusted for promotion unless the leader reruns it serially. `scripts/ltp_summary.py` therefore reports zero wrappers and zero internal signals. This is explicitly not counted as PASS, not counted as a timeout result, and not used as promotion evidence.
 
 ## Subagent integration
 
