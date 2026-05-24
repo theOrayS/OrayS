@@ -31,14 +31,15 @@ Delivered state: **stable300 retained**
   - RV guard `followup-rv-waitpid-signal-guard-001`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0.
   - LA guard `followup-la-waitpid-signal-guard-001`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0.
   - Follow-up marker-prefix scan over new waitpid/pipe logs: `TOTAL markers=42 bad=0`.
+  - RV `pipe2_02` after `/bin/sh` compatibility fix: PASS 2 / FAIL 0; internal TFAIL/TBROK/TCONF=0.
+  - LA `pipe2_02` after `/bin/sh` compatibility fix: PASS 2 / FAIL 0; internal TFAIL/TBROK/TCONF=0.
+  - Pipe2 marker-prefix scan: `TOTAL markers=4 bad=0`.
 
 ## Why stable350 was not delivered
 
-Fresh candidate evidence now contains seven four-way clean cases: `prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01`. This is useful but still below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
+Fresh candidate evidence now contains eight four-way clean cases: `prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01,pipe2_02`. This is useful but still below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
 
-Current high-value blocker:
-
-- `pipe2_02`: fresh RV targeted still TBROK on both libc from helper/resource setup; latest leader workaround was reverted because it did not fix LTP's resource copy path.
+The former high-value blocker `pipe2_02` is now a clean seed after the `/bin/sh` exec fallback fix. Remaining work is to find at least 7 more four-way clean cases for stable315.
 
 Post-Team LA attempts `followup-la-targeted-001/002/003` were aborted/untrusted due duplicated starts and are not used as evidence.
 
@@ -52,4 +53,5 @@ No timeout, ENOSYS, panic/trap, TFAIL, TBROK, or TCONF was converted to PASS. No
 - POSIX/Linux-visible behavior: `prlimit64` now accepts the current process pid as a valid current target; default-fatal self/pending signals are handled more synchronously when unblocked or delivered.
 - LoongArch musl loader behavior: ENOSYS-only exported musl scheduler wrappers are patched to issue the real syscall and tail-call musl `__syscall_ret`, preserving libc errno semantics while raw syscall paths still return raw `-errno`.
 - POSIX/Linux-visible behavior added by this follow-up: fork-like process creation now avoids leaking libc's transient all-application-signal mask into the child, so default-fatal child signals are reported through wait status instead of being spuriously blocked until normal exit.
+- POSIX/Linux-visible behavior added by this follow-up: `execve("/bin/sh", ...)` and related busybox shell aliases fall back to the current suite busybox when no root-level `/bin/sh` exists, allowing real libc `system()` calls to execute shell commands instead of failing before the command starts.
 - `LTP_STABLE_CASES` and visible stable score did not change.

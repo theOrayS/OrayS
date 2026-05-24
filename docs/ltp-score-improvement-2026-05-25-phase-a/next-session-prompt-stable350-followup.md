@@ -34,10 +34,10 @@
 - `raw/followup-rv-pipe2_02-resource-prestage-003-summary.txt`
 - `raw/followup-waitpid-marker-prefix-check.txt`
 
-Fresh RV+LA x musl+glibc clean seeds（现有 7 个，不足 stable315）：
+Fresh RV+LA x musl+glibc clean seeds（现有 8 个，不足 stable315）：
 
 ```text
-prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01
+prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01,pipe2_02
 ```
 
 ## 本轮修复结论
@@ -50,14 +50,11 @@ prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid
 
 Near-clean blocker：
 
-1. `pipe2_02`
-   - Fresh RV both libc `TBROK=1`，helper copy/resource setup 仍失败。
-   - 最新 leader workaround 已回滚；失败仍是 LTP `SAFE_CP()` 从 `/musl|/glibc/ltp/testcases/bin/pipe2_02_child` 拷贝到 `.`。
-   - 先修 helper/resource cwd/LTPROOT/PATH 或文件系统 copy 语义，再 RV targeted。
+1. `pipe2_02` 已由 `/bin/sh` exec fallback 修复并成为 clean seed；不要重复从旧 TBROK 日志判断它仍阻塞。
 2. `chmod05`、`access02/access04`、`statx01`、`writev03`、mmap/mprotect/munmap 系列仍按 `candidate-matrix.md` 排队。
 
 ## 最小下一步
 
-不要先改 `LTP_STABLE_CASES`。下一步优先从 `pipe2_02` 或 batch-A one-combo tails 继续，先 RV targeted，只有 RV musl+glibc clean 后再串行 LA targeted。
+不要先改 `LTP_STABLE_CASES`。下一步优先从 batch-A one-combo tails 或 permissions/metadata/iovec/VM blockers 继续，先 RV targeted，只有 RV musl+glibc clean 后再串行 LA targeted。
 
 若新修复带来更多 clean seed，必须累计至少 15 个 fresh RV+LA x musl+glibc clean case 后，再修改 stable list 并跑 stable315 aggregate gate。

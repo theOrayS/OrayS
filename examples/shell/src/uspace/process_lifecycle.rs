@@ -297,6 +297,40 @@ fn exec_program(
     Ok((image.entry, image.stack_ptr, image.argc))
 }
 
+fn existing_busybox_for_exec_root(exec_root: &str) -> Option<String> {
+    let mut candidates = Vec::new();
+    if exec_root == "/glibc" {
+        candidates.push("/glibc/busybox");
+        candidates.push("/musl/busybox");
+    } else {
+        candidates.push("/musl/busybox");
+        candidates.push("/glibc/busybox");
+    }
+    candidates.into_iter().find_map(|path| {
+        matches!(std::fs::metadata(path), Ok(meta) if meta.is_file()).then(|| path.into())
+    })
+}
+
+fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [String]) -> String {
+    let needs_busybox = matches!(path.as_str(), "/bin/sh" | "/busybox" | "/bin/busybox")
+        && !matches!(std::fs::metadata(path.as_str()), Ok(meta) if meta.is_file());
+    if !needs_busybox {
+        return path;
+    }
+
+    let Some(busybox) = existing_busybox_for_exec_root(process.exec_root().as_str()) else {
+        return path;
+    };
+    if path == "/bin/sh" {
+        if let Some(argv0) = argv.first_mut() {
+            if argv0 == "/bin/sh" || argv0.ends_with("/sh") {
+                *argv0 = "sh".into();
+            }
+        }
+    }
+    busybox
+}
+
 impl UserProcess {
     pub(super) fn cwd(&self) -> String {
         self.cwd.lock().clone()
@@ -721,10 +755,11 @@ pub(super) fn sys_execve(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let argv = match read_execve_argv(process, argv, path.as_str()) {
+    let mut argv = match read_execve_argv(process, argv, path.as_str()) {
         Ok(argv) => argv,
         Err(err) => return neg_errno(err),
     };
+    let path = resolve_execve_compat_path(process, path, &mut argv);
     let env = match read_execve_envp(process, _envp) {
         Ok(env) => env,
         Err(err) => return neg_errno(err),
