@@ -20,6 +20,7 @@
 - wave2 metadata/path blockers: `access04`, `chmod06`, `chmod07`, `fchmod02`, `fchmod06`, `statx01`, `rename04`, `rename05` 仍有 TBROK/ENOSYS。
 - time/signal/wait scout: `clock_gettime01`, `nanosleep01`, `nanosleep02`, `pause01`, `sigpending02`, `signal01`, `signal06`, `waitid07`, `waitid08`, `waitid10` 在 RV musl 有 TFAIL/TBROK/TCONF/timeout；`kill02` 仅 RV musl 通过，不具备 promotion 证据。
 - FD/fcntl scout: `dup05`, `fcntl07`, `fcntl11`, `fcntl14`, `fcntl15`, `fcntl07_64`, `fcntl11_64`, `fcntl15_64` 在 RV musl+glibc PASS 0 / FAIL 16；涉及 `mkfifo` ENOSYS 和 record-locking TFAIL，不具备 promotion 证据。
+- FS/path scout: `link02`, `mkdir02`, `unlink05`, `readlink03`, `symlink03`, `lstat02`, `stat03`, `stat04` 在 RV musl+glibc PASS 0 / FAIL 16；涉及 TFAIL/TBROK 和 `link`/`unlink` ENOSYS，不具备 promotion 证据。
 - 任何标记为 `invalid-concurrent` 的日志都不是证据；不要用于 promotion。
 
 目标：

@@ -20,6 +20,7 @@ Status: **no promotion accepted**; G002 remains active/in-progress.
 | `raw/target-stable400-wave2-rv-001-summary.txt` | RV musl PASS 1 / FAIL 8; TBROK 8, ENOSYS 1, panic/trap 1 (`pipe02`) | Negative scout only; avoid broad batches containing `pipe02` |
 | `raw/target-stable400-timesignal-rv-serial-001-summary.txt` | RV musl PASS 1 / FAIL 10; TFAIL 22, TCONF 2, TBROK 1, timeout 3; glibc did not complete because scout was stopped after blockers | Negative/aborted scout only; no promotion |
 | `raw/target-stable400-fd-rv-serial-001-summary.txt` | RV FD/fcntl scout PASS 0 / FAIL 16; TBROK 10, TFAIL 900, ENOSYS 6 | Negative scout only; no promotion |
+| `raw/target-stable400-fspath-rv-serial-001-summary.txt` | RV FS/path scout PASS 0 / FAIL 16; TFAIL 26, TBROK 3, ENOSYS 4 | Negative scout only; no promotion |
 
 Invalidated logs from an accidental concurrent-QEMU attempt were deleted or kept out of commit. They are not evidence and must not be used for promotion.
 
@@ -30,6 +31,7 @@ Invalidated logs from an accidental concurrent-QEMU attempt were deleted or kept
 - Wave2 metadata/path cases (`access04`, `chmod06`, `chmod07`, `fchmod02`, `fchmod06`, `statx01`, `rename04`, `rename05`) remain TBROK/ENOSYS-blocked in RV musl.
 - Time/signal/wait scout (`clock_gettime01`, `nanosleep01`, `nanosleep02`, `pause01`, `sigpending02`, `signal01`, `signal06`, `waitid07`, `waitid08`, `waitid10`) is not clean: it includes real TFAIL/TBROK/TCONF/timeout signals. `kill02` alone passed RV musl in this scout, but it lacks glibc and LA proof and was previously called out as aggregate-risk, so it remains unpromoted.
 - FD/fcntl scout (`dup05`, `fcntl07`, `fcntl11`, `fcntl14`, `fcntl15`, and 64-bit variants) is not clean: it fails both RV musl and RV glibc, with `mkfifo` ENOSYS on `dup05`/`fcntl07*` and record-locking TFAILs on `fcntl11`/`fcntl14`/`fcntl15*`.
+- FS/path scout (`link02`, `mkdir02`, `unlink05`, `readlink03`, `symlink03`, `lstat02`, `stat03`, `stat04`) is not clean: it fails both RV musl and RV glibc with TFAIL/TBROK and `link`/`unlink` ENOSYS signals.
 
 ## Next minimal plan
 

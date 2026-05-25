@@ -38,6 +38,7 @@ The G002 retry found no additional four-way-clean cases. Fresh scout summaries a
 - `raw/target-stable400-wave2-rv-001-summary.txt`: RV wave2 has TBROK/ENOSYS and `pipe02` panic/trap; not promotable.
 - `raw/target-stable400-timesignal-rv-serial-001-summary.txt`: RV time/signal/wait scout has TFAIL/TBROK/TCONF/timeouts and was stopped after blockers; not promotable.
 - `raw/target-stable400-fd-rv-serial-001-summary.txt`: RV FD/fcntl scout has PASS 0 / FAIL 16 with TBROK/TFAIL/ENOSYS; not promotable.
+- `raw/target-stable400-fspath-rv-serial-001-summary.txt`: RV FS/path scout has PASS 0 / FAIL 16 with TFAIL/TBROK/ENOSYS; not promotable.
 
 Stable400 remains undelivered.
 
