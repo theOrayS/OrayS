@@ -1,0 +1,56 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-la-rvclean-gap-scout-001.log`
+
+- PASS LTP CASE: 7
+- FAIL LTP CASE: 1
+- Internal TFAIL/TBROK/TCONF: 12 ({'TBROK': 12})
+- timeout matches: 1
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 0 failed
+- ltp-glibc: 3 passed, 1 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cve-2017-17052 | la | glibc | ltp-glibc | FAIL | 137 | 95597 | 191687 | 187252 | -4435 | 0 | 12 | 0 | 1 | 0 | 0 |
+| cve-2017-17052 | la | musl | ltp-musl | PASS | 0 | 6315 | 192307 | 191779 | -528 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs02_64 | la | glibc | ltp-glibc | PASS | 0 | 4587 | 187252 | 187213 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs02_64 | la | musl | ltp-musl | PASS | 0 | 2599 | 191779 | 191747 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getparam03 | la | glibc | ltp-glibc | PASS | 0 | 4534 | 191747 | 191717 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getparam03 | la | musl | ltp-musl | PASS | 0 | 2667 | 194403 | 192331 | -2072 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam04 | la | glibc | ltp-glibc | PASS | 0 | 4548 | 191717 | 191687 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam04 | la | musl | ltp-musl | PASS | 0 | 2889 | 192331 | 192307 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 7 (la:musl:cve-2017-17052, la:glibc:fstatfs02_64, la:musl:fstatfs02_64, la:glibc:sched_getparam03, la:musl:sched_getparam03, la:glibc:sched_setparam04, la:musl:sched_setparam04)
+- pass_with_tconf: 0
+- fail_wrapper: 1 (la:glibc:cve-2017-17052)
+- internal_tfail: 0
+- internal_tbrok: 1 (la:glibc:cve-2017-17052)
+- timeout: 1 (la:glibc:cve-2017-17052)
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-glibc:cve-2017-17052
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 3
+- FAIL: 1
+- Internal: {'TBROK': 12}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: cve-2017-17052

@@ -283,6 +283,10 @@ fn sched_priority_bounds(policy: i32) -> Option<(i32, i32)> {
     }
 }
 
+fn sched_policy_needs_privilege(policy: i32) -> bool {
+    matches!(policy as u32, general::SCHED_FIFO | general::SCHED_RR)
+}
+
 fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {
     if pid < 0 {
         return Err(LinuxError::EINVAL);
@@ -293,6 +297,30 @@ fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState,
     user_thread_entry_by_process_pid(pid)
         .map(|entry| entry.process.get_sched_state())
         .ok_or(LinuxError::ESRCH)
+}
+
+fn sched_target_uid(process: &UserProcess, pid: i32) -> Result<u32, LinuxError> {
+    if pid < 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    if pid == 0 || pid == current_tid() || pid == process.pid() {
+        return Ok(process.uid());
+    }
+    if pid == 1 {
+        return Ok(0);
+    }
+    user_thread_entry_by_process_pid(pid)
+        .map(|entry| entry.process.uid())
+        .ok_or(LinuxError::ESRCH)
+}
+
+fn can_set_sched_target(process: &UserProcess, pid: i32) -> Result<(), LinuxError> {
+    let target_uid = sched_target_uid(process, pid)?;
+    if process.uid() == 0 || process.uid() == target_uid {
+        Ok(())
+    } else {
+        Err(LinuxError::EPERM)
+    }
 }
 
 fn set_sched_target_state(
@@ -339,6 +367,9 @@ pub(super) fn sys_sched_setparam(process: &UserProcess, pid: i32, param: usize) 
     };
     match read_user_value::<UserSchedParam>(process, param) {
         Ok(value) if sched_param_accepts_policy(state.policy, value) => {
+            if let Err(err) = can_set_sched_target(process, pid) {
+                return neg_errno(err);
+            }
             state.param = value;
             match set_sched_target_state(process, pid, state) {
                 Ok(()) => 0,
@@ -370,20 +401,29 @@ pub(super) fn sys_sched_setscheduler(
     if param == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    if let Err(err) = sched_target_state(process, pid) {
-        return neg_errno(err);
+    if sched_priority_bounds(policy).is_none() {
+        return neg_errno(LinuxError::EINVAL);
     }
     let param = match read_user_value::<UserSchedParam>(process, param) {
         Ok(param) => param,
         Err(err) => return neg_errno(err),
     };
-    if sched_param_accepts_policy(policy, param) {
-        match set_sched_target_state(process, pid, UserSchedState { policy, param }) {
-            Ok(()) => 0,
-            Err(err) => neg_errno(err),
-        }
-    } else {
-        neg_errno(LinuxError::EINVAL)
+    if !sched_param_accepts_policy(policy, param) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    match sched_target_state(process, pid) {
+        Ok(_) => {}
+        Err(err) => return neg_errno(err),
+    };
+    if let Err(err) = can_set_sched_target(process, pid) {
+        return neg_errno(err);
+    }
+    if process.uid() != 0 && sched_policy_needs_privilege(policy) {
+        return neg_errno(LinuxError::EPERM);
+    }
+    match set_sched_target_state(process, pid, UserSchedState { policy, param }) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
     }
 }
 

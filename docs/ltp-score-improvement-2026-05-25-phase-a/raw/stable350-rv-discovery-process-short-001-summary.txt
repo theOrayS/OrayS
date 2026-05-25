@@ -1,0 +1,68 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-discovery-process-short-001.log`
+
+- PASS LTP CASE: 9
+- FAIL LTP CASE: 6
+- Internal TFAIL/TBROK/TCONF: 20 ({'TCONF': 2, 'TFAIL': 16, 'TBROK': 2})
+- timeout matches: 1
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 8 passed, 6 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fork03 | rv | musl | ltp-musl | PASS | 0 | 2570 | 256651 | 256630 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork04 | rv | musl | ltp-musl | PASS | 0 | 2869 | 256630 | 256609 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | rv | musl | ltp-musl | PASS | 0 | 2575 | 256609 | 256602 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork07 | rv | musl | ltp-musl | PASS | 0 | 10749 | 256602 | 255888 | -714 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork08 | rv | musl | ltp-musl | PASS | 0 | 2765 | 255888 | 255860 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork09 | rv | musl | ltp-musl | PASS | 0 | 3660 | 255860 | 255846 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill05 | rv | musl | ltp-musl | FAIL | 3 | 2653 | 256736 | 256707 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| signal01 | rv | glibc | ltp-glibc | UNKNOWN |  |  | 255839 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| signal01 | rv | musl | ltp-musl | FAIL | 137 | 31543 | 256799 | 256757 | -42 | 0 | 0 | 0 | 1 | 0 | 0 |
+| signal05 | rv | musl | ltp-musl | PASS | 0 | 2545 | 256757 | 256743 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| signal06 | rv | musl | ltp-musl | FAIL | 32 | 2146 | 256743 | 256736 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| string01 | rv | glibc | ltp-glibc | PASS | 0 | 2833 | 255846 | 255839 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| string01 | rv | musl | ltp-musl | PASS | 0 | 2086 | 258854 | 256799 | -2055 | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitid07 | rv | musl | ltp-musl | FAIL | 1 | 2520 | 256707 | 256686 | -21 | 5 | 0 | 0 | 0 | 0 | 0 |
+| waitid08 | rv | musl | ltp-musl | FAIL | 1 | 2797 | 256686 | 256665 | -21 | 10 | 0 | 0 | 0 | 0 | 0 |
+| waitid10 | rv | musl | ltp-musl | FAIL | 2 | 2639 | 256665 | 256651 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 9 (rv:musl:fork03, rv:musl:fork04, rv:musl:fork05, rv:musl:fork07, rv:musl:fork08, rv:musl:fork09, rv:musl:signal05, rv:glibc:string01, rv:musl:string01)
+- pass_with_tconf: 0
+- fail_wrapper: 6 (rv:musl:kill05, rv:musl:signal01, rv:musl:signal06, rv:musl:waitid07, rv:musl:waitid08, rv:musl:waitid10)
+- internal_tfail: 3 (rv:musl:kill05, rv:musl:waitid07, rv:musl:waitid08)
+- internal_tbrok: 2 (rv:musl:kill05, rv:musl:waitid10)
+- timeout: 1 (rv:musl:signal01)
+- enosys: 0
+- panic_trap: 0
+- unknown: 1 (rv:glibc:signal01)
+
+## FAIL LTP CASE
+- ltp-musl:signal01
+- ltp-musl:signal06
+- ltp-musl:kill05
+- ltp-musl:waitid07
+- ltp-musl:waitid08
+- ltp-musl:waitid10
+
+## Groups
+### ltp-musl
+- PASS: 8
+- FAIL: 6
+- Internal: {'TCONF': 2, 'TFAIL': 16, 'TBROK': 2}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: signal01, signal06, kill05, waitid07, waitid08, waitid10
+
+### ltp-glibc
+- PASS: 1
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

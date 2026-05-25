@@ -1,0 +1,74 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable330-rv-targeted-fd-fcntl-001.log`
+
+- PASS LTP CASE: 22
+- FAIL LTP CASE: 2
+- Internal TFAIL/TBROK/TCONF: 2 ({'TBROK': 2})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 11 passed, 1 failed
+- ltp-glibc: 11 passed, 1 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fchdir01 | rv | glibc | ltp-glibc | PASS | 0 | 3134 | 256612 | 256598 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchdir01 | rv | musl | ltp-musl | PASS | 0 | 3273 | 258856 | 256794 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchdir03 | rv | glibc | ltp-glibc | FAIL | 2 | 3262 | 256598 | 256584 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchdir03 | rv | musl | ltp-musl | FAIL | 2 | 2289 | 256794 | 256780 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | glibc | ltp-glibc | PASS | 0 | 2889 | 256570 | 256556 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | musl | ltp-musl | PASS | 0 | 1526 | 256766 | 256752 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05_64 | rv | glibc | ltp-glibc | PASS | 0 | 3365 | 256556 | 256542 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05_64 | rv | musl | ltp-musl | PASS | 0 | 2800 | 256752 | 256738 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | glibc | ltp-glibc | PASS | 0 | 4537 | 256542 | 256521 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | musl | ltp-musl | PASS | 0 | 4857 | 256738 | 256717 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12_64 | rv | glibc | ltp-glibc | PASS | 0 | 4290 | 256521 | 256500 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12_64 | rv | musl | ltp-musl | PASS | 0 | 4131 | 256717 | 256696 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | glibc | ltp-glibc | PASS | 0 | 3075 | 256500 | 252390 | -4110 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | musl | ltp-musl | PASS | 0 | 2143 | 256696 | 256682 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13_64 | rv | glibc | ltp-glibc | PASS | 0 | 2976 | 252390 | 252376 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13_64 | rv | musl | ltp-musl | PASS | 0 | 2935 | 256682 | 256668 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fdatasync01 | rv | glibc | ltp-glibc | PASS | 0 | 2723 | 256584 | 256577 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fdatasync01 | rv | musl | ltp-musl | PASS | 0 | 2964 | 256780 | 256773 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fdatasync02 | rv | glibc | ltp-glibc | PASS | 0 | 2775 | 256577 | 256570 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fdatasync02 | rv | musl | ltp-musl | PASS | 0 | 2494 | 256773 | 256766 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler01 | rv | glibc | ltp-glibc | PASS | 0 | 3579 | 252376 | 252355 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler01 | rv | musl | ltp-musl | PASS | 0 | 2398 | 256668 | 256647 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler02 | rv | glibc | ltp-glibc | PASS | 0 | 3454 | 252355 | 252320 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler02 | rv | musl | ltp-musl | PASS | 0 | 3125 | 256647 | 256612 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 22 (rv:glibc:fchdir01, rv:musl:fchdir01, rv:glibc:fcntl05, rv:musl:fcntl05, rv:glibc:fcntl05_64, rv:musl:fcntl05_64, rv:glibc:fcntl12, rv:musl:fcntl12, rv:glibc:fcntl12_64, rv:musl:fcntl12_64, rv:glibc:fcntl13, rv:musl:fcntl13, rv:glibc:fcntl13_64, rv:musl:fcntl13_64, rv:glibc:fdatasync01, rv:musl:fdatasync01, rv:glibc:fdatasync02, rv:musl:fdatasync02, rv:glibc:sched_setscheduler01, rv:musl:sched_setscheduler01, rv:glibc:sched_setscheduler02, rv:musl:sched_setscheduler02)
+- pass_with_tconf: 0
+- fail_wrapper: 2 (rv:glibc:fchdir03, rv:musl:fchdir03)
+- internal_tfail: 0
+- internal_tbrok: 2 (rv:glibc:fchdir03, rv:musl:fchdir03)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:fchdir03
+- ltp-glibc:fchdir03
+
+## Groups
+### ltp-musl
+- PASS: 11
+- FAIL: 1
+- Internal: {'TBROK': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: fchdir03
+
+### ltp-glibc
+- PASS: 11
+- FAIL: 1
+- Internal: {'TBROK': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: fchdir03

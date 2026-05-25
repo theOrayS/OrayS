@@ -1,57 +1,67 @@
-# stable350 delivery report
+# stable350 Delivery Report
 
 Date: 2026-05-25
-Requested target: stable350
-Delivered state: **stable300 retained**
+Verdict: **DELIVERED**
 
-## Final status
+## Result
 
-- Live `examples/shell/src/cmd.rs::LTP_STABLE_CASES`: **300 total / 300 unique / 0 duplicates**.
-- No duplicate stable entries.
-- No new stable cases were added.
-- Stable350 final gate was **not run**, because stable315 promotion did not pass.
-- Codex goal remains active; final `update_goal({status: "complete"})` was not called.
+Live `examples/shell/src/cmd.rs::LTP_STABLE_CASES` now contains exactly **350 total / 350 unique / 0 duplicates**. The final list is captured in `stable350-live.cases`.
 
-## What was completed
+Final aggregate gates:
 
-- Team state prompt was rechecked during this handoff; `omx team status ltp-stable300-to-stab-7c9de325` now reports no team state and the referenced leader mailbox is missing, so the worker prompts are stale.
-- Discovery/report lanes produced candidate matrices for permissions/VFS, fd/pipe/iovec, process/wait/signal/rlimit, and mmap/mprotect/munmap.
-- Earlier Team-integrated implementation changes remained in place:
-  - LTP runner environment/cwd handling for resource-helper cases (`LTPROOT`, `PATH`, per-case `/tmp/ltp-work/<case>-run`).
-  - Linux-visible `prlimit64(current pid)` acceptance plus default-fatal signal delivery/exit handling.
-  - LoongArch musl scheduler wrapper patch preserving libc errno semantics for `sched_getscheduler02`.
-- This follow-up added a real wait/signal fix: fork-like process children restore the pre-libc-fork all-application signal mask when libc temporarily blocks every maskable signal around fork.
-- Validation completed before or during follow-up gates:
-  - `cargo fmt --all -- --check` passed.
-  - `python3 -B scripts/test_ltp_summary.py` passed earlier in this phase.
-  - `git diff --check` passed.
-  - `make A=examples/shell ARCH=riscv64` passed.
-  - RV targeted `followup-rv-waitpid01-maskrestore-001`: PASS 2 / FAIL 0; `ltp-musl 1/0`, `ltp-glibc 1/0`; internal TFAIL/TBROK/TCONF=0.
-  - LA targeted `followup-la-waitpid01-maskrestore-001`: PASS 2 / FAIL 0; `ltp-musl 1/0`, `ltp-glibc 1/0`; internal TFAIL/TBROK/TCONF=0.
-  - RV guard `followup-rv-waitpid-signal-guard-001`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0.
-  - LA guard `followup-la-waitpid-signal-guard-001`: PASS 16 / FAIL 0, both libc 8/0, internal TFAIL/TBROK/TCONF=0.
-  - Follow-up marker-prefix scan over new waitpid/pipe logs: `TOTAL markers=42 bad=0`.
-  - RV `pipe2_02` after `/bin/sh` compatibility fix: PASS 2 / FAIL 0; internal TFAIL/TBROK/TCONF=0.
-  - LA `pipe2_02` after `/bin/sh` compatibility fix: PASS 2 / FAIL 0; internal TFAIL/TBROK/TCONF=0.
-  - Pipe2 marker-prefix scan: `TOTAL markers=4 bad=0`.
+| Arch | Final summary | PASS/FAIL | musl | glibc | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap | Marker prefix |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| RV | `raw/stable350-rv-final-002-summary.txt` | 700/0 | 350/0 | 350/0 | 0 | 0 | 4 known `read02` only | 0 | 0 | 0 | `raw/stable350-rv-final-002-marker-prefix.txt`: bad=0 |
+| LA | `raw/stable350-la-final-002-summary.txt` | 700/0 | 350/0 | 350/0 | 0 | 0 | 4 known `read02` only | 0 | 0 | 0 | `raw/stable350-la-final-002-marker-prefix.txt`: bad=0 |
 
-## Why stable350 was not delivered
+`read02` remains disclosed as pass-with-TCONF and is not treated as clean. No new internal TFAIL/TBROK/TCONF was introduced beyond that known source.
 
-Fresh candidate evidence now contains eight four-way clean cases: `prctl05,sched_getscheduler02,sethostname01,setrlimit01,signal03,signal04,waitpid01,pipe2_02`. This is useful but still below stable315's +15 gate, so no stable315/stable330/stable350 aggregate gate was justified.
+## Stage summary
 
-The former high-value blocker `pipe2_02` is now a clean seed after the `/bin/sh` exec fallback fix. Remaining work is to find at least 7 more four-way clean cases for stable315.
+- stable315 additions: `alarm05, alarm07, write05, gettimeofday02, waitpid01, pipe2_02, sched_getscheduler02, fstat03, fstat03_64, statfs02, fstatfs02, fstatfs02_64, sched_getparam03, sched_setparam04, sched_setparam05`
+- stable330 additions: `fchdir01, fchdir03, fcntl05, fcntl05_64, fcntl12, fcntl12_64, fcntl13, fcntl13_64, fdatasync01, fdatasync02, readlinkat01, sched_setscheduler01, sched_setscheduler02, symlinkat01, ftruncate03_64`
+- stable350 additions: `chdir04, chown01, chown02, chown03, chown05, creat05, abs01, mkdir05, statfs02_64, truncate03_64, fork03, fork04, fork07, fork08, fork09, signal05, string01, memcmp01, memcpy01, memset01`
 
-Post-Team LA attempts `followup-la-targeted-001/002/003` were aborted/untrusted due duplicated starts and are not used as evidence.
+## Important demotion
 
-## Promotion policy preserved
+`kill02` was removed from the final stable350 set. It had targeted promise, but the first LA final aggregate showed `PASS LTP CASE: 699`, `FAIL LTP CASE: 1`, `ltp-glibc 349/1`, and TBROK=4 in `raw/stable350-la-final-summary.txt`. The final list replaced it with `abs01`, which passed fresh RV+LA targeted replacement checks and the final RV+LA stable aggregate gates.
 
-No timeout, ENOSYS, panic/trap, TFAIL, TBROK, or TCONF was converted to PASS. No case-name hardcoding was introduced. `read02` remains transparently documented as `pass_with_tconf` in the stable300 baseline.
+## Source changes supporting the promotion
 
-## User-visible / ABI-visible behavior changes integrated this round
+- `examples/shell/src/cmd.rs`: stable list now has 350 unique cases; `kill02` is not present; `abs01` is present.
+- `examples/shell/src/uspace/fd_table.rs` and `linux_abi.rs`: improve `O_NOFOLLOW`, symlink/O_PATH behavior, fcntl lock/lease validation, fsync/fchdir/mkdirat edge semantics.
+- `examples/shell/src/uspace/metadata.rs`: support `readlinkat` empty-path/fd target behavior.
+- `examples/shell/src/uspace/resource_sched.rs`: tighten scheduler permission and errno behavior for scheduler promotion/regression cases.
+- `examples/shell/src/uspace/memory_map.rs`: page-fault exit now routes through SIGSEGV group exit status so wait-status tests observe signal semantics.
 
-- LTP runner behavior: cases with `<case>_*` resource helpers may run from a per-case work directory with `LTPROOT` and adjusted `PATH`; this is harness/environment behavior for executing real LTP binaries, not a PASS shim.
-- POSIX/Linux-visible behavior: `prlimit64` now accepts the current process pid as a valid current target; default-fatal self/pending signals are handled more synchronously when unblocked or delivered.
-- LoongArch musl loader behavior: ENOSYS-only exported musl scheduler wrappers are patched to issue the real syscall and tail-call musl `__syscall_ret`, preserving libc errno semantics while raw syscall paths still return raw `-errno`.
-- POSIX/Linux-visible behavior added by this follow-up: fork-like process creation now avoids leaking libc's transient all-application-signal mask into the child, so default-fatal child signals are reported through wait status instead of being spuriously blocked until normal exit.
-- POSIX/Linux-visible behavior added by this follow-up: `execve("/bin/sh", ...)` and related busybox shell aliases fall back to the current suite busybox when no root-level `/bin/sh` exists, allowing real libc `system()` calls to execute shell commands instead of failing before the command starts.
-- `LTP_STABLE_CASES` and visible stable score did not change.
+## Validation commands run
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv
+python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-final-002.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la
+python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-final-002.log
+cargo fmt --all -- --check
+make A=examples/shell ARCH=riscv64
+make all
+```
+
+Marker-prefix checks were run on final RV and LA logs and both reported `TOTAL markers=700 bad=0`.
+
+## Checks not run
+
+- Offline remote build: `CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true PATH=$PWD/tools/bin:$PATH make all`.
+- Full `make clippy`.
+- `make unittest_no_fail_fast`.
+
+## User-visible / POSIX behavior changes
+
+This campaign intentionally changes POSIX-visible compatibility behavior in the shell/uspace LTP environment:
+
+- `fcntl` lock/lease commands now validate and return Linux-compatible errors for the covered cases.
+- `O_NOFOLLOW` and O_PATH/symlink opening behavior is more Linux-like.
+- `readlinkat` with an empty path can resolve from the supplied fd target.
+- `fchdir`, `fsync`, `mkdirat`, scheduler permission checks, and scheduler errno ordering were tightened.
+- User page faults now produce SIGSEGV group-exit status rather than a plain hardcoded exit code.
+
+No fake PASS, LTP case-name special-casing, or marker-output laundering was introduced.

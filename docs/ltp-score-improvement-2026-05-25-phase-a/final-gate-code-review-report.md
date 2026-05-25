@@ -1,59 +1,57 @@
-# Final gate code-review report
+# Final Gate Code Review Report
 
-Recommendation: **BLOCK stable350 / PASS narrow waitpid01 and /bin/sh exec compatibility fixes**
-Architect status: **BLOCKED for stable350**
+Date: 2026-05-25
+Recommendation: **APPROVE**
+Architectural Status: **CLEAR**
 
-## Reason
+## Scope reviewed
 
-Final stable350 acceptance is still blocked by missing clean promotion evidence: only 8 RV+LA × musl+glibc clean seed cases are available, below the +15 stable315 tranche gate, and no stable aggregate gate was run.
+- `examples/shell/src/cmd.rs`
+- `examples/shell/src/uspace/fd_table.rs`
+- `examples/shell/src/uspace/linux_abi.rs`
+- `examples/shell/src/uspace/memory_map.rs`
+- `examples/shell/src/uspace/metadata.rs`
+- `examples/shell/src/uspace/resource_sched.rs`
+- `docs/ltp-score-improvement-2026-05-25-phase-a/*`
 
-## Narrow fix review
+## Findings by severity
 
-Reviewed follow-up changes in:
+### CRITICAL
 
-- `examples/shell/src/uspace/task_context.rs`
-- `examples/shell/src/uspace/signal_abi.rs`
-- `examples/shell/src/uspace/process_lifecycle.rs`
+None.
 
-The change records the previous signal mask when libc transiently sets the all-application-signal mask, then uses that recorded mask for fork-like process children only. Thread clone inheritance still uses the live signal mask. This addresses `waitpid01` musl children inheriting libc's temporary all-mask fork critical section and exiting normally instead of being default-terminated by `raise()`/`kill(getpid())`.
+### HIGH
 
-Review findings:
+None.
 
-- No LTP case-name hardcoding, fake PASS, timeout laundering, or marker-output change was introduced.
-- The behavior is scoped to process clone/fork inheritance and signal-mask state; it does not change the stable case list.
-- The code preserves signal mask behavior for non-all-mask `rt_sigprocmask()` calls by clearing the restore sentinel.
-- Risk remains moderate because this is Linux/POSIX-visible signal inheritance behavior and uses a libc-pattern heuristic; therefore it is not enough for broad promotion without targeted regression guards.
+### MEDIUM
 
-## Additional /bin/sh compatibility fix review
+None blocking. The fcntl lock/lease implementation remains intentionally minimal for the current in-memory test environment; future campaigns should expand it only with fresh cross-arch evidence rather than assuming full Linux lease semantics.
 
-Reviewed follow-up changes in `examples/shell/src/uspace/process_lifecycle.rs` for `execve("/bin/sh", ...)` compatibility. LTP resource helpers call libc `system()`, which requires a shell at `/bin/sh`; this tree provides suite-local busybox binaries instead of a root-level `/bin/sh`. The fix falls back to the current process exec root's busybox, preserving argv shell dispatch, with musl/glibc fallback ordering.
+### LOW / watch items
 
-Review findings:
+- Scheduler permission and errno ordering were tuned for Linux-compatible negative and privilege cases. Keep `sched_*` regression cases in the next campaign.
+- `O_NOFOLLOW`, O_PATH, and symlink behavior now covers promoted readlinkat/symlink/fcntl cases; future VFS changes should keep `readlinkat01`, `symlinkat01`, `fcntl12`, and `fcntl13` in targeted regressions.
+- SIGSEGV wait-status behavior is now observable through group-exit signal status; future memory-map work should rerun wait/signal regressions.
 
-- This is not case-name hardcoding; it is a general `/bin/sh`/busybox exec compatibility path.
-- It enables real `system("cp ...")` execution for LTP resource copying instead of bypassing test behavior.
-- It does not alter marker output or stable case membership.
+## No-fake-pass audit
 
-Evidence reviewed:
-
-- RV `pipe2_02`: `raw/followup-rv-pipe2_02-binsh-001-summary.txt` PASS 2 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
-- LA `pipe2_02`: `raw/followup-la-pipe2_02-binsh-001-summary.txt` PASS 2 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
-- Marker prefix: `raw/followup-pipe2-binsh-marker-prefix-check.txt` reports `TOTAL markers=4 bad=0`.
+- No branch keys on an LTP case name.
+- No test-source edits.
+- No marker-prefix weakening.
+- No timeout/TBROK/TFAIL/TCONF conversion to PASS/SKIP.
+- `kill02` failure was preserved in documentation and removed from stable instead of hidden.
 
 ## Evidence reviewed
 
-- `cargo fmt --all -- --check` passed.
-- `git diff --check` passed.
-- `make A=examples/shell ARCH=riscv64` passed.
-- RV waitpid targeted: `raw/followup-rv-waitpid01-maskrestore-001-summary.txt` PASS 2 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
-- LA waitpid targeted: `raw/followup-la-waitpid01-maskrestore-001-summary.txt` PASS 2 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
-- RV signal/wait guard: `raw/followup-rv-waitpid-signal-guard-001-summary.txt` PASS 16 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
-- LA signal/wait guard: `raw/followup-la-waitpid-signal-guard-001-summary.txt` PASS 16 / FAIL 0, internal TFAIL/TBROK/TCONF=0.
-- Marker prefix: `raw/followup-waitpid-marker-prefix-check.txt` reports `TOTAL markers=42 bad=0`.
+- `raw/stable350-rv-final-002-summary.txt`: PASS 700 / FAIL 0; musl 350/0; glibc 350/0; TFAIL/TBROK 0; read02 TCONF only.
+- `raw/stable350-la-final-002-summary.txt`: PASS 700 / FAIL 0; musl 350/0; glibc 350/0; TFAIL/TBROK 0; read02 TCONF only.
+- `raw/stable350-rv-final-002-marker-prefix.txt`: `TOTAL markers=700 bad=0`.
+- `raw/stable350-la-final-002-marker-prefix.txt`: `TOTAL markers=700 bad=0`.
+- `cargo fmt --all -- --check`: passed.
+- `make A=examples/shell ARCH=riscv64`: passed.
+- `make all`: passed.
 
-## Required before final APPROVE
+## Verdict
 
-1. Clean serialized RV targeted gate for a >=15-case candidate tranche.
-2. Clean serialized LA targeted gate for exactly the same subset.
-3. Stable aggregate gate after editing `LTP_STABLE_CASES`.
-4. Marker prefix check on final RV/LA logs.
+Approve. The final gate is clean under the stable350 constraints, and remaining risks are documented as future regression watch items rather than merge blockers.
