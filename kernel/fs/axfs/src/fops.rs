@@ -294,7 +294,7 @@ impl Directory {
         let node = crate::root::lookup(dir, path)?;
         let attr = node.get_attr()?;
         if !attr.is_dir() {
-            return ax_err!(NotADirectory);
+            return Err(AxError::NotADirectory);
         }
         let access_cap = opts.into();
         if !perm_to_cap(attr.perm()).contains(access_cap) {
