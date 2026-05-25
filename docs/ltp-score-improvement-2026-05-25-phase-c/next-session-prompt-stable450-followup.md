@@ -13,6 +13,15 @@
 - known transparent TCONF 仍只有 `read02`；不能把它说成 clean。
 - original `axfs::fops:297 [AxError::NotADirectory]` 噪声在 stable379 aggregate 中为 0；残留 `axfs_ramfs::file:69` NotADirectory 每架构 22 条。
 
+新增 G002 Attempt 3 负证据（必须重新 live 复核，不要 promotion）：
+
+- `readlinkat02`: RV musl+glibc clean，LA glibc clean，但 LA musl TFAIL；`target-stable400-readlinkat02-serial-promotion-candidates.txt` 为 0 candidates。
+- `pipe02`: RV wave2 出现 panic/trap；不要放入 broad batch，先 root-cause。
+- wave2 metadata/path blockers: `access04`, `chmod06`, `chmod07`, `fchmod02`, `fchmod06`, `statx01`, `rename04`, `rename05` 仍有 TBROK/ENOSYS。
+- time/signal/wait scout: `clock_gettime01`, `nanosleep01`, `nanosleep02`, `pause01`, `sigpending02`, `signal01`, `signal06`, `waitid07`, `waitid08`, `waitid10` 在 RV musl 有 TFAIL/TBROK/TCONF/timeout；`kill02` 仅 RV musl 通过，不具备 promotion 证据。
+- FD/fcntl scout: `dup05`, `fcntl07`, `fcntl11`, `fcntl14`, `fcntl15`, `fcntl07_64`, `fcntl11_64`, `fcntl15_64` 在 RV musl+glibc PASS 0 / FAIL 16；涉及 `mkfifo` ENOSYS 和 record-locking TFAIL，不具备 promotion 证据。
+- 任何标记为 `invalid-concurrent` 的日志都不是证据；不要用于 promotion。
+
 目标：
 
 1. 从 stable379 冲 stable400（先找 21 个 clean case）。

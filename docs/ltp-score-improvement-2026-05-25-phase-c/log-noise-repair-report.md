@@ -90,8 +90,8 @@ During G002 candidate scouts, nearby expected errno paths still produced warning
 - `git diff --check`: PASS.
 - `make A=examples/shell ARCH=riscv64`: PASS.
 
-The attempted stable379 aggregate RV gate later provided a blocker/noise sample, not promotion evidence: it was aborted after an existing `ftest03` timeout, with marker prefixes still clean and original `axfs::fops` noise still absent. The live stable list remains stable375.
+The first attempted stable379 aggregate RV gate provided a blocker/noise sample, not promotion evidence: it was aborted after an existing `ftest03` timeout, with marker prefixes still clean and original `axfs::fops` noise still absent. A later retry plus LA gate accepted the honest stable379 partial promotion; the current live stable list is 379 total / 379 unique / 0 duplicates.
 
 ## Conclusion
 
-G001 is complete: the high-frequency `axfs::fops:297 [AxError::NotADirectory]` warning path is eliminated locally with no intended POSIX-visible errno change, marker prefixes remain clean, and small RV musl+glibc LTP smoke remains honest with only the known `read02` TCONF disclosed. The post-G001 follow-up adds adjacent no-warn hardening for the same expected-error pattern without converting any failure to success. G002 promotion remains blocked; no new stable case is committed from this slice.
+G001 is complete: the high-frequency `axfs::fops:297 [AxError::NotADirectory]` warning path is eliminated locally with no intended POSIX-visible errno change, marker prefixes remain clean, and small RV musl+glibc LTP smoke remains honest with only the known `read02` TCONF disclosed. The post-G001 follow-up adds adjacent no-warn hardening for the same expected-error pattern without converting any failure to success. G002 later accepted only the four-case stable379 partial promotion; stable400/stable450 remain blocked by fresh negative scout evidence.
