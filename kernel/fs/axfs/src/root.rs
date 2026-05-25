@@ -401,7 +401,7 @@ pub(crate) fn lookup(dir: Option<&VfsNodeRef>, path: &str) -> AxResult<VfsNodeRe
     }
     let node = parent_node_of(dir, path).lookup(path)?;
     if path.ends_with('/') && !node.get_attr()?.is_dir() {
-        ax_err!(NotADirectory)
+        Err(AxError::NotADirectory)
     } else {
         Ok(node)
     }
@@ -411,7 +411,7 @@ pub(crate) fn create_file(dir: Option<&VfsNodeRef>, path: &str) -> AxResult<VfsN
     if path.is_empty() {
         return ax_err!(NotFound);
     } else if path.ends_with('/') {
-        return ax_err!(NotADirectory);
+        return Err(AxError::NotADirectory);
     }
     let parent = parent_node_of(dir, path);
     parent.create(path, VfsNodeType::File)?;
@@ -459,7 +459,7 @@ pub(crate) fn remove_dir(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
     let node = lookup(dir, path)?;
     let attr = node.get_attr()?;
     if !attr.is_dir() {
-        ax_err!(NotADirectory)
+        Err(AxError::NotADirectory)
     } else if !attr.perm().owner_writable() {
         ax_err!(PermissionDenied)
     } else {
@@ -485,7 +485,7 @@ pub(crate) fn set_current_dir(path: &str) -> AxResult {
     let node = lookup(None, &abs_path)?;
     let attr = node.get_attr()?;
     if !attr.is_dir() {
-        ax_err!(NotADirectory)
+        Err(AxError::NotADirectory)
     } else if !attr.perm().owner_executable() {
         ax_err!(PermissionDenied)
     } else {

@@ -157,7 +157,7 @@ impl File {
                 Ok(node) => {
                     // already exists
                     if opts.create_new {
-                        return ax_err!(AlreadyExists);
+                        return Err(AxError::AlreadyExists);
                     }
                     node
                 }
@@ -174,7 +174,7 @@ impl File {
         if attr.is_dir()
             && (opts.create || opts.create_new || opts.write || opts.append || opts.truncate)
         {
-            return ax_err!(IsADirectory);
+            return Err(AxError::IsADirectory);
         }
         let access_cap = opts.into();
         if !perm_to_cap(attr.perm()).contains(access_cap) {
