@@ -28,7 +28,7 @@ These cases passed targeted RV+LA x musl+glibc cleanly with no internal TFAIL/TB
 
 | Case/family | Subsystem | Fresh evidence | Blocker | Next minimal action |
 | --- | --- | --- | --- | --- |
-| `readlinkat02` | VFS/path/user buffer | RV clean in `target-stable400-scout-rv-001`; LA summary `target-stable400-rvclean2-la-001` | LA musl internal TFAIL: expected negative path did not match | Inspect readlinkat zero-size/null buffer semantics; retest single case RV+LA both libc |
+| `readlinkat02` | VFS/path/user buffer | RV clean in `target-stable400-scout-rv-001`; LA diagnostic `raw/readlinkat02-la-diagnostic-003-summary.txt` | LA musl internal TFAIL: intended `bufsiz=0` reaches kernel as `bufsiz=1`; LA glibc reaches `0` and passes | Blocked outside syscall-body semantics; do not promote without LA-musl call-boundary/root-cause fix |
 | `inode02` | fs metadata/stress | RV clean in scout; LA summary `target-stable400-rvclean2-la-001` | LA glibc timeout | Investigate LA runtime/memory growth before any promotion |
 | `chmod05`, `fchmod05` | permission/group lookup | `target-stable400-scout-rv-001` | RV musl TBROK; group lookup/setup issue | Fix group/user database or test setup compatibility; then four-way retest |
 | `openat02`, `openat03` | openat flags/path semantics | `target-stable400-scout-rv-001` | RV both libc TBROK; ENOSPC/O_TMPFILE style setup failures | Check tmpfs capacity/O_TMPFILE errno path; not promotable |
@@ -46,7 +46,7 @@ No new case was accepted into `LTP_STABLE_CASES`; live stable remains 379 total 
 
 | Case/family | Fresh evidence | Result | Decision |
 | --- | --- | --- | --- |
-| `readlinkat02` | `raw/target-stable400-readlinkat02-rv-serial-001-summary.txt`; `raw/target-stable400-readlinkat02-la-serial-001-summary.txt`; `raw/target-stable400-readlinkat02-serial-promotion-candidates.txt` | RV musl+glibc clean; LA glibc clean; LA musl TFAIL 1; promotion candidates 0 | Blocked; do not promote without LA musl fix and four-way retest |
+| `readlinkat02` | `raw/target-stable400-readlinkat02-rv-serial-001-summary.txt`; `raw/target-stable400-readlinkat02-la-serial-001-summary.txt`; `raw/readlinkat02-la-diagnostic-003-summary.txt`; `raw/target-stable400-readlinkat02-serial-promotion-candidates.txt` | RV musl+glibc clean; LA glibc clean; LA musl TFAIL 1; diagnostic shows LA-musl passed `bufsiz=1` into syscall for the zero-size testcase | Blocked; kernel syscall already returns EINVAL for real `bufsiz=0`; do not add non-Linux special-case |
 | Wave2 metadata/path batch | `raw/target-stable400-wave2-rv-001-summary.txt` | RV musl PASS 1 / FAIL 8; TBROK 8; ENOSYS 1; panic/trap 1 on `pipe02` | Negative scout only; do not use as promotion evidence |
 | Time/signal/wait batch | `raw/target-stable400-timesignal-rv-serial-001-summary.txt` | RV musl PASS 1 / FAIL 10; TFAIL 22; TCONF 2; TBROK 1; timeout 3; scout stopped after blockers, so glibc incomplete | Negative/aborted scout only; no promotion |
 | FD/fcntl batch | `raw/target-stable400-fd-rv-serial-001-summary.txt` | RV musl+glibc PASS 0 / FAIL 16; TBROK 10; TFAIL 900; ENOSYS 6 | Negative scout only; needs FIFO/syscall and fcntl record-lock semantics work |
@@ -67,7 +67,7 @@ Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were ex
 | Priority | Family/cases | Source/yield signal | Related subsystem | Rationale | Cost/risk |
 | --- | --- | --- | --- | --- | --- |
 | High | group/permission follow-ups around `chmod05`, `fchmod05` | already RV glibc clean, musl setup TBROK | VFS permissions, user/group lookup | Small compatibility repair may unlock multiple chmod/fchmod tests | Medium: setup/user database behavior can affect many tests |
-| High | `readlinkat02` negative-path fix | RV clean, LA glibc clean, one LA musl TFAIL | VFS path and user-memory copy | Narrow errno/buffer semantics likely high ROI | Medium: ABI-visible errno must stay Linux-compatible |
+| Blocked | `readlinkat02` LA-musl call-boundary split | RV clean, LA glibc clean, one LA musl TFAIL; diagnostic shows `bufsiz=1` reaches syscall | VFS path, user-memory copy, libc/ABI boundary | Not a safe syscall-body fix; only revisit with LA-musl call-boundary root cause | High: forcing EINVAL for `bufsiz=1` would break Linux-compatible readlinkat semantics |
 | High | lightweight time/process neighbors after stable379 | `clock_settime01/02`, `clone03`, `confstr01` now promoted; nearby scouts still mixed | time syscall, process lifecycle | Nearby cases could produce more clean promotions after targeted fixes | Medium/high: timers caused timeouts/TFAIL in scout |
 | Medium | openat/rename setup blockers | multiple TBROK in scout | VFS/tmpfs/device setup | Could unlock path semantics cases but setup failures must be real, not hidden | Medium/high: ENOSPC/device setup can mask real regressions |
 | Medium | fs-suite missing executable/path issues | `ftest09`, `openfile01` wrapper `-1` | shell runner/test staging | May be staging rather than kernel semantics | Medium: must not modify LTP to fake PASS |
@@ -76,6 +76,6 @@ Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were ex
 
 1. Treat stable379 as the current live accepted baseline for the next campaign; stable450 remains 71 cases away.
 2. Do not count the aborted `stable379-rv-gate-001` as accepted evidence. Keep its `ftest03` timeout documented, but prefer the accepted `stable379-rv-gate-002` / `stable379-la-gate-001` summaries plus the single-case `ftest03` retry summaries for current state.
-3. Repair one blocker lane at a time: `readlinkat02` LA musl first if diagnostic evidence supports it; avoid `pipe02`, wave2 metadata/path blockers, time/signal/wait blockers, FD/fcntl record-lock/FIFO blockers, and FS/path link/unlink/stat blockers in broad batches until fixed.
+3. Do not spend more promotion time on `readlinkat02` syscall-body changes: fresh diagnostic shows LA-musl passes `bufsiz=1` into the syscall for the zero-size testcase while LA-glibc passes `0`. Avoid `pipe02`, wave2 metadata/path blockers, time/signal/wait blockers, FD/fcntl record-lock/FIFO blockers, and FS/path link/unlink/stat blockers in broad batches until fixed.
 4. After every blocker fix: run targeted RV+LA x musl+glibc matrix, then promote in small clean batches, then aggregate stable gate.
 5. Preserve marker-prefix and remote log-size guardrails after every logging or runner change, and continue disclosing the known `read02` TCONF pair plus any inherited raw timeout notices separately from promoted-case cleanliness.
