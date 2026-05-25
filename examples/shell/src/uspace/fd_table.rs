@@ -1052,6 +1052,27 @@ impl FdTable {
         read_file_at_into(&file.file, offset, dst)
     }
 
+    pub(super) fn mmap_read_file_at_into_fd(
+        &mut self,
+        fd: i32,
+        offset: u64,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
+        let FdEntry::File(file) = self.entry_mut(fd)? else {
+            return match self.entry(fd)? {
+                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                    Err(LinuxError::ESPIPE)
+                }
+                _ => Err(LinuxError::EBADF),
+            };
+        };
+        if !file_is_readable(file.status_flags) {
+            return Err(LinuxError::EACCES);
+        }
+        read_file_at_into(&file.file, offset, dst)
+    }
+
     pub(super) fn insert_with_flags(
         &mut self,
         entry: FdEntry,

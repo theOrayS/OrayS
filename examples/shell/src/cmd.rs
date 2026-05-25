@@ -135,7 +135,13 @@ const LTP_STABLE_CASES: &[&str] = &[
     "abs01", "mkdir05", "statfs02_64", "truncate03_64",
     "fork03", "fork04", "fork07", "fork08",
     "fork09", "signal05", "string01", "memcmp01",
-    "memcpy01", "memset01",
+    "memcpy01", "memset01", "access02", "fchmodat02",
+    "inode01", "mmap06", "ftest01", "ftest02",
+    "ftest03", "ftest04", "mmap10", "stream01",
+    "ftest05", "ftest07", "ftest08", "mmap09",
+    "mmap11", "stream03", "stream04", "stream05",
+    "abort01", "poll01", "fork05", "fork10",
+    "kill11", "kill12", "mem02",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[

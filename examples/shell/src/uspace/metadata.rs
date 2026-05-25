@@ -350,6 +350,9 @@ pub(super) fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize
             Err(err) => return neg_errno(err),
         }
     };
+    if !chmod_permission_allowed(process, &st) {
+        return neg_errno(LinuxError::EPERM);
+    }
     if let Some(path) = path {
         process.set_path_mode(path, chmod_effective_mode(process, &st, mode as u32));
     }
@@ -373,6 +376,9 @@ pub(super) fn sys_fchmodat(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
+    if path.len() >= LINUX_PATH_MAX {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
     let mode = mode as u32;
     if let Some(fd) = proc_self_fd_number(path.as_str()) {
         let mut fds = process.fds.lock();
@@ -383,6 +389,9 @@ pub(super) fn sys_fchmodat(
             Ok((path, st)) => (path, st),
             Err(err) => return neg_errno(err),
         };
+        if !chmod_permission_allowed(process, &st) {
+            return neg_errno(LinuxError::EPERM);
+        }
         if let Some(path) = path {
             process.set_path_mode(path, chmod_effective_mode(process, &st, mode));
         }
@@ -404,6 +413,9 @@ pub(super) fn sys_fchmodat(
                         Ok(st) => st,
                         Err(err) => return neg_errno(err),
                     };
+                    if !chmod_permission_allowed(process, &st) {
+                        return neg_errno(LinuxError::EPERM);
+                    }
                     process.set_path_mode(cwd, chmod_effective_mode(process, &st, mode));
                     0
                 }
@@ -420,6 +432,9 @@ pub(super) fn sys_fchmodat(
                 Err(err) => return neg_errno(err),
             }
         };
+        if !chmod_permission_allowed(process, &st) {
+            return neg_errno(LinuxError::EPERM);
+        }
         if let Some(path) = path {
             process.set_path_mode(path, chmod_effective_mode(process, &st, mode));
         }
@@ -433,21 +448,41 @@ pub(super) fn sys_fchmodat(
             return neg_errno(err);
         }
     };
+    match fds.parent_dirs_searchable(
+        process,
+        resolved_path.as_str(),
+        process.fs_uid(),
+        process.fs_gid(),
+    ) {
+        Ok(true) => {}
+        Ok(false) => return neg_errno(LinuxError::EACCES),
+        Err(err) => return neg_errno(err),
+    }
     if axfs::api::metadata(resolved_path.as_str()).is_ok() {
         let st = match fds.stat_path(process, dirfd as i32, path.as_str()) {
             Ok(st) => st,
             Err(err) => return neg_errno(err),
         };
+        if !chmod_permission_allowed(process, &st) {
+            return neg_errno(LinuxError::EPERM);
+        }
         process.set_path_mode(resolved_path, chmod_effective_mode(process, &st, mode));
         return 0;
     }
     match fds.stat_path(process, dirfd as i32, path.as_str()) {
         Ok(st) => {
+            if !chmod_permission_allowed(process, &st) {
+                return neg_errno(LinuxError::EPERM);
+            }
             process.set_path_mode(resolved_path, chmod_effective_mode(process, &st, mode));
             0
         }
         Err(err) => neg_errno(err),
     }
+}
+
+fn chmod_permission_allowed(process: &UserProcess, st: &general::stat) -> bool {
+    process.uid() == 0 || st.st_uid as u32 == process.uid()
 }
 
 fn chmod_effective_mode(process: &UserProcess, st: &general::stat, mode: u32) -> u32 {
@@ -795,6 +830,7 @@ pub(super) fn sys_statx(
     dirfd: usize,
     pathname: usize,
     flags: usize,
+    mask: usize,
     statxbuf: usize,
 ) -> isize {
     if statxbuf == 0 {
@@ -806,6 +842,18 @@ pub(super) fn sys_statx(
         | general::AT_NO_AUTOMOUNT
         | general::AT_STATX_SYNC_TYPE;
     if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let mask = mask as u32;
+    let supported_mask = general::STATX_BASIC_STATS
+        | general::STATX_BTIME
+        | general::STATX_MNT_ID
+        | general::STATX_DIOALIGN
+        | general::STATX_MNT_ID_UNIQUE
+        | general::STATX_SUBVOL
+        | general::STATX_WRITE_ATOMIC
+        | general::STATX_DIO_READ_ALIGN;
+    if mask & !supported_mask != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
 

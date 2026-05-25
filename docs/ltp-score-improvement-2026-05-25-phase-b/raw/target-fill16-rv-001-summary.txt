@@ -1,0 +1,110 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-fill16-rv-001.log`
+
+- PASS LTP CASE: 2
+- FAIL LTP CASE: 30
+- Internal TFAIL/TBROK/TCONF: 93 ({'TFAIL': 79, 'TBROK': 12, 'TCONF': 2})
+- timeout matches: 2
+- ENOSYS/not implemented matches: 16
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 1 passed, 15 failed
+- ltp-glibc: 1 passed, 15 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| getcwd03 | rv | glibc | ltp-glibc | FAIL | 2 | 3017 | 256502 | 256488 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getcwd03 | rv | musl | ltp-musl | FAIL | 2 | 2436 | 256757 | 256743 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getcwd04 | rv | glibc | ltp-glibc | FAIL | 32 | 3156 | 256488 | 256481 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getcwd04 | rv | musl | ltp-musl | FAIL | 32 | 2564 | 256743 | 256736 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| gethostname02 | rv | glibc | ltp-glibc | PASS | 0 | 2879 | 256516 | 256502 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gethostname02 | rv | musl | ltp-musl | FAIL | 1 | 2727 | 256771 | 256757 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getitimer01 | rv | glibc | ltp-glibc | FAIL | 1 | 3014 | 256383 | 256369 | -14 | 16 | 0 | 0 | 0 | 6 | 0 |
+| getitimer01 | rv | musl | ltp-musl | FAIL | 1 | 2696 | 256638 | 256624 | -14 | 16 | 0 | 0 | 0 | 6 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 3032 | 256561 | 256540 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 2640 | 258855 | 256786 | -2069 | 1 | 1 | 0 | 0 | 0 | 0 |
+| gettid02 | rv | glibc | ltp-glibc | FAIL | 2 | 3092 | 256540 | 256516 | -24 | 0 | 1 | 0 | 0 | 0 | 0 |
+| gettid02 | rv | musl | ltp-musl | PASS | 0 | 2294 | 256786 | 256771 | -15 | 0 | 0 | 0 | 0 | 0 | 0 |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 3295 | 256327 | 256313 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 2673 | 256582 | 256568 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| mkdir02 | rv | glibc | ltp-glibc | FAIL | 1 | 3365 | 256369 | 256355 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | musl | ltp-musl | FAIL | 2 | 2860 | 256624 | 256610 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mkdir03 | rv | glibc | ltp-glibc | FAIL | 2 | 2785 | 256355 | 256348 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mkdir03 | rv | musl | ltp-musl | FAIL | 2 | 2494 | 256610 | 256603 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| nanosleep01 | rv | glibc | ltp-glibc | FAIL | 1 | 15695 | 256481 | 256460 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep01 | rv | musl | ltp-musl | FAIL | 1 | 13656 | 256736 | 256715 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep02 | rv | glibc | ltp-glibc | FAIL | 1 | 7659 | 256460 | 256439 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep02 | rv | musl | ltp-musl | FAIL | 1 | 7462 | 256715 | 256694 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| rmdir02 | rv | glibc | ltp-glibc | FAIL | 2 | 3294 | 256348 | 256341 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rmdir02 | rv | musl | ltp-musl | FAIL | 2 | 2752 | 256603 | 256596 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| setitimer01 | rv | glibc | ltp-glibc | FAIL | 137 | 61598 | 256411 | 256383 | -28 | 5 | 0 | 0 | 1 | 0 | 0 |
+| setitimer01 | rv | musl | ltp-musl | FAIL | 137 | 61488 | 256666 | 256638 | -28 | 5 | 0 | 0 | 1 | 0 | 0 |
+| symlink03 | rv | glibc | ltp-glibc | FAIL | 1 | 2514 | 256313 | 256306 | -7 | 2 | 0 | 0 | 0 | 0 | 0 |
+| symlink03 | rv | musl | ltp-musl | FAIL | 1 | 2218 | 256568 | 256561 | -7 | 2 | 0 | 0 | 0 | 0 | 0 |
+| times03 | rv | glibc | ltp-glibc | FAIL | 1 | 11103 | 256439 | 256411 | -28 | 6 | 0 | 0 | 0 | 0 | 0 |
+| times03 | rv | musl | ltp-musl | FAIL | 1 | 9581 | 256694 | 256666 | -28 | 6 | 0 | 0 | 0 | 0 | 0 |
+| unlink05 | rv | glibc | ltp-glibc | FAIL | 2 | 2728 | 256341 | 256327 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| unlink05 | rv | musl | ltp-musl | FAIL | 2 | 2152 | 256596 | 256582 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:glibc:gethostname02, rv:musl:gettid02)
+- pass_with_tconf: 0
+- fail_wrapper: 30 (rv:glibc:getcwd03, rv:musl:getcwd03, rv:glibc:getcwd04, rv:musl:getcwd04, rv:musl:gethostname02, rv:glibc:getitimer01, rv:musl:getitimer01, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:gettid02, rv:glibc:link02, rv:musl:link02, rv:glibc:mkdir02, rv:musl:mkdir02, rv:glibc:mkdir03, rv:musl:mkdir03, rv:glibc:nanosleep01, rv:musl:nanosleep01, rv:glibc:nanosleep02, rv:musl:nanosleep02, rv:glibc:rmdir02, rv:musl:rmdir02, rv:glibc:setitimer01, rv:musl:setitimer01, rv:glibc:symlink03, rv:musl:symlink03, rv:glibc:times03, rv:musl:times03, rv:glibc:unlink05, rv:musl:unlink05)
+- internal_tfail: 18 (rv:musl:gethostname02, rv:glibc:getitimer01, rv:musl:getitimer01, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:link02, rv:musl:link02, rv:glibc:mkdir02, rv:glibc:nanosleep01, rv:musl:nanosleep01, rv:glibc:nanosleep02, rv:musl:nanosleep02, rv:glibc:setitimer01, rv:musl:setitimer01, rv:glibc:symlink03, rv:musl:symlink03, rv:glibc:times03, rv:musl:times03)
+- internal_tbrok: 12 (rv:glibc:getcwd03, rv:musl:getcwd03, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:gettid02, rv:musl:mkdir02, rv:glibc:mkdir03, rv:musl:mkdir03, rv:glibc:rmdir02, rv:musl:rmdir02, rv:glibc:unlink05, rv:musl:unlink05)
+- timeout: 2 (rv:glibc:setitimer01, rv:musl:setitimer01)
+- enosys: 6 (rv:glibc:getitimer01, rv:musl:getitimer01, rv:glibc:link02, rv:musl:link02, rv:glibc:unlink05, rv:musl:unlink05)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getpgid01
+- ltp-musl:gethostname02
+- ltp-musl:getcwd03
+- ltp-musl:getcwd04
+- ltp-musl:nanosleep01
+- ltp-musl:nanosleep02
+- ltp-musl:times03
+- ltp-musl:setitimer01
+- ltp-musl:getitimer01
+- ltp-musl:mkdir02
+- ltp-musl:mkdir03
+- ltp-musl:rmdir02
+- ltp-musl:unlink05
+- ltp-musl:link02
+- ltp-musl:symlink03
+- ltp-glibc:getpgid01
+- ltp-glibc:gettid02
+- ltp-glibc:getcwd03
+- ltp-glibc:getcwd04
+- ltp-glibc:nanosleep01
+- ltp-glibc:nanosleep02
+- ltp-glibc:times03
+- ltp-glibc:setitimer01
+- ltp-glibc:getitimer01
+- ltp-glibc:mkdir02
+- ltp-glibc:mkdir03
+- ltp-glibc:rmdir02
+- ltp-glibc:unlink05
+- ltp-glibc:link02
+- ltp-glibc:symlink03
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 15
+- Internal: {'TFAIL': 39, 'TBROK': 6, 'TCONF': 1}
+- timeout: 1
+- ENOSYS/not implemented: 8
+- panic/trap: 0
+- Fail cases: getpgid01, gethostname02, getcwd03, getcwd04, nanosleep01, nanosleep02, times03, setitimer01, getitimer01, mkdir02, mkdir03, rmdir02, unlink05, link02, symlink03
+
+### ltp-glibc
+- PASS: 1
+- FAIL: 15
+- Internal: {'TFAIL': 40, 'TBROK': 6, 'TCONF': 1}
+- timeout: 1
+- ENOSYS/not implemented: 8
+- panic/trap: 0
+- Fail cases: getpgid01, gettid02, getcwd03, getcwd04, nanosleep01, nanosleep02, times03, setitimer01, getitimer01, mkdir02, mkdir03, rmdir02, unlink05, link02, symlink03
