@@ -1,31 +1,40 @@
 # Stable450 delivery report
 
-Date: 2026-05-25
+Date: 2026-05-26
 Status: **not delivered**.
 
 ## Summary
 
-Stable450 was the main target, but this execution slice did not produce 75 clean new cases. After repairing the remote log-noise source, the campaign found four cases with fresh RV+LA x musl+glibc targeted-clean evidence, but promoted **zero** cases: the aggregate stable379 attempt hit an existing RV `ftest03` timeout and was aborted before LA, so the live stable list was reverted to and kept at 375 unique cases.
+Stable450 remains the main target, but this execution slice honestly delivered only a partial promotion to **stable379**. The live `LTP_STABLE_CASES` list is 379 total / 379 unique / 0 duplicates.
+
+Accepted additions from stable375:
+
+- `clock_settime01`
+- `clock_settime02`
+- `clone03`
+- `confstr01`
+
+## Highest trusted gate
+
+| Arch | Summary | Markers | Suite result |
+| --- | --- | ---: | --- |
+| RV | `raw/stable379-rv-gate-002-summary.txt` | PASS 758 / FAIL 0 | `ltp-musl` 379/0; `ltp-glibc` 379/0 |
+| LA | `raw/stable379-la-gate-001-summary.txt` | PASS 758 / FAIL 0 | `ltp-musl` 379/0; `ltp-glibc` 379/0 |
+
+Known `read02` TCONF remains disclosed as `pass_with_tconf`; no new promoted case adds TFAIL/TBROK/TCONF. Parser timeout, ENOSYS, and panic/trap counts are 0 in both accepted summaries.
 
 ## Why stable450 was not claimed
 
-The remaining candidate pools contain real unresolved failures:
+The remaining candidate pools contain unresolved failures and risks:
 
 - internal TFAIL/TBROK in VFS/path, statx, clone, timer, and setup-heavy tests;
-- timeout risk in `inode02`, `clock_gettime01`, `setitimer01`, and related timer/fs cases;
+- timeout or long-runtime risk in fs/timer/process candidates;
 - ENOSYS/not-implemented signals in some clone/time scout paths;
 - wrapper or missing-test failures in fs-suite candidates;
-- architecture/libc split failures such as `readlinkat02` LA musl and `inode02` LA glibc.
+- architecture/libc split failures such as previously observed `readlinkat02` LA musl and `inode02` LA glibc.
 
 Claiming stable450 would violate the no-fake-PASS/no-timeout-as-PASS/no-hidden-TCONF constraints.
 
-## Highest trusted target for this slice
+## Follow-up
 
-Stable379 is **not delivered**. The attempted RV aggregate gate failed on existing `ftest03` timeout and was aborted before LA. A future stable379 attempt would need:
-
-- expected RV markers: PASS LTP CASE 758, FAIL 0;
-- expected LA markers: PASS LTP CASE 758, FAIL 0;
-- expected suites: `ltp-musl` 379/0 and `ltp-glibc` 379/0 on both arches;
-- known internal TCONF: only transparent `read02` O_DIRECT-on-tmpfs.
-
-The final gate quality JSON records this as a failed/aborted stable379 attempt, not a stable450 delivery.
+Continue from stable379. Stable400 needs 21 additional clean cases; stable450 needs 71 additional clean cases. Use `next-session-prompt-stable450-followup.md` for the next run.

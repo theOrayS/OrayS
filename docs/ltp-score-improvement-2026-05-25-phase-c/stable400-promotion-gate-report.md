@@ -1,32 +1,34 @@
 # Stable400 promotion gate report
 
-Date: 2026-05-25
-Status: **not achieved** in this phase-c execution slice.
+Date: 2026-05-26
+Status: **not achieved**.
 
 ## Result
 
-The campaign found only four fresh four-way-clean promotion candidates after the log-noise repair:
+The campaign accepted a smaller honest partial promotion from stable375 to stable379, not stable400. The live stable list is 379 total / 379 unique / 0 duplicates.
+
+Accepted new cases:
 
 - `clock_settime01`
 - `clock_settime02`
 - `clone03`
 - `confstr01`
 
-These four cases were temporarily tested as a stable379 candidate set, but the aggregate RV stable gate timed out on existing `ftest03` and was aborted. The live stable list is therefore kept at 375 unique cases; the four cases remain pending targeted-clean candidates, not an accepted promotion.
-
-## Evidence accepted
+## Accepted gate evidence
 
 | Evidence | Result |
 | --- | --- |
-| `raw/target-stable400-clocksettime2-rv-001-summary.txt` | RV musl+glibc PASS 4 / FAIL 0 for the two clock_settime cases; internal failures 0 |
-| `raw/target-stable400-clocksettime2-la-001-summary.txt` | LA musl+glibc PASS 4 / FAIL 0 for the two clock_settime cases; internal failures 0 |
-| `raw/target-stable400-cloneconf2-rv-001-summary.txt` | RV musl+glibc PASS 4 / FAIL 0 for clone03/confstr01; internal failures 0 |
-| `raw/target-stable400-cloneconf2-la-001-summary.txt` | LA musl+glibc PASS 4 / FAIL 0 for clone03/confstr01; internal failures 0 |
+| `raw/target-stable400-clocksettime2-rv-001-summary.txt` | RV targeted musl+glibc PASS 4 / FAIL 0 for `clock_settime01,clock_settime02` |
+| `raw/target-stable400-clocksettime2-la-001-summary.txt` | LA targeted musl+glibc PASS 4 / FAIL 0 for `clock_settime01,clock_settime02` |
+| `raw/target-stable400-cloneconf2-rv-001-summary.txt` | RV targeted musl+glibc PASS 4 / FAIL 0 for `clone03,confstr01` |
+| `raw/target-stable400-cloneconf2-la-001-summary.txt` | LA targeted musl+glibc PASS 4 / FAIL 0 for `clone03,confstr01` |
+| `raw/stable379-rv-gate-002-summary.txt` | RV stable379 aggregate PASS 758 / FAIL 0; `ltp-musl` 379/0; `ltp-glibc` 379/0 |
+| `raw/stable379-la-gate-001-summary.txt` | LA stable379 aggregate PASS 758 / FAIL 0; `ltp-musl` 379/0; `ltp-glibc` 379/0 |
 
-## Evidence rejected
+## Evidence rejected / not enough for stable400
 
-See `candidate-matrix.md` for rejected cases and blockers. Timeout, TFAIL/TBROK, pass_with_tconf, ENOSYS, or wrapper-failure evidence was not used for promotion.
+The broader scout pools still contain real failures, setup breakage, TCONF/TBROK/TFAIL, timeout risk, or arch/libc splits. They were not promoted. Stable400 still needs at least 21 additional RV+LA x musl+glibc clean cases plus clean aggregate gates.
 
-## Gate status
+## Policy note
 
-The attempted stable379 aggregate gate is the blocker evidence: RV hit `FAIL LTP CASE ftest03 : 137` / `TIMEOUT LTP CASE ftest03 after 60s`, then the run was aborted before LA. Stable400 remains blocked until the aggregate gate is clean and at least 25 cases beyond stable375 have fresh RV+LA x musl+glibc clean evidence.
+`read02` remains transparent `pass_with_tconf`. The parser reports no wrapper timeout/ENOSYS/panic in accepted stable379 aggregate gates. LA raw logs still contain two inherited LTP internal `Test timeouted, sending SIGKILL!` notices in pre-existing long-running cases; these are disclosed and are not from the four newly promoted cases.

@@ -1,38 +1,69 @@
 {
-  "status": "failed_aborted_before_la",
-  "target": "stable379_attempt_from_stable375_plus_4_targeted_clean_candidates",
+  "status": "partial_stable379_promoted_stable450_not_delivered",
+  "date": "2026-05-26",
+  "target": "stable450",
+  "highest_trusted_stable": 379,
   "live_stable_cases": {
-    "total": 375,
-    "unique": 375,
+    "total": 379,
+    "unique": 379,
     "duplicates": 0
   },
-  "stable450_delivered": false,
+  "stable379_delivered": true,
   "stable400_delivered": false,
-  "rv_gate": {
-    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-001.log",
-    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-001-summary.txt",
-    "aborted": true,
-    "reason": "existing ftest03 timed out at RV 60s gate; no LA aggregate was run",
-    "nonzero_fail_markers": [
-      "FAIL LTP CASE ftest03 : 137"
-    ],
-    "marker_count_before_abort": 361,
-    "bad_marker_prefix": 0,
-    "noise_counts": {
-      "AxError::NotADirectory": 11,
-      "AxError::IsADirectory": 0,
-      "AxError::AlreadyExists": 0,
-      "axfs::fops": 0,
-      "axfs_ramfs::file": 11
-    }
-  },
-  "accepted_as_promotion": [],
-  "pending_targeted_clean_candidates": [
+  "stable425_delivered": false,
+  "stable450_delivered": false,
+  "accepted_as_promotion": [
     "clock_settime01",
     "clock_settime02",
     "clone03",
     "confstr01"
   ],
-  "known_transparent_tconf": "read02 O_DIRECT on tmpfs remains transparent in stable375 evidence; this aborted partial gate also contains read02 TCONF before the blocker.",
-  "policy": "timeout is not PASS; do not claim stable379/stable400/stable450 from this run"
+  "rv_gate": {
+    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-002.log",
+    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-002-summary.txt",
+    "pass_ltp_case": 758,
+    "fail_ltp_case": 0,
+    "ltp_musl": "379/0",
+    "ltp_glibc": "379/0",
+    "internal": { "TFAIL": 0, "TBROK": 0, "TCONF": 4 },
+    "known_tconf_only": "read02 pass_with_tconf in musl+glibc",
+    "parser_timeout_matches": 0,
+    "enosys": 0,
+    "panic_trap": 0,
+    "marker_count": 758,
+    "bad_marker_prefix": 0,
+    "noise_counts": {
+      "AxError::NotADirectory": 22,
+      "AxError::IsADirectory": 0,
+      "AxError::AlreadyExists": 0,
+      "axfs::fops": 0,
+      "axfs_ramfs::file:69": 22
+    }
+  },
+  "la_gate": {
+    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-la-gate-001.log",
+    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-la-gate-001-summary.txt",
+    "pass_ltp_case": 758,
+    "fail_ltp_case": 0,
+    "ltp_musl": "379/0",
+    "ltp_glibc": "379/0",
+    "internal": { "TFAIL": 0, "TBROK": 0, "TCONF": 4 },
+    "known_tconf_only": "read02 pass_with_tconf in musl+glibc",
+    "parser_timeout_matches": 0,
+    "enosys": 0,
+    "panic_trap": 0,
+    "marker_count": 758,
+    "bad_marker_prefix": 0,
+    "raw_internal_timeouted_notice_count": 2,
+    "raw_internal_timeouted_notice_note": "Two inherited LTP internal notices in pre-existing waitpid10/pipe13 paths; no wrapper timeout and not from newly promoted cases.",
+    "noise_counts": {
+      "AxError::NotADirectory": 22,
+      "AxError::IsADirectory": 0,
+      "AxError::AlreadyExists": 0,
+      "axfs::fops": 0,
+      "axfs_ramfs::file:69": 22
+    }
+  },
+  "known_transparent_tconf": "read02 O_DIRECT on tmpfs remains transparent and disclosed.",
+  "policy": "Do not claim stable400/stable425/stable450; stable379 is the highest trusted partial promotion. Timeout/ENOSYS/panic/trap are not accepted for new promotions."
 }

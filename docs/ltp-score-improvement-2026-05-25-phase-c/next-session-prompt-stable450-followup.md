@@ -1,32 +1,45 @@
-# Next-session prompt — continue stable379 toward stable450
+# Next-session prompt: continue from stable379 toward stable450
 
-Working directory: `/root/oskernel2026-orays`
-Language: Chinese reports.
-Mode: Use Ultragoal + Team only if the new session can run QEMU serial promotion gates; workers may do discovery but must not race shared QEMU/sdcard images.
+工作目录：`/root/oskernel2026-orays`
 
-## Current honest state
+请继续使用 Ultragoal + Team 模式，中文汇报，遵守 AGENTS.md。
 
-- Phase-c log-noise repair changed expected VFS errno paths from `ax_err!` to direct `Err(AxError::...)`, preserving visible errno while suppressing high-frequency warnings.
-- Stable375 baseline was live-rechecked as 375 total / 375 unique / 0 duplicates.
-- Four cases have fresh RV+LA x musl+glibc clean targeted evidence but are **not currently in `LTP_STABLE_CASES`** because the stable379 aggregate gate failed on existing `ftest03` timeout: `clock_settime01`, `clock_settime02`, `clone03`, `confstr01`.
-- Live stable list after blocker handling: 375 total / 375 unique / 0 duplicates.
-- Do not call this stable400/425/450 unless the aggregate gate and later promotions prove it.
+当前最高可信状态必须 live 复核：
 
-## Must-do first
+- `examples/shell/src/cmd.rs::LTP_STABLE_CASES` 应为 379 total / 379 unique / 0 duplicates。
+- 已从 stable375 真实 promotion 的 4 个 case：`clock_settime01`, `clock_settime02`, `clone03`, `confstr01`。
+- RV aggregate evidence: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-002-summary.txt`，PASS LTP CASE 758 / FAIL 0，`ltp-musl` 379/0，`ltp-glibc` 379/0。
+- LA aggregate evidence: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-la-gate-001-summary.txt`，PASS LTP CASE 758 / FAIL 0，`ltp-musl` 379/0，`ltp-glibc` 379/0。
+- known transparent TCONF 仍只有 `read02`；不能把它说成 clean。
+- original `axfs::fops:297 [AxError::NotADirectory]` 噪声在 stable379 aggregate 中为 0；残留 `axfs_ramfs::file:69` NotADirectory 每架构 22 条。
 
-1. Re-run `git status --short` and count live `LTP_STABLE_CASES`.
-2. Parse the latest stable379 aggregate summaries if present under `docs/ltp-score-improvement-2026-05-25-phase-c/raw/`.
-3. If re-attempting stable379, first address or explicitly preserve the existing `ftest03` timeout blocker without counting it as PASS; do not add pending cases until the aggregate gate is clean.
-4. If stable379 is clean, checkpoint it as the highest trusted baseline.
+目标：
 
-## Best next blockers
+1. 从 stable379 冲 stable400（先找 21 个 clean case）。
+2. 再冲 stable425/stable450；stretch stable460/475 只有资源和 clean subset 足够时才做。
+3. 任何新增 case 必须 RV+LA x musl+glibc 全 clean：wrapper FAIL 0，internal TFAIL/TBROK 0，无新增 TCONF，parser timeout/ENOSYS/panic/trap 0。
+4. 不伪造 PASS、不 hardcode case name、不修改 LTP 源码、不把 timeout/TFAIL/TBROK/ENOSYS/panic 改成 PASS/TCONF。
 
-1. `readlinkat02`: RV clean and LA glibc clean, but LA musl TFAIL. Inspect readlinkat zero-size/null-buffer errno semantics.
-2. `chmod05`/`fchmod05`: RV glibc clean, RV musl TBROK likely group lookup/setup compatibility.
-3. `inode02`: RV clean, LA musl clean, LA glibc timeout; investigate LA runtime/memory before promotion.
-4. Time/clone neighbors: `clock_settime01/02`, `clone03`, and `confstr01` are clean; adjacent timer/clone cases have TFAIL/TBROK/timeout/ENOSYS and need real fixes.
-5. fs-suite staging: `ftest09` and `openfile01` wrapper `-1` may be missing executable/path staging, but do not modify LTP tests or fake PASS.
+启动步骤：
 
-## Promotion rule
+1. `df -h / /root` 和 `du -sh /root/.codex`。
+2. `git status --short`，保护用户文件和 root-level kernel/raw logs。
+3. 重新计算 live stable count/duplicates。
+4. 读取 `final-gate-quality-gate.json`、`stable379-promotion-gate-report.md`、`candidate-matrix.md`。
+5. Team 分工仍按 VFS/FD/process/mmap-fs/verification lanes；worker 不拥有 `.omx/ultragoal` 和最终 `LTP_STABLE_CASES` 修改。
+6. 串行运行最终 promotion aggregate gate，避免并发 QEMU/sdcard 争用。
 
-Only add a case to `LTP_STABLE_CASES` after RV+LA x musl+glibc all pass cleanly with `scripts/ltp_summary.py`: no wrapper FAIL, no internal TFAIL/TBROK/new TCONF, no timeout, no ENOSYS, no panic/trap. Keep `read02` TCONF transparent.
+优先候选方向：
+
+- 从 worker reports 和 `candidate-matrix.md` 继续筛选，不要重复已失败 blocker。
+- 优先同子系统、低成本、高隐藏价值：access/chmod/statx/openat/link/unlink/readlinkat、pipe/pipe2/readv/writev/preadv/pwritev/fcntl、wait/waitid/kill/fork/signal、mmap/munmap/mprotect、fs_perms/ftest/rwtest/stream/openfile/writetest。
+- 避免低 ROI 重构族：fs_bind/test_robind/ksm/fanotify/inotify/bpf/keyctl/ptrace/mount/quotactl/broad xattr/io_uring/perf。
+
+交付条件：
+
+- stable450 live list 450 unique。
+- RV final stable gate PASS LTP CASE 900 / FAIL 0；LA 同样 PASS 900 / FAIL 0。
+- `ltp-musl` 450/0 和 `ltp-glibc` 450/0 均成立。
+- marker prefix bad lines 0。
+- 原始 fops NotADirectory 噪声不回归；残留 `axfs_ramfs::file:69` 单独披露或修复。
+- 自动 commit agent-owned tracked 变更，遵循 Lore commit protocol。
