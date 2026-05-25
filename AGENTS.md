@@ -13,26 +13,16 @@ asks for it.
 
 ## Repository Layout
 
-| Path | Purpose |
-| ---- | ------- |
-| `kernel/` | Core runtime and subsystems: arch/hal, config, diagnostics/logging, drivers, FS, memory, namespace, net, runtime, SMP/IPI, sync, task. |
-| `api/` | Public ArceOS APIs and POSIX-facing APIs. `api/arceos_posix_api` is the user-space/Linux-compat boundary. |
-| `ulib/` | User-facing libraries: `axstd` for Rust apps and `axlibc` for C/POSIX-facing apps. |
-| `examples/` | Rust and C example applications used by local builds and CI (`helloworld`, `httpclient`, `httpserver`, `shell`, plus C variants). |
-| `configs/` | Default, dummy, and custom platform configuration files. |
-| `scripts/` | Make helpers, build/QEMU glue, linker wrapper scripts, and network helper scripts. |
-| `tools/` | Board-specific and utility tools. |
-| `doc/` | Upstream-style build/platform documentation and figures. |
-| `docs/` | Local compatibility/progress notes for this fork. |
-| `vendor/` | Vendored/patched third-party crates (`axcpu`, `axfs_ramfs`, `rust-fatfs`, `smoltcp`). |
-| `.github/workflows/` | CI definitions for build, docs, and app/unit tests. |
-| `build/`, `target/` | Generated artifacts; avoid manual edits. |
+Key paths: `kernel/` for runtime/subsystems, `api/arceos_posix_api` for the
+Linux/POSIX boundary, `ulib/` for user libraries, `examples/shell` for evaluator
+integration, `configs/` for platform configs, `scripts/` and `tools/` for build
+helpers, `docs/` for local progress notes, and `vendor/`/`cargo-home/` for
+offline-capable dependencies.
 
-Important generated or local-only root files can include `kernel-rv`, `kernel-la`,
-`sdcard-*.img`, `disk*.img`, `output*.md`, `*.log`, `.axconfig.toml`, and the
-`build/kernels/` tree. Do not edit or commit generated artifacts unless the task
-is explicitly about those artifacts. `run-eval` is a local symlink to
-`run-eval.sh` when present.
+Generated or local-only artifacts include `kernel-rv`, `kernel-la`,
+`sdcard-*.img`, `disk*.img`, `output*.md`, `*.log`, `.axconfig.toml`,
+`build/`, and `target/`. Do not edit or commit them unless the task explicitly
+targets generated evidence. `run-eval` may be a local symlink to `run-eval.sh`.
 
 ## Disk Space and Commit Hygiene
 
@@ -67,52 +57,29 @@ Run commands from the repository root (`/root/oskernel2026-orays` in this
 container) unless a task clearly spans a sibling checkout.
 
 ```bash
-# Default target: build remote-submission kernels (kernel-rv and kernel-la).
-# The LoongArch kernel built by `make all` uses the remote evaluator address map.
-make
-
-# Build a Rust example for one architecture
-make A=examples/helloworld ARCH=x86_64
-
-# Build and run an example in QEMU
-make A=examples/shell ARCH=riscv64 run
-
-# Build local evaluator kernels used by this fork
-make kernel-rv
-make kernel-la
-
-# Run testsuite-backed evaluator boots when the sdcard images/QEMU are available
-./run-eval.sh rv
-./run-eval.sh la
-# Equivalent lower-level targets:
+make                         # remote-submission kernels: kernel-rv/kernel-la
+make kernel-rv && make kernel-la
+./run-eval.sh rv             # local RISC-V evaluator path
+./run-eval.sh la             # local LoongArch evaluator path
 make run-rv ARCH=riscv64
 make run-la ARCH=loongarch64
-
-# Lint, format, docs, and unit tests
+make A=examples/shell ARCH=riscv64 run
 make clippy
-make fmt
-make fmt_c
+make fmt && make fmt_c
 make doc_check_missing
 make unittest_no_fail_fast
-
-# Docker helper path
-make docker-image
-make docker
 ```
 
 ### Build Notes
 
 - `ARCH` must be one of `x86_64`, `riscv64`, `aarch64`, or `loongarch64`.
-- The Makefile accepts `A`/`APP`, `FEATURES`, `APP_FEATURES`, `LOG`, `SMP`,
-  `MODE`, `MYPLAT`, `PLAT_CONFIG`, `TARGET_DIR`, and QEMU options such as
-  `BLK`, `NET`, `GRAPHIC`, `BUS`, `MEM`, `DISK_IMG`, `NET_DEV`, and `ACCEL`.
-- Runtime QEMU device flags such as `NET=y`, `BLK=y`, and `GRAPHIC=y` affect
-  the QEMU invocation; they are not a substitute for compile-time feature flags.
-- Running apps or app tests requires QEMU. The evaluator path expects
-  `qemu-system-riscv64` and/or `qemu-system-loongarch64` plus matching sdcard
-  images.
-- Building C examples requires the appropriate musl cross toolchains and
-  `libclang`/`clang` tooling described in `README.md`.
+- Common Make variables include `A`/`APP`, `FEATURES`, `APP_FEATURES`, `LOG`,
+  `SMP`, `MODE`, `PLAT_CONFIG`, `TARGET_DIR`, and QEMU flags such as `BLK`,
+  `NET`, `GRAPHIC`, `MEM`, and `DISK_IMG`.
+- QEMU runtime flags are not compile-time feature flags. Evaluator runs require
+  the matching QEMU binary plus sdcard image.
+- C examples require the musl cross toolchains and `libclang`/`clang` described
+  in `README.md`.
 - `make testsuite-sdcard` expects the sibling testsuite checkout configured by
   `TESTSUITE_DIR` (default `../testsuits-for-oskernel`).
 
@@ -137,10 +104,10 @@ make docker
   `0xffff_8000_8000_0000`; hardcoding `BOOT_PT_L0[0]` can boot locally but loop
   on remote instruction-fetch faults.
 - Treat the remote evaluator as network-unreliable/offline. Submission builds
-  must not depend on `cargo install` or downloading crates during `make all`.
-  Keep repo-local build helpers under `tools/bin/`, platform config fallbacks
-  under `configs/platforms/`, and the non-hidden Cargo home `cargo-home/` plus
-  `vendor/cargo-vendor.tar.gz` source archive in sync when dependency closure changes; `scripts/ensure-cargo-vendor.sh` restores the working `vendor/cargo/` directory during builds.
+  must not download crates or install tools during `make all`. Keep
+  `tools/bin/`, `configs/platforms/`, `cargo-home/`, and
+  `vendor/cargo-vendor.tar.gz` in sync when dependency closure changes;
+  `scripts/ensure-cargo-vendor.sh` restores `vendor/cargo/`.
 - The historical `refactor/moss_kernel_like_remote` branch and sibling checkout
   may be used only as read-only references for remote-evaluator behavior. Do not
   modify that branch or sync source into it for normal local-branch tasks.
@@ -157,6 +124,11 @@ Prioritize high-score, high-yield tests that are strongly related to subsystems
 already implemented or recently repaired. Do not blindly run, triage, or repair
 all LTP cases with equal effort.
 
+When source-level LTP evidence is needed, prefer the contest evaluator baseline
+`oscomp/testsuits-for-oskernel@pre-2025` and its `ltp-full-20240524` tree over
+upstream LTP master. Use upstream LTP only as supporting context when the
+contest tree is unavailable or ambiguous.
+
 When choosing LTP cases, sort candidates in this order:
 
 1. Existing gaps in the current contest score table where `pass < all`.
@@ -172,18 +144,42 @@ When choosing LTP cases, sort candidates in this order:
    `inotify`, `keyctl`, `landlock`, `io_uring`, `perf_event_open`, `ptrace`,
    `mount`/`swap`, `quota`, and broad `xattr` coverage.
 
-Before recommending an LTP candidate, inspect all of the following:
+For broad LTP selection beyond the current stable list, do not rank candidates
+by raw runtest size alone. Use the evaluator's actual `ltp/runtest` files as
+the counting baseline, then apply contest ROI. The current high-value
+`syscalls`, `mm`, and `fs` expansion order is:
 
-- the current contest score table's `pass`/`all`/score data;
-- upstream LTP `runtest/syscalls`;
-- the matching upstream source under
-  `testcases/kernel/syscalls/<syscall>/`;
-- source-level yield signals such as `tcases[]`, `ARRAY_SIZE`,
-  `.test_variants`, `for` loops, forked children, `TST_EXP_PASS`,
-  `TST_EXP_FAIL`, and `tst_res(TPASS)` counts;
-- required subsystems such as syscall dispatch, VFS, permissions, file
-  descriptors, pipes, process lifecycle, wait/fork, signals, memory management,
-  and user-memory access checks.
+1. `syscalls`: prefer `statx`, `mmap`, `fcntl`, `open`/`openat`, `rename`,
+   `link`, `unlink`, `readlinkat`, `preadv`/`pwritev`, `writev`, `sendfile`,
+   `waitid`, `kill`, `fork`/`clone`, `pipe`, `access`, `chmod`/`fchmod`, and
+   `chown`/`fchown` before broader missing subsystems. These families either
+   have large remaining runtest coverage, directly reuse current VFS/FD/process
+   work, or defend common hidden Linux-compatibility checks.
+2. `mm`: prefer base `mm`/`page`/`mem`, `mmap10*`, `vma*`, and then
+   `mmapstress*` or `shmt*` after basic mapping and SysV-shm behavior is
+   understood. Treat `ksm*`, `oom*`, `thp*`, `overcommit_memory*`, `cpuset*`,
+   and `swapping*` as low-ROI unless the kernel gains the corresponding Linux
+   VM controls.
+3. `fs`: prefer `fs_perms*`, `ftest*`, `rwtest*`, `stream*`, `openfile01`,
+   `writetest01`, `iogen01`, `fs_inod01`, and `inode*` before generic stress
+   runs. Run `gf*` only in smaller batches after basic file semantics are
+   stable. Treat `fs_bind*` and `test_robind*` as low-ROI until mount, bind
+   mount, and namespace semantics are real targets.
+
+Large runtest families such as `fs_bind*`, `test_robind*`, `ksm*`,
+`fanotify*`, `inotify*`, `bpf*`, `keyctl*`, `ptrace*`, `mount*`, `quotactl*`,
+and namespace-specific `ioctl*` tests must not displace smaller adjacent cases
+that exercise already-implemented VFS, FD, process, signal, pipe, or memory-map
+behavior.
+
+Before recommending an LTP candidate, inspect the current score gap, the
+evaluator/upstream `runtest` entry, the matching source under
+`testcases/kernel/{syscalls,mem,fs}/` or its corresponding directory, and
+source-level yield signals such as `tcases[]`, `ARRAY_SIZE`, `.test_variants`,
+loops, forks, `TST_EXP_PASS`, `TST_EXP_FAIL`, and `tst_res(TPASS)` counts.
+Always name the required subsystems: syscall dispatch, VFS, permissions, FDs,
+pipes, process lifecycle, wait/fork, signals, memory management, or user-memory
+copying.
 
 Rank candidates with this model:
 
@@ -196,22 +192,12 @@ priority_score =
   / regression_risk
 ```
 
-Interpret the factors as follows:
-
-- `potential_score_or_case_count`: use the current contest score table or the
-  upstream LTP source's internal case count, loop count, variant count, and fork
-  fan-out.
-- `relevance_to_existing_work`: raise priority when the case can reuse existing
-  `access`, `chmod`, `stat`, `pipe`, `fork`, `signal`, `read`, or `write`
-  logic.
-- `hidden_test_value`: raise priority when the case covers common hidden
-  evaluator semantics.
-- `implementation_cost`: keep priority high for errno, flag, and boundary
-  repairs; lower it for work requiring broad VM, scheduler, networking,
-  permission-model, or filesystem redesign.
-- `regression_risk`: lower priority when a change could break proven high-score
-  cases such as `access01`, `getpid01`, `pipe11`, `chmod01`, `signal03`, or
-  `signal04`.
+Use contest score data, runtest counts, internal source case counts, loop/variant
+counts, and fork fan-out for `potential_score_or_case_count`. Raise priority for
+cases reusing existing `access`, `chmod`, `stat`, `pipe`, `fork`, `signal`,
+`read`, or `write` logic, and for hidden-test defense. Lower priority for work
+requiring broad VM, scheduler, networking, permission-model, or filesystem
+redesign, or when it risks proven high-score cases.
 
 Once the following high-yield case families pass, treat them as regression
 protection targets:
@@ -240,43 +226,24 @@ LTP contest work must not:
 
 Every LTP analysis or fix report must include:
 
-A. Current gap summary
+A. Current gap summary: case, `pass`/`all`, remaining gap, subsystem, priority.
 
-- case name;
-- `pass`/`all`;
-- remaining gap;
-- involved subsystem;
-- whether it should be prioritized.
+B. Not-yet-run cases worth adding to self-test: source evidence, internal
+case/loop/variant/fork counts, related syscalls, rationale, estimated cost, and
+regression risk.
 
-B. Not-yet-run cases worth adding to self-test
-
-- case name;
-- upstream LTP source evidence;
-- internal case, loop, variant, and fork counts;
-- related syscalls;
-- recommendation rationale;
-- estimated cost;
-- regression risk.
-
-C. Next minimal execution plan
-
-- which cases to run individually first;
-- if they fail, which syscalls, errno values, flags, and boundary conditions to
-  inspect first;
-- which regression cases to run after the fix;
-- how to finish with RISC-V/LoongArch plus glibc/musl comparison.
+C. Next minimal execution plan: individual cases to run first, likely syscall /
+errno / flag / boundary checks on failure, regression cases after fixes, and the
+RISC-V/LoongArch plus glibc/musl finish gate.
 
 ## Toolchain
 
-- Rust toolchain is pinned in `rust-toolchain.toml` to `nightly-2025-05-20`.
-- Rust edition is 2024.
-- Required Rust components: `rust-src`, `llvm-tools`, `rustfmt`, and `clippy`.
-- Configured Rust targets:
-  - `x86_64-unknown-none`
-  - `riscv64gc-unknown-none-elf`
-  - `aarch64-unknown-none-softfloat`
-  - `loongarch64-unknown-none-softfloat`
-- Build helpers used by the Makefile include `cargo-binutils`/`rust-objcopy`,
+- Rust is pinned by `rust-toolchain.toml` to `nightly-2025-05-20`, edition
+  2024, with `rust-src`, `llvm-tools`, `rustfmt`, and `clippy`.
+- Supported Rust targets are `x86_64-unknown-none`,
+  `riscv64gc-unknown-none-elf`, `aarch64-unknown-none-softfloat`, and
+  `loongarch64-unknown-none-softfloat`.
+- Makefile helper tools include `cargo-binutils`/`rust-objcopy`,
   `axconfig-gen`, and `cargo-axplat`.
 - For remote/offline submission builds, prefer the checked-in helper shims
   `tools/bin/cargo-axplat`, `tools/bin/axconfig-gen`, and
@@ -356,30 +323,20 @@ C. Next minimal execution plan
 
 Pick the smallest check set that proves the change:
 
-- For local-branch code tasks, do not claim the target is delivered until both
-  `./run-eval.sh` (the default RV path) and `./run-eval.sh la` have been run
-  successfully from `/root/oskernel2026-orays`, unless a required host tool,
-  image, or external dependency is unavailable. If either command cannot be run
-  or fails, report the exact blocker/output instead of substituting build-only or
-  smoke-only evidence.
-- Documentation-only changes: inspect the rendered Markdown structure manually or
-  run a lightweight text check; no kernel build is required unless examples or
-  commands changed in a way that needs proof.
-- Formatting-only or broad Rust edits: run `cargo fmt --all -- --check` after
-  formatting, or `make fmt` if intentionally applying formatting.
-- C formatting changes: run `make fmt_c` or the targeted `clang-format` command.
+- Documentation-only changes: inspect Markdown structure and run a lightweight
+  text check such as `git diff --check`.
+- Formatting-only or broad Rust/C edits: use `make fmt`, `cargo fmt --all --
+  --check`, `make fmt_c`, or targeted `clang-format` as appropriate.
 - Library/module changes: run `make clippy` or `make clippy ARCH=<arch>` for the
-  affected target when architecture-specific code changed.
-- Example changes: build the touched example for the affected architecture, e.g.
-  `make A=examples/helloworld ARCH=riscv64`.
-- `api/arceos_posix_api`, `ulib/axlibc`, or user-space behavior changes: at
-  minimum build `make A=examples/shell ARCH=riscv64` or the closest relevant
-  kernel target; add QEMU/evaluator validation when behavior is observable only
-  at runtime.
-- Unit-testable code: run `make unittest_no_fail_fast`.
-- Evaluator-kernel changes: build `make kernel-rv` and/or `make kernel-la`; run
-  `./run-eval.sh rv` / `./run-eval.sh la` when QEMU and sdcard images are
-  available and runtime behavior is in scope.
+  affected target; unit-testable code should also run `make unittest_no_fail_fast`.
+- Example changes: build the touched example for the affected architecture.
+- POSIX/user-space behavior changes: at minimum build `make A=examples/shell
+  ARCH=riscv64`; add QEMU/evaluator validation when runtime behavior matters.
+- Evaluator-kernel or local-branch behavior changes: build `make kernel-rv`
+  and/or `make kernel-la`, then run both `./run-eval.sh rv` and
+  `./run-eval.sh la` when QEMU and sdcard images are available. Do not claim
+  delivery from build-only evidence if either evaluator run is required but
+  missing or failing.
 
 For changes spanning tightly coupled boot, trap, scheduler, or user-task flow
 code — especially across `kernel/runtime/axruntime`, `kernel/arch/axhal`,
@@ -395,26 +352,11 @@ full verification.
 
 ## CI Facts
 
-Current CI verifies at least the following:
-
-- `cargo fmt --all -- --check` on the x86_64 clippy lane.
-- `make clippy` and `make clippy ARCH=<arch>` across `x86_64`, `riscv64`,
-  `aarch64`, and `loongarch64`.
-- Rust example builds for `examples/helloworld`, `examples/httpclient`,
-  `examples/httpserver`, and `examples/shell` on all four supported arches.
-- C example builds for `examples/helloworld-c`, `examples/httpclient-c`, and
-  `examples/httpserver-c` on all four supported arches after musl setup.
-- Additional platform/config builds for `helloworld-myplat`, x86_64 custom
-  config, Raspi4, BSTA1000B, Phytium Pi, and loongarch64/riscv64 QEMU virt
-  paths.
-- `make doc_check_missing` on Ubuntu and macOS doc lanes.
-- `make unittest_no_fail_fast`.
-- QEMU-backed app tests through `arceos-apps` at the revision pinned in
-  `.github/workflows/test.yml`.
-
-CI runs both the pinned nightly (`nightly-2025-05-20`) and a moving `nightly` in
-several build lanes; moving-nightly failures may be marked `continue-on-error`,
-but pinned-toolchain failures should be treated as regressions.
+CI covers formatting, clippy across configured architectures, Rust/C example
+builds, selected platform/config builds, docs checks, unit tests, and
+QEMU-backed `arceos-apps` tests as defined in `.github/workflows/`. CI runs the
+pinned nightly and some moving-nightly lanes; pinned-toolchain failures are
+regressions even if moving-nightly failures are allowed to continue.
 
 Any change that only works on one local architecture but breaks other configured
 targets, feature combinations, or CI entry points should be treated as a
