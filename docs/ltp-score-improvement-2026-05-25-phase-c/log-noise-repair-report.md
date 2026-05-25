@@ -6,10 +6,16 @@ Ultragoal story: `G001-first-fix-the-high-frequency-remote`
 
 ## Result
 
-Fixed the high-frequency remote warning source `kernel/fs/axfs/src/fops.rs::_open_dir_at()` by preserving `Err(AxError::NotADirectory)` while avoiding the `ax_err!` macro warning side effect. Also applied the same narrow no-warn pattern to two adjacent expected VFS negative paths in `kernel/fs/axfs/src/root.rs`:
+Fixed the high-frequency remote warning source `kernel/fs/axfs/src/fops.rs::_open_dir_at()` by preserving `Err(AxError::NotADirectory)` while avoiding the `ax_err!` macro warning side effect. Also applied the same narrow no-warn pattern to adjacent expected VFS negative paths after fresh scouts exposed remaining high-frequency warning families:
 
 - existing directory on `create_dir` still returns `AxError::AlreadyExists`;
-- removing a directory through the file removal path still returns `AxError::IsADirectory`.
+- removing a directory through the file removal path still returns `AxError::IsADirectory`;
+- trailing slash lookup on a non-directory still returns `AxError::NotADirectory`;
+- `create_file` on a trailing slash path still returns `AxError::NotADirectory`;
+- `remove_dir` on a non-directory still returns `AxError::NotADirectory`;
+- `set_current_dir` on a non-directory still returns `AxError::NotADirectory`;
+- `File::_open_at` with `O_EXCL` on an existing node still returns `AxError::AlreadyExists`;
+- writable/truncating open on a directory still returns `AxError::IsADirectory`.
 
 No success path was added. No errno was changed. The visible POSIX/Linux behavior is intended to remain ENOTDIR/EEXIST/EISDIR on the same failure paths.
 
@@ -20,6 +26,8 @@ No success path was added. No errno was changed. The visible POSIX/Linux behavio
 | `kernel/fs/axfs/src/fops.rs` | `return ax_err!(NotADirectory);` | `return Err(AxError::NotADirectory);` | still ENOTDIR/`AxError::NotADirectory`; warning suppressed |
 | `kernel/fs/axfs/src/root.rs` | `ax_err!(AlreadyExists)` | `Err(AxError::AlreadyExists)` | still EEXIST/`AxError::AlreadyExists`; warning suppressed |
 | `kernel/fs/axfs/src/root.rs` | `ax_err!(IsADirectory)` | `Err(AxError::IsADirectory)` | still EISDIR/`AxError::IsADirectory`; warning suppressed |
+| `kernel/fs/axfs/src/root.rs` | selected `ax_err!(NotADirectory)` expected negative paths | `Err(AxError::NotADirectory)` | still ENOTDIR/`AxError::NotADirectory`; warning suppressed |
+| `kernel/fs/axfs/src/fops.rs` | selected `ax_err!(AlreadyExists/IsADirectory)` expected negative paths | `Err(AxError::AlreadyExists/IsADirectory)` | still EEXIST/EISDIR; warning suppressed |
 
 Worker 2 independently reviewed the patch and confirmed from `axerrno` macro behavior that `ax_err!` prints a warning while direct `Err(AxError::...)` does not.
 
@@ -40,7 +48,7 @@ This confirms the problem is output volume/noise, not hidden glibc LTP failure.
 
 - `cargo fmt --all -- --check`: PASS.
 - `git diff --check`: PASS.
-- `make A=examples/shell ARCH=riscv64`: PASS, produced `kernel-rv` and remote-config `kernel-la` successfully.
+- `make A=examples/shell ARCH=riscv64`: PASS for the touched shell/evaluator integration build path. Remote-submission `kernel-rv`/`kernel-la` artifacts are covered by `make all`, not by this targeted command.
 
 ### Targeted RV LTP subset
 
@@ -74,6 +82,16 @@ Second subset (`access01,read02,mem02`, timeout 90) after both fops/root changes
 
 Team shutdown reached `completed=5 failed=0`. Worker-5 merge reported a harmless untracked-file conflict because the leader had already copied the report into the same path.
 
+## Additional post-G001 scout hardening
+
+During G002 candidate scouts, nearby expected errno paths still produced warning noise even though the original `fops.rs:297` hot path was gone. The follow-up patch keeps the same direct-`Err` approach for those paths only. Validation was rerun after the follow-up patch:
+
+- `cargo fmt --all -- --check`: PASS.
+- `git diff --check`: PASS.
+- `make A=examples/shell ARCH=riscv64`: PASS.
+
+The attempted stable379 aggregate RV gate later provided a blocker/noise sample, not promotion evidence: it was aborted after an existing `ftest03` timeout, with marker prefixes still clean and original `axfs::fops` noise still absent. The live stable list remains stable375.
+
 ## Conclusion
 
-G001 is complete: the high-frequency `axfs::fops:297 [AxError::NotADirectory]` warning path is eliminated locally with no intended POSIX-visible errno change, marker prefixes remain clean, and small RV musl+glibc LTP smoke remains honest with only the known `read02` TCONF disclosed.
+G001 is complete: the high-frequency `axfs::fops:297 [AxError::NotADirectory]` warning path is eliminated locally with no intended POSIX-visible errno change, marker prefixes remain clean, and small RV musl+glibc LTP smoke remains honest with only the known `read02` TCONF disclosed. The post-G001 follow-up adds adjacent no-warn hardening for the same expected-error pattern without converting any failure to success. G002 promotion remains blocked; no new stable case is committed from this slice.
