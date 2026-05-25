@@ -29,6 +29,18 @@ Accepted new cases:
 
 The broader scout pools still contain real failures, setup breakage, TCONF/TBROK/TFAIL, timeout risk, or arch/libc splits. They were not promoted. Stable400 still needs at least 21 additional RV+LA x musl+glibc clean cases plus clean aggregate gates.
 
+## Attempt 3 scout evidence (no promotion)
+
+The G002 retry found no additional four-way-clean cases. Fresh scout summaries are preserved as negative evidence:
+
+- `raw/target-stable400-readlinkat02-rv-serial-001-summary.txt`: RV `readlinkat02` musl+glibc clean.
+- `raw/target-stable400-readlinkat02-la-serial-001-summary.txt`: LA `readlinkat02` glibc clean, LA musl TFAIL; not promotable.
+- `raw/target-stable400-wave2-rv-001-summary.txt`: RV wave2 has TBROK/ENOSYS and `pipe02` panic/trap; not promotable.
+- `raw/target-stable400-timesignal-rv-serial-001-summary.txt`: RV time/signal/wait scout has TFAIL/TBROK/TCONF/timeouts and was stopped after blockers; not promotable.
+- `raw/target-stable400-fd-rv-serial-001-summary.txt`: RV FD/fcntl scout has PASS 0 / FAIL 16 with TBROK/TFAIL/ENOSYS; not promotable.
+
+Stable400 remains undelivered.
+
 ## Policy note
 
 `read02` remains transparent `pass_with_tconf`. The parser reports no wrapper timeout/ENOSYS/panic in accepted stable379 aggregate gates. LA raw logs still contain two inherited LTP internal `Test timeouted, sending SIGKILL!` notices in pre-existing long-running cases; these are disclosed and are not from the four newly promoted cases.

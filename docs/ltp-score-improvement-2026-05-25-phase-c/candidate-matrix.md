@@ -40,6 +40,19 @@ These cases passed targeted RV+LA x musl+glibc cleanly with no internal TFAIL/TB
 | `clone02`, `clone04`, `clone05` | clone flags/process | `target-stable400-light15-rv-001-summary.txt` | TFAIL/TBROK/ENOSYS | Requires clone flag semantics review |
 | `creat04`, `creat06`, `creat07` | VFS/create permissions | `target-stable400-light15-rv-001-summary.txt` | TFAIL/TBROK or unknown | Check permission/ownership semantics before retest |
 
+## Attempt 3 scout update (2026-05-26)
+
+No new case was accepted into `LTP_STABLE_CASES`; live stable remains 379 total / 379 unique / 0 duplicates.
+
+| Case/family | Fresh evidence | Result | Decision |
+| --- | --- | --- | --- |
+| `readlinkat02` | `raw/target-stable400-readlinkat02-rv-serial-001-summary.txt`; `raw/target-stable400-readlinkat02-la-serial-001-summary.txt`; `raw/target-stable400-readlinkat02-serial-promotion-candidates.txt` | RV musl+glibc clean; LA glibc clean; LA musl TFAIL 1; promotion candidates 0 | Blocked; do not promote without LA musl fix and four-way retest |
+| Wave2 metadata/path batch | `raw/target-stable400-wave2-rv-001-summary.txt` | RV musl PASS 1 / FAIL 8; TBROK 8; ENOSYS 1; panic/trap 1 on `pipe02` | Negative scout only; do not use as promotion evidence |
+| Time/signal/wait batch | `raw/target-stable400-timesignal-rv-serial-001-summary.txt` | RV musl PASS 1 / FAIL 10; TFAIL 22; TCONF 2; TBROK 1; timeout 3; scout stopped after blockers, so glibc incomplete | Negative/aborted scout only; no promotion |
+| FD/fcntl batch | `raw/target-stable400-fd-rv-serial-001-summary.txt` | RV musl+glibc PASS 0 / FAIL 16; TBROK 10; TFAIL 900; ENOSYS 6 | Negative scout only; needs FIFO/syscall and fcntl record-lock semantics work |
+
+Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were explicitly invalidated and are not promotion evidence.
+
 ## Team lane conclusions
 
 - Worker 1 built the initial discovery matrix and found no pre-existing artifact that could honestly promote non-stable cases without fresh four-way proof; the leader later accepted only four cases with fresh targeted plus aggregate proof.
@@ -62,6 +75,6 @@ These cases passed targeted RV+LA x musl+glibc cleanly with no internal TFAIL/TB
 
 1. Treat stable379 as the current live accepted baseline for the next campaign; stable450 remains 71 cases away.
 2. Do not count the aborted `stable379-rv-gate-001` as accepted evidence. Keep its `ftest03` timeout documented, but prefer the accepted `stable379-rv-gate-002` / `stable379-la-gate-001` summaries plus the single-case `ftest03` retry summaries for current state.
-3. Repair one blocker lane at a time: `readlinkat02` LA musl, chmod/fchmod group lookup, then time/clone neighbors.
+3. Repair one blocker lane at a time: `readlinkat02` LA musl first if diagnostic evidence supports it; avoid `pipe02`, wave2 metadata/path blockers, time/signal/wait blockers, and FD/fcntl record-lock/FIFO blockers in broad batches until fixed.
 4. After every blocker fix: run targeted RV+LA x musl+glibc matrix, then promote in small clean batches, then aggregate stable gate.
 5. Preserve marker-prefix and remote log-size guardrails after every logging or runner change, and continue disclosing the known `read02` TCONF pair plus any inherited raw timeout notices separately from promoted-case cleanliness.
