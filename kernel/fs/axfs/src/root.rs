@@ -420,7 +420,7 @@ pub(crate) fn create_file(dir: Option<&VfsNodeRef>, path: &str) -> AxResult<VfsN
 
 pub(crate) fn create_dir(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
     match lookup(dir, path) {
-        Ok(_) => ax_err!(AlreadyExists),
+        Ok(_) => Err(AxError::AlreadyExists),
         Err(AxError::NotFound) => parent_node_of(dir, path).create(path, VfsNodeType::Dir),
         Err(e) => Err(e),
     }
@@ -430,7 +430,7 @@ pub(crate) fn remove_file(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
     let node = lookup(dir, path)?;
     let attr = node.get_attr()?;
     if attr.is_dir() {
-        ax_err!(IsADirectory)
+        Err(AxError::IsADirectory)
     } else if !attr.perm().owner_writable() {
         ax_err!(PermissionDenied)
     } else {
