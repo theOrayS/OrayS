@@ -1,0 +1,80 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-fspath-rv-serial-001.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 16
+- Internal TFAIL/TBROK/TCONF: 29 ({'TFAIL': 26, 'TBROK': 3})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 8 failed
+- ltp-glibc: 0 passed, 8 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 4275 | 256716 | 256702 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 3591 | 258855 | 256793 | -2062 | 1 | 0 | 0 | 0 | 1 | 0 |
+| lstat02 | rv | glibc | ltp-glibc | FAIL | 1 | 3803 | 256653 | 256639 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| lstat02 | rv | musl | ltp-musl | FAIL | 1 | 2821 | 256744 | 256730 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | glibc | ltp-glibc | FAIL | 1 | 4266 | 256702 | 256688 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | musl | ltp-musl | FAIL | 2 | 2665 | 256793 | 256779 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | glibc | ltp-glibc | FAIL | 1 | 4201 | 256674 | 256660 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | musl | ltp-musl | FAIL | 1 | 3162 | 256765 | 256751 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| stat03 | rv | glibc | ltp-glibc | FAIL | 1 | 4148 | 256639 | 256625 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| stat03 | rv | musl | ltp-musl | FAIL | 1 | 2178 | 256730 | 256716 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| stat04 | rv | glibc | ltp-glibc | FAIL | -1 | 24 | 256625 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat04 | rv | musl | ltp-musl | FAIL | -1 | 26 | 256716 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink03 | rv | glibc | ltp-glibc | FAIL | 1 | 3524 | 256660 | 256653 | -7 | 2 | 0 | 0 | 0 | 0 | 0 |
+| symlink03 | rv | musl | ltp-musl | FAIL | 1 | 2750 | 256751 | 256744 | -7 | 2 | 0 | 0 | 0 | 0 | 0 |
+| unlink05 | rv | glibc | ltp-glibc | FAIL | 2 | 3780 | 256688 | 256674 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| unlink05 | rv | musl | ltp-musl | FAIL | 2 | 2749 | 256779 | 256765 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 16 (rv:glibc:link02, rv:musl:link02, rv:glibc:lstat02, rv:musl:lstat02, rv:glibc:mkdir02, rv:musl:mkdir02, rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:stat03, rv:musl:stat03, rv:glibc:stat04, rv:musl:stat04, rv:glibc:symlink03, rv:musl:symlink03, rv:glibc:unlink05, rv:musl:unlink05)
+- internal_tfail: 11 (rv:glibc:link02, rv:musl:link02, rv:glibc:lstat02, rv:musl:lstat02, rv:glibc:mkdir02, rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:stat03, rv:musl:stat03, rv:glibc:symlink03, rv:musl:symlink03)
+- internal_tbrok: 3 (rv:musl:mkdir02, rv:glibc:unlink05, rv:musl:unlink05)
+- timeout: 0
+- enosys: 4 (rv:glibc:link02, rv:musl:link02, rv:glibc:unlink05, rv:musl:unlink05)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:link02
+- ltp-musl:mkdir02
+- ltp-musl:unlink05
+- ltp-musl:readlink03
+- ltp-musl:symlink03
+- ltp-musl:lstat02
+- ltp-musl:stat03
+- ltp-musl:stat04
+- ltp-glibc:link02
+- ltp-glibc:mkdir02
+- ltp-glibc:unlink05
+- ltp-glibc:readlink03
+- ltp-glibc:symlink03
+- ltp-glibc:lstat02
+- ltp-glibc:stat03
+- ltp-glibc:stat04
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 8
+- Internal: {'TFAIL': 12, 'TBROK': 2}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: link02, mkdir02, unlink05, readlink03, symlink03, lstat02, stat03, stat04
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 8
+- Internal: {'TFAIL': 14, 'TBROK': 1}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: link02, mkdir02, unlink05, readlink03, symlink03, lstat02, stat03, stat04
