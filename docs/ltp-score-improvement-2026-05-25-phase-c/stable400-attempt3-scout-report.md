@@ -26,7 +26,7 @@ Invalidated logs from an accidental concurrent-QEMU attempt were deleted or kept
 
 ## Blocker details
 
-- `readlinkat02`: RV clean and LA glibc clean, but LA musl reports a real internal TFAIL on the `readlinkat(..., NULL, 0)` negative-path expectation. The live syscall implementation already returns `EINVAL` for `bufsiz == 0`; next work should instrument/diagnose LA musl arguments before changing ABI-visible errno behavior.
+- `readlinkat02`: RV clean and LA glibc clean, but LA musl reports a real internal TFAIL on the `readlinkat(..., NULL, 0)` negative-path expectation. Fresh diagnostic `raw/readlinkat02-la-diagnostic-003-summary.txt` shows the LA-musl call reaches `sys_readlinkat` with `bufsiz=1`, while LA-glibc reaches it with `bufsiz=0`; the syscall-body guard for real zero size is already correct. This is not safe to fix by changing kernel `readlinkat` semantics.
 - `pipe02`: RV scout hit a panic/trap; do not include it in broad batches until root-caused.
 - Wave2 metadata/path cases (`access04`, `chmod06`, `chmod07`, `fchmod02`, `fchmod06`, `statx01`, `rename04`, `rename05`) remain TBROK/ENOSYS-blocked in RV musl.
 - Time/signal/wait scout (`clock_gettime01`, `nanosleep01`, `nanosleep02`, `pause01`, `sigpending02`, `signal01`, `signal06`, `waitid07`, `waitid08`, `waitid10`) is not clean: it includes real TFAIL/TBROK/TCONF/timeout signals. `kill02` alone passed RV musl in this scout, but it lacks glibc and LA proof and was previously called out as aggregate-risk, so it remains unpromoted.
@@ -37,5 +37,5 @@ Invalidated logs from an accidental concurrent-QEMU attempt were deleted or kept
 
 1. Keep stable379 as the accepted baseline; stable400 still needs 21 additional four-way-clean cases, stable450 needs 71.
 2. Do not re-run broad batches with `pipe02` or known wave2 blockers until those blocker lanes are fixed.
-3. If pursuing `readlinkat02`, first add temporary diagnostic evidence for LA musl argument/return behavior, then remove diagnostics before commit and rerun RV+LA x musl+glibc.
-4. Prefer a fresh candidate lane outside the current blockers: small FD/fcntl or FS metadata subsets with one serial RV batch at a time, then LA only for RV-clean candidates.
+3. Treat `readlinkat02` as blocked outside the syscall-body semantics unless the LA-musl call-boundary root cause is found; forcing `EINVAL` for `bufsiz=1` would be Linux-incompatible.
+4. Prefer a fresh candidate lane outside the current blockers: small FD/fcntl, process, or FS metadata subsets with one serial RV batch at a time, then LA only for RV-clean candidates.
