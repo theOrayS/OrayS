@@ -86,6 +86,7 @@ pub(super) const SYSV_SHM_RDONLY: i32 = 0o10000;
 pub(super) const SYSV_SHM_MAX_SIZE: usize = 16 * 1024 * 1024;
 
 pub(super) const O_PATH_FLAG: u32 = 0o10000000;
+pub(super) const O_NOFOLLOW_FLAG: u32 = 0o0400000;
 pub(super) const PROC_SELF_MAPS_PATH: &str = "/proc/self/maps";
 pub(super) const ETC_PASSWD_PATH: &str = "/etc/passwd";
 pub(super) const ETC_GROUP_PATH: &str = "/etc/group";

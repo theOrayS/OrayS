@@ -16,8 +16,9 @@ use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
     ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE,
-    O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR,
-    ST_MODE_FILE, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
+    ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno,
+    posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -40,9 +41,9 @@ use super::synthetic_fs::{
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, user_io_buffer,
-    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
-    write_user_bytes, write_user_value,
+    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value,
 };
 
 pub(super) struct FdTable {
@@ -76,6 +77,7 @@ pub(super) struct FileEntry {
     pub(super) path: String,
     pub(super) status_flags: u32,
     offset: Arc<Mutex<u64>>,
+    lease_type: Arc<Mutex<u32>>,
 }
 
 #[derive(Clone)]
@@ -474,7 +476,11 @@ pub(super) fn sys_dup3(process: &UserProcess, oldfd: usize, newfd: usize, flags:
 }
 
 pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize) -> isize {
-    match process.fds.lock().fcntl(fd as i32, cmd as u32, arg) {
+    match process
+        .fds
+        .lock()
+        .fcntl(process, fd as i32, cmd as u32, arg)
+    {
         Ok(v) => v as isize,
         Err(err) => neg_errno(err),
     }
@@ -482,6 +488,9 @@ pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize
 
 pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().entry(fd as i32) {
+        Ok(FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc) => {
+            neg_errno(LinuxError::EINVAL)
+        }
         Ok(_) => 0,
         Err(err) => neg_errno(err),
     }
@@ -620,9 +629,29 @@ pub(super) fn sys_unlinkat(
 
 pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
     let new_cwd = {
-        let table = process.fds.lock();
+        let mut table = process.fds.lock();
         match table.entry(fd as i32) {
-            Ok(FdEntry::Directory(dir)) => dir.path.clone(),
+            Ok(FdEntry::Directory(dir)) => {
+                let uid = process.fs_uid();
+                let gid = process.fs_gid();
+                let path = dir.path.clone();
+                let stat = apply_recorded_path_metadata(
+                    process,
+                    path.as_str(),
+                    file_attr_to_stat(&dir.attr, Some(path.as_str())),
+                );
+                let parents_searchable =
+                    match table.parent_dirs_searchable(process, path.as_str(), uid, gid) {
+                        Ok(searchable) => searchable,
+                        Err(err) => return neg_errno(err),
+                    };
+                if uid != 0
+                    && (!parents_searchable || !access_allowed(&stat, ACCESS_X_OK, uid, gid))
+                {
+                    return neg_errno(LinuxError::EACCES);
+                }
+                path
+            }
             Ok(_) => return neg_errno(LinuxError::ENOTDIR),
             Err(err) => return neg_errno(err),
         }
@@ -1144,7 +1173,8 @@ impl FdTable {
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         directory_create_dir(abs_path.as_str())?;
-        process.set_path_mode(abs_path, process.apply_umask(mode));
+        process.set_path_mode(abs_path.clone(), process.apply_umask(mode));
+        process.set_path_owner(abs_path, Some(process.fs_uid()), Some(process.fs_gid()));
         Ok(())
     }
 
@@ -1325,7 +1355,13 @@ impl FdTable {
         Ok(generic_statfs(fd_entry_statfs_path(&entry)))
     }
 
-    pub(super) fn fcntl(&mut self, fd: i32, cmd: u32, arg: usize) -> Result<i32, LinuxError> {
+    pub(super) fn fcntl(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        cmd: u32,
+        arg: usize,
+    ) -> Result<i32, LinuxError> {
         const F_SETPIPE_SZ: u32 = 1031;
         const F_GETPIPE_SZ: u32 = 1032;
         if matches!(self.entry(fd)?, FdEntry::Path(_)) && cmd == general::F_GETFL {
@@ -1415,12 +1451,75 @@ impl FdTable {
                 }
                 _ => Ok(0),
             },
-            _ => Ok(0),
+            general::F_GETLK => self.fcntl_getlk(process, fd, arg),
+            general::F_SETLK | general::F_SETLKW => self.fcntl_setlk(process, fd, arg),
+            general::F_GETLEASE => self.fcntl_getlease(fd),
+            general::F_SETLEASE => self.fcntl_setlease(fd, arg as u32),
+            _ => Err(LinuxError::EINVAL),
         }
+    }
+
+    fn fcntl_getlk(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        arg: usize,
+    ) -> Result<i32, LinuxError> {
+        self.entry(fd)?;
+        let mut lock: general::flock = read_user_value(process, arg)?;
+        validate_flock(&lock)?;
+        lock.l_type = general::F_UNLCK as _;
+        if write_user_value(process, arg, &lock) == 0 {
+            Ok(0)
+        } else {
+            Err(LinuxError::EFAULT)
+        }
+    }
+
+    fn fcntl_setlk(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        arg: usize,
+    ) -> Result<i32, LinuxError> {
+        self.entry(fd)?;
+        let lock: general::flock = read_user_value(process, arg)?;
+        validate_flock(&lock)?;
+        Ok(0)
+    }
+
+    fn fcntl_getlease(&mut self, fd: i32) -> Result<i32, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::File(file) => Ok(*file.lease_type.lock() as i32),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    fn fcntl_setlease(&mut self, fd: i32, lease_type: u32) -> Result<i32, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::File(file) => match lease_type {
+                general::F_RDLCK | general::F_WRLCK | general::F_UNLCK => {
+                    *file.lease_type.lock() = lease_type;
+                    Ok(())
+                }
+                _ => Err(LinuxError::EINVAL),
+            },
+            _ => return Err(LinuxError::EINVAL),
+        }?;
+        Ok(0)
     }
 }
 
 impl PathEntry {
+    pub(super) fn symlink(path: &str) -> Self {
+        Self {
+            path: path.into(),
+            mode: ST_MODE_LNK | 0o777,
+            size: 0,
+            blocks: 0,
+        }
+    }
+
     pub(super) fn from_attr(path: &str, attr: &FileAttr) -> Self {
         Self {
             path: path.into(),
@@ -1498,6 +1597,17 @@ impl MemoryFileEntry {
         }
         self.offset = next as usize;
         Ok(self.offset as u64)
+    }
+}
+
+fn validate_flock(lock: &general::flock) -> Result<(), LinuxError> {
+    match lock.l_type as u32 {
+        general::F_RDLCK | general::F_WRLCK | general::F_UNLCK => {}
+        _ => return Err(LinuxError::EINVAL),
+    }
+    match lock.l_whence as u32 {
+        general::SEEK_SET | general::SEEK_CUR | general::SEEK_END => Ok(()),
+        _ => Err(LinuxError::EINVAL),
     }
 }
 
@@ -1742,7 +1852,17 @@ fn open_candidates(
     let file_opts = if path_only { &path_opts } else { opts };
     let mut last_err = LinuxError::ENOENT;
     for path in candidates {
-        if let Some(resolved_path) = process.resolve_path_symlink(path.as_str())? {
+        if flags & O_NOFOLLOW_FLAG != 0 {
+            if process.path_symlink(path.as_str()).is_some() {
+                if prefer_dir {
+                    return Err(LinuxError::ENOTDIR);
+                }
+                if path_only {
+                    return Ok(FdEntry::Path(PathEntry::symlink(path.as_str())));
+                }
+                return Err(LinuxError::ELOOP);
+            }
+        } else if let Some(resolved_path) = process.resolve_path_symlink(path.as_str())? {
             return open_candidates(process, &[resolved_path], opts, flags, mode);
         }
         if is_proc_self_maps_path(path.as_str()) {
@@ -1860,6 +1980,12 @@ fn open_candidates(
         {
             return Err(LinuxError::EISDIR);
         }
+        if !path_only && !prefer_dir && flags & general::O_ACCMODE == general::O_RDONLY {
+            if let Ok(FdEntry::Directory(dir)) = open_dir_entry(path.as_str()) {
+                check_open_permission(process, path.as_str(), flags)?;
+                return Ok(FdEntry::Directory(dir));
+            }
+        }
         let created_by_this_open = !path_only
             && flags & general::O_CREAT != 0
             && axfs::api::metadata(path.as_str()).is_err();
@@ -1894,6 +2020,7 @@ fn open_candidates(
                     path: path.clone(),
                     status_flags: fcntl_status_flags(flags),
                     offset: Arc::new(Mutex::new(0)),
+                    lease_type: Arc::new(Mutex::new(general::F_UNLCK)),
                 }));
             }
             Err(err) => {
@@ -1990,6 +2117,9 @@ pub(super) fn resolve_dirfd_path(
     let FdEntry::Directory(dir) = table.entry(dirfd)? else {
         return Err(LinuxError::ENOTDIR);
     };
+    if axfs::api::metadata(dir.path.as_str()).is_err() {
+        return Err(LinuxError::ENOENT);
+    }
     normalize_path(dir.path.as_str(), path)
         .map(|path| process.translate_mount_path(path.as_str()))
         .ok_or(LinuxError::EINVAL)

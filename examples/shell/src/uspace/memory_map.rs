@@ -8,7 +8,7 @@ use linux_raw_sys::general;
 use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
 
 use super::UserProcess;
-use super::linux_abi::{USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
+use super::linux_abi::{SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::task_context::current_process;
 use super::task_context::current_task_ext;
@@ -114,7 +114,8 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         handled
     };
     if !handled && _from_user {
-        terminate_current_thread(process.as_ref(), 128 + 11);
+        process.request_signal_exit_group(SIGSEGV_NUM);
+        terminate_current_thread(process.as_ref(), 128 + SIGSEGV_NUM);
     }
     #[cfg(target_arch = "loongarch64")]
     if handled {

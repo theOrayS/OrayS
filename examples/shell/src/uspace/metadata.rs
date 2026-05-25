@@ -890,7 +890,17 @@ pub(super) fn sys_readlinkat(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let resolved_path = {
+    let resolved_path = if path.is_empty() {
+        let table = process.fds.lock();
+        match table.entry(dirfd as i32).and_then(|entry| {
+            fd_entry_path(entry)
+                .map(ToString::to_string)
+                .ok_or(LinuxError::EINVAL)
+        }) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        }
+    } else {
         let table = process.fds.lock();
         match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
             Ok(path) => path,

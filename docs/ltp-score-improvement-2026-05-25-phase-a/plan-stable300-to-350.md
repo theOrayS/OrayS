@@ -1,39 +1,103 @@
-# Plan: LTP stable300 -> stable350
+# LTP stable300 -> stable350 Ultragoal Plan
 
-## Baseline refresh
+Date: 2026-05-25
+Status: **delivered stable350**
 
-- Disk preflight: `df -h / /root`; `/root/.codex` size via `du -sh /root/.codex`.
-- Git preflight: `git status --short`; preserve user evidence logs such as `Riscv输出.txt` and `LoongArch输出.txt`.
-- Live stable count: parse `examples/shell/src/cmd.rs::LTP_STABLE_CASES`; initial snapshot saved as `stable300-live.cases`.
-- Prior evidence: review `docs/ltp-score-improvement-2026-05-24-phase-a/` final summaries, candidate matrix, delivery report, and quality gate.
+## Goal and non-negotiable gates
 
-## Stage gates
+Raise live `examples/shell/src/cmd.rs::LTP_STABLE_CASES` from stable300 to stable350 without fake pass semantics.
 
-1. `stable315`: choose about 15 RV+LA × musl+glibc clean cases from targeted batches, update stable list only after clean evidence, run stable aggregate gate, and write `stable315-promotion-gate-report.md`.
-2. `stable330`: repeat with the next clean tranche and write `stable330-promotion-gate-report.md`.
-3. `stable350`: repeat to 350 unique cases, then run final stable gate and write `stable350-delivery-report.md` plus quality/review artifacts.
+Completion gates:
 
-## Candidate strategy
+- live stable list is exactly 350 total / 350 unique / 0 duplicates;
+- RV final stable aggregate: `PASS LTP CASE: 700`, `FAIL LTP CASE: 0`, `ltp-musl 350/0`, `ltp-glibc 350/0`;
+- LA final stable aggregate: `PASS LTP CASE: 700`, `FAIL LTP CASE: 0`, `ltp-musl 350/0`, `ltp-glibc 350/0`;
+- no internal TFAIL/TBROK, no timeout, no ENOSYS/not-implemented, no panic/trap;
+- `read02` pass-with-TCONF remains explicitly disclosed and is the only known TCONF source;
+- wrapper markers remain line-prefix clean: `PASS LTP CASE` / `FAIL LTP CASE` at column 0, 0 bad lines;
+- final reports, ai-slop-cleaner audit, and code-review report are written before final Ultragoal completion.
 
-- First-pass candidates come from stable300 deferred blockers and neighboring high-value syscall families.
-- Batches should be 5-15 cases for promotion evidence; broader 80-150 case discovery is allowed only to find clean subsets.
-- Promotion requires clean parser evidence, not wrapper success alone.
-- If a high-value blocker remains non-clean, record it and move to a different clean subset.
+## Phased promotion strategy
 
-## Team lanes
+1. **stable315**: promote 15 cases only after RV+LA aggregate gates stayed clean.
+2. **stable330**: promote the next 15 cases using fchdir/fcntl/readlinkat/sched/symlink evidence.
+3. **stable350**: promote the final 20 cases, demote near-misses, then run full final RV+LA stable gates.
 
-- Worker 1: discovery + candidate matrix.
-- Worker 2: permissions/VFS/errno/metadata.
-- Worker 3: fd/pipe/iovec/fcntl.
-- Worker 4: process/wait/sched/rlimit/proc.
-- Worker 5: mmap/mprotect/munmap/signal/time + marker/no-fake-pass guardrails.
+## Promotion batches
 
-## Final gate
+### stable315 additions
+- `alarm05`
+- `alarm07`
+- `write05`
+- `gettimeofday02`
+- `waitpid01`
+- `pipe2_02`
+- `sched_getscheduler02`
+- `fstat03`
+- `fstat03_64`
+- `statfs02`
+- `fstatfs02`
+- `fstatfs02_64`
+- `sched_getparam03`
+- `sched_setparam04`
+- `sched_setparam05`
 
-- `OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv`
-- `OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la`
-- `python3 -B scripts/ltp_summary.py <rv-log>` and `<la-log>`
-- marker-prefix scanner over phase raw logs
-- `cargo fmt --all -- --check`
-- `make A=examples/shell ARCH=riscv64`
-- `make all` only when remote submission build is touched or final policy requires it.
+Evidence:
+
+- `raw/stable315-rv-aggregate-002-summary.txt`: PASS 630 / FAIL 0; musl 315/0; glibc 315/0; read02 TCONF only; timeout/ENOSYS/panic 0.
+- `raw/stable315-la-aggregate-001-summary.txt`: PASS 630 / FAIL 0; musl 315/0; glibc 315/0; read02 TCONF only; timeout/ENOSYS/panic 0.
+
+### stable330 additions
+- `fchdir01`
+- `fchdir03`
+- `fcntl05`
+- `fcntl05_64`
+- `fcntl12`
+- `fcntl12_64`
+- `fcntl13`
+- `fcntl13_64`
+- `fdatasync01`
+- `fdatasync02`
+- `readlinkat01`
+- `sched_setscheduler01`
+- `sched_setscheduler02`
+- `symlinkat01`
+- `ftruncate03_64`
+
+Evidence:
+
+- `raw/stable330-rv-aggregate-002-summary.txt`: PASS 660 / FAIL 0; musl 330/0; glibc 330/0; read02 TCONF only; timeout/ENOSYS/panic 0.
+- `raw/stable330-la-aggregate-001-summary.txt`: PASS 660 / FAIL 0; musl 330/0; glibc 330/0; read02 TCONF only; timeout/ENOSYS/panic 0.
+
+### stable350 additions
+- `chdir04`
+- `chown01`
+- `chown02`
+- `chown03`
+- `chown05`
+- `creat05`
+- `abs01`
+- `mkdir05`
+- `statfs02_64`
+- `truncate03_64`
+- `fork03`
+- `fork04`
+- `fork07`
+- `fork08`
+- `fork09`
+- `signal05`
+- `string01`
+- `memcmp01`
+- `memcpy01`
+- `memset01`
+
+Final evidence:
+
+- `raw/stable350-rv-final-002-summary.txt`: PASS 700 / FAIL 0; musl 350/0; glibc 350/0.
+- `raw/stable350-la-final-002-summary.txt`: PASS 700 / FAIL 0; musl 350/0; glibc 350/0.
+- `raw/stable350-rv-final-002-marker-prefix.txt`: `TOTAL markers=700 bad=0`.
+- `raw/stable350-la-final-002-marker-prefix.txt`: `TOTAL markers=700 bad=0`.
+
+## Key steering decision
+
+`kill02` was initially attractive from targeted evidence but failed the LA final aggregate (`raw/stable350-la-final-summary.txt`) in glibc with TBROK setup failures. It was removed from stable and replaced with `abs01`, which has fresh RV+LA targeted replacement evidence and final aggregate evidence. This preserves the no-fake-pass/no-timeout-as-pass policy.

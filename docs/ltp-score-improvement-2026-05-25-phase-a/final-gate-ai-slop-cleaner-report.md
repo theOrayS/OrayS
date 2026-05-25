@@ -1,20 +1,55 @@
-# Final gate ai-slop-cleaner report
+# Final Gate AI Slop Cleaner Report
 
-Status: **blocked for stable350 / narrow signal-mask and /bin/sh fixes accepted**
+Date: 2026-05-25
+Status: **PASSED / CLEAN**
 
-## Scope reviewed
+## Scope
 
-- Follow-up source changes: `examples/shell/src/uspace/task_context.rs`, `examples/shell/src/uspace/signal_abi.rs`, `examples/shell/src/uspace/process_lifecycle.rs`.
-- Follow-up evidence: waitpid targeted summaries plus RV/LA waitpid/signal guard summaries.
+Changed-file scope only:
 
-## Slop findings
+- `examples/shell/src/cmd.rs`
+- `examples/shell/src/uspace/fd_table.rs`
+- `examples/shell/src/uspace/linux_abi.rs`
+- `examples/shell/src/uspace/memory_map.rs`
+- `examples/shell/src/uspace/metadata.rs`
+- `examples/shell/src/uspace/resource_sched.rs`
+- stable350 report files under `docs/ltp-score-improvement-2026-05-25-phase-a/`
 
-- The fix is narrowly scoped to fork-like process signal-mask inheritance and does not add a dependency, broad refactor, or case-name branch.
-- It reuses existing `UserTaskExt` signal-mask state and a sentinel pattern already used by `sigsuspend_restore_mask`.
-- It avoids changing thread-clone signal inheritance, stable case lists, or marker output.
-- The implementation is still a heuristic for libc's transient all-application-signal mask; future cleanup should prefer a more explicit fork/vfork signal-mask boundary if this subsystem is redesigned.
-- The `/bin/sh` fallback is a general busybox compatibility path, not an LTP case branch; it reuses existing suite-local busybox binaries and avoids adding files to the root filesystem image.
+## Behavior lock
 
-## Cleanup decision
+Behavior was locked by staged LTP gates before cleanup/audit:
 
-No further cleanup was applied. The branch remains delivery-blocked because stable315/stable330/stable350 gates still lack enough clean candidates, not because of source slop in the narrow `waitpid01` and `pipe2_02` enabling fixes.
+- stable315 RV+LA aggregate gates passed.
+- stable330 RV+LA aggregate gates passed.
+- stable350 final RV+LA aggregate gates passed.
+- `cargo fmt --all -- --check`, `make A=examples/shell ARCH=riscv64`, and `make all` passed.
+
+## Cleanup plan and result
+
+1. Keep changes subsystem-local and avoid broad refactors.
+2. Prefer targeted Linux/POSIX edge semantics over new abstraction layers.
+3. Preserve failure evidence for demoted candidates.
+4. Do not commit generated raw logs, kernels, sdcard/disk images, or user-provided remote output logs.
+
+Result: no additional code cleanup patch was required after the final gates. The diff is larger than a single bugfix because it covers a stable promotion campaign, but it remains bounded to the shell/uspace compatibility boundary plus durable documentation.
+
+## Fallback-like code review
+
+- Masking fallback slop: none found.
+- Grounded compatibility/fail-safe behavior: fcntl lease/lock emulation remains scoped to Linux-compatible API surface needed by the in-memory shell/uspace environment and returns explicit errors for unsupported/invalid cases.
+- Escalation: none required.
+
+## Slop-specific checks
+
+- No new dependency.
+- No case-name hardcoding.
+- No fake TPASS/PASS printing.
+- No timeout-as-pass conversion.
+- No broad repository-wide reformat.
+- No unrelated generated artifacts selected for commit.
+
+## Remaining risks
+
+- fcntl lock/lease behavior is sufficient for current promoted coverage but not a full multi-process POSIX lock manager.
+- VFS symlink/O_PATH edge semantics should stay under targeted regression when adding more readlink/stat/open cases.
+- Scheduler privilege semantics should be rechecked if process credential modeling changes.
