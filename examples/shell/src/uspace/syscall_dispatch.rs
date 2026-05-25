@@ -170,7 +170,14 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_newfstatat => {
             sys_newfstatat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
-        general::__NR_statx => sys_statx(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg4()),
+        general::__NR_statx => sys_statx(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
         general::__NR_fstat => sys_fstat(&process, tf.arg0(), tf.arg1()),
         general::__NR_getdents64 => sys_getdents64(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_lseek => sys_lseek(&process, tf.arg0(), tf.arg1(), tf.arg2()),

@@ -142,9 +142,14 @@ pub(super) fn sys_mmap(
     if size == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    let anonymous = flags as u32 & general::MAP_ANONYMOUS != 0;
-    let shared = flags as u32 & general::MAP_SHARED != 0;
-    let map_fixed = flags as u32 & general::MAP_FIXED != 0;
+    let flags_u32 = flags as u32;
+    match flags_u32 & general::MAP_TYPE {
+        general::MAP_SHARED | general::MAP_PRIVATE | general::MAP_SHARED_VALIDATE => {}
+        _ => return neg_errno(LinuxError::EINVAL),
+    }
+    let anonymous = flags_u32 & general::MAP_ANONYMOUS != 0;
+    let shared = flags_u32 & general::MAP_SHARED != 0;
+    let map_fixed = flags_u32 & general::MAP_FIXED != 0;
     let request_addr = if addr == 0 {
         None
     } else {
@@ -211,7 +216,8 @@ pub(super) fn sys_mmap(
             };
             let read = {
                 let mut table = process.fds.lock();
-                match table.read_file_at_into_fd(fd as i32, file_offset, &mut buf[..chunk_len]) {
+                match table.mmap_read_file_at_into_fd(fd as i32, file_offset, &mut buf[..chunk_len])
+                {
                     Ok(read) => read,
                     Err(err) => {
                         let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
@@ -346,7 +352,10 @@ pub(super) fn sys_mprotect(
     let Some(raw_end) = _addr.checked_add(_len) else {
         return neg_errno(LinuxError::EINVAL);
     };
-    let start = align_down(_addr, PAGE_SIZE_4K);
+    if _addr & (PAGE_SIZE_4K - 1) != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let start = _addr;
     let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
         return neg_errno(LinuxError::EINVAL);
     };

@@ -1,0 +1,58 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-stable375-la-001.log`
+
+- PASS LTP CASE: 14
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 7 passed, 0 failed
+- ltp-glibc: 7 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| abort01 | la | glibc | ltp-glibc | PASS | 0 | 5578 | 191449 | 191419 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| abort01 | la | musl | ltp-musl | PASS | 0 | 3080 | 194402 | 192330 | -2072 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm06 | la | glibc | ltp-glibc | PASS | 0 | 7660 | 191419 | 191398 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm06 | la | musl | ltp-musl | PASS | 0 | 5692 | 192330 | 192314 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | la | glibc | ltp-glibc | PASS | 0 | 3698 | 191398 | 191386 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | la | musl | ltp-musl | PASS | 0 | 2478 | 192314 | 192306 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork10 | la | glibc | ltp-glibc | PASS | 0 | 5060 | 191073 | 191034 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork10 | la | musl | ltp-musl | PASS | 0 | 2773 | 191593 | 191561 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill11 | la | glibc | ltp-glibc | PASS | 0 | 6197 | 191386 | 191149 | -237 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill11 | la | musl | ltp-musl | PASS | 0 | 4445 | 192306 | 192098 | -208 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill12 | la | glibc | ltp-glibc | PASS | 0 | 20366 | 191034 | 190905 | -129 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill12 | la | musl | ltp-musl | PASS | 0 | 19262 | 191561 | 191449 | -112 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | la | glibc | ltp-glibc | PASS | 0 | 19012 | 191149 | 191073 | -76 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | la | musl | ltp-musl | PASS | 0 | 30717 | 192098 | 191593 | -505 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 14 (la:glibc:abort01, la:musl:abort01, la:glibc:alarm06, la:musl:alarm06, la:glibc:fork05, la:musl:fork05, la:glibc:fork10, la:musl:fork10, la:glibc:kill11, la:musl:kill11, la:glibc:kill12, la:musl:kill12, la:glibc:mem02, la:musl:mem02)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 7
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 7
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

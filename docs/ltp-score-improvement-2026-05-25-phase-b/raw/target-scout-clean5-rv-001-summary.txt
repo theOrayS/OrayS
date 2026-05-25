@@ -1,0 +1,54 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-scout-clean5-rv-001.log`
+
+- PASS LTP CASE: 10
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 5 passed, 0 failed
+- ltp-glibc: 5 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| abort01 | rv | glibc | ltp-glibc | PASS | 0 | 3103 | 256512 | 256491 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| abort01 | rv | musl | ltp-musl | PASS | 0 | 2694 | 258855 | 256786 | -2069 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm06 | rv | glibc | ltp-glibc | PASS | 0 | 5792 | 256491 | 256477 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm06 | rv | musl | ltp-musl | PASS | 0 | 5268 | 256786 | 256772 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | rv | glibc | ltp-glibc | PASS | 0 | 2765 | 256477 | 256470 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | rv | musl | ltp-musl | PASS | 0 | 2551 | 256772 | 256765 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill11 | rv | glibc | ltp-glibc | PASS | 0 | 5074 | 256470 | 256288 | -182 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill11 | rv | musl | ltp-musl | PASS | 0 | 3869 | 256765 | 256583 | -182 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | rv | glibc | ltp-glibc | PASS | 0 | 8570 | 256288 | 256217 | -71 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | rv | musl | ltp-musl | PASS | 0 | 8048 | 256583 | 256512 | -71 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 10 (rv:glibc:abort01, rv:musl:abort01, rv:glibc:alarm06, rv:musl:alarm06, rv:glibc:fork05, rv:musl:fork05, rv:glibc:kill11, rv:musl:kill11, rv:glibc:mem02, rv:musl:mem02)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 5
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 5
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
