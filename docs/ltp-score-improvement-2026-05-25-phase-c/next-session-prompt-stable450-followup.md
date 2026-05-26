@@ -22,6 +22,13 @@
 
 仍需避免直接 promotion 的负证据：
 
+新增 Attempt 4 负证据（不要 promotion）：
+
+- `lseek03`, `lseek04`, `lseek05`, `lseek06`, `lseek08`, `lseek09`, `lseek10`: `raw/target-stable400-lseek-neighbors-rv-002-summary.txt` 显示 RV musl+glibc wrapper FAIL `-1`，当前 sdcard 缺失测试二进制。
+- `lseek11`: 同一 summary 显示 RV musl+glibc wrapper FAIL 32，SEEK_DATA/SEEK_HOLE TCONF，ENOSYS/not implemented matches 2；无真实 SEEK_DATA/SEEK_HOLE 语义前不要 promotion。
+- 一次 FD/fcntl scout 曾因工具重复启动被终止并作废；不要使用任何 `target-stable400-fd-after-fifo-rv-001` 残留作为证据。
+
+
 - `readlinkat02`: RV musl+glibc clean，LA glibc clean，但 LA musl TFAIL；`target-stable400-readlinkat02-serial-promotion-candidates.txt` 为 0 candidates。
 - `pipe02`: RV wave2 出现 panic/trap；不要放入 broad batch，先 root-cause。
 - wave2 metadata/path blockers: `access04`, `chmod06`, `chmod07`, `fchmod02`, `fchmod06`, `statx01`, `rename04`, `rename05` 仍有 TBROK/ENOSYS。
@@ -29,6 +36,8 @@
 - FD/fcntl scout: `dup05`, `fcntl07`, `fcntl11`, `fcntl14`, `fcntl15`, `fcntl07_64`, `fcntl11_64`, `fcntl15_64` 在 RV musl+glibc PASS 0 / FAIL 16；涉及 record-locking TFAIL，不具备 promotion 证据。FIFO ENOSYS 已部分修复，但不能自动外推。
 - FS/path scout: `link02`, `mkdir02`, `unlink05`, `readlink03`, `symlink03`, `lstat02`, `stat03`, `stat04` 在 RV musl+glibc PASS 0 / FAIL 16；涉及 TFAIL/TBROK 和 `link`/`unlink` ENOSYS，不具备 promotion 证据。
 - 任何标记为 `invalid-concurrent` 的日志都不是证据；不要用于 promotion。
+- `lseek03,lseek04,lseek05,lseek06,lseek08,lseek09,lseek10,lseek11`: `raw/target-stable400-lseek-neighbors-rv-002-summary.txt` 为 RV PASS 0 / FAIL 16；`lseek03/04/05/06/08/09/10` 缺测试二进制，`lseek11` 是 SEEK_DATA/HOLE TCONF+ENOSYS。不要 promotion。
+- FD/fcntl after-FIFO scout 曾因重复 QEMU/build 进程被 invalidated 并清理；不是证据，后续如要复核必须单路唯一日志名重跑。
 
 目标：
 

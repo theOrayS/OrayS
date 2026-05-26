@@ -56,3 +56,8 @@ Stable400 remains undelivered; stable382 is the highest trusted partial promotio
 ## Policy note
 
 `lseek02` was only accepted after real `mknodat`/FIFO behavior was added and aggregate stable382 gates passed. `read02` remains transparent `pass_with_tconf`. The parser reports no wrapper timeout/ENOSYS/panic in accepted stable381 aggregate gates. LA stable381 raw log still contains one inherited LTP internal `Test timeouted, sending SIGKILL!` notice in a pre-existing long-running case; it is disclosed and is not from the two latest promoted chmod/fchmod cases.
+
+## Attempt 4 scout evidence (no promotion)
+
+- `raw/target-stable400-lseek-neighbors-rv-002-summary.txt`: RV `lseek03,lseek04,lseek05,lseek06,lseek08,lseek09,lseek10,lseek11` PASS 0 / FAIL 16. `lseek03/04/05/06/08/09/10` are missing test binaries on the sdcard; `lseek11` is TCONF+ENOSYS for SEEK_DATA/SEEK_HOLE. No LA rerun and no promotion.
+- A later FD/fcntl after-FIFO scout was invalidated because duplicate run-eval/build processes were accidentally started; it was terminated and deleted, and is explicitly not evidence.
