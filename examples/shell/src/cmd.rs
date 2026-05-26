@@ -144,7 +144,7 @@ const LTP_STABLE_CASES: &[&str] = &[
     "abort01", "poll01", "fork05", "fork10",
     "kill11", "kill12", "mem02", "clock_settime01",
     "clock_settime02", "clone03", "confstr01",
-    "chmod05", "fchmod05",
+    "chmod05", "fchmod05", "pipe08",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
