@@ -1,34 +1,29 @@
-# LTP Development Workflow
+# LTP 开发流程
 
-LTP work in this repository is contest-score oriented, but it must still preserve
-honest Linux/POSIX semantics.  The goal is to promote real, regression-safe
-coverage rather than to make individual test names appear green.
+本仓库的 LTP 工作以比赛得分为导向，但仍必须保持真实 Linux/POSIX 语义。目标是推广真正可靠、可回归保护的覆盖，而不是让某个 testcase 名字表面变绿。
 
-## Source of truth
+## 事实来源
 
-LTP runner behavior lives mainly in `examples/shell/src/cmd.rs`:
+LTP runner 行为主要在 `examples/shell/src/cmd.rs`：
 
-- `LTP_CORE_CASES` — small smoke set.
-- `LTP_STABLE_CASES` — current high-confidence stable set.
-- `LTP_CASE_BATCHES` — named targeted batches.
-- `selected_ltp_cases()` — runtime/build-time case selection.
-- `run_ltp_suite()` — per-case execution, timeout handling, wrapper markers,
-  cleanup, and summary output.
+- `LTP_CORE_CASES`：小型 smoke 集合。
+- `LTP_STABLE_CASES`：当前高置信 stable 集合。
+- `LTP_CASE_BATCHES`：命名 targeted batch。
+- `selected_ltp_cases()`：运行时/构建时 case 选择逻辑。
+- `run_ltp_suite()`：per-case 执行、timeout、wrapper marker、清理和汇总输出。
 
-Current stable count must be read from `LTP_STABLE_CASES`, not from old reports.
-At this document update it is 383 unique cases, executed for both `/musl` and
-`/glibc`.
+当前 stable 数量必须从 `LTP_STABLE_CASES` 读取，不能从旧报告推断。截至本文档更新时，它包含 383 个不重复 case，并会分别在 `/musl` 和 `/glibc` 下执行。
 
-## Case selection controls
+## case 选择方式
 
-Inside the guest, either file overrides the selected cases:
+guest 内部任一文件存在时，会覆盖选例：
 
 ```text
 /ltp_cases.txt
 /tmp/ltp_cases.txt
 ```
 
-At build time, `LTP_CASES` can select:
+构建时 `LTP_CASES` 可以选择：
 
 ```text
 stable
@@ -38,14 +33,11 @@ file:<path>
 case1,case2,case3
 ```
 
-Timeout can be overridden by `/ltp_case_timeout_secs` in the guest or by the
-build-time `LTP_CASE_TIMEOUT_SECS` option.  The default per-case timeout is
-currently 15 seconds.
+timeout 可以通过 guest 内的 `/ltp_case_timeout_secs` 或构建时 `LTP_CASE_TIMEOUT_SECS` 覆盖。当前默认 per-case timeout 是 15 秒。
 
-## Required parser discipline
+## 必须使用 parser 解析
 
-Always parse evaluator logs with `scripts/ltp_summary.py` before calling a run
-healthy:
+在声称某次 evaluator 运行健康之前，必须用 `scripts/ltp_summary.py` 解析日志：
 
 ```bash
 python3 scripts/ltp_summary.py output_rv.md
@@ -53,49 +45,45 @@ python3 scripts/ltp_summary.py output_la.md
 python3 scripts/ltp_summary.py --promotion-candidates rv.log la.log
 ```
 
-The parser counts wrapper result lines and internal quality signals:
+parser 会统计 wrapper result line 和内部质量信号：
 
 - `TFAIL`
 - `TBROK`
 - `TCONF`
-- `TIMEOUT LTP CASE` / timeout text
+- `TIMEOUT LTP CASE` / timeout 文本
 - `ENOSYS` / not implemented
-- panic/trap signals
+- panic/trap 信号
 
-A clean outer `run-eval` or QEMU exit code is not enough.  Keep `TCONF`, timeout,
-ENOSYS, and panic/trap caveats visible in reports.
+外层 `run-eval` 或 QEMU 退出码干净不代表 LTP 干净通过。报告里必须保留 `TCONF`、timeout、ENOSYS、panic/trap 等 caveat。
 
-## Wrapper marker format
+## wrapper marker 格式
 
-The runner preserves the remote scorer wire format for completed LTP cases:
+runner 保留远程 scorer 使用的 completed-case wire format：
 
 ```text
 FAIL LTP CASE <case> : <status>
 ```
 
-Status `0` means wrapper-level pass; non-zero means failure.  This is why the
-summary parser treats the numeric status as the source of truth.  Do not rewrite
-marker format casually; remote scoring depends on it.
+其中 status `0` 表示 wrapper 层通过，非 0 表示失败。因此 summary parser 以数字 status 作为事实来源。不要随意修改 marker 格式；远程计分依赖它。
 
-## Recommended fix loop
+## 推荐修复循环
 
-1. Pick candidate cases by contest value and subsystem relevance.
-2. Inspect the contest testsuite `runtest` entry and matching LTP source.
-3. Run a small targeted batch, not the full evaluator, while diagnosing.
-4. Parse the log with `scripts/ltp_summary.py`.
-5. Fix the real syscall/VFS/FD/process/signal/memory semantics.
-6. Run adjacent regression cases from the same subsystem.
-7. Validate both RV and LA when promoting a case.
-8. Only then consider adding cases to `LTP_STABLE_CASES`.
+1. 按比赛价值和子系统相关性选择候选 case。
+2. 阅读 contest testsuite 的 `runtest` entry 和对应 LTP 源码。
+3. 诊断阶段先跑小 targeted batch，不要一开始跑完整 evaluator。
+4. 用 `scripts/ltp_summary.py` 解析日志。
+5. 修复真实 syscall / VFS / FD / process / signal / memory 语义。
+6. 跑同一子系统的相邻回归 case。
+7. 推广 case 前验证 RV 和 LA。
+8. 通过后再考虑加入 `LTP_STABLE_CASES`。
 
-## Red lines
+## 红线
 
-Do not:
+禁止：
 
-- hardcode behavior by testcase name, path, or process name;
-- fake `TPASS` or wrapper PASS output;
-- edit LTP testsuite sources to bypass failures;
-- hide real failures as `SKIP`/`TCONF`;
-- treat timeout as a pass;
-- promote a case from one architecture/libc variant without naming the missing
-  validation.
+- 按 testcase 名称、路径或进程名硬编码行为；
+- 伪造 `TPASS` 或 wrapper PASS 输出；
+- 修改 LTP testsuite 源码绕过失败；
+- 把真实失败隐藏成 `SKIP` / `TCONF`；
+- 把 timeout 当成通过；
+- 在没有说明缺失验证的情况下，只凭单架构或单 libc 结果推广 case。

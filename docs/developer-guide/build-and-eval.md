@@ -1,74 +1,65 @@
-# Build and Evaluation Workflow
+# 构建与评测流程
 
-This branch has two evaluator modes that must stay distinct: local QEMU
-validation and remote-submission artifact generation.
+这个分支有两条必须明确区分的评测路径：本地 QEMU 验证，以及远程提交产物构建。
 
-## Local evaluator runs
+## 本地评测运行
 
-Use the wrapper script when validating against local sdcard images:
+验证本地 sdcard 镜像时，使用 wrapper 脚本：
 
 ```bash
 ./run-eval.sh rv
 ./run-eval.sh la
 ```
 
-The script checks for `cargo`, `qemu-img`, and the matching QEMU binary, then
-invokes:
+脚本会检查 `cargo`、`qemu-img` 和对应 QEMU system binary，然后调用：
 
 ```bash
 make run-rv ARCH=riscv64
 make run-la ARCH=loongarch64
 ```
 
-By default it expects root-level images:
+默认镜像路径在仓库根目录：
 
 ```text
 sdcard-rv.img
 sdcard-la.img
 ```
 
-Override them when needed:
+需要时可以覆盖：
 
 ```bash
 RV_TESTSUITE_IMG=/path/to/sdcard-rv.img ./run-eval.sh rv
 LA_TESTSUITE_IMG=/path/to/sdcard-la.img ./run-eval.sh la
 ```
 
-The direct `run-rv` and `run-la` targets create temporary qcow2 overlays under
-`/tmp`.  Do not run parallel evaluator QEMU jobs that share the same overlay
-paths; the resulting evidence can be contaminated.
+`run-rv` 和 `run-la` 会在 `/tmp` 下创建临时 qcow2 overlay。不要并行运行共享同一 overlay 路径的 evaluator QEMU 任务，否则得到的证据可能被污染。
 
-## Remote-submission build
+## 远程提交构建
 
-The remote evaluator expects root-level artifacts:
+远程评测期望仓库根目录存在两个产物：
 
 ```bash
 make all
-# produces ./kernel-rv and ./kernel-la
+# 生成 ./kernel-rv 和 ./kernel-la
 ```
 
-Per-architecture build targets are also available:
+也可以分别构建：
 
 ```bash
 make kernel-rv
 make kernel-la
 ```
 
-Important distinction:
+关键区别：
 
-- `make all` builds the LoongArch submission kernel with
-  `configs/remote-eval/axplat-loongarch64-qemu-virt.toml`.
-- Local `kernel-la` / `run-la` use the normal package/platform defaults unless
-  `PLAT_CONFIG` is explicitly overridden.
+- `make all` 构建 LoongArch 提交内核时使用 `configs/remote-eval/axplat-loongarch64-qemu-virt.toml`。
+- 本地 `kernel-la` / `run-la` 默认使用常规 package/platform 配置，除非显式覆盖 `PLAT_CONFIG`。
 
-Do not silently mix the local LoongArch address map with the remote submission
-address map.  A kernel can boot locally and still fail remotely if boot
-page-table or platform-address assumptions are wrong.
+不要把本地 LoongArch 地址映射和远程提交地址映射混用。一个内核可以在本地启动，但因为 boot page-table 或平台地址假设错误而在远程失败。
 
-## Offline and helper-tool behavior
+## 离线和 helper 工具行为
 
-Remote/submission builds should not depend on network downloads.  The Makefile
-prefers repository-provided helper paths:
+远程/提交构建不应该依赖网络下载。Makefile 会优先使用仓库内提供的 helper 路径：
 
 ```text
 scripts/axconfig-gen.py
@@ -81,13 +72,11 @@ cargo-home/config.toml
 vendor/cargo-vendor.tar.gz
 ```
 
-If dependency closure changes, keep `cargo-home/`, `vendor/`, and helper shims
-in sync.  `scripts/ensure-cargo-vendor.sh` restores `vendor/cargo/` from the
-archive when needed.
+如果依赖闭包发生变化，需要同步 `cargo-home/`、`vendor/` 和 helper shim。需要时，`scripts/ensure-cargo-vendor.sh` 会从归档恢复 `vendor/cargo/`。
 
-## Normal ArceOS app builds
+## 常规 ArceOS app 构建
 
-For non-evaluator app work, use the standard Make interface:
+非评测 app 工作仍然使用标准 Make 接口：
 
 ```bash
 make A=examples/helloworld ARCH=riscv64 run
@@ -95,10 +84,6 @@ make A=examples/httpserver ARCH=aarch64 LOG=info SMP=4 run NET=y
 make A=examples/shell ARCH=riscv64 build
 ```
 
-`ARCH` must be one of `x86_64`, `riscv64`, `aarch64`, or `loongarch64`.
-Common variables include `A`/`APP`, `FEATURES`, `APP_FEATURES`, `LOG`, `SMP`,
-`MODE`, `PLAT_CONFIG`, `TARGET_DIR`, `BLK`, `NET`, `GRAPHIC`, `MEM`, and
-`DISK_IMG`.
+`ARCH` 必须是 `x86_64`、`riscv64`、`aarch64`、`loongarch64` 之一。常见变量包括 `A`/`APP`、`FEATURES`、`APP_FEATURES`、`LOG`、`SMP`、`MODE`、`PLAT_CONFIG`、`TARGET_DIR`、`BLK`、`NET`、`GRAPHIC`、`MEM` 和 `DISK_IMG`。
 
-QEMU options such as `NET=y` and `BLK=y` configure runtime devices; they do not
-by themselves enable Rust feature flags.
+`NET=y`、`BLK=y` 这类 QEMU 参数配置的是运行时设备；它们不会自动开启 Rust feature。
