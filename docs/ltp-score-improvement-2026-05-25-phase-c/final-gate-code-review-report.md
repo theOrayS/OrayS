@@ -1,34 +1,34 @@
 # Final gate code review report
 
 Date: 2026-05-26
-Scope: phase-c partial promotion to stable379 and earlier expected-errno log-noise repair.
+Scope: `examples/shell/src/uspace/fd_socket.rs`, `examples/shell/src/cmd.rs`, phase-c reports.
 
-## Verdict
+## Review result
 
-- Stable450 final delivery: **not approved / not claimed**.
-- Stable379 partial promotion: **approved with disclosed caveats**.
+Recommendation: **COMMENT**
+Architectural status: **WATCH**
+Merge blocker for stable381 partial promotion: **none after follow-up fix**
 
-## Reviewed changes
+## Findings and resolution
 
-- `examples/shell/src/cmd.rs`: adds exactly four accepted stable cases: `clock_settime01`, `clock_settime02`, `clone03`, `confstr01`.
-- Earlier committed `kernel/fs/axfs/src/fops.rs` and `kernel/fs/axfs/src/root.rs` log-noise changes return the same `AxError` values directly instead of invoking noisy `ax_err!` on expected negative paths.
+### HIGH — resolved
 
-## Evidence reviewed
+- File: `examples/shell/src/uspace/fd_socket.rs`
+- Finding: the first AF_UNIX local socket connect repair returned `ENOTSOCK` for existing pathname targets and used direct `axfs::api::metadata(path)` lookup.
+- Risk: hidden POSIX/LTP errno checks could expect `ECONNREFUSED`, and relative paths could bypass process-visible cwd/mount resolution.
+- Fix applied: pathname connects now use `resolve_dirfd_path(process, ..., AT_FDCWD, path)` before metadata lookup and return `ECONNREFUSED` for existing pathname targets until a real AF_UNIX listener registry exists. Missing pathname still returns `ENOENT`; invalid user pointers/families still return their respective errno.
 
-- RV stable379 aggregate: `raw/stable379-rv-gate-002-summary.txt` PASS 758 / FAIL 0.
-- LA stable379 aggregate: `raw/stable379-la-gate-001-summary.txt` PASS 758 / FAIL 0.
-- Marker prefix: 0 bad lines in both accepted aggregates.
-- Original `axfs::fops` NotADirectory noise: 0 in both accepted aggregates.
-- Known `read02` TCONF remains disclosed.
+### WATCH — documented partial support
 
-## Risks
+- The code intentionally does not implement full AF_UNIX pathname sockets. `bind/listen/accept` remain outside this patch. The new path is a bounded errno compatibility shim for valid local socket fds and known libc nscd/group lookup probes.
+- This is acceptable for the stable381 partial promotion because `chmod05`/`fchmod05` have post-fix targeted RV+LA x musl+glibc clean evidence and no LTP source/harness fake PASS was introduced.
 
-- The campaign did not find enough clean cases for stable400/425/450.
-- LA raw stable379 log contains two inherited internal `Test timeouted` notices in pre-existing cases; parser wrapper timeout count is 0 and no newly promoted case is affected, but future gates should continue tracking this separately.
-- Residual `axfs_ramfs::file:69` NotADirectory noise remains at 22 per accepted aggregate.
+## Positive checks
 
-## Fresh validation run by leader
+- `examples/shell/src/cmd.rs` only adds `chmod05` and `fchmod05`; live stable count is 381 total / 381 unique / 0 duplicates.
+- No test-name hardcoding, fake PASS marker, LTP source modification, timeout laundering, or wrapper-only promotion was found.
+- Targeted and aggregate evidence are preserved in phase-c docs and raw summaries.
 
-- `cargo fmt --all -- --check`: passed.
-- `git diff --check`: passed.
-- `make A=examples/shell ARCH=riscv64`: passed; this Makefile path built the remote-submission RV wrapper and LA ELF outputs (`kernel-rv`/`kernel-la`) as generated artifacts, which are not committed.
+## Final recommendation rationale
+
+`COMMENT` rather than `APPROVE` because the AF_UNIX support is intentionally partial and should stay on the follow-up watchlist. It is not a blocker for committing the current stable381 partial promotion because the blocking errno/path-resolution issue was fixed and revalidated with targeted RV+LA checks.

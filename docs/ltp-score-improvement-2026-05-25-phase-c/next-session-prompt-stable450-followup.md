@@ -1,4 +1,4 @@
-# Next-session prompt: continue from stable379 toward stable450
+# Next-session prompt: continue from stable381 toward stable450
 
 工作目录：`/root/oskernel2026-orays`
 
@@ -6,12 +6,12 @@
 
 当前最高可信状态必须 live 复核：
 
-- `examples/shell/src/cmd.rs::LTP_STABLE_CASES` 应为 379 total / 379 unique / 0 duplicates。
-- 已从 stable375 真实 promotion 的 4 个 case：`clock_settime01`, `clock_settime02`, `clone03`, `confstr01`。
-- RV aggregate evidence: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-002-summary.txt`，PASS LTP CASE 758 / FAIL 0，`ltp-musl` 379/0，`ltp-glibc` 379/0。
-- LA aggregate evidence: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-la-gate-001-summary.txt`，PASS LTP CASE 758 / FAIL 0，`ltp-musl` 379/0，`ltp-glibc` 379/0。
+- `examples/shell/src/cmd.rs::LTP_STABLE_CASES` 应为 381 total / 381 unique / 0 duplicates。
+- 已从 stable375 真实 promotion 的 6 个 case：`clock_settime01`, `clock_settime02`, `clone03`, `confstr01`, `chmod05`, `fchmod05`。
+- RV aggregate evidence: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable381-rv-gate-001-summary.txt`，PASS LTP CASE 762 / FAIL 0，`ltp-musl` 381/0，`ltp-glibc` 381/0。
+- LA aggregate evidence: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable381-la-gate-001-summary.txt`，PASS LTP CASE 762 / FAIL 0，`ltp-musl` 381/0，`ltp-glibc` 381/0。
 - known transparent TCONF 仍只有 `read02`；不能把它说成 clean。
-- original `axfs::fops:297 [AxError::NotADirectory]` 噪声在 stable379 aggregate 中为 0；残留 `axfs_ramfs::file:69` NotADirectory 每架构 22 条。
+- original `axfs::fops:297 [AxError::NotADirectory]` 噪声在 stable381 aggregate 中为 0；残留 `axfs_ramfs::file:69` NotADirectory 每架构 22 条。
 
 新增 G002 Attempt 3 负证据（必须重新 live 复核，不要 promotion）：
 
@@ -25,7 +25,7 @@
 
 目标：
 
-1. 从 stable379 冲 stable400（先找 21 个 clean case）。
+1. 从 stable381 冲 stable400（先找 19 个 clean case）。
 2. 再冲 stable425/stable450；stretch stable460/475 只有资源和 clean subset 足够时才做。
 3. 任何新增 case 必须 RV+LA x musl+glibc 全 clean：wrapper FAIL 0，internal TFAIL/TBROK 0，无新增 TCONF，parser timeout/ENOSYS/panic/trap 0。
 4. 不伪造 PASS、不 hardcode case name、不修改 LTP 源码、不把 timeout/TFAIL/TBROK/ENOSYS/panic 改成 PASS/TCONF。
@@ -35,7 +35,7 @@
 1. `df -h / /root` 和 `du -sh /root/.codex`。
 2. `git status --short`，保护用户文件和 root-level kernel/raw logs。
 3. 重新计算 live stable count/duplicates。
-4. 读取 `final-gate-quality-gate.json`、`stable379-promotion-gate-report.md`、`candidate-matrix.md`。
+4. 读取 `final-gate-quality-gate.json`、`stable381-promotion-gate-report.md`、`stable400-promotion-gate-report.md`、`candidate-matrix.md`。
 5. Team 分工仍按 VFS/FD/process/mmap-fs/verification lanes；worker 不拥有 `.omx/ultragoal` 和最终 `LTP_STABLE_CASES` 修改。
 6. 串行运行最终 promotion aggregate gate，避免并发 QEMU/sdcard 争用。
 
