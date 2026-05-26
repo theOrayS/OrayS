@@ -43,3 +43,13 @@ The log-noise repair is accepted as a first-stage output-volume fix and stable38
 | LA accepted stable381 aggregate | 0 | 22 | 0 | 0 | 0 | PASS 762 / FAIL 0; `ltp-musl` 381/0; `ltp-glibc` 381/0; known `read02` TCONF only |
 
 Stable381 preserves the original `axfs::fops` high-frequency warning fix: `axfs::fops` warning count remains 0 on both architectures. The remaining 22 `AxError::NotADirectory` entries per architecture are the already-disclosed `axfs_ramfs::file:69` family, not the fixed `fops.rs:297` remote-output flood.
+
+
+## Stable382 update
+
+| Evidence | fops NotADirectory | any NotADirectory | any IsADirectory | AlreadyExists | marker bad prefix | LTP semantic status |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| RV accepted stable382 aggregate | 0 | 22 | 0 | 0 | 0 | PASS 764 / FAIL 0; `ltp-musl` 382/0; `ltp-glibc` 382/0; known `read02` TCONF only |
+| LA accepted stable382 aggregate | 0 | 22 | 0 | 0 | 0 | PASS 764 / FAIL 0; `ltp-musl` 382/0; `ltp-glibc` 382/0; known `read02` TCONF only |
+
+Stable382 preserves the original `axfs::fops` high-frequency warning fix: `axfs::fops:297` warning count remains 0 on both architectures. The remaining 22 `AxError::NotADirectory` entries per architecture are the already-disclosed `axfs_ramfs::file:69` family, not the fixed `fops.rs:297` remote-output flood. Marker prefix bad lines remain 0.

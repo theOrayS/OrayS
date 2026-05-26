@@ -1,34 +1,39 @@
-# Final gate code review report
+# Final gate code-review report — stable382 partial promotion
 
 Date: 2026-05-26
-Scope: `examples/shell/src/uspace/fd_socket.rs`, `examples/shell/src/cmd.rs`, phase-c reports.
+Scope reviewed: stable382 delta from stable381 (`lseek02` promotion plus minimal `mknodat`/FIFO support).
+Recommendation: **COMMENT / accept stable382 partial promotion; do not claim stable400+**.
 
-## Review result
+## Reviewed changes
 
-Recommendation: **COMMENT**
-Architectural status: **WATCH**
-Merge blocker for stable381 partial promotion: **none after follow-up fix**
+- `examples/shell/src/cmd.rs`: adds `lseek02` to `LTP_STABLE_CASES`.
+- `examples/shell/src/uspace/syscall_dispatch.rs`: dispatches `__NR_mknodat`.
+- `examples/shell/src/uspace/fd_table.rs`: implements minimal `mknodat`, records FIFO metadata, and opens recorded FIFO paths as pipe-backed non-seekable descriptors.
+- `examples/shell/src/uspace/metadata.rs`, `linux_abi.rs`, `mod.rs`, `process_lifecycle.rs`: add `S_IFIFO` metadata plumbing and preserve it across fork-like process cloning.
 
-## Findings and resolution
+## Safety review
 
-### HIGH — resolved
+- No LTP case-name hardcoding was introduced.
+- LTP test sources and evaluator scripts were not modified.
+- The original `lseek02` blocker was a real `mkfifo()` ENOSYS setup failure; adding `mknodat` is a general syscall compatibility repair.
+- FIFO descriptors reuse existing pipe `lseek` behavior, so non-seekable FIFO paths return ESPIPE through the normal FD implementation.
+- Unsupported special `mknodat` node types return `EPERM` rather than fake success.
+- Regular-file `mknodat` creates a real placeholder file with create-new semantics and records metadata consistently with existing chmod/chown side maps.
 
-- File: `examples/shell/src/uspace/fd_socket.rs`
-- Finding: the first AF_UNIX local socket connect repair returned `ENOTSOCK` for existing pathname targets and used direct `axfs::api::metadata(path)` lookup.
-- Risk: hidden POSIX/LTP errno checks could expect `ECONNREFUSED`, and relative paths could bypass process-visible cwd/mount resolution.
-- Fix applied: pathname connects now use `resolve_dirfd_path(process, ..., AT_FDCWD, path)` before metadata lookup and return `ECONNREFUSED` for existing pathname targets until a real AF_UNIX listener registry exists. Missing pathname still returns `ENOENT`; invalid user pointers/families still return their respective errno.
+## Watchlist / limitations
 
-### WATCH — documented partial support
+- FIFO support is intentionally minimal: no full named-FIFO peer registry, blocking open semantics, rename propagation, or cross-process persistent endpoint sharing beyond the current recorded path metadata.
+- `path_special_modes` follows the existing side-map style used for path modes/owners; it is removed on successful unlink but not moved on rename. Do not rely on full rename semantics until targeted tests are added.
+- Stable450 is not delivered; this report only accepts stable382 evidence.
 
-- The code intentionally does not implement full AF_UNIX pathname sockets. `bind/listen/accept` remain outside this patch. The new path is a bounded errno compatibility shim for valid local socket fds and known libc nscd/group lookup probes.
-- This is acceptable for the stable381 partial promotion because `chmod05`/`fchmod05` have post-fix targeted RV+LA x musl+glibc clean evidence and no LTP source/harness fake PASS was introduced.
+## Evidence reviewed
 
-## Positive checks
+- `raw/target-stable400-lseek02-rv-001-summary.txt`: pre-fix failure due to `mkfifo` ENOSYS.
+- `raw/target-stable400-lseek02-rv-002-summary.txt`: RV targeted PASS 2 / FAIL 0.
+- `raw/target-stable400-lseek02-la-001-summary.txt`: LA targeted PASS 2 / FAIL 0.
+- `raw/stable382-rv-gate-001-summary.txt`: RV stable382 PASS 764 / FAIL 0; `ltp-musl` 382/0; `ltp-glibc` 382/0.
+- `raw/stable382-la-gate-001-summary.txt`: LA stable382 PASS 764 / FAIL 0; `ltp-musl` 382/0; `ltp-glibc` 382/0.
 
-- `examples/shell/src/cmd.rs` only adds `chmod05` and `fchmod05`; live stable count is 381 total / 381 unique / 0 duplicates.
-- No test-name hardcoding, fake PASS marker, LTP source modification, timeout laundering, or wrapper-only promotion was found.
-- Targeted and aggregate evidence are preserved in phase-c docs and raw summaries.
+## Decision
 
-## Final recommendation rationale
-
-`COMMENT` rather than `APPROVE` because the AF_UNIX support is intentionally partial and should stay on the follow-up watchlist. It is not a blocker for committing the current stable381 partial promotion because the blocking errno/path-resolution issue was fixed and revalidated with targeted RV+LA checks.
+No blocking code-review issue for the stable382 partial promotion. Keep the FIFO limitations explicit in future prompts and do not expand promotion based on FIFO behavior without fresh targeted plus aggregate evidence.

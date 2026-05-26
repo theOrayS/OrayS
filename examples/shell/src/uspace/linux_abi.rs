@@ -60,6 +60,7 @@ pub(super) const ST_MODE_FILE: u32 = 0o100000;
 pub(super) const ST_MODE_LNK: u32 = 0o120000;
 pub(super) const ST_MODE_CHR: u32 = 0o020000;
 pub(super) const ST_MODE_BLK: u32 = 0o060000;
+pub(super) const ST_MODE_FIFO: u32 = 0o010000;
 pub(super) const ST_MODE_SOCKET: u32 = 0o140000;
 pub(super) const ST_MODE_TYPE_MASK: u32 = 0o170000;
 pub(super) const FILE_MODE_PERMISSION_MASK: u32 = 0o7777;

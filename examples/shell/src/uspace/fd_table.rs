@@ -17,8 +17,8 @@ use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, 
 use super::linux_abi::{
     ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE,
     O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno,
-    posix_ret_i32,
+    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK, fd_cloexec_flag,
+    neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -601,6 +601,27 @@ pub(super) fn sys_mkdirat(
         .fds
         .lock()
         .mkdirat(process, dirfd as i32, path.as_str(), mode as u32)
+    {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_mknodat(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    mode: usize,
+    _dev: usize,
+) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    match process
+        .fds
+        .lock()
+        .mknodat(process, dirfd as i32, path.as_str(), mode as u32)
     {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
@@ -1199,6 +1220,44 @@ impl FdTable {
         Ok(())
     }
 
+    pub(super) fn mknodat(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+        mode: u32,
+    ) -> Result<(), LinuxError> {
+        if path.is_empty() {
+            return Err(LinuxError::ENOENT);
+        }
+        let node_type = mode & ST_MODE_TYPE_MASK;
+        let node_type = match node_type {
+            0 | ST_MODE_FILE => ST_MODE_FILE,
+            ST_MODE_FIFO => ST_MODE_FIFO,
+            _ => return Err(LinuxError::EPERM),
+        };
+        let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        if axfs::api::metadata(abs_path.as_str()).is_ok() {
+            return Err(LinuxError::EEXIST);
+        }
+        let mut opts = OpenOptions::new();
+        opts.write(true);
+        opts.create_new(true);
+        File::open(abs_path.as_str(), &opts).map_err(LinuxError::from)?;
+        process.set_path_mode(abs_path.clone(), process.apply_umask(mode));
+        process.set_path_owner(
+            abs_path.clone(),
+            Some(process.fs_uid()),
+            Some(process.fs_gid()),
+        );
+        if node_type == ST_MODE_FIFO {
+            process.set_path_special_mode(abs_path, ST_MODE_FIFO);
+        } else {
+            process.remove_path_special_mode(abs_path.as_str());
+        }
+        Ok(())
+    }
+
     pub(super) fn unlinkat(
         &mut self,
         process: &UserProcess,
@@ -1218,11 +1277,15 @@ impl FdTable {
         if process.remove_path_symlink(abs_path.as_str()) {
             return Ok(());
         }
-        if remove_dir {
+        let removed = if remove_dir {
             directory_remove_dir(abs_path.as_str())
         } else {
             directory_remove_file(abs_path.as_str())
+        };
+        if removed.is_ok() {
+            process.remove_path_special_mode(abs_path.as_str());
         }
+        removed
     }
 
     pub(super) fn stat(&mut self, fd: i32) -> Result<general::stat, LinuxError> {
@@ -1547,6 +1610,15 @@ impl PathEntry {
             mode: file_type_mode(attr.file_type()) | attr.perm().bits() as u32,
             size: attr.size(),
             blocks: attr.blocks(),
+        }
+    }
+
+    pub(super) fn fifo(path: &str, mode: u32) -> Self {
+        Self {
+            path: path.into(),
+            mode: ST_MODE_FIFO | (mode & 0o7777),
+            size: 0,
+            blocks: 0,
         }
     }
 
@@ -1979,6 +2051,28 @@ fn open_candidates(
                 FdEntry::Path(PathEntry::synthetic_char(path.as_str()))
             } else {
                 FdEntry::Rtc
+            });
+        }
+        if process.path_special_mode(path.as_str()) == Some(ST_MODE_FIFO) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
+                return Err(LinuxError::EEXIST);
+            }
+            check_open_permission(process, path.as_str(), flags)?;
+            if path_only {
+                let mode = process.path_mode(path.as_str()).unwrap_or(0o666);
+                return Ok(FdEntry::Path(PathEntry::fifo(path.as_str(), mode)));
+            }
+            let status_flags = flags & (general::O_NONBLOCK | general::O_DIRECT);
+            let (read_end, write_end) = PipeEndpoint::new_pair(status_flags);
+            return Ok(match flags & general::O_ACCMODE {
+                general::O_WRONLY => FdEntry::Pipe(write_end),
+                // Opening a FIFO with O_RDWR is Linux-specific but common in
+                // tests to avoid blocking; any pipe endpoint is non-seekable,
+                // preserving the required ESPIPE semantics.
+                _ => FdEntry::Pipe(read_end),
             });
         }
         if prefer_dir {
