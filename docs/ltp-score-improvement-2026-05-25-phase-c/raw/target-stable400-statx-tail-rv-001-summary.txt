@@ -1,0 +1,84 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-statx-tail-rv-001.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 18
+- Internal TFAIL/TBROK/TCONF: 18 ({'TBROK': 14, 'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 9 failed
+- ltp-glibc: 0 passed, 9 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| statx04 | rv | glibc | ltp-glibc | FAIL | 6 | 3204 | 256742 | 256735 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx04 | rv | musl | ltp-musl | FAIL | 6 | 2765 | 258853 | 256798 | -2055 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx05 | rv | glibc | ltp-glibc | FAIL | 32 | 2802 | 256735 | 256728 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx05 | rv | musl | ltp-musl | FAIL | 32 | 2854 | 256798 | 256791 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx06 | rv | glibc | ltp-glibc | FAIL | 6 | 3052 | 256728 | 256721 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx06 | rv | musl | ltp-musl | FAIL | 6 | 2571 | 256791 | 256784 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx07 | rv | glibc | ltp-glibc | FAIL | 32 | 3108 | 256721 | 256714 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx07 | rv | musl | ltp-musl | FAIL | 32 | 2236 | 256784 | 256777 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx08 | rv | glibc | ltp-glibc | FAIL | 6 | 2879 | 256714 | 256707 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx08 | rv | musl | ltp-musl | FAIL | 6 | 2339 | 256777 | 256770 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx09 | rv | glibc | ltp-glibc | FAIL | 2 | 3265 | 256707 | 256700 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx09 | rv | musl | ltp-musl | FAIL | 2 | 2783 | 256770 | 256763 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx10 | rv | glibc | ltp-glibc | FAIL | 6 | 2866 | 256700 | 256693 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx10 | rv | musl | ltp-musl | FAIL | 6 | 2774 | 256763 | 256756 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx11 | rv | glibc | ltp-glibc | FAIL | 6 | 3126 | 256693 | 256686 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx11 | rv | musl | ltp-musl | FAIL | 6 | 2208 | 256756 | 256749 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx12 | rv | glibc | ltp-glibc | FAIL | 6 | 2973 | 256686 | 256679 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx12 | rv | musl | ltp-musl | FAIL | 6 | 2474 | 256749 | 256742 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 18 (rv:glibc:statx04, rv:musl:statx04, rv:glibc:statx05, rv:musl:statx05, rv:glibc:statx06, rv:musl:statx06, rv:glibc:statx07, rv:musl:statx07, rv:glibc:statx08, rv:musl:statx08, rv:glibc:statx09, rv:musl:statx09, rv:glibc:statx10, rv:musl:statx10, rv:glibc:statx11, rv:musl:statx11, rv:glibc:statx12, rv:musl:statx12)
+- internal_tfail: 0
+- internal_tbrok: 14 (rv:glibc:statx04, rv:musl:statx04, rv:glibc:statx06, rv:musl:statx06, rv:glibc:statx08, rv:musl:statx08, rv:glibc:statx09, rv:musl:statx09, rv:glibc:statx10, rv:musl:statx10, rv:glibc:statx11, rv:musl:statx11, rv:glibc:statx12, rv:musl:statx12)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:statx04
+- ltp-musl:statx05
+- ltp-musl:statx06
+- ltp-musl:statx07
+- ltp-musl:statx08
+- ltp-musl:statx09
+- ltp-musl:statx10
+- ltp-musl:statx11
+- ltp-musl:statx12
+- ltp-glibc:statx04
+- ltp-glibc:statx05
+- ltp-glibc:statx06
+- ltp-glibc:statx07
+- ltp-glibc:statx08
+- ltp-glibc:statx09
+- ltp-glibc:statx10
+- ltp-glibc:statx11
+- ltp-glibc:statx12
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 9
+- Internal: {'TBROK': 7, 'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: statx04, statx05, statx06, statx07, statx08, statx09, statx10, statx11, statx12
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 9
+- Internal: {'TBROK': 7, 'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: statx04, statx05, statx06, statx07, statx08, statx09, statx10, statx11, statx12

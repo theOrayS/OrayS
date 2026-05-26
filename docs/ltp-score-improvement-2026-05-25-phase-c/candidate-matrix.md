@@ -87,6 +87,15 @@ A post-stable382 lseek-neighbor scout found no promotable cases. Evidence: `stab
 
 The accidental duplicate FD/fcntl scout launch was terminated and invalidated; no FD/fcntl result from that duplicate attempt is promotion evidence.
 
+
+## Attempt 5 inventory/statx update (2026-05-26)
+
+The leader generated an RV sdcard inventory to avoid retrying missing test binaries. Artifacts: `raw/sdcard-rv-musl-ltp-bin-list.txt`, `raw/sdcard-rv-glibc-ltp-bin-list.txt`, and `raw/sdcard-rv-common-not-stable-ltp-bins.txt`. The inventory found 2824 musl entries, 2844 glibc entries, and 2442 names present in both libc trees but not stable382. This is discovery-only, not promotion evidence.
+
+Parsing existing phase-c summaries found only `readlinkat02` and `inode02` as non-stable cases with RV musl+glibc pass-clean evidence; both remain blocked by LA evidence (`readlinkat02` LA-musl TFAIL, `inode02` LA glibc timeout).
+
+A new RV statx-tail scout for `statx04`-`statx12` produced PASS 0 / FAIL 18; TBROK 14 and TCONF 4. Evidence: `stable400-attempt5-inventory-statx-report.md` and `raw/target-stable400-statx-tail-rv-001-summary.txt`. Do not promote or broadly retry this statx tail before solving ENOSPC device acquisition, missing `mkfs.ext4` / `exportfs`, and kernel config parsing prerequisites.
+
 ## B. Not-yet-run cases worth adding to self-test
 
 | Priority | Family/cases | Source/yield signal | Related subsystem | Rationale | Cost/risk |

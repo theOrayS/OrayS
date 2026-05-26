@@ -61,3 +61,8 @@ Stable400 remains undelivered; stable382 is the highest trusted partial promotio
 
 - `raw/target-stable400-lseek-neighbors-rv-002-summary.txt`: RV `lseek03,lseek04,lseek05,lseek06,lseek08,lseek09,lseek10,lseek11` PASS 0 / FAIL 16. `lseek03/04/05/06/08/09/10` are missing test binaries on the sdcard; `lseek11` is TCONF+ENOSYS for SEEK_DATA/SEEK_HOLE. No LA rerun and no promotion.
 - A later FD/fcntl after-FIFO scout was invalidated because duplicate run-eval/build processes were accidentally started; it was terminated and deleted, and is explicitly not evidence.
+
+## Attempt 5 inventory/statx evidence (no promotion)
+
+- `raw/sdcard-rv-musl-ltp-bin-list.txt`, `raw/sdcard-rv-glibc-ltp-bin-list.txt`, `raw/sdcard-rv-common-not-stable-ltp-bins.txt`: RV sdcard inventory used to avoid missing-testcase blind scouts. Presence in both libc trees is discovery-only, not promotion evidence.
+- `raw/target-stable400-statx-tail-rv-001-summary.txt`: RV `statx04`-`statx12` PASS 0 / FAIL 18, TBROK 14, TCONF 4; no timeout/ENOSYS/panic. No LA rerun and no promotion.

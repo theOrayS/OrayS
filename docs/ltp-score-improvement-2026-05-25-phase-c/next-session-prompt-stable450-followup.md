@@ -38,6 +38,8 @@
 - 任何标记为 `invalid-concurrent` 的日志都不是证据；不要用于 promotion。
 - `lseek03,lseek04,lseek05,lseek06,lseek08,lseek09,lseek10,lseek11`: `raw/target-stable400-lseek-neighbors-rv-002-summary.txt` 为 RV PASS 0 / FAIL 16；`lseek03/04/05/06/08/09/10` 缺测试二进制，`lseek11` 是 SEEK_DATA/HOLE TCONF+ENOSYS。不要 promotion。
 - FD/fcntl after-FIFO scout 曾因重复 QEMU/build 进程被 invalidated 并清理；不是证据，后续如要复核必须单路唯一日志名重跑。
+- RV sdcard inventory 已生成：`raw/sdcard-rv-musl-ltp-bin-list.txt`, `raw/sdcard-rv-glibc-ltp-bin-list.txt`, `raw/sdcard-rv-common-not-stable-ltp-bins.txt`；用于避免缺二进制盲跑，但不是 promotion 证据。
+- `statx04`-`statx12`: `raw/target-stable400-statx-tail-rv-001-summary.txt` 为 RV PASS 0 / FAIL 18，TBROK 14、TCONF 4；主要 blocker 是 ENOSPC device acquisition、缺 `mkfs.ext4`/`exportfs`、kernel config parsing。不要 promotion。
 
 目标：
 
