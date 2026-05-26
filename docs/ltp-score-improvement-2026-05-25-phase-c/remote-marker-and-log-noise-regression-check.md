@@ -53,3 +53,14 @@ Stable381 preserves the original `axfs::fops` high-frequency warning fix: `axfs:
 | LA accepted stable382 aggregate | 0 | 22 | 0 | 0 | 0 | PASS 764 / FAIL 0; `ltp-musl` 382/0; `ltp-glibc` 382/0; known `read02` TCONF only |
 
 Stable382 preserves the original `axfs::fops` high-frequency warning fix: `axfs::fops:297` warning count remains 0 on both architectures. The remaining 22 `AxError::NotADirectory` entries per architecture are the already-disclosed `axfs_ramfs::file:69` family, not the fixed `fops.rs:297` remote-output flood. Marker prefix bad lines remain 0.
+
+## User stop-state check: stable383 / RV superset (2026-05-26)
+
+After the user requested stopping the campaign, completed logs were checked rather than continuing QEMU work:
+
+| Log | Marker prefix bad lines | `axfs::fops:297 [AxError::NotADirectory]` | `AxError::NotADirectory` total | `AxError::IsADirectory` | `AxError::AlreadyExists` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `raw/stable383-la-gate-001.log` | 0 | 0 | 22 | 0 | 0 |
+| `raw/stable384-rv-gate-001.log` | 0 | 0 | 22 | 0 | 0 |
+
+The original remote-output risk source, `axfs::fops:297 [AxError::NotADirectory]`, stayed at 0 in these completed logs. Residual `NotADirectory` noise remains visible and should not be described as fully eliminated.

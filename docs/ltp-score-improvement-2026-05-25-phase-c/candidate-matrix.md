@@ -113,3 +113,13 @@ A new RV statx-tail scout for `statx04`-`statx12` produced PASS 0 / FAIL 18; TBR
 3. Do not spend more promotion time on `readlinkat02` syscall-body changes: fresh diagnostic shows LA-musl passes `bufsiz=1` into the syscall for the zero-size testcase while LA-glibc passes `0`. Avoid `pipe02`, lseek-neighbor missing/SEEK_DATA blockers, wave2 metadata/path blockers, time/signal/wait blockers, FD/fcntl record-lock/FIFO blockers, and FS/path link/unlink/stat blockers in broad batches until fixed.
 4. After every blocker fix: run targeted RV+LA x musl+glibc matrix, then promote in small clean batches, then aggregate stable gate.
 5. Preserve marker-prefix and remote log-size guardrails after every logging or runner change, and continue disclosing the known `read02` TCONF pair plus any inherited raw timeout notices separately from promoted-case cleanliness.
+
+## User stop-state update: stable383 retained (2026-05-26)
+
+| Case/family | Fresh evidence | Result | Decision |
+| --- | --- | --- | --- |
+| `pipe08` | `raw/target-stable400-proc-vm-pipe-rv-001-summary.txt`; `raw/target-stable400-kill02-pipe08-la-001-summary.txt`; `raw/stable383-la-gate-001-summary.txt`; RV support from `raw/stable384-rv-gate-001-summary.txt` | Targeted RV+LA musl/glibc clean; LA exact stable383 aggregate clean; RV completed aggregate support is stable384 superset because exact stable383 RV rerun was user-stopped | Retained in live stable383 stop-state |
+| `kill02` | `raw/target-stable400-kill02-pipe08-la-001-summary.txt`; `raw/stable384-la-gate-001-summary.txt` | Targeted clean but LA aggregate `kill02` TBROK/setup timeout | Reject; do not promote without fresh aggregate-stable evidence |
+| `access04`, `chmod06`, `fchmod06` | `raw/target-stable400-access-chmod-rv-001-summary.txt` | RV TBROK from tmpfs mount setup EINVAL | Blocked |
+| `chmod07`, `fchmod02` | `raw/target-stable400-access-chmod-rv-001-summary.txt` | RV TBROK from `getgrnam(daemon)` setup | Blocked |
+| `waitid07/08/10`, `munmap01`, `mmap04/05`, `mprotect01/02`, `pipe07/15` | `raw/target-stable400-proc-vm-pipe-rv-001-summary.txt` | Real TFAIL/TBROK/wrapper failures | Blocked; no promotion |
