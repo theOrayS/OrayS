@@ -10,7 +10,7 @@ use linux_raw_sys::general;
 use std::sync::Arc;
 use std::vec::Vec;
 
-use super::fd_table::FdEntry;
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     AF_UNIX_DOMAIN, DEFAULT_SOCKET_BUFFER_SIZE, DEFAULT_TCP_MAXSEG,
     INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IP_RECVERR_OPT, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
@@ -982,7 +982,65 @@ pub(super) fn sys_connect_bridge(
     addr: usize,
     addrlen: usize,
 ) -> isize {
+    match is_local_socket_fd(process, fd) {
+        Ok(true) => return sys_connect_local_socket(process, addr, addrlen),
+        Ok(false) => {}
+        Err(err) => return neg_errno(err),
+    }
     socket_addr_call(process, fd, addr, addrlen, arceos_posix_api::sys_connect)
+}
+
+fn sys_connect_local_socket(process: &UserProcess, addr: usize, addrlen: usize) -> isize {
+    if addr == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let family_len = size_of::<posix_ctypes::sa_family_t>();
+    if addrlen < family_len {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_user_read(process, addr, addrlen) {
+        return neg_errno(err);
+    }
+    let bytes = match read_user_bytes(process, addr, addrlen.min(MAX_USER_IO_CHUNK)) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    let family = posix_ctypes::sa_family_t::from_ne_bytes(
+        bytes[..family_len]
+            .try_into()
+            .unwrap_or([0; size_of::<posix_ctypes::sa_family_t>()]),
+    );
+    if family as i32 != AF_UNIX_DOMAIN {
+        return neg_errno_code(LINUX_EAFNOSUPPORT);
+    }
+    let path_bytes = &bytes[family_len..];
+    let Some(&first) = path_bytes.first() else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    if first == 0 {
+        return neg_errno(LinuxError::ECONNREFUSED);
+    }
+    let path_len = path_bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(path_bytes.len());
+    let path = match core::str::from_utf8(&path_bytes[..path_len]) {
+        Ok(path) if !path.is_empty() => path,
+        _ => return neg_errno(LinuxError::EINVAL),
+    };
+    let resolved_path = {
+        let table = process.fds.lock();
+        match resolve_dirfd_path(process, &table, general::AT_FDCWD, path) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    match axfs::api::metadata(resolved_path.as_str()) {
+        // No pathname AF_UNIX listener registry exists yet. Linux reports
+        // ECONNREFUSED when the socket fd is valid but no peer is listening.
+        Ok(_) => neg_errno(LinuxError::ECONNREFUSED),
+        Err(_) => neg_errno(LinuxError::ENOENT),
+    }
 }
 
 pub(super) fn sys_sendto_bridge(

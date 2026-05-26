@@ -32,4 +32,14 @@ LA stable379 raw log contains two inherited LTP internal `Test timeouted, sendin
 
 ## Decision
 
-The log-noise repair is accepted as a first-stage output-volume fix and stable379 partial promotion evidence is accepted. Stable400/stable425/stable450 still require more fresh clean candidates and serial aggregate gates.
+The log-noise repair is accepted as a first-stage output-volume fix and stable381 partial promotion evidence is accepted. Stable400/stable425/stable450 still require more fresh clean candidates and serial aggregate gates.
+
+
+## Stable381 update
+
+| Evidence | fops NotADirectory | any NotADirectory | any IsADirectory | AlreadyExists | marker bad prefix | LTP semantic status |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| RV accepted stable381 aggregate | 0 | 22 | 0 | 0 | 0 | PASS 762 / FAIL 0; `ltp-musl` 381/0; `ltp-glibc` 381/0; known `read02` TCONF only |
+| LA accepted stable381 aggregate | 0 | 22 | 0 | 0 | 0 | PASS 762 / FAIL 0; `ltp-musl` 381/0; `ltp-glibc` 381/0; known `read02` TCONF only |
+
+Stable381 preserves the original `axfs::fops` high-frequency warning fix: `axfs::fops` warning count remains 0 on both architectures. The remaining 22 `AxError::NotADirectory` entries per architecture are the already-disclosed `axfs_ramfs::file:69` family, not the fixed `fops.rs:297` remote-output flood.

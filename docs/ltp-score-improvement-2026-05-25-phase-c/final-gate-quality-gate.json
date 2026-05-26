@@ -1,14 +1,14 @@
 {
-  "status": "partial_stable379_promoted_stable450_not_delivered",
+  "status": "partial_stable381_promoted_stable450_not_delivered",
   "date": "2026-05-26",
   "target": "stable450",
-  "highest_trusted_stable": 379,
+  "highest_trusted_stable": 381,
   "live_stable_cases": {
-    "total": 379,
-    "unique": 379,
+    "total": 381,
+    "unique": 381,
     "duplicates": 0
   },
-  "stable379_delivered": true,
+  "stable381_delivered": true,
   "stable400_delivered": false,
   "stable425_delivered": false,
   "stable450_delivered": false,
@@ -16,54 +16,84 @@
     "clock_settime01",
     "clock_settime02",
     "clone03",
-    "confstr01"
+    "confstr01",
+    "chmod05",
+    "fchmod05"
+  ],
+  "new_in_stable381": [
+    "chmod05",
+    "fchmod05"
   ],
   "rv_gate": {
-    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-002.log",
-    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-rv-gate-002-summary.txt",
-    "pass_ltp_case": 758,
+    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable381-rv-gate-001.log",
+    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable381-rv-gate-001-summary.txt",
+    "pass_ltp_case": 762,
     "fail_ltp_case": 0,
-    "ltp_musl": "379/0",
-    "ltp_glibc": "379/0",
-    "internal": { "TFAIL": 0, "TBROK": 0, "TCONF": 4 },
+    "ltp_musl": "381/0",
+    "ltp_glibc": "381/0",
+    "internal": {
+      "TFAIL": 0,
+      "TBROK": 0,
+      "TCONF": 4
+    },
     "known_tconf_only": "read02 pass_with_tconf in musl+glibc",
     "parser_timeout_matches": 0,
     "enosys": 0,
     "panic_trap": 0,
-    "marker_count": 758,
+    "marker_count": 762,
     "bad_marker_prefix": 0,
     "noise_counts": {
       "AxError::NotADirectory": 22,
       "AxError::IsADirectory": 0,
       "AxError::AlreadyExists": 0,
       "axfs::fops": 0,
-      "axfs_ramfs::file:69": 22
+      "axfs_ramfs::file:69": 22,
+      "Test timeouted, sending SIGKILL!": 0
     }
   },
   "la_gate": {
-    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-la-gate-001.log",
-    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable379-la-gate-001-summary.txt",
-    "pass_ltp_case": 758,
+    "log": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable381-la-gate-001.log",
+    "summary": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable381-la-gate-001-summary.txt",
+    "pass_ltp_case": 762,
     "fail_ltp_case": 0,
-    "ltp_musl": "379/0",
-    "ltp_glibc": "379/0",
-    "internal": { "TFAIL": 0, "TBROK": 0, "TCONF": 4 },
+    "ltp_musl": "381/0",
+    "ltp_glibc": "381/0",
+    "internal": {
+      "TFAIL": 0,
+      "TBROK": 0,
+      "TCONF": 4
+    },
     "known_tconf_only": "read02 pass_with_tconf in musl+glibc",
     "parser_timeout_matches": 0,
     "enosys": 0,
     "panic_trap": 0,
-    "marker_count": 758,
+    "marker_count": 762,
     "bad_marker_prefix": 0,
-    "raw_internal_timeouted_notice_count": 2,
-    "raw_internal_timeouted_notice_note": "Two inherited LTP internal notices in pre-existing waitpid10/pipe13 paths; no wrapper timeout and not from newly promoted cases.",
+    "raw_internal_timeouted_notice_count": 1,
+    "raw_internal_timeouted_notice_note": "Inherited LTP internal notice in a pre-existing long-running path; no wrapper timeout and not from newly promoted chmod/fchmod cases.",
     "noise_counts": {
       "AxError::NotADirectory": 22,
       "AxError::IsADirectory": 0,
       "AxError::AlreadyExists": 0,
       "axfs::fops": 0,
-      "axfs_ramfs::file:69": 22
+      "axfs_ramfs::file:69": 22,
+      "Test timeouted, sending SIGKILL!": 1
     }
   },
   "known_transparent_tconf": "read02 O_DIRECT on tmpfs remains transparent and disclosed.",
-  "policy": "Do not claim stable400/stable425/stable450; stable379 is the highest trusted partial promotion. Timeout/ENOSYS/panic/trap are not accepted for new promotions."
+  "policy": "Do not claim stable400/stable425/stable450; stable381 is the highest trusted partial promotion. Timeout/ENOSYS/panic/trap are not accepted for new promotions.",
+  "aiSlopCleaner": {
+    "status": "passed",
+    "evidence": "docs/ltp-score-improvement-2026-05-25-phase-c/final-gate-ai-slop-cleaner-report.md"
+  },
+  "codeReview": {
+    "recommendation": "COMMENT",
+    "architectStatus": "WATCH",
+    "evidence": "docs/ltp-score-improvement-2026-05-25-phase-c/final-gate-code-review-report.md",
+    "blockers": "none after errno/path-resolution fix; partial AF_UNIX support remains watchlisted"
+  },
+  "post_review_targeted_verification": {
+    "rv": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-chmod-fchmod-rv-002-summary.txt: PASS 4 / FAIL 0",
+    "la": "docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-chmod-fchmod-la-002-summary.txt: PASS 4 / FAIL 0"
+  }
 }
