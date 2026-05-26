@@ -14,6 +14,7 @@
 2. [`build-and-eval.md`](build-and-eval.md)：在修改评测相关代码前，先理解本地 QEMU 评测和远程提交构建的区别。
 3. [`ltp-workflow.md`](ltp-workflow.md)：按照诚实的 LTP 选例、targeted 运行、日志解析和推广流程开展工作。
 4. [`validation-matrix.md`](validation-matrix.md)：根据修改类型选择最小但足够的验证命令。
+5. [`logs/README.md`](logs/README.md)：阅读此前评测/LTP 日志的开发者索引和当前 stop-state。
 
 ## 核心开发原则
 
