@@ -56,6 +56,7 @@ Attempt 3 initially accepted no new cases; after a follow-up AF_UNIX group-looku
 | Time/signal/wait batch | `raw/target-stable400-timesignal-rv-serial-001-summary.txt` | RV musl PASS 1 / FAIL 10; TFAIL 22; TCONF 2; TBROK 1; timeout 3; scout stopped after blockers, so glibc incomplete | Negative/aborted scout only; no promotion |
 | FD/fcntl batch | `raw/target-stable400-fd-rv-serial-001-summary.txt` | RV musl+glibc PASS 0 / FAIL 16; TBROK 10; TFAIL 900; ENOSYS 6 | Negative scout only; needs FIFO/syscall and fcntl record-lock semantics work |
 | FS/path batch | `raw/target-stable400-fspath-rv-serial-001-summary.txt` | RV musl+glibc PASS 0 / FAIL 16; TFAIL 26; TBROK 3; ENOSYS 4 | Negative scout only; needs link/unlink syscall and metadata/path semantics work |
+| `lseek03`-`lseek11` neighbors | FD/lseek path | `raw/target-stable400-lseek-neighbors-rv-002-summary.txt` | RV PASS 0 / FAIL 16; `lseek03/04/05/06/08/09/10` missing test binaries; `lseek11` TCONF+ENOSYS for SEEK_DATA/SEEK_HOLE | Negative scout only; no LA run and no promotion |
 
 Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were explicitly invalidated and are not promotion evidence.
 
@@ -74,6 +75,18 @@ Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were ex
 
 Current highest trusted live baseline is stable382 total / 382 unique / 0 duplicates. Stable400 remains 18 clean cases away; stable450 remains 68 clean cases away.
 
+
+## Attempt 4 scout update (2026-05-26)
+
+A post-stable382 lseek-neighbor scout found no promotable cases. Evidence: `stable400-attempt4-scout-report.md` and `raw/target-stable400-lseek-neighbors-rv-002-summary.txt`.
+
+| Case/family | Fresh evidence | Result | Decision |
+| --- | --- | --- | --- |
+| `lseek03`, `lseek04`, `lseek05`, `lseek06`, `lseek08`, `lseek09`, `lseek10` | `raw/target-stable400-lseek-neighbors-rv-002-summary.txt` | RV musl+glibc wrapper FAIL `-1`; testcase binaries missing from `/musl` and `/glibc` sdcard paths | Do not promote; not available in current test image |
+| `lseek11` | `raw/target-stable400-lseek-neighbors-rv-002-summary.txt` | RV musl+glibc wrapper FAIL 32; TCONF on SEEK_DATA/SEEK_HOLE; ENOSYS/not implemented matches 2 | Do not promote without real SEEK_DATA/SEEK_HOLE semantics and four-way clean evidence |
+
+The accidental duplicate FD/fcntl scout launch was terminated and invalidated; no FD/fcntl result from that duplicate attempt is promotion evidence.
+
 ## B. Not-yet-run cases worth adding to self-test
 
 | Priority | Family/cases | Source/yield signal | Related subsystem | Rationale | Cost/risk |
@@ -88,6 +101,6 @@ Current highest trusted live baseline is stable382 total / 382 unique / 0 duplic
 
 1. Treat stable382 as the current live accepted baseline for the next campaign; stable450 remains 68 cases away.
 2. Do not count the aborted `stable379-rv-gate-001` as accepted evidence. Keep its `ftest03` timeout documented, but prefer the accepted `stable379-rv-gate-002` / `stable379-la-gate-001` summaries plus the single-case `ftest03` retry summaries for current state.
-3. Do not spend more promotion time on `readlinkat02` syscall-body changes: fresh diagnostic shows LA-musl passes `bufsiz=1` into the syscall for the zero-size testcase while LA-glibc passes `0`. Avoid `pipe02`, wave2 metadata/path blockers, time/signal/wait blockers, FD/fcntl record-lock/FIFO blockers, and FS/path link/unlink/stat blockers in broad batches until fixed.
+3. Do not spend more promotion time on `readlinkat02` syscall-body changes: fresh diagnostic shows LA-musl passes `bufsiz=1` into the syscall for the zero-size testcase while LA-glibc passes `0`. Avoid `pipe02`, lseek-neighbor missing/SEEK_DATA blockers, wave2 metadata/path blockers, time/signal/wait blockers, FD/fcntl record-lock/FIFO blockers, and FS/path link/unlink/stat blockers in broad batches until fixed.
 4. After every blocker fix: run targeted RV+LA x musl+glibc matrix, then promote in small clean batches, then aggregate stable gate.
 5. Preserve marker-prefix and remote log-size guardrails after every logging or runner change, and continue disclosing the known `read02` TCONF pair plus any inherited raw timeout notices separately from promoted-case cleanliness.
