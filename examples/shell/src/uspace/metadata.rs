@@ -13,9 +13,9 @@ use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
     FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FILE, ST_MODE_LNK,
-    ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC, neg_errno,
-    neg_errno_code,
+    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
+    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
+    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -50,6 +50,20 @@ impl UserProcess {
 
     pub(super) fn path_mode(&self, path: &str) -> Option<u32> {
         self.path_modes.lock().get(path).copied()
+    }
+
+    pub(super) fn set_path_special_mode(&self, path: String, ty: u32) {
+        self.path_special_modes
+            .lock()
+            .insert(path, ty & ST_MODE_TYPE_MASK);
+    }
+
+    pub(super) fn remove_path_special_mode(&self, path: &str) {
+        self.path_special_modes.lock().remove(path);
+    }
+
+    pub(super) fn path_special_mode(&self, path: &str) -> Option<u32> {
+        self.path_special_modes.lock().get(path).copied()
     }
 
     pub(super) fn apply_umask(&self, mode: u32) -> u32 {
@@ -146,6 +160,9 @@ pub(super) fn apply_recorded_path_metadata(
     path: &str,
     mut st: general::stat,
 ) -> general::stat {
+    if let Some(ty) = process.path_special_mode(path) {
+        st.st_mode = (st.st_mode & !ST_MODE_TYPE_MASK) | ty;
+    }
     if let Some(mode) = process.path_mode(path) {
         st.st_mode = (st.st_mode & !FILE_MODE_PERMISSION_MASK) | mode;
     }
@@ -721,6 +738,8 @@ pub(super) fn file_type_mode(ty: FileType) -> u32 {
     match ty {
         FileType::Dir => ST_MODE_DIR,
         FileType::CharDevice => ST_MODE_CHR,
+        FileType::Fifo => ST_MODE_FIFO,
+        FileType::Socket => ST_MODE_SOCKET,
         _ => ST_MODE_FILE,
     }
 }

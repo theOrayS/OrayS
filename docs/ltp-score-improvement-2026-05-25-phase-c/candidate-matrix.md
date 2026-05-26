@@ -2,7 +2,7 @@
 
 Date: 2026-05-26
 Team: `ltp-stable375-to-stab-eae749f6`
-Status: stable381 partial promotion accepted; stable400/stable425/stable450 remain undelivered because only six new cases have fresh targeted plus RV/LA aggregate-clean evidence.
+Status: stable382 partial promotion accepted; stable400/stable425/stable450 remain undelivered because only seven new cases have fresh targeted plus RV/LA aggregate-clean evidence.
 
 ## A. Current gap summary
 
@@ -11,6 +11,7 @@ Status: stable381 partial promotion accepted; stable400/stable425/stable450 rema
 | Live baseline before phase-c edits | 375 | 375 | 0 | 75 | `stable375-live-baseline.txt`; phase-b final gate summaries |
 | Live accepted baseline after phase-c retry | 379 | 379 | 0 | 71 | `examples/shell/src/cmd.rs::LTP_STABLE_CASES`; `raw/stable379-rv-gate-002-summary.txt`; `raw/stable379-la-gate-001-summary.txt` |
 | Live accepted baseline after AF_UNIX group-lookup repair | 381 | 381 | 0 | 69 | `examples/shell/src/cmd.rs::LTP_STABLE_CASES`; `raw/stable381-rv-gate-001-summary.txt`; `raw/stable381-la-gate-001-summary.txt` |
+| Live accepted baseline after `mknodat`/FIFO repair for `lseek02` | 382 | 382 | 0 | 68 | `examples/shell/src/cmd.rs::LTP_STABLE_CASES`; `raw/stable382-rv-gate-001-summary.txt`; `raw/stable382-la-gate-001-summary.txt` |
 
 Subsystem focus remains contest ROI: VFS/path/permissions, FD/pipe/iovec, process/wait/signal, mmap/VM, and light fs-suite substitutes. No low-ROI fake or broad subsystem promotion was accepted.
 
@@ -26,6 +27,7 @@ These cases passed targeted RV+LA x musl+glibc cleanly with no internal TFAIL/TB
 | `confstr01` | libc/sysconf compatibility surface | same as above | same as above | Promoted in stable379 |
 | `chmod05` | permissions / musl group lookup via AF_UNIX nscd probe | `raw/target-stable400-chmod-fchmod-rv-001-summary.txt`: PASS 4/FAIL 0 for pair; aggregate RV stable381 accepted | `raw/target-stable400-chmod-fchmod-la-001-summary.txt`: PASS 4/FAIL 0 for pair; aggregate LA stable381 accepted | Promoted in stable381 |
 | `fchmod05` | FD permissions / musl group lookup via AF_UNIX nscd probe | same as above | same as above | Promoted in stable381 |
+| `lseek02` | FD/FIFO/lseek negative path | `raw/target-stable400-lseek02-rv-002-summary.txt`: PASS 2/FAIL 0; aggregate RV stable382 accepted | `raw/target-stable400-lseek02-la-001-summary.txt`: PASS 2/FAIL 0; aggregate LA stable382 accepted | Promoted in stable382 |
 
 ## Rejected or blocked candidates from fresh phase-c scouts
 
@@ -65,6 +67,13 @@ Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were ex
 - Worker 4 kept `kill02`/`waitid07`/`waitid08`/`waitid10` out of promotion because aggregate/four-way risk remains.
 - Worker 5 found mmap/fs-suite substitutes useful for future work but not clean enough for immediate stable450 promotion.
 
+
+## Stable382 update (2026-05-26)
+
+`lseek02` was promoted after a real `mknodat`/FIFO compatibility repair. The initial RV targeted run failed because `mkfifo()` returned ENOSYS; after adding minimal `mknodat` dispatch plus recorded `S_IFIFO` path metadata and pipe-backed non-seekable FIFO opens, RV and LA targeted runs passed cleanly and both stable382 aggregate gates passed. Evidence: `stable382-promotion-gate-report.md`, `raw/target-stable400-lseek02-rv-002-summary.txt`, `raw/target-stable400-lseek02-la-001-summary.txt`, `raw/stable382-rv-gate-001-summary.txt`, `raw/stable382-la-gate-001-summary.txt`.
+
+Current highest trusted live baseline is stable382 total / 382 unique / 0 duplicates. Stable400 remains 18 clean cases away; stable450 remains 68 clean cases away.
+
 ## B. Not-yet-run cases worth adding to self-test
 
 | Priority | Family/cases | Source/yield signal | Related subsystem | Rationale | Cost/risk |
@@ -77,7 +86,7 @@ Guardrail: accidental concurrent-QEMU logs from an earlier wave3 attempt were ex
 
 ## C. Next minimal execution plan
 
-1. Treat stable381 as the current live accepted baseline for the next campaign; stable450 remains 69 cases away.
+1. Treat stable382 as the current live accepted baseline for the next campaign; stable450 remains 68 cases away.
 2. Do not count the aborted `stable379-rv-gate-001` as accepted evidence. Keep its `ftest03` timeout documented, but prefer the accepted `stable379-rv-gate-002` / `stable379-la-gate-001` summaries plus the single-case `ftest03` retry summaries for current state.
 3. Do not spend more promotion time on `readlinkat02` syscall-body changes: fresh diagnostic shows LA-musl passes `bufsiz=1` into the syscall for the zero-size testcase while LA-glibc passes `0`. Avoid `pipe02`, wave2 metadata/path blockers, time/signal/wait blockers, FD/fcntl record-lock/FIFO blockers, and FS/path link/unlink/stat blockers in broad batches until fixed.
 4. After every blocker fix: run targeted RV+LA x musl+glibc matrix, then promote in small clean batches, then aggregate stable gate.
