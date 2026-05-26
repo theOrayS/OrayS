@@ -1,253 +1,281 @@
-# ArceOS
+# OSKernel 2026 ArceOS Evaluation Branch
 
-[![CI](https://github.com/arceos-org/arceos/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/arceos-org/arceos/actions/workflows/build.yml)
-[![CI](https://github.com/arceos-org/arceos/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/arceos-org/arceos/actions/workflows/test.yml)
-[![Docs](https://img.shields.io/badge/docs-pages-green)](https://arceos-org.github.io/arceos/)
+This repository is an ArceOS-based experimental modular OS/unikernel, adapted
+for the OSKernel 2026 evaluation flow.  It keeps the upstream ArceOS workspace
+structure, but the maintained branch is focused on bootable evaluator kernels,
+Linux/POSIX compatibility in the shell/user-space path, and honest LTP result
+reporting for both local QEMU validation and remote submission builds.
 
-An experimental modular operating system (or unikernel) written in Rust.
+The current working branch is the single maintained source tree for both modes:
 
-ArceOS was inspired a lot by [Unikraft](https://github.com/unikraft/unikraft).
+- **Local validation:** `./run-eval.sh rv` and `./run-eval.sh la` run the
+  RISC-V and LoongArch QEMU evaluator paths against local sdcard images.
+- **Remote submission build:** `make all` builds the root-level `kernel-rv` and
+  `kernel-la` artifacts expected by the remote evaluator.  The LoongArch
+  submission build uses `configs/remote-eval/axplat-loongarch64-qemu-virt.toml`
+  so its address map matches the remote environment.
+- **Offline-friendly dependencies:** helper shims under `scripts/` and
+  `tools/bin/`, the non-hidden `cargo-home/`, and `vendor/cargo-vendor.tar.gz`
+  keep submission builds from depending on network access.
 
-🚧 Working In Progress.
+ArceOS itself was inspired by [Unikraft](https://github.com/unikraft/unikraft).
+This branch is still experimental and under active compatibility work.
 
-## Features & TODOs
+## Current feature focus
 
-* [x] Architecture: x86_64, riscv64, aarch64, loongarch64
-* [x] Platform: QEMU pc-q35 (x86_64), virt (riscv64/aarch64/loongarch64)
-* [x] Multi-thread
-* [x] FIFO/RR/CFS scheduler
-* [x] VirtIO net/blk/gpu drivers
-* [x] TCP/UDP net stack using [smoltcp](https://github.com/smoltcp-rs/smoltcp)
-* [x] Synchronization/Mutex
-* [x] SMP scheduling with [per-cpu run queue](https://github.com/arceos-org/arceos/discussions/181)
-* [x] File system
-* [ ] Compatible with Linux apps
-* [ ] Interrupt driven device I/O
-* [ ] Async I/O
+- Architectures: `x86_64`, `riscv64`, `aarch64`, `loongarch64`.
+- QEMU platforms: pc-q35 for x86_64 and virt platforms for
+  RISC-V/AArch64/LoongArch.
+- Kernel subsystems: multitasking, FIFO/RR/CFS schedulers, SMP scheduling,
+  VirtIO block/network/display, file systems, and a smoltcp-based TCP/UDP stack.
+- User-space boundary: `api/arceos_posix_api` plus `examples/shell` provide the
+  POSIX/Linux-facing evaluator integration, ELF loading, process lifecycle,
+  file descriptors, signals, futexes, memory mapping, and syscall dispatch.
+- Evaluator harness: `examples/shell` can auto-run official groups and LTP cases
+  from the mounted test images.
+- LTP stable set: `examples/shell/src/cmd.rs::LTP_STABLE_CASES` currently lists
+  383 unique cases.  The runner executes the selected list for both `/musl` and
+  `/glibc`, so the stable default is 766 LTP case executions per architecture.
 
-## Quick Start
+## Repository layout
 
-### Build and Run through Docker
+| Path | Purpose |
+| --- | --- |
+| `kernel/` | Core ArceOS runtime, HAL, memory, tasking, drivers, fs, net, sync, and SMP modules. |
+| `api/arceos_posix_api/` | Linux/POSIX ABI-facing syscall and user-space integration layer. |
+| `ulib/` | User libraries, including `axstd` and `axlibc`. |
+| `examples/shell/` | Interactive shell and OSKernel evaluator integration point. |
+| `configs/` | Default, platform, custom, and remote-evaluator platform configs. |
+| `scripts/` | Build helper shims, QEMU/build make fragments, and LTP summary tools. |
+| `tools/bin/` | Repo-provided helper executables preferred by offline/submission builds. |
+| `cargo-home/` | Non-hidden Cargo home for vendored/offline source replacement. |
+| `vendor/` | Local crate patches and `cargo-vendor.tar.gz` restore archive. |
+| `docs/` | Local compatibility notes, remote/local eval unification evidence, LTP plans, raw summaries, and final gates. |
+| `eval-reports/` | Archived evaluator result bundles, when present. |
+| `doc/` | Upstream-style ArceOS documentation and platform notes. |
 
-Install [Docker](https://www.docker.com/) in your system. The provided image
-contains the Rust toolchain selected by `rust-toolchain.toml`, the ArceOS cargo
-helpers, the QEMU targets used by this repository, and the musl cross toolchains
-used when C user apps need to be rebuilt.
+Generated/local artifacts such as `kernel-rv`, `kernel-la`, `sdcard-*.img`,
+`disk*.img`, `output*.md`, `*.log`, `build/`, and `target/` may exist in a
+working checkout.  They are not source-of-truth files unless a task explicitly
+asks to preserve generated evidence.
 
-Build the image with the provided Dockerfile:
+## Prerequisites
 
-```bash
-docker build -t arceos -f Dockerfile .
-```
+The Rust toolchain is pinned by `rust-toolchain.toml`:
 
-Create a container and build/run apps:
+- channel: `nightly-2025-05-20`
+- components: `rust-src`, `llvm-tools`, `rustfmt`, `clippy`
+- targets: `x86_64-unknown-none`, `riscv64gc-unknown-none-elf`,
+  `aarch64-unknown-none-softfloat`, `loongarch64-unknown-none-softfloat`
 
-```bash
-docker run --rm -it -v $(pwd):/arceos -w /arceos arceos bash
-
-# Now build/run app in the container
-make A=examples/helloworld ARCH=aarch64 run
-```
-
-If evaluator images and `run-eval.sh` are provided in the repository directory,
-they can also be used inside the container. For local validation that must avoid
-Docker, use the direct-server instructions below.
-
-### Manually Build and Run
-
-#### 1. Install Build Dependencies
-
-Install the host packages needed to build and run ArceOS directly on
-Debian/Ubuntu:
+On Debian/Ubuntu, install the host packages needed for direct builds and QEMU
+runs:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential make git wget ca-certificates \
-    python3 python3-venv pkg-config libclang-dev qemu-system
+    python3 python3-venv pkg-config libclang-dev qemu-system qemu-utils
 ```
 
-The repository pins the Rust toolchain in `rust-toolchain.toml`
-(`nightly-2025-05-20` with `rust-src`, `llvm-tools`, `rustfmt`, and `clippy`).
-With `rustup` installed, entering the repository or invoking `cargo`/`make`
-will use that pinned toolchain and its configured targets.
-
-Install [cargo-binutils](https://github.com/rust-embedded/cargo-binutils) to use
-`rust-objcopy` and `rust-objdump` tools, [axconfig-gen](https://github.com/arceos-org/axconfig-gen)
-for kernel configuration, and [cargo-axplat](https://github.com/arceos-org/axplat_crates/tree/dev/cargo-axplat)
-for platform configuration:
+The Makefile prefers repository helper shims before user-installed tools, but a
+normal development host can also install the upstream Cargo helpers:
 
 ```bash
 cargo install cargo-binutils axconfig-gen cargo-axplat
 ```
 
-##### Dependencies for running apps
+C examples and libc-oriented rebuilds need the appropriate musl cross toolchains
+for the target architecture.  See the upstream toolchain notes in this file's
+history or the contest environment setup if you need to rebuild C user apps.
+
+## Quick start
+
+### Build remote-submission kernels
+
+The default target is `all`, which builds both evaluator artifacts:
 
 ```bash
-# for Debian/Ubuntu
-sudo apt-get install qemu-system
-# for macos
-brew install qemu
+make all
+# outputs:
+#   ./kernel-rv
+#   ./kernel-la
 ```
 
-The supplied RV/LA evaluator path has been validated on a direct server with
-QEMU available as `qemu-system-riscv64` and `qemu-system-loongarch64`. When the
-two evaluator images and `run-eval.sh` are present in the repository directory,
-run:
+Equivalent per-architecture targets are available:
+
+```bash
+make kernel-rv
+make kernel-la
+```
+
+`kernel-rv` is wrapped from the RISC-V binary through
+`scripts/make/riscv64-kernel-wrap.lds`; `kernel-la` is copied from the
+LoongArch ELF output.  `make all` intentionally uses the remote LoongArch
+platform config, while local `kernel-la`/`run-la` keep the package default
+LoongArch config unless you override `PLAT_CONFIG`.
+
+### Run local evaluator images
+
+Place or point to the evaluator sdcard images, then run:
 
 ```bash
 ./run-eval.sh rv
 ./run-eval.sh la
 ```
 
-##### Dependencies for building C apps (optional)
-
-Install `libclang-dev` if it was not installed with the host packages above:
+By default the script looks for `sdcard-rv.img` and `sdcard-la.img` in the
+repository root.  You can override paths with:
 
 ```bash
-sudo apt install libclang-dev
+RV_TESTSUITE_IMG=/path/to/sdcard-rv.img ./run-eval.sh rv
+LA_TESTSUITE_IMG=/path/to/sdcard-la.img ./run-eval.sh la
 ```
 
-Download & install [musl](https://musl.cc) toolchains:
+The script checks for `cargo`, `qemu-img`, and the matching QEMU system binary
+before launching the run.
+
+### Run QEMU targets directly
 
 ```bash
-# download
-wget https://musl.cc/aarch64-linux-musl-cross.tgz
-wget https://musl.cc/riscv64-linux-musl-cross.tgz
-wget https://musl.cc/x86_64-linux-musl-cross.tgz
-wget https://github.com/LoongsonLab/oscomp-toolchains-for-oskernel/releases/download/loongarch64-linux-musl-cross-gcc-13.2.0/loongarch64-linux-musl-cross.tgz
-# install
-tar zxf aarch64-linux-musl-cross.tgz
-tar zxf riscv64-linux-musl-cross.tgz
-tar zxf x86_64-linux-musl-cross.tgz
-tar zxf loongarch64-linux-musl-cross.tgz
-# exec below command in bash OR add below info in ~/.bashrc
-export PATH=`pwd`/x86_64-linux-musl-cross/bin:`pwd`/aarch64-linux-musl-cross/bin:`pwd`/riscv64-linux-musl-cross/bin:`pwd`/loongarch64-linux-musl-cross/bin:$PATH
+make run-rv ARCH=riscv64
+make run-la ARCH=loongarch64
 ```
 
-Other systems and arch please refer to [Qemu Download](https://www.qemu.org/download/#linux)
+The direct targets build `kernel-rv`/`kernel-la`, create temporary qcow2 overlays
+under `/tmp`, and boot QEMU with the mounted evaluator image.  Avoid running RV
+or LA evaluator QEMU jobs in parallel unless their run-image paths are isolated.
 
-#### 2. Build & Run
-
-```bash
-# build app in arceos directory
-make A=path/to/app ARCH=<arch> LOG=<log>
-```
-
-Where `path/to/app` is the relative path to the application. Examples applications can be found in the [examples](examples/) directory or the [arceos-apps](https://github.com/arceos-org/arceos-apps) repository.
-
-`<arch>` should be one of `riscv64`, `aarch64`, `x86_64`, `loongarch64`.
-
-`<log>` should be one of `off`, `error`, `warn`, `info`, `debug`, `trace`.
-
-More arguments and targets can be found in [Makefile](Makefile).
-
-For example, to run the [httpserver](examples/httpserver/) on `qemu-system-aarch64` with 4 cores and log level `info`:
+### Build or run a normal ArceOS app
 
 ```bash
+make A=examples/helloworld ARCH=riscv64 run
 make A=examples/httpserver ARCH=aarch64 LOG=info SMP=4 run NET=y
+make A=examples/shell ARCH=riscv64 build
 ```
 
-Note that the `NET=y` argument is required to enable the network device in QEMU. These arguments (`BLK`, `GRAPHIC`, etc.) only take effect at runtime not build time.
+`ARCH` must be one of `x86_64`, `riscv64`, `aarch64`, or `loongarch64`.
+Common Make variables include `A`/`APP`, `FEATURES`, `APP_FEATURES`, `LOG`,
+`SMP`, `MODE`, `PLAT_CONFIG`, `TARGET_DIR`, `BLK`, `NET`, `GRAPHIC`, `MEM`, and
+`DISK_IMG`.  QEMU flags such as `NET=y` or `BLK=y` affect runtime device
+configuration, not the Rust feature set by themselves.
 
-## How to write ArceOS apps
+## LTP and evaluator workflow
 
-You can write and build your custom applications outside the ArceOS source tree.
-Examples are given below and in the [app-helloworld](https://github.com/arceos-org/app-helloworld) and [arceos-apps](https://github.com/arceos-org/arceos-apps) repositories.
+The shell evaluator path is selected with `APP_FEATURES=auto-run-tests,uspace`
+by the kernel build targets.  LTP execution is controlled in
+`examples/shell/src/cmd.rs`:
 
-### Rust
+- `LTP_CORE_CASES` is the small smoke set.
+- `LTP_STABLE_CASES` is the current high-confidence contest set.
+- `LTP_CASE_BATCHES` contains named targeted batches.
+- `/ltp_cases.txt` or `/tmp/ltp_cases.txt` inside the guest overrides the case
+  selection at runtime.
+- Build-time `LTP_CASES` can select `stable`, `core`, `batch:<name>`,
+  `file:<path>`, or an inline comma/space-separated case list.
+- `/ltp_case_timeout_secs` or build-time `LTP_CASE_TIMEOUT_SECS` can override
+  the default per-case timeout.
 
-1. Create a new rust package with `no_std` and `no_main` environment.
-2. Add `axstd` dependency and features to enable to `Cargo.toml`:
+The runner keeps the remote evaluator's wrapper wire format for completed LTP
+cases: `FAIL LTP CASE <case> : <status>`, where status `0` is a wrapper-level
+pass and non-zero is a failure.  Internal LTP output (`TFAIL`, `TBROK`, `TCONF`),
+timeouts, ENOSYS, and panic/trap signals remain visible in the raw log.
 
-    ```toml
-    [dependencies]
-    axstd = { path = "/path/to/arceos/ulib/axstd", features = ["..."] }
-    # or use git repository:
-    # axstd = { git = "https://github.com/arceos-org/arceos.git", features = ["..."] }
-    ```
-
-3. Call library functions from `axstd` in your code, just like the Rust [std](https://doc.rust-lang.org/std/) library.
-
-    Remember to annotate the `main` function with `#[unsafe(no_mangle)]` (see this [example](examples/helloworld/src/main.rs)).
-
-4. Build your application with ArceOS, by running the `make` command in the application directory:
-
-    ```bash
-    # in app directory
-    make -C /path/to/arceos A=$(pwd) ARCH=<arch> run
-    # more args: LOG=<log> SMP=<smp> NET=[y|n] ...
-    ```
-
-    All arguments and targets are the same as above.
-
-### C
-
-1. Create `axbuild.mk` and `features.txt` in your project:
-
-    ```bash
-    app/
-    ├── foo.c
-    ├── bar.c
-    ├── axbuild.mk      # optional, if there is only one `main.c`
-    └── features.txt    # optional, if only use default features
-    ```
-
-2. Add build targets to `axbuild.mk`, add features to enable to `features.txt` (see this [example](examples/httpserver-c/)):
-
-    ```bash
-    # in axbuild.mk
-    app-objs := foo.o bar.o
-    ```
-
-    ```bash
-    # in features.txt
-    alloc
-    paging
-    net
-    ```
-
-3. Build your application with ArceOS, by running the `make` command in the application directory:
-
-    ```bash
-    # in app directory
-    make -C /path/to/arceos A=$(pwd) ARCH=<arch> run
-    # more args: LOG=<log> SMP=<smp> NET=[y|n] ...
-    ```
-
-## How to build ArceOS for specific platforms and devices
-
-You need to manually link your application with the appropriate platform packages:
-
-```rs
-// Add this line to your application (for raspi4 platform)
-extern crate axplat_aarch64_raspi;
-```
-
-Then set the `MYPLAT` variable when run `make`:
+Always summarize evaluator logs with the parser before promoting a result:
 
 ```bash
-# Build helloworld for raspi4
-make MYPLAT=axplat-aarch64-raspi SMP=4 A=examples/helloworld
+python3 scripts/ltp_summary.py output_rv.md
+python3 scripts/ltp_summary.py output_la.md
+python3 scripts/ltp_summary.py --promotion-candidates rv.log la.log
 ```
 
-You may also need to select the corrsponding device drivers by setting the `FEATURES` variable:
+Do not rely on the outer QEMU/run-eval exit code alone.  A clean promotion needs
+wrapper pass counts plus no unexpected internal failure, timeout, ENOSYS, or
+panic/trap signals for the selected scope.
+
+## Validation commands
+
+Use the smallest check that proves your change:
 
 ```bash
-# Build the shell app for raspi4, and use the SD card driver
-make MYPLAT=axplat-aarch64-raspi SMP=4 A=examples/shell FEATURES=page-alloc-4g,driver-bcm2835-sdhci BUS=mmio
-# Build httpserver for the bare-metal x86_64 platform, and use the ixgbe and ramdisk driver
-make PLAT_CONFIG=$(pwd)/configs/custom/x86_64-pc-oslab.toml A=examples/httpserver FEATURES=page-alloc-4g,driver-ixgbe,driver-ramdisk SMP=4
+# Formatting / static checks
+make fmt
+make fmt_c
+make clippy
+make doc_check_missing
+make unittest_no_fail_fast
+
+# Build-only evaluator artifacts
+make kernel-rv
+make kernel-la
+make all
+
+# Local evaluator gates when images and QEMU are available
+./run-eval.sh rv
+./run-eval.sh la
 ```
 
-## How to reuse ArceOS modules in your own project
+For POSIX/user-space changes, at least build the shell for the affected target;
+for evaluator behavior changes, follow build validation with RV and LA evaluator
+runs when the images and QEMU are available.
+
+## Docker workflow
+
+A Dockerfile is provided for a development container with the pinned Rust
+workflow and QEMU/tooling assumptions:
+
+```bash
+docker build -t orays-arceos-dev -f Dockerfile .
+docker run --rm -it -v "$(pwd):/work" -w /work orays-arceos-dev bash
+```
+
+The Makefile also provides `make docker-image` and `make docker`; the latter
+uses the Makefile's built-in `/code/arceos` mount convention, so the manual
+command above is safer when this checkout is not literally named `arceos`.
+
+## Writing ArceOS apps
+
+Rust applications should be `no_std`/`no_main` crates that depend on `axstd`:
 
 ```toml
-# In Cargo.toml
 [dependencies]
-axalloc = { git = "https://github.com/arceos-org/arceos.git", tag = "v0.2.0" } # kernel/memory/axalloc
-axhal = { git = "https://github.com/arceos-org/arceos.git", tag = "v0.2.0" } # kernel/arch/axhal
+axstd = { path = "/path/to/arceos/ulib/axstd", features = ["..."] }
 ```
 
-## Design
+Annotate the entry point with `#[unsafe(no_mangle)]`, then build through this
+repository:
 
-![ArceOS logo](doc/figures/ArceOS.svg)
+```bash
+make -C /path/to/arceos A=$(pwd) ARCH=<arch> run
+```
+
+C applications can provide `axbuild.mk` and `features.txt` like the examples in
+`examples/`, then use the same Make interface.
+
+## Platform-specific builds
+
+Use `MYPLAT` for platform crates or `PLAT_CONFIG` for explicit TOML configs:
+
+```bash
+make MYPLAT=axplat-aarch64-raspi SMP=4 A=examples/helloworld
+make PLAT_CONFIG=$(pwd)/configs/custom/x86_64-pc-oslab.toml \
+    A=examples/httpserver FEATURES=page-alloc-4g,driver-ixgbe,driver-ramdisk SMP=4
+```
+
+Repository configs are under `configs/platforms/`, `configs/custom/`, and
+`configs/remote-eval/`.
+
+## Documentation and evidence
+
+- Long-running LTP score work is recorded in dated folders such as
+  `docs/ltp-score-improvement-YYYY-MM-DD-phase-x/`.
+- Compatibility notes live in `docs/`, for example FD/socket progress and
+  network loopback behavior.
+- Upstream-style platform docs remain under `doc/`.
+
+Keep evaluator reports honest: do not hardcode test names, fake `TPASS`, hide
+`TCONF`/timeouts, or edit testsuite sources to manufacture a pass.
+
+## Licenses
+
+This workspace inherits the upstream ArceOS licensing files in the repository
+root: Apache-2.0, GPLv3, MulanPSL2, and MulanPubL2.
