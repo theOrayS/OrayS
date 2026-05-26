@@ -266,7 +266,7 @@ Repository configs are under `configs/platforms/`, `configs/custom/`, and
 
 ## Documentation and evidence
 
-- Developer-facing maintenance docs start at
+- Chinese developer-facing maintenance docs start at
   `docs/developer-guide/README.md`.
 - Long-running LTP score work is recorded in dated folders such as
   `docs/ltp-score-improvement-YYYY-MM-DD-phase-x/`.
