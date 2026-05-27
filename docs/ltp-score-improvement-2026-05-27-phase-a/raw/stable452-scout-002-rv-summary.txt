@@ -1,0 +1,167 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable452-scout-002-rv.log`
+
+- PASS LTP CASE: 5
+- FAIL LTP CASE: 57
+- Internal TFAIL/TBROK/TCONF: 412 ({'TBROK': 30, 'TCONF': 76, 'TFAIL': 306})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 3 passed, 28 failed
+- ltp-glibc: 2 passed, 29 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fcntl11 | rv | glibc | ltp-glibc | FAIL | 1 | 1060 | 251029 | 251015 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11 | rv | musl | ltp-musl | FAIL | 1 | 905 | 251893 | 251879 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11_64 | rv | glibc | ltp-glibc | FAIL | 1 | 1546 | 251015 | 251001 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11_64 | rv | musl | ltp-musl | FAIL | 1 | 1305 | 251879 | 251865 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15 | rv | glibc | ltp-glibc | FAIL | 1 | 1199 | 251361 | 251319 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15 | rv | musl | ltp-musl | FAIL | 1 | 903 | 252201 | 252159 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15_64 | rv | glibc | ltp-glibc | FAIL | 1 | 1934 | 251319 | 251277 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15_64 | rv | musl | ltp-musl | FAIL | 1 | 1383 | 252159 | 252117 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl30 | rv | glibc | ltp-glibc | FAIL | 2 | 1208 | 251277 | 251263 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl30 | rv | musl | ltp-musl | FAIL | 2 | 979 | 252117 | 252103 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl30_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1818 | 251263 | 251249 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl30_64 | rv | musl | ltp-musl | FAIL | 2 | 1393 | 252103 | 252089 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl31 | rv | glibc | ltp-glibc | FAIL | 1 | 1396 | 251249 | 251242 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl31 | rv | musl | ltp-musl | FAIL | 1 | 1241 | 252089 | 252082 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl31_64 | rv | glibc | ltp-glibc | FAIL | 1 | 1650 | 251242 | 251235 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl31_64 | rv | musl | ltp-musl | FAIL | 1 | 1185 | 252082 | 252075 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl32 | rv | glibc | ltp-glibc | FAIL | 32 | 1136 | 251235 | 251228 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| fcntl32 | rv | musl | ltp-musl | FAIL | 32 | 977 | 252075 | 252068 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| fcntl32_64 | rv | glibc | ltp-glibc | FAIL | 32 | 1524 | 251228 | 251221 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| fcntl32_64 | rv | musl | ltp-musl | FAIL | 32 | 1292 | 252068 | 252061 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| fcntl33 | rv | glibc | ltp-glibc | FAIL | 36 | 1357 | 251221 | 251207 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl33 | rv | musl | ltp-musl | FAIL | 36 | 960 | 252061 | 252047 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl33_64 | rv | glibc | ltp-glibc | FAIL | 36 | 1474 | 251207 | 251193 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl33_64 | rv | musl | ltp-musl | FAIL | 36 | 1251 | 252047 | 252033 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl34 | rv | glibc | ltp-glibc | FAIL | 2 | 1599 | 251193 | 251176 | -17 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl34 | rv | musl | ltp-musl | FAIL | 2 | 920 | 252033 | 252019 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl34_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1532 | 251176 | 251159 | -17 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl34_64 | rv | musl | ltp-musl | FAIL | 2 | 1288 | 252019 | 252005 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl35 | rv | glibc | ltp-glibc | FAIL | 36 | 1348 | 251159 | 251145 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl35 | rv | musl | ltp-musl | FAIL | 36 | 930 | 252005 | 251991 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl35_64 | rv | glibc | ltp-glibc | FAIL | 36 | 1502 | 251145 | 251131 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl35_64 | rv | musl | ltp-musl | FAIL | 36 | 1240 | 251991 | 251977 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| fcntl36 | rv | glibc | ltp-glibc | FAIL | 2 | 1461 | 251131 | 251108 | -23 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl36 | rv | musl | ltp-musl | FAIL | 2 | 1056 | 251977 | 251963 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl36_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1474 | 251108 | 251085 | -23 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl36_64 | rv | musl | ltp-musl | FAIL | 2 | 1272 | 251963 | 251949 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl37 | rv | glibc | ltp-glibc | FAIL | 2 | 1452 | 251085 | 251071 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl37 | rv | musl | ltp-musl | FAIL | 2 | 911 | 251949 | 251935 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl37_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1451 | 251071 | 251057 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl37_64 | rv | musl | ltp-musl | FAIL | 2 | 1417 | 251935 | 251921 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl38 | rv | glibc | ltp-glibc | FAIL | 2 | 1688 | 251057 | 251050 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl38 | rv | musl | ltp-musl | FAIL | 2 | 973 | 251921 | 251914 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl38_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1636 | 251050 | 251043 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl38_64 | rv | musl | ltp-musl | FAIL | 2 | 1205 | 251914 | 251907 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl39 | rv | glibc | ltp-glibc | FAIL | 2 | 1293 | 251043 | 251036 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl39 | rv | musl | ltp-musl | FAIL | 2 | 927 | 251907 | 251900 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl39_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1535 | 251036 | 251029 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fcntl39_64 | rv | musl | ltp-musl | FAIL | 2 | 1187 | 251900 | 251893 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe07 | rv | glibc | ltp-glibc | FAIL | 2 | 1456 | 251410 | 251396 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe07 | rv | musl | ltp-musl | FAIL | 2 | 1228 | 256346 | 252236 | -4110 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe15 | rv | glibc | ltp-glibc | FAIL | 2 | 1653 | 251396 | 251382 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe15 | rv | musl | ltp-musl | FAIL | 2 | 1343 | 252236 | 252222 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| poll02 | rv | glibc | ltp-glibc | FAIL | 1 | 10774 | 251382 | 251361 | -21 | 2 | 0 | 0 | 0 | 0 | 0 |
+| poll02 | rv | musl | ltp-musl | FAIL | 1 | 10463 | 252222 | 252201 | -21 | 3 | 0 | 0 | 0 | 0 | 0 |
+| select01 | rv | glibc | ltp-glibc | FAIL | 2 | 1652 | 251865 | 251851 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| select01 | rv | musl | ltp-musl | FAIL | 2 | 1504 | 258849 | 256787 | -2062 | 0 | 1 | 0 | 0 | 0 | 0 |
+| select02 | rv | glibc | ltp-glibc | FAIL | 1 | 21405 | 251851 | 251774 | -77 | 5 | 0 | 3 | 0 | 0 | 0 |
+| select02 | rv | musl | ltp-musl | PASS | 0 | 20679 | 256787 | 256710 | -77 | 0 | 0 | 3 | 0 | 0 | 0 |
+| select03 | rv | glibc | ltp-glibc | PASS | 0 | 3572 | 251774 | 251452 | -322 | 0 | 0 | 24 | 0 | 0 | 0 |
+| select03 | rv | musl | ltp-musl | PASS | 0 | 3015 | 256710 | 256388 | -322 | 0 | 0 | 24 | 0 | 0 | 0 |
+| select04 | rv | glibc | ltp-glibc | PASS | 0 | 1805 | 251452 | 251410 | -42 | 0 | 0 | 3 | 0 | 0 | 0 |
+| select04 | rv | musl | ltp-musl | PASS | 0 | 1375 | 256388 | 256346 | -42 | 0 | 0 | 3 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 5 (rv:musl:select02, rv:glibc:select03, rv:musl:select03, rv:glibc:select04, rv:musl:select04)
+- fail_wrapper: 57 (rv:glibc:fcntl11, rv:musl:fcntl11, rv:glibc:fcntl11_64, rv:musl:fcntl11_64, rv:glibc:fcntl15, rv:musl:fcntl15, rv:glibc:fcntl15_64, rv:musl:fcntl15_64, rv:glibc:fcntl30, rv:musl:fcntl30, rv:glibc:fcntl30_64, rv:musl:fcntl30_64, rv:glibc:fcntl31, rv:musl:fcntl31, rv:glibc:fcntl31_64, rv:musl:fcntl31_64, rv:glibc:fcntl32, rv:musl:fcntl32, rv:glibc:fcntl32_64, rv:musl:fcntl32_64, rv:glibc:fcntl33, rv:musl:fcntl33, rv:glibc:fcntl33_64, rv:musl:fcntl33_64, rv:glibc:fcntl34, rv:musl:fcntl34, rv:glibc:fcntl34_64, rv:musl:fcntl34_64, rv:glibc:fcntl35, rv:musl:fcntl35, rv:glibc:fcntl35_64, rv:musl:fcntl35_64, rv:glibc:fcntl36, rv:musl:fcntl36, rv:glibc:fcntl36_64, rv:musl:fcntl36_64, rv:glibc:fcntl37, rv:musl:fcntl37, rv:glibc:fcntl37_64, rv:musl:fcntl37_64, rv:glibc:fcntl38, rv:musl:fcntl38, rv:glibc:fcntl38_64, rv:musl:fcntl38_64, rv:glibc:fcntl39, rv:musl:fcntl39, rv:glibc:fcntl39_64, rv:musl:fcntl39_64, rv:glibc:pipe07, rv:musl:pipe07, rv:glibc:pipe15, rv:musl:pipe15, rv:glibc:poll02, rv:musl:poll02, rv:glibc:select01, rv:musl:select01, rv:glibc:select02)
+- internal_tfail: 15 (rv:glibc:fcntl11, rv:musl:fcntl11, rv:glibc:fcntl11_64, rv:musl:fcntl11_64, rv:glibc:fcntl15, rv:musl:fcntl15, rv:glibc:fcntl15_64, rv:musl:fcntl15_64, rv:glibc:fcntl31, rv:musl:fcntl31, rv:glibc:fcntl31_64, rv:musl:fcntl31_64, rv:glibc:poll02, rv:musl:poll02, rv:glibc:select02)
+- internal_tbrok: 30 (rv:glibc:fcntl30, rv:musl:fcntl30, rv:glibc:fcntl30_64, rv:musl:fcntl30_64, rv:glibc:fcntl34, rv:musl:fcntl34, rv:glibc:fcntl34_64, rv:musl:fcntl34_64, rv:glibc:fcntl36, rv:musl:fcntl36, rv:glibc:fcntl36_64, rv:musl:fcntl36_64, rv:glibc:fcntl37, rv:musl:fcntl37, rv:glibc:fcntl37_64, rv:musl:fcntl37_64, rv:glibc:fcntl38, rv:musl:fcntl38, rv:glibc:fcntl38_64, rv:musl:fcntl38_64, rv:glibc:fcntl39, rv:musl:fcntl39, rv:glibc:fcntl39_64, rv:musl:fcntl39_64, rv:glibc:pipe07, rv:musl:pipe07, rv:glibc:pipe15, rv:musl:pipe15, rv:glibc:select01, rv:musl:select01)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:select01
+- ltp-musl:pipe07
+- ltp-musl:pipe15
+- ltp-musl:poll02
+- ltp-musl:fcntl15
+- ltp-musl:fcntl15_64
+- ltp-musl:fcntl30
+- ltp-musl:fcntl30_64
+- ltp-musl:fcntl31
+- ltp-musl:fcntl31_64
+- ltp-musl:fcntl32
+- ltp-musl:fcntl32_64
+- ltp-musl:fcntl33
+- ltp-musl:fcntl33_64
+- ltp-musl:fcntl34
+- ltp-musl:fcntl34_64
+- ltp-musl:fcntl35
+- ltp-musl:fcntl35_64
+- ltp-musl:fcntl36
+- ltp-musl:fcntl36_64
+- ltp-musl:fcntl37
+- ltp-musl:fcntl37_64
+- ltp-musl:fcntl38
+- ltp-musl:fcntl38_64
+- ltp-musl:fcntl39
+- ltp-musl:fcntl39_64
+- ltp-musl:fcntl11
+- ltp-musl:fcntl11_64
+- ltp-glibc:select01
+- ltp-glibc:select02
+- ltp-glibc:pipe07
+- ltp-glibc:pipe15
+- ltp-glibc:poll02
+- ltp-glibc:fcntl15
+- ltp-glibc:fcntl15_64
+- ltp-glibc:fcntl30
+- ltp-glibc:fcntl30_64
+- ltp-glibc:fcntl31
+- ltp-glibc:fcntl31_64
+- ltp-glibc:fcntl32
+- ltp-glibc:fcntl32_64
+- ltp-glibc:fcntl33
+- ltp-glibc:fcntl33_64
+- ltp-glibc:fcntl34
+- ltp-glibc:fcntl34_64
+- ltp-glibc:fcntl35
+- ltp-glibc:fcntl35_64
+- ltp-glibc:fcntl36
+- ltp-glibc:fcntl36_64
+- ltp-glibc:fcntl37
+- ltp-glibc:fcntl37_64
+- ltp-glibc:fcntl38
+- ltp-glibc:fcntl38_64
+- ltp-glibc:fcntl39
+- ltp-glibc:fcntl39_64
+- ltp-glibc:fcntl11
+- ltp-glibc:fcntl11_64
+
+## Groups
+### ltp-musl
+- PASS: 3
+- FAIL: 28
+- Internal: {'TBROK': 15, 'TCONF': 38, 'TFAIL': 151}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: select01, pipe07, pipe15, poll02, fcntl15, fcntl15_64, fcntl30, fcntl30_64, fcntl31, fcntl31_64, fcntl32, fcntl32_64, fcntl33, fcntl33_64, fcntl34, fcntl34_64, fcntl35, fcntl35_64, fcntl36, fcntl36_64, fcntl37, fcntl37_64, fcntl38, fcntl38_64, fcntl39, fcntl39_64, fcntl11, fcntl11_64
+
+### ltp-glibc
+- PASS: 2
+- FAIL: 29
+- Internal: {'TBROK': 15, 'TFAIL': 155, 'TCONF': 38}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: select01, select02, pipe07, pipe15, poll02, fcntl15, fcntl15_64, fcntl30, fcntl30_64, fcntl31, fcntl31_64, fcntl32, fcntl32_64, fcntl33, fcntl33_64, fcntl34, fcntl34_64, fcntl35, fcntl35_64, fcntl36, fcntl36_64, fcntl37, fcntl37_64, fcntl38, fcntl38_64, fcntl39, fcntl39_64, fcntl11, fcntl11_64

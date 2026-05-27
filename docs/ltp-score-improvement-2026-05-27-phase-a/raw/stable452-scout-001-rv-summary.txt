@@ -1,0 +1,170 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable452-scout-001-rv.log`
+
+- PASS LTP CASE: 2
+- FAIL LTP CASE: 60
+- Internal TFAIL/TBROK/TCONF: 68 ({'TCONF': 8, 'TBROK': 26, 'TFAIL': 34})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 32
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 1 passed, 30 failed
+- ltp-glibc: 1 passed, 30 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fchmod02 | rv | glibc | ltp-glibc | FAIL | 2 | 1484 | 252362 | 252348 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod02 | rv | musl | ltp-musl | FAIL | 2 | 1201 | 256661 | 256647 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod06 | rv | glibc | ltp-glibc | FAIL | 2 | 1572 | 252348 | 252341 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod06 | rv | musl | ltp-musl | FAIL | 2 | 1184 | 256647 | 256640 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod07 | rv | glibc | ltp-glibc | FAIL | -1 | 6 | 252341 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod07 | rv | musl | ltp-musl | FAIL | -1 | 9 | 256640 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock06 | rv | glibc | ltp-glibc | PASS | 0 | 1557 | 256598 | 256584 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock06 | rv | musl | ltp-musl | PASS | 0 | 1508 | 258849 | 256787 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms01 | rv | glibc | ltp-glibc | FAIL | -1 | 6 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms01 | rv | musl | ltp-musl | FAIL | -1 | 7 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms02 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms02 | rv | musl | ltp-musl | FAIL | -1 | 3 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms03 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms03 | rv | musl | ltp-musl | FAIL | -1 | 3 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms04 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms04 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms05 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms05 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms06 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms06 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms07 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms07 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms08 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms08 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms09 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms09 | rv | musl | ltp-musl | FAIL | -1 | 0 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms10 | rv | glibc | ltp-glibc | FAIL | -1 | 0 | 252299 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms10 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256598 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | glibc | ltp-glibc | FAIL | 2 | 1104 | 252313 | 252306 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | musl | ltp-musl | FAIL | 2 | 806 | 256612 | 256605 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04_64 | rv | glibc | ltp-glibc | FAIL | 2 | 1633 | 252306 | 252299 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04_64 | rv | musl | ltp-musl | FAIL | 2 | 1158 | 256605 | 256598 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| link01 | rv | glibc | ltp-glibc | FAIL | -1 | 7 | 252418 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link01 | rv | musl | ltp-musl | FAIL | -1 | 7 | 256717 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 1484 | 252418 | 252404 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 1156 | 256717 | 256703 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link04 | rv | glibc | ltp-glibc | FAIL | 1 | 1631 | 252404 | 252390 | -14 | 14 | 0 | 0 | 0 | 14 | 0 |
+| link04 | rv | musl | ltp-musl | FAIL | 1 | 1251 | 256703 | 256689 | -14 | 14 | 0 | 0 | 0 | 14 | 0 |
+| link05 | rv | glibc | ltp-glibc | FAIL | 1 | 1708 | 252390 | 252376 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link05 | rv | musl | ltp-musl | FAIL | 1 | 1283 | 256689 | 256675 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| linkat01 | rv | glibc | ltp-glibc | FAIL | 32 | 1558 | 252376 | 252369 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| linkat01 | rv | musl | ltp-musl | FAIL | 32 | 1308 | 256675 | 256668 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| linkat02 | rv | glibc | ltp-glibc | FAIL | 6 | 1649 | 252369 | 252362 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| linkat02 | rv | musl | ltp-musl | FAIL | 6 | 1152 | 256668 | 256661 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| open07 | rv | glibc | ltp-glibc | FAIL | 2 | 1410 | 256556 | 256542 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| open07 | rv | musl | ltp-musl | FAIL | 2 | 1274 | 256759 | 256745 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| openat02 | rv | glibc | ltp-glibc | FAIL | 2 | 1620 | 256542 | 252432 | -4110 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat02 | rv | musl | ltp-musl | FAIL | 2 | 1022 | 256745 | 256731 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat03 | rv | glibc | ltp-glibc | FAIL | 2 | 1436 | 252432 | 252425 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat03 | rv | musl | ltp-musl | FAIL | 2 | 1279 | 256731 | 256724 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat04 | rv | glibc | ltp-glibc | FAIL | 6 | 1543 | 252425 | 252418 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| openat04 | rv | musl | ltp-musl | FAIL | 6 | 1307 | 256724 | 256717 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| sendfile09 | rv | glibc | ltp-glibc | FAIL | 32 | 1554 | 256584 | 256570 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sendfile09 | rv | musl | ltp-musl | FAIL | 32 | 818 | 256787 | 256773 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sendfile09_64 | rv | glibc | ltp-glibc | FAIL | 32 | 1698 | 256570 | 256556 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sendfile09_64 | rv | musl | ltp-musl | FAIL | 32 | 1465 | 256773 | 256759 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx01 | rv | glibc | ltp-glibc | FAIL | 2 | 1669 | 252341 | 252327 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx01 | rv | musl | ltp-musl | FAIL | 2 | 1437 | 256640 | 256626 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx03 | rv | glibc | ltp-glibc | FAIL | 1 | 1487 | 252327 | 252313 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statx03 | rv | musl | ltp-musl | FAIL | 1 | 1266 | 256626 | 256612 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| unlink01 | rv | glibc | ltp-glibc | FAIL | -1 | 8 | 252362 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink01 | rv | musl | ltp-musl | FAIL | -1 | 9 | 256661 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:glibc:flock06, rv:musl:flock06)
+- pass_with_tconf: 0
+- fail_wrapper: 60 (rv:glibc:fchmod02, rv:musl:fchmod02, rv:glibc:fchmod06, rv:musl:fchmod06, rv:glibc:fchmod07, rv:musl:fchmod07, rv:glibc:fs_perms01, rv:musl:fs_perms01, rv:glibc:fs_perms02, rv:musl:fs_perms02, rv:glibc:fs_perms03, rv:musl:fs_perms03, rv:glibc:fs_perms04, rv:musl:fs_perms04, rv:glibc:fs_perms05, rv:musl:fs_perms05, rv:glibc:fs_perms06, rv:musl:fs_perms06, rv:glibc:fs_perms07, rv:musl:fs_perms07, rv:glibc:fs_perms08, rv:musl:fs_perms08, rv:glibc:fs_perms09, rv:musl:fs_perms09, rv:glibc:fs_perms10, rv:musl:fs_perms10, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:ftruncate04_64, rv:musl:ftruncate04_64, rv:glibc:link01, rv:musl:link01, rv:glibc:link02, rv:musl:link02, rv:glibc:link04, rv:musl:link04, rv:glibc:link05, rv:musl:link05, rv:glibc:linkat01, rv:musl:linkat01, rv:glibc:linkat02, rv:musl:linkat02, rv:glibc:open07, rv:musl:open07, rv:glibc:openat02, rv:musl:openat02, rv:glibc:openat03, rv:musl:openat03, rv:glibc:openat04, rv:musl:openat04, rv:glibc:sendfile09, rv:musl:sendfile09, rv:glibc:sendfile09_64, rv:musl:sendfile09_64, rv:glibc:statx01, rv:musl:statx01, rv:glibc:statx03, rv:musl:statx03, rv:glibc:unlink01, rv:musl:unlink01)
+- internal_tfail: 8 (rv:glibc:link02, rv:musl:link02, rv:glibc:link04, rv:musl:link04, rv:glibc:link05, rv:musl:link05, rv:glibc:statx03, rv:musl:statx03)
+- internal_tbrok: 20 (rv:glibc:fchmod02, rv:musl:fchmod02, rv:glibc:fchmod06, rv:musl:fchmod06, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:ftruncate04_64, rv:musl:ftruncate04_64, rv:glibc:linkat02, rv:musl:linkat02, rv:glibc:open07, rv:musl:open07, rv:glibc:openat02, rv:musl:openat02, rv:glibc:openat03, rv:musl:openat03, rv:glibc:openat04, rv:musl:openat04, rv:glibc:statx01, rv:musl:statx01)
+- timeout: 0
+- enosys: 6 (rv:glibc:link02, rv:musl:link02, rv:glibc:link04, rv:musl:link04, rv:glibc:link05, rv:musl:link05)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:sendfile09
+- ltp-musl:sendfile09_64
+- ltp-musl:open07
+- ltp-musl:openat02
+- ltp-musl:openat03
+- ltp-musl:openat04
+- ltp-musl:link01
+- ltp-musl:link02
+- ltp-musl:link04
+- ltp-musl:link05
+- ltp-musl:linkat01
+- ltp-musl:linkat02
+- ltp-musl:unlink01
+- ltp-musl:fchmod02
+- ltp-musl:fchmod06
+- ltp-musl:fchmod07
+- ltp-musl:statx01
+- ltp-musl:statx03
+- ltp-musl:ftruncate04
+- ltp-musl:ftruncate04_64
+- ltp-musl:fs_perms01
+- ltp-musl:fs_perms02
+- ltp-musl:fs_perms03
+- ltp-musl:fs_perms04
+- ltp-musl:fs_perms05
+- ltp-musl:fs_perms06
+- ltp-musl:fs_perms07
+- ltp-musl:fs_perms08
+- ltp-musl:fs_perms09
+- ltp-musl:fs_perms10
+- ltp-glibc:sendfile09
+- ltp-glibc:sendfile09_64
+- ltp-glibc:open07
+- ltp-glibc:openat02
+- ltp-glibc:openat03
+- ltp-glibc:openat04
+- ltp-glibc:link01
+- ltp-glibc:link02
+- ltp-glibc:link04
+- ltp-glibc:link05
+- ltp-glibc:linkat01
+- ltp-glibc:linkat02
+- ltp-glibc:unlink01
+- ltp-glibc:fchmod02
+- ltp-glibc:fchmod06
+- ltp-glibc:fchmod07
+- ltp-glibc:statx01
+- ltp-glibc:statx03
+- ltp-glibc:ftruncate04
+- ltp-glibc:ftruncate04_64
+- ltp-glibc:fs_perms01
+- ltp-glibc:fs_perms02
+- ltp-glibc:fs_perms03
+- ltp-glibc:fs_perms04
+- ltp-glibc:fs_perms05
+- ltp-glibc:fs_perms06
+- ltp-glibc:fs_perms07
+- ltp-glibc:fs_perms08
+- ltp-glibc:fs_perms09
+- ltp-glibc:fs_perms10
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 30
+- Internal: {'TCONF': 4, 'TBROK': 13, 'TFAIL': 17}
+- timeout: 0
+- ENOSYS/not implemented: 16
+- panic/trap: 0
+- Fail cases: sendfile09, sendfile09_64, open07, openat02, openat03, openat04, link01, link02, link04, link05, linkat01, linkat02, unlink01, fchmod02, fchmod06, fchmod07, statx01, statx03, ftruncate04, ftruncate04_64, fs_perms01, fs_perms02, fs_perms03, fs_perms04, fs_perms05, fs_perms06, fs_perms07, fs_perms08, fs_perms09, fs_perms10
+
+### ltp-glibc
+- PASS: 1
+- FAIL: 30
+- Internal: {'TCONF': 4, 'TBROK': 13, 'TFAIL': 17}
+- timeout: 0
+- ENOSYS/not implemented: 16
+- panic/trap: 0
+- Fail cases: sendfile09, sendfile09_64, open07, openat02, openat03, openat04, link01, link02, link04, link05, linkat01, linkat02, unlink01, fchmod02, fchmod06, fchmod07, statx01, statx03, ftruncate04, ftruncate04_64, fs_perms01, fs_perms02, fs_perms03, fs_perms04, fs_perms05, fs_perms06, fs_perms07, fs_perms08, fs_perms09, fs_perms10

@@ -1,0 +1,114 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable452-scout-005-rv.log`
+
+- PASS LTP CASE: 14
+- FAIL LTP CASE: 26
+- Internal TFAIL/TBROK/TCONF: 41 ({'TFAIL': 17, 'TBROK': 8, 'TCONF': 16})
+- timeout matches: 1
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 7 passed, 13 failed
+- ltp-glibc: 7 passed, 13 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| capset01 | rv | glibc | ltp-glibc | FAIL | 32 | 1656 | 256465 | 256451 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset01 | rv | musl | ltp-musl | FAIL | 32 | 1275 | 256668 | 256654 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset02 | rv | glibc | ltp-glibc | FAIL | 32 | 1482 | 256451 | 256437 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset02 | rv | musl | ltp-musl | FAIL | 32 | 1203 | 256654 | 256640 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset03 | rv | glibc | ltp-glibc | FAIL | 32 | 1584 | 256437 | 256423 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset03 | rv | musl | ltp-musl | FAIL | 32 | 1215 | 256640 | 256626 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset04 | rv | glibc | ltp-glibc | FAIL | 32 | 1507 | 256423 | 256409 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| capset04 | rv | musl | ltp-musl | FAIL | 32 | 1345 | 256626 | 256612 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| chown04 | rv | glibc | ltp-glibc | FAIL | 2 | 1091 | 256570 | 256563 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chown04 | rv | musl | ltp-musl | FAIL | 2 | 929 | 256773 | 256766 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchown01 | rv | glibc | ltp-glibc | PASS | 0 | 1380 | 256563 | 256549 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown01 | rv | musl | ltp-musl | PASS | 0 | 1127 | 256766 | 256752 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown02 | rv | glibc | ltp-glibc | PASS | 0 | 1212 | 256549 | 256535 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown02 | rv | musl | ltp-musl | PASS | 0 | 773 | 256752 | 256738 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown03 | rv | glibc | ltp-glibc | PASS | 0 | 1286 | 256535 | 256521 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown03 | rv | musl | ltp-musl | PASS | 0 | 1040 | 256738 | 256724 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown04 | rv | glibc | ltp-glibc | FAIL | 2 | 1334 | 256521 | 256514 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchown04 | rv | musl | ltp-musl | FAIL | 2 | 987 | 256724 | 256717 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchown05 | rv | glibc | ltp-glibc | PASS | 0 | 1309 | 256514 | 256500 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown05 | rv | musl | ltp-musl | PASS | 0 | 860 | 256717 | 256703 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat01 | rv | glibc | ltp-glibc | PASS | 0 | 1421 | 256500 | 256493 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat01 | rv | musl | ltp-musl | PASS | 0 | 1208 | 256703 | 256696 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat02 | rv | glibc | ltp-glibc | FAIL | 1 | 1637 | 256493 | 256486 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fchownat02 | rv | musl | ltp-musl | FAIL | 1 | 1164 | 256696 | 256689 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getgroups01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1584 | 256409 | 256402 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getgroups01_16 | rv | musl | ltp-musl | FAIL | 32 | 1237 | 256612 | 256605 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getgroups03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1702 | 256402 | 256395 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getgroups03_16 | rv | musl | ltp-musl | FAIL | 32 | 1238 | 256605 | 256598 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| lchown01 | rv | glibc | ltp-glibc | FAIL | 1 | 1276 | 256486 | 256479 | -7 | 6 | 0 | 0 | 0 | 0 | 0 |
+| lchown01 | rv | musl | ltp-musl | FAIL | 1 | 894 | 256689 | 256682 | -7 | 6 | 0 | 0 | 0 | 0 | 0 |
+| lchown02 | rv | glibc | ltp-glibc | FAIL | 1 | 1086 | 256479 | 256472 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| lchown02 | rv | musl | ltp-musl | FAIL | 1 | 862 | 256682 | 256675 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| lchown03 | rv | glibc | ltp-glibc | FAIL | 6 | 1114 | 256472 | 256465 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| lchown03 | rv | musl | ltp-musl | FAIL | 6 | 711 | 256675 | 256668 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| setfsgid03 | rv | glibc | ltp-glibc | FAIL | 137 | 45623 | 256577 | 256570 | -7 | 0 | 0 | 0 | 1 | 0 | 0 |
+| setfsgid03 | rv | musl | ltp-musl | PASS | 0 | 26271 | 256780 | 256773 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setgroups03 | rv | glibc | ltp-glibc | PASS | 0 | 1326 | 256591 | 256577 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setgroups03 | rv | musl | ltp-musl | FAIL | 1 | 1051 | 256794 | 256780 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setresgid04 | rv | glibc | ltp-glibc | PASS | 0 | 1030 | 256598 | 256591 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresgid04 | rv | musl | ltp-musl | PASS | 0 | 825 | 258849 | 256794 | -2055 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 14 (rv:glibc:fchown01, rv:musl:fchown01, rv:glibc:fchown02, rv:musl:fchown02, rv:glibc:fchown03, rv:musl:fchown03, rv:glibc:fchown05, rv:musl:fchown05, rv:glibc:fchownat01, rv:musl:fchownat01, rv:musl:setfsgid03, rv:glibc:setgroups03, rv:glibc:setresgid04, rv:musl:setresgid04)
+- pass_with_tconf: 0
+- fail_wrapper: 26 (rv:glibc:capset01, rv:musl:capset01, rv:glibc:capset02, rv:musl:capset02, rv:glibc:capset03, rv:musl:capset03, rv:glibc:capset04, rv:musl:capset04, rv:glibc:chown04, rv:musl:chown04, rv:glibc:fchown04, rv:musl:fchown04, rv:glibc:fchownat02, rv:musl:fchownat02, rv:glibc:getgroups01_16, rv:musl:getgroups01_16, rv:glibc:getgroups03_16, rv:musl:getgroups03_16, rv:glibc:lchown01, rv:musl:lchown01, rv:glibc:lchown02, rv:musl:lchown02, rv:glibc:lchown03, rv:musl:lchown03, rv:glibc:setfsgid03, rv:musl:setgroups03)
+- internal_tfail: 7 (rv:glibc:fchownat02, rv:musl:fchownat02, rv:glibc:lchown01, rv:musl:lchown01, rv:glibc:lchown02, rv:musl:lchown02, rv:musl:setgroups03)
+- internal_tbrok: 6 (rv:glibc:chown04, rv:musl:chown04, rv:glibc:fchown04, rv:musl:fchown04, rv:glibc:lchown03, rv:musl:lchown03)
+- timeout: 1 (rv:glibc:setfsgid03)
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:setgroups03
+- ltp-musl:chown04
+- ltp-musl:fchown04
+- ltp-musl:fchownat02
+- ltp-musl:lchown01
+- ltp-musl:lchown02
+- ltp-musl:lchown03
+- ltp-musl:capset01
+- ltp-musl:capset02
+- ltp-musl:capset03
+- ltp-musl:capset04
+- ltp-musl:getgroups01_16
+- ltp-musl:getgroups03_16
+- ltp-glibc:setfsgid03
+- ltp-glibc:chown04
+- ltp-glibc:fchown04
+- ltp-glibc:fchownat02
+- ltp-glibc:lchown01
+- ltp-glibc:lchown02
+- ltp-glibc:lchown03
+- ltp-glibc:capset01
+- ltp-glibc:capset02
+- ltp-glibc:capset03
+- ltp-glibc:capset04
+- ltp-glibc:getgroups01_16
+- ltp-glibc:getgroups03_16
+
+## Groups
+### ltp-musl
+- PASS: 7
+- FAIL: 13
+- Internal: {'TFAIL': 9, 'TBROK': 4, 'TCONF': 8}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: setgroups03, chown04, fchown04, fchownat02, lchown01, lchown02, lchown03, capset01, capset02, capset03, capset04, getgroups01_16, getgroups03_16
+
+### ltp-glibc
+- PASS: 7
+- FAIL: 13
+- Internal: {'TBROK': 4, 'TFAIL': 8, 'TCONF': 8}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: setfsgid03, chown04, fchown04, fchownat02, lchown01, lchown02, lchown03, capset01, capset02, capset03, capset04, getgroups01_16, getgroups03_16

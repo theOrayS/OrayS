@@ -1,0 +1,170 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable452-scout-004-rv.log`
+
+- PASS LTP CASE: 10
+- FAIL LTP CASE: 56
+- Internal TFAIL/TBROK/TCONF: 68 ({'TCONF': 68})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 5 passed, 28 failed
+- ltp-glibc: 5 passed, 28 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| getresgid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1505 | 252222 | 252215 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresgid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1486 | 256780 | 256773 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresgid02_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1651 | 252215 | 252208 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresgid02_16 | rv | musl | ltp-musl | FAIL | 32 | 1216 | 256773 | 256766 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresgid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1645 | 252208 | 252201 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresgid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1176 | 256766 | 256759 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresuid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1528 | 252243 | 252236 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresuid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1426 | 258849 | 256794 | -2055 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresuid02_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1584 | 252236 | 252229 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresuid02_16 | rv | musl | ltp-musl | FAIL | 32 | 1413 | 256794 | 256787 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresuid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1648 | 252229 | 252222 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| getresuid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1243 | 256787 | 256780 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| setgid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1639 | 252159 | 252145 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setgid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1389 | 256717 | 256703 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setgid02_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1688 | 252145 | 252131 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setgid02_16 | rv | musl | ltp-musl | FAIL | 32 | 1367 | 256703 | 256689 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setgid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1444 | 252131 | 252117 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setgid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1244 | 256689 | 256675 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1740 | 251949 | 251935 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1296 | 252411 | 252397 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid02_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1757 | 251935 | 251921 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid02_16 | rv | musl | ltp-musl | FAIL | 32 | 1433 | 252397 | 252383 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1447 | 251921 | 251900 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1205 | 252383 | 252362 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid04_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1642 | 251900 | 251886 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setregid04_16 | rv | musl | ltp-musl | FAIL | 32 | 1226 | 252362 | 252348 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1480 | 251886 | 251872 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1373 | 252348 | 252334 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid02_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1711 | 251872 | 251858 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid02_16 | rv | musl | ltp-musl | FAIL | 32 | 1335 | 252334 | 252320 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1571 | 251858 | 251844 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1220 | 252320 | 252306 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid04 | rv | glibc | ltp-glibc | PASS | 0 | 1474 | 251844 | 251823 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid04 | rv | musl | ltp-musl | PASS | 0 | 1294 | 252306 | 252285 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid04_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1509 | 251823 | 251809 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid04_16 | rv | musl | ltp-musl | FAIL | 32 | 1360 | 252285 | 252271 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid05 | rv | glibc | ltp-glibc | PASS | 0 | 1214 | 251809 | 251795 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid05 | rv | musl | ltp-musl | PASS | 0 | 834 | 252271 | 252257 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid05_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1562 | 251795 | 251781 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setresuid05_16 | rv | musl | ltp-musl | FAIL | 32 | 1244 | 252257 | 252243 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1699 | 252117 | 252103 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1247 | 256675 | 256661 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid02_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1673 | 252103 | 252089 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid02_16 | rv | musl | ltp-musl | FAIL | 32 | 1395 | 256661 | 256647 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1594 | 252089 | 252075 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1169 | 256647 | 256633 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid04_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1729 | 252075 | 252054 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid04_16 | rv | musl | ltp-musl | FAIL | 32 | 1266 | 256633 | 256612 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid05 | rv | glibc | ltp-glibc | PASS | 0 | 1432 | 252054 | 252033 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid05 | rv | musl | ltp-musl | PASS | 0 | 1226 | 256612 | 256591 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid05_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1783 | 252033 | 252012 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid05_16 | rv | musl | ltp-musl | FAIL | 32 | 1363 | 256591 | 256570 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid06 | rv | glibc | ltp-glibc | PASS | 0 | 1441 | 252012 | 251998 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid06 | rv | musl | ltp-musl | PASS | 0 | 968 | 256570 | 256556 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid06_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1573 | 251998 | 251984 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid06_16 | rv | musl | ltp-musl | FAIL | 32 | 1254 | 256556 | 256542 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid07 | rv | glibc | ltp-glibc | PASS | 0 | 1310 | 251984 | 251963 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid07 | rv | musl | ltp-musl | PASS | 0 | 845 | 256542 | 252425 | -4117 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid07_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1632 | 251963 | 251949 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setreuid07_16 | rv | musl | ltp-musl | FAIL | 32 | 1238 | 252425 | 252411 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setuid01_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1601 | 252201 | 252187 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setuid01_16 | rv | musl | ltp-musl | FAIL | 32 | 1481 | 256759 | 256745 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setuid03_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1725 | 252187 | 252173 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setuid03_16 | rv | musl | ltp-musl | FAIL | 32 | 1224 | 256745 | 256731 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setuid04_16 | rv | glibc | ltp-glibc | FAIL | 32 | 1634 | 252173 | 252159 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setuid04_16 | rv | musl | ltp-musl | FAIL | 32 | 1187 | 256731 | 256717 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 10 (rv:glibc:setresuid04, rv:musl:setresuid04, rv:glibc:setresuid05, rv:musl:setresuid05, rv:glibc:setreuid05, rv:musl:setreuid05, rv:glibc:setreuid06, rv:musl:setreuid06, rv:glibc:setreuid07, rv:musl:setreuid07)
+- pass_with_tconf: 0
+- fail_wrapper: 56 (rv:glibc:getresgid01_16, rv:musl:getresgid01_16, rv:glibc:getresgid02_16, rv:musl:getresgid02_16, rv:glibc:getresgid03_16, rv:musl:getresgid03_16, rv:glibc:getresuid01_16, rv:musl:getresuid01_16, rv:glibc:getresuid02_16, rv:musl:getresuid02_16, rv:glibc:getresuid03_16, rv:musl:getresuid03_16, rv:glibc:setgid01_16, rv:musl:setgid01_16, rv:glibc:setgid02_16, rv:musl:setgid02_16, rv:glibc:setgid03_16, rv:musl:setgid03_16, rv:glibc:setregid01_16, rv:musl:setregid01_16, rv:glibc:setregid02_16, rv:musl:setregid02_16, rv:glibc:setregid03_16, rv:musl:setregid03_16, rv:glibc:setregid04_16, rv:musl:setregid04_16, rv:glibc:setresuid01_16, rv:musl:setresuid01_16, rv:glibc:setresuid02_16, rv:musl:setresuid02_16, rv:glibc:setresuid03_16, rv:musl:setresuid03_16, rv:glibc:setresuid04_16, rv:musl:setresuid04_16, rv:glibc:setresuid05_16, rv:musl:setresuid05_16, rv:glibc:setreuid01_16, rv:musl:setreuid01_16, rv:glibc:setreuid02_16, rv:musl:setreuid02_16, rv:glibc:setreuid03_16, rv:musl:setreuid03_16, rv:glibc:setreuid04_16, rv:musl:setreuid04_16, rv:glibc:setreuid05_16, rv:musl:setreuid05_16, rv:glibc:setreuid06_16, rv:musl:setreuid06_16, rv:glibc:setreuid07_16, rv:musl:setreuid07_16, rv:glibc:setuid01_16, rv:musl:setuid01_16, rv:glibc:setuid03_16, rv:musl:setuid03_16, rv:glibc:setuid04_16, rv:musl:setuid04_16)
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getresuid01_16
+- ltp-musl:getresuid02_16
+- ltp-musl:getresuid03_16
+- ltp-musl:getresgid01_16
+- ltp-musl:getresgid02_16
+- ltp-musl:getresgid03_16
+- ltp-musl:setuid01_16
+- ltp-musl:setuid03_16
+- ltp-musl:setuid04_16
+- ltp-musl:setgid01_16
+- ltp-musl:setgid02_16
+- ltp-musl:setgid03_16
+- ltp-musl:setreuid01_16
+- ltp-musl:setreuid02_16
+- ltp-musl:setreuid03_16
+- ltp-musl:setreuid04_16
+- ltp-musl:setreuid05_16
+- ltp-musl:setreuid06_16
+- ltp-musl:setreuid07_16
+- ltp-musl:setregid01_16
+- ltp-musl:setregid02_16
+- ltp-musl:setregid03_16
+- ltp-musl:setregid04_16
+- ltp-musl:setresuid01_16
+- ltp-musl:setresuid02_16
+- ltp-musl:setresuid03_16
+- ltp-musl:setresuid04_16
+- ltp-musl:setresuid05_16
+- ltp-glibc:getresuid01_16
+- ltp-glibc:getresuid02_16
+- ltp-glibc:getresuid03_16
+- ltp-glibc:getresgid01_16
+- ltp-glibc:getresgid02_16
+- ltp-glibc:getresgid03_16
+- ltp-glibc:setuid01_16
+- ltp-glibc:setuid03_16
+- ltp-glibc:setuid04_16
+- ltp-glibc:setgid01_16
+- ltp-glibc:setgid02_16
+- ltp-glibc:setgid03_16
+- ltp-glibc:setreuid01_16
+- ltp-glibc:setreuid02_16
+- ltp-glibc:setreuid03_16
+- ltp-glibc:setreuid04_16
+- ltp-glibc:setreuid05_16
+- ltp-glibc:setreuid06_16
+- ltp-glibc:setreuid07_16
+- ltp-glibc:setregid01_16
+- ltp-glibc:setregid02_16
+- ltp-glibc:setregid03_16
+- ltp-glibc:setregid04_16
+- ltp-glibc:setresuid01_16
+- ltp-glibc:setresuid02_16
+- ltp-glibc:setresuid03_16
+- ltp-glibc:setresuid04_16
+- ltp-glibc:setresuid05_16
+
+## Groups
+### ltp-musl
+- PASS: 5
+- FAIL: 28
+- Internal: {'TCONF': 34}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: getresuid01_16, getresuid02_16, getresuid03_16, getresgid01_16, getresgid02_16, getresgid03_16, setuid01_16, setuid03_16, setuid04_16, setgid01_16, setgid02_16, setgid03_16, setreuid01_16, setreuid02_16, setreuid03_16, setreuid04_16, setreuid05_16, setreuid06_16, setreuid07_16, setregid01_16, setregid02_16, setregid03_16, setregid04_16, setresuid01_16, setresuid02_16, setresuid03_16, setresuid04_16, setresuid05_16
+
+### ltp-glibc
+- PASS: 5
+- FAIL: 28
+- Internal: {'TCONF': 34}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: getresuid01_16, getresuid02_16, getresuid03_16, getresgid01_16, getresgid02_16, getresgid03_16, setuid01_16, setuid03_16, setuid04_16, setgid01_16, setgid02_16, setgid03_16, setreuid01_16, setreuid02_16, setreuid03_16, setreuid04_16, setreuid05_16, setreuid06_16, setreuid07_16, setregid01_16, setregid02_16, setregid03_16, setregid04_16, setresuid01_16, setresuid02_16, setresuid03_16, setresuid04_16, setresuid05_16
