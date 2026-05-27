@@ -7,8 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::fd_table::FdEntry;
 use super::linux_abi::{SIGPIPE_NUM, fd_cloexec_flag};
-use super::process_lifecycle::terminate_current_thread_for_exit_group;
-use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal, signal_is_blocked};
+use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal};
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::user_thread_entry_by_tid;
 use super::user_memory::{validate_user_write, write_user_value};
@@ -189,20 +188,14 @@ impl PipeEndpoint {
             return;
         };
         if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
+            // `write(2)` on a pipe with no readers raises SIGPIPE and reports
+            // EPIPE when the signal is ignored/handled/blocked.  The fd-table
+            // syscall path still holds `process.fds` while it calls into a pipe
+            // endpoint, so do not synchronously tear the process down here: the
+            // normal user-return hook observes the pending default-fatal signal
+            // after the fd-table lock has been released and then performs the
+            // exit-group teardown.
             let _ = deliver_user_signal(&entry, SIGPIPE_NUM, ext.process.pid());
-        }
-
-        let handler = ext
-            .process
-            .signal_actions
-            .lock()
-            .get(&(SIGPIPE_NUM as usize))
-            .copied()
-            .and_then(|action| action.sa_handler_kernel.map(|func| func as usize))
-            .unwrap_or(0);
-        if handler == 0 && !signal_is_blocked(ext, SIGPIPE_NUM) {
-            ext.process.request_signal_exit_group(SIGPIPE_NUM);
-            terminate_current_thread_for_exit_group(ext.process.as_ref(), 128 + SIGPIPE_NUM);
         }
     }
 
