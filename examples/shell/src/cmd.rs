@@ -187,6 +187,22 @@ const LTP_STABLE_CASES: &[&str] = &[
     "statfs03_64",
     "pselect03",
     "setrlimit05",
+    "unlink05",
+    "pipe02",
+    "dup05",
+    "sendfile07",
+    "sendfile07_64",
+    "stream02",
+    "flock01",
+    "flock02",
+    "flock03",
+    "flock04",
+    "clone06",
+    "clone07",
+    "pselect03_64",
+    "pselect02",
+    "pselect02_64",
+
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[

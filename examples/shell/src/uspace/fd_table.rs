@@ -5,7 +5,9 @@ use core::ptr;
 use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
+use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
+use std::collections::BTreeMap;
 use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
@@ -653,6 +655,13 @@ pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize
     }
 }
 
+pub(super) fn sys_flock(process: &UserProcess, fd: usize, operation: usize) -> isize {
+    match process.fds.lock().flock(fd as i32, operation as u32) {
+        Ok(v) => v as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
 pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().entry(fd as i32) {
         Ok(FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc) => {
@@ -1055,6 +1064,9 @@ impl FdTable {
     }
 
     fn close_slot(&mut self, idx: usize) -> Result<(), LinuxError> {
+        if let Some(FdEntry::File(file)) = self.entries[idx].as_ref() {
+            release_flock_on_last_close(file);
+        }
         if let Some(FdEntry::Socket(socket)) = self.entries[idx].as_ref() {
             socket.close()?;
         }
@@ -1809,6 +1821,15 @@ impl FdTable {
         }
     }
 
+    pub(super) fn flock(&mut self, fd: i32, operation: u32) -> Result<i32, LinuxError> {
+        let (key, owner) = match self.entry(fd)? {
+            FdEntry::File(file) => (flock_key(file), flock_owner(file)),
+            _ => return Err(LinuxError::EBADF),
+        };
+        apply_flock_operation(key, owner, operation)?;
+        Ok(0)
+    }
+
     fn fcntl_getlk(
         &mut self,
         process: &UserProcess,
@@ -1966,6 +1987,121 @@ fn validate_flock(lock: &general::flock) -> Result<(), LinuxError> {
     }
     match lock.l_whence as u32 {
         general::SEEK_SET | general::SEEK_CUR | general::SEEK_END => Ok(()),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+struct FlockState {
+    exclusive_owner: Option<usize>,
+    shared_owners: Vec<usize>,
+}
+
+impl FlockState {
+    fn new() -> Self {
+        Self {
+            exclusive_owner: None,
+            shared_owners: Vec::new(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.exclusive_owner.is_none() && self.shared_owners.is_empty()
+    }
+
+    fn unlock(&mut self, owner: usize) {
+        if self.exclusive_owner == Some(owner) {
+            self.exclusive_owner = None;
+        }
+        self.shared_owners.retain(|held_owner| *held_owner != owner);
+    }
+
+    fn lock_shared(&mut self, owner: usize) -> Result<(), LinuxError> {
+        if matches!(self.exclusive_owner, Some(held_owner) if held_owner != owner) {
+            return Err(LinuxError::EAGAIN);
+        }
+        self.exclusive_owner = None;
+        if !self.shared_owners.contains(&owner) {
+            self.shared_owners.push(owner);
+        }
+        Ok(())
+    }
+
+    fn lock_exclusive(&mut self, owner: usize) -> Result<(), LinuxError> {
+        if matches!(self.exclusive_owner, Some(held_owner) if held_owner != owner) {
+            return Err(LinuxError::EAGAIN);
+        }
+        if self
+            .shared_owners
+            .iter()
+            .any(|held_owner| *held_owner != owner)
+        {
+            return Err(LinuxError::EAGAIN);
+        }
+        self.shared_owners.retain(|held_owner| *held_owner != owner);
+        self.exclusive_owner = Some(owner);
+        Ok(())
+    }
+}
+
+fn flock_table() -> &'static Mutex<BTreeMap<u64, FlockState>> {
+    static FLOCKS: LazyInit<Mutex<BTreeMap<u64, FlockState>>> = LazyInit::new();
+    if !FLOCKS.is_inited() {
+        FLOCKS.init_once(Mutex::new(BTreeMap::new()));
+    }
+    &FLOCKS
+}
+
+fn flock_key(file: &FileEntry) -> u64 {
+    path_inode(Some(file.path.as_str()))
+}
+
+fn flock_owner(file: &FileEntry) -> usize {
+    Arc::as_ptr(&file.offset) as usize
+}
+
+fn release_flock_on_last_close(file: &FileEntry) {
+    if Arc::strong_count(&file.offset) == 1 {
+        release_flock_owner(flock_key(file), flock_owner(file));
+    }
+}
+
+fn release_flock_owner(key: u64, owner: usize) {
+    let mut table = flock_table().lock();
+    let should_remove = if let Some(state) = table.get_mut(&key) {
+        state.unlock(owner);
+        state.is_empty()
+    } else {
+        false
+    };
+    if should_remove {
+        table.remove(&key);
+    }
+}
+
+fn apply_flock_operation(key: u64, owner: usize, operation: u32) -> Result<(), LinuxError> {
+    if operation & !(general::LOCK_SH | general::LOCK_EX | general::LOCK_NB | general::LOCK_UN) != 0
+    {
+        return Err(LinuxError::EINVAL);
+    }
+    let mode = operation & !general::LOCK_NB;
+    match mode {
+        general::LOCK_UN => {
+            release_flock_owner(key, owner);
+            Ok(())
+        }
+        general::LOCK_SH | general::LOCK_EX => {
+            let mut table = flock_table().lock();
+            let state = table.entry(key).or_insert_with(FlockState::new);
+            let ret = if mode == general::LOCK_SH {
+                state.lock_shared(owner)
+            } else {
+                state.lock_exclusive(owner)
+            };
+            if state.is_empty() {
+                table.remove(&key);
+            }
+            ret
+        }
         _ => Err(LinuxError::EINVAL),
     }
 }

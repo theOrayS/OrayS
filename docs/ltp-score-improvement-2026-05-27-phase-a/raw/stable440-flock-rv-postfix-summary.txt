@@ -1,0 +1,52 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable440-flock-rv-postfix.log`
+
+- PASS LTP CASE: 8
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 0 failed
+- ltp-glibc: 4 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| flock01 | rv | glibc | ltp-glibc | PASS | 0 | 1585 | 256710 | 256696 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock01 | rv | musl | ltp-musl | PASS | 0 | 1379 | 258849 | 256787 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock02 | rv | glibc | ltp-glibc | PASS | 0 | 3456 | 256696 | 256682 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock02 | rv | musl | ltp-musl | PASS | 0 | 1428 | 256787 | 256773 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock03 | rv | glibc | ltp-glibc | PASS | 0 | 1653 | 256682 | 256661 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock03 | rv | musl | ltp-musl | PASS | 0 | 1424 | 256773 | 256752 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock04 | rv | glibc | ltp-glibc | PASS | 0 | 2164 | 256661 | 256619 | -42 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock04 | rv | musl | ltp-musl | PASS | 0 | 1694 | 256752 | 256710 | -42 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (rv:glibc:flock01, rv:musl:flock01, rv:glibc:flock02, rv:musl:flock02, rv:glibc:flock03, rv:musl:flock03, rv:glibc:flock04, rv:musl:flock04)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
