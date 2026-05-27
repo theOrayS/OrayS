@@ -10,15 +10,14 @@ use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE,
-    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK, fd_cloexec_flag,
-    neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG,
+    RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -41,10 +40,11 @@ use super::synthetic_fs::{
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value,
+    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
+    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
