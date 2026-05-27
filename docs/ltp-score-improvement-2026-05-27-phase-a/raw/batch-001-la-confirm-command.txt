@@ -1,0 +1,1 @@
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fcntl07,fcntl07_64,readlinkat02 LTP_CASE_TIMEOUT_SECS=90 timeout 70m ./run-eval.sh la
