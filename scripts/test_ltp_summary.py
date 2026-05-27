@@ -115,6 +115,59 @@ class LtpSummarySemanticsTest(unittest.TestCase):
         self.assertEqual(data["categories"]["pass_clean"], [])
         self.assertEqual(data["categories"]["timeout"], ["rv:musl:nanosleep01"])
 
+    def test_promotion_candidate_blocks_timeout_even_after_wrapper_pass(self) -> None:
+        report = self.promotion_report(
+            rv_log="\n".join(
+                [
+                    "#### OS COMP TEST GROUP START ltp-musl ####",
+                    "RUN LTP CASE kill02",
+                    "PASS LTP CASE kill02 : 0",
+                    "TIMEOUT LTP CASE kill02 after 60s",
+                    "#### OS COMP TEST GROUP END ltp-musl ####",
+                    "#### OS COMP TEST GROUP START ltp-glibc ####",
+                    "RUN LTP CASE kill02",
+                    "PASS LTP CASE kill02 : 0",
+                    "#### OS COMP TEST GROUP END ltp-glibc ####",
+                ]
+            ),
+            la_log=self.two_libc_pass_log("kill02"),
+        )
+
+        self.assertEqual(report["candidate_count"], 0)
+        self.assertEqual(report["blocked_count"], 1)
+        blocker = report["blocked"][0]["blockers"][0]
+        self.assertEqual(blocker["arch"], "rv")
+        self.assertEqual(blocker["libc"], "musl")
+        self.assertEqual(blocker["reasons"], ["timeout=1", "status=TIMEOUT"])
+
+    def test_promotion_candidate_blocks_enosys_and_panic_trap_markers(self) -> None:
+        report = self.promotion_report(
+            rv_log="\n".join(
+                [
+                    "#### OS COMP TEST GROUP START ltp-musl ####",
+                    "RUN LTP CASE getcpu01",
+                    "getcpu01: not implemented",
+                    "PASS LTP CASE getcpu01 : 0",
+                    "#### OS COMP TEST GROUP END ltp-musl ####",
+                    "#### OS COMP TEST GROUP START ltp-glibc ####",
+                    "RUN LTP CASE getcpu01",
+                    "kernel trap while handling getcpu01",
+                    "PASS LTP CASE getcpu01 : 0",
+                    "#### OS COMP TEST GROUP END ltp-glibc ####",
+                ]
+            ),
+            la_log=self.two_libc_pass_log("getcpu01"),
+        )
+
+        self.assertEqual(report["candidate_count"], 0)
+        self.assertEqual(report["blocked_count"], 1)
+        blockers = {
+            (blocker["arch"], blocker["libc"]): blocker["reasons"]
+            for blocker in report["blocked"][0]["blockers"]
+        }
+        self.assertEqual(blockers[("rv", "musl")], ["ENOSYS=1"])
+        self.assertEqual(blockers[("rv", "glibc")], ["panic/trap=1"])
+
     def test_promotion_candidate_requires_four_way_clean_matrix(self) -> None:
         report = self.promotion_report(
             rv_log=self.two_libc_pass_log("openat02"),
