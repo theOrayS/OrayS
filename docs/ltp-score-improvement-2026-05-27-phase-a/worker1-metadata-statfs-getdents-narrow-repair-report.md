@@ -20,6 +20,7 @@ Scope: task 3, metadata/statfs/getdents lane
 
 1. `FdTable::getdents64` now checks whether the recorded directory path still exists before reading entries. If the directory was removed after `open(O_DIRECTORY)`, it returns `ENOENT` instead of continuing on a stale directory handle. This directly targets the `getdents02` unlinked-directory errno expectation without adding any legacy `getdents` alias.
 2. `FdTable::statfs_path` now opens the target with `O_PATH_FLAG` rather than read-open semantics, then enforces parent-directory search permission for non-root callers. This keeps `statfs(2)` metadata semantics independent from file read permission while allowing `statfs03` to return `EACCES` when a parent directory lacks search permission.
+3. After leader auto-merged worker lanes, I fixed the local integration compile break in the same file by importing `FILE_MODE_STICKY` and making `stat_absolute_path` build a `general::stat` from `axfs::api::Metadata` accessors instead of passing that wrapper to `file_attr_to_stat`.
 
 No dispatcher alias was added. Existing dispatch still covers `__NR_statfs`, `__NR_fstatfs`, `__NR_getcwd`, `__NR_newfstatat`, `__NR_fstat`, and `__NR_getdents64`, and the absence of a safe target-arch legacy `__NR_getdents` path remains explicit.
 
@@ -82,7 +83,7 @@ PASS/FAIL below is for local worker verification only; it is not LTP promotion e
 | Worker mailbox/inbox | PASS | Re-read task 3 inbox and mailbox; no new undelivered steering. `raw/batch-001-rv-inline-summary.txt` absent. |
 | Stable list preflight | PASS | `stable_total=413 unique=413 duplicates=0`; focus cases absent; sentinels present. |
 | Rust format | PASS | `rustfmt --edition 2024 examples/shell/src/uspace/fd_table.rs`; later `rustfmt --edition 2024 --check examples/shell/src/uspace/fd_table.rs`. |
-| Typecheck/build | PASS | `cargo check -p arceos-shell --features 'uspace,auto-run-tests,axhal/defplat' --target riscv64gc-unknown-none-elf` finished successfully. A narrower check without `auto-run-tests` failed on pre-existing `WaitQueue::wait_timeout_until` feature wiring, so the successful command includes the feature used by this uspace test build shape. |
+| Typecheck/build | PASS | Final `cargo check -p arceos-shell --features 'uspace,auto-run-tests,axhal/defplat' --target riscv64gc-unknown-none-elf` finished successfully after the post-merge compile fix. A narrower check without `auto-run-tests` failed on pre-existing `WaitQueue::wait_timeout_until` feature wiring, so the successful command includes the feature used by this uspace test build shape. |
 | Test suite fallback | PASS | `python3 -B scripts/test_ltp_summary.py` ran 10 tests OK. |
 | Rust no-run tests | FAIL / not applicable | `cargo test -p arceos-shell --features 'uspace,auto-run-tests,axhal/defplat' --target riscv64gc-unknown-none-elf --no-run` failed with `can't find crate for test` for the bare-metal target; this is a harness limitation, not a code failure in the modified file. |
 | End-to-end LTP | NOT RUN | QEMU/evaluator runs are explicitly prohibited for this worker lane without an isolated image. |
