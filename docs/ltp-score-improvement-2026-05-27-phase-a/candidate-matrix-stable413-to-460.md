@@ -29,6 +29,41 @@ Lane: discovery + promotion matrix.
 | stable460 reserve | `clone06,clone07,clone08,clone09,open14,creat08,creat09,fs_perms` plus leader-supplied fresh clean rows | Reserve for fill only if lower-risk pools under-yield. | No prior parsed clean evidence in this matrix; do not spend final budget unless fresh summaries are clean. |
 | do-not-first-batch | `kill02,waitid07,waitid08,waitid10,poll02,getcpu01,gethostid01,gethostname02,times03,getpgid01,fork13,fork14,kill05,kill10,mmap04,mmap05,munmap01,mprotect01,mprotect02,inode02` | Blocker/diagnosis only. | Prior rows include TFAIL/TBROK/TCONF/timeout/ENOSYS or aggregate-only failure; never promote from targeted-only clean rows. |
 
+## Leader fresh-evidence update (post Team repair/scout)
+
+After the worker matrix was written, the leader serialized additional targeted parser runs from the same phase directory. These supersede the older blocker rows only for the cases named below; all other table rows keep their prior blocker classification until fresh RV+LA evidence exists.
+
+Fresh evidence files:
+
+- `raw/postrepair-scout-001-rv-summary.txt`: RV targeted batch over VFS/metadata rows; `PASS LTP CASE 22`, `FAIL 16`, timeout 0, panic/trap 0.
+- `raw/postrepair-scout-001-la-confirm-summary.txt`: LA confirmation for the RV-clean subset; `PASS LTP CASE 20`, `FAIL 0`, timeout/ENOSYS/panic/trap 0.
+- `raw/scout-misc-process-001-rv-summary.txt`: RV misc/process scout; only `pselect03` and `setrlimit05` were clean across musl+glibc.
+- `raw/scout-misc-process-001-la-confirm-summary.txt`: LA confirmation for `pselect03,setrlimit05`; `PASS LTP CASE 4`, `FAIL 0`, timeout/ENOSYS/panic/trap 0.
+
+Promotion-clean candidates from these fresh targeted runs (RV+LA x musl+glibc clean, zero internal `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap):
+
+| Case | Pool | Fresh classification | Evidence | Promotion note |
+| --- | --- | --- | --- | --- |
+| `fcntl07` | B FD/fcntl | clean | `batch-001-*`, plus stable425 aggregate precheck in progress | already clean from worker task-6 |
+| `fcntl07_64` | B FD/fcntl | clean | `batch-001-*`, plus stable425 aggregate precheck in progress | already clean from worker task-6 |
+| `open06` | D VFS create/open/remove | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `creat04` | D VFS create/open/remove | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `mkdir04` | D VFS create/open/remove | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `rmdir03` | D VFS create/open/remove | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `unlink08` | D VFS create/open/remove | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `unlink07` | D VFS create/open/remove | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `statfs03` | C metadata/statfs | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `statfs03_64` | C metadata/statfs | clean | `postrepair-scout-001-rv-summary.txt`, `postrepair-scout-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `pselect03` | E light syscall | clean | `scout-misc-process-001-rv-summary.txt`, `scout-misc-process-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+| `setrlimit05` | E light syscall | clean | `scout-misc-process-001-rv-summary.txt`, `scout-misc-process-001-la-confirm-summary.txt` | promoted only if stable425 aggregate gate stays clean |
+
+Freshly demoted/blocker rows from the same runs:
+
+- `getdents01`, `getdents02`, `fstatfs01`, `fstatfs01_64`, `statfs01`, `statfs01_64`, `statvfs01`, `getcwd03`, `getcwd04` remain non-clean because RV summary still contains internal `TFAIL/TBROK/TCONF` and/or ENOSYS markers; `getdents02` pass-with-TCONF is not promotion-clean.
+- `select01`/`select02`/`select03`/`select04`, `pselect01`/`pselect02`, `clock_gettime01`/`clock_gettime04`, `setrlimit04`, `sched_rr_get_interval03`, `sched_setaffinity01`, `setpriority01`, `nice04`, and `signal01` are non-clean or split-risk in `scout-misc-process-001-rv-summary.txt`; no promotion without a future clean repair.
+
+Current leader-owned stable list state after applying this candidate set: `425 total / 425 unique / 0 duplicates`. Aggregate stable425 RV/LA gates are still required before the stable425 story can be claimed.
+
 ## Candidate status table
 | Case | Pool | Inv | Current classification | Latest exact status by combo | Prior blocker classes seen | Evidence path(s) | Recommendation |
 | --- | --- | ---: | --- | --- | --- | --- | --- |
