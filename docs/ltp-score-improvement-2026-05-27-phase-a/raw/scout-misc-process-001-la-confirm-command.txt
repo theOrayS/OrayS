@@ -1,0 +1,1 @@
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=pselect03,setrlimit05 LTP_CASE_TIMEOUT_SECS=90 timeout 80m ./run-eval.sh la

@@ -1,0 +1,64 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/postrepair-scout-001-la-confirm.log`
+
+- PASS LTP CASE: 20
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 10 passed, 0 failed
+- ltp-glibc: 10 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| creat04 | la | glibc | ltp-glibc | PASS | 0 | 3493 | 191984 | 191945 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat04 | la | musl | ltp-musl | PASS | 0 | 2214 | 192253 | 192221 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | la | glibc | ltp-glibc | PASS | 0 | 9191 | 192101 | 192053 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | la | musl | ltp-musl | PASS | 0 | 4935 | 194397 | 192309 | -2088 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07_64 | la | glibc | ltp-glibc | PASS | 0 | 10421 | 192053 | 192005 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07_64 | la | musl | ltp-musl | PASS | 0 | 5775 | 192309 | 192269 | -40 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdir04 | la | glibc | ltp-glibc | PASS | 0 | 3409 | 191945 | 191924 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdir04 | la | musl | ltp-musl | PASS | 0 | 2006 | 192221 | 192205 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open06 | la | glibc | ltp-glibc | PASS | 0 | 3251 | 192005 | 191984 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open06 | la | musl | ltp-musl | PASS | 0 | 1818 | 192269 | 192253 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir03 | la | glibc | ltp-glibc | PASS | 0 | 3850 | 191924 | 191903 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir03 | la | musl | ltp-musl | PASS | 0 | 2279 | 192205 | 192189 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03 | la | glibc | ltp-glibc | PASS | 0 | 3193 | 187738 | 187717 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03 | la | musl | ltp-musl | PASS | 0 | 1765 | 192133 | 192117 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03_64 | la | glibc | ltp-glibc | PASS | 0 | 3161 | 187717 | 187696 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03_64 | la | musl | ltp-musl | PASS | 0 | 2339 | 192117 | 192101 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink07 | la | glibc | ltp-glibc | PASS | 0 | 3852 | 187759 | 187738 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink07 | la | musl | ltp-musl | PASS | 0 | 2114 | 192149 | 192133 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink08 | la | glibc | ltp-glibc | PASS | 0 | 3485 | 191903 | 187759 | -4144 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink08 | la | musl | ltp-musl | PASS | 0 | 2369 | 192189 | 192149 | -40 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 20 (la:glibc:creat04, la:musl:creat04, la:glibc:fcntl07, la:musl:fcntl07, la:glibc:fcntl07_64, la:musl:fcntl07_64, la:glibc:mkdir04, la:musl:mkdir04, la:glibc:open06, la:musl:open06, la:glibc:rmdir03, la:musl:rmdir03, la:glibc:statfs03, la:musl:statfs03, la:glibc:statfs03_64, la:musl:statfs03_64, la:glibc:unlink07, la:musl:unlink07, la:glibc:unlink08, la:musl:unlink08)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 10
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 10
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

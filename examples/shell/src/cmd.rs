@@ -175,6 +175,18 @@ const LTP_STABLE_CASES: &[&str] = &[
     "pwritev201_64",
     "pwritev202",
     "pwritev202_64",
+    "fcntl07",
+    "fcntl07_64",
+    "open06",
+    "creat04",
+    "mkdir04",
+    "rmdir03",
+    "unlink08",
+    "unlink07",
+    "statfs03",
+    "statfs03_64",
+    "pselect03",
+    "setrlimit05",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
