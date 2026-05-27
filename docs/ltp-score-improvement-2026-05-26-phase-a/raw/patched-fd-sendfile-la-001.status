@@ -1,0 +1,3 @@
+arch=la
+cases=pread02,pread02_64,pwrite02,pwrite02_64,pwrite04,pwrite04_64,sendfile02,sendfile02_64,sendfile03,sendfile03_64,sendfile04,sendfile04_64,sendfile05,sendfile05_64
+run-eval rc=0

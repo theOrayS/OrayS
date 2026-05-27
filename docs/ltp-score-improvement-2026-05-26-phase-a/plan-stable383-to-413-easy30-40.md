@@ -39,3 +39,9 @@ Leader cwd: `/root/oskernel2026-orays`
 - Worker 5: VFS small create/remove + fs-suite guardrail; no fake-pass/marker/timeout guardrail.
 
 Workers do not mutate `.omx/ultragoal` or final `LTP_STABLE_CASES`. Promotion gates are leader-serialized.
+
+## Final execution note
+
+- Main goal delivered at stable413: live list is 413 total / 413 unique / 0 duplicates.
+- Final disk hygiene: after QEMU/build logs and Codex transient log growth, `/root/.codex/log/codex-tui.log` was truncated as low-value runtime log; final disk check recovered `/` to 36% used / 37G free and `/root/.codex` to 1.1G.
+- Stretch stable423 was deferred because the first 30 four-way clean cases satisfied the main goal, while the remaining easy pools require additional scout/fix cycles before honest promotion.
