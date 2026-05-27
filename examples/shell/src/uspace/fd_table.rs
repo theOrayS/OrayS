@@ -85,6 +85,7 @@ pub(super) struct DirectoryEntry {
     pub(super) dir: Directory,
     pub(super) attr: FileAttr,
     pub(super) path: String,
+    next_dirent_cookie: u64,
 }
 
 #[derive(Clone)]
@@ -1189,11 +1190,15 @@ impl FdTable {
         let FdEntry::Directory(dir) = entry else {
             return Err(LinuxError::ENOTDIR);
         };
+        let min_reclen = align_up(offset_of!(general::linux_dirent64, d_name) + 1, 8);
+        if max_len < min_reclen {
+            return Err(LinuxError::EINVAL);
+        }
         let mut read_buf: [fops::DirEntry; 16] =
             core::array::from_fn(|_| fops::DirEntry::default());
         let count = dir.dir.read_dir(&mut read_buf).map_err(LinuxError::from)?;
         let mut out = Vec::new();
-        for (idx, item) in read_buf[..count].iter().enumerate() {
+        for item in read_buf[..count].iter() {
             let name = item.name_as_bytes();
             let reclen = align_up(
                 offset_of!(general::linux_dirent64, d_name) + name.len() + 1,
@@ -1202,6 +1207,10 @@ impl FdTable {
             if out.len() + reclen > max_len {
                 break;
             }
+            let entry_path = core::str::from_utf8(name)
+                .ok()
+                .and_then(|name| normalize_path(dir.path.as_str(), name));
+            dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
             let start = out.len();
             out.resize(start + reclen, 0);
             unsafe {
@@ -1209,8 +1218,8 @@ impl FdTable {
                 ptr::write_unaligned(
                     dirent,
                     general::linux_dirent64 {
-                        d_ino: (idx + 1) as _,
-                        d_off: 0,
+                        d_ino: path_inode(entry_path.as_deref()) as _,
+                        d_off: dir.next_dirent_cookie as _,
                         d_reclen: reclen as _,
                         d_type: dirent_type(item.entry_type()) as u8,
                         d_name: Default::default(),
@@ -2408,6 +2417,7 @@ pub(super) fn open_dir_entry(path: &str) -> Result<FdEntry, LinuxError> {
         dir,
         attr,
         path: path.into(),
+        next_dirent_cookie: 0,
     }))
 }
 
