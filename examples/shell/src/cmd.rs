@@ -214,6 +214,14 @@ const LTP_STABLE_CASES: &[&str] = &[
     "fchown01",
     "fchown02",
     "fchown03",
+    "fchown05",
+    "fchownat01",
+    "fcntl18",
+    "fcntl18_64",
+    "syscall01",
+    "mknod06",
+    "mknod02",
+    "mknod05",
 
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]

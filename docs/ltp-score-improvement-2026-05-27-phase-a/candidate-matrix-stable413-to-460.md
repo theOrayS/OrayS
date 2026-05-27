@@ -259,3 +259,25 @@ The following rows supersede earlier blocked/unscouted matrix status for this st
 | `fchownat01` | A/E permissions/ownership | clean reserve for stable460 | same as `fchown05` | confirmed RV+LA clean but intentionally held for next story budget |
 
 Aggregate gate result: RV and LA both `PASS LTP CASE 904`, `FAIL LTP CASE 0`, `ltp-musl 452/0`, `ltp-glibc 452/0`, timeout/ENOSYS/panic/trap 0, bad marker-prefix lines 0. The only aggregate internal TCONF remains the known `read02` O_DIRECT/tmpfs TCONF (2 per libc group per arch).
+
+## Stable460 delivery update (G006, 2026-05-27)
+
+The following rows supersede earlier matrix status for the final stable460 story. Promotion proof is the combination of targeted parser summaries and the final RV/LA stable460 gates recorded in `stable460-delivery-report.md` and `final-gate-quality-gate.json`.
+
+| Case | Batch | Final status | Evidence | Notes |
+| --- | --- | --- | --- | --- |
+| `fchown05` | A/E permissions/ownership | promoted stable460 | `raw/stable452-clean14-la-confirm-summary.txt`, `raw/stable460-scout-001-rv-summary.txt`, final RV/LA stable460 summaries | clean reserve consumed from stable452 |
+| `fchownat01` | A/E permissions/ownership | promoted stable460 | same as `fchown05` | clean reserve consumed from stable452 |
+| `fcntl18` | B FD/fcntl | promoted stable460 | `raw/stable460-scout-002-rv-summary.txt`, `raw/stable460-clean13-la-confirm-001-summary.txt`, final RV/LA stable460 summaries | supersedes older RV blocker rows |
+| `fcntl18_64` | B FD/fcntl | promoted stable460 | same as `fcntl18` | 64-bit companion |
+| `syscall01` | E light syscall | promoted stable460 | `raw/stable460-scout-003-rv-summary.txt`, `raw/stable460-clean13-la-confirm-001-summary.txt`, final RV/LA stable460 summaries | getpid/getuid/getgid syscall wrapper smoke |
+| `mknod06` | D/A VFS path/mknod | promoted stable460 | `raw/stable460-scout-005-rv-summary.txt`, `raw/stable460-clean13-la-confirm-001-summary.txt`, final RV/LA stable460 summaries | replacement for demoted `kill02` |
+| `mknod02` | D/A VFS path/mknod | promoted stable460 | same as `mknod06` | mknod ownership/setgid behavior |
+| `mknod05` | D/A VFS path/mknod | promoted stable460 | same as `mknod06` | mknod symlink/type behavior |
+| `kill02` | E process/signal | demoted | `raw/stable460-scout-004-rv-summary.txt`, `raw/stable460-la-final-gate-summary.txt` | targeted clean was invalidated by LA aggregate `TBROK=8` child setup timeout; do not promote until fixed |
+| `readlinkat02` | A VFS/path | demoted | `raw/stable460-clean13-la-confirm-001-summary.txt` | LA musl `TFAIL=1` |
+| `mknod08` | D/A VFS path/mknod | clean reserve | `raw/stable460-scout-005-rv-summary.txt`, `raw/stable460-clean13-la-confirm-001-summary.txt` | candidate for stable470 after fresh confirmation |
+| `mknodat01` | D/A VFS path/mknod | clean reserve | same as `mknod08` | candidate for stable470 after fresh confirmation |
+| `rename14` | A/D VFS rename | clean reserve | same as `mknod08` | candidate for stable470 after fresh confirmation |
+
+Aggregate final gate result: RV and LA both `PASS LTP CASE 920`, `FAIL LTP CASE 0`, `ltp-musl 460/0`, `ltp-glibc 460/0`, timeout/ENOSYS/panic/trap 0, bad marker-prefix lines 0. The only aggregate internal TCONF remains the known `read02` O_DIRECT/tmpfs TCONF (2 per libc group per arch).

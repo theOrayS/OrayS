@@ -1,0 +1,218 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable460-scout-004-rv.log`
+
+- PASS LTP CASE: 10
+- FAIL LTP CASE: 80
+- Internal TFAIL/TBROK/TCONF: 146 ({'TCONF': 35, 'TFAIL': 93, 'TBROK': 18})
+- timeout matches: 4
+- ENOSYS/not implemented matches: 28
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 41 failed
+- ltp-glibc: 6 passed, 39 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fork06 | rv | glibc | ltp-glibc | FAIL | -1 | 4 | 128612 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork06 | rv | musl | ltp-musl | FAIL | -1 | 5 | 129453 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork11 | rv | glibc | ltp-glibc | FAIL | -1 | 2 | 128612 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork11 | rv | musl | ltp-musl | FAIL | -1 | 2 | 129453 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcontext01 | rv | glibc | ltp-glibc | PASS | 0 | 1541 | 128998 | 128984 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcontext01 | rv | musl | ltp-musl | FAIL | 32 | 1267 | 258849 | 256794 | -2055 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getcpu01 | rv | glibc | ltp-glibc | FAIL | 1 | 1723 | 128970 | 128956 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| getcpu01 | rv | musl | ltp-musl | FAIL | 32 | 1375 | 256787 | 256773 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| gethostid01 | rv | glibc | ltp-glibc | FAIL | 1 | 31791 | 128984 | 128970 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| gethostid01 | rv | musl | ltp-musl | FAIL | 32 | 1480 | 256794 | 256787 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| gethostname02 | rv | glibc | ltp-glibc | PASS | 0 | 1469 | 128956 | 128942 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gethostname02 | rv | musl | ltp-musl | FAIL | 1 | 1500 | 256773 | 256759 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 1735 | 128942 | 128921 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 1352 | 256759 | 256738 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill02 | rv | glibc | ltp-glibc | PASS | 0 | 11825 | 128893 | 128858 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | rv | musl | ltp-musl | PASS | 0 | 11599 | 256710 | 256675 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill05 | rv | glibc | ltp-glibc | FAIL | 3 | 1673 | 128858 | 128829 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill05 | rv | musl | ltp-musl | FAIL | 3 | 1299 | 256675 | 256646 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill10 | rv | glibc | ltp-glibc | FAIL | 137 | 45951 | 128829 | 128668 | -161 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill10 | rv | musl | ltp-musl | FAIL | 137 | 45988 | 256646 | 129509 | -127137 | 0 | 0 | 0 | 1 | 0 | 0 |
+| prctl02 | rv | glibc | ltp-glibc | FAIL | 32 | 1554 | 128449 | 128435 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl02 | rv | musl | ltp-musl | FAIL | 32 | 1382 | 129292 | 129278 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl03 | rv | glibc | ltp-glibc | FAIL | 32 | 1695 | 128435 | 128421 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl03 | rv | musl | ltp-musl | FAIL | 32 | 1235 | 129278 | 129264 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl04 | rv | glibc | ltp-glibc | FAIL | 32 | 1757 | 128421 | 128407 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl04 | rv | musl | ltp-musl | FAIL | 32 | 1184 | 129264 | 129250 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl06 | rv | glibc | ltp-glibc | FAIL | 6 | 1162 | 128407 | 128400 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| prctl06 | rv | musl | ltp-musl | FAIL | 6 | 763 | 129250 | 129243 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| prctl07 | rv | glibc | ltp-glibc | FAIL | 32 | 1608 | 128400 | 128386 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl07 | rv | musl | ltp-musl | FAIL | 32 | 1207 | 129243 | 129229 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| prctl08 | rv | glibc | ltp-glibc | FAIL | 33 | 1641 | 128386 | 128372 | -14 | 5 | 0 | 1 | 0 | 0 | 0 |
+| prctl08 | rv | musl | ltp-musl | FAIL | 33 | 1365 | 129229 | 129215 | -14 | 5 | 0 | 1 | 0 | 0 | 0 |
+| sched_getattr01 | rv | glibc | ltp-glibc | FAIL | 134 | 1382 | 128465 | 128457 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr01 | rv | musl | ltp-musl | FAIL | 1 | 1156 | 129306 | 129299 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sched_rr_get_interval03 | rv | glibc | ltp-glibc | PASS | 0 | 1703 | 128528 | 128507 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sched_rr_get_interval03 | rv | musl | ltp-musl | PASS | 0 | 1273 | 129369 | 129348 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| sched_setaffinity01 | rv | glibc | ltp-glibc | FAIL | 1 | 1811 | 128486 | 128465 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sched_setaffinity01 | rv | musl | ltp-musl | FAIL | 1 | 1336 | 129327 | 129306 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sched_setattr01 | rv | glibc | ltp-glibc | FAIL | 134 | 1564 | 128457 | 128449 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setattr01 | rv | musl | ltp-musl | FAIL | 1 | 1266 | 129299 | 129292 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler04 | rv | glibc | ltp-glibc | FAIL | 32 | 1772 | 128507 | 128486 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| sched_setscheduler04 | rv | musl | ltp-musl | FAIL | 32 | 1415 | 129348 | 129327 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| setdomainname01 | rv | glibc | ltp-glibc | FAIL | 5 | 1630 | 128372 | 128358 | -14 | 1 | 0 | 0 | 0 | 2 | 0 |
+| setdomainname01 | rv | musl | ltp-musl | FAIL | 5 | 1337 | 129215 | 129201 | -14 | 1 | 0 | 0 | 0 | 2 | 0 |
+| setdomainname02 | rv | glibc | ltp-glibc | FAIL | 37 | 1946 | 128358 | 128337 | -21 | 3 | 0 | 1 | 0 | 5 | 0 |
+| setdomainname02 | rv | musl | ltp-musl | FAIL | 37 | 1223 | 129201 | 129180 | -21 | 3 | 0 | 1 | 0 | 5 | 0 |
+| setdomainname03 | rv | glibc | ltp-glibc | FAIL | 37 | 1524 | 128337 | 128316 | -21 | 1 | 0 | 1 | 0 | 3 | 0 |
+| setdomainname03 | rv | musl | ltp-musl | FAIL | 37 | 1202 | 129180 | 129159 | -21 | 1 | 0 | 1 | 0 | 3 | 0 |
+| setitimer01 | rv | glibc | ltp-glibc | FAIL | 137 | 45926 | 128316 | 128288 | -28 | 5 | 0 | 0 | 1 | 0 | 0 |
+| setitimer01 | rv | musl | ltp-musl | FAIL | 137 | 45848 | 129159 | 129131 | -28 | 5 | 0 | 0 | 1 | 0 | 0 |
+| setitimer02 | rv | glibc | ltp-glibc | FAIL | 1 | 1775 | 128288 | 128274 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setitimer02 | rv | musl | ltp-musl | FAIL | 1 | 1426 | 129131 | 129117 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setpgid03 | rv | glibc | ltp-glibc | FAIL | 2 | 11160 | 128612 | 128584 | -28 | 0 | 1 | 0 | 0 | 0 | 0 |
+| setpgid03 | rv | musl | ltp-musl | FAIL | 2 | 10984 | 129453 | 129425 | -28 | 0 | 1 | 0 | 0 | 0 | 0 |
+| setpriority01 | rv | glibc | ltp-glibc | PASS | 0 | 1723 | 128556 | 128528 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setpriority01 | rv | musl | ltp-musl | PASS | 0 | 1547 | 129397 | 129369 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setsid01 | rv | glibc | ltp-glibc | PASS | 0 | 2771 | 128584 | 128556 | -28 | 3 | 0 | 0 | 0 | 0 | 0 |
+| setsid01 | rv | musl | ltp-musl | PASS | 0 | 2292 | 129425 | 129397 | -28 | 2 | 0 | 0 | 0 | 0 | 0 |
+| timer_create01 | rv | glibc | ltp-glibc | FAIL | -1 | 7 | 128239 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| timer_create01 | rv | musl | ltp-musl | FAIL | -1 | 8 | 129082 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| timer_create02 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 128239 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| timer_create02 | rv | musl | ltp-musl | FAIL | -1 | 2 | 129082 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| timer_create03 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 128239 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| timer_create03 | rv | musl | ltp-musl | FAIL | -1 | 12 | 129082 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| timer_delete01 | rv | glibc | ltp-glibc | FAIL | 32 | 1693 | 128239 | 128225 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_delete01 | rv | musl | ltp-musl | FAIL | 32 | 1343 | 129082 | 129068 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_delete02 | rv | glibc | ltp-glibc | FAIL | 32 | 1629 | 128225 | 128211 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_delete02 | rv | musl | ltp-musl | FAIL | 32 | 1233 | 129068 | 129054 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_gettime01 | rv | glibc | ltp-glibc | FAIL | 32 | 1789 | 128211 | 128197 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_gettime01 | rv | musl | ltp-musl | FAIL | 32 | 1486 | 129054 | 129040 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_settime01 | rv | glibc | ltp-glibc | FAIL | 32 | 1735 | 128197 | 128183 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_settime01 | rv | musl | ltp-musl | FAIL | 32 | 1257 | 129040 | 129026 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_settime02 | rv | glibc | ltp-glibc | FAIL | 32 | 1556 | 128183 | 128169 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_settime02 | rv | musl | ltp-musl | FAIL | 32 | 1225 | 129026 | 129012 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| timer_settime03 | rv | glibc | ltp-glibc | FAIL | 6 | 1699 | 128169 | 128155 | -14 | 0 | 1 | 0 | 0 | 2 | 0 |
+| timer_settime03 | rv | musl | ltp-musl | FAIL | 6 | 1321 | 129012 | 128998 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| timerfd01 | rv | glibc | ltp-glibc | FAIL | 2 | 1686 | 128274 | 128260 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| timerfd01 | rv | musl | ltp-musl | FAIL | 2 | 1457 | 129117 | 129103 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| timerfd02 | rv | glibc | ltp-glibc | FAIL | 2 | 1633 | 128260 | 128246 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| timerfd02 | rv | musl | ltp-musl | FAIL | 2 | 1333 | 129103 | 129089 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| timerfd04 | rv | glibc | ltp-glibc | FAIL | 2 | 1696 | 128246 | 128239 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| timerfd04 | rv | musl | ltp-musl | FAIL | 2 | 1219 | 129089 | 129082 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| times03 | rv | glibc | ltp-glibc | FAIL | 1 | 9244 | 128921 | 128893 | -28 | 6 | 0 | 0 | 0 | 0 | 0 |
+| times03 | rv | musl | ltp-musl | FAIL | 1 | 8748 | 256738 | 256710 | -28 | 6 | 0 | 0 | 0 | 0 | 0 |
+| waitid07 | rv | glibc | ltp-glibc | FAIL | 1 | 1685 | 128668 | 128647 | -21 | 5 | 0 | 0 | 0 | 0 | 0 |
+| waitid07 | rv | musl | ltp-musl | FAIL | 1 | 1472 | 129509 | 129488 | -21 | 5 | 0 | 0 | 0 | 0 | 0 |
+| waitid08 | rv | glibc | ltp-glibc | FAIL | 1 | 1807 | 128647 | 128626 | -21 | 10 | 0 | 0 | 0 | 0 | 0 |
+| waitid08 | rv | musl | ltp-musl | FAIL | 1 | 1322 | 129488 | 129467 | -21 | 10 | 0 | 0 | 0 | 0 | 0 |
+| waitid10 | rv | glibc | ltp-glibc | FAIL | 2 | 1729 | 128626 | 128612 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| waitid10 | rv | musl | ltp-musl | FAIL | 2 | 1364 | 129467 | 129453 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 4 (rv:glibc:getcontext01, rv:glibc:gethostname02, rv:glibc:kill02, rv:musl:kill02)
+- pass_with_tconf: 4 (rv:glibc:sched_rr_get_interval03, rv:musl:sched_rr_get_interval03, rv:glibc:setpriority01, rv:musl:setpriority01)
+- fail_wrapper: 80 (rv:glibc:fork06, rv:musl:fork06, rv:glibc:fork11, rv:musl:fork11, rv:musl:getcontext01, rv:glibc:getcpu01, rv:musl:getcpu01, rv:glibc:gethostid01, rv:musl:gethostid01, rv:musl:gethostname02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:kill05, rv:musl:kill05, rv:glibc:kill10, rv:musl:kill10, rv:glibc:prctl02, rv:musl:prctl02, rv:glibc:prctl03, rv:musl:prctl03, rv:glibc:prctl04, rv:musl:prctl04, rv:glibc:prctl06, rv:musl:prctl06, rv:glibc:prctl07, rv:musl:prctl07, rv:glibc:prctl08, rv:musl:prctl08, rv:glibc:sched_getattr01, rv:musl:sched_getattr01, rv:glibc:sched_setaffinity01, rv:musl:sched_setaffinity01, rv:glibc:sched_setattr01, rv:musl:sched_setattr01, rv:glibc:sched_setscheduler04, rv:musl:sched_setscheduler04, rv:glibc:setdomainname01, rv:musl:setdomainname01, rv:glibc:setdomainname02, rv:musl:setdomainname02, rv:glibc:setdomainname03, rv:musl:setdomainname03, rv:glibc:setitimer01, rv:musl:setitimer01, rv:glibc:setitimer02, rv:musl:setitimer02, rv:glibc:setpgid03, rv:musl:setpgid03, rv:glibc:timer_create01, rv:musl:timer_create01, rv:glibc:timer_create02, rv:musl:timer_create02, rv:glibc:timer_create03, rv:musl:timer_create03, rv:glibc:timer_delete01, rv:musl:timer_delete01, rv:glibc:timer_delete02, rv:musl:timer_delete02, rv:glibc:timer_gettime01, rv:musl:timer_gettime01, rv:glibc:timer_settime01, rv:musl:timer_settime01, rv:glibc:timer_settime02, rv:musl:timer_settime02, rv:glibc:timer_settime03, rv:musl:timer_settime03, rv:glibc:timerfd01, rv:musl:timerfd01, rv:glibc:timerfd02, rv:musl:timerfd02, rv:glibc:timerfd04, rv:musl:timerfd04, rv:glibc:times03, rv:musl:times03, rv:glibc:waitid07, rv:musl:waitid07, rv:glibc:waitid08, rv:musl:waitid08, rv:glibc:waitid10, rv:musl:waitid10)
+- internal_tfail: 31 (rv:glibc:getcpu01, rv:glibc:gethostid01, rv:musl:gethostname02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:kill05, rv:musl:kill05, rv:glibc:prctl08, rv:musl:prctl08, rv:musl:sched_getattr01, rv:glibc:sched_setaffinity01, rv:musl:sched_setaffinity01, rv:musl:sched_setattr01, rv:glibc:setdomainname01, rv:musl:setdomainname01, rv:glibc:setdomainname02, rv:musl:setdomainname02, rv:glibc:setdomainname03, rv:musl:setdomainname03, rv:glibc:setitimer01, rv:musl:setitimer01, rv:glibc:setitimer02, rv:musl:setitimer02, rv:glibc:setsid01, rv:musl:setsid01, rv:glibc:times03, rv:musl:times03, rv:glibc:waitid07, rv:musl:waitid07, rv:glibc:waitid08, rv:musl:waitid08)
+- internal_tbrok: 18 (rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:kill05, rv:musl:kill05, rv:glibc:prctl06, rv:musl:prctl06, rv:glibc:setpgid03, rv:musl:setpgid03, rv:glibc:timer_settime03, rv:musl:timer_settime03, rv:glibc:timerfd01, rv:musl:timerfd01, rv:glibc:timerfd02, rv:musl:timerfd02, rv:glibc:timerfd04, rv:musl:timerfd04, rv:glibc:waitid10, rv:musl:waitid10)
+- timeout: 4 (rv:glibc:kill10, rv:musl:kill10, rv:glibc:setitimer01, rv:musl:setitimer01)
+- enosys: 13 (rv:glibc:getcpu01, rv:glibc:setdomainname01, rv:musl:setdomainname01, rv:glibc:setdomainname02, rv:musl:setdomainname02, rv:glibc:setdomainname03, rv:musl:setdomainname03, rv:glibc:timer_settime03, rv:musl:timer_settime03, rv:glibc:timerfd01, rv:musl:timerfd01, rv:glibc:timerfd02, rv:musl:timerfd02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getcontext01
+- ltp-musl:gethostid01
+- ltp-musl:getcpu01
+- ltp-musl:gethostname02
+- ltp-musl:getpgid01
+- ltp-musl:times03
+- ltp-musl:kill05
+- ltp-musl:kill10
+- ltp-musl:waitid07
+- ltp-musl:waitid08
+- ltp-musl:waitid10
+- ltp-musl:fork06
+- ltp-musl:fork11
+- ltp-musl:setpgid03
+- ltp-musl:sched_setscheduler04
+- ltp-musl:sched_setaffinity01
+- ltp-musl:sched_getattr01
+- ltp-musl:sched_setattr01
+- ltp-musl:prctl02
+- ltp-musl:prctl03
+- ltp-musl:prctl04
+- ltp-musl:prctl06
+- ltp-musl:prctl07
+- ltp-musl:prctl08
+- ltp-musl:setdomainname01
+- ltp-musl:setdomainname02
+- ltp-musl:setdomainname03
+- ltp-musl:setitimer01
+- ltp-musl:setitimer02
+- ltp-musl:timerfd01
+- ltp-musl:timerfd02
+- ltp-musl:timerfd04
+- ltp-musl:timer_create01
+- ltp-musl:timer_create02
+- ltp-musl:timer_create03
+- ltp-musl:timer_delete01
+- ltp-musl:timer_delete02
+- ltp-musl:timer_gettime01
+- ltp-musl:timer_settime01
+- ltp-musl:timer_settime02
+- ltp-musl:timer_settime03
+- ltp-glibc:gethostid01
+- ltp-glibc:getcpu01
+- ltp-glibc:getpgid01
+- ltp-glibc:times03
+- ltp-glibc:kill05
+- ltp-glibc:kill10
+- ltp-glibc:waitid07
+- ltp-glibc:waitid08
+- ltp-glibc:waitid10
+- ltp-glibc:fork06
+- ltp-glibc:fork11
+- ltp-glibc:setpgid03
+- ltp-glibc:sched_setscheduler04
+- ltp-glibc:sched_setaffinity01
+- ltp-glibc:sched_getattr01
+- ltp-glibc:sched_setattr01
+- ltp-glibc:prctl02
+- ltp-glibc:prctl03
+- ltp-glibc:prctl04
+- ltp-glibc:prctl06
+- ltp-glibc:prctl07
+- ltp-glibc:prctl08
+- ltp-glibc:setdomainname01
+- ltp-glibc:setdomainname02
+- ltp-glibc:setdomainname03
+- ltp-glibc:setitimer01
+- ltp-glibc:setitimer02
+- ltp-glibc:timerfd01
+- ltp-glibc:timerfd02
+- ltp-glibc:timerfd04
+- ltp-glibc:timer_create01
+- ltp-glibc:timer_create02
+- ltp-glibc:timer_create03
+- ltp-glibc:timer_delete01
+- ltp-glibc:timer_delete02
+- ltp-glibc:timer_gettime01
+- ltp-glibc:timer_settime01
+- ltp-glibc:timer_settime02
+- ltp-glibc:timer_settime03
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 41
+- Internal: {'TCONF': 19, 'TFAIL': 45, 'TBROK': 9}
+- timeout: 2
+- ENOSYS/not implemented: 13
+- panic/trap: 0
+- Fail cases: getcontext01, gethostid01, getcpu01, gethostname02, getpgid01, times03, kill05, kill10, waitid07, waitid08, waitid10, fork06, fork11, setpgid03, sched_setscheduler04, sched_setaffinity01, sched_getattr01, sched_setattr01, prctl02, prctl03, prctl04, prctl06, prctl07, prctl08, setdomainname01, setdomainname02, setdomainname03, setitimer01, setitimer02, timerfd01, timerfd02, timerfd04, timer_create01, timer_create02, timer_create03, timer_delete01, timer_delete02, timer_gettime01, timer_settime01, timer_settime02, timer_settime03
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 39
+- Internal: {'TFAIL': 48, 'TBROK': 9, 'TCONF': 16}
+- timeout: 2
+- ENOSYS/not implemented: 15
+- panic/trap: 0
+- Fail cases: gethostid01, getcpu01, getpgid01, times03, kill05, kill10, waitid07, waitid08, waitid10, fork06, fork11, setpgid03, sched_setscheduler04, sched_setaffinity01, sched_getattr01, sched_setattr01, prctl02, prctl03, prctl04, prctl06, prctl07, prctl08, setdomainname01, setdomainname02, setdomainname03, setitimer01, setitimer02, timerfd01, timerfd02, timerfd04, timer_create01, timer_create02, timer_create03, timer_delete01, timer_delete02, timer_gettime01, timer_settime01, timer_settime02, timer_settime03
