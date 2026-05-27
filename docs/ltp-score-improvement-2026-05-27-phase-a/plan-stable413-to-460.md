@@ -49,3 +49,9 @@ Mode: Ultragoal + Team.
 ## Verification stop rule
 
 The campaign is complete only when live stable count is 460 unique / 0 duplicates, RV and LA stable final gates each pass 920 LTP rows with 0 failures, only known `read02` internal TCONF is present, marker/noise checks pass, code review and ai-slop-cleaner pass, post-disk check is recorded, and agent-owned changes are committed.
+
+## Progress checkpoints
+
+- stable425: reached 425 total / 425 unique / 0 duplicates; RV and LA aggregate gates both `PASS LTP CASE 850`, `FAIL 0`.
+- stable440: reached 440 total / 440 unique / 0 duplicates; RV and LA aggregate gates both `PASS LTP CASE 880`, `FAIL 0`.
+- stable452: reached 452 total / 452 unique / 0 duplicates; RV and LA aggregate gates both `PASS LTP CASE 904`, `FAIL 0`; only known `read02` TCONF remains. Clean reserves for stable460: `fchown05`, `fchownat01`.

@@ -236,3 +236,26 @@ The following rows supersede earlier blocked/unscouted matrix status for this st
 | `pselect02_64` | E/B select | promoted stable440 | same as `pselect02` | required invalid-fd-set EBADF validation |
 
 Aggregate gate result: RV and LA both `PASS LTP CASE 880`, `FAIL LTP CASE 0`, `ltp-musl 440/0`, `ltp-glibc 440/0`, timeout/ENOSYS/panic/trap 0, bad marker-prefix lines 0. The only aggregate internal TCONF remains the known `read02` O_DIRECT/tmpfs TCONF (2 per libc group per arch).
+
+## Stable452 promotion update (G005, 2026-05-27/28)
+
+The following rows supersede earlier blocked/unscouted matrix status for this story only. Promotion proof is the combination of targeted parser summaries and aggregate RV/LA stable452 gates recorded in `stable452-promotion-gate-report.md`.
+
+| Case | Batch | Final status | Evidence | Notes |
+| --- | --- | --- | --- | --- |
+| `flock06` | B FD/flock | promoted stable452 | `raw/stable452-scout-001-rv-summary.txt`, `raw/stable452-clean14-la-confirm-summary.txt`, aggregate RV/LA stable452 summaries | `flock01`-`flock04` remain regression protection from stable440 |
+| `llseek02` | B FD/lseek | promoted stable452 | `raw/stable452-scout-003-rv-summary.txt`, `raw/stable452-clean14-la-confirm-summary.txt`, aggregate RV/LA stable452 summaries | negative/invalid seek semantics covered |
+| `llseek03` | B FD/lseek | promoted stable452 | same as `llseek02` | same scout/confirm path |
+| `setresgid04` | E process/credentials | promoted stable452 | `raw/stable452-scout-005-rv-summary.txt`, `raw/stable452-clean14-la-confirm-summary.txt`, aggregate RV/LA stable452 summaries | credential family expansion |
+| `setresuid04` | E process/credentials | promoted stable452 | `raw/stable452-scout-004-rv-summary.txt`, `raw/stable452-clean14-la-confirm-summary.txt`, aggregate RV/LA stable452 summaries | 16-bit variants remain TCONF and demoted |
+| `setresuid05` | E process/credentials | promoted stable452 | same as `setresuid04` | same scout/confirm path |
+| `setreuid05` | E process/credentials | promoted stable452 | same as `setresuid04` | same scout/confirm path |
+| `setreuid06` | E process/credentials | promoted stable452 | same as `setresuid04` | same scout/confirm path |
+| `setreuid07` | E process/credentials | promoted stable452 | same as `setresuid04` | same scout/confirm path |
+| `fchown01` | A/E permissions/ownership | promoted stable452 | `raw/stable452-scout-005-rv-summary.txt`, `raw/stable452-clean14-la-confirm-summary.txt`, aggregate RV/LA stable452 summaries | fchown family expansion |
+| `fchown02` | A/E permissions/ownership | promoted stable452 | same as `fchown01` | same scout/confirm path |
+| `fchown03` | A/E permissions/ownership | promoted stable452 | same as `fchown01` | same scout/confirm path |
+| `fchown05` | A/E permissions/ownership | clean reserve for stable460 | `raw/stable452-scout-005-rv-summary.txt`, `raw/stable452-clean14-la-confirm-summary.txt` | confirmed RV+LA clean but intentionally held for next story budget |
+| `fchownat01` | A/E permissions/ownership | clean reserve for stable460 | same as `fchown05` | confirmed RV+LA clean but intentionally held for next story budget |
+
+Aggregate gate result: RV and LA both `PASS LTP CASE 904`, `FAIL LTP CASE 0`, `ltp-musl 452/0`, `ltp-glibc 452/0`, timeout/ENOSYS/panic/trap 0, bad marker-prefix lines 0. The only aggregate internal TCONF remains the known `read02` O_DIRECT/tmpfs TCONF (2 per libc group per arch).
