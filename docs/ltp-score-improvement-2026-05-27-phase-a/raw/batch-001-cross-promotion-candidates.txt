@@ -1,0 +1,59 @@
+# LTP promotion-candidate report
+
+- Inputs: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/batch-001-rv-inline.log`, `docs/ltp-score-improvement-2026-05-27-phase-a/raw/batch-001-la-confirm.log`
+- Required arches: la, rv
+- Required libcs: glibc, musl
+- Required arch/libc combos: 4
+- Promotion candidates: 2
+- Blocked/incomplete cases: 41
+
+## Candidates
+| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |
+| --- | --- | ---: | ---: |
+| fcntl07 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 34418 | -2088 |
+| fcntl07_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 44237 | -48 |
+
+## Blocked or incomplete
+| Case | Reason |
+| --- | --- |
+| access04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| chmod06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| chmod07 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| creat04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| creat06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| fchmod02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| fchmod06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| fcntl11 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=66/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=66/event-failures=1/status=FAIL |
+| fcntl11_64 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=66/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=66/event-failures=1/status=FAIL |
+| fstat02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| fstat02_64 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| fstatfs01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| fstatfs01_64 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| getcwd03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| getcwd04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| getdents01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=2/TCONF=2/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=3/TCONF=1/event-failures=1/status=FAIL |
+| getdents02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=4/TCONF=2/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=6/TCONF=1/event-failures=1/status=FAIL |
+| link02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |
+| mkdir03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| mkdir04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| open06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| open07 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| openat02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| openat03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| readlinkat02 | la:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| rename01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rename03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rename04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rename05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rmdir02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rmdir03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/event-failures=1/status=FAIL |
+| statfs01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| statfs01_64 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| statfs03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| statfs03_64 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| statvfs01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| statx01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| statx03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| unlink07 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| unlink08 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/event-failures=1/status=FAIL |
+| writev03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
