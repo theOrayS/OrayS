@@ -1,0 +1,1 @@
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=flock01\,flock02\,flock03\,flock04\,getrusage03\,setpriority03\,clock_gettime04\,sigpending02\,mkdir02 LTP_CASE_TIMEOUT_SECS=80 timeout 90m ./run-eval.sh rv

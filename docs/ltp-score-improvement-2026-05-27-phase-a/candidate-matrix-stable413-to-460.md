@@ -212,3 +212,27 @@ python3 /tmp/generate_candidate_matrix_doc.py
 ## Notes for leader
 - This document intentionally recommends scout/repair subsets, not promotion edits. Leader must rerun targeted RV+LA parser gates after any source patch and before stable425/440/452/460 updates.
 - If leader adds fresh summaries under `docs/ltp-score-improvement-2026-05-27-phase-a/raw/`, rerun the matrix generation step or update the table rows from those exact parser outputs.
+
+## Stable440 promotion update (G004, 2026-05-27)
+
+The following rows supersede earlier blocked/unscouted matrix status for this story only. Promotion proof is the combination of targeted parser summaries and the aggregate RV/LA stable440 gates recorded in `stable440-promotion-gate-report.md`.
+
+| Case | Batch | Final status | Evidence | Notes |
+| --- | --- | --- | --- | --- |
+| `unlink05` | A/D VFS path/remove | promoted stable440 | `raw/stable440-vfs-scout-001-rv-inline-summary.txt`, `raw/stable440-vfs-clean2-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | `readlinkat02` from same scout remains demoted on LA musl setup mismatch |
+| `pipe02` | B FD/pipe | promoted stable440 | `raw/stable440-pipe02-rv-postfix-summary.txt`, `raw/stable440-clean6-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | pipe regression-protection row |
+| `dup05` | B FD | promoted stable440 | `raw/stable440-fd-select-sendfile-rv-scout-summary.txt`, `raw/stable440-clean6-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | shared FD semantics guardrail |
+| `sendfile07` | B FD/sendfile | promoted stable440 | same as `dup05` | stable413 sendfile-adjacent expansion |
+| `sendfile07_64` | B FD/sendfile | promoted stable440 | same as `dup05` | stable413 sendfile-adjacent expansion |
+| `stream02` | F fs-suite substitute | promoted stable440 | `raw/stable440-fs-substitute-rv-scout-summary.txt`, `raw/stable440-clean6-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | supersedes older ENOSYS/TFAIL rows |
+| `flock01` | B FD/flock | promoted stable440 | `raw/stable440-flock-rv-postfix-summary.txt`, `raw/stable440-flock-la-postfix-summary.txt`, aggregate RV/LA stable440 summaries | new real `flock(2)` support; blocking conflicts still limited |
+| `flock02` | B FD/flock | promoted stable440 | same as `flock01` | same limitation |
+| `flock03` | B FD/flock | promoted stable440 | same as `flock01` | same limitation |
+| `flock04` | B FD/flock | promoted stable440 | same as `flock01` | same limitation |
+| `clone06` | E process/light syscall | promoted stable440 | `raw/stable440-mixed-scout-002-rv-summary.txt`, `raw/stable440-clean5-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | clone08/clone09 remain demoted |
+| `clone07` | E process/light syscall | promoted stable440 | same as `clone06` | clone08/clone09 remain demoted |
+| `pselect03_64` | E/B select | promoted stable440 | `raw/stable440-mixed-scout-002-rv-summary.txt`, `raw/stable440-clean5-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | 64-bit companion to stable425 `pselect03` |
+| `pselect02` | E/B select | promoted stable440 | `raw/stable440-pselect02-rv-postfix-summary.txt`, `raw/stable440-clean5-la-confirm-summary.txt`, aggregate RV/LA stable440 summaries | required invalid-fd-set EBADF validation |
+| `pselect02_64` | E/B select | promoted stable440 | same as `pselect02` | required invalid-fd-set EBADF validation |
+
+Aggregate gate result: RV and LA both `PASS LTP CASE 880`, `FAIL LTP CASE 0`, `ltp-musl 440/0`, `ltp-glibc 440/0`, timeout/ENOSYS/panic/trap 0, bad marker-prefix lines 0. The only aggregate internal TCONF remains the known `read02` O_DIRECT/tmpfs TCONF (2 per libc group per arch).

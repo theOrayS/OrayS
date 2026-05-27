@@ -1,0 +1,90 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable440-mixed-scout-002-rv.log`
+
+- PASS LTP CASE: 6
+- FAIL LTP CASE: 18
+- Internal TFAIL/TBROK/TCONF: 24 ({'TFAIL': 8, 'TBROK': 16})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 6
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 3 passed, 9 failed
+- ltp-glibc: 3 passed, 9 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clone06 | rv | glibc | ltp-glibc | PASS | 0 | 1871 | 256605 | 256582 | -23 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone06 | rv | musl | ltp-musl | PASS | 0 | 1239 | 256752 | 256731 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone07 | rv | glibc | ltp-glibc | PASS | 0 | 2018 | 256582 | 256559 | -23 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone07 | rv | musl | ltp-musl | PASS | 0 | 1362 | 256731 | 256710 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone08 | rv | glibc | ltp-glibc | FAIL | 2 | 2695 | 256559 | 256528 | -31 | 0 | 2 | 0 | 0 | 2 | 0 |
+| clone08 | rv | musl | ltp-musl | FAIL | 2 | 1421 | 256710 | 256682 | -28 | 0 | 2 | 0 | 0 | 2 | 0 |
+| clone09 | rv | glibc | ltp-glibc | FAIL | 2 | 1554 | 256528 | 256513 | -15 | 0 | 1 | 0 | 0 | 1 | 0 |
+| clone09 | rv | musl | ltp-musl | FAIL | 2 | 1213 | 256682 | 256668 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fstatfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 2323 | 256626 | 256619 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | musl | ltp-musl | FAIL | 6 | 989 | 256773 | 256766 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01_64 | rv | glibc | ltp-glibc | FAIL | 6 | 1545 | 256619 | 256612 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01_64 | rv | musl | ltp-musl | FAIL | 6 | 1383 | 256766 | 256759 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| open15 | rv | glibc | ltp-glibc | FAIL | -1 | 8 | 256640 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| open15 | rv | musl | ltp-musl | FAIL | -1 | 13 | 256787 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| pselect03_64 | rv | glibc | ltp-glibc | PASS | 0 | 1817 | 256513 | 256499 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pselect03_64 | rv | musl | ltp-musl | PASS | 0 | 1326 | 256668 | 256654 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | glibc | ltp-glibc | FAIL | 1 | 1765 | 256654 | 256640 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | musl | ltp-musl | FAIL | 1 | 1586 | 258849 | 256787 | -2062 | 4 | 0 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1461 | 256640 | 256633 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 1123 | 256787 | 256780 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01_64 | rv | glibc | ltp-glibc | FAIL | 6 | 1900 | 256633 | 256626 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01_64 | rv | musl | ltp-musl | FAIL | 6 | 1303 | 256780 | 256773 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1605 | 256612 | 256605 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | musl | ltp-musl | FAIL | 6 | 1367 | 256759 | 256752 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 6 (rv:glibc:clone06, rv:musl:clone06, rv:glibc:clone07, rv:musl:clone07, rv:glibc:pselect03_64, rv:musl:pselect03_64)
+- pass_with_tconf: 0
+- fail_wrapper: 18 (rv:glibc:clone08, rv:musl:clone08, rv:glibc:clone09, rv:musl:clone09, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:fstatfs01_64, rv:musl:fstatfs01_64, rv:glibc:open15, rv:musl:open15, rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statfs01_64, rv:musl:statfs01_64, rv:glibc:statvfs01, rv:musl:statvfs01)
+- internal_tfail: 2 (rv:glibc:readlink03, rv:musl:readlink03)
+- internal_tbrok: 14 (rv:glibc:clone08, rv:musl:clone08, rv:glibc:clone09, rv:musl:clone09, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:fstatfs01_64, rv:musl:fstatfs01_64, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statfs01_64, rv:musl:statfs01_64, rv:glibc:statvfs01, rv:musl:statvfs01)
+- timeout: 0
+- enosys: 4 (rv:glibc:clone08, rv:musl:clone08, rv:glibc:clone09, rv:musl:clone09)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:readlink03
+- ltp-musl:open15
+- ltp-musl:statfs01
+- ltp-musl:statfs01_64
+- ltp-musl:fstatfs01
+- ltp-musl:fstatfs01_64
+- ltp-musl:statvfs01
+- ltp-musl:clone08
+- ltp-musl:clone09
+- ltp-glibc:readlink03
+- ltp-glibc:open15
+- ltp-glibc:statfs01
+- ltp-glibc:statfs01_64
+- ltp-glibc:fstatfs01
+- ltp-glibc:fstatfs01_64
+- ltp-glibc:statvfs01
+- ltp-glibc:clone08
+- ltp-glibc:clone09
+
+## Groups
+### ltp-musl
+- PASS: 3
+- FAIL: 9
+- Internal: {'TFAIL': 4, 'TBROK': 8}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: readlink03, open15, statfs01, statfs01_64, fstatfs01, fstatfs01_64, statvfs01, clone08, clone09
+
+### ltp-glibc
+- PASS: 3
+- FAIL: 9
+- Internal: {'TFAIL': 4, 'TBROK': 8}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: readlink03, open15, statfs01, statfs01_64, fstatfs01, fstatfs01_64, statvfs01, clone08, clone09

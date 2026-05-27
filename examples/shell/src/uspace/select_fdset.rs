@@ -99,6 +99,31 @@ pub(super) fn poll_fd_set(
     count
 }
 
+fn validate_fd_set_entries(
+    table: &FdTable,
+    nfds: usize,
+    requested: &[usize; FD_SET_WORDS],
+) -> Result<(), LinuxError> {
+    let words = nfds.div_ceil(BITS_PER_USIZE).min(FD_SET_WORDS);
+    for word_idx in 0..words {
+        let mut bits = requested[word_idx];
+        let used_bits = nfds.saturating_sub(word_idx * BITS_PER_USIZE);
+        if used_bits < BITS_PER_USIZE {
+            bits &= (1usize << used_bits) - 1;
+        }
+        while bits != 0 {
+            let bit_idx = bits.trailing_zeros() as usize;
+            let fd = word_idx * BITS_PER_USIZE + bit_idx;
+            if fd >= nfds {
+                break;
+            }
+            table.entry(fd as i32)?;
+            bits &= bits - 1;
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn sys_pselect6(
     process: &UserProcess,
     nfds: i32,
@@ -128,6 +153,14 @@ pub(super) fn sys_pselect6(
         Ok(deadline) => deadline,
         Err(err) => return neg_errno(err),
     };
+    {
+        let table = process.fds.lock();
+        for fd_set in [&read_bits, &write_bits, &except_bits] {
+            if let Err(err) = validate_fd_set_entries(&table, nfds, fd_set) {
+                return neg_errno(err);
+            }
+        }
+    }
     loop {
         if process.eval_watchdog_expired() {
             return neg_errno(LinuxError::EINTR);
