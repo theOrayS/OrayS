@@ -66,6 +66,7 @@ pub(super) const ST_MODE_TYPE_MASK: u32 = 0o170000;
 pub(super) const FILE_MODE_PERMISSION_MASK: u32 = 0o7777;
 pub(super) const FILE_MODE_SET_UID: u32 = 0o4000;
 pub(super) const FILE_MODE_SET_GID: u32 = 0o2000;
+pub(super) const FILE_MODE_STICKY: u32 = 0o1000;
 pub(super) const FILE_MODE_GROUP_EXECUTE: u32 = 0o0010;
 pub(super) const CHOWN_ID_UNCHANGED: u32 = u32::MAX;
 

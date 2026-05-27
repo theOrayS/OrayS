@@ -10,15 +10,14 @@ use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE,
-    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK, fd_cloexec_flag,
-    neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    DEFAULT_NOFILE_LIMIT, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG,
+    RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -41,10 +40,11 @@ use super::synthetic_fs::{
 use super::system_info::write_default_winsize;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value,
+    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
+    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -1436,7 +1436,14 @@ impl FdTable {
         if path.is_empty() {
             return Err(LinuxError::ENOENT);
         }
+        if path_exceeds_linux_limits(path) {
+            return Err(LinuxError::ENAMETOOLONG);
+        }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        if axfs::api::metadata(abs_path.as_str()).is_ok() {
+            return Err(LinuxError::EEXIST);
+        }
+        check_parent_write_search_permission(process, abs_path.as_str())?;
         directory_create_dir(abs_path.as_str())?;
         process.set_path_mode(abs_path.clone(), process.apply_umask(mode));
         process.set_path_owner(abs_path, Some(process.fs_uid()), Some(process.fs_gid()));
@@ -1453,6 +1460,9 @@ impl FdTable {
         if path.is_empty() {
             return Err(LinuxError::ENOENT);
         }
+        if path_exceeds_linux_limits(path) {
+            return Err(LinuxError::ENAMETOOLONG);
+        }
         let node_type = mode & ST_MODE_TYPE_MASK;
         let node_type = match node_type {
             0 | ST_MODE_FILE => ST_MODE_FILE,
@@ -1463,6 +1473,7 @@ impl FdTable {
         if axfs::api::metadata(abs_path.as_str()).is_ok() {
             return Err(LinuxError::EEXIST);
         }
+        check_parent_write_search_permission(process, abs_path.as_str())?;
         let mut opts = OpenOptions::new();
         opts.write(true);
         opts.create_new(true);
@@ -1496,8 +1507,32 @@ impl FdTable {
         if path.is_empty() {
             return Err(LinuxError::ENOENT);
         }
+        if path_exceeds_linux_limits(path) {
+            return Err(LinuxError::ENAMETOOLONG);
+        }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
-        if process.remove_path_symlink(abs_path.as_str()) {
+        let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
+        let target_st = if let Some(st) = process.path_symlink_stat(abs_path.as_str()) {
+            Some(apply_recorded_path_metadata(
+                process,
+                abs_path.as_str(),
+                st,
+            ))
+        } else {
+            match stat_absolute_path(process, abs_path.as_str()) {
+                Ok(st) => Some(st),
+                Err(LinuxError::ENOENT) if !remove_dir => None,
+                Err(err) => return Err(err),
+            }
+        };
+        if let Some(st) = target_st.as_ref() {
+            check_sticky_parent_permission(process, &parent_st, st)?;
+        }
+        if process.path_symlink(abs_path.as_str()).is_some() {
+            if remove_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            process.remove_path_symlink(abs_path.as_str());
             return Ok(());
         }
         let removed = if remove_dir {
@@ -1967,11 +2002,7 @@ fn open_fd_entry(
     flags: u32,
     mode: u32,
 ) -> Result<FdEntry, LinuxError> {
-    if path.len() >= LINUX_PATH_MAX
-        || path
-            .split('/')
-            .any(|component| component.len() > LINUX_NAME_MAX)
-    {
+    if path_exceeds_linux_limits(path) {
         return Err(LinuxError::ENAMETOOLONG);
     }
 
@@ -2109,6 +2140,93 @@ fn file_entry_seek(file: &mut FileEntry, pos: SeekFrom) -> Result<u64, LinuxErro
     Ok(next)
 }
 
+fn path_exceeds_linux_limits(path: &str) -> bool {
+    path.len() >= LINUX_PATH_MAX || path.split('/').any(|component| component.len() > LINUX_NAME_MAX)
+}
+
+fn parent_path(path: &str) -> &str {
+    if path == "/" {
+        return "/";
+    }
+    match path.rsplit_once('/') {
+        Some(("", _)) => "/",
+        Some((parent, _)) if !parent.is_empty() => parent,
+        _ => "/",
+    }
+}
+
+fn stat_absolute_path(process: &UserProcess, path: &str) -> Result<general::stat, LinuxError> {
+    let attr = axfs::api::metadata(path).map_err(LinuxError::from)?;
+    Ok(apply_recorded_path_metadata(
+        process,
+        path,
+        file_attr_to_stat(&attr, Some(path)),
+    ))
+}
+
+fn parent_dirs_searchable_absolute(
+    process: &UserProcess,
+    path: &str,
+    uid: u32,
+    gid: u32,
+) -> Result<bool, LinuxError> {
+    if uid == 0 {
+        return Ok(true);
+    }
+    let components: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+    if components.len() <= 1 {
+        return Ok(true);
+    }
+    let mut parent = String::new();
+    for component in &components[..components.len() - 1] {
+        parent.push('/');
+        parent.push_str(component);
+        let st = stat_absolute_path(process, parent.as_str())?;
+        if !access_allowed(&st, ACCESS_X_OK, uid, gid) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn check_parent_write_search_permission(
+    process: &UserProcess,
+    path: &str,
+) -> Result<general::stat, LinuxError> {
+    let uid = process.fs_uid();
+    let gid = process.fs_gid();
+    let parent = parent_path(path);
+    let parent_st = stat_absolute_path(process, parent)?;
+    if parent_st.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
+        return Err(LinuxError::ENOTDIR);
+    }
+    if uid == 0 {
+        return Ok(parent_st);
+    }
+    if !parent_dirs_searchable_absolute(process, parent, uid, gid)?
+        || !access_allowed(&parent_st, ACCESS_W_OK | ACCESS_X_OK, uid, gid)
+    {
+        return Err(LinuxError::EACCES);
+    }
+    Ok(parent_st)
+}
+
+fn check_sticky_parent_permission(
+    process: &UserProcess,
+    parent_st: &general::stat,
+    target_st: &general::stat,
+) -> Result<(), LinuxError> {
+    let uid = process.fs_uid();
+    if uid == 0 || parent_st.st_mode & FILE_MODE_STICKY == 0 {
+        return Ok(());
+    }
+    if uid == parent_st.st_uid as u32 || uid == target_st.st_uid as u32 {
+        Ok(())
+    } else {
+        Err(LinuxError::EPERM)
+    }
+}
+
 fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {
     for candidate in candidates.clone() {
         push_runtime_candidate(candidates, busybox_applet_target_path(candidate.as_str()));
@@ -2142,6 +2260,9 @@ fn check_open_permission(process: &UserProcess, path: &str, flags: u32) -> Resul
     let st = apply_recorded_path_metadata(process, path, st);
     let uid = process.fs_uid();
     let gid = process.fs_gid();
+    if !parent_dirs_searchable_absolute(process, path, uid, gid)? {
+        return Err(LinuxError::EACCES);
+    }
     if access_allowed(&st, open_permission_mode(flags), uid, gid) {
         Ok(())
     } else {
@@ -2354,7 +2475,9 @@ fn open_candidates(
                 return Err(LinuxError::EPERM);
             }
         }
-        if !created_by_this_open {
+        if created_by_this_open {
+            check_parent_write_search_permission(process, path.as_str())?;
+        } else {
             check_open_permission(process, path.as_str(), flags)?;
         }
         match File::open(path.as_str(), file_opts) {
