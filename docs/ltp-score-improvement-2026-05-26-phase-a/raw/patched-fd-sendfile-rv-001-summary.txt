@@ -1,0 +1,85 @@
+# patched-fd-sendfile-rv-001
+
+cases=pread02,pread02_64,pwrite02,pwrite02_64,pwrite04,pwrite04_64,sendfile02,sendfile02_64,sendfile03,sendfile03_64,sendfile04,sendfile04_64,sendfile05,sendfile05_64
+run-eval rc=0
+
+# LTP summary: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/patched-fd-sendfile-rv-001.log`
+
+- PASS LTP CASE: 24
+- FAIL LTP CASE: 4
+- Internal TFAIL/TBROK/TCONF: 8 ({'TFAIL': 8})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 12 passed, 2 failed
+- ltp-glibc: 12 passed, 2 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| pread02 | rv | glibc | ltp-glibc | PASS | 0 | 2451 | 256608 | 256594 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread02 | rv | musl | ltp-musl | PASS | 0 | 2764 | 258852 | 256790 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread02_64 | rv | glibc | ltp-glibc | PASS | 0 | 4497 | 256594 | 256580 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread02_64 | rv | musl | ltp-musl | PASS | 0 | 4640 | 256790 | 256776 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite02 | rv | glibc | ltp-glibc | PASS | 0 | 4382 | 256580 | 256566 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite02 | rv | musl | ltp-musl | PASS | 0 | 2423 | 256776 | 256762 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite02_64 | rv | glibc | ltp-glibc | PASS | 0 | 5336 | 256566 | 256552 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite02_64 | rv | musl | ltp-musl | PASS | 0 | 4275 | 256762 | 256748 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite04 | rv | glibc | ltp-glibc | PASS | 0 | 3406 | 256552 | 256538 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite04 | rv | musl | ltp-musl | PASS | 0 | 2750 | 256748 | 256734 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite04_64 | rv | glibc | ltp-glibc | PASS | 0 | 7394 | 256538 | 256524 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwrite04_64 | rv | musl | ltp-musl | PASS | 0 | 4074 | 256734 | 256720 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile02 | rv | glibc | ltp-glibc | PASS | 0 | 3774 | 256524 | 256510 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile02 | rv | musl | ltp-musl | PASS | 0 | 3101 | 256720 | 256706 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile02_64 | rv | glibc | ltp-glibc | PASS | 0 | 5788 | 256510 | 256496 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile02_64 | rv | musl | ltp-musl | PASS | 0 | 3350 | 256706 | 256692 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile03 | rv | glibc | ltp-glibc | FAIL | 1 | 3603 | 256496 | 256482 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sendfile03 | rv | musl | ltp-musl | FAIL | 1 | 3053 | 256692 | 256678 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sendfile03_64 | rv | glibc | ltp-glibc | FAIL | 1 | 5999 | 256482 | 256468 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sendfile03_64 | rv | musl | ltp-musl | FAIL | 1 | 3965 | 256678 | 256664 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sendfile04 | rv | glibc | ltp-glibc | PASS | 0 | 6246 | 256468 | 256454 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile04 | rv | musl | ltp-musl | PASS | 0 | 3386 | 256664 | 256650 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile04_64 | rv | glibc | ltp-glibc | PASS | 0 | 5902 | 256454 | 256440 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile04_64 | rv | musl | ltp-musl | PASS | 0 | 4262 | 256650 | 256636 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile05 | rv | glibc | ltp-glibc | PASS | 0 | 4704 | 256440 | 256426 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile05 | rv | musl | ltp-musl | PASS | 0 | 3887 | 256636 | 256622 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile05_64 | rv | glibc | ltp-glibc | PASS | 0 | 6447 | 256426 | 256412 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile05_64 | rv | musl | ltp-musl | PASS | 0 | 4288 | 256622 | 256608 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 24 (rv:glibc:pread02, rv:musl:pread02, rv:glibc:pread02_64, rv:musl:pread02_64, rv:glibc:pwrite02, rv:musl:pwrite02, rv:glibc:pwrite02_64, rv:musl:pwrite02_64, rv:glibc:pwrite04, rv:musl:pwrite04, rv:glibc:pwrite04_64, rv:musl:pwrite04_64, rv:glibc:sendfile02, rv:musl:sendfile02, rv:glibc:sendfile02_64, rv:musl:sendfile02_64, rv:glibc:sendfile04, rv:musl:sendfile04, rv:glibc:sendfile04_64, rv:musl:sendfile04_64, rv:glibc:sendfile05, rv:musl:sendfile05, rv:glibc:sendfile05_64, rv:musl:sendfile05_64)
+- pass_with_tconf: 0
+- fail_wrapper: 4 (rv:glibc:sendfile03, rv:musl:sendfile03, rv:glibc:sendfile03_64, rv:musl:sendfile03_64)
+- internal_tfail: 4 (rv:glibc:sendfile03, rv:musl:sendfile03, rv:glibc:sendfile03_64, rv:musl:sendfile03_64)
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:sendfile03
+- ltp-musl:sendfile03_64
+- ltp-glibc:sendfile03
+- ltp-glibc:sendfile03_64
+
+## Groups
+### ltp-musl
+- PASS: 12
+- FAIL: 2
+- Internal: {'TFAIL': 4}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sendfile03, sendfile03_64
+
+### ltp-glibc
+- PASS: 12
+- FAIL: 2
+- Internal: {'TFAIL': 4}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sendfile03, sendfile03_64

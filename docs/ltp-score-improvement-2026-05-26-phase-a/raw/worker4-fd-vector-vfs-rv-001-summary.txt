@@ -1,0 +1,65 @@
+# worker4-fd-vector-vfs-rv-001
+
+cases=preadv01,preadv02,pwritev01,pwritev02,unlink07
+run-eval rc=0
+
+# LTP summary: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/worker4-fd-vector-vfs-rv-001.log`
+
+- PASS LTP CASE: 8
+- FAIL LTP CASE: 2
+- Internal TFAIL/TBROK/TCONF: 2 ({'TFAIL': 2})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 1 failed
+- ltp-glibc: 4 passed, 1 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| preadv01 | rv | glibc | ltp-glibc | PASS | 0 | 7870 | 256735 | 256721 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv01 | rv | musl | ltp-musl | PASS | 0 | 4909 | 258853 | 256791 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv02 | rv | glibc | ltp-glibc | PASS | 0 | 5056 | 256721 | 256707 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv02 | rv | musl | ltp-musl | PASS | 0 | 3847 | 256791 | 256777 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev01 | rv | glibc | ltp-glibc | PASS | 0 | 6487 | 256707 | 256693 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev01 | rv | musl | ltp-musl | PASS | 0 | 5980 | 256777 | 256763 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev02 | rv | glibc | ltp-glibc | PASS | 0 | 6240 | 256693 | 256679 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev02 | rv | musl | ltp-musl | PASS | 0 | 6462 | 256763 | 256749 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink07 | rv | glibc | ltp-glibc | FAIL | 1 | 9764 | 256679 | 256665 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| unlink07 | rv | musl | ltp-musl | FAIL | 1 | 7378 | 256749 | 256735 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (rv:glibc:preadv01, rv:musl:preadv01, rv:glibc:preadv02, rv:musl:preadv02, rv:glibc:pwritev01, rv:musl:pwritev01, rv:glibc:pwritev02, rv:musl:pwritev02)
+- pass_with_tconf: 0
+- fail_wrapper: 2 (rv:glibc:unlink07, rv:musl:unlink07)
+- internal_tfail: 2 (rv:glibc:unlink07, rv:musl:unlink07)
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:unlink07
+- ltp-glibc:unlink07
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 1
+- Internal: {'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: unlink07
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 1
+- Internal: {'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: unlink07

@@ -1,0 +1,86 @@
+# preadv2-pwritev2-rv-001
+cases=preadv201,preadv201_64,preadv202,preadv202_64,pwritev201,pwritev201_64,pwritev202,pwritev202_64
+run-eval rc=0
+# LTP summary: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/preadv2-pwritev2-rv-001.log`
+
+- PASS LTP CASE: 16
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 8 passed, 0 failed
+- ltp-glibc: 8 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| preadv201 | rv | glibc | ltp-glibc | PASS | 0 | 3597 | 256692 | 256678 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv201 | rv | musl | ltp-musl | PASS | 0 | 3107 | 258852 | 256790 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv201_64 | rv | glibc | ltp-glibc | PASS | 0 | 3965 | 256678 | 256664 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv201_64 | rv | musl | ltp-musl | PASS | 0 | 2937 | 256790 | 256776 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202 | rv | glibc | ltp-glibc | PASS | 0 | 2983 | 256664 | 256650 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202 | rv | musl | ltp-musl | PASS | 0 | 2125 | 256776 | 256762 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202_64 | rv | glibc | ltp-glibc | PASS | 0 | 3963 | 256650 | 256636 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202_64 | rv | musl | ltp-musl | PASS | 0 | 2589 | 256762 | 256748 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201 | rv | glibc | ltp-glibc | PASS | 0 | 2760 | 256636 | 256622 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201 | rv | musl | ltp-musl | PASS | 0 | 2089 | 256748 | 256734 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201_64 | rv | glibc | ltp-glibc | PASS | 0 | 3502 | 256622 | 256608 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201_64 | rv | musl | ltp-musl | PASS | 0 | 2846 | 256734 | 256720 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202 | rv | glibc | ltp-glibc | PASS | 0 | 3203 | 256608 | 256594 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202 | rv | musl | ltp-musl | PASS | 0 | 2458 | 256720 | 256706 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202_64 | rv | glibc | ltp-glibc | PASS | 0 | 3873 | 256594 | 256580 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202_64 | rv | musl | ltp-musl | PASS | 0 | 2820 | 256706 | 256692 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 16 (rv:glibc:preadv201, rv:musl:preadv201, rv:glibc:preadv201_64, rv:musl:preadv201_64, rv:glibc:preadv202, rv:musl:preadv202, rv:glibc:preadv202_64, rv:musl:preadv202_64, rv:glibc:pwritev201, rv:musl:pwritev201, rv:glibc:pwritev201_64, rv:musl:pwritev201_64, rv:glibc:pwritev202, rv:musl:pwritev202, rv:glibc:pwritev202_64, rv:musl:pwritev202_64)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 8
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 8
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+# LTP promotion-candidate report
+
+- Inputs: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/preadv2-pwritev2-rv-001.log`
+- Required arches: rv
+- Required libcs: glibc, musl
+- Required arch/libc combos: 2
+- Promotion candidates: 8
+- Blocked/incomplete cases: 0
+
+## Candidates
+| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |
+| --- | --- | ---: | ---: |
+| preadv201 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3597 | -2062 |
+| preadv201_64 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3965 | -14 |
+| preadv202 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2983 | -14 |
+| preadv202_64 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3963 | -14 |
+| pwritev201 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2760 | -14 |
+| pwritev201_64 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3502 | -14 |
+| pwritev202 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3203 | -14 |
+| pwritev202_64 | rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3873 | -14 |
+
+## Blocked or incomplete
+- None
