@@ -4,7 +4,7 @@
 
 ## 单一工作分支原则
 
-`/root/oskernel2026-orays` 是本地 QEMU 验证和远程提交构建共用的维护 checkout。不要另建或维护单独 remote 分支作为交付目标，除非用户提出新的明确要求。
+`/root/oskernel2026-orays` 是本地 QEMU 验证和远程提交构建共用的维护 checkout。当前最高分维护线使用 `score/best`；原 `refactor/moss_kernel_like` 已改名为 `score/best`。不要另建或维护单独 remote 分支作为交付目标，除非用户提出新的明确要求。
 
 历史 `refactor/moss_kernel_like_remote` 分支和 sibling checkout 只能作为只读参考；不要为了常规交付去修改或同步它。
 

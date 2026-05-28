@@ -27,6 +27,7 @@
 | 选择下一批 LTP/score 测例、估算 ROI | `docs/agent-workflow/ltp-selection.md` |
 | 推广 `LTP_STABLE_CASES`、LTP 报告、阶段文档命名 | `docs/agent-workflow/ltp-promotion-and-docs.md` |
 | Rust/POSIX/ABI/高风险子系统修改边界 | `docs/agent-workflow/coding-boundaries.md` |
+| 分支命名、`score/best`、release/fix/feat/exp 用途 | `docs/agent-workflow/branch-policy.md` |
 | 多 agent 协作、冻结期、交付模板、Lore commit | `docs/agent-workflow/collaboration-and-delivery.md` |
 | 更完整的开发者背景材料 | `docs/developer-guide/README.md` |
 
