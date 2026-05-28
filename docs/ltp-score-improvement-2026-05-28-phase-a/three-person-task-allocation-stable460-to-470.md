@@ -13,7 +13,7 @@ Stretch goal: stable480（仅在低风险 clean pool 足够且 final-gate 预算
 examples/shell/src/cmd.rs::LTP_STABLE_CASES = 460 total / 460 unique / 0 duplicates
 ```
 
-可信交付证据仍以 `docs/ltp-score-improvement-2026-05-27-phase-a/stable460-delivery-report.md` 为准：
+可信交付证据仍以 `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-27-phase-a/stable460-delivery-report.md` 为准：
 
 - RV stable460 final gate 002：`PASS LTP CASE 920`，`FAIL 0`，musl/glibc 各 460/0。
 - LA stable460 final gate 002：`PASS LTP CASE 920`，`FAIL 0`，musl/glibc 各 460/0。

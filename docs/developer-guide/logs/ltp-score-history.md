@@ -7,10 +7,10 @@
 | 阶段 | 目标 / 结果 | 关键结果 | 首选证据 |
 | --- | --- | --- | --- |
 | 2026-05-22 remote/local 统一 | stable157 级别验证 | RV/LA 各 314 wrapper PASS / 0 FAIL；musl/glibc 各 157/0 | `docs/remote-local-eval-unification-2026-05-22/final-terminal-report.md` |
-| 2026-05-24 phase-a | stable250 -> stable300 | RV/LA 各 600 PASS / 0 FAIL；musl/glibc 300/0；`read02` TCONF 透明披露 | `docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-quality-gate.json` |
-| 2026-05-25 phase-a | stable300 -> stable350 | RV/LA 各 700 PASS / 0 FAIL；musl/glibc 350/0；`kill02` demote，`abs01` replacement | `docs/ltp-score-improvement-2026-05-25-phase-a/final-gate-quality-gate.json` |
-| 2026-05-25 phase-b | stable350 -> stable375 | RV/LA 各 750 PASS / 0 FAIL；musl/glibc 375/0；`kill02` 不交付 | `docs/ltp-score-improvement-2026-05-25-phase-b/stable375-delivery-report.md` |
-| 2026-05-25 phase-c | stable375 -> stable450 尝试 | stable450 未完成；先后接受 stable379、381、382，最终用户 stop-state 保留 stable383 | `docs/ltp-score-improvement-2026-05-25-phase-c/stable383-promotion-gate-report.md` |
+| 2026-05-24 phase-a | stable250 -> stable300 | RV/LA 各 600 PASS / 0 FAIL；musl/glibc 300/0；`read02` TCONF 透明披露 | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-24-phase-a/final-gate-quality-gate.json` |
+| 2026-05-25 phase-a | stable300 -> stable350 | RV/LA 各 700 PASS / 0 FAIL；musl/glibc 350/0；`kill02` demote，`abs01` replacement | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-a/final-gate-quality-gate.json` |
+| 2026-05-25 phase-b | stable350 -> stable375 | RV/LA 各 750 PASS / 0 FAIL；musl/glibc 375/0；`kill02` 不交付 | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/stable375-delivery-report.md` |
+| 2026-05-25 phase-c | stable375 -> stable450 尝试 | stable450 未完成；先后接受 stable379、381、382，最终用户 stop-state 保留 stable383 | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/stable383-promotion-gate-report.md` |
 
 ## stable300 交付要点
 
@@ -26,9 +26,9 @@
 
 首选证据：
 
-- `docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-quality-gate.json`
-- `docs/ltp-score-improvement-2026-05-24-phase-a/candidate-matrix.md`
-- `docs/ltp-score-improvement-2026-05-24-phase-a/final-gate-code-review-report.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-24-phase-a/final-gate-quality-gate.json`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-24-phase-a/candidate-matrix.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-24-phase-a/final-gate-code-review-report.md`
 
 开发者关注点：`access02`、`access04`、`chmod05`、`statx01`、`writev03`、`pipe2_02`、`waitpid01`、mmap/mprotect/munmap 等在该阶段仍不是 clean promotion。
 
@@ -46,9 +46,9 @@
 
 首选证据：
 
-- `docs/ltp-score-improvement-2026-05-25-phase-a/final-gate-quality-gate.json`
-- `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-final-002-summary.txt`
-- `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-final-002-summary.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-a/final-gate-quality-gate.json`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-final-002-summary.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-final-002-summary.txt`
 
 开发者关注点：targeted clean 不能替代 aggregate clean；`kill02` 在后续阶段也因 LA aggregate 风险被反复拒绝。
 
@@ -73,10 +73,10 @@ abort01, poll01, fork05, fork10, kill11, kill12, mem02
 
 首选证据：
 
-- `docs/ltp-score-improvement-2026-05-25-phase-b/stable375-delivery-report.md`
-- `docs/ltp-score-improvement-2026-05-25-phase-b/candidate-matrix.md`
-- `docs/ltp-score-improvement-2026-05-25-phase-b/raw/stable375-rv-final-002-summary.txt`
-- `docs/ltp-score-improvement-2026-05-25-phase-b/raw/stable375-la-final-003-summary.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/stable375-delivery-report.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/candidate-matrix.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/raw/stable375-rv-final-002-summary.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/raw/stable375-la-final-003-summary.txt`
 
 ## stable400/stable450 尝试与 stable383 stop-state
 
@@ -93,10 +93,10 @@ stable450 未交付。phase-c 只诚实接受了小步 partial promotion：stabl
 
 可信证据：
 
-- `docs/ltp-score-improvement-2026-05-25-phase-c/stable400-promotion-gate-report.md`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/stable450-delivery-report.md`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/stable383-promotion-gate-report.md`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable383-la-gate-001-summary.txt`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable384-rv-gate-001-summary.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/stable400-promotion-gate-report.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/stable450-delivery-report.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/stable383-promotion-gate-report.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/stable383-la-gate-001-summary.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/stable384-rv-gate-001-summary.txt`
 
 重要 caveat：exact RV stable383 aggregate 被用户 stop 请求中止，未作为证据提交；当前 RV 支撑来自已完成的 stable384 superset summary。若下一轮要求严格 exact 双架构证明，应先补跑 exact RV stable383 aggregate。

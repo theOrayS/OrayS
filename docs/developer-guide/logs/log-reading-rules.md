@@ -95,9 +95,9 @@ PASS LTP CASE <case> : 0
 
 常见证据文件：
 
-- `docs/ltp-score-improvement-2026-05-25-phase-a/raw/*marker-prefix*.txt`
-- `docs/ltp-score-improvement-2026-05-25-phase-b/raw/stable375-final-marker-prefix.txt`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/remote-marker-and-log-noise-regression-check.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-a/raw/*marker-prefix*.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/raw/stable375-final-marker-prefix.txt`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/remote-marker-and-log-noise-regression-check.md`
 
 ## 7. 日志噪声和 errno
 
