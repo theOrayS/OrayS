@@ -64,10 +64,10 @@ CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true PATH=$PWD/tools/bin:$PATH make
 
 相关证据：
 
-- `docs/ltp-score-improvement-2026-05-25-phase-c/raw/LoongArch-remote-summary.json`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/raw/Riscv-remote-summary.json`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/raw/remote-output-noise-baseline.json`
-- `docs/ltp-score-improvement-2026-05-25-phase-c/remote-marker-and-log-noise-regression-check.md`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/LoongArch-remote-summary.json`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/Riscv-remote-summary.json`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/remote-output-noise-baseline.json`
+- `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/remote-marker-and-log-noise-regression-check.md`
 
 ## 5. 开发者行动规则
 

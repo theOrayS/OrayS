@@ -18,11 +18,11 @@
 
 | 证据 | 结论 | 用途 |
 | --- | --- | --- |
-| `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-proc-vm-pipe-rv-001-summary.txt` | RV targeted 中 `pipe08` musl+glibc clean | `pipe08` RV targeted proof |
-| `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-kill02-pipe08-la-001-summary.txt` | LA targeted 中 `pipe08` musl+glibc clean | `pipe08` LA targeted proof |
-| `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable383-la-gate-001-summary.txt` | LA exact stable383 aggregate PASS 766 / FAIL 0；musl/glibc 383/0；known `read02` TCONF only | exact LA aggregate proof |
-| `docs/ltp-score-improvement-2026-05-25-phase-c/raw/stable384-rv-gate-001-summary.txt` | RV stable384 superset aggregate PASS 768 / FAIL 0；musl/glibc 384/0；known `read02` TCONF only | completed RV support containing `pipe08` |
-| `docs/ltp-score-improvement-2026-05-25-phase-c/stable383-promotion-gate-report.md` | stable383 stop-state 报告 | 当前状态的首选总报告 |
+| `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-proc-vm-pipe-rv-001-summary.txt` | RV targeted 中 `pipe08` musl+glibc clean | `pipe08` RV targeted proof |
+| `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-kill02-pipe08-la-001-summary.txt` | LA targeted 中 `pipe08` musl+glibc clean | `pipe08` LA targeted proof |
+| `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/stable383-la-gate-001-summary.txt` | LA exact stable383 aggregate PASS 766 / FAIL 0；musl/glibc 383/0；known `read02` TCONF only | exact LA aggregate proof |
+| `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/raw/stable384-rv-gate-001-summary.txt` | RV stable384 superset aggregate PASS 768 / FAIL 0；musl/glibc 384/0；known `read02` TCONF only | completed RV support containing `pipe08` |
+| `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-c/stable383-promotion-gate-report.md` | stable383 stop-state 报告 | 当前状态的首选总报告 |
 
 ## 未完成 / 不应夸大的证据
 
