@@ -300,6 +300,53 @@ const LTP_CASE_BATCHES: &[(&str, &[&str])] = &[
     ("time-signal-basic", LTP_TIME_SIGNAL_BASIC_CASES),
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_SWEEP_BLACKLIST_FILES: &[&str] = &["/ltp_blacklist.txt", "/tmp/ltp_blacklist.txt"];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_SWEEP_DEFAULT_BLACKLIST_CASES: &[&str] = &[
+    // Experimental full-sweep guardrails only: these are stress, cgroup,
+    // namespace, crash, or fork-bomb style tests that can dominate the run or
+    // destabilize the evaluator.  Passing stable cases must not be added here
+    // just to hide regressions.
+    "cgroup_fj_proc",
+    "cgroup_regression_fork_processes",
+    "cpuctl_def_task01",
+    "cpuctl_def_task02",
+    "cpuctl_def_task03",
+    "cpuctl_def_task04",
+    "cpuctl_fj_cpu-hog",
+    "cpuctl_test01",
+    "cpuctl_test02",
+    "cpuctl_test03",
+    "cpuctl_test04",
+    "cpuhotplug_do_disk_write_loop",
+    "cpuhotplug_do_kcompile_loop",
+    "cpuhotplug_do_spin_loop",
+    "cpuhotplug_report_proc_interrupts",
+    "cpuset_cpu_hog",
+    "cpuset_mem_hog",
+    "cpuset_memory_test",
+    "crash01",
+    "crash02",
+    "dirtyc0w_child",
+    "dirtyc0w_shmem",
+    "doio",
+    "ebizzy",
+    "fork_exec_loop",
+    "fork_procs",
+    "fsx-linux",
+    "hackbench",
+    "mallocstress",
+    "memcg_test_2",
+    "memcg_test_4",
+    "memctl_test01",
+    "mmapstress01",
+    "mtest01",
+    "netstress",
+    "pids_task2",
+    "shm_test",
+    "timed_forkbomb",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_CASE_TIMEOUT_ENV: &str = "LTP_CASE_TIMEOUT_SECS";
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const DEFAULT_GROUP_TIMEOUT_SECS: u64 = 60;
@@ -667,6 +714,53 @@ fn ltp_cases_from_slice(slice: &[&str]) -> Result<Vec<String>, String> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_cases_from_dir(target_dir: &str) -> Result<Vec<String>, String> {
+    let entries = fs::read_dir(target_dir)
+        .map_err(|err| format!("failed to read LTP testcase dir '{target_dir}': {err}"))?;
+    let mut cases = Vec::new();
+    for entry in entries.filter_map(Result::ok) {
+        let name = String::from(path_to_str(&entry.file_name()));
+        if !valid_ltp_case_name(&name) || name.ends_with(".sh") {
+            continue;
+        }
+        let path = join_path(target_dir, &name);
+        if matches!(fs::metadata(&path), Ok(metadata) if metadata.is_file()) {
+            push_ltp_case(&mut cases, &name)?;
+        }
+    }
+    cases.sort();
+    Ok(cases)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_sweep_blacklist_cases() -> Result<Vec<String>, String> {
+    let mut blacklist = ltp_cases_from_slice(LTP_SWEEP_DEFAULT_BLACKLIST_CASES)?;
+    if let Some(raw) = option_env!("LTP_BLACKLIST") {
+        for case in split_ltp_case_list(raw)? {
+            push_ltp_case(&mut blacklist, &case)?;
+        }
+    }
+    for path in LTP_SWEEP_BLACKLIST_FILES {
+        if !matches!(fs::metadata(path), Ok(meta) if meta.is_file()) {
+            continue;
+        }
+        let raw = fs::read_to_string(path)
+            .map_err(|err| format!("failed to read LTP blacklist file '{path}': {err}"))?;
+        for case in split_ltp_case_list(&raw)? {
+            push_ltp_case(&mut blacklist, &case)?;
+        }
+    }
+    Ok(blacklist)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn retain_ltp_cases_not_blacklisted(cases: &mut Vec<String>, blacklist: &[String]) -> usize {
+    let before = cases.len();
+    cases.retain(|case| !blacklist.iter().any(|blocked| blocked == case));
+    before.saturating_sub(cases.len())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn ltp_static_case_list(name: &str) -> Option<&'static [&'static str]> {
     LTP_CASE_BATCHES
         .iter()
@@ -675,7 +769,7 @@ fn ltp_static_case_list(name: &str) -> Option<&'static [&'static str]> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn selected_ltp_cases() -> Result<(String, Vec<String>), String> {
+fn selected_ltp_cases(target_dir: &str) -> Result<(String, Vec<String>), String> {
     let file_spec = ["/ltp_cases.txt", "/tmp/ltp_cases.txt"]
         .iter()
         .find(|path| matches!(fs::metadata(path), Ok(meta) if meta.is_file()))
@@ -693,6 +787,26 @@ fn selected_ltp_cases() -> Result<(String, Vec<String>), String> {
     }
     if spec == "core" {
         return Ok((String::from("core"), ltp_cases_from_slice(LTP_CORE_CASES)?));
+    }
+
+    if matches!(spec, "all" | "sweep:all") {
+        let cases = ltp_cases_from_dir(target_dir)?;
+        if cases.is_empty() {
+            return Err(format!("no LTP testcases found in '{target_dir}'"));
+        }
+        return Ok((String::from("all"), cases));
+    }
+    if matches!(
+        spec,
+        "blacklist" | "all-minus-blacklist" | "sweep:blacklist"
+    ) {
+        let mut cases = ltp_cases_from_dir(target_dir)?;
+        if cases.is_empty() {
+            return Err(format!("no LTP testcases found in '{target_dir}'"));
+        }
+        let blacklist = ltp_sweep_blacklist_cases()?;
+        let skipped = retain_ltp_cases_not_blacklisted(&mut cases, &blacklist);
+        return Ok((format!("all-minus-blacklist skipped={skipped}"), cases));
     }
 
     if let Some(name) = spec.strip_prefix("batch:") {
@@ -1547,7 +1661,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
     let busybox_path = join_path(suite_dir, "busybox");
     let helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
         .map_err(|err| format!("prepare ltp helper bin failed: {err}"))?;
-    let (case_list_name, cases) = selected_ltp_cases()?;
+    let (case_list_name, cases) = selected_ltp_cases(&target_dir)?;
     let timeout_secs = ltp_case_timeout_secs();
     println!("#### OS COMP TEST GROUP START {label} ####");
     println!(
