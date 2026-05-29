@@ -10,7 +10,7 @@
 - `release/stage-N`：每个比赛阶段或正式提交节点的冻结分支。
 - `feat/<subsystem>-xxx`：功能开发分支。
 - `fix/<subsystem>-xxx`：bug 修复分支。
-- `exp/<name>-xxx`：高风险实验分支，默认不合进 `main`。
+- `exp/<name>-xxx`：高风险实验分支，默认不合进 `main`；例如 full-LTP blacklist sweep、runner/scorer 计分实验、资源隔离试验。
 
 ## 使用规则
 
@@ -19,6 +19,7 @@
 - `dev` 只在多人并行时作为集成缓冲；单人、小修复可以直接从目标基线开 `fix/` 或 `feat/`。
 - `release/stage-N` 创建后按冻结分支处理：只接受 P0 和低风险 P1，所有改动要有回滚方案。
 - `exp/` 是探索隔离区；除非后续经过 targeted 验证、回归验证和人工/leader 决策，否则默认不合进 `main` 或 `score/best`。
+- `exp/*full-sweep*` / `exp/*blacklist*` 可以为跑全量 LTP 调整 runner 选择策略和 blacklist，但产物默认是侦察证据：不能直接代表 `score/best`，不能把 blacklist skip 算作 pass，合回前必须把 runner 格式、默认 autorun 范围、blacklist 变更和风险回滚方案逐项复核。
 
 ## 命名示例
 
@@ -28,6 +29,7 @@ feat/mm-mprotect-basic
 fix/posix-statx-errno
 fix/pipe-sigpipe-teardown
 exp/scheduler-timeslice-ltp
+exp/ltp-full-sweep-blacklist
 release/stage-1
 score/best
 ```

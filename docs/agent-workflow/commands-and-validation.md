@@ -28,6 +28,27 @@ python3 scripts/ltp_summary.py output_la.md
 python3 scripts/ltp_summary.py --promotion-candidates rv.log la.log
 ```
 
+实验性全量 LTP / blacklist sweep 只在 `exp/` 分支或明确实验任务中运行。入口仍是
+shell evaluator，但用 `LTP_CASES` 切换 case 选择：
+
+```bash
+# 枚举 guest LTP bin 目录中所有 case，再扣除默认 blacklist 和可选文件/env blacklist
+LTP_CASES=blacklist ./run-eval.sh rv
+LTP_CASES=blacklist ./run-eval.sh la
+
+# 等价别名
+LTP_CASES=all-minus-blacklist ./run-eval.sh rv
+LTP_CASES=sweep:blacklist ./run-eval.sh rv
+
+# 不扣 blacklist 的全量枚举仅用于小心诊断，容易卡死或打爆资源
+LTP_CASES=all ./run-eval.sh rv
+```
+
+blacklist 来源按优先合并：源码默认 `LTP_SWEEP_DEFAULT_BLACKLIST_CASES`、
+build-time `LTP_BLACKLIST`、guest `/ltp_blacklist.txt`、guest `/tmp/ltp_blacklist.txt`。
+如需调长单 case 上限，使用 `/ltp_case_timeout_secs` 或 build-time
+`LTP_CASE_TIMEOUT_SECS`，但报告必须说明原因。
+
 ## 工具链事实
 
 - Rust pinned by `rust-toolchain.toml`: `nightly-2025-05-20`, edition 2024。
@@ -52,6 +73,7 @@ QEMU runtime flags 不是 compile-time feature flags。
 - 示例：构建 touched example 的相关架构。
 - POSIX/user-space 行为：至少 `make A=examples/shell ARCH=riscv64`；运行时语义再加 QEMU/evaluator。
 - evaluator kernel 或本地分支行为：`make kernel-rv`/`make kernel-la` 后，在 QEMU 与 sdcard 可用时跑 `./run-eval.sh rv` 和 `./run-eval.sh la`。
+- blacklist full sweep：运行前后检查 `df -h / /root`；保存 raw log，但不要把大 raw log 当作默认提交内容；用 `scripts/ltp_summary.py`、`rg '^RUN LTP CASE|^PASS LTP CASE|^FAIL LTP CASE|^TIMEOUT LTP CASE|^\[CONTEST\]\[LTP\]\[SKIP\]'` 和尾部闭合检查确认 started/pass/fail/timeout/skip/incomplete 数量。
 
 ## 分阶段验证
 
