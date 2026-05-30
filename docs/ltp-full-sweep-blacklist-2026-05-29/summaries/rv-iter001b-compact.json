@@ -1,0 +1,45 @@
+{
+  "blacklist_candidate": {
+    "case": "pthserv",
+    "category": "hang/incomplete RUN",
+    "first_evidence": "rv-iter001b.log WORKER_META blocker=pthserv and incomplete RUN=pthserv",
+    "removal_condition": "targeted pthserv completes with PASS/FAIL/TIMEOUT marker without QEMU/guest stall and no residual environment damage",
+    "scope": "generic supplemental blacklist for next RV and LA sweeps; evidence observed on RV"
+  },
+  "closure": {
+    "closed": false,
+    "last_run": "pthserv",
+    "reason": "manual QEMU termination after stalled incomplete RUN at pthserv"
+  },
+  "parser_summary": {
+    "enosys_matches": 246,
+    "internal_line": "2263 ({'TCONF': 487, 'TBROK': 351, 'TFAIL': 1425})",
+    "normalized_fail": 919,
+    "normalized_pass": 348,
+    "panic_trap_matches": 0,
+    "timeout_matches": 17
+  },
+  "raw_counts": {
+    "FAIL_markers": 1267,
+    "FAIL_nonzero_wrapper_fail": 919,
+    "FAIL_status0_wrapper_pass_candidates": 348,
+    "PASS_markers": 0,
+    "RUN": 1268,
+    "SKIP_markers": 0,
+    "TIMEOUT_markers": 17,
+    "incomplete_cases": [
+      "pthserv"
+    ],
+    "incomplete_unique": 1
+  },
+  "raw_log": "target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log",
+  "run_meta": [
+    "RUN_META arch=rv iter=001b start=2026-05-29T10:55:58Z head=9e8c6ed7 cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt rv_img=/root/oskernel2026-orays/sdcard-rv.img",
+    "RUN_META exit_code=0 end=2026-05-29T11:48:26Z"
+  ],
+  "selected": "ltp case list: all-minus-blacklist skipped=35 (2333 cases, timeout 15s)",
+  "sha256": "617e674f5255d20ad8a5276131956d273a3fcc713da98ee2562ad70f76ad2b37",
+  "worker_meta": [
+    "WORKER_META blocker=pthserv action=terminate_stalled_qemu at=2026-05-29T11:48:21Z reason=\"no log growth since 2026-05-29T11:42:10Z; incomplete RUN marker without closure\""
+  ]
+}

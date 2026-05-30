@@ -1,0 +1,530 @@
+{
+  "source": "python3 scripts/ltp_summary.py --json /root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.log (full JSON not committed; compacted here)",
+  "pass_count": 593,
+  "fail_count": 1740,
+  "internal": {
+    "TBROK": 521,
+    "TCONF": 1339,
+    "TFAIL": 1978
+  },
+  "timeouts": 31,
+  "enosys": 626,
+  "panic_trap": 0,
+  "case_matrix_count": 2334,
+  "failed_code_counts": {
+    "-1": 8,
+    "1": 247,
+    "2": 318,
+    "3": 15,
+    "4": 1,
+    "5": 4,
+    "6": 132,
+    "7": 1,
+    "22": 1,
+    "32": 889,
+    "33": 13,
+    "34": 6,
+    "36": 45,
+    "37": 2,
+    "126": 2,
+    "127": 7,
+    "128": 1,
+    "134": 6,
+    "137": 31,
+    "139": 11
+  },
+  "timeout_cases": [
+    {
+      "case": "clock_gettime01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15804,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "clock_nanosleep01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15948,
+      "timeouts": 1,
+      "internal": {
+        "TCONF": 2,
+        "TFAIL": 2
+      },
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "fork13",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15969,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "fork14",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 17072,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "ftest03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15882,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "ftest07",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15907,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "futex_wait03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15657,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "futex_wait05",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15713,
+      "timeouts": 1,
+      "internal": {
+        "TFAIL": 3
+      },
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "futex_wake03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16208,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "getrusage04",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15862,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "inode02",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 17415,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "kill10",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15835,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "mmap3",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16134,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "nptl01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15964,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "pause01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15857,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "pause03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15876,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "pth_str01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15797,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "pth_str03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15838,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "select02",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15736,
+      "timeouts": 1,
+      "internal": {
+        "TCONF": 1,
+        "TFAIL": 1
+      },
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "setfsgid03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15671,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "setfsgid03_16",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15924,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "setitimer01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15986,
+      "timeouts": 1,
+      "internal": {
+        "TFAIL": 5
+      },
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "setrlimit06",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15837,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "signal01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16489,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "splice02",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16204,
+      "timeouts": 1,
+      "internal": {
+        "TFAIL": 1
+      },
+      "enosys": 1,
+      "panic_trap": 0
+    },
+    {
+      "case": "splice04",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16662,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "splice05",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15761,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "starvation",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16539,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "tgkill01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 15754,
+      "timeouts": 1,
+      "internal": {
+        "TBROK": 1,
+        "TFAIL": 1
+      },
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "thp01",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16109,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    },
+    {
+      "case": "vmsplice03",
+      "arch": "rv",
+      "libc": "musl",
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "code": 137,
+      "runtime_ms": 16934,
+      "timeouts": 1,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    }
+  ],
+  "unknown_cases": [
+    {
+      "case": "accept02",
+      "arch": "rv",
+      "libc": "glibc",
+      "group": "ltp-glibc",
+      "status": "UNKNOWN",
+      "code": null,
+      "runtime_ms": null,
+      "timeouts": 0,
+      "internal": {},
+      "enosys": 0,
+      "panic_trap": 0
+    }
+  ],
+  "raw_marker_counts": {
+    "run_count": 2334,
+    "pass_markers": 0,
+    "fail_markers": 2333,
+    "fail_status0": 593,
+    "fail_nonzero": 1740,
+    "timeout_markers": 31,
+    "skip_lines": 0,
+    "incomplete_count": 1,
+    "incomplete_cases": [
+      "accept02"
+    ],
+    "incomplete_details": [
+      {
+        "case": "accept02",
+        "run_line": 43921,
+        "occurrence": 2
+      }
+    ]
+  },
+  "closure": {
+    "clean_closed": false,
+    "reason": "RUN_META exit_code=0; 1 occurrence-aware incomplete RUN marker(s): accept02@line43921; LEADER_META records forced termination/stall handling; qemu termination signal present; partial/truncated meta line present: 426s; last_run=accept02; last_done=accept01\"",
+    "exit_meta": "RUN_META exit_code=0 end=2026-05-29T19:35:26Z",
+    "start_meta": "RUN_META arch=rv iter=004 start=2026-05-29T17:59:52Z head=b1c8090b cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt rv_img=/root/oskernel2026-orays/sdcard-rv.img",
+    "run_status_meta": "RUN_META run_eval_status=0",
+    "worker_meta": [],
+    "leader_meta": [
+      "LEADER_META action=ensure_terminate_stalled_qemu blocker=accept02 at=2026-05-29T19:35:25Z reason=\"WORKER_META already recorded; qemu still alive after monitor termination\""
+    ],
+    "qemu_signal_tail": [
+      {
+        "line": 43930,
+        "text": "qemu-system-riscv64: terminating on signal 15 from pid 803586 (<unknown process>)"
+      }
+    ],
+    "truncated_or_partial_meta_tail": [
+      {
+        "line": 43932,
+        "text": "426s; last_run=accept02; last_done=accept01\""
+      }
+    ],
+    "make_killed_tail": [],
+    "last_run": {
+      "case": "accept02",
+      "run_line": 43921,
+      "occurrence": 2
+    },
+    "last_done": {
+      "case": "accept01",
+      "line": 43914,
+      "marker": "FAIL",
+      "status_code": "0",
+      "run_line": 43889,
+      "occurrence": 2
+    }
+  },
+  "sha256": "5f60c62c916990254ba827cdba006c5818dc12dbec790d6e34ed4df8214031aa",
+  "line_count": 43934
+}

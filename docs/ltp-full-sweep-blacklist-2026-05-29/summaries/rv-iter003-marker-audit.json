@@ -1,0 +1,84 @@
+{
+  "log": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.log",
+  "status": {
+    "arch": "rv",
+    "iteration": "003",
+    "exit_code": 2,
+    "ended_at": "2026-05-29T17:57:07Z",
+    "run_status_file": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.run-status",
+    "monitor_log": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.monitor.log",
+    "df_before": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.df-before.txt",
+    "df_after": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.df-after.txt",
+    "free_before": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.free-before.txt",
+    "free_after": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.free-after.txt"
+  },
+  "sha256": "bd702ce941c5a5b43d9162f1168bf9b08d04c59c6503b989e74e0abd654f1e6d",
+  "line_count": 34107,
+  "run_count": 1597,
+  "pass_markers": 0,
+  "fail_markers": 1596,
+  "fail_status0": 477,
+  "fail_nonzero": 1119,
+  "timeout_markers": 25,
+  "skip_lines": 0,
+  "incomplete_count": 1,
+  "incomplete_cases": [
+    "shmat1"
+  ],
+  "incomplete_details": [
+    {
+      "case": "shmat1",
+      "run_line": 33653
+    }
+  ],
+  "last_run": "shmat1",
+  "last_done": {
+    "case": "shmat04",
+    "line": 33646,
+    "marker": "FAIL",
+    "status_code": "0"
+  },
+  "exit_meta": "RUN_META exit_code=2 end=2026-05-29T17:57:07Z",
+  "run_status_meta": "RUN_META run_eval_status=2",
+  "worker_meta": [],
+  "make_killed": [
+    {
+      "line": 34105,
+      "text": "make: *** [Makefile:373: run-rv] Killed"
+    }
+  ],
+  "tail_evidence": [
+    "  [0x10000cbb08]: Num iter: [90] Total Num Iter: [1000]",
+    "    [0x10001ebb08]: write_to_mem(): memory address: [0x100abfe000]",
+    "      [0x100030bb08]: read_from_mem():  memory address: [0x100abfe000]",
+    "      [0x100030bb08]: read_mem(): content of memory: Y",
+    "  [0x10000cbb08]: shmget(): success, got segment of size 1171456",
+    "  [0x10000cbb08]: Map address = 0x100ad1d000",
+    "  [0x10000cbb08]: Num iter: [91] Total Num Iter: [1000]",
+    "  [0x10000cbb08]: shmget(): success, got segment of size 1171456",
+    "  [0x10000cbb08]: Map address = 0x100ae3c000",
+    "  [0x10000cbb08]: Num iter: [92] Total Num Iter: [1000]",
+    "    [0x10001ebb08]: write_to_mem(): memory address: [0x100ae3c000]",
+    "      [0x100030bb08]: read_from_mem():  memory address: [0x100ae3c000]",
+    "      [0x100030bb08]: read_mem(): content of memory: Y",
+    "  [0x10000cbb08]: shmget(): success, got segment of size 1171456",
+    "  [0x10000cbb08]: Map address = 0x100af5b000",
+    "  [0x10000cbb08]: Num iter: [93] Total Num Iter: [1000]",
+    "    [0x10001ebb08]: write_to_mem(): memory address: [0x100af5b000]",
+    "  [0x10000cbb08]: shmget(): success, got segment of size 1171456",
+    "  [0x10000cbb08]: Map address = 0x100b07a000",
+    "  [0x10000cbb08]: Num iter: [94] Total Num Iter: [1000]",
+    "    [0x10001ebb08]: write_to_mem(): memory address: [0x100b07a000]",
+    "      [0x100030bb08]: read_from_mem():  memory address: [0x100b07a000]",
+    "      [0x100030bb08]: read_mem(): content of memory: Y",
+    "  [0x10000cbb08]: shmget(): success, got segment of size 1171456",
+    "  [0x10000cbb08]: Map address = 0x100b199000",
+    "  [0x10000cbb08]: Num iter: [95] Total Num Iter: [1000]",
+    "    [0x10001ebb08]: write_to_mem(): memory address: [0x100b199000]",
+    "make: *** [Makefile:373: run-rv] Killed",
+    "RUN_META run_eval_status=2",
+    "RUN_META exit_code=2 end=2026-05-29T17:57:07Z"
+  ],
+  "clean_closed": false,
+  "clean_closed_reason": "RUN_META exit_code=2 and one RUN marker lacks a terminal PASS/FAIL/TIMEOUT/SKIP marker; tail shows make killed during shmat1."
+}

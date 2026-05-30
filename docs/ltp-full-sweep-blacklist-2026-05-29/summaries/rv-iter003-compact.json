@@ -1,0 +1,41 @@
+{
+  "log": "target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.log",
+  "sha256": "bd702ce941c5a5b43d9162f1168bf9b08d04c59c6503b989e74e0abd654f1e6d",
+  "selection": "ltp case list: all-minus-blacklist skipped=37 (2331 cases, timeout 15s)",
+  "run_meta": [
+    "RUN_META arch=rv iter=003 start=2026-05-29T14:39:18Z head=b1c8090b cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt rv_img=/root/oskernel2026-orays/sdcard-rv.img",
+    "RUN_META run_eval_status=2",
+    "RUN_META exit_code=2 end=2026-05-29T17:57:07Z"
+  ],
+  "worker_meta": [],
+  "raw_markers": {
+    "run": 1597,
+    "pass": 0,
+    "fail": 1596,
+    "fail_status0": 477,
+    "fail_nonzero": 1119,
+    "timeout": 25,
+    "skip": 0,
+    "incomplete": [
+      "shmat1"
+    ]
+  },
+  "parser": {
+    "pass_count": 477,
+    "fail_count": 1119,
+    "timeouts": 25,
+    "internal": {
+      "TPASS": null,
+      "TFAIL": 1784,
+      "TBROK": 431,
+      "TCONF": 623
+    },
+    "enosys_count": 359,
+    "panic_trap_count": 0
+  },
+  "blocker_assessment": {
+    "closed_clean": false,
+    "severe_blocker": "shmat1",
+    "reason_category": "guest/host OOM or resource exhaustion killed runner"
+  }
+}

@@ -1,0 +1,559 @@
+{
+  "log": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log",
+  "status": {
+    "arch": "rv",
+    "iteration": "001b",
+    "command": "LTP_BLACKLIST=\"$(cat /root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt)\" LTP_CASES=blacklist RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img ./run-eval.sh rv 2>&1 | tee /root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log",
+    "cwd": "/root/oskernel2026-orays-team-fullsweep-20260529",
+    "head": "9e8c6ed7",
+    "blacklist": "/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt",
+    "rv_img": "/root/oskernel2026-orays/sdcard-rv.img",
+    "log": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log",
+    "df_before": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.df-before.txt",
+    "df_after": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.df-after.txt",
+    "exit_code": 0,
+    "started_at": "2026-05-29T10:55:58Z",
+    "ended_at": "2026-05-29T11:48:26Z"
+  },
+  "sha256": "617e674f5255d20ad8a5276131956d273a3fcc713da98ee2562ad70f76ad2b37",
+  "line_count": 25295,
+  "run_count": 1268,
+  "pass_markers": 0,
+  "fail_markers": 1267,
+  "fail_status0": 348,
+  "fail_nonzero": 919,
+  "timeout_markers": 17,
+  "skip_lines": 0,
+  "incomplete_count": 1,
+  "incomplete_cases": [
+    "pthserv"
+  ],
+  "last_run": "pthserv",
+  "last_done": "pth_str03",
+  "exit_meta": "RUN_META exit_code=0 end=2026-05-29T11:48:26Z",
+  "severe_keyword_hits_count": 891,
+  "severe_keyword_hits_tail": [
+    {
+      "line": 23202,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23222,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23242,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23272,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23292,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23312,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23341,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23362,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23383,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23426,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23449,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23470,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23501,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23522,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23618,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23621,
+      "kind": "fork_resource",
+      "text": "pipe12.c:54: \u001b[1;32mTPASS: \u001b[0mwrite failed as expected: EAGAIN/EWOULDBLOCK (11)"
+    },
+    {
+      "line": 23647,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23675,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23696,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23720,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23751,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23781,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23783,
+      "kind": "fork_resource",
+      "text": "pipe2_04.c:36: \u001b[1;32mTPASS: \u001b[0mwrite failed as expected: EAGAIN/EWOULDBLOCK (11)"
+    },
+    {
+      "line": 23813,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23834,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23902,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23924,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 23930,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 39s"
+    },
+    {
+      "line": 23996,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24016,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24036,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24061,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24086,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24106,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24126,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24151,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24176,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24184,
+      "kind": "timeout_text",
+      "text": "ppoll01.c:246: \u001b[1;34mTINFO: \u001b[0mcase TIMEOUT"
+    },
+    {
+      "line": 24196,
+      "kind": "trap_fault",
+      "text": "ppoll01.c:285: \u001b[1;32mTPASS: \u001b[0mret: -1, errno: EFAULT (14)"
+    },
+    {
+      "line": 24204,
+      "kind": "timeout_text",
+      "text": "ppoll01.c:246: \u001b[1;34mTINFO: \u001b[0mcase TIMEOUT"
+    },
+    {
+      "line": 24216,
+      "kind": "trap_fault",
+      "text": "ppoll01.c:285: \u001b[1;32mTPASS: \u001b[0mret: -1, errno: EFAULT (14)"
+    },
+    {
+      "line": 24234,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24256,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24276,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24296,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24316,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24370,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24390,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24416,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24445,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24466,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24487,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24510,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24534,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24558,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24581,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24586,
+      "kind": "trap_fault",
+      "text": "preadv02.c:79: \u001b[1;32mTPASS: \u001b[0mpreadv() failed as expected: EFAULT (14)"
+    },
+    {
+      "line": 24609,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24614,
+      "kind": "trap_fault",
+      "text": "preadv02.c:79: \u001b[1;32mTPASS: \u001b[0mpreadv() failed as expected: EFAULT (14)"
+    },
+    {
+      "line": 24671,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24697,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24723,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24728,
+      "kind": "trap_fault",
+      "text": "preadv202.c:82: \u001b[1;32mTPASS: \u001b[0mpreadv2() failed as expected: EFAULT (14)"
+    },
+    {
+      "line": 24751,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24756,
+      "kind": "trap_fault",
+      "text": "preadv202.c:82: \u001b[1;32mTPASS: \u001b[0mpreadv2() failed as expected: EFAULT (14)"
+    },
+    {
+      "line": 24852,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24874,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24894,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24914,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24958,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 24964,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 39s"
+    },
+    {
+      "line": 25030,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 25036,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 39s"
+    },
+    {
+      "line": 25102,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 25125,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 25148,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 25169,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 25190,
+      "kind": "timeout_text",
+      "text": "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s"
+    },
+    {
+      "line": 25237,
+      "kind": "timeout_text",
+      "text": "TIMEOUT LTP CASE pth_str01 after 15s"
+    },
+    {
+      "line": 25275,
+      "kind": "timeout_text",
+      "text": "TIMEOUT LTP CASE pth_str03 after 15s"
+    }
+  ],
+  "last_markers": [
+    {
+      "line": 24934,
+      "text": "FAIL LTP CASE profil01 : 32"
+    },
+    {
+      "line": 24940,
+      "text": "RUN LTP CASE prot_hsymlinks"
+    },
+    {
+      "line": 24948,
+      "text": "FAIL LTP CASE prot_hsymlinks : 134"
+    },
+    {
+      "line": 24954,
+      "text": "RUN LTP CASE pselect01"
+    },
+    {
+      "line": 25020,
+      "text": "FAIL LTP CASE pselect01 : 1"
+    },
+    {
+      "line": 25026,
+      "text": "RUN LTP CASE pselect01_64"
+    },
+    {
+      "line": 25092,
+      "text": "FAIL LTP CASE pselect01_64 : 1"
+    },
+    {
+      "line": 25098,
+      "text": "RUN LTP CASE pselect02"
+    },
+    {
+      "line": 25114,
+      "text": "FAIL LTP CASE pselect02 : 0"
+    },
+    {
+      "line": 25121,
+      "text": "RUN LTP CASE pselect02_64"
+    },
+    {
+      "line": 25137,
+      "text": "FAIL LTP CASE pselect02_64 : 0"
+    },
+    {
+      "line": 25144,
+      "text": "RUN LTP CASE pselect03"
+    },
+    {
+      "line": 25158,
+      "text": "FAIL LTP CASE pselect03 : 0"
+    },
+    {
+      "line": 25165,
+      "text": "RUN LTP CASE pselect03_64"
+    },
+    {
+      "line": 25179,
+      "text": "FAIL LTP CASE pselect03_64 : 0"
+    },
+    {
+      "line": 25186,
+      "text": "RUN LTP CASE pt_test"
+    },
+    {
+      "line": 25200,
+      "text": "FAIL LTP CASE pt_test : 32"
+    },
+    {
+      "line": 25206,
+      "text": "RUN LTP CASE ptem01"
+    },
+    {
+      "line": 25210,
+      "text": "FAIL LTP CASE ptem01 : 2"
+    },
+    {
+      "line": 25216,
+      "text": "RUN LTP CASE pth_str01"
+    },
+    {
+      "line": 25236,
+      "text": "FAIL LTP CASE pth_str01 : 137"
+    },
+    {
+      "line": 25237,
+      "text": "TIMEOUT LTP CASE pth_str01 after 15s"
+    },
+    {
+      "line": 25243,
+      "text": "RUN LTP CASE pth_str02"
+    },
+    {
+      "line": 25247,
+      "text": "FAIL LTP CASE pth_str02 : 0"
+    },
+    {
+      "line": 25254,
+      "text": "RUN LTP CASE pth_str03"
+    },
+    {
+      "line": 25274,
+      "text": "FAIL LTP CASE pth_str03 : 137"
+    },
+    {
+      "line": 25275,
+      "text": "TIMEOUT LTP CASE pth_str03 after 15s"
+    },
+    {
+      "line": 25281,
+      "text": "RUN LTP CASE pthcli"
+    },
+    {
+      "line": 25285,
+      "text": "FAIL LTP CASE pthcli : 1"
+    },
+    {
+      "line": 25291,
+      "text": "RUN LTP CASE pthserv"
+    }
+  ]
+}
