@@ -1,0 +1,55 @@
+# LTP full-sweep experiment supplemental blacklist for 2026-05-29.
+# Format: case names separated by whitespace/commas; '#' comments are ignored by the runner.
+# Baseline source: examples/shell/src/cmd.rs::LTP_SWEEP_DEFAULT_BLACKLIST_CASES.
+# Add only severe sweep blockers (panic/trap/hang/OOM/fork bomb/environment pollution/unsupported blocking dependency).
+# Do NOT add ordinary TFAIL/TBROK/ENOSYS/wrong errno or anything solely to improve pass rate.
+#
+# Added entries must be documented in iterations.md with:
+# - case name
+# - reason category
+# - first evidence path/location
+# - scope: rv+la common or arch-specific
+# - removal condition
+
+# 2026-05-29 rv-iter001b: severe hang/incomplete RUN.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log
+#   WORKER_META blocker=pthserv action=terminate_stalled_qemu at=2026-05-29T11:48:21Z
+# Scope: generic supplemental blacklist for subsequent RV and LA sweeps; observed on RV, not LA-specific.
+# Removal condition: targeted pthserv completes with PASS/FAIL/TIMEOUT marker without QEMU/guest stall or environment damage.
+pthserv
+
+# 2026-05-29 rv-iter002: oom/resource exhaustion killed QEMU/runner.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter002.log
+#   RUN LTP CASE oom01; thread allocating 3221225472 bytes; make: *** [Makefile:373: run-rv] Killed
+# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter002-host-oom-dmesg.txt
+#   host OOM killer killed qemu-system-ris pid 648578.
+# Scope: generic supplemental blacklist for subsequent RV and LA sweeps; observed on RV, not LA-specific.
+# Removal condition: targeted oom01 completes with PASS/FAIL/TIMEOUT marker without killing QEMU/runner or exhausting host/guest memory.
+oom01
+
+# 2026-05-29 rv-iter003: SysV shared-memory stress exhausted host/guest memory and killed QEMU/runner.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter003.log
+#   RUN LTP CASE shmat1; repeated shmget/map iterations; make: *** [Makefile:373: run-rv] Killed
+# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter003-host-oom-dmesg.txt
+#   host OOM killer killed qemu-system-ris pid 722284.
+# Scope: generic supplemental blacklist for subsequent RV and LA sweeps; observed on RV, not LA-specific.
+# Removal condition: targeted shmat1 completes with PASS/FAIL/TIMEOUT marker without killing QEMU/runner or exhausting host/guest memory.
+shmat1
+
+# 2026-05-29 rv-iter004: glibc accept02 hung after futex error and required QEMU termination.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.log
+#   second-suite RUN LTP CASE accept02; "The futex facility returned an unexpected error code."; no FAIL/PASS/TIMEOUT closure.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.monitor.log
+#   WORKER_META blocker=accept02 action=terminate_stalled_qemu at=2026-05-29T19:34:20Z
+# Scope: generic supplemental blacklist because runner blacklist is case-name based; observed in RV glibc phase, not LA-specific.
+# Removal condition: both targeted accept02 variants, especially glibc, complete with PASS/FAIL/TIMEOUT marker without futex abort, QEMU stall, or environment damage.
+accept02
+
+# 2026-05-29 rv-iter005: mincore03 caused resource exhaustion and host OOM killed QEMU/runner.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter005.log
+#   RUN LTP CASE mincore03; LTP MEMORY before free_frames=56557 allocated_frames=204678; make: *** [Makefile:373: run-rv] Killed
+# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter005-host-oom-dmesg.txt
+#   host OOM killer killed qemu-system-ris pid 806463.
+# Scope: generic supplemental blacklist for subsequent RV and LA sweeps; observed on RV, not LA-specific.
+# Removal condition: targeted mincore03 completes with PASS/FAIL/TIMEOUT marker without killing QEMU/runner or exhausting host/guest memory.
+mincore03

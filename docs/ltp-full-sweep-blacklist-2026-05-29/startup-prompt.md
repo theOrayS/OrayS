@@ -21,13 +21,13 @@
 
 - 不允许 fake pass。
 - blacklist / SKIP 不算 PASS，不得作为 stable promotion 证据。
-- 普通 `TFAIL`、`TBROK`、`ENOSYS`、wrong errno 不进入 blacklist，除非它们导致 sweep 无法继续。
+- 普通 `TFAIL`、`TBROK`、`TCONF`、`ENOSYS`、wrong errno、已闭合 `TIMEOUT LTP CASE` 不进入 blacklist，除非它们伴随未闭合/卡死/环境破坏并导致 sweep 无法继续。
 - 只允许 blacklist 严重阻断项：
   - kernel panic / trap
   - QEMU 或 guest hang
   - guest OOM / fork bomb / 资源耗尽
   - 破坏后续 case 的环境污染
-  - 多轮复现的不可接受 timeout
+  - 多轮复现且未闭合/卡死、阻断 sweep 继续或破坏后续环境的不可接受 timeout；已闭合 `TIMEOUT LTP CASE` 仍是失败，不是 blacklist 证据
   - cgroup / namespace / driver / module / cpuhotplug 等当前内核模型不支持且会阻断 sweep 的环境依赖
 - 每个新增 blacklist case 必须记录：
   - case 名

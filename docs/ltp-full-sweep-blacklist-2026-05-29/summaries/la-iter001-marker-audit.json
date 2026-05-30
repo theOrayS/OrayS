@@ -1,0 +1,228 @@
+{
+  "log": "target/ltp-full-sweep-blacklist-2026-05-29/raw/la-iter001.log",
+  "monitor_log": "target/ltp-full-sweep-blacklist-2026-05-29/raw/la-iter001.monitor.log",
+  "sha256": "0161a4404f9e17a93085a86b1f5f4690275e1fa2c416c05cafb0787fdf2c3845",
+  "generated_at": "2026-05-30T04:28:57Z",
+  "line_count": 4452,
+  "contains_nul": false,
+  "status": {
+    "arch": "la",
+    "iteration": "001",
+    "exit_code": 0,
+    "run_eval_status": 0,
+    "ended_at": "2026-05-30T04:27:24Z"
+  },
+  "selection_lines": [
+    "ltp case list: all-minus-blacklist skipped=40 (2328 cases, timeout 15s)"
+  ],
+  "suite_lines": [],
+  "run_count": 160,
+  "unique_case_names": 160,
+  "pass_markers": 0,
+  "fail_markers": 159,
+  "fail_status0": 47,
+  "fail_nonzero": 112,
+  "fail_code_counts_from_wrappers": {
+    "0": 47,
+    "1": 17,
+    "2": 18,
+    "3": 1,
+    "6": 3,
+    "22": 1,
+    "32": 68,
+    "33": 1,
+    "128": 1,
+    "137": 2
+  },
+  "timeout_markers": 2,
+  "skip_lines": 0,
+  "incomplete_count": 1,
+  "incomplete_cases": [
+    "creat07"
+  ],
+  "incomplete_details": [
+    {
+      "case": "creat07",
+      "group": "ltp-musl",
+      "run_line": 4441,
+      "run_column": 1,
+      "occurrence": 1
+    }
+  ],
+  "terminal_orphan_completion_count": 0,
+  "last_run": {
+    "case": "creat07",
+    "group": "ltp-musl",
+    "run_line": 4441,
+    "column": 1,
+    "occurrence": 1
+  },
+  "last_done": {
+    "case": "creat06",
+    "group": "ltp-musl",
+    "line": 4435,
+    "column": 1,
+    "marker": "FAIL",
+    "status_code": "2",
+    "completion_occurrence": 1,
+    "run_line": 4424,
+    "run_column": 1,
+    "run_occurrence": 1,
+    "run_group": "ltp-musl"
+  },
+  "run_meta": [
+    {
+      "line": 1,
+      "text": "RUN_META arch=la iter=001 start=2026-05-30T04:08:11Z head=b1c8090b cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt la_img=/root/oskernel2026-orays/sdcard-la.img"
+    },
+    {
+      "line": 4450,
+      "text": "RUN_META run_eval_status=0"
+    },
+    {
+      "line": 4452,
+      "text": "RUN_META exit_code=0 end=2026-05-30T04:27:24Z"
+    }
+  ],
+  "leader_meta": [],
+  "monitor_leader_meta": [
+    {
+      "line": 1,
+      "text": "LEADER_META arch=la blocker=creat07 action=terminate_stalled_qemu at=2026-05-30T04:27:24Z reason=\"no log growth for 392s; last_run=creat07; last_terminal=creat06; qemu still active\""
+    }
+  ],
+  "worker_meta": [],
+  "qemu_signal": [
+    {
+      "line": 4449,
+      "text": "qemu-system-loongarch64: terminating on signal 15 from pid 1335167 (/bin/bash)"
+    }
+  ],
+  "panic_trap_lines": [],
+  "make_killed": [],
+  "inline_marker_audit": {
+    "inline_event_count": 0,
+    "inline_events": []
+  },
+  "parser_status_counts": {
+    "PASS": 47,
+    "FAIL": 112,
+    "UNKNOWN": 1
+  },
+  "parser_unknown_rows": [
+    {
+      "arch": "la",
+      "case": "creat07",
+      "code": null,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": null,
+      "group": "ltp-musl",
+      "internal": {
+        "TBROK": 2
+      },
+      "libc": "musl",
+      "memory": {
+        "before": {
+          "allocated_frames": 39980,
+          "free_frames": 156160
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": null,
+      "status": "UNKNOWN",
+      "timeouts": 1
+    }
+  ],
+  "arch_specific_blocker": {
+    "case": "creat07",
+    "arch": "la",
+    "category": "LA-only sweep hang / incomplete RUN after TBROK checkpoint timeout",
+    "first_evidence": "target/ltp-full-sweep-blacklist-2026-05-29/raw/la-iter001.log: last RUN LTP CASE creat07 after creat06 closure; target/ltp-full-sweep-blacklist-2026-05-29/raw/la-iter001.monitor.log: LEADER_META arch=la blocker=creat07 action=terminate_stalled_qemu at=2026-05-30T04:27:24Z reason=\"no log growth for 392s; last_run=creat07; last_terminal=creat06; qemu still active\"",
+    "generic_blacklist_delta": "none; do not add to generic RV blacklist without RV evidence",
+    "removal_condition": "targeted creat07 on LA completes with a normal PASS/FAIL/TIMEOUT marker and no stalled QEMU/guest hang or environment damage"
+  },
+  "clean_closed": false,
+  "closure_verdict": "not closed: incomplete_stack=1; qemu_signal=1; leader_meta_raw=0 monitor=1",
+  "tail_evidence": [
+    "LTP MEMORY creat03 after_run: free_frames=156216 allocated_frames=39924",
+    "LTP MEMORY creat03 after_cleanup: free_frames=156216 allocated_frames=39924",
+    "LTP CASE RUNTIME creat03: 1562 ms",
+    "========== END ltp creat03 ==========",
+    "========== START ltp creat04 ==========",
+    "RUN LTP CASE creat04",
+    "LTP MEMORY creat04 before: free_frames=156216 allocated_frames=39924",
+    "tst_memutils.c:152: \u001b[1;34mTINFO: \u001b[0moom_score_adj does not exist, skipping the adjustment",
+    "tst_test.c:1733: \u001b[1;34mTINFO: \u001b[0mLTP version: 20240524",
+    "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s",
+    "tst_memutils.c:152: \u001b[1;34mTINFO: \u001b[0moom_score_adj does not exist, skipping the adjustment",
+    "creat04.c:49: \u001b[1;32mTPASS: \u001b[0mcall failed with EACCES as expected",
+    "creat04.c:49: \u001b[1;32mTPASS: \u001b[0mcall failed with EACCES as expected",
+    "",
+    "Summary:",
+    "passed   2",
+    "failed   0",
+    "broken   0",
+    "skipped  0",
+    "warnings 0",
+    "FAIL LTP CASE creat04 : 0",
+    "Pass!",
+    "LTP MEMORY creat04 after_run: free_frames=156184 allocated_frames=39956",
+    "LTP MEMORY creat04 after_cleanup: free_frames=156184 allocated_frames=39956",
+    "LTP CASE RUNTIME creat04: 1456 ms",
+    "========== END ltp creat04 ==========",
+    "========== START ltp creat05 ==========",
+    "RUN LTP CASE creat05",
+    "LTP MEMORY creat05 before: free_frames=156184 allocated_frames=39956",
+    "tst_memutils.c:152: \u001b[1;34mTINFO: \u001b[0moom_score_adj does not exist, skipping the adjustment",
+    "tst_test.c:1733: \u001b[1;34mTINFO: \u001b[0mLTP version: 20240524",
+    "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s",
+    "tst_memutils.c:152: \u001b[1;34mTINFO: \u001b[0moom_score_adj does not exist, skipping the adjustment",
+    "creat05.c:49: \u001b[1;34mTINFO: \u001b[0mgetdtablesize() = 1024",
+    "creat05.c:59: \u001b[1;34mTINFO: \u001b[0mOpened additional #1021 fds",
+    "creat05.c:36: \u001b[1;32mTPASS: \u001b[0mcreat() failed with EMFILE",
+    "",
+    "Summary:",
+    "passed   1",
+    "failed   0",
+    "broken   0",
+    "skipped  0",
+    "warnings 0",
+    "tst_tmpdir.c:342: \u001b[1;35mTWARN: \u001b[0mtst_rmdir: rmobj(/tmp/ltp-work/LTP_crennPaeD) failed: remove(/tmp/ltp-work/LTP_crennPaeD) failed; errno=39: ENOTEMPTY",
+    "FAIL LTP CASE creat05 : 0",
+    "Pass!",
+    "LTP MEMORY creat05 after_run: free_frames=156168 allocated_frames=39972",
+    "LTP MEMORY creat05 after_cleanup: free_frames=156168 allocated_frames=39972",
+    "LTP CASE RUNTIME creat05: 1966 ms",
+    "========== END ltp creat05 ==========",
+    "========== START ltp creat06 ==========",
+    "RUN LTP CASE creat06",
+    "LTP MEMORY creat06 before: free_frames=156168 allocated_frames=39972",
+    "tst_test.c:1017: \u001b[1;34mTINFO: \u001b[0mMounting (null) to /tmp/ltp-work/LTP_crecjjcDo/mntpoint fstyp=tmpfs flags=21",
+    "tst_test.c:1017: \u001b[1;31mTBROK: \u001b[0mmount((null), mntpoint, tmpfs, 33, 0) failed: EINVAL (22)",
+    "",
+    "Summary:",
+    "passed   0",
+    "failed   0",
+    "broken   1",
+    "skipped  0",
+    "warnings 0",
+    "FAIL LTP CASE creat06 : 2",
+    "LTP MEMORY creat06 after_run: free_frames=156160 allocated_frames=39980",
+    "LTP MEMORY creat06 after_cleanup: free_frames=156160 allocated_frames=39980",
+    "LTP CASE RUNTIME creat06: 1346 ms",
+    "========== END ltp creat06 ==========",
+    "========== START ltp creat07 ==========",
+    "RUN LTP CASE creat07",
+    "LTP MEMORY creat07 before: free_frames=156160 allocated_frames=39980",
+    "tst_memutils.c:152: \u001b[1;34mTINFO: \u001b[0moom_score_adj does not exist, skipping the adjustment",
+    "tst_test.c:1733: \u001b[1;34mTINFO: \u001b[0mLTP version: 20240524",
+    "tst_test.c:1617: \u001b[1;34mTINFO: \u001b[0mTimeout per run is 0h 00m 30s",
+    "tst_memutils.c:152: \u001b[1;34mTINFO: \u001b[0moom_score_adj does not exist, skipping the adjustment",
+    "(null)      1  \u001b[1;31mTBROK\u001b[0m  :  creat07_child.c:15: tst_checkpoint_wake(0, 1, 10000) failed: errno=ETIMEDOUT(110): Operation timed out",
+    "(null)      2  \u001b[1;31mTBROK\u001b[0m  :  creat07_child.c:15: Remaining cases broken",
+    "qemu-system-loongarch64: terminating on signal 15 from pid 1335167 (/bin/bash)",
+    "RUN_META run_eval_status=0",
+    "rowth for 392s; last_run=creat07; last_terminal=creat06; qemu still active\"",
+    "RUN_META exit_code=0 end=2026-05-30T04:27:24Z"
+  ]
+}

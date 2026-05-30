@@ -1,0 +1,20 @@
+{
+  "inline_events": [
+    {
+      "line": 47213,
+      "pos": 45,
+      "kind": "FAIL",
+      "case": "cpuset_memory_pressure",
+      "code": "1",
+      "text": "usage: cpuset_memory_pressure mmap-size-in-kBFAIL LTP CASE cpuset_memory_pressure : 1"
+    }
+  ],
+  "remaining_incomplete": [
+    {
+      "case": "mincore03",
+      "line": 61656,
+      "occurrence": 2
+    }
+  ],
+  "cpuset_closed": true
+}

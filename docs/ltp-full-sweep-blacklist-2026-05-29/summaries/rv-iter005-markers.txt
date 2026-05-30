@@ -1,0 +1,13 @@
+RUN=3254
+PASS_MARKERS=0
+FAIL=3253
+FAIL_STATUS0=857
+FAIL_NONZERO=2396
+TIMEOUT=51
+SKIP=0
+INCOMPLETE_STACK_COUNT=1
+INCOMPLETE_STACK_TAIL=mincore03@line61656#2
+META_TAIL=RUN_META arch=rv iter=005 start=2026-05-29T19:37:29Z head=b1c8090b cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt rv_img=/root/oskernel2026-orays/sdcard-rv.img | RUN_META run_eval_status=2 | RUN_META exit_code=2 end=2026-05-29T23:52:18Z
+SELECTION_LINES=ltp case list: all-minus-blacklist skipped=39 (2329 cases, timeout 15s) | ltp case list: all-minus-blacklist skipped=42 (2333 cases, timeout 15s)
+SUITE_SUMMARIES=ltp cases: 590 passed, 1739 failed, 31 timed out
+INLINE_MARKER_NOTE=cpuset_memory_pressure has glued inline FAIL marker at line 47213 and is closed; do not blacklist it.

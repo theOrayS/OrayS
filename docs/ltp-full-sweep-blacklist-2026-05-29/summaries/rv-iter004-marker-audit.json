@@ -1,0 +1,114 @@
+{
+  "log": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.log",
+  "status": {
+    "arch": "rv",
+    "iteration": "004",
+    "exit_code": 0,
+    "ended_at": "2026-05-29T19:35:26Z",
+    "run_status_file": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.run-status",
+    "monitor_log": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.monitor.log",
+    "df_before": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.df-before.txt",
+    "df_after": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.df-after.txt",
+    "free_before": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.free-before.txt",
+    "free_after": "/root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.free-after.txt"
+  },
+  "sha256": "5f60c62c916990254ba827cdba006c5818dc12dbec790d6e34ed4df8214031aa",
+  "line_count": 43934,
+  "run_count": 2334,
+  "pass_markers": 0,
+  "fail_markers": 2333,
+  "fail_status0": 593,
+  "fail_nonzero": 1740,
+  "timeout_markers": 31,
+  "skip_lines": 0,
+  "incomplete_count": 1,
+  "incomplete_cases": [
+    "accept02"
+  ],
+  "incomplete_details": [
+    {
+      "case": "accept02",
+      "run_line": 43921,
+      "occurrence": 2
+    }
+  ],
+  "terminal_orphan_completion_count": 0,
+  "terminal_orphan_completions_tail": [],
+  "last_run": {
+    "case": "accept02",
+    "run_line": 43921,
+    "occurrence": 2
+  },
+  "last_done": {
+    "case": "accept01",
+    "line": 43914,
+    "marker": "FAIL",
+    "status_code": "0",
+    "run_line": 43889,
+    "occurrence": 2
+  },
+  "exit_meta": "RUN_META exit_code=0 end=2026-05-29T19:35:26Z",
+  "start_meta": "RUN_META arch=rv iter=004 start=2026-05-29T17:59:52Z head=b1c8090b cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt rv_img=/root/oskernel2026-orays/sdcard-rv.img",
+  "run_status_meta": "RUN_META run_eval_status=0",
+  "worker_meta": [],
+  "leader_meta": [
+    "LEADER_META action=ensure_terminate_stalled_qemu blocker=accept02 at=2026-05-29T19:35:25Z reason=\"WORKER_META already recorded; qemu still alive after monitor termination\""
+  ],
+  "qemu_signal": [
+    {
+      "line": 43930,
+      "text": "qemu-system-riscv64: terminating on signal 15 from pid 803586 (<unknown process>)"
+    }
+  ],
+  "truncated_or_partial_meta": [
+    {
+      "line": 43932,
+      "text": "426s; last_run=accept02; last_done=accept01\""
+    }
+  ],
+  "make_killed": [],
+  "tail_evidence": [
+    "accept01.c:92: TPASS: bad file descriptor : EBADF (9)",
+    "\u001b[37m[5177.859927 0:28548 axnet::smoltcp_impl::tcp:284] \u001b[33m[AxError::InvalidInput] socket accept() failed: not listen\u001b[m\u001b[m",
+    "\u001b[37m[5177.872786 0:28548 arceos_posix_api::imp::net:567] \u001b[32msys_accept => Err(EINVAL)\u001b[m\u001b[m",
+    "accept01.c:92: TPASS: invalid socket buffer : EINVAL (22)",
+    "\u001b[37m[5177.875095 0:28548 axnet::smoltcp_impl::tcp:284] \u001b[33m[AxError::InvalidInput] socket accept() failed: not listen\u001b[m\u001b[m",
+    "\u001b[37m[5177.875246 0:28548 arceos_posix_api::imp::net:567] \u001b[32msys_accept => Err(EINVAL)\u001b[m\u001b[m",
+    "accept01.c:92: TPASS: invalid salen : EINVAL (22)",
+    "\u001b[37m[5177.875553 0:28548 axnet::smoltcp_impl::tcp:284] \u001b[33m[AxError::InvalidInput] socket accept() failed: not listen\u001b[m\u001b[m",
+    "\u001b[37m[5177.875686 0:28548 arceos_posix_api::imp::net:567] \u001b[32msys_accept => Err(EINVAL)\u001b[m\u001b[m",
+    "accept01.c:92: TPASS: no queued connections : EINVAL (22)",
+    "\u001b[37m[5177.876141 0:28548 arceos_posix_api::imp::net:567] \u001b[32msys_accept => Err(EOPNOTSUPP)\u001b[m\u001b[m",
+    "accept01.c:92: TPASS: UDP accept : EOPNOTSUPP (95)",
+    "",
+    "Summary:",
+    "passed   5",
+    "failed   0",
+    "broken   0",
+    "skipped  0",
+    "warnings 0",
+    "FAIL LTP CASE accept01 : 0",
+    "Pass!",
+    "LTP MEMORY accept01 after_run: free_frames=75452 allocated_frames=185783",
+    "LTP MEMORY accept01 after_cleanup: free_frames=75452 allocated_frames=185783",
+    "LTP CASE RUNTIME accept01: 2193 ms",
+    "========== END ltp accept01 ==========",
+    "========== START ltp accept02 ==========",
+    "RUN LTP CASE accept02",
+    "LTP MEMORY accept02 before: free_frames=75452 allocated_frames=185783",
+    "tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment",
+    "tst_test.c:1733: TINFO: LTP version: 20240524",
+    "tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s",
+    "tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment",
+    "tst_buffers.c:57: TINFO: Test is using guarded buffers",
+    "accept02.c:131: TINFO: Starting listener on port: 49197",
+    "The futex facility returned an unexpected error code.",
+    "qemu-system-riscv64: terminating on signal 15 from pid 803586 (<unknown process>)",
+    "RUN_META run_eval_status=0",
+    "426s; last_run=accept02; last_done=accept01\"",
+    "LEADER_META action=ensure_terminate_stalled_qemu blocker=accept02 at=2026-05-29T19:35:25Z reason=\"WORKER_META already recorded; qemu still alive after monitor termination\"",
+    "RUN_META exit_code=0 end=2026-05-29T19:35:26Z"
+  ],
+  "clean_closed": false,
+  "clean_closed_reason": "RUN_META exit_code=0; 1 occurrence-aware incomplete RUN marker(s): accept02@line43921; LEADER_META records forced termination/stall handling; qemu termination signal present; partial/truncated meta line present: 426s; last_run=accept02; last_done=accept01\""
+}
