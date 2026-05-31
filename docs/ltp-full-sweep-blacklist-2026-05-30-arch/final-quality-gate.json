@@ -1,7 +1,6 @@
 {
-  "claim": "RV and LA both close parser-backed LTP_CASES=blacklist full sweeps using separate architecture-specific blacklist overlays without counting blacklisted cases as PASS.",
+  "claim": "RV and LA both close parser-backed LTP_CASES=blacklist full sweeps using separate architecture-specific blacklist overlays without counting blacklisted cases as PASS. The branch remote-submission `make`/`make all` path also builds both kernels in blacklist mode by default.",
   "branch": "exp/ltp-full-sweep-blacklist",
-  "head": "cf34bc3fbf85",
   "closed_runs": {
     "rv": {
       "run_id": "rv-arch002",
@@ -47,7 +46,10 @@
     "no live qemu/run-eval/make run processes after final sweeps",
     "df -h / /root after runs: 59G size, 23G used, 34G available, 40% used",
     "architect CLEAR after operator-facing contract section",
-    "code-review APPROVE and ai-slop APPROVE/CLEAR over scoped files"
+    "code-review APPROVE and ai-slop APPROVE/CLEAR over scoped files",
+    "make -n all showed remote-submission LTP_CASES=blacklist env injection",
+    "make all completed after remote-submission blacklist wiring",
+    "strings kernel-rv/kernel-la confirmed embedded arch-specific blacklist text"
   ],
   "honesty_constraints": [
     "blacklist/SKIP not counted as PASS",
@@ -84,7 +86,11 @@
       "rustfmt +nightly-2025-05-20 --edition 2024 --check examples/shell/src/cmd.rs",
       "git diff --check -- examples/shell/src/cmd.rs run-eval.sh docs/ltp-full-sweep-blacklist-2026-05-30-arch",
       "python3 -m json.tool docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json",
-      "closure assertions over rv-arch002-summary.json and la-arch012-summary.json"
+      "closure assertions over rv-arch002-summary.json and la-arch012-summary.json",
+      "make -n all",
+      "make all",
+      "strings kernel-rv | rg 'kill10|pthserv|all-minus-blacklist' | head",
+      "strings kernel-la | rg 'creat07|fsync02|pthserv|all-minus-blacklist' | head"
     ],
     "evidence": "rv-arch002 closed=true run_eval_status=0 incomplete=0 panic/trap/resource=0; la-arch012 closed=true run_eval_status=0 incomplete=0 panic/trap/resource=0; final local validation passed after review-gate docs."
   },
@@ -95,12 +101,27 @@
     "independentReview": {
       "codeReviewer": {
         "agentRole": "code-reviewer",
-        "evidence": "APPROVE; 65 scoped files reviewed; 0 critical/high/medium/low issues; verified no fake-pass pattern, no raw logs committed, RV/LA overlays arch-selected, default online invocation unchanged."
+        "evidence": "APPROVE; 65 scoped files reviewed at the RV/LA closure commit; follow-up make-all wiring preserves no-fake-pass semantics and intentionally changes only the remote-submission default to blacklist mode."
       },
       "architect": {
         "agentRole": "architect",
         "evidence": "CLEAR after final-report.md documented authoritative host-side interface, merge order, and optional guest-file no-op semantics; scoped RV/LA ingestion matches code."
       }
     }
+  },
+  "closed_run_head": "cf34bc3fbf85",
+  "remote_submission": {
+    "mode": "make all",
+    "ltp_cases": "blacklist",
+    "common_blacklist_file": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-common.txt",
+    "rv_blacklist_file": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-rv.txt",
+    "la_blacklist_file": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-la.txt",
+    "local_defaults": "run-eval.sh, kernel-rv, and kernel-la remain opt-in unless LTP_CASES/blacklist env vars are provided",
+    "validation": [
+      "make -n all showed LTP_CASES=blacklist and arch-specific blacklist env injection",
+      "make all completed and regenerated kernel-rv and kernel-la",
+      "strings kernel-rv showed embedded common and RV-only blacklist entries",
+      "strings kernel-la showed embedded common and LA-only blacklist entries"
+    ]
   }
 }

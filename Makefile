@@ -81,6 +81,15 @@ KERNEL_RV_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
 KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
+# This experimental branch is meant to be submitted to the official evaluator
+# as a blacklist full-sweep.  Keep local targets opt-in, but make the default
+# remote-submission path (`make` / `make all`) compile the chosen sweep mode and
+# per-arch blacklist overlays into kernel-rv/kernel-la.
+REMOTE_LTP_CASES ?= blacklist
+REMOTE_LTP_BLACKLIST_DIR ?= $(CURDIR)/docs/ltp-full-sweep-blacklist-2026-05-30-arch
+REMOTE_LTP_BLACKLIST_COMMON_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-common.txt
+REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
+REMOTE_LTP_BLACKLIST_LA_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-la.txt
 TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
 RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
 LA_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-la.img
@@ -279,14 +288,23 @@ la_aux_drive := \
 endif
 
 all:
-	$(MAKE) test_build ARCH=riscv64 BUS=mmio \
+	@test -f "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)" || { printf 'missing REMOTE_LTP_BLACKLIST_COMMON_FILE: %s\n' "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)" >&2; exit 1; }
+	@test -f "$(REMOTE_LTP_BLACKLIST_RV_FILE)" || { printf 'missing REMOTE_LTP_BLACKLIST_RV_FILE: %s\n' "$(REMOTE_LTP_BLACKLIST_RV_FILE)" >&2; exit 1; }
+	LTP_CASES="$(REMOTE_LTP_CASES)" \
+		LTP_BLACKLIST="$$(cat "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)")" \
+		LTP_BLACKLIST_RV="$$(cat "$(REMOTE_LTP_BLACKLIST_RV_FILE)")" \
+		$(MAKE) test_build ARCH=riscv64 BUS=mmio \
 		KERNEL_FEATURES="$(KERNEL_RV_FEATURES)" \
 		APP_FEATURES="$(KERNEL_RV_APP_FEATURES)" \
 		AXCONFIG_WRITES="$(KERNEL_RV_AXCONFIG_WRITES)" \
 		OUT_DIR=$(KERNEL_RV_OUT_DIR) \
 		OUT_CONFIG=$(KERNEL_RV_CONFIG) \
 		TARGET_DIR=$(KERNEL_RV_TARGET_DIR)
-	$(MAKE) test_build ARCH=loongarch64 BUS=pci \
+	@test -f "$(REMOTE_LTP_BLACKLIST_LA_FILE)" || { printf 'missing REMOTE_LTP_BLACKLIST_LA_FILE: %s\n' "$(REMOTE_LTP_BLACKLIST_LA_FILE)" >&2; exit 1; }
+	LTP_CASES="$(REMOTE_LTP_CASES)" \
+		LTP_BLACKLIST="$$(cat "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)")" \
+		LTP_BLACKLIST_LA="$$(cat "$(REMOTE_LTP_BLACKLIST_LA_FILE)")" \
+		$(MAKE) test_build ARCH=loongarch64 BUS=pci \
 		PLAT_CONFIG="$(REMOTE_LA_PLAT_CONFIG)" \
 		KERNEL_FEATURES="$(KERNEL_LA_FEATURES)" \
 		APP_FEATURES="$(KERNEL_LA_APP_FEATURES)" \
