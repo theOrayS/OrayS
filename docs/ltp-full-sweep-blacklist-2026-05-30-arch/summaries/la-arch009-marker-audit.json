@@ -1,0 +1,267 @@
+{
+  "incomplete_count": 1,
+  "incomplete": [
+    {
+      "case": "futex_wait01",
+      "line": 50507
+    }
+  ],
+  "first_resource_failure": null,
+  "resource_failure_count": 0,
+  "panic_count": 0,
+  "first_panic": null,
+  "trap_like_count": 0,
+  "first_trap_like": null,
+  "recent_group_events": [
+    {
+      "line": 50196,
+      "event": "end",
+      "group": "ltp",
+      "case": "fstatfs02_64"
+    },
+    {
+      "line": 50197,
+      "event": "start",
+      "group": "ltp",
+      "case": "fsync01"
+    },
+    {
+      "line": 50213,
+      "event": "end",
+      "group": "ltp",
+      "case": "fsync01"
+    },
+    {
+      "line": 50214,
+      "event": "start",
+      "group": "ltp",
+      "case": "fsync03"
+    },
+    {
+      "line": 50237,
+      "event": "end",
+      "group": "ltp",
+      "case": "fsync03"
+    },
+    {
+      "line": 50238,
+      "event": "start",
+      "group": "ltp",
+      "case": "fsync04"
+    },
+    {
+      "line": 50254,
+      "event": "end",
+      "group": "ltp",
+      "case": "fsync04"
+    },
+    {
+      "line": 50255,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest01"
+    },
+    {
+      "line": 50267,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest01"
+    },
+    {
+      "line": 50268,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest02"
+    },
+    {
+      "line": 50282,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest02"
+    },
+    {
+      "line": 50283,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest03"
+    },
+    {
+      "line": 50293,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest03"
+    },
+    {
+      "line": 50294,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest04"
+    },
+    {
+      "line": 50303,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest04"
+    },
+    {
+      "line": 50304,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest05"
+    },
+    {
+      "line": 50314,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest05"
+    },
+    {
+      "line": 50315,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest06"
+    },
+    {
+      "line": 50333,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest06"
+    },
+    {
+      "line": 50334,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest07"
+    },
+    {
+      "line": 50344,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest07"
+    },
+    {
+      "line": 50345,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftest08"
+    },
+    {
+      "line": 50354,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftest08"
+    },
+    {
+      "line": 50355,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftruncate01"
+    },
+    {
+      "line": 50378,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftruncate01"
+    },
+    {
+      "line": 50379,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftruncate01_64"
+    },
+    {
+      "line": 50402,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftruncate01_64"
+    },
+    {
+      "line": 50403,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftruncate03"
+    },
+    {
+      "line": 50426,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftruncate03"
+    },
+    {
+      "line": 50427,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftruncate03_64"
+    },
+    {
+      "line": 50450,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftruncate03_64"
+    },
+    {
+      "line": 50451,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftruncate04"
+    },
+    {
+      "line": 50460,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftruncate04"
+    },
+    {
+      "line": 50461,
+      "event": "start",
+      "group": "ltp",
+      "case": "ftruncate04_64"
+    },
+    {
+      "line": 50470,
+      "event": "end",
+      "group": "ltp",
+      "case": "ftruncate04_64"
+    },
+    {
+      "line": 50471,
+      "event": "start",
+      "group": "ltp",
+      "case": "futex_cmp_requeue01"
+    },
+    {
+      "line": 50484,
+      "event": "end",
+      "group": "ltp",
+      "case": "futex_cmp_requeue01"
+    },
+    {
+      "line": 50485,
+      "event": "start",
+      "group": "ltp",
+      "case": "futex_cmp_requeue02"
+    },
+    {
+      "line": 50505,
+      "event": "end",
+      "group": "ltp",
+      "case": "futex_cmp_requeue02"
+    },
+    {
+      "line": 50506,
+      "event": "start",
+      "group": "ltp",
+      "case": "futex_wait01"
+    }
+  ],
+  "case_list_lines": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=413 (1955 cases, timeout 15s)"
+    },
+    {
+      "line": 39721,
+      "text": "ltp case list: all-minus-blacklist skipped=416 (1959 cases, timeout 15s)"
+    }
+  ]
+}

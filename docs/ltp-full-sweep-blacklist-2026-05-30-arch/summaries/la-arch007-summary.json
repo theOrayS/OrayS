@@ -1,0 +1,289 @@
+{
+  "run_id": "la-arch007",
+  "arch": "la",
+  "raw_log": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch007.log",
+  "source": "scripts/ltp_summary.py --json",
+  "closed": false,
+  "run_eval_status": "143",
+  "selection": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=411 (1957 cases, timeout 15s)"
+    }
+  ],
+  "wrapper": {
+    "pass_count": 54,
+    "fail_count": 139,
+    "timeout_count": 3,
+    "raw_pass_markers": 0,
+    "raw_fail_markers": 193,
+    "raw_timeout_markers": 2,
+    "raw_skip_markers": 0,
+    "raw_run_markers": 194
+  },
+  "internal": {
+    "TBROK": 35,
+    "TCONF": 120,
+    "TFAIL": 31
+  },
+  "enosys": 29,
+  "panic_trap": 0,
+  "suite_summaries": [],
+  "marker_audit": {
+    "incomplete_count": 1,
+    "incomplete": [
+      {
+        "case": "dirtyc0w",
+        "line": 4896
+      }
+    ],
+    "first_resource_failure": null,
+    "resource_failure_count": 0,
+    "panic_count": 0,
+    "first_panic": null,
+    "trap_like_count": 0,
+    "first_trap_like": null,
+    "recent_group_events": [
+      {
+        "line": 4603,
+        "event": "end",
+        "group": "ltp",
+        "case": "cve-2017-17053"
+      },
+      {
+        "line": 4604,
+        "event": "start",
+        "group": "ltp",
+        "case": "cve-2017-2618"
+      },
+      {
+        "line": 4623,
+        "event": "end",
+        "group": "ltp",
+        "case": "cve-2017-2618"
+      },
+      {
+        "line": 4624,
+        "event": "start",
+        "group": "ltp",
+        "case": "cve-2017-2671"
+      },
+      {
+        "line": 4643,
+        "event": "end",
+        "group": "ltp",
+        "case": "cve-2017-2671"
+      },
+      {
+        "line": 4644,
+        "event": "start",
+        "group": "ltp",
+        "case": "cve-2022-4378"
+      },
+      {
+        "line": 4653,
+        "event": "end",
+        "group": "ltp",
+        "case": "cve-2022-4378"
+      },
+      {
+        "line": 4654,
+        "event": "start",
+        "group": "ltp",
+        "case": "data"
+      },
+      {
+        "line": 4663,
+        "event": "end",
+        "group": "ltp",
+        "case": "data"
+      },
+      {
+        "line": 4664,
+        "event": "start",
+        "group": "ltp",
+        "case": "data_space"
+      },
+      {
+        "line": 4673,
+        "event": "end",
+        "group": "ltp",
+        "case": "data_space"
+      },
+      {
+        "line": 4674,
+        "event": "start",
+        "group": "ltp",
+        "case": "delete_module01"
+      },
+      {
+        "line": 4683,
+        "event": "end",
+        "group": "ltp",
+        "case": "delete_module01"
+      },
+      {
+        "line": 4684,
+        "event": "start",
+        "group": "ltp",
+        "case": "delete_module02"
+      },
+      {
+        "line": 4704,
+        "event": "end",
+        "group": "ltp",
+        "case": "delete_module02"
+      },
+      {
+        "line": 4705,
+        "event": "start",
+        "group": "ltp",
+        "case": "delete_module03"
+      },
+      {
+        "line": 4714,
+        "event": "end",
+        "group": "ltp",
+        "case": "delete_module03"
+      },
+      {
+        "line": 4715,
+        "event": "start",
+        "group": "ltp",
+        "case": "dio_append"
+      },
+      {
+        "line": 4734,
+        "event": "end",
+        "group": "ltp",
+        "case": "dio_append"
+      },
+      {
+        "line": 4735,
+        "event": "start",
+        "group": "ltp",
+        "case": "dio_read"
+      },
+      {
+        "line": 4754,
+        "event": "end",
+        "group": "ltp",
+        "case": "dio_read"
+      },
+      {
+        "line": 4755,
+        "event": "start",
+        "group": "ltp",
+        "case": "dio_sparse"
+      },
+      {
+        "line": 4774,
+        "event": "end",
+        "group": "ltp",
+        "case": "dio_sparse"
+      },
+      {
+        "line": 4775,
+        "event": "start",
+        "group": "ltp",
+        "case": "dio_truncate"
+      },
+      {
+        "line": 4794,
+        "event": "end",
+        "group": "ltp",
+        "case": "dio_truncate"
+      },
+      {
+        "line": 4795,
+        "event": "start",
+        "group": "ltp",
+        "case": "diotest1"
+      },
+      {
+        "line": 4804,
+        "event": "end",
+        "group": "ltp",
+        "case": "diotest1"
+      },
+      {
+        "line": 4805,
+        "event": "start",
+        "group": "ltp",
+        "case": "diotest2"
+      },
+      {
+        "line": 4817,
+        "event": "end",
+        "group": "ltp",
+        "case": "diotest2"
+      },
+      {
+        "line": 4818,
+        "event": "start",
+        "group": "ltp",
+        "case": "diotest3"
+      },
+      {
+        "line": 4830,
+        "event": "end",
+        "group": "ltp",
+        "case": "diotest3"
+      },
+      {
+        "line": 4831,
+        "event": "start",
+        "group": "ltp",
+        "case": "diotest4"
+      },
+      {
+        "line": 4858,
+        "event": "end",
+        "group": "ltp",
+        "case": "diotest4"
+      },
+      {
+        "line": 4859,
+        "event": "start",
+        "group": "ltp",
+        "case": "diotest5"
+      },
+      {
+        "line": 4871,
+        "event": "end",
+        "group": "ltp",
+        "case": "diotest5"
+      },
+      {
+        "line": 4872,
+        "event": "start",
+        "group": "ltp",
+        "case": "diotest6"
+      },
+      {
+        "line": 4884,
+        "event": "end",
+        "group": "ltp",
+        "case": "diotest6"
+      },
+      {
+        "line": 4885,
+        "event": "start",
+        "group": "ltp",
+        "case": "dirty"
+      },
+      {
+        "line": 4894,
+        "event": "end",
+        "group": "ltp",
+        "case": "dirty"
+      },
+      {
+        "line": 4895,
+        "event": "start",
+        "group": "ltp",
+        "case": "dirtyc0w"
+      }
+    ]
+  }
+}

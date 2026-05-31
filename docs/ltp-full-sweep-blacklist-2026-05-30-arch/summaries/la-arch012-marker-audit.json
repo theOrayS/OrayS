@@ -1,0 +1,262 @@
+{
+  "incomplete_count": 0,
+  "incomplete": [],
+  "first_resource_failure": null,
+  "resource_failure_count": 0,
+  "panic_count": 0,
+  "first_panic": null,
+  "trap_like_count": 0,
+  "first_trap_like": null,
+  "recent_group_events": [
+    {
+      "line": 78592,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue03"
+    },
+    {
+      "line": 78611,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue03"
+    },
+    {
+      "line": 78612,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue04"
+    },
+    {
+      "line": 78631,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue04"
+    },
+    {
+      "line": 78632,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue05"
+    },
+    {
+      "line": 78651,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue05"
+    },
+    {
+      "line": 78652,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue06"
+    },
+    {
+      "line": 78671,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue06"
+    },
+    {
+      "line": 78672,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue07"
+    },
+    {
+      "line": 78691,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue07"
+    },
+    {
+      "line": 78692,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue08"
+    },
+    {
+      "line": 78711,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue08"
+    },
+    {
+      "line": 78712,
+      "event": "start",
+      "group": "ltp",
+      "case": "wqueue09"
+    },
+    {
+      "line": 78732,
+      "event": "end",
+      "group": "ltp",
+      "case": "wqueue09"
+    },
+    {
+      "line": 78733,
+      "event": "start",
+      "group": "ltp",
+      "case": "write02"
+    },
+    {
+      "line": 78754,
+      "event": "end",
+      "group": "ltp",
+      "case": "write02"
+    },
+    {
+      "line": 78755,
+      "event": "start",
+      "group": "ltp",
+      "case": "write03"
+    },
+    {
+      "line": 78775,
+      "event": "end",
+      "group": "ltp",
+      "case": "write03"
+    },
+    {
+      "line": 78776,
+      "event": "start",
+      "group": "ltp",
+      "case": "write04"
+    },
+    {
+      "line": 78795,
+      "event": "end",
+      "group": "ltp",
+      "case": "write04"
+    },
+    {
+      "line": 78796,
+      "event": "start",
+      "group": "ltp",
+      "case": "write05"
+    },
+    {
+      "line": 78818,
+      "event": "end",
+      "group": "ltp",
+      "case": "write05"
+    },
+    {
+      "line": 78819,
+      "event": "start",
+      "group": "ltp",
+      "case": "write06"
+    },
+    {
+      "line": 78841,
+      "event": "end",
+      "group": "ltp",
+      "case": "write06"
+    },
+    {
+      "line": 78842,
+      "event": "start",
+      "group": "ltp",
+      "case": "writetest"
+    },
+    {
+      "line": 78863,
+      "event": "end",
+      "group": "ltp",
+      "case": "writetest"
+    },
+    {
+      "line": 78864,
+      "event": "start",
+      "group": "ltp",
+      "case": "writev01"
+    },
+    {
+      "line": 78889,
+      "event": "end",
+      "group": "ltp",
+      "case": "writev01"
+    },
+    {
+      "line": 78890,
+      "event": "start",
+      "group": "ltp",
+      "case": "writev02"
+    },
+    {
+      "line": 78899,
+      "event": "end",
+      "group": "ltp",
+      "case": "writev02"
+    },
+    {
+      "line": 78900,
+      "event": "start",
+      "group": "ltp",
+      "case": "writev03"
+    },
+    {
+      "line": 78908,
+      "event": "end",
+      "group": "ltp",
+      "case": "writev03"
+    },
+    {
+      "line": 78909,
+      "event": "start",
+      "group": "ltp",
+      "case": "writev05"
+    },
+    {
+      "line": 78918,
+      "event": "end",
+      "group": "ltp",
+      "case": "writev05"
+    },
+    {
+      "line": 78919,
+      "event": "start",
+      "group": "ltp",
+      "case": "writev06"
+    },
+    {
+      "line": 78928,
+      "event": "end",
+      "group": "ltp",
+      "case": "writev06"
+    },
+    {
+      "line": 78929,
+      "event": "start",
+      "group": "ltp",
+      "case": "writev07"
+    },
+    {
+      "line": 78964,
+      "event": "end",
+      "group": "ltp",
+      "case": "writev07"
+    },
+    {
+      "line": 78965,
+      "event": "start",
+      "group": "ltp",
+      "case": "zram03"
+    },
+    {
+      "line": 78973,
+      "event": "end",
+      "group": "ltp",
+      "case": "zram03"
+    }
+  ],
+  "case_list_lines": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=416 (1952 cases, timeout 15s)"
+    },
+    {
+      "line": 39534,
+      "text": "ltp case list: all-minus-blacklist skipped=419 (1956 cases, timeout 15s)"
+    }
+  ]
+}

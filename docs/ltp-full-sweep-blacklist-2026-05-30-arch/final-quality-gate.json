@@ -1,0 +1,106 @@
+{
+  "claim": "RV and LA both close parser-backed LTP_CASES=blacklist full sweeps using separate architecture-specific blacklist overlays without counting blacklisted cases as PASS.",
+  "branch": "exp/ltp-full-sweep-blacklist",
+  "head": "cf34bc3fbf85",
+  "closed_runs": {
+    "rv": {
+      "run_id": "rv-arch002",
+      "raw_log": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/rv-arch002.log",
+      "sha256": "70a3f9cab0c5c7a9a2743f168cabfd2eaafb7c01565b1630a02f9604aca5f096",
+      "summary": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/summaries/rv-arch002-summary.json",
+      "closed": true,
+      "run_eval_status": 0,
+      "run_markers": 4658,
+      "terminal_markers": 4658,
+      "incomplete": 0,
+      "panic_trap": 0,
+      "resource_failures": 0
+    },
+    "la": {
+      "run_id": "la-arch012",
+      "raw_log": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch012.log",
+      "sha256": "41a5fdbba4a56a4ea76a168d2c9c6aa1e86a572d09de734a43a5365ec52c84df",
+      "summary": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/summaries/la-arch012-summary.json",
+      "closed": true,
+      "run_eval_status": 0,
+      "run_markers": 3908,
+      "terminal_markers": 3908,
+      "incomplete": 0,
+      "panic_trap": 0,
+      "resource_failures": 0
+    }
+  },
+  "blacklist_counts": {
+    "common": 5,
+    "rv_only": 1,
+    "la_only": 376
+  },
+  "validation": [
+    "scripts/ltp_summary.py-backed summaries for rv-arch002 and la-arch012",
+    "marker audit incomplete=0 for rv-arch002 and la-arch012",
+    "raw log sha256 files recorded under docs/ltp-full-sweep-blacklist-2026-05-30-arch/summaries/",
+    "run-eval status 0 for both final runs",
+    "bash -n run-eval.sh passed",
+    "rustfmt +nightly-2025-05-20 --edition 2024 --check examples/shell/src/cmd.rs passed",
+    "git diff --check over owned source/docs passed",
+    "final-quality-gate.json parsed with python3 -m json.tool",
+    "no live qemu/run-eval/make run processes after final sweeps",
+    "df -h / /root after runs: 59G size, 23G used, 34G available, 40% used",
+    "architect CLEAR after operator-facing contract section",
+    "code-review APPROVE and ai-slop APPROVE/CLEAR over scoped files"
+  ],
+  "honesty_constraints": [
+    "blacklist/SKIP not counted as PASS",
+    "ordinary TFAIL/TBROK/TCONF/ENOSYS remain failures or skips in parser evidence",
+    "raw logs not committed by default",
+    "LA-only blockers do not pollute RV blacklist"
+  ],
+  "review_gate": {
+    "code_review": {
+      "status": "APPROVE",
+      "issues": 0,
+      "scope": "owned source/docs only"
+    },
+    "ai_slop_cleanup": {
+      "status": "APPROVE/CLEAR",
+      "blockers": 0,
+      "fallback_classification": "optional blacklist ingress paths are grounded compatibility hooks"
+    },
+    "architecture": {
+      "status": "CLEAR",
+      "resolved_watch": "documented operator-facing contract, precedence, and optional guest-file no-op semantics"
+    },
+    "artifact": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-review-gate.md"
+  },
+  "aiSlopCleaner": {
+    "status": "passed",
+    "evidence": "code-simplifier/ai-slop audit APPROVE/CLEAR over examples/shell/src/cmd.rs, run-eval.sh, and docs/ltp-full-sweep-blacklist-2026-05-30-arch/**; no masking fallback slop; optional blacklist ingress paths classified as grounded compatibility hooks."
+  },
+  "verification": {
+    "status": "passed",
+    "commands": [
+      "scripts/ltp_summary.py-backed closure summaries for rv-arch002 and la-arch012",
+      "bash -n run-eval.sh",
+      "rustfmt +nightly-2025-05-20 --edition 2024 --check examples/shell/src/cmd.rs",
+      "git diff --check -- examples/shell/src/cmd.rs run-eval.sh docs/ltp-full-sweep-blacklist-2026-05-30-arch",
+      "python3 -m json.tool docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json",
+      "closure assertions over rv-arch002-summary.json and la-arch012-summary.json"
+    ],
+    "evidence": "rv-arch002 closed=true run_eval_status=0 incomplete=0 panic/trap/resource=0; la-arch012 closed=true run_eval_status=0 incomplete=0 panic/trap/resource=0; final local validation passed after review-gate docs."
+  },
+  "codeReview": {
+    "recommendation": "APPROVE",
+    "architectStatus": "CLEAR",
+    "evidence": "Independent code-reviewer reported APPROVE with 0 issues; architect initially WATCHed ingress-path documentation, then CLEAR after operator-facing contract was added; final-review-gate.md records synthesis.",
+    "independentReview": {
+      "codeReviewer": {
+        "agentRole": "code-reviewer",
+        "evidence": "APPROVE; 65 scoped files reviewed; 0 critical/high/medium/low issues; verified no fake-pass pattern, no raw logs committed, RV/LA overlays arch-selected, default online invocation unchanged."
+      },
+      "architect": {
+        "agentRole": "architect",
+        "evidence": "CLEAR after final-report.md documented authoritative host-side interface, merge order, and optional guest-file no-op semantics; scoped RV/LA ingestion matches code."
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# LTP full-sweep supplemental RV-only blacklist overlay for 2026-05-30.
+# Run RV with: LTP_BLACKLIST_COMMON_FILE=<dir>/blacklist-common.txt LTP_BLACKLIST_RV_FILE=<dir>/blacklist-rv.txt LTP_CASES=blacklist ./run-eval.sh rv
+# Entries here must be RV-specific severe blockers with evidence and removal conditions.
+# 2026-05-31 rv-arch001: RV allocator panic during kill10 full-sweep.
+# Reason category: arch=rv kernel panic / allocator OOM during signal/process stress; blocks closure even though run-eval exits 0.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/rv-arch001.log:16818 RUN LTP CASE kill10; lines 16821-16822 `panicked at ... memory allocation of 262144 bytes failed`, followed by platform shutdown.
+# Scope: arch=rv. LA also has separate kill10 evidence in blacklist-la.txt; keep this entry RV-scoped so per-arch evidence remains auditable.
+# Removal condition: RV full-sweep or targeted kill10 completes with a normal PASS/FAIL/TIMEOUT marker and no allocator failure, panic, resource pollution, or platform shutdown.
+kill10

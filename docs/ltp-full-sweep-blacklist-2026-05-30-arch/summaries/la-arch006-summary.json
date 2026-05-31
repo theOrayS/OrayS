@@ -1,0 +1,304 @@
+{
+  "run_id": "la-arch006",
+  "arch": "la",
+  "raw_log": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch006.log",
+  "source": "scripts/ltp_summary.py --json",
+  "closed": false,
+  "run_eval_status": "0",
+  "selection": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=410 (1958 cases, timeout 15s)"
+    },
+    {
+      "line": 39780,
+      "text": "ltp case list: all-minus-blacklist skipped=413 (1962 cases, timeout 15s)"
+    }
+  ],
+  "wrapper": {
+    "pass_count": 899,
+    "fail_count": 2040,
+    "timeout_count": 38,
+    "raw_pass_markers": 0,
+    "raw_fail_markers": 2940,
+    "raw_timeout_markers": 38,
+    "raw_skip_markers": 0,
+    "raw_run_markers": 2941
+  },
+  "internal": {
+    "TBROK": 752,
+    "TCONF": 1397,
+    "TFAIL": 3249
+  },
+  "enosys": 764,
+  "panic_trap": 1,
+  "suite_summaries": [
+    {
+      "failed": 1354,
+      "group": "ltp-musl",
+      "passed": 604,
+      "timed_out": 26
+    }
+  ],
+  "marker_audit": {
+    "incomplete_count": 1,
+    "incomplete": [
+      {
+        "case": "mmstress",
+        "line": 58990
+      }
+    ],
+    "first_resource_failure": null,
+    "resource_failure_count": 0,
+    "panic_count": 2,
+    "first_panic": {
+      "line": 58994,
+      "case": "mmstress",
+      "text": "\u001b[37m[6107.036454 0:15189 axruntime::lang_items:5] \u001b[31mpanicked at library/alloc/src/alloc.rs:437:13:"
+    },
+    "trap_like_count": 0,
+    "first_trap_like": null,
+    "recent_group_events": [
+      {
+        "line": 58300,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap12"
+      },
+      {
+        "line": 58301,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap13"
+      },
+      {
+        "line": 58320,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap13"
+      },
+      {
+        "line": 58321,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap14"
+      },
+      {
+        "line": 58329,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap14"
+      },
+      {
+        "line": 58330,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap15"
+      },
+      {
+        "line": 58350,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap15"
+      },
+      {
+        "line": 58351,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap16"
+      },
+      {
+        "line": 58359,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap16"
+      },
+      {
+        "line": 58360,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap17"
+      },
+      {
+        "line": 58380,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap17"
+      },
+      {
+        "line": 58381,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap18"
+      },
+      {
+        "line": 58417,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap18"
+      },
+      {
+        "line": 58418,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap19"
+      },
+      {
+        "line": 58438,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap19"
+      },
+      {
+        "line": 58439,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap2"
+      },
+      {
+        "line": 58452,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap2"
+      },
+      {
+        "line": 58453,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap20"
+      },
+      {
+        "line": 58472,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap20"
+      },
+      {
+        "line": 58473,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmap3"
+      },
+      {
+        "line": 58883,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmap3"
+      },
+      {
+        "line": 58884,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress02"
+      },
+      {
+        "line": 58893,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress02"
+      },
+      {
+        "line": 58894,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress03"
+      },
+      {
+        "line": 58904,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress03"
+      },
+      {
+        "line": 58905,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress04"
+      },
+      {
+        "line": 58924,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress04"
+      },
+      {
+        "line": 58925,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress05"
+      },
+      {
+        "line": 58934,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress05"
+      },
+      {
+        "line": 58935,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress06"
+      },
+      {
+        "line": 58944,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress06"
+      },
+      {
+        "line": 58945,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress07"
+      },
+      {
+        "line": 58959,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress07"
+      },
+      {
+        "line": 58960,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress08"
+      },
+      {
+        "line": 58969,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress08"
+      },
+      {
+        "line": 58970,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress09"
+      },
+      {
+        "line": 58979,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress09"
+      },
+      {
+        "line": 58980,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmapstress10"
+      },
+      {
+        "line": 58988,
+        "event": "end",
+        "group": "ltp",
+        "case": "mmapstress10"
+      },
+      {
+        "line": 58989,
+        "event": "start",
+        "group": "ltp",
+        "case": "mmstress"
+      }
+    ]
+  }
+}
