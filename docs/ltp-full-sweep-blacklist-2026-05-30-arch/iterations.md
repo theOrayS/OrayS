@@ -292,3 +292,36 @@ Pending runs will append: command, raw log path, parser summary, marker audit, c
 - Parser summary: wrapper PASS=1204, FAIL=3453, TIMEOUT=55; internal TBROK=1043, TCONF=2663, TFAIL=4058; ENOSYS/not-implemented matches=1280; panic/trap=0; resource failures=0.
 - Suite summaries: `ltp-musl` passed=598 failed=1729 timed_out=27; `ltp-glibc` passed=606 failed=1725 timed_out=28.
 - Blacklist delta: none.  This is the first closed RV full-sweep with the RV-only overlay; skipped/blacklisted cases are not counted as PASS or stable-promotion evidence.
+
+## 2026-05-31 follow-up: remote-submission blacklist mode
+
+User requirement: submitting this experimental branch to online evaluation should run the blacklist full-sweep mode, not the stable list.
+
+Change:
+
+- `make` / `make all` now builds remote-submission `kernel-rv` with:
+  - `LTP_CASES=blacklist`
+  - `LTP_BLACKLIST=<blacklist-common.txt>`
+  - `LTP_BLACKLIST_RV=<blacklist-rv.txt>`
+- `make` / `make all` now builds remote-submission `kernel-la` with:
+  - `LTP_CASES=blacklist`
+  - `LTP_BLACKLIST=<blacklist-common.txt>`
+  - `LTP_BLACKLIST_LA=<blacklist-la.txt>`
+- Local `./run-eval.sh rv|la`, `make kernel-rv`, and `make kernel-la` remain opt-in for blacklist mode unless their env vars are explicitly provided.
+
+Validation:
+
+```bash
+make -n all
+make all
+strings kernel-rv | rg 'kill10|pthserv|all-minus-blacklist' | head
+strings kernel-la | rg 'creat07|fsync02|pthserv|all-minus-blacklist' | head
+```
+
+Result:
+
+- `make -n all` showed `LTP_CASES="blacklist"` plus RV/LA blacklist env injection in the remote-submission build commands.
+- `make all` completed and regenerated both `kernel-rv` and `kernel-la`.
+- `strings kernel-rv` showed the RV-only `kill10` overlay and common entries such as `pthserv` embedded in the built submission kernel.
+- `strings kernel-la` showed LA-only entries such as `creat07` / `fsync02` and common entries such as `pthserv` embedded in the built submission kernel.
+- This is build-mode wiring only; the closed runtime evidence remains `rv-arch002` and `la-arch012` above.

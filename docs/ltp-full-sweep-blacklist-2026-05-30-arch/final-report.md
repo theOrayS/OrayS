@@ -29,7 +29,12 @@ Both architectures now have a parser-backed closed `LTP_CASES=blacklist` full sw
     - common: `LTP_BLACKLIST_FILE`, `LTP_BLACKLIST_COMMON_FILE`
     - RV: `LTP_BLACKLIST_RV_FILE`
     - LA: `LTP_BLACKLIST_LA_FILE`
-  - These are opt-in only; if unset, online/default evaluator behavior is unchanged.
+  - These remain opt-in for local `./run-eval.sh rv|la`; if unset, local evaluator behavior is unchanged.
+- `Makefile`
+  - `make` / `make all` is now the explicit remote-submission entry point for this experimental branch.
+  - It builds `kernel-rv` with `LTP_CASES=blacklist`, `blacklist-common.txt`, and `blacklist-rv.txt`.
+  - It builds `kernel-la` with `LTP_CASES=blacklist`, `blacklist-common.txt`, and `blacklist-la.txt`.
+  - It still uses the remote LoongArch platform config `configs/remote-eval/axplat-loongarch64-qemu-virt.toml`; local `kernel-la`, `run-la`, and `./run-eval.sh la` remain on the local platform config path unless their own env vars are provided.
 
 
 ## Operator-facing blacklist contract
@@ -48,15 +53,32 @@ LTP_BLACKLIST_LA_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-la
 ./run-eval.sh la
 ```
 
+Authoritative remote-submission entry point for this branch:
+
+```bash
+make all
+```
+
+Remote `make all` intentionally compiles the blacklist sweep selection into both submitted kernels through these overridable make variables:
+
+```text
+REMOTE_LTP_CASES=blacklist
+REMOTE_LTP_BLACKLIST_COMMON_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-common.txt
+REMOTE_LTP_BLACKLIST_RV_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-rv.txt
+REMOTE_LTP_BLACKLIST_LA_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-la.txt
+```
+
+This means submitting this `exp/ltp-full-sweep-blacklist` branch to the online evaluator should exercise the blacklist full-sweep mode by default after the evaluator runs its normal `make` / `make all` build.  To intentionally recover the old stable submission behavior for a local diagnostic build, override `REMOTE_LTP_CASES=stable`; do not use that override for this blacklist-sweep submission.
+
 Precedence / merge order inside the guest runner is:
 
 1. built-in `LTP_SWEEP_DEFAULT_BLACKLIST_CASES`;
-2. `LTP_BLACKLIST` build-time text, which `run-eval.sh` composes from `LTP_BLACKLIST_FILE`, `LTP_BLACKLIST_COMMON_FILE`, and the selected arch file variable;
+2. `LTP_BLACKLIST` build-time text, which `run-eval.sh` composes from `LTP_BLACKLIST_FILE`, `LTP_BLACKLIST_COMMON_FILE`, and the selected arch file variable for local runs, and which `make all` composes from `REMOTE_LTP_BLACKLIST_COMMON_FILE` for remote-submission builds;
 3. arch-specific build-time text (`LTP_BLACKLIST_RV` / `LTP_BLACKLIST_RISCV64` or `LTP_BLACKLIST_LA` / `LTP_BLACKLIST_LOONGARCH64`);
 4. optional guest common files (`/ltp_blacklist.txt`, `/tmp/ltp_blacklist.txt`);
 5. optional guest arch files (`/ltp_blacklist_rv.txt`, `/tmp/ltp_blacklist_riscv64.txt`, `/ltp_blacklist_la.txt`, `/tmp/ltp_blacklist_loongarch64.txt`, and dash-name aliases).
 
-The host-side file variables above are the recommended operator interface for this branch.  The arch-specific build-time env knobs and guest filesystem paths are advanced compatibility hooks for prepared images or external runners; missing optional guest files intentionally no-op and must not be treated as evidence that a blacklist was applied.  Every closure report must record the concrete command and skipped count, as this report does.
+The host-side file variables above are the recommended local operator interface for this branch, while `make all` is the recommended online-submission interface.  The arch-specific build-time env knobs and guest filesystem paths are advanced compatibility hooks for prepared images or external runners; missing optional guest files intentionally no-op and must not be treated as evidence that a blacklist was applied.  Every closure report must record the concrete command and skipped count, as this report does.
 
 ## Blacklist sources and counts
 
