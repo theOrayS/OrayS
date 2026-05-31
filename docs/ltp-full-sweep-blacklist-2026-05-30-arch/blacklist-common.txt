@@ -1,0 +1,30 @@
+# LTP full-sweep supplemental COMMON blacklist overlay for 2026-05-30.
+# Used only with LTP_CASES=blacklist / all-minus-blacklist experiments.
+# Source default blacklist remains in examples/shell/src/cmd.rs::LTP_SWEEP_DEFAULT_BLACKLIST_CASES.
+# These entries are severe sweep blockers already documented in the 2026-05-29 RV convergence run.
+# They are exclusions only; blacklist/SKIP never counts as PASS or stable promotion proof.
+
+# 2026-05-29 rv-iter001b: severe hang/incomplete RUN.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log
+# Removal condition: targeted pthserv completes with PASS/FAIL/TIMEOUT marker without QEMU/guest stall or environment damage.
+pthserv
+
+# 2026-05-29 rv-iter002: oom/resource exhaustion killed QEMU/runner.
+# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter002-host-oom-dmesg.txt
+# Removal condition: targeted oom01 completes without killing QEMU/runner or exhausting host/guest memory.
+oom01
+
+# 2026-05-29 rv-iter003: SysV shared-memory stress exhausted host/guest memory and killed QEMU/runner.
+# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter003-host-oom-dmesg.txt
+# Removal condition: targeted shmat1 completes without killing QEMU/runner or exhausting host/guest memory.
+shmat1
+
+# 2026-05-29 rv-iter004: glibc accept02 hung after futex error and required QEMU termination.
+# Evidence: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter004.monitor.log
+# Removal condition: both accept02 variants close with PASS/FAIL/TIMEOUT marker and no futex abort or stall.
+accept02
+
+# 2026-05-29 rv-iter005: mincore03 caused resource exhaustion and host OOM killed QEMU/runner.
+# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter005-host-oom-dmesg.txt
+# Removal condition: targeted mincore03 completes without killing QEMU/runner or exhausting host/guest memory.
+mincore03

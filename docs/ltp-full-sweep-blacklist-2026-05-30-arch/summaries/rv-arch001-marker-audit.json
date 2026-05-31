@@ -1,0 +1,267 @@
+{
+  "incomplete_count": 1,
+  "incomplete": [
+    {
+      "case": "kill10",
+      "line": 16818
+    }
+  ],
+  "first_resource_failure": null,
+  "resource_failure_count": 0,
+  "panic_count": 2,
+  "first_panic": {
+    "line": 16821,
+    "case": "kill10",
+    "text": "\u001b[37m[1519.409310 0:5309 axruntime::lang_items:5] \u001b[31mpanicked at library/alloc/src/alloc.rs:437:13:"
+  },
+  "trap_like_count": 0,
+  "first_trap_like": null,
+  "recent_group_events": [
+    {
+      "line": 16476,
+      "event": "end",
+      "group": "ltp",
+      "case": "kcmp01"
+    },
+    {
+      "line": 16477,
+      "event": "start",
+      "group": "ltp",
+      "case": "kcmp02"
+    },
+    {
+      "line": 16496,
+      "event": "end",
+      "group": "ltp",
+      "case": "kcmp02"
+    },
+    {
+      "line": 16497,
+      "event": "start",
+      "group": "ltp",
+      "case": "kcmp03"
+    },
+    {
+      "line": 16519,
+      "event": "end",
+      "group": "ltp",
+      "case": "kcmp03"
+    },
+    {
+      "line": 16520,
+      "event": "start",
+      "group": "ltp",
+      "case": "kernbench"
+    },
+    {
+      "line": 16529,
+      "event": "end",
+      "group": "ltp",
+      "case": "kernbench"
+    },
+    {
+      "line": 16530,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl01"
+    },
+    {
+      "line": 16549,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl01"
+    },
+    {
+      "line": 16550,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl02"
+    },
+    {
+      "line": 16577,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl02"
+    },
+    {
+      "line": 16578,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl03"
+    },
+    {
+      "line": 16597,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl03"
+    },
+    {
+      "line": 16598,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl04"
+    },
+    {
+      "line": 16617,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl04"
+    },
+    {
+      "line": 16618,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl05"
+    },
+    {
+      "line": 16638,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl05"
+    },
+    {
+      "line": 16639,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl06"
+    },
+    {
+      "line": 16658,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl06"
+    },
+    {
+      "line": 16659,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl07"
+    },
+    {
+      "line": 16679,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl07"
+    },
+    {
+      "line": 16680,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl08"
+    },
+    {
+      "line": 16699,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl08"
+    },
+    {
+      "line": 16700,
+      "event": "start",
+      "group": "ltp",
+      "case": "keyctl09"
+    },
+    {
+      "line": 16709,
+      "event": "end",
+      "group": "ltp",
+      "case": "keyctl09"
+    },
+    {
+      "line": 16710,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill02"
+    },
+    {
+      "line": 16720,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill02"
+    },
+    {
+      "line": 16721,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill03"
+    },
+    {
+      "line": 16743,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill03"
+    },
+    {
+      "line": 16744,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill05"
+    },
+    {
+      "line": 16764,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill05"
+    },
+    {
+      "line": 16765,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill06"
+    },
+    {
+      "line": 16785,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill06"
+    },
+    {
+      "line": 16786,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill07"
+    },
+    {
+      "line": 16796,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill07"
+    },
+    {
+      "line": 16797,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill08"
+    },
+    {
+      "line": 16806,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill08"
+    },
+    {
+      "line": 16807,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill09"
+    },
+    {
+      "line": 16816,
+      "event": "end",
+      "group": "ltp",
+      "case": "kill09"
+    },
+    {
+      "line": 16817,
+      "event": "start",
+      "group": "ltp",
+      "case": "kill10"
+    }
+  ],
+  "case_list_lines": [
+    {
+      "line": 989,
+      "text": "ltp case list: all-minus-blacklist skipped=40 (2328 cases, timeout 15s)"
+    }
+  ]
+}

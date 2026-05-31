@@ -1,0 +1,304 @@
+{
+  "run_id": "la-arch005",
+  "arch": "la",
+  "raw_log": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch005.log",
+  "source": "scripts/ltp_summary.py --json",
+  "closed": false,
+  "run_eval_status": "0",
+  "selection": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=409 (1959 cases, timeout 15s)"
+    },
+    {
+      "line": 39801,
+      "text": "ltp case list: all-minus-blacklist skipped=412 (1963 cases, timeout 15s)"
+    }
+  ],
+  "wrapper": {
+    "pass_count": 857,
+    "fail_count": 1937,
+    "timeout_count": 37,
+    "raw_pass_markers": 0,
+    "raw_fail_markers": 2795,
+    "raw_timeout_markers": 37,
+    "raw_skip_markers": 0,
+    "raw_run_markers": 2796
+  },
+  "internal": {
+    "TBROK": 716,
+    "TCONF": 1367,
+    "TFAIL": 3153
+  },
+  "enosys": 713,
+  "panic_trap": 1,
+  "suite_summaries": [
+    {
+      "failed": 1355,
+      "group": "ltp-musl",
+      "passed": 604,
+      "timed_out": 26
+    }
+  ],
+  "marker_audit": {
+    "incomplete_count": 1,
+    "incomplete": [
+      {
+        "case": "lftest",
+        "line": 56047
+      }
+    ],
+    "first_resource_failure": null,
+    "resource_failure_count": 0,
+    "panic_count": 2,
+    "first_panic": {
+      "line": 56054,
+      "case": "lftest",
+      "text": "\u001b[37m[5790.225179 0:14793 axruntime::lang_items:5] \u001b[31mpanicked at library/alloc/src/alloc.rs:437:13:"
+    },
+    "trap_like_count": 0,
+    "first_trap_like": null,
+    "recent_group_events": [
+      {
+        "line": 55819,
+        "event": "end",
+        "group": "ltp",
+        "case": "kill12"
+      },
+      {
+        "line": 55820,
+        "event": "start",
+        "group": "ltp",
+        "case": "kill13"
+      },
+      {
+        "line": 55829,
+        "event": "end",
+        "group": "ltp",
+        "case": "kill13"
+      },
+      {
+        "line": 55830,
+        "event": "start",
+        "group": "ltp",
+        "case": "killall_icmp_traffic"
+      },
+      {
+        "line": 55839,
+        "event": "end",
+        "group": "ltp",
+        "case": "killall_icmp_traffic"
+      },
+      {
+        "line": 55840,
+        "event": "start",
+        "group": "ltp",
+        "case": "killall_tcp_traffic"
+      },
+      {
+        "line": 55849,
+        "event": "end",
+        "group": "ltp",
+        "case": "killall_tcp_traffic"
+      },
+      {
+        "line": 55850,
+        "event": "start",
+        "group": "ltp",
+        "case": "killall_udp_traffic"
+      },
+      {
+        "line": 55859,
+        "event": "end",
+        "group": "ltp",
+        "case": "killall_udp_traffic"
+      },
+      {
+        "line": 55860,
+        "event": "start",
+        "group": "ltp",
+        "case": "kmsg01"
+      },
+      {
+        "line": 55880,
+        "event": "end",
+        "group": "ltp",
+        "case": "kmsg01"
+      },
+      {
+        "line": 55881,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm01"
+      },
+      {
+        "line": 55890,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm01"
+      },
+      {
+        "line": 55891,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm02"
+      },
+      {
+        "line": 55899,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm02"
+      },
+      {
+        "line": 55900,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm03"
+      },
+      {
+        "line": 55909,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm03"
+      },
+      {
+        "line": 55910,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm04"
+      },
+      {
+        "line": 55918,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm04"
+      },
+      {
+        "line": 55919,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm05"
+      },
+      {
+        "line": 55928,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm05"
+      },
+      {
+        "line": 55929,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm06"
+      },
+      {
+        "line": 55937,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm06"
+      },
+      {
+        "line": 55938,
+        "event": "start",
+        "group": "ltp",
+        "case": "ksm07"
+      },
+      {
+        "line": 55947,
+        "event": "end",
+        "group": "ltp",
+        "case": "ksm07"
+      },
+      {
+        "line": 55948,
+        "event": "start",
+        "group": "ltp",
+        "case": "lchown01"
+      },
+      {
+        "line": 55961,
+        "event": "end",
+        "group": "ltp",
+        "case": "lchown01"
+      },
+      {
+        "line": 55962,
+        "event": "start",
+        "group": "ltp",
+        "case": "lchown01_16"
+      },
+      {
+        "line": 55971,
+        "event": "end",
+        "group": "ltp",
+        "case": "lchown01_16"
+      },
+      {
+        "line": 55972,
+        "event": "start",
+        "group": "ltp",
+        "case": "lchown02"
+      },
+      {
+        "line": 55986,
+        "event": "end",
+        "group": "ltp",
+        "case": "lchown02"
+      },
+      {
+        "line": 55987,
+        "event": "start",
+        "group": "ltp",
+        "case": "lchown02_16"
+      },
+      {
+        "line": 55996,
+        "event": "end",
+        "group": "ltp",
+        "case": "lchown02_16"
+      },
+      {
+        "line": 55997,
+        "event": "start",
+        "group": "ltp",
+        "case": "lchown03"
+      },
+      {
+        "line": 56007,
+        "event": "end",
+        "group": "ltp",
+        "case": "lchown03"
+      },
+      {
+        "line": 56008,
+        "event": "start",
+        "group": "ltp",
+        "case": "lchown03_16"
+      },
+      {
+        "line": 56018,
+        "event": "end",
+        "group": "ltp",
+        "case": "lchown03_16"
+      },
+      {
+        "line": 56019,
+        "event": "start",
+        "group": "ltp",
+        "case": "leapsec01"
+      },
+      {
+        "line": 56045,
+        "event": "end",
+        "group": "ltp",
+        "case": "leapsec01"
+      },
+      {
+        "line": 56046,
+        "event": "start",
+        "group": "ltp",
+        "case": "lftest"
+      }
+    ]
+  }
+}

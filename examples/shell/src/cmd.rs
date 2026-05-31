@@ -300,7 +300,25 @@ const LTP_CASE_BATCHES: &[(&str, &[&str])] = &[
     ("time-signal-basic", LTP_TIME_SIGNAL_BASIC_CASES),
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-const LTP_SWEEP_BLACKLIST_FILES: &[&str] = &["/ltp_blacklist.txt", "/tmp/ltp_blacklist.txt"];
+const LTP_SWEEP_COMMON_BLACKLIST_FILES: &[&str] = &["/ltp_blacklist.txt", "/tmp/ltp_blacklist.txt"];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_SWEEP_RV_BLACKLIST_FILES: &[&str] = &[
+    "/ltp_blacklist_rv.txt",
+    "/tmp/ltp_blacklist_rv.txt",
+    "/ltp_blacklist-rv.txt",
+    "/tmp/ltp_blacklist-rv.txt",
+    "/ltp_blacklist_riscv64.txt",
+    "/tmp/ltp_blacklist_riscv64.txt",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_SWEEP_LA_BLACKLIST_FILES: &[&str] = &[
+    "/ltp_blacklist_la.txt",
+    "/tmp/ltp_blacklist_la.txt",
+    "/ltp_blacklist-la.txt",
+    "/tmp/ltp_blacklist-la.txt",
+    "/ltp_blacklist_loongarch64.txt",
+    "/tmp/ltp_blacklist_loongarch64.txt",
+];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SWEEP_DEFAULT_BLACKLIST_CASES: &[&str] = &[
     // Experimental full-sweep guardrails only: these are stress, cgroup,
@@ -733,22 +751,69 @@ fn ltp_cases_from_dir(target_dir: &str) -> Result<Vec<String>, String> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn push_ltp_blacklist_text(blacklist: &mut Vec<String>, raw: &str) -> Result<(), String> {
+    for case in split_ltp_case_list(raw)? {
+        push_ltp_case(blacklist, &case)?;
+    }
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_sweep_arch_blacklist_files() -> &'static [&'static str] {
+    match option_env!("AX_ARCH").unwrap_or("") {
+        "riscv64" => LTP_SWEEP_RV_BLACKLIST_FILES,
+        "loongarch64" => LTP_SWEEP_LA_BLACKLIST_FILES,
+        _ => &[],
+    }
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn push_ltp_sweep_arch_blacklist_env(blacklist: &mut Vec<String>) -> Result<(), String> {
+    match option_env!("AX_ARCH").unwrap_or("") {
+        "riscv64" => {
+            if let Some(raw) = option_env!("LTP_BLACKLIST_RV") {
+                push_ltp_blacklist_text(blacklist, raw)?;
+            }
+            if let Some(raw) = option_env!("LTP_BLACKLIST_RISCV64") {
+                push_ltp_blacklist_text(blacklist, raw)?;
+            }
+        }
+        "loongarch64" => {
+            if let Some(raw) = option_env!("LTP_BLACKLIST_LA") {
+                push_ltp_blacklist_text(blacklist, raw)?;
+            }
+            if let Some(raw) = option_env!("LTP_BLACKLIST_LOONGARCH64") {
+                push_ltp_blacklist_text(blacklist, raw)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn push_ltp_blacklist_file(blacklist: &mut Vec<String>, path: &str) -> Result<bool, String> {
+    if !matches!(fs::metadata(path), Ok(meta) if meta.is_file()) {
+        return Ok(false);
+    }
+    let raw = fs::read_to_string(path)
+        .map_err(|err| format!("failed to read LTP blacklist file '{path}': {err}"))?;
+    push_ltp_blacklist_text(blacklist, &raw)?;
+    Ok(true)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn ltp_sweep_blacklist_cases() -> Result<Vec<String>, String> {
     let mut blacklist = ltp_cases_from_slice(LTP_SWEEP_DEFAULT_BLACKLIST_CASES)?;
     if let Some(raw) = option_env!("LTP_BLACKLIST") {
-        for case in split_ltp_case_list(raw)? {
-            push_ltp_case(&mut blacklist, &case)?;
-        }
+        push_ltp_blacklist_text(&mut blacklist, raw)?;
     }
-    for path in LTP_SWEEP_BLACKLIST_FILES {
-        if !matches!(fs::metadata(path), Ok(meta) if meta.is_file()) {
-            continue;
-        }
-        let raw = fs::read_to_string(path)
-            .map_err(|err| format!("failed to read LTP blacklist file '{path}': {err}"))?;
-        for case in split_ltp_case_list(&raw)? {
-            push_ltp_case(&mut blacklist, &case)?;
-        }
+    push_ltp_sweep_arch_blacklist_env(&mut blacklist)?;
+    for path in LTP_SWEEP_COMMON_BLACKLIST_FILES {
+        let _ = push_ltp_blacklist_file(&mut blacklist, path)?;
+    }
+    for path in ltp_sweep_arch_blacklist_files() {
+        let _ = push_ltp_blacklist_file(&mut blacklist, path)?;
     }
     Ok(blacklist)
 }

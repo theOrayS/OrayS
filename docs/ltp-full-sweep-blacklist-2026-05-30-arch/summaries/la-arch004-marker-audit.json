@@ -1,0 +1,271 @@
+{
+  "incomplete_count": 1,
+  "incomplete": [
+    {
+      "case": "clock_settime03",
+      "line": 42269
+    }
+  ],
+  "first_resource_failure": {
+    "line": 40228,
+    "case": "access02",
+    "text": "sh: fork: Resource temporarily unavailable"
+  },
+  "resource_failure_count": 61,
+  "panic_count": 0,
+  "first_panic": null,
+  "trap_like_count": 0,
+  "first_trap_like": null,
+  "recent_group_events": [
+    {
+      "line": 41916,
+      "event": "end",
+      "group": "ltp",
+      "case": "chown04_16"
+    },
+    {
+      "line": 41917,
+      "event": "start",
+      "group": "ltp",
+      "case": "chown05"
+    },
+    {
+      "line": 41935,
+      "event": "end",
+      "group": "ltp",
+      "case": "chown05"
+    },
+    {
+      "line": 41936,
+      "event": "start",
+      "group": "ltp",
+      "case": "chown05_16"
+    },
+    {
+      "line": 41954,
+      "event": "end",
+      "group": "ltp",
+      "case": "chown05_16"
+    },
+    {
+      "line": 41955,
+      "event": "start",
+      "group": "ltp",
+      "case": "chroot01"
+    },
+    {
+      "line": 41973,
+      "event": "end",
+      "group": "ltp",
+      "case": "chroot01"
+    },
+    {
+      "line": 41974,
+      "event": "start",
+      "group": "ltp",
+      "case": "chroot02"
+    },
+    {
+      "line": 41992,
+      "event": "end",
+      "group": "ltp",
+      "case": "chroot02"
+    },
+    {
+      "line": 41993,
+      "event": "start",
+      "group": "ltp",
+      "case": "chroot03"
+    },
+    {
+      "line": 42012,
+      "event": "end",
+      "group": "ltp",
+      "case": "chroot03"
+    },
+    {
+      "line": 42013,
+      "event": "start",
+      "group": "ltp",
+      "case": "chroot04"
+    },
+    {
+      "line": 42031,
+      "event": "end",
+      "group": "ltp",
+      "case": "chroot04"
+    },
+    {
+      "line": 42032,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_adjtime01"
+    },
+    {
+      "line": 42050,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_adjtime01"
+    },
+    {
+      "line": 42051,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_adjtime02"
+    },
+    {
+      "line": 42069,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_adjtime02"
+    },
+    {
+      "line": 42070,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_getres01"
+    },
+    {
+      "line": 42089,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_getres01"
+    },
+    {
+      "line": 42090,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_gettime01"
+    },
+    {
+      "line": 42108,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_gettime01"
+    },
+    {
+      "line": 42109,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_gettime02"
+    },
+    {
+      "line": 42127,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_gettime02"
+    },
+    {
+      "line": 42128,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_gettime03"
+    },
+    {
+      "line": 42137,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_gettime03"
+    },
+    {
+      "line": 42138,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_gettime04"
+    },
+    {
+      "line": 42160,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_gettime04"
+    },
+    {
+      "line": 42161,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_nanosleep01"
+    },
+    {
+      "line": 42180,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_nanosleep01"
+    },
+    {
+      "line": 42181,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_nanosleep02"
+    },
+    {
+      "line": 42199,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_nanosleep02"
+    },
+    {
+      "line": 42200,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_nanosleep03"
+    },
+    {
+      "line": 42209,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_nanosleep03"
+    },
+    {
+      "line": 42210,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_nanosleep04"
+    },
+    {
+      "line": 42228,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_nanosleep04"
+    },
+    {
+      "line": 42229,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_settime01"
+    },
+    {
+      "line": 42248,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_settime01"
+    },
+    {
+      "line": 42249,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_settime02"
+    },
+    {
+      "line": 42267,
+      "event": "end",
+      "group": "ltp",
+      "case": "clock_settime02"
+    },
+    {
+      "line": 42268,
+      "event": "start",
+      "group": "ltp",
+      "case": "clock_settime03"
+    }
+  ],
+  "case_list_lines": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=407 (1961 cases, timeout 15s)"
+    },
+    {
+      "line": 39848,
+      "text": "ltp case list: all-minus-blacklist skipped=410 (1965 cases, timeout 15s)"
+    }
+  ]
+}

@@ -1,0 +1,289 @@
+{
+  "run_id": "la-arch011",
+  "arch": "la",
+  "raw_log": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch011.log",
+  "source": "scripts/ltp_summary.py --json",
+  "closed": false,
+  "run_eval_status": "143",
+  "selection": [
+    {
+      "line": 932,
+      "text": "ltp case list: all-minus-blacklist skipped=415 (1953 cases, timeout 15s)"
+    }
+  ],
+  "wrapper": {
+    "pass_count": 303,
+    "fail_count": 779,
+    "timeout_count": 10,
+    "raw_pass_markers": 0,
+    "raw_fail_markers": 1082,
+    "raw_timeout_markers": 10,
+    "raw_skip_markers": 0,
+    "raw_run_markers": 1083
+  },
+  "internal": {
+    "TBROK": 290,
+    "TCONF": 453,
+    "TFAIL": 1330
+  },
+  "enosys": 188,
+  "panic_trap": 0,
+  "suite_summaries": [],
+  "marker_audit": {
+    "incomplete_count": 1,
+    "incomplete": [
+      {
+        "case": "nice05",
+        "line": 21288
+      }
+    ],
+    "first_resource_failure": null,
+    "resource_failure_count": 0,
+    "panic_count": 0,
+    "first_panic": null,
+    "trap_like_count": 0,
+    "first_trap_like": null,
+    "recent_group_events": [
+      {
+        "line": 20956,
+        "event": "end",
+        "group": "ltp",
+        "case": "name_to_handle_at01"
+      },
+      {
+        "line": 20957,
+        "event": "start",
+        "group": "ltp",
+        "case": "name_to_handle_at02"
+      },
+      {
+        "line": 20984,
+        "event": "end",
+        "group": "ltp",
+        "case": "name_to_handle_at02"
+      },
+      {
+        "line": 20985,
+        "event": "start",
+        "group": "ltp",
+        "case": "nanosleep01"
+      },
+      {
+        "line": 21031,
+        "event": "end",
+        "group": "ltp",
+        "case": "nanosleep01"
+      },
+      {
+        "line": 21032,
+        "event": "start",
+        "group": "ltp",
+        "case": "nanosleep02"
+      },
+      {
+        "line": 21051,
+        "event": "end",
+        "group": "ltp",
+        "case": "nanosleep02"
+      },
+      {
+        "line": 21052,
+        "event": "start",
+        "group": "ltp",
+        "case": "nanosleep04"
+      },
+      {
+        "line": 21074,
+        "event": "end",
+        "group": "ltp",
+        "case": "nanosleep04"
+      },
+      {
+        "line": 21075,
+        "event": "start",
+        "group": "ltp",
+        "case": "netns_netlink"
+      },
+      {
+        "line": 21084,
+        "event": "end",
+        "group": "ltp",
+        "case": "netns_netlink"
+      },
+      {
+        "line": 21085,
+        "event": "start",
+        "group": "ltp",
+        "case": "newuname01"
+      },
+      {
+        "line": 21100,
+        "event": "end",
+        "group": "ltp",
+        "case": "newuname01"
+      },
+      {
+        "line": 21101,
+        "event": "start",
+        "group": "ltp",
+        "case": "nextafter01"
+      },
+      {
+        "line": 21112,
+        "event": "end",
+        "group": "ltp",
+        "case": "nextafter01"
+      },
+      {
+        "line": 21113,
+        "event": "start",
+        "group": "ltp",
+        "case": "nfs01_open_files"
+      },
+      {
+        "line": 21121,
+        "event": "end",
+        "group": "ltp",
+        "case": "nfs01_open_files"
+      },
+      {
+        "line": 21122,
+        "event": "start",
+        "group": "ltp",
+        "case": "nfs04_create_file"
+      },
+      {
+        "line": 21132,
+        "event": "end",
+        "group": "ltp",
+        "case": "nfs04_create_file"
+      },
+      {
+        "line": 21133,
+        "event": "start",
+        "group": "ltp",
+        "case": "nfs05_make_tree"
+      },
+      {
+        "line": 21152,
+        "event": "end",
+        "group": "ltp",
+        "case": "nfs05_make_tree"
+      },
+      {
+        "line": 21153,
+        "event": "start",
+        "group": "ltp",
+        "case": "nfs_flock"
+      },
+      {
+        "line": 21161,
+        "event": "end",
+        "group": "ltp",
+        "case": "nfs_flock"
+      },
+      {
+        "line": 21162,
+        "event": "start",
+        "group": "ltp",
+        "case": "nfs_flock_dgen"
+      },
+      {
+        "line": 21170,
+        "event": "end",
+        "group": "ltp",
+        "case": "nfs_flock_dgen"
+      },
+      {
+        "line": 21171,
+        "event": "start",
+        "group": "ltp",
+        "case": "nft02"
+      },
+      {
+        "line": 21180,
+        "event": "end",
+        "group": "ltp",
+        "case": "nft02"
+      },
+      {
+        "line": 21181,
+        "event": "start",
+        "group": "ltp",
+        "case": "nftw01"
+      },
+      {
+        "line": 21190,
+        "event": "end",
+        "group": "ltp",
+        "case": "nftw01"
+      },
+      {
+        "line": 21191,
+        "event": "start",
+        "group": "ltp",
+        "case": "nftw6401"
+      },
+      {
+        "line": 21200,
+        "event": "end",
+        "group": "ltp",
+        "case": "nftw6401"
+      },
+      {
+        "line": 21201,
+        "event": "start",
+        "group": "ltp",
+        "case": "nice01"
+      },
+      {
+        "line": 21223,
+        "event": "end",
+        "group": "ltp",
+        "case": "nice01"
+      },
+      {
+        "line": 21224,
+        "event": "start",
+        "group": "ltp",
+        "case": "nice02"
+      },
+      {
+        "line": 21244,
+        "event": "end",
+        "group": "ltp",
+        "case": "nice02"
+      },
+      {
+        "line": 21245,
+        "event": "start",
+        "group": "ltp",
+        "case": "nice03"
+      },
+      {
+        "line": 21265,
+        "event": "end",
+        "group": "ltp",
+        "case": "nice03"
+      },
+      {
+        "line": 21266,
+        "event": "start",
+        "group": "ltp",
+        "case": "nice04"
+      },
+      {
+        "line": 21286,
+        "event": "end",
+        "group": "ltp",
+        "case": "nice04"
+      },
+      {
+        "line": 21287,
+        "event": "start",
+        "group": "ltp",
+        "case": "nice05"
+      }
+    ]
+  }
+}
