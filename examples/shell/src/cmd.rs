@@ -247,7 +247,27 @@ const LTP_STABLE_CASES: &[&str] = &[
     "mmap17",
     "mmap19",
     "mincore01",
-
+    "futex_wait02",
+    "futex_wait04",
+    "futex_wake01",
+    "kill02",
+    "sched_tc2",
+    "sched_tc3",
+    "sched_tc4",
+    "sched_tc5",
+    "shmdt02",
+    "shmem_2nstest",
+    "shmnstest",
+    "shmt02",
+    "shmt03",
+    "shmt06",
+    "shmt07",
+    "shmt08",
+    "shmt10",
+    "tkill01",
+    "tkill02",
+    "vfork01",
+    "vfork02",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
