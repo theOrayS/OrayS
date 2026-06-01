@@ -57,6 +57,35 @@ Artifacts:
 
 RV scout: 8 PASS / 8 FAIL; `TFAIL=14`, `TCONF=12`, `TBROK=2`, ENOSYS=2. `readlinkat02` was RV-clean, but LA musl still has `TFAIL`, so it is blocked.
 
+### LA `readlinkat02` rerun after code inspection
+
+Artifacts:
+
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.summary.json`
+
+Parser result: 1 PASS / 1 FAIL; `TFAIL=1`, no timeout, ENOSYS, panic, or trap. The rerun confirms the existing blocker: LA glibc is clean, but LA musl is not promotion-clean.
+
+### RV `fsync02` isolated rerun
+
+Artifacts:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.summary.json`
+
+Parser result: 1 PASS / 1 FAIL; `TBROK=1`, no timeout, ENOSYS, panic, or trap. `fsync02` remains blocked and is not in the candidate pool.
+
+### Closed arch full-sweep mining against live stable606
+
+Artifacts:
+
+- Candidate report: `target/ltp-1000-milestone-03-stable656/arch-sweep-rv002-la012-not-stable606-20260601T224223Z.promotion-candidates.txt`
+- RV matrix: `target/ltp-1000-milestone-03-stable656/rv-arch002-full-matrix-20260601T224223Z.json`
+- LA matrix: `target/ltp-1000-milestone-03-stable656/la-arch012-full-matrix-20260601T224223Z.json`
+- Not-stable filter: `target/ltp-1000-milestone-03-stable656/arch-sweep-rv002-la012-not-stable606-20260601T224223Z.not-stable.txt`
+
+The closed RV/LA arch-sweep logs contain 563 four-way-clean rows overall, but filtering against the live `606/606/0` stable list yields zero not-yet-stable four-way-clean cases. This confirms the old sweep is exhausted for immediate stable656 promotion and should be used only as a blocker map for further repair lanes.
+
 ### `sched_setaffinity01` targeted fix and regression
 
 Artifacts:
@@ -85,11 +114,13 @@ Two new unique cases are currently four-way clean, but stable656 requires 50 new
 - `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 - No milestone promotion commit is created for stable656 yet.
 - The scheduler permission fix is kept as generic behavior work with closed targeted and regression evidence.
+- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current two-case pool.
 
 ## Risks / next steps
 
 1. Accumulate more four-way-clean candidates before editing the stable list.
 2. Isolate `kill10` panic/trap before broad process/signal shards.
-3. Diagnose LA musl `readlinkat02` before counting the RV-clean row.
-4. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
-5. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS evidence visible; none counts toward stable promotion.
+3. Diagnose LA musl `readlinkat02` before counting the RV-clean row; the current syscall body already rejects `bufsiz == 0`, so do not special-case the LA musl `bufsiz=1` boundary without root cause.
+4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
+5. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
+6. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS evidence visible; none counts toward stable promotion.

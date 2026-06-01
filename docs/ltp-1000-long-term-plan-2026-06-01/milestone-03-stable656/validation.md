@@ -149,6 +149,66 @@ Promotion candidates: 0
 
 Decision: `readlinkat02` is blocked by LA musl `TFAIL`.
 
+## LA `readlinkat02` rerun after code inspection
+
+Command captured in run meta:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=readlinkat02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.log`
+- Summary: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.summary.txt`
+- JSON: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.summary.json`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/la-readlinkat02-rerun-20260601T223953Z.derived.sha256`
+
+Parser summary:
+
+```text
+PASS LTP CASE: 1
+FAIL LTP CASE: 1
+Internal TFAIL/TBROK/TCONF: 1 ({'TFAIL': 1})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 0
+```
+
+Decision: unchanged blocker. LA glibc is clean, LA musl still fails the zero-size readlink boundary, and this case cannot be promoted.
+
+## RV `fsync02` isolated rerun
+
+Command captured in run meta:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fsync02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.log`
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.summary.txt`
+- JSON: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.summary.json`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/rv-fsync02-isolated-20260601T224426Z.derived.sha256`
+
+Parser summary:
+
+```text
+PASS LTP CASE: 1
+FAIL LTP CASE: 1
+Internal TFAIL/TBROK/TCONF: 1 ({'TBROK': 1})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 0
+```
+
+Decision: `fsync02` remains blocked by the glibc-side `TBROK`; it is not promotion evidence.
+
 ## `sched_setaffinity01` targeted fix proof
 
 Commands captured in run meta:
@@ -232,6 +292,41 @@ Blocked/incomplete cases: 13
 Candidates: futex_wait01, sched_setaffinity01
 ```
 
+## Closed arch full-sweep mining against live stable606
+
+Command shape:
+
+```bash
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc \
+  target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/rv-arch002.log \
+  target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch012.log
+```
+
+Artifacts:
+
+- Candidate report: `target/ltp-1000-milestone-03-stable656/arch-sweep-rv002-la012-not-stable606-20260601T224223Z.promotion-candidates.txt`
+- Not-stable filter: `target/ltp-1000-milestone-03-stable656/arch-sweep-rv002-la012-not-stable606-20260601T224223Z.not-stable.txt`
+- RV matrix JSON: `target/ltp-1000-milestone-03-stable656/rv-arch002-full-matrix-20260601T224223Z.json`
+- LA matrix JSON: `target/ltp-1000-milestone-03-stable656/la-arch012-full-matrix-20260601T224223Z.json`
+- Checksums: `target/ltp-1000-milestone-03-stable656/arch-sweep-rv002-la012-not-stable606-20260601T224223Z.derived.sha256`
+
+Parser/mining summary:
+
+```text
+Raw arch-sweep four-way clean candidates: 563
+Four-way clean candidates not already in live stable606: 0
+RV matrix: PASS 1204, FAIL 3453, internal {'TBROK': 1043, 'TCONF': 2663, 'TFAIL': 4058}, timeout 55, ENOSYS 1280, panic/trap 0
+LA matrix: PASS 1207, FAIL 2698, internal {'TBROK': 1031, 'TCONF': 1936, 'TFAIL': 4041}, timeout 53, ENOSYS 1279, panic/trap 0
+```
+
+Decision: the closed arch sweep is exhausted for immediate post-stable606 promotion. Its remaining value is blocker triage, not stable656 counting.
+
+## `nice04` source/errno-boundary note
+
+Source inspected: `/root/oskernel2026-orays-clean-stable520/docs/ltp-score-improvement-2026-05-28-phase-b/raw/ltp-source/nice_nice04.c`.
+
+Observed requirement: after switching to user `nobody`, `nice(-10)` expects failure with `errno == EPERM`. Current kernel `setpriority` lowering path returns Linux `EACCES` semantics for non-root callers that try to lower nice, and stable `setpriority02` protects that syscall-level behavior. Therefore `nice04` is not changed in this checkpoint; it remains a libc-wrapper/errno-boundary investigation rather than a safe kernel errno flip.
+
 ## Gate outcome
 
 - Targeted RV: clean for `futex_wait01` and `sched_setaffinity01`; other scout rows blocked as documented.
@@ -244,5 +339,5 @@ Candidates: futex_wait01, sched_setaffinity01
 ## Unverified items
 
 - No stable656 promotion gate because the candidate pool has only 2/50 required new cases.
-- No broad all-minus-blacklist sweep in this checkpoint.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait03`, `shmat1`, or LA musl `readlinkat02`.
+- No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
+- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait03`, `shmat1`, `fsync02`, `nice04`, or LA musl `readlinkat02`.
