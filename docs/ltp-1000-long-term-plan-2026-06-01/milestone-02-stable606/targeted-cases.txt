@@ -177,3 +177,22 @@ mmap14
 mincore01
 mprotect05
 vma01
+
+## open10 / creat08 setgid inheritance follow-up
+
+open10
+creat08
+open01
+open03
+open08
+open09
+creat01
+creat03
+creat04
+creat05
+chmod05
+chown01
+chown02
+chown03
+mkdir04
+mknod02

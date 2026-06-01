@@ -122,3 +122,21 @@ Evidence:
   - 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/mmap12-regression-rv-la.promotion-candidates.txt`
   - All twelve rows clean across RV + LA x musl + glibc; `mmap12` is the new candidate row.
+
+## open10 / creat08 setgid create regression set
+
+Rationale: the code change affects metadata recorded after successful file, FIFO, and directory creation under setgid parent directories. The protected subset combines the new candidates with stable open/creat/chmod/chown/mkdir/mknod anchors.
+
+Cases:
+
+- New candidates: `open10`, `creat08`
+- Existing stable anchors: `open01`, `open03`, `open08`, `open09`, `creat01`, `creat03`, `creat04`, `creat05`, `chmod05`, `chown01`, `chown02`, `chown03`, `mkdir04`, `mknod02`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-open-creat-setgid-regression-20260601T180236Z.summary.txt`
+  - 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-open-creat-setgid-regression-20260601T180348Z.summary.txt`
+  - 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/open-creat-setgid-regression-rv-la.promotion-candidates.txt`
+  - All sixteen rows clean across RV + LA x musl + glibc; `open10` and `creat08` are the new candidate rows.

@@ -136,3 +136,24 @@ POSIX/Linux-visible impact:
 - mmap/resource impact: `MAP_POPULATE`-visible present pages can now be observed through pagemap. This is a snapshot-on-open model, not a live kernel pagemap; callers that expect Linux's continuously changing pagemap bits remain outside the current compatibility boundary.
 - Signal/futex/user-pointer copy impact: none.
 - Resource/lifetime risk: moderate-low. The fd stores coalesced present page-index ranges rather than a full address-space-sized byte vector; the RV/LA regression subset protects existing mmap/mincore/mprotect/proc maps anchors.
+
+## Additional setgid-directory create metadata behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/fd_table.rs`
+
+Behavior:
+
+- New filesystem nodes created via `open(O_CREAT)`/`creat()`, `mkdirat()`, and `mknodat()` now inspect the parent directory metadata before recording synthetic uid/gid/mode metadata.
+- If the parent directory has `S_ISGID`, the new node's recorded gid inherits the parent directory gid instead of the caller's current `fs_gid()`.
+- New subdirectories under a setgid parent also retain the setgid bit in the recorded mode after applying umask. Non-setgid parents keep the previous process-gid behavior.
+
+POSIX/Linux-visible impact:
+
+- Syscall/flag surface affected: `open`/`openat` with `O_CREAT`, `creat`, `mkdir`/`mkdirat`, and `mknod`/`mknodat` for regular/FIFO nodes in setgid directories.
+- `stat`/`fstatat`/`lstat` visible metadata becomes more Linux-compatible for `st_gid` and directory setgid inheritance.
+- Errno impact: none; existing permission and existence checks run before creation as before.
+- FD impact: no new descriptor semantics; this only changes recorded metadata after successful creation.
+- Signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: low. The change reuses existing per-process path metadata maps and only broadens the values recorded for successful generic create paths; RV/LA regression protects adjacent stable open/creat/chmod/chown/mkdir/mknod anchors.

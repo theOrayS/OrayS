@@ -310,3 +310,38 @@ Parser summary:
 - Combined report: all twelve rows clean across RV + LA x musl + glibc; `mmap12` is the new not-yet-stable candidate from this fix.
 
 Non-LTP caveat: the full evaluator still reports existing `iperf-glibc` failures in these QEMU runs. They are outside the LTP parser gate and are not counted as LTP promotion evidence.
+
+## open10 / creat08 setgid inheritance validation
+
+Pre-fix evidence from the 80-case RV scout:
+
+- `open10` and `creat08` failed in both musl and glibc when files were created under the setgid `dir_b`; the new files reported gid `65534` instead of the parent directory gid `1`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=open10,creat08 LTP_CASE_TIMEOUT_SECS=90 timeout 50m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=open10,creat08 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-open-creat-setgid-postfix-20260601T180048Z.log \
+  target/ltp-1000-milestone-02-stable606/la-open-creat-setgid-postfix-20260601T180132Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=open10,creat08,open01,open03,open08,open09,creat01,creat03,creat04,creat05,chmod05,chown01,chown02,chown03,mkdir04,mknod02 LTP_CASE_TIMEOUT_SECS=90 timeout 70m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=open10,creat08,open01,open03,open08,open09,creat01,creat03,creat04,creat05,chmod05,chown01,chown02,chown03,mkdir04,mknod02 LTP_CASE_TIMEOUT_SECS=90 timeout 80m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV singleton raw/summary: `target/ltp-1000-milestone-02-stable606/rv-open-creat-setgid-postfix-20260601T180048Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA singleton raw/summary: `target/ltp-1000-milestone-02-stable606/la-open-creat-setgid-postfix-20260601T180132Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way singleton report: `target/ltp-1000-milestone-02-stable606/open-creat-setgid-rv-la-postfix.promotion-candidates.txt`, `.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-open-creat-setgid-regression-20260601T180236Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-open-creat-setgid-regression-20260601T180348Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way regression report: `target/ltp-1000-milestone-02-stable606/open-creat-setgid-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV singleton: 4 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA singleton: 4 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- RV regression subset: 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA regression subset: 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined regression report: all sixteen rows clean across RV + LA x musl + glibc; only `open10` and `creat08` are new relative to current stable list.

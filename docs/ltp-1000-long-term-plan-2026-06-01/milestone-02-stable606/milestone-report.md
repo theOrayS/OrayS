@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`.
-- Current candidate bank size for stable606 planning: at most 28 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`.
+- Current candidate bank size for stable606 planning: at most 30 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -129,3 +129,22 @@ Targeted evidence:
 - `mmap12-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twelve rows are clean, with `mmap12` as the new not-yet-stable candidate from this follow-up.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 28, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+## open10 / creat08 setgid inheritance follow-up
+
+A generic VFS metadata improvement was added after the `mmap12` work:
+
+- New file/FIFO/directory metadata recording now derives the child gid from the parent directory when the parent has `S_ISGID` set.
+- New subdirectories under a setgid parent also inherit the setgid bit in the recorded mode.
+- Non-setgid parents keep the previous process `fs_gid()` behavior. No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-open-creat-setgid-postfix-20260601T180048Z.log`: `open10,creat08` RV musl+glibc PASS, parser-clean.
+- `la-open-creat-setgid-postfix-20260601T180132Z.log`: `open10,creat08` LA musl+glibc PASS, parser-clean.
+- `open-creat-setgid-rv-la-postfix.promotion-candidates.txt`: combined four-way report; `open10` and `creat08` are clean across RV + LA x musl + glibc.
+- `rv-open-creat-setgid-regression-20260601T180236Z.log`: RV VFS metadata regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `la-open-creat-setgid-regression-20260601T180348Z.log`: LA VFS metadata regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `open-creat-setgid-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `open10` and `creat08` as the new not-yet-stable candidates from this follow-up.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 30, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
