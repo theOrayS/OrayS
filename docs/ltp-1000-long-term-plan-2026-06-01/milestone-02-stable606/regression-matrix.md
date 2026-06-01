@@ -214,3 +214,23 @@ Evidence:
   - 26 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Targeted four-way report: `target/ltp-1000-milestone-02-stable606/mknod-mode-rv-la.promotion-candidates.txt`
   - `mknod03`, `mknod04`, and `mknod09` are clean across RV + LA x musl + glibc.
+
+## fchownat symlink nofollow regression set
+
+Rationale: the code change affects `fchownat(..., AT_SYMLINK_NOFOLLOW)` path selection and synthetic symlink `lstat` ownership reporting. The protected subset combines the new candidate with existing symlink/readlink/lstat/chown/fchmod anchors and already-banked metadata candidates.
+
+Cases:
+
+- New candidate: `fchownat02`
+- Existing stable or already-banked anchors: `symlink01`, `symlink02`, `readlink01`, `readlinkat01`, `lstat01`, `lstat01_64`, `chown01`, `chown02`, `chown03`, `fchownat01`, `fchmodat01`, `chown04`, `fchown04`, `chmod07`, `fchmod02`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-fchownat-symlink-regression-20260601T191310Z.summary.txt`
+  - 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-fchownat-symlink-regression-20260601T191417Z.summary.txt`
+  - 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/fchownat02-nofollow-rv-la.promotion-candidates.txt`
+  - `fchownat02` is clean across RV + LA x musl + glibc.
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/fchownat-symlink-regression-rv-la.promotion-candidates.txt`
+  - All sixteen rows clean across RV + LA x musl + glibc; only `fchownat02` is new relative to current stable and previously banked rows.
