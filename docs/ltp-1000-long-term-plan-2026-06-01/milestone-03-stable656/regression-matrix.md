@@ -1,6 +1,34 @@
 # Milestone 03 stable656 regression matrix
 
-This checkpoint records the regression sets that must protect future G009 fixes. No candidate from this scout is promoted yet.
+This checkpoint records both completed regression evidence for the `sched_setaffinity01` fix and required future regression sets for unresolved G009 blockers.
+
+## Completed regression for `sched_setaffinity01`
+
+Changed syscall: `sched_setaffinity` permission path in `examples/shell/src/uspace/resource_sched.rs`.
+
+Targeted promotion proof:
+
+- RV: `target/ltp-1000-milestone-03-stable656/rv-sched-setaffinity01-postfix-20260601T222738Z.summary.txt`
+- LA: `target/ltp-1000-milestone-03-stable656/la-sched-setaffinity01-postfix-20260601T222823Z.summary.txt`
+
+Adjacent stable regression subset:
+
+- `sched_getaffinity01`
+- `sched_setparam01`
+- `sched_setparam02`
+- `sched_setparam03`
+- `sched_setparam04`
+- `sched_setparam05`
+- `sched_setscheduler01`
+- `sched_setscheduler02`
+- `sched_setscheduler03`
+- `setpriority02`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-sched-affinity-regression-20260601T222920Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-sched-affinity-regression-20260601T223023Z.summary.txt`
+- Result: 20/20 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 
 ## If fixing recoverable user SIGSEGV / page-fault signal delivery
 
@@ -35,11 +63,26 @@ Primary retest case:
 
 Adjacent regression candidates:
 
-- current stable futex rows, if any, from `LTP_STABLE_CASES`
+- `futex_wait01` (now four-way clean candidate)
+- current stable futex rows, if any, from live `LTP_STABLE_CASES`
 - timeout/EINTR-related wait and signal-mask cases
 - task teardown/wakeup lifetime smoke tests
+
+## If fixing SysV shm / resource lifetime
+
+Primary retest case:
+
+- `shmat1`
+
+Adjacent regression candidates:
+
+- current stable SysV shm/IPC rows from live `LTP_STABLE_CASES`
+- process exit and address-space teardown cases
+- resource telemetry checks on RV and LA
 
 ## Non-promotion rows
 
 - `mmap10_1`: do not include until the guest LTP inventory contains the binary.
 - `vma02`: do not include until libnuma-related `TCONF` is resolved and both libcs are parser-clean.
+- `readlinkat02`: do not include until LA musl is parser-clean.
+- `kill10`: do not include broad batches until the panic/trap is isolated.

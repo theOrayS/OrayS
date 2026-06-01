@@ -575,7 +575,12 @@ pub(super) fn sys_sched_setaffinity(
         return neg_errno(err);
     }
     match read_user_value::<u8>(process, mask) {
-        Ok(first) if sched_affinity_accepts_current_cpu(first) => 0,
+        Ok(first) if sched_affinity_accepts_current_cpu(first) => {
+            match can_set_sched_target(process, pid) {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            }
+        }
         Ok(_) => neg_errno(LinuxError::EINVAL),
         Err(err) => neg_errno(err),
     }
