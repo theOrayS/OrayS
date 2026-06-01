@@ -826,6 +826,13 @@ fn retain_ltp_cases_not_blacklisted(cases: &mut Vec<String>, blacklist: &[String
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn retain_ltp_cases_not_selected(cases: &mut Vec<String>, selected: &[String]) -> usize {
+    let before = cases.len();
+    cases.retain(|case| !selected.iter().any(|existing| existing == case));
+    before.saturating_sub(cases.len())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn ltp_static_case_list(name: &str) -> Option<&'static [&'static str]> {
     LTP_CASE_BATCHES
         .iter()
@@ -872,6 +879,30 @@ fn selected_ltp_cases(target_dir: &str) -> Result<(String, Vec<String>), String>
         let blacklist = ltp_sweep_blacklist_cases()?;
         let skipped = retain_ltp_cases_not_blacklisted(&mut cases, &blacklist);
         return Ok((format!("all-minus-blacklist skipped={skipped}"), cases));
+    }
+    if matches!(
+        spec,
+        "score-blacklist" | "stable-plus-blacklist" | "stable-plus-all-minus-blacklist"
+    ) {
+        let mut cases = ltp_cases_from_slice(LTP_STABLE_CASES)?;
+        let stable_count = cases.len();
+        let mut extras = ltp_cases_from_dir(target_dir)?;
+        if extras.is_empty() {
+            return Err(format!("no LTP testcases found in '{target_dir}'"));
+        }
+        let deduped = retain_ltp_cases_not_selected(&mut extras, &cases);
+        let blacklist = ltp_sweep_blacklist_cases()?;
+        let skipped = retain_ltp_cases_not_blacklisted(&mut extras, &blacklist);
+        let extra_count = extras.len();
+        for case in extras {
+            push_ltp_case(&mut cases, &case)?;
+        }
+        return Ok((
+            format!(
+                "stable-plus-all-minus-blacklist stable={stable_count} extra={extra_count} deduped={deduped} skipped={skipped}"
+            ),
+            cases,
+        ));
     }
 
     if let Some(name) = spec.strip_prefix("batch:") {

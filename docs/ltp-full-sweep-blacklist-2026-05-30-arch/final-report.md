@@ -32,9 +32,10 @@ Both architectures now have a parser-backed closed `LTP_CASES=blacklist` full sw
   - These remain opt-in for local `./run-eval.sh rv|la`; if unset, local evaluator behavior is unchanged.
 - `Makefile`
   - `make` / `make all` remains the explicit remote-submission entry point.
-  - As of the 2026-06-01 online-score follow-up, the default remote-submission mode is back to `REMOTE_LTP_CASES=stable`.
-  - The blacklist full-sweep build remains available only when explicitly requested, for example `make all REMOTE_LTP_CASES=blacklist`.
-  - In blacklist mode, it builds `kernel-rv` with `blacklist-common.txt` + `blacklist-rv.txt`, and `kernel-la` with `blacklist-common.txt` + `blacklist-la.txt`.
+  - As of the 2026-06-01 score-safe superset follow-up, the default remote-submission mode is `REMOTE_LTP_CASES=stable-plus-blacklist`.
+  - That mode runs `LTP_STABLE_CASES` first, then appends extra guest LTP binaries after removing stable duplicates and supplemental blacklist entries.
+  - Pure stable remains available with `make all REMOTE_LTP_CASES=stable`; pure full-sweep blacklist remains available with `make all REMOTE_LTP_CASES=blacklist`.
+  - In blacklist-consuming modes, it builds `kernel-rv` with `blacklist-common.txt` + `blacklist-rv.txt`, and `kernel-la` with `blacklist-common.txt` + `blacklist-la.txt`.
   - It still uses the remote LoongArch platform config `configs/remote-eval/axplat-loongarch64-qemu-virt.toml`; local `kernel-la`, `run-la`, and `./run-eval.sh la` remain on the local platform config path unless their own env vars are provided.
 
 
@@ -60,19 +61,31 @@ Authoritative online-score submission entry point for this branch:
 make all
 ```
 
-Remote `make all` now defaults to the curated stable whitelist:
+Remote `make all` now defaults to a stable-first score-safe superset:
 
 ```text
-REMOTE_LTP_CASES=stable
+REMOTE_LTP_CASES=stable-plus-blacklist
 ```
 
-This is intentionally online-friendly: it preserves the known whitelist ordering/coverage and avoids letting a long all-minus-blacklist sweep spend the evaluator budget before it reaches high-value stable cases.  To run the closed blacklist full-sweep experiment explicitly, opt in:
+This is intentionally online-friendly: it preserves the known whitelist ordering/coverage before trying additional full-sweep cases.  The resulting case order is:
+
+```text
+LTP_STABLE_CASES + (all guest LTP binaries - LTP_STABLE_CASES - blacklist)
+```
+
+To run the old stable-only submission explicitly:
+
+```bash
+make all REMOTE_LTP_CASES=stable
+```
+
+To run the closed pure blacklist full-sweep experiment explicitly:
 
 ```bash
 make all REMOTE_LTP_CASES=blacklist
 ```
 
-When `REMOTE_LTP_CASES` is a blacklist mode, `make all` compiles the supplemental blacklist overlays through these overridable make variables:
+When `REMOTE_LTP_CASES` is a blacklist-consuming mode (`stable-plus-blacklist`, `score-blacklist`, `stable-plus-all-minus-blacklist`, `blacklist`, `all-minus-blacklist`, or `sweep:blacklist`), `make all` compiles the supplemental blacklist overlays through these overridable make variables:
 
 ```text
 REMOTE_LTP_BLACKLIST_COMMON_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-common.txt
@@ -80,7 +93,8 @@ REMOTE_LTP_BLACKLIST_RV_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/black
 REMOTE_LTP_BLACKLIST_LA_FILE=docs/ltp-full-sweep-blacklist-2026-05-30-arch/blacklist-la.txt
 ```
 
-This means submitting this `exp/ltp-full-sweep-blacklist` branch to the online evaluator should exercise the stable whitelist by default after the evaluator runs its normal `make` / `make all` build.  The blacklist closure artifacts remain valid experimental evidence, but the full-sweep mode is no longer the default scoring path.
+This means submitting this `exp/ltp-full-sweep-blacklist` branch to the online evaluator should exercise the stable whitelist first after the evaluator runs its normal `make` / `make all` build, then continue into non-stable extras that are not in the active blacklist.  Blacklisted/skipped extras still do not count as PASS or promotion proof.
+The blacklist is intentionally applied only to the extra suffix in the default mode: stable whitelist cases still run first even if an arch-specific experimental blacklist contains their names.
 
 Precedence / merge order inside the guest runner is:
 
@@ -90,7 +104,7 @@ Precedence / merge order inside the guest runner is:
 4. optional guest common files (`/ltp_blacklist.txt`, `/tmp/ltp_blacklist.txt`);
 5. optional guest arch files (`/ltp_blacklist_rv.txt`, `/tmp/ltp_blacklist_riscv64.txt`, `/ltp_blacklist_la.txt`, `/tmp/ltp_blacklist_loongarch64.txt`, and dash-name aliases).
 
-The host-side file variables above are the recommended local operator interface for blacklist experiments.  `make all` is the recommended online-submission interface and defaults to `stable`; blacklist file variables are consumed there only for explicit blacklist modes.  The arch-specific build-time env knobs and guest filesystem paths are advanced compatibility hooks for prepared images or external runners; missing optional guest files intentionally no-op and must not be treated as evidence that a blacklist was applied.  Every closure report must record the concrete command and skipped count, as this report does.
+The host-side file variables above are the recommended local operator interface for blacklist experiments.  `make all` is the recommended online-submission interface and defaults to `stable-plus-blacklist`; blacklist file variables are consumed there for blacklist-consuming modes.  The arch-specific build-time env knobs and guest filesystem paths are advanced compatibility hooks for prepared images or external runners; missing optional guest files intentionally no-op and must not be treated as evidence that a blacklist was applied.  Every closure report must record the concrete command and skipped count, as this report does.
 
 ## Blacklist sources and counts
 
@@ -190,8 +204,8 @@ These are candidates for later real fixes.  They are not promotion claims.
 ## Online evaluator compatibility
 
 - The default invocation `./run-eval.sh rv` / `./run-eval.sh la` still works with no new required environment variables.
-- Remote `make` / `make all` defaults to `REMOTE_LTP_CASES=stable` for online scoring; blacklist full sweep is opt-in via `REMOTE_LTP_CASES=blacklist`.
-- New blacklist file variables are optional and experiment oriented.  They are required only for explicit Makefile blacklist modes and otherwise do not affect the stable default.
+- Remote `make` / `make all` defaults to `REMOTE_LTP_CASES=stable-plus-blacklist` for online scoring: stable whitelist first, then non-stable all-minus-blacklist extras.
+- New blacklist file variables are optional for local experiments and required by the remote default because it consumes the checked-in common/RV/LA blacklist overlays for the extra suffix.
 - Arch-specific guest file paths are optional; absence is ignored.
 - No testsuite/evaluator scripts were modified to fake PASS, suppress TCONF/TBROK/TFAIL, or hide panic/trap/timeout.
 
@@ -201,8 +215,8 @@ These are candidates for later real fixes.  They are not promotion claims.
 - `rustfmt +nightly-2025-05-20 --edition 2024 --check examples/shell/src/cmd.rs` passed.
 - `git diff --check -- examples/shell/src/cmd.rs run-eval.sh docs/ltp-full-sweep-blacklist-2026-05-30-arch` passed.
 - `python3 -m json.tool docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json` passed.
-- 2026-06-01 online-score follow-up: `make -n all` shows default `LTP_CASES="stable"` with no blacklist env injection, while `make -n all REMOTE_LTP_CASES=blacklist` still shows RV/LA blacklist env injection.
-- 2026-06-01 online-score follow-up: `make all` completed with default `LTP_CASES="stable"` and regenerated `kernel-rv` / `kernel-la`; disk stayed at `/` and `/root` 59G size, 23G used, 34G available, 41% used before and after.
+- 2026-06-01 score-safe superset follow-up: `make -n all` shows default `LTP_CASES="stable-plus-blacklist"` plus RV/LA blacklist env injection; `make -n all REMOTE_LTP_CASES=stable` shows stable-only with no blacklist env injection; `make -n all REMOTE_LTP_CASES=blacklist` still shows pure blacklist env injection.
+- 2026-06-01 score-safe superset follow-up: `make all` completed with default `LTP_CASES="stable-plus-blacklist"` and regenerated `kernel-rv` / `kernel-la`; disk stayed at `/` and `/root` 59G size, 23G used, 34G available, 41% used before and after.
 - Closure assertion over `rv-arch002-summary.json` and `la-arch012-summary.json` passed: closed=true, run_eval_status=0, incomplete=0, panic/trap/resource=0.
 - No live `qemu-system-*`, `run-eval.sh rv/la`, or `make run-rv/run-la` processes after final sweeps.
 - Disk after runs: `/` and `/root` both 59G size, 23G used, 34G available, 40% used.
