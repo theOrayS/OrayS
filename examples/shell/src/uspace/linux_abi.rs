@@ -102,7 +102,8 @@ pub(super) const ACCESS_R_OK: usize = 4;
 pub(super) const ACCESS_MODE_MASK: usize = ACCESS_X_OK | ACCESS_W_OK | ACCESS_R_OK;
 pub(super) const DEFAULT_PASSWD_CONTENT: &[u8] =
     b"root:x:0:0:root:/root:/bin/sh\nnobody:x:65534:65534:nobody:/nonexistent:/sbin/nologin\n";
-pub(super) const DEFAULT_GROUP_CONTENT: &[u8] = b"root:x:0:\nnogroup:x:65534:\n";
+pub(super) const DEFAULT_GROUP_CONTENT: &[u8] =
+    b"root:x:0:\ndaemon:x:1:\nusers:x:100:\nnogroup:x:65534:\n";
 pub(super) const RTC_RD_TIME: u32 = 0x8024_7009;
 
 pub(super) const SOL_SOCKET_LEVEL: i32 = 1;

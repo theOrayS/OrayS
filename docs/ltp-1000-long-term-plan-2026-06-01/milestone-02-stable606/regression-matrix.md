@@ -140,3 +140,22 @@ Evidence:
   - 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/open-creat-setgid-regression-rv-la.promotion-candidates.txt`
   - All sixteen rows clean across RV + LA x musl + glibc; `open10` and `creat08` are the new candidate rows.
+
+
+## chmod07 / fchmod02 group database regression set
+
+Rationale: the code change affects synthetic `/etc/group` content consumed by libc group-name lookup. The protected subset combines the new candidates with stable chmod/chown/open/creat anchors that could observe group metadata or setup behavior.
+
+Cases:
+
+- New candidates: `chmod07`, `fchmod02`
+- Existing stable anchors: `chmod05`, `chown01`, `chown02`, `chown03`, `open01`, `creat01`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-groupdb-chmod-regression-20260601T181338Z.summary.txt`
+  - 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-groupdb-chmod-regression-20260601T181429Z.summary.txt`
+  - 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/groupdb-chmod-regression-rv-la.promotion-candidates.txt`
+  - All eight rows clean across RV + LA x musl + glibc; `chmod07` and `fchmod02` are the new candidate rows.

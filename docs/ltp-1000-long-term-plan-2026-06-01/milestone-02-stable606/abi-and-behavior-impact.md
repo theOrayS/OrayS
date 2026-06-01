@@ -157,3 +157,23 @@ POSIX/Linux-visible impact:
 - FD impact: no new descriptor semantics; this only changes recorded metadata after successful creation.
 - Signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: low. The change reuses existing per-process path metadata maps and only broadens the values recorded for successful generic create paths; RV/LA regression protects adjacent stable open/creat/chmod/chown/mkdir/mknod anchors.
+
+
+## Additional synthetic group database behavior change on 2026-06-02
+
+File:
+
+- `examples/shell/src/uspace/linux_abi.rs`
+
+Behavior:
+
+- The default synthetic `/etc/group` file now contains `daemon:x:1:` and `users:x:100:` in addition to `root` and `nogroup`.
+- The change is generic filesystem-visible data for libc name-service lookups; it does not special-case LTP binaries, process names, paths beyond the existing `/etc/group` synthetic file, or wrapper output.
+
+POSIX/Linux-visible impact:
+
+- Synthetic filesystem ABI affected: reads/stat/open of `/etc/group` expose two additional conventional group entries.
+- Syscall/errno impact: none for kernel syscalls directly; successful libc `getgrnam("users")` / `getgrnam("daemon")` can change user-space setup paths that previously treated the groups as absent.
+- FD impact: none beyond the existing read-only synthetic-file fd behavior.
+- Signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: low. This is static byte content consumed by existing synthetic-file plumbing; RV/LA regression protects chmod/chown/open/creat anchors.
