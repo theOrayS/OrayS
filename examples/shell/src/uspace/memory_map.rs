@@ -3,15 +3,17 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
+use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
+use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
+use std::vec::Vec;
 
-use super::UserProcess;
-use super::linux_abi::{SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
+use super::linux_abi::{neg_errno, SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP};
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::task_context::current_process;
 use super::task_context::current_task_ext;
+use super::user_memory::{validate_user_write, write_user_bytes};
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -338,6 +340,43 @@ pub(super) fn sys_msync(process: &UserProcess, addr: usize, len: usize, flags: u
         }
     }
     0
+}
+
+pub(super) fn sys_mincore(process: &UserProcess, addr: usize, len: usize, vec: usize) -> isize {
+    if len == 0 {
+        return 0;
+    }
+    if addr & (PAGE_SIZE_4K - 1) != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let Some(raw_end) = addr.checked_add(len) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if end <= addr || end > USER_STACK_TOP {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+    let page_count = (end - addr) / PAGE_SIZE_4K;
+    if let Err(err) = validate_user_write(process, vec, page_count) {
+        return neg_errno(err);
+    }
+
+    let mut residency = Vec::new();
+    if residency.try_reserve_exact(page_count).is_err() {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+    let aspace = process.aspace.lock();
+    for page in PageIter4K::new(VirtAddr::from(addr), VirtAddr::from(end)).unwrap() {
+        if aspace.page_table().query(page).is_err() {
+            return neg_errno(LinuxError::ENOMEM);
+        }
+        residency.push(1);
+    }
+    drop(aspace);
+
+    write_user_bytes(process, vec, residency.as_slice()).map_or_else(neg_errno, |_| 0)
 }
 
 pub(super) fn sys_mprotect(

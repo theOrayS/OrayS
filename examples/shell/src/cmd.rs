@@ -236,6 +236,17 @@ const LTP_STABLE_CASES: &[&str] = &[
     "getxattr01",
     "listxattr01",
     "statx03",
+    "diotest1",
+    "diotest2",
+    "diotest3",
+    "diotest5",
+    "diotest6",
+    "mprotect05",
+    "mmap001",
+    "mmap15",
+    "mmap17",
+    "mmap19",
+    "mincore01",
 
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
