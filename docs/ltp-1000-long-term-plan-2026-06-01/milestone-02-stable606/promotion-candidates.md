@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 26, so promotion is blocked.
+- Current candidate bank after this preflight: at most 27, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -78,3 +78,18 @@ Updated candidate-bank note before the time follow-up: 21 deferred rows + `socke
   - `times03-regression-rv-la.promotion-candidates.txt` shows all five rows clean across RV + LA x musl + glibc; only `times03` is a new not-yet-stable candidate from this fix.
 
 Updated candidate-bank note after the time follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` = at most 26 plausible cases, still short of stable606.
+
+
+### mmap14
+
+- Pre-fix RV scout state: both musl and glibc failed one internal TFAIL row because `/proc/self/status` reported `VmLck` as 0K after an anonymous `MAP_LOCKED` mmap.
+- Fix: generic `UserMmapRegion` locked-mapping metadata plus `/proc/self/status` `VmLck` reporting; `MAP_LOCKED` mappings are eagerly populated and tracked until range removal/splitting. No case-specific special-casing.
+- Current evidence:
+  - `rv-mmap14-postfix-20260601T170355Z.log`: RV musl + glibc PASS for `mmap14`, parser-clean.
+  - `la-mmap14-postfix-20260601T170553Z.log`: LA musl + glibc PASS for `mmap14`, parser-clean.
+  - `mmap14-rv-la-postfix.promotion-candidates.txt`: one four-way candidate, `mmap14`.
+- Adjacent regression evidence:
+  - `rv-mmap14-regression-20260601T170753Z.log` and `la-mmap14-regression-20260601T171057Z.log` both report 24 PASS / 0 FAIL for `mmap14` plus mmap/proc stable anchors.
+  - `mmap14-regression-rv-la.promotion-candidates.txt` shows all twelve rows clean across RV + LA x musl + glibc; only `mmap14` is a new not-yet-stable candidate from this follow-up.
+
+Updated candidate-bank note after the mmap14 follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` = at most 27 plausible cases, still short of stable606.

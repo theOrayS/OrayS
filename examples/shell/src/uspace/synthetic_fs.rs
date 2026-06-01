@@ -114,6 +114,7 @@ struct UserProcessStat {
     sid: i32,
     state: char,
     comm: String,
+    locked_mmap_kb: usize,
 }
 
 impl UserProcessStat {
@@ -144,6 +145,7 @@ impl UserProcessStat {
             sid: process.sid(),
             state,
             comm,
+            locked_mmap_kb: process.locked_mmap_kb(),
         }
     }
 }
@@ -209,6 +211,7 @@ fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String,
          Tgid:\t{pid}\n\
          Pid:\t{pid}\n\
          PPid:\t{}\n\
+         VmLck:\t{} kB\n\
          Uid:\t{}\t{}\t{}\t{}\n\
          Gid:\t{}\t{}\t{}\t{}\n\
          Groups:\t{groups}\n",
@@ -216,6 +219,7 @@ fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String,
         stat.state,
         stat.state,
         stat.ppid,
+        stat.locked_mmap_kb,
         process.real_uid(),
         process.uid(),
         process.saved_uid(),

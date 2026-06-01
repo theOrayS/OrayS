@@ -200,3 +200,52 @@ Parser summary:
 - RV regression subset: 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - LA regression subset: 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `times01`, `times03`, `gettimeofday01`, `gettimeofday02`, and `clock_gettime02` all clean across RV + LA x musl + glibc; only `times03` is new relative to current stable list.
+
+## mmap14 MAP_LOCKED / VmLck validation
+
+Pre-fix evidence from the 80-case RV scout:
+
+- `mmap14` failed in both musl and glibc with `Expected 1024K locked, get 0K locked`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap14 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap14 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-mmap14-postfix-20260601T170355Z.log \
+  target/ltp-1000-milestone-02-stable606/la-mmap14-postfix-20260601T170553Z.log
+```
+
+Artifacts:
+
+- RV singleton raw/summary: `target/ltp-1000-milestone-02-stable606/rv-mmap14-postfix-20260601T170355Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- LA singleton raw/summary: `target/ltp-1000-milestone-02-stable606/la-mmap14-postfix-20260601T170553Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- Four-way report: `target/ltp-1000-milestone-02-stable606/mmap14-rv-la-postfix.promotion-candidates.txt`, `target/ltp-1000-milestone-02-stable606/mmap14-promotion-reports.sha256`
+
+Parser summary:
+
+- RV singleton: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA singleton: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Four-way candidate report: 1 candidate, `mmap14`.
+
+## mmap14 adjacent mmap/proc regression subset
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,vma01,mmap14,mmap01,mmap02,mmap03,mmap06,mmap09,mmap10,mmap11,mincore01,mprotect05 LTP_CASE_TIMEOUT_SECS=90 timeout 75m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,vma01,mmap14,mmap01,mmap02,mmap03,mmap06,mmap09,mmap10,mmap11,mincore01,mprotect05 LTP_CASE_TIMEOUT_SECS=90 timeout 75m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-mmap14-regression-20260601T170753Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-mmap14-regression-20260601T171057Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- Four-way report: `target/ltp-1000-milestone-02-stable606/mmap14-regression-rv-la.promotion-candidates.txt`, `target/ltp-1000-milestone-02-stable606/mmap14-promotion-reports.sha256`
+
+Parser summary:
+
+- RV regression subset: 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA regression subset: 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: all twelve rows clean across RV + LA x musl + glibc; only `mmap14` is new relative to the current stable list and already-banked `mmap04`/`vma01`.

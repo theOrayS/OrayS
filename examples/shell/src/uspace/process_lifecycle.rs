@@ -521,7 +521,14 @@ impl UserProcess {
         self.shared_mmap_ranges.lock().push((start, size, flags));
     }
 
-    pub(super) fn record_mmap_region(&self, start: usize, size: usize, prot: u32, shared: bool) {
+    pub(super) fn record_mmap_region(
+        &self,
+        start: usize,
+        size: usize,
+        prot: u32,
+        shared: bool,
+        locked: bool,
+    ) {
         let Some(end) = start.checked_add(size) else {
             return;
         };
@@ -532,6 +539,7 @@ impl UserProcess {
             size,
             prot,
             shared,
+            locked,
         });
         ranges.sort_by_key(|region| region.start);
     }
@@ -551,6 +559,7 @@ impl UserProcess {
                     size: start - region.start,
                     prot: region.prot,
                     shared: region.shared,
+                    locked: region.locked,
                 });
             }
             let protected_start = region.start.max(start);
@@ -561,6 +570,7 @@ impl UserProcess {
                     size: protected_end - protected_start,
                     prot,
                     shared: region.shared,
+                    locked: region.locked,
                 });
             }
             if region_end > end {
@@ -569,6 +579,7 @@ impl UserProcess {
                     size: region_end - end,
                     prot: region.prot,
                     shared: region.shared,
+                    locked: region.locked,
                 });
             }
         }
@@ -590,6 +601,7 @@ impl UserProcess {
                     size: start - region.start,
                     prot: region.prot,
                     shared: region.shared,
+                    locked: region.locked,
                 });
             }
             if region_end > end {
@@ -598,6 +610,7 @@ impl UserProcess {
                     size: region_end - end,
                     prot: region.prot,
                     shared: region.shared,
+                    locked: region.locked,
                 });
             }
         }
@@ -606,6 +619,15 @@ impl UserProcess {
 
     pub(super) fn mmap_regions(&self) -> Vec<super::UserMmapRegion> {
         self.mmap_ranges.lock().clone()
+    }
+
+    pub(super) fn locked_mmap_kb(&self) -> usize {
+        self.mmap_ranges
+            .lock()
+            .iter()
+            .filter(|region| region.locked)
+            .map(|region| region.size / 1024)
+            .sum()
     }
 
     pub(super) fn forget_mmap_range(&self, start: usize, end: usize) {

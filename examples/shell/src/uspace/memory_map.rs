@@ -152,6 +152,7 @@ pub(super) fn sys_mmap(
     let anonymous = flags_u32 & general::MAP_ANONYMOUS != 0;
     let shared = flags_u32 & general::MAP_SHARED != 0;
     let map_fixed = flags_u32 & general::MAP_FIXED != 0;
+    let locked = flags_u32 & general::MAP_LOCKED != 0;
     let request_addr = if addr == 0 {
         None
     } else {
@@ -195,7 +196,7 @@ pub(super) fn sys_mmap(
     if anonymous && size <= 0x40000 {
         user_trace!("user-mmap: target={target:#x} len={size:#x} prot={prot:#x} flags={flags:#x}");
     }
-    let populate = !anonymous || shared;
+    let populate = !anonymous || shared || locked;
     {
         let mut aspace = process.aspace.lock();
         if map_fixed {
@@ -254,7 +255,7 @@ pub(super) fn sys_mmap(
     if shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, size, map_flags);
     }
-    process.record_mmap_region(target, size, prot as u32, shared);
+    process.record_mmap_region(target, size, prot as u32, shared, locked);
     target as isize
 }
 
