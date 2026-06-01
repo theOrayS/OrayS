@@ -1,14 +1,24 @@
 # Milestone 03 stable656 ABI and behavior impact
 
-This checkpoint includes one generic Linux/POSIX-visible behavior fix and several scout-only evidence updates.
+This checkpoint includes two generic Linux/POSIX-visible behavior fixes and several scout-only evidence updates.
 
-## Code change
+## Code changes
+
+### `sched_setaffinity` permission path
 
 File: `examples/shell/src/uspace/resource_sched.rs`
 
 `sys_sched_setaffinity` now reuses the existing scheduler-target permission helper (`can_set_sched_target`) after validating that the target exists and the supplied CPU mask can run on CPU0. This aligns `sched_setaffinity(2)` with the permission behavior already used by `sched_setparam` and `sched_setscheduler`.
 
+### Synthetic filesystem capacity reporting
+
+File: `examples/shell/src/uspace/metadata.rs`
+
+`generic_statfs` now clamps the synthetic free-block count to the current in-memory regular-file capacity guardrail (`MAX_IN_MEMORY_FILE_SIZE / STATFS_BLOCK_SIZE`) before computing `f_blocks`, `f_bfree`, `f_bavail`, and derived `statvfs` fields. The previous value exposed the global allocator's free pages, which could substantially overstate the amount a single temporary regular file can safely grow before the in-memory file limit returns `ENOSPC`.
+
 ## User-visible ABI / errno impact
+
+### Scheduler
 
 - Syscall affected: `sched_setaffinity`.
 - New errno behavior: a non-root caller attempting to set affinity for a target whose effective test uid is different now receives `-EPERM` when the target exists and the mask is otherwise valid.
@@ -18,9 +28,18 @@ File: `examples/shell/src/uspace/resource_sched.rs`
   - invalid user pointer still returns the user-memory validation error;
   - masks that do not include the only supported CPU still return `-EINVAL`;
   - valid self/root-owned operations on CPU0 still return success.
-- Struct layout / syscall numbers / flag constants: unchanged.
-- FD, signal, futex, mmap, user-pointer layout: unchanged by the code fix.
+
+### `statfs` / `fstatfs` / `statvfs`
+
+- Syscalls / libc-visible APIs affected: `statfs`, `fstatfs`, and `statvfs` via shared `generic_statfs` data.
+- Visible field behavior: reported free/available block fields are now conservative and capped by the maximum in-memory regular-file capacity rather than by total allocator free pages.
+- Error numbers, syscall numbers, struct layouts, flag constants, FD semantics, signal delivery, futex behavior, mmap ABI, and user-pointer layout are unchanged by this capacity-reporting change.
+- The change is intentionally generic: it does not check LTP case names or paths, and it reflects the current synthetic filesystem's per-file capacity boundary.
+
+## Stable-list impact
+
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- Candidate pool after this checkpoint: 3/50 for stable656 (`fsync02`, `futex_wait01`, `sched_setaffinity01`).
 
 ## Behavior gaps exposed but not fixed
 
@@ -28,11 +47,10 @@ File: `examples/shell/src/uspace/resource_sched.rs`
 2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
 3. `futex_wait03`: futex wait timeout path does not complete within the case timeout.
 4. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects `bufsiz == 0`, so the remaining issue is an LA-musl call-boundary/root-cause problem, not a safe syscall special case.
-5. `fsync02`: isolated RV rerun keeps a glibc `TBROK`; no errno/ABI change was made.
-6. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
-7. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
-8. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
+5. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
+6. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
+7. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
 
 ## Maintenance boundary
 
-The `sched_setaffinity` change is a generic permission check, not an LTP case-name special case. Future fixes must stay generic and must not hardcode LTP case names, paths, processes, or outputs. Signal/futex/mmap/SysV changes require adjacent regression sets before any stable promotion.
+Both code changes are generic behavior fixes, not LTP case-name special cases. Future fixes must stay generic and must not hardcode LTP case names, paths, processes, or outputs. Signal/futex/mmap/SysV and filesystem-capacity changes require adjacent regression sets before any stable promotion.
