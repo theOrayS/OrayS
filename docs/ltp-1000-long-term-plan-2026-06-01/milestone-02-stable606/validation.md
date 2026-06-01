@@ -410,3 +410,53 @@ Parser summary:
 - Regression four-way report: 15 clean rows across RV + LA x musl + glibc.
 
 The first attempted RV rebuild used the nonexistent `LinuxError::ReadOnlyFilesystem` variant and stopped at compile time before any LTP cases ran. It was corrected to the generated errno variant `LinuxError::EROFS`; that failed compile log is not promotion evidence.
+
+
+## Team nudge reconciliation refresh on 2026-06-02
+
+Commands:
+
+```bash
+omx team status complete-dev-1000ltp-c632b4a0
+# No team state found for complete-dev-1000ltp-c632b4a0
+OMX_TEAM_STATE_ROOT=/root/.omx-runs/run-20260601071305-5c04/.omx/state   omx team status complete-dev-1000ltp-c632b4a0
+# No team state found for complete-dev-1000ltp-c632b4a0
+```
+
+The path named by the worker-2/worker-4 Stop nudges (`/root/.omx-runs/run-20260601071305-5c04/.omx/state/team/complete-dev-1000ltp-c632b4a0/mailbox/leader-fixed.json`) was absent. The remaining canonical evidence is the previously generated commit-hygiene report at `/root/oskernel2026-orays-1000ltp-leader-20260601-1336/.omx/reports/team-commit-hygiene/complete-dev-1000ltp-c632b4a0.md`, which records all seven phase0 report-only tasks completed and shutdown merges at `2026-06-01T13:55:33.785Z`. No new worker assignment was possible or needed; current work continued in leader-owned solo mode.
+
+## /proc/self/fd / pipe07 validation
+
+Pre-fix evidence from the 80-case RV scout:
+
+- `pipe07` failed in both musl and glibc because `opendir(/proc/self/fd)` returned `ENOENT`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=pipe07 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=pipe07 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl   target/ltp-1000-milestone-02-stable606/rv-proc-fd-pipe07-20260601T184539Z.log   target/ltp-1000-milestone-02-stable606/la-proc-fd-pipe07-20260601T184915Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=pipe07,pipe01,pipe02,pipe03,pipe04,pipe05,pipe06,pipe08,pipe09,pipe10,pipe14,pipe2_01,pipe2_02,pipe2_04,proc01,readlink01,readlinkat01,fcntl01,fcntl02,fcntl03 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=pipe07,pipe01,pipe02,pipe03,pipe04,pipe05,pipe06,pipe08,pipe09,pipe10,pipe14,pipe2_01,pipe2_02,pipe2_04,proc01,readlink01,readlinkat01,fcntl01,fcntl02,fcntl03 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV targeted raw/summary: `target/ltp-1000-milestone-02-stable606/rv-proc-fd-pipe07-20260601T184539Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA targeted raw/summary: `target/ltp-1000-milestone-02-stable606/la-proc-fd-pipe07-20260601T184915Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/proc-fd-pipe07-rv-la.promotion-candidates.txt`, `.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-proc-fd-regression-20260601T185013Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-proc-fd-regression-20260601T185013Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/proc-fd-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: 1 candidate, `pipe07`.
+- RV regression subset: 40 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 40 PASS / 0 FAIL, no parser caveats.
+- Regression four-way report: 20 clean rows across RV + LA x musl + glibc; `pipe07` is the only new row relative to current stable.
+
+Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.

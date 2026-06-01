@@ -261,6 +261,7 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::BlockDevice(dev) => Some(dev.path.as_str()),
         FdEntry::File(file) => Some(file.path.as_str()),
         FdEntry::Directory(dir) => Some(dir.path.as_str()),
+        FdEntry::ProcFdDir(dir) => Some(dir.path.as_str()),
         FdEntry::Path(path) => Some(path.path.as_str()),
         FdEntry::MemoryFile(file) => Some(file.path.as_str()),
         FdEntry::ProcPagemap(file) => Some(file.path.as_str()),

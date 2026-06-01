@@ -149,4 +149,19 @@ Updated candidate-bank note after the group database follow-up: 21 deferred rows
   - `rv-tmpfs-readonly-regression-20260601T183034Z.log` and `la-tmpfs-readonly-regression-20260601T183152Z.log` both report 30 PASS / 0 FAIL for the five new rows plus stable VFS/permission anchors.
   - `tmpfs-readonly-regression-rv-la.promotion-candidates.txt` shows all fifteen rows clean across RV + LA x musl + glibc; only `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` are new relative to the current stable list.
 
-Updated candidate-bank note after the tmpfs read-only mount follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` = at most 37 plausible cases, still short of stable606.
+Updated candidate-bank note after the tmpfs read-only mount follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` = at most 37 plausible cases before the proc-fd follow-up, still short of stable606.
+
+
+### pipe07
+
+- Pre-fix RV scout state: both musl and glibc TBROK because `opendir(/proc/self/fd)` returned `ENOENT`; the test fills pipe fds until `EMFILE` and needs to count existing open fds via the procfs fd directory.
+- Fix: generic dynamic synthetic directories for `/proc/self/fd`, `/proc/<current-pid>/fd`, and `/dev/fd`; `getdents64` enumerates current open fd numbers without special-casing LTP.
+- Current evidence:
+  - `rv-proc-fd-pipe07-20260601T184539Z.log`: RV musl + glibc PASS for `pipe07`, parser-clean.
+  - `la-proc-fd-pipe07-20260601T184915Z.log`: LA musl + glibc PASS for `pipe07`, parser-clean.
+  - `proc-fd-pipe07-rv-la.promotion-candidates.txt`: one four-way candidate, `pipe07`.
+- Adjacent regression evidence:
+  - `rv-proc-fd-regression-20260601T185013Z.log` and `la-proc-fd-regression-20260601T185013Z.log` both report 40 PASS / 0 FAIL for `pipe07` plus pipe/proc/readlink/fcntl anchors.
+  - `proc-fd-regression-rv-la.promotion-candidates.txt` shows all twenty rows clean across RV + LA x musl + glibc; only `pipe07` is new relative to the current stable list.
+
+Updated candidate-bank note after the proc-fd follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` = at most 38 plausible cases, still short of stable606.

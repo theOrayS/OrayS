@@ -203,3 +203,27 @@ POSIX/Linux-visible impact:
 - Signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: moderate-low. Mount state is still per-process shared metadata, now with one extra boolean and source-root string per mount point. The RV/LA regression subset protects adjacent stable VFS permission and metadata cases.
 - Maintenance boundary: this is read-only mount metadata sufficient for VFS errno semantics. It does not implement a full Linux VFS superblock layer, shared mount namespaces, or bind-mount read-only propagation beyond the current synthetic mount table model.
+
+
+## Additional `/proc/self/fd` directory behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/fd_table.rs`
+- `examples/shell/src/uspace/metadata.rs`
+
+Behavior:
+
+- `/proc/self/fd`, `/proc/<current-pid>/fd`, and `/dev/fd` are now exposed as read-only synthetic directories.
+- `getdents64` on those directory fds returns `.`, `..`, and a dynamic snapshot of the process's currently open fd numbers; numeric fd rows use directory cookies for continuation and `DT_LNK` type to match Linux procfs expectations.
+- Directory fd operations reuse the current directory behavior: file reads and file-offset seeks return directory errors, while `getdents64` advances the fd-directory enumeration cursor and `fstat`/path stat report a read-only directory mode.
+- `O_PATH` opens of the directory paths use the existing synthetic path entry so later metadata operations can identify the path without creating a readable fd object.
+
+POSIX/Linux-visible impact:
+
+- Procfs ABI affected: `open`/`openat`, `getdents64`, `fstat`, `stat`/`fstatat`, and fd-relative path resolution for `/proc/self/fd`, `/proc/<pid>/fd` when `<pid>` is the current process, and `/dev/fd`.
+- Errno impact: creating/truncating/writing those directory paths is rejected as a directory/read-only procfs operation; regular directory reads still return directory errors. Existing `/proc/self/fd/<n>` `readlink` handling is unchanged.
+- FD impact: the new fd entry carries only the directory path and getdents cursor; descriptor allocation, dup/fork, close, pipe EOF/SIGPIPE, and file offset sharing semantics outside this synthetic directory are unchanged.
+- Signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: moderate-low. `getdents64` snapshots open fd numbers at call time and stores only a cursor; it does not hold references to every fd entry. The RV/LA regression subset protects stable pipe, proc, readlink, and fcntl anchors.
+- Maintenance boundary: this implements the fd directory surface needed for generic procfs enumeration. It does not yet provide full Linux semantics for every `/proc/<other-pid>/fd` namespace, permission, or per-fd `readlink` target type.

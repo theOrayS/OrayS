@@ -68,6 +68,7 @@ pub(super) enum FdEntry {
     Rtc,
     File(FileEntry),
     Directory(DirectoryEntry),
+    ProcFdDir(ProcFdDirEntry),
     Path(PathEntry),
     MemoryFile(MemoryFileEntry),
     ProcPagemap(ProcPagemapEntry),
@@ -89,6 +90,12 @@ pub(super) struct FileEntry {
 pub(super) struct DirectoryEntry {
     pub(super) dir: Directory,
     pub(super) attr: FileAttr,
+    pub(super) path: String,
+    next_dirent_cookie: u64,
+}
+
+#[derive(Clone)]
+pub(super) struct ProcFdDirEntry {
     pub(super) path: String,
     next_dirent_cookie: u64,
 }
@@ -962,6 +969,7 @@ impl FdTable {
                 | FdEntry::Rtc
                 | FdEntry::File(_)
                 | FdEntry::Directory(_)
+                | FdEntry::ProcFdDir(_)
                 | FdEntry::MemoryFile(_)
                 | FdEntry::ProcPagemap(_) => true,
                 FdEntry::Path(_) => false,
@@ -978,6 +986,7 @@ impl FdTable {
                 | FdEntry::Rtc => true,
                 FdEntry::File(_) => true,
                 FdEntry::Directory(_)
+                | FdEntry::ProcFdDir(_)
                 | FdEntry::Path(_)
                 | FdEntry::MemoryFile(_)
                 | FdEntry::ProcPagemap(_) => false,
@@ -1006,7 +1015,7 @@ impl FdTable {
             }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
             FdEntry::ProcPagemap(file) => Ok(file.read(dst)),
-            FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
             FdEntry::Pipe(pipe) => pipe.read(dst),
             FdEntry::Socket(socket) => socket.read(dst),
             FdEntry::LocalSocket(socket) => socket.read(dst),
@@ -1167,7 +1176,7 @@ impl FdTable {
             FdEntry::DevNull => Ok(0),
             FdEntry::BlockDevice(_) => Ok(0),
             FdEntry::Rtc => Ok(0),
-            FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
             FdEntry::Path(_) => Err(LinuxError::EBADF),
             FdEntry::MemoryFile(file) => file.seek(pos),
             FdEntry::ProcPagemap(file) => file.seek(pos),
@@ -1242,6 +1251,18 @@ impl FdTable {
         fd: i32,
         max_len: usize,
     ) -> Result<Vec<u8>, LinuxError> {
+        if matches!(self.entry(fd)?, FdEntry::ProcFdDir(_)) {
+            let fd_names = self
+                .entries
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, entry)| entry.as_ref().map(|_| idx.to_string()))
+                .collect::<Vec<_>>();
+            let FdEntry::ProcFdDir(dir) = self.entry_mut(fd)? else {
+                unreachable!();
+            };
+            return get_proc_fd_dirents(dir, &fd_names, max_len);
+        }
         let entry = self.entry_mut(fd)?;
         let FdEntry::Directory(dir) = entry else {
             return Err(LinuxError::ENOTDIR);
@@ -1335,7 +1356,7 @@ impl FdTable {
     ) -> Result<usize, LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
             return match self.entry(fd)? {
-                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
                 FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                     Err(LinuxError::ESPIPE)
                 }
@@ -1355,7 +1376,7 @@ impl FdTable {
     ) -> Result<(u64, usize), LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
             return match self.entry(fd)? {
-                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
                 FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                     Err(LinuxError::ESPIPE)
                 }
@@ -1376,7 +1397,7 @@ impl FdTable {
     ) -> Result<(), LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
             return match self.entry(fd)? {
-                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
                 FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                     Err(LinuxError::ESPIPE)
                 }
@@ -1396,7 +1417,7 @@ impl FdTable {
     ) -> Result<usize, LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
             return match self.entry(fd)? {
-                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
                 FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                     Err(LinuxError::ESPIPE)
                 }
@@ -1481,6 +1502,61 @@ impl FdTable {
             .and_then(|entry| entry.as_mut())
             .ok_or(LinuxError::EBADF)
     }
+}
+
+fn get_proc_fd_dirents(
+    dir: &mut ProcFdDirEntry,
+    fd_names: &[String],
+    max_len: usize,
+) -> Result<Vec<u8>, LinuxError> {
+    let min_reclen = align_up(offset_of!(general::linux_dirent64, d_name) + 1, 8);
+    if max_len < min_reclen {
+        return Err(LinuxError::EINVAL);
+    }
+
+    let total_entries = fd_names.len().saturating_add(2);
+    let mut out = Vec::new();
+    let mut index = dir.next_dirent_cookie as usize;
+    while index < total_entries {
+        let (name, d_type, entry_path) = if index == 0 {
+            (".", general::DT_DIR as u8, dir.path.clone())
+        } else if index == 1 {
+            ("..", general::DT_DIR as u8, "/proc/self".into())
+        } else {
+            let name = fd_names[index - 2].as_str();
+            let entry_path = format!("{}/{}", dir.path, name);
+            (name, general::DT_LNK as u8, entry_path)
+        };
+        let name_bytes = name.as_bytes();
+        let reclen = align_up(
+            offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
+            8,
+        );
+        if out.len() + reclen > max_len {
+            break;
+        }
+        let start = out.len();
+        out.resize(start + reclen, 0);
+        let next_cookie = index.saturating_add(1) as u64;
+        unsafe {
+            let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
+            ptr::write_unaligned(
+                dirent,
+                general::linux_dirent64 {
+                    d_ino: path_inode(Some(entry_path.as_str())) as _,
+                    d_off: next_cookie as _,
+                    d_reclen: reclen as _,
+                    d_type,
+                    d_name: Default::default(),
+                },
+            );
+        }
+        let name_start = start + offset_of!(general::linux_dirent64, d_name);
+        out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
+        dir.next_dirent_cookie = next_cookie;
+        index += 1;
+    }
+    Ok(out)
 }
 
 fn limit_file_write_len<'a>(
@@ -1640,6 +1716,7 @@ impl FdTable {
                 Some(file.path.as_str()),
             )),
             FdEntry::Directory(dir) => Ok(file_attr_to_stat(&dir.attr, Some(dir.path.as_str()))),
+            FdEntry::ProcFdDir(dir) => Ok(proc_fd_dir_stat(dir.path.as_str())),
             FdEntry::Path(path) => Ok(path.stat()),
             FdEntry::MemoryFile(file) => Ok(file.stat()),
             FdEntry::ProcPagemap(file) => Ok(file.stat()),
@@ -1691,6 +1768,7 @@ impl FdTable {
                 dir.path.as_str(),
                 file_attr_to_stat(&dir.attr, Some(dir.path.as_str())),
             )),
+            Ok(FdEntry::ProcFdDir(dir)) => Ok(proc_fd_dir_stat(dir.path.as_str())),
             Ok(FdEntry::Path(path)) => Ok(apply_recorded_path_metadata(
                 process,
                 path.path.as_str(),
@@ -1739,6 +1817,7 @@ impl FdTable {
         } else {
             let base = match self.entry(dirfd)? {
                 FdEntry::Directory(dir) => dir.path.as_str(),
+                FdEntry::ProcFdDir(dir) => dir.path.as_str(),
                 FdEntry::Path(path_entry) if path_entry.mode & ST_MODE_TYPE_MASK == ST_MODE_DIR => {
                     path_entry.path.as_str()
                 }
@@ -2044,6 +2123,15 @@ impl PathEntry {
         }
     }
 
+    pub(super) fn synthetic_dir(path: &str) -> Self {
+        Self {
+            path: path.into(),
+            mode: ST_MODE_DIR | 0o555,
+            size: 0,
+            blocks: 0,
+        }
+    }
+
     pub(super) fn stat(&self) -> general::stat {
         if self.mode & ST_MODE_TYPE_MASK == ST_MODE_CHR {
             return synthetic_char_stat_for_path(self.path.as_str(), self.mode);
@@ -2058,6 +2146,12 @@ impl PathEntry {
         st.st_blocks = self.blocks as _;
         st
     }
+}
+
+fn proc_fd_dir_stat(path: &str) -> general::stat {
+    let mut st = PathEntry::synthetic_dir(path).stat();
+    st.st_nlink = 2;
+    st
 }
 
 impl MemoryFileEntry {
@@ -2500,6 +2594,7 @@ impl FdEntry {
             Self::Rtc => Ok(Self::Rtc),
             Self::File(file) => Ok(Self::File(file.clone())),
             Self::Directory(dir) => Ok(Self::Directory(dir.clone())),
+            Self::ProcFdDir(dir) => Ok(Self::ProcFdDir(dir.clone())),
             Self::Path(path) => Ok(Self::Path(path.clone())),
             Self::MemoryFile(file) => Ok(Self::MemoryFile(file.clone())),
             Self::ProcPagemap(file) => Ok(Self::ProcPagemap(file.clone())),
@@ -2865,6 +2960,24 @@ fn open_candidates(
         } else if let Some(resolved_path) = process.resolve_path_symlink(path.as_str())? {
             return open_candidates(process, &[resolved_path], opts, flags, mode);
         }
+        if let Some(proc_fd_path) = proc_fd_dir_path(process, path.as_str()) {
+            if !path_only
+                && (matches!(
+                    flags & general::O_ACCMODE,
+                    general::O_WRONLY | general::O_RDWR
+                ) || flags & (general::O_CREAT | general::O_TRUNC) != 0)
+            {
+                return Err(LinuxError::EISDIR);
+            }
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_dir(proc_fd_path.as_str()))
+            } else {
+                FdEntry::ProcFdDir(ProcFdDirEntry {
+                    path: proc_fd_path,
+                    next_dirent_cookie: 0,
+                })
+            });
+        }
         if is_proc_self_maps_path(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -3128,6 +3241,15 @@ pub(super) fn open_dir_entry(path: &str) -> Result<FdEntry, LinuxError> {
         path: path.into(),
         next_dirent_cookie: 0,
     }))
+}
+
+fn proc_fd_dir_path(process: &UserProcess, path: &str) -> Option<String> {
+    let normalized = normalize_path("/", path)?;
+    if normalized == "/proc/self/fd" || normalized == "/dev/fd" {
+        return Some(normalized);
+    }
+    let pid_path = format!("/proc/{}/fd", process.pid());
+    (normalized == pid_path).then_some(normalized)
 }
 
 fn directory_create_dir(path: &str) -> Result<(), LinuxError> {
