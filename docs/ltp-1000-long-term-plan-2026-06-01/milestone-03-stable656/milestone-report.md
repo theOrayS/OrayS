@@ -125,12 +125,28 @@ Targeted result: `sched_setaffinity01` is RV + LA x musl + glibc parser-clean wi
 
 Regression result: adjacent scheduler/priority stable subset is parser-clean on RV and LA, 20/20 wrapper PASS on each arch.
 
+
+### `futex_wait03` procfs sleeping-state repair
+
+Artifacts:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.summary.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.derived.sha256`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.derived.sha256`
+- RV adjacent regression summary: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.summary.txt`
+- LA adjacent regression summary: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.summary.txt`
+
+Targeted result: `futex_wait03` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Regression result: `futex_wait02`, `futex_wait04`, `futex_wake01`, `proc01`, and `waitpid04` are parser-clean on RV and LA, 10/10 wrapper PASS on each arch.
+
 ### Combined candidate pool
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean3-20260601T230334Z.promotion-candidates.txt`
-- Candidates: 3 (`fsync02`, `futex_wait01`, `sched_setaffinity01`)
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean4-20260601T232334Z.promotion-candidates.txt`
+- Candidates: 4 (`fsync02`, `futex_wait01`, `futex_wait03`, `sched_setaffinity01`)
 - Blocked/incomplete: 0 in this clean proof set
 
 An earlier combined report that included the old mixed scout is intentionally not used for the current pool because it mixes the pre-fix `fsync02` `TBROK` row with the post-fix `fsync02` proof.
@@ -148,16 +164,16 @@ Parser result: 0/2 wrapper PASS, `TBROK=4`, zero timeout, ENOSYS, panic/trap. Bo
 
 ## Conclusion
 
-Three new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
+Four new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
 
 - `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 - No milestone promotion commit is created for stable656 yet.
-- The scheduler permission fix and statfs capacity clamp are kept as generic behavior work with closed targeted and regression evidence.
-- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current three-case pool.
+- The scheduler permission fix, statfs capacity clamp, and procfs futex-sleeping state repair are kept as generic behavior work with closed targeted and regression evidence.
+- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current four-case pool.
 
 ## Risks / next steps
 
-1. Accumulate 47 more four-way-clean candidates before editing the stable list for stable656.
+1. Accumulate 46 more four-way-clean candidates before editing the stable list for stable656.
 2. Isolate `kill10` panic/trap before broad process/signal shards.
 3. Diagnose LA musl `readlinkat02` before counting the RV-clean row; the current syscall body already rejects `bufsiz == 0`, so do not special-case the LA musl `bufsiz=1` boundary without root cause.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
