@@ -52,6 +52,7 @@ sched_setaffinity01
 futex_wait01
 readlinkat02
 fsync02
+openat02
 
 ## Closed arch-sweep mining rows
 # Unit remains LTP case. The closed RV/LA arch matrices were mined as a whole;

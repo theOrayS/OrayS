@@ -41,6 +41,7 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 | Case/lane | Current blocker | Next useful action |
 | --- | --- | --- |
 | `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL=1` on rerun | inspect LA-musl call boundary; do not special-case syscall `bufsiz=1` |
+| `openat02` | post-statfs-clamp isolated RV rerun still has musl+glibc `TBROK` setup `ENOSPC` | keep blocked; diagnose file-growth/space accounting separately before any LA rerun |
 | `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
 | `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |
 | `futex_wait03` / `futex_wait05` | timeout or slept-too-long semantics | narrow futex timeout/EINTR lane with stable futex regressions |
