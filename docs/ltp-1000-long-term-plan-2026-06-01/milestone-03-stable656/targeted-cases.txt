@@ -69,10 +69,20 @@ sched_setscheduler02
 sched_setscheduler03
 setpriority02
 
+## Adjacent stable regression subset for generic_statfs capacity clamp
+statfs02
+fstatfs02
+fstatfs02_64
+statfs02_64
+statfs03
+statfs03_64
+statvfs02
+
 ## Four-way clean candidate pool (not yet promoted)
+fsync02
 futex_wait01
 sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 2 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 3 new four-way-clean unique candidates are available, below the +50 milestone gate.

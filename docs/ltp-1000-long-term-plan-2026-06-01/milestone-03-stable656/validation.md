@@ -3,7 +3,7 @@
 Date: 2026-06-02
 Branch: `dev/1000ltp-plan`
 Head at first scout: `e9a64d35`
-Head during post-fix targeted runs: `840e4a3b` plus local `resource_sched.rs` change
+Head during post-fix targeted runs: after `3ee6ee06` plus local `metadata.rs` capacity-reporting change
 
 ## Stable count before/after
 
@@ -115,7 +115,35 @@ panic/trap matches: 0
 Promotion candidates: 1
 ```
 
-Caveat: the RV mixed scout command was terminated with exit code 143 after `shmat1` ran long/hung; only completed parser-clean rows are usable as scout evidence.
+Caveat: the RV mixed scout command was terminated with exit code 143 after `shmat1` ran long/hung. It also contains a pre-fix `fsync02` failure. Only completed parser-clean rows are usable, and a later RV isolated futex run is used for the clean current combined candidate pool.
+
+## RV isolated `futex_wait01` proof
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait01 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-03-stable656/rv-futex-wait01-isolated-standalone-20260601T230253Z.log`
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-futex-wait01-isolated-standalone-20260601T230253Z.summary.txt`
+- JSON: `target/ltp-1000-milestone-03-stable656/rv-futex-wait01-isolated-standalone-20260601T230253Z.summary.json`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-futex-wait01-isolated-standalone-20260601T230253Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/rv-futex-wait01-isolated-standalone-20260601T230253Z.derived.sha256`
+
+Parser summary:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
 
 ## RV divergence scout and LA readlink confirmation
 
@@ -179,7 +207,7 @@ Promotion candidates: 0
 
 Decision: unchanged blocker. LA glibc is clean, LA musl still fails the zero-size readlink boundary, and this case cannot be promoted.
 
-## RV `fsync02` isolated rerun
+## RV `fsync02` pre-fix isolated rerun
 
 Command captured in run meta:
 
@@ -207,7 +235,80 @@ panic/trap matches: 0
 Promotion candidates: 0
 ```
 
-Decision: `fsync02` remains blocked by the glibc-side `TBROK`; it is not promotion evidence.
+Decision: this old run remains failed evidence and is not counted. It motivated the `generic_statfs` capacity-reporting inspection.
+
+## `fsync02` post-fix statfs-capacity proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fsync02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fsync02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
+
+Decision: `fsync02` is now four-way clean and enters the future candidate pool.
+
+## Adjacent statfs/fstatfs/statvfs regression subset
+
+Cases: `statfs02,fstatfs02,fstatfs02_64,statfs02_64,statfs03,statfs03_64,statvfs02`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs02,fstatfs02,fstatfs02_64,statfs02_64,statfs03,statfs03_64,statvfs02 LTP_CASE_TIMEOUT_SECS=90 timeout 40m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs02,fstatfs02,fstatfs02_64,statfs02_64,statfs03,statfs03_64,statvfs02 LTP_CASE_TIMEOUT_SECS=90 timeout 40m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-statfs-regression-statfs-clamp-20260601T230028Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-statfs-regression-statfs-clamp-20260601T230028Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-statfs-regression-statfs-clamp-20260601T230028Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-statfs-regression-statfs-clamp-20260601T230028Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-statfs-regression-statfs-clamp-20260601T230028Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 14
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: the stable statfs/fstatfs/statvfs adjacent subset did not regress.
 
 ## `sched_setaffinity01` targeted fix proof
 
@@ -270,26 +371,27 @@ Command:
 
 ```bash
 python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc \
-  target/ltp-1000-milestone-03-stable656/rv-g009-mixed-safe-scout-20260602T061659Z.log \
+  target/ltp-1000-milestone-03-stable656/rv-futex-wait01-isolated-standalone-20260601T230253Z.log \
   target/ltp-1000-milestone-03-stable656/la-futex-wait01-confirm-20260602T062001Z.log \
   target/ltp-1000-milestone-03-stable656/rv-sched-setaffinity01-postfix-20260601T222738Z.log \
   target/ltp-1000-milestone-03-stable656/la-sched-setaffinity01-postfix-20260601T222823Z.log \
-  target/ltp-1000-milestone-03-stable656/rv-divergence-highyield-scout-20260602T062139Z.log \
-  target/ltp-1000-milestone-03-stable656/la-readlinkat02-confirm-20260602T062321Z.log
+  target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.log \
+  target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.log
 ```
 
-Artifact:
+Artifacts:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-20260601T223023Z.promotion-candidates.txt`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean3-20260601T230334Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean3-20260601T230334Z.derived.sha256`
 
 Parser result:
 
 ```text
 Required arches: la, rv
 Required libcs: glibc, musl
-Promotion candidates: 2
-Blocked/incomplete cases: 13
-Candidates: futex_wait01, sched_setaffinity01
+Promotion candidates: 3
+Blocked/incomplete cases: 0
+Candidates: fsync02, futex_wait01, sched_setaffinity01
 ```
 
 ## Closed arch full-sweep mining against live stable606
@@ -329,15 +431,15 @@ Observed requirement: after switching to user `nobody`, `nice(-10)` expects fail
 
 ## Gate outcome
 
-- Targeted RV: clean for `futex_wait01` and `sched_setaffinity01`; other scout rows blocked as documented.
-- Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix.
-- LA confirmation: clean for `futex_wait01` and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
-- musl + glibc: clean only for the two candidate rows.
+- Targeted RV: clean for `fsync02`, `futex_wait01`, and `sched_setaffinity01`; other scout rows blocked as documented.
+- Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix and the statfs capacity clamp.
+- LA confirmation: clean for `fsync02`, `futex_wait01`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
+- musl + glibc: clean only for the three candidate rows.
 - Parser blockers: still present in scout rows; they are not counted.
 - Stable list: unchanged at `606/606/0`.
 
 ## Unverified items
 
-- No stable656 promotion gate because the candidate pool has only 2/50 required new cases.
+- No stable656 promotion gate because the candidate pool has only 3/50 required new cases.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait03`, `shmat1`, `fsync02`, `nice04`, or LA musl `readlinkat02`.
+- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait03`, `futex_wait05`, `shmat1`, `nice04`, or LA musl `readlinkat02`.

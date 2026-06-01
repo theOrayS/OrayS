@@ -1,12 +1,12 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint found two four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint found three four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 2 (`futex_wait01`, `sched_setaffinity01`).
+- Current four-way-clean new candidate pool: 3 (`fsync02`, `futex_wait01`, `sched_setaffinity01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
 Because the candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
@@ -25,7 +25,7 @@ The following blockers prevent counting additional rows:
 | `kill10` | severe panic/trap during RV VFS/process scout; evidence cannot be promoted |
 | `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
 | `readlinkat02` | RV clean, but LA musl `TFAIL`; rerun after code inspection still 1 PASS / 1 FAIL |
-| `fsync02` | isolated RV rerun still 1 PASS / 1 FAIL with glibc `TBROK=1` |
+| pre-fix `fsync02` row | old isolated RV rerun had glibc `TBROK=1`; superseded by post-fix proof but retained as failed evidence |
 | `nice04` | RV musl gets `EACCES` for `nice(-10)`, but stable `setpriority02` source requires direct unprivileged `setpriority` lowering to return `EACCES`; no safe kernel errno flip |
 | closed arch sweep | 563 four-way-clean historical rows, but zero not-yet-stable rows after filtering live stable606 |
 | `select02`, `sched_rr_get_interval03`, `setpriority01` | wrapper PASS rows include `TCONF`; not promotion evidence |
@@ -35,4 +35,4 @@ The following blockers prevent counting additional rows:
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `futex_wait01` and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `fsync02`, `futex_wait01`, and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.

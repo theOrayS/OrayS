@@ -1,6 +1,6 @@
 # Milestone 03 stable656 regression matrix
 
-This checkpoint records both completed regression evidence for the `sched_setaffinity01` fix and required future regression sets for unresolved G009 blockers.
+This checkpoint records completed regression evidence for the `sched_setaffinity01` fix and the `generic_statfs` capacity clamp, plus required future regression sets for unresolved G009 blockers.
 
 ## Completed regression for `sched_setaffinity01`
 
@@ -30,6 +30,31 @@ Regression evidence:
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-sched-affinity-regression-20260601T223023Z.summary.txt`
 - Result: 20/20 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 
+## Completed regression for `generic_statfs` capacity clamp
+
+Changed surface: shared synthetic filesystem capacity reporting in `examples/shell/src/uspace/metadata.rs::generic_statfs`, observed through `statfs`, `fstatfs`, and `statvfs`.
+
+Targeted promotion proof:
+
+- RV `fsync02`: `target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.summary.txt`
+- LA `fsync02`: `target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.summary.txt`
+
+Adjacent stable regression subset:
+
+- `statfs02`
+- `fstatfs02`
+- `fstatfs02_64`
+- `statfs02_64`
+- `statfs03`
+- `statfs03_64`
+- `statvfs02`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-statfs-regression-statfs-clamp-20260601T230028Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.summary.txt`
+- Result: 14/14 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
 ## If fixing recoverable user SIGSEGV / page-fault signal delivery
 
 Primary retest cases:
@@ -57,9 +82,10 @@ Adjacent regression candidates:
 
 ## If fixing futex wait timeout/wakeup semantics
 
-Primary retest case:
+Primary retest cases:
 
 - `futex_wait03`
+- `futex_wait05`
 
 Adjacent regression candidates:
 
@@ -85,7 +111,6 @@ Adjacent regression candidates:
 - `mmap10_1`: do not include until the guest LTP inventory contains the binary.
 - `vma02`: do not include until libnuma-related `TCONF` is resolved and both libcs are parser-clean.
 - `readlinkat02`: do not include until LA musl is parser-clean; add readlink/readlinkat and user-pointer boundary regressions once a root-cause fix exists.
-- `fsync02`: do not include until glibc-side `TBROK` is gone; retest with write/fsync/syncfs and free-space-sensitive VFS rows.
 - `nice04`: do not include until the `nice()` wrapper errno boundary is fixed without regressing `setpriority02`; use `nice04-errno-boundary-report.md` as the handoff.
 - closed arch sweep: no extra stable606-missing four-way-clean rows remain; use the matrices only for blocker prioritization.
 - `kill10`: do not include broad batches until the panic/trap is isolated.

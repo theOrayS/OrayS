@@ -1083,7 +1083,8 @@ fn statfs_type_for_path(path: Option<&str>) -> i64 {
 
 pub(super) fn generic_statfs(path: Option<&str>) -> general::statfs {
     let alloc = global_allocator();
-    let available_pages = alloc.available_pages() as i64;
+    let reported_file_blocks = (MAX_IN_MEMORY_FILE_SIZE / STATFS_BLOCK_SIZE as u64).max(1) as i64;
+    let available_pages = (alloc.available_pages() as i64).min(reported_file_blocks);
     let total_pages = (alloc.used_pages() as i64 + available_pages).max(1);
     let fs_type = statfs_type_for_path(path);
     general::statfs {
