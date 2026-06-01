@@ -134,3 +134,17 @@ openat02
 openat03
 mknodat02
 rename03
+
+## Proc maps / mmap fix and regression cases
+
+mmap04
+vma01
+mmap01
+mmap02
+mmap03
+mmap06
+mmap09
+mmap10
+mmap11
+mincore01
+mprotect05

@@ -46,3 +46,21 @@ Caveat: the earlier grouped RV scout had one musl timing TFAIL, so this row need
 - Full stable606 RV + LA x musl + glibc gate.
 - Broad stable regression beyond the socket-adjacent subset.
 - LA full-sweep shard from G010.
+
+## Proc maps / mmap regression set
+
+Rationale: the code change affects synthetic `/proc/self/maps` output and per-process mmap metadata. The protected subset combines new candidates with existing stable mmap/mincore/mprotect anchors.
+
+Cases:
+
+- New candidates: `mmap04`, `vma01`
+- Existing stable anchors: `mmap01`, `mmap02`, `mmap03`, `mmap06`, `mmap09`, `mmap10`, `mmap11`, `mincore01`, `mprotect05`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-proc-maps-mmap-regression-20260601T162607Z.summary.txt`
+  - 22 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-proc-maps-mmap-regression-20260601T162755Z.summary.txt`
+  - 22 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/proc-maps-mmap-regression-rv-la.promotion-candidates.txt`
+  - All eleven rows clean across RV + LA x musl + glibc; `mmap04` and `vma01` are the new candidate rows.

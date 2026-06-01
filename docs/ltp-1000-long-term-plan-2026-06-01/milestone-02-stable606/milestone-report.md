@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`.
-- Current candidate bank size for stable606 planning: at most 23 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`.
+- Current candidate bank size for stable606 planning: at most 25 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -42,7 +42,7 @@ This preflight includes one kernel-visible errno fix in `examples/shell/src/uspa
 - Other invalid AF_INET socket types now return `EINVAL` instead of `ESOCKTNOSUPPORT`.
 - No LTP case/path/process/output is hardcoded.
 
-No stable-list ABI surface changes are made in this preflight. See `abi-and-behavior-impact.md` for details and the deliberately rejected `nice04` errno shortcut.
+No stable-list ABI surface changes are made in this preflight. See `abi-and-behavior-impact.md` for details, the proc-maps impact boundary, and the deliberately rejected `nice04` errno shortcut.
 
 ## Risk and caveats
 
@@ -54,3 +54,21 @@ No stable-list ABI surface changes are made in this preflight. See `abi-and-beha
 ## Next step
 
 Continue G009 with real semantic fixes or low-risk clean candidates until at least 50 new unique cases can pass the full RV + LA x musl + glibc promotion gate. Do not update `LTP_STABLE_CASES` or checkpoint G009 from this preflight alone.
+
+## Additional G009 progress on 2026-06-02
+
+A generic `/proc/self/maps` improvement was added after the socket preflight:
+
+- `UserProcess` now tracks user-created mmap regions, including current protection bits and shared/private display state.
+- `/proc/self/maps` now emits parseable dynamic mmap ranges in addition to executable/heap/stack rows.
+- `MAP_FIXED`, `munmap`, `exec`, `fork`, and `mprotect` update or preserve this synthetic maps state generically.
+
+Targeted evidence:
+
+- `rv-proc-maps-mmap-vma-postfix2-20260601T162318Z.log`: `mmap04,vma01` RV musl+glibc PASS, parser-clean.
+- `la-proc-maps-mmap-vma-postfix-20260601T162441Z.log`: `mmap04,vma01` LA musl+glibc PASS, parser-clean.
+- `rv-proc-maps-mmap-regression-20260601T162607Z.log`: RV mmap/proc maps regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `la-proc-maps-mmap-regression-20260601T162755Z.log`: LA mmap/proc maps regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `proc-maps-mmap-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the eleven clean rows, new not-yet-stable candidates are `mmap04` and `vma01`.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 25, still short of +50, and no final stable606 gate has been run.

@@ -60,6 +60,7 @@ struct UserProcess {
     aspace: Mutex<AddrSpace>,
     brk: Mutex<BrkState>,
     shared_mmap_ranges: Mutex<Vec<(usize, usize, MappingFlags)>>,
+    mmap_ranges: Mutex<Vec<UserMmapRegion>>,
     fds: Mutex<FdTable>,
     cwd: Mutex<String>,
     exec_root: Mutex<String>,
@@ -120,6 +121,20 @@ struct BrkState {
     end: usize,
     limit: usize,
     next_mmap: usize,
+}
+
+#[derive(Clone, Copy)]
+struct UserMmapRegion {
+    start: usize,
+    size: usize,
+    prot: u32,
+    shared: bool,
+}
+
+impl UserMmapRegion {
+    fn end(&self) -> usize {
+        self.start.saturating_add(self.size)
+    }
 }
 
 struct ChildTask {

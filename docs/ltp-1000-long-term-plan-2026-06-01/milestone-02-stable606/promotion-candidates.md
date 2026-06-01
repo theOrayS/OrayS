@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 23, so promotion is blocked.
+- Current candidate bank after this preflight: at most 25, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -48,3 +48,18 @@ These 21 cases were four-way clean in milestone-01 combined proof but intentiona
 ## Promotion decision
 
 Do not update `LTP_STABLE_CASES` yet. The candidate bank is short of 50 and some candidates need grouped regression confirmation.
+
+### mmap04 and vma01
+
+- Pre-fix RV scout state:
+  - `mmap04` failed because `/proc/self/maps` did not contain parseable dynamic mmap ranges.
+  - `vma01` failed because adjacent mmap VMAs were not visible in `/proc/self/maps`.
+- Fix: generic `UserProcess` mmap-region tracking and `/proc/self/maps` dynamic range emission; no case-specific special-casing.
+- Current evidence:
+  - `rv-proc-maps-mmap-vma-postfix2-20260601T162318Z.log`: RV musl + glibc PASS for `mmap04,vma01`, parser-clean.
+  - `la-proc-maps-mmap-vma-postfix-20260601T162441Z.log`: LA musl + glibc PASS for `mmap04,vma01`, parser-clean.
+  - `proc-maps-mmap-regression-rv-la.promotion-candidates.txt`: combined RV + LA x musl + glibc report; `mmap04` and `vma01` are four-way clean.
+- Adjacent regression evidence:
+  - `rv-proc-maps-mmap-regression-20260601T162607Z.log` and `la-proc-maps-mmap-regression-20260601T162755Z.log` both report 22 PASS / 0 FAIL for `mmap04,vma01` plus stable mmap/mincore/mprotect anchors.
+
+Updated candidate-bank note: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` = at most 25 plausible cases, still short of stable606.

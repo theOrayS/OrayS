@@ -15,6 +15,27 @@ use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
 use super::task_registry::{user_thread_entry_by_process_pid, user_thread_entry_by_tid};
 
+fn proc_maps_perms(prot: u32, shared: bool) -> String {
+    let mut perms = String::new();
+    perms.push(if prot & general::PROT_READ != 0 {
+        'r'
+    } else {
+        '-'
+    });
+    perms.push(if prot & general::PROT_WRITE != 0 {
+        'w'
+    } else {
+        '-'
+    });
+    perms.push(if prot & general::PROT_EXEC != 0 {
+        'x'
+    } else {
+        '-'
+    });
+    perms.push(if shared { 's' } else { 'p' });
+    perms
+}
+
 fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let exec_path = process.exec_path();
     let brk = *process.brk.lock();
@@ -24,12 +45,20 @@ fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let heap_end = align_up(brk.end.max(brk.start + PAGE_SIZE_4K), PAGE_SIZE_4K);
     let stack_top = align_down(USER_STACK_TOP, PAGE_SIZE_4K);
     let stack_base = stack_top - USER_STACK_SIZE;
-    format!(
+    let mut content = format!(
         "{text_start:08x}-{text_end:08x} r-xp 00000000 00:00 0 {exec_path}\n\
          {heap_start:08x}-{heap_end:08x} rw-p 00000000 00:00 0 [heap]\n\
          {stack_base:08x}-{stack_top:08x} rw-p 00000000 00:00 0 [stack]\n"
-    )
-    .into_bytes()
+    );
+    for region in process.mmap_regions() {
+        content.push_str(&format!(
+            "{:08x}-{:08x} {} 00000000 00:00 0\n",
+            region.start,
+            region.end(),
+            proc_maps_perms(region.prot, region.shared)
+        ));
+    }
+    content.into_bytes()
 }
 
 pub(super) fn is_proc_self_maps_path(path: &str) -> bool {
