@@ -43,7 +43,6 @@ mod user_memory;
 
 use fd_table::FdTable;
 use linux_abi::*;
-use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 pub use process_lifecycle::run_user_program;
@@ -51,6 +50,7 @@ pub use process_lifecycle::run_user_program;
 pub use process_lifecycle::run_user_program_in;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in_timeout;
+use process_lifecycle::ProcessTeardown;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
 
@@ -94,6 +94,10 @@ struct UserProcess {
     real_timer_generation: AtomicU64,
     real_timer_deadline_us: AtomicU64,
     real_timer_interval_us: AtomicU64,
+    virtual_timer_deadline_us: AtomicU64,
+    virtual_timer_interval_us: AtomicU64,
+    prof_timer_deadline_us: AtomicU64,
+    prof_timer_interval_us: AtomicU64,
     eval_watchdog_deadline_us: AtomicU64,
     child_wait_blocked: AtomicBool,
     syscall_wait_blocked: AtomicBool,

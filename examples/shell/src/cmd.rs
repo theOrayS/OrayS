@@ -222,6 +222,8 @@ const LTP_STABLE_CASES: &[&str] = &[
     "mknod06",
     "mknod02",
     "mknod05",
+    "getitimer01",
+    "ppoll01",
 
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]

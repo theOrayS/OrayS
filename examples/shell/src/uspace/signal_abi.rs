@@ -6,17 +6,16 @@ use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use axhal::trap::PageFaultFlags;
-use axhal::trap::{USER_EXCEPTION, register_trap_handler, register_user_return_handler};
+use axhal::trap::{register_trap_handler, register_user_return_handler, USER_EXCEPTION};
 use linux_raw_sys::general;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 
-use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
-    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM,
-    SIGCANCEL_NUM, SIGCHLD_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
-    SIGQUIT_NUM, SIGSEGV_NUM, SIGSTOP_NUM, SIGTERM_NUM, neg_errno,
+    neg_errno, KERNEL_SIGSET_BYTES, SIGABRT_NUM, SIGALRM_NUM, SIGCANCEL_NUM, SIGCHLD_NUM,
+    SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM, SIGQUIT_NUM, SIGSEGV_NUM,
+    SIGSTOP_NUM, SIGTERM_NUM, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW,
 };
 #[cfg(target_arch = "loongarch64")]
 use super::linux_abi::{LOONGARCH_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
@@ -26,20 +25,32 @@ use super::linux_abi::{RISCV_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_D
 use super::memory_map::{align_down, align_up, user_mapping_flags};
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
-use super::task_context::{UserTaskExt, current_task_ext, current_tid};
+use super::task_context::{current_task_ext, current_tid, UserTaskExt};
 use super::task_registry::{
-    UserThreadEntry, user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
-    user_thread_entry_by_tid, user_thread_entry_for_process,
+    user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
+    user_thread_entry_by_tid, user_thread_entry_for_process, UserThreadEntry,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
 };
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
 }
 
 const NO_SIGSUSPEND_RESTORE_MASK: u64 = u64::MAX;
+
+pub(super) struct TemporarySignalMaskGuard {
+    ext: &'static UserTaskExt,
+    old_mask: u64,
+}
+
+impl Drop for TemporarySignalMaskGuard {
+    fn drop(&mut self) {
+        self.ext.signal_mask.store(self.old_mask, Ordering::Release);
+    }
+}
 
 #[cfg(target_arch = "riscv64")]
 use super::linux_abi::{RISCV_SIGNAL_FPSTATE_BYTES, RISCV_SIGNAL_SIGSET_RESERVED_BYTES};
@@ -126,6 +137,26 @@ pub(super) fn current_unblocked_signal_pending() -> bool {
         let sig = ext.pending_signal.load(Ordering::Acquire);
         sig != 0 && !signal_is_blocked(ext, sig)
     })
+}
+
+pub(super) fn install_temporary_signal_mask(
+    process: &UserProcess,
+    set: usize,
+    sigsetsize: usize,
+) -> Result<Option<TemporarySignalMaskGuard>, LinuxError> {
+    if set == 0 {
+        return Ok(None);
+    }
+    if sigsetsize != 0 && sigsetsize < KERNEL_SIGSET_BYTES {
+        return Err(LinuxError::EINVAL);
+    }
+    let src = read_user_bytes(process, set, KERNEL_SIGSET_BYTES)?;
+    let mut set_bytes = [0u8; KERNEL_SIGSET_BYTES];
+    set_bytes.copy_from_slice(&src);
+    let mask = u64::from_ne_bytes(set_bytes) & !unmaskable_signal_bits();
+    let ext = current_task_ext().ok_or(LinuxError::EINVAL)?;
+    let old_mask = ext.signal_mask.swap(mask, Ordering::AcqRel);
+    Ok(Some(TemporarySignalMaskGuard { ext, old_mask }))
 }
 
 pub(super) fn deliver_user_signal(

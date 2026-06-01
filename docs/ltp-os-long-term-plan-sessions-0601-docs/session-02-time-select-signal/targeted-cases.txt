@@ -1,0 +1,29 @@
+# Session 2 targeted cases
+# 单位：LTP case；同一 case 在 RV/LA、musl/glibc 下分别由 wrapper 运行。
+
+## RV time/select/signal batch（已跑）
+getitimer01
+ppoll01
+select02
+clock_gettime04
+clock_nanosleep02
+nanosleep01
+poll02
+pselect01
+pselect01_64
+settimeofday01
+time-schedule
+
+## LA promotion confirmation（已跑）
+getitimer01
+ppoll01
+
+## LA adjacent regression（已跑）
+poll02
+pselect01
+pselect01_64
+
+## 本 session 未跑/保留到后续 session
+select02: RV 仍因 wrapper 15s timeout + __NR_select TCONF 卡住，属于运行时预算/legacy syscall 分类，不推广。
+clock_gettime04: RV musl 仍有内部 TFAIL，保留到后续 time 精度/环境噪声复核。
+nanosleep01: RV musl 仍有内部 TFAIL，保留到后续 timer jitter 复核。

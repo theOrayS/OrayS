@@ -1,5 +1,5 @@
 use core::ffi::c_long;
-use core::sync::atomic::{AtomicI64, Ordering};
+use core::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 
 use axerrno::LinuxError;
 use linux_raw_sys::general;
@@ -11,7 +11,7 @@ use super::signal_abi::deliver_user_signal;
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 
@@ -378,17 +378,36 @@ pub(super) fn itimerval_to_micros_pair(
     Ok((first_us, interval_us))
 }
 
-fn current_real_itimer(process: &UserProcess) -> general::itimerval {
-    let deadline = process.real_timer_deadline_us.load(Ordering::Acquire);
+fn itimer_cells(process: &UserProcess, which: i32) -> Result<(&AtomicU64, &AtomicU64), LinuxError> {
+    match which {
+        value if value == general::ITIMER_REAL as i32 => Ok((
+            &process.real_timer_deadline_us,
+            &process.real_timer_interval_us,
+        )),
+        value if value == general::ITIMER_VIRTUAL as i32 => Ok((
+            &process.virtual_timer_deadline_us,
+            &process.virtual_timer_interval_us,
+        )),
+        value if value == general::ITIMER_PROF as i32 => Ok((
+            &process.prof_timer_deadline_us,
+            &process.prof_timer_interval_us,
+        )),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn current_itimer(process: &UserProcess, which: i32) -> Result<general::itimerval, LinuxError> {
+    let (deadline_cell, interval_cell) = itimer_cells(process, which)?;
+    let deadline = deadline_cell.load(Ordering::Acquire);
     let remaining = if deadline == 0 {
         0
     } else {
         deadline.saturating_sub(monotonic_time_micros())
     };
-    general::itimerval {
-        it_interval: micros_to_timeval(process.real_timer_interval_us.load(Ordering::Acquire)),
+    Ok(general::itimerval {
+        it_interval: micros_to_timeval(interval_cell.load(Ordering::Acquire)),
         it_value: micros_to_timeval(remaining),
-    }
+    })
 }
 
 fn arm_real_itimer(
@@ -429,11 +448,15 @@ pub(super) fn sys_setitimer(
     new_value: usize,
     old_value: usize,
 ) -> isize {
-    if which != general::ITIMER_REAL as i32 {
-        return neg_errno(LinuxError::EINVAL);
-    }
+    let (deadline_cell, interval_cell) = match itimer_cells(process, which) {
+        Ok(cells) => cells,
+        Err(err) => return neg_errno(err),
+    };
     if old_value != 0 {
-        let value = current_real_itimer(process);
+        let value = match current_itimer(process, which) {
+            Ok(value) => value,
+            Err(err) => return neg_errno(err),
+        };
         let ret = write_user_value(process, old_value, &value);
         if ret != 0 {
             return ret;
@@ -456,20 +479,36 @@ pub(super) fn sys_setitimer(
         None => (0, 0),
     };
 
-    let generation = process.real_timer_generation.fetch_add(1, Ordering::AcqRel) + 1;
-    process
-        .real_timer_interval_us
-        .store(interval_us, Ordering::Release);
+    interval_cell.store(interval_us, Ordering::Release);
     if first_us == 0 {
-        process.real_timer_deadline_us.store(0, Ordering::Release);
+        deadline_cell.store(0, Ordering::Release);
     } else {
-        process.real_timer_deadline_us.store(
+        deadline_cell.store(
             monotonic_time_micros().saturating_add(first_us),
             Ordering::Release,
         );
-        arm_real_itimer(process.clone(), generation, first_us, interval_us);
+    }
+    if which == general::ITIMER_REAL as i32 {
+        let generation = process.real_timer_generation.fetch_add(1, Ordering::AcqRel) + 1;
+        if first_us != 0 {
+            // Only ITIMER_REAL currently delivers SIGALRM.  The virtual/prof
+            // slots are still tracked so getitimer/setitimer report real state
+            // instead of ENOSYS/EINVAL to user space.
+            arm_real_itimer(process.clone(), generation, first_us, interval_us);
+        }
     }
     0
+}
+
+pub(super) fn sys_getitimer(process: &UserProcess, which: i32, curr_value: usize) -> isize {
+    let value = match current_itimer(process, which) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    if curr_value == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    write_user_value(process, curr_value, &value)
 }
 
 pub(super) fn read_timespec_duration(
