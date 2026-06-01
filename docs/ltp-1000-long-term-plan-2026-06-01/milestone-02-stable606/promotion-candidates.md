@@ -1,0 +1,50 @@
+# milestone-02-stable606 promotion candidates preflight
+
+## Status
+
+This file records candidate evidence only. It is **not** a stable606 promotion list.
+
+- Current stable: 556 total / 556 unique / 0 duplicate.
+- Stable list changes: none.
+- Required new unique cases for milestone-02: 50.
+- Current candidate bank after this preflight: at most 23, so promotion is blocked.
+
+## Deferred clean bank from milestone-01
+
+These 21 cases were four-way clean in milestone-01 combined proof but intentionally deferred from stable556:
+
+`modify_ldt01`, `modify_ldt02`, `modify_ldt03`, `print_caps`, `test_ioctl`, `tst_kvcmp`, `tst_ncpus`, `tst_ncpus_conf`, `tst_ncpus_max`, `tst_supported_fs`, `fanotify_child`, `genload`, `gensin`, `gensinh`, `gensqrt`, `gentan`, `gentanh`, `geny0`, `geny1`, `tst_exit`, `tst_hexdump`.
+
+## New targeted candidate evidence
+
+### socket01
+
+- Pre-fix RV scout state: both musl and glibc failed with two internal TFAIL rows due generic socket errno mismatch.
+- Fix: generic AF_INET socket errno handling in `sys_socket_bridge`; no case-specific special-casing.
+- Current evidence:
+  - `rv-socket01-postfix-20260601T160003Z.log`: RV musl + glibc PASS, parser-clean.
+  - `la-socket01-postfix-20260601T160247Z.log`: LA musl + glibc PASS, parser-clean.
+  - `socket01-rv-la-postfix.promotion-candidates.txt`: one four-way candidate, `socket01`.
+- Adjacent regression evidence:
+  - `socket-adjacent-rv-la-postfix.promotion-candidates.txt` shows `accept01`, `listen01`, `socket01`, `socket02`, `socketpair02` clean across RV + LA x musl + glibc.
+
+### nanosleep01
+
+- RV 80-case scout state: glibc PASS, musl failed one timing TFAIL at the 10ms interval.
+- Isolated rescout evidence:
+  - `rv-nanosleep01-rescout-20260601T160605Z.log`: RV musl + glibc PASS, parser-clean.
+  - `la-nanosleep01-rescout-20260601T160721Z.log`: LA musl + glibc PASS, parser-clean.
+  - `nanosleep01-rv-la-rescout.promotion-candidates.txt`: one four-way candidate, `nanosleep01`.
+- Caveat: because the earlier grouped RV scout failed, keep this as tentative until a later grouped regression/promotion gate proves it is not timing-flaky.
+
+## Not promoted / blocked examples from this preflight
+
+- `nice04`: musl failed because `nice(-10)` surfaced `EACCES` while POSIX `nice()` expects `EPERM`; a kernel-only remap would also change direct Linux `setpriority()` semantics, so no shortcut was taken.
+- `clone04`: musl TBROK/SIGSEGV in the 80-case scout; requires separate clone/thread diagnosis.
+- `signal01`, `setitimer01`: timed out in both libcs in RV scout; not promotion candidates.
+- `getdents02`, `sched_rr_get_interval03`, `setpriority01`: wrapper PASS but TCONF/ENOSYS caveats remain; not promotion candidates.
+- VFS/device rows such as `openat02`, `mknodat02`, `rename03` remain blocked by real ENOSPC/device/mount/metadata behavior.
+
+## Promotion decision
+
+Do not update `LTP_STABLE_CASES` yet. The candidate bank is short of 50 and some candidates need grouped regression confirmation.

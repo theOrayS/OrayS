@@ -798,8 +798,10 @@ pub(super) fn sys_socket_bridge(
         if protocol != 0 && protocol as u32 != posix_ctypes::IPPROTO_UDP {
             return neg_errno_code(LINUX_EPROTONOSUPPORT);
         }
+    } else if base_socktype as u32 == posix_ctypes::SOCK_RAW {
+        return neg_errno_code(LINUX_EPROTONOSUPPORT);
     } else {
-        return neg_errno_code(LINUX_ESOCKTNOSUPPORT);
+        return neg_errno(LinuxError::EINVAL);
     }
     let posix_fd = match posix_ret_i32(arceos_posix_api::sys_socket(
         domain,

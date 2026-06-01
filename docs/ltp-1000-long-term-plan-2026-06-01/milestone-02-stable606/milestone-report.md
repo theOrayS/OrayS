@@ -1,0 +1,56 @@
+# milestone-02-stable606 preflight report
+
+## Goal
+
+Promote the live stable baseline from 556 to the next milestone target of 606 trusted unique LTP stable cases on `dev/1000ltp-plan`, without counting blacklist/SKIP/status0 evidence and without hiding parser caveats.
+
+## Current result
+
+- Current stable list: 556 total / 556 unique / 0 duplicate.
+- Target for this milestone: 606 total / 606 unique / 0 duplicate.
+- Milestone status: **not complete / no stable promotion yet**.
+- Stable list update in this preflight: none.
+- Ultragoal checkpoint for G009: not run, because stable606 gate is not closed.
+
+## Evidence generated in this preflight
+
+Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
+
+1. `rv-m02-scout-001-20260601T154726Z.log`
+   - 80-case RV scout across musl + glibc.
+   - Parser result: 51 wrapper PASS / 109 wrapper FAIL rows; internal signals `TBROK=73`, `TFAIL=122`, `TCONF=24`; timeout matches 4; ENOSYS/not-implemented matches 6; panic/trap 0.
+   - Clean RV two-libc candidates were limited to the 21 deferred clean rows from milestone-01.
+2. `rv-socket01-postfix-20260601T160003Z.log` and `la-socket01-postfix-20260601T160247Z.log`
+   - After the generic socket errno fix, `socket01` is clean on RV + LA x musl + glibc.
+3. `rv-socket-adjacent-postfix-20260601T160853Z.log` and `la-socket-adjacent-postfix-20260601T160953Z.log`
+   - Adjacent socket regression subset (`socket01`, existing stable `socket02`, `socketpair02`, `accept01`, `listen01`) is parser-clean on RV + LA x musl + glibc.
+4. `rv-nanosleep01-rescout-20260601T160605Z.log` and `la-nanosleep01-rescout-20260601T160721Z.log`
+   - Isolated `nanosleep01` rescout is parser-clean on RV + LA x musl + glibc.
+   - Caveat: the earlier 80-case RV scout had one musl timing TFAIL for `nanosleep01`; it should be re-run in a later grouped gate before milestone promotion.
+
+## Candidate bank after this preflight
+
+- Deferred four-way clean bank inherited from milestone-01: 21 cases.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`.
+- Current candidate bank size for stable606 planning: at most 23 cases, still short of the +50 milestone.
+
+## User-visible behavior / ABI impact
+
+This preflight includes one kernel-visible errno fix in `examples/shell/src/uspace/fd_socket.rs::sys_socket_bridge`:
+
+- AF_INET `SOCK_RAW` with unsupported protocol now returns `EPROTONOSUPPORT` instead of `ESOCKTNOSUPPORT`.
+- Other invalid AF_INET socket types now return `EINVAL` instead of `ESOCKTNOSUPPORT`.
+- No LTP case/path/process/output is hardcoded.
+
+No stable-list ABI surface changes are made in this preflight. See `abi-and-behavior-impact.md` for details and the deliberately rejected `nice04` errno shortcut.
+
+## Risk and caveats
+
+- This is a preflight, not a promotion commit.
+- `nanosleep01` has mixed scout history; keep it as a tentative candidate until a later grouped milestone gate proves stability.
+- The 80-case RV scout exposed broad VFS/device/metadata blockers (`ENOSPC`, missing device/mount behavior, getdents symlink visibility, signal/itimer timeout) that require real semantic work.
+- No blacklist changes were made.
+
+## Next step
+
+Continue G009 with real semantic fixes or low-risk clean candidates until at least 50 new unique cases can pass the full RV + LA x musl + glibc promotion gate. Do not update `LTP_STABLE_CASES` or checkpoint G009 from this preflight alone.
