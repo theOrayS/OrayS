@@ -20,7 +20,7 @@ use super::linux_abi::{
     ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
     FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
     RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
-    ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -1634,7 +1634,11 @@ impl FdTable {
         let node_type = match node_type {
             0 | ST_MODE_FILE => ST_MODE_FILE,
             ST_MODE_FIFO => ST_MODE_FIFO,
-            _ => return Err(LinuxError::EPERM),
+            ST_MODE_CHR | ST_MODE_BLK => return Err(LinuxError::EPERM),
+            ST_MODE_DIR | ST_MODE_LNK | ST_MODE_SOCKET | ST_MODE_TYPE_MASK => {
+                return Err(LinuxError::EINVAL);
+            }
+            _ => return Err(LinuxError::EINVAL),
         };
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         if axfs::api::metadata(abs_path.as_str()).is_ok() {

@@ -460,3 +460,40 @@ Parser summary:
 - Regression four-way report: 20 clean rows across RV + LA x musl + glibc; `pipe07` is the only new row relative to current stable.
 
 Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.
+
+## mknod mode errno validation
+
+Pre-fix evidence:
+
+- In the post-proc-fd RV rescout, `mknod09` failed because invalid type bits returned `EPERM` instead of the expected `EINVAL`.
+- `mknod03` and `mknod04` were clean in that RV-only scout, but still required fresh LA confirmation before they could enter the four-way candidate bank.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mknod03,mknod04,mknod09 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mknod03,mknod04,mknod09 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-mknod-mode-rescout-20260601T190332Z.log \
+  target/ltp-1000-milestone-02-stable606/la-mknod-mode-rescout-20260601T190415Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mknod03,mknod04,mknod09,mknod02,open10,creat08,chmod07,fchmod02,access04,chmod06,chown04,fchmod06,fchown04 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mknod03,mknod04,mknod09,mknod02,open10,creat08,chmod07,fchmod02,access04,chmod06,chown04,fchmod06,fchown04 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV targeted raw/summary: `target/ltp-1000-milestone-02-stable606/rv-mknod-mode-rescout-20260601T190332Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA targeted raw/summary: `target/ltp-1000-milestone-02-stable606/la-mknod-mode-rescout-20260601T190415Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/mknod-mode-rv-la.promotion-candidates.txt`, `.derived.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-mknod-vfs-regression-20260601T190520Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-mknod-vfs-regression-20260601T190623Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV targeted: 6 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 6 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: 3 candidates: `mknod03`, `mknod04`, `mknod09`.
+- RV regression subset: 26 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 26 PASS / 0 FAIL, no parser caveats.
+
+Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.

@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 37, so promotion is blocked.
+- Current candidate bank after this preflight: at most 41, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -165,3 +165,18 @@ Updated candidate-bank note after the tmpfs read-only mount follow-up: 21 deferr
   - `proc-fd-regression-rv-la.promotion-candidates.txt` shows all twenty rows clean across RV + LA x musl + glibc; only `pipe07` is new relative to the current stable list.
 
 Updated candidate-bank note after the proc-fd follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` = at most 38 plausible cases, still short of stable606.
+
+### mknod03, mknod04, and mknod09
+
+- Pre-fix RV scout state:
+  - `mknod03` and `mknod04` were already clean in the post-fix RV rescout, but still needed current LA confirmation before banking.
+  - `mknod09` failed because invalid `mknod()` file-type bits returned `EPERM` where Linux reports `EINVAL`.
+- Fix: generic `mknodat()` file-type validation now distinguishes unsupported privileged device nodes (`S_IFCHR`/`S_IFBLK` -> `EPERM`) from invalid mode encodings (`S_IFMT`, directory, symlink, socket, unknown type bits -> `EINVAL`). Regular files and FIFOs keep the previous behavior. No case-specific special-casing.
+- Current evidence:
+  - `rv-mknod-mode-rescout-20260601T190332Z.log`: RV musl + glibc PASS for `mknod03,mknod04,mknod09`, parser-clean.
+  - `la-mknod-mode-rescout-20260601T190415Z.log`: LA musl + glibc PASS for `mknod03,mknod04,mknod09`, parser-clean.
+  - `mknod-mode-rv-la.promotion-candidates.txt`: three four-way candidates: `mknod03`, `mknod04`, and `mknod09`.
+- Adjacent regression evidence:
+  - `rv-mknod-vfs-regression-20260601T190520Z.log` and `la-mknod-vfs-regression-20260601T190623Z.log` both report 26 PASS / 0 FAIL for `mknod03,mknod04,mknod09` plus stable/setgid/permission anchors.
+
+Updated candidate-bank note after the mknod mode-errno follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` = at most 41 plausible cases, still short of stable606.

@@ -227,3 +227,24 @@ POSIX/Linux-visible impact:
 - Signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: moderate-low. `getdents64` snapshots open fd numbers at call time and stores only a cursor; it does not hold references to every fd entry. The RV/LA regression subset protects stable pipe, proc, readlink, and fcntl anchors.
 - Maintenance boundary: this implements the fd directory surface needed for generic procfs enumeration. It does not yet provide full Linux semantics for every `/proc/<other-pid>/fd` namespace, permission, or per-fd `readlink` target type.
+
+## Additional mknodat mode errno behavior change on 2026-06-02
+
+File:
+
+- `examples/shell/src/uspace/fd_table.rs`
+
+Behavior:
+
+- `mknod()`/`mknodat()` still create only regular files and FIFOs in the current synthetic filesystem model.
+- Character and block device node requests still return `EPERM`, matching the existing no-device-node/no-`CAP_MKNOD` boundary.
+- Invalid or nonsensical file-type encodings now return `EINVAL` instead of falling through to `EPERM`; this covers `S_IFMT`, directory, symlink, socket, and unknown type-bit combinations.
+
+POSIX/Linux-visible impact:
+
+- Syscall/flag surface affected: `mknod`/`mknodat` mode file-type validation and errno ordering.
+- Errno impact: unsupported privileged device nodes remain `EPERM`; invalid mode type encodings now surface `EINVAL`.
+- FD impact: none; successful regular/FIFO creation still uses the existing file creation and metadata recording path.
+- Signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: low. The change only narrows the pre-create mode validation branch before any filesystem mutation; RV/LA targeted and VFS regression subsets protect adjacent mknod/open/creat/chmod/chown cases.
+- Maintenance boundary: this is an errno/order compatibility fix, not a full Linux device-node implementation. Future device-node support must revisit the `EPERM` branch with real capability and special-file semantics.
