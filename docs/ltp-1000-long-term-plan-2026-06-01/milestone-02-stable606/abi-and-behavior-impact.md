@@ -86,3 +86,29 @@ POSIX/Linux-visible impact:
 - Accounting is still coarse: self user/system ticks are wall-clock-derived and split between user/system time rather than scheduler-precise CPU sampling. This is more truthful than the prior all-zero stub but remains a maintenance boundary for future scheduler-level CPU accounting.
 - FD, signal delivery, futex, mmap permissions, and user-pointer copy semantics are unchanged.
 - Resource/lifetime risk: low. Added counters are per-process atomics and are only accumulated when a child is actually waited/reaped; regression subset protects existing time anchors on RV and LA.
+
+
+## Additional MAP_LOCKED / VmLck behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/mod.rs`
+- `examples/shell/src/uspace/process_lifecycle.rs`
+- `examples/shell/src/uspace/memory_map.rs`
+- `examples/shell/src/uspace/synthetic_fs.rs`
+
+Behavior:
+
+- `mmap(..., MAP_LOCKED, ...)` now records the created VMA as locked metadata and eagerly populates the pages instead of leaving the mapping lazy.
+- `munmap` and `MAP_FIXED` range replacement remove/split the locked metadata together with the mmap range; `mprotect` preserves the locked state while changing visible protection bits.
+- `/proc/self/status` now includes `VmLck:\t<N> kB` computed from the current process's locked mmap ranges.
+
+POSIX/Linux-visible impact:
+
+- Syscall/flag surface affected: `mmap` with `MAP_LOCKED`; `munmap`, `mprotect`, and `MAP_FIXED` preserve/update the associated synthetic metadata.
+- Procfs ABI affected: `/proc/<pid>/status` and `/proc/self/status` now expose `VmLck`, enabling generic locked-memory introspection.
+- Errno impact: none in this follow-up; unsupported flags and existing mmap error paths are unchanged.
+- FD impact: none; no descriptor allocation or lifetime behavior changes.
+- Signal/futex/user-pointer copy impact: none.
+- mmap/resource caveat: this is locked-range accounting plus eager population in a no-swap teaching kernel. It does not yet implement full Linux `mlock(2)`/`RLIMIT_MEMLOCK` enforcement or page-reclaim interaction.
+- Resource/lifetime risk: moderate-low. Metadata is per-process, cloned on fork, cleared on exec, and reduced on unmap; the RV/LA regression subset protects stable mmap/mincore/mprotect anchors.

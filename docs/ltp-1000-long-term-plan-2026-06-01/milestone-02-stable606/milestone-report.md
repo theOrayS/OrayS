@@ -31,12 +31,12 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`.
-- Current candidate bank size for stable606 planning: at most 25 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`.
+- Current candidate bank size for stable606 planning: at most 27 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
-This preflight includes one kernel-visible errno fix in `examples/shell/src/uspace/fd_socket.rs::sys_socket_bridge`:
+The initial preflight included one kernel-visible errno fix in `examples/shell/src/uspace/fd_socket.rs::sys_socket_bridge`:
 
 - AF_INET `SOCK_RAW` with unsupported protocol now returns `EPROTONOSUPPORT` instead of `ESOCKTNOSUPPORT`.
 - Other invalid AF_INET socket types now return `EINVAL` instead of `ESOCKTNOSUPPORT`.
@@ -90,4 +90,23 @@ Targeted evidence:
 - `la-times03-regression-20260601T164956Z.log`: LA time regression subset 10 PASS / 0 FAIL, no internal caveats.
 - `times03-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the five clean rows, the new not-yet-stable candidate is `times03`.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 26, still short of +50, and no final stable606 gate has been run.
+Promotion remained blocked after the time follow-up: the stable606 candidate bank was at most 26, still short of +50, and no final stable606 gate had been run.
+
+
+## mmap14 MAP_LOCKED / VmLck follow-up
+
+A generic mmap/proc-status improvement was added after the `times03` work:
+
+- `UserMmapRegion` now records whether a mapping was created with `MAP_LOCKED`.
+- `MAP_LOCKED` mappings are eagerly populated and tracked as locked mmap bytes until `munmap`/`MAP_FIXED` removes or splits the range.
+- `/proc/self/status` now reports `VmLck` from per-process locked mmap metadata.
+
+Targeted evidence:
+
+- `rv-mmap14-postfix-20260601T170355Z.log`: `mmap14` RV musl+glibc PASS, parser-clean.
+- `la-mmap14-postfix-20260601T170553Z.log`: `mmap14` LA musl+glibc PASS, parser-clean.
+- `rv-mmap14-regression-20260601T170753Z.log`: RV mmap/proc regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `la-mmap14-regression-20260601T171057Z.log`: LA mmap/proc regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `mmap14-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the twelve clean rows, the new not-yet-stable candidate from this follow-up is `mmap14`.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 27, still short of +50, and no final stable606 gate has been run.

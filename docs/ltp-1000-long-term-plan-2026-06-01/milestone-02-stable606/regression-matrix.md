@@ -83,3 +83,23 @@ Evidence:
   - 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/times03-regression-rv-la.promotion-candidates.txt`
   - All five rows clean across RV + LA x musl + glibc; `times03` is the new candidate row.
+
+
+## mmap14 / MAP_LOCKED VmLck regression set
+
+Rationale: the code change affects `MAP_LOCKED` mmap metadata, range splitting/removal, eager population, and synthetic `/proc/self/status` `VmLck` output. The protected subset extends the prior proc-maps regression with `mmap14`.
+
+Cases:
+
+- New candidate: `mmap14`
+- Already banked candidates: `mmap04`, `vma01`
+- Existing stable anchors: `mmap01`, `mmap02`, `mmap03`, `mmap06`, `mmap09`, `mmap10`, `mmap11`, `mincore01`, `mprotect05`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-mmap14-regression-20260601T170753Z.summary.txt`
+  - 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-mmap14-regression-20260601T171057Z.summary.txt`
+  - 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/mmap14-regression-rv-la.promotion-candidates.txt`
+  - All twelve rows clean across RV + LA x musl + glibc; `mmap14` is the new candidate row.

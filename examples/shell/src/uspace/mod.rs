@@ -132,6 +132,7 @@ struct UserMmapRegion {
     size: usize,
     prot: u32,
     shared: bool,
+    locked: bool,
 }
 
 impl UserMmapRegion {
