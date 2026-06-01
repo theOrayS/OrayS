@@ -2723,6 +2723,9 @@ fn check_parent_write_search_permission(
     if parent_st.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
         return Err(LinuxError::ENOTDIR);
     }
+    if process.path_on_readonly_mount(parent) {
+        return Err(LinuxError::EROFS);
+    }
     if uid == 0 {
         return Ok(parent_st);
     }
@@ -2807,7 +2810,11 @@ fn check_open_permission(process: &UserProcess, path: &str, flags: u32) -> Resul
     if !parent_dirs_searchable_absolute(process, path, uid, gid)? {
         return Err(LinuxError::EACCES);
     }
-    if access_allowed(&st, open_permission_mode(flags), uid, gid) {
+    let mode = open_permission_mode(flags);
+    if mode & ACCESS_W_OK != 0 && process.path_on_readonly_mount(path) {
+        return Err(LinuxError::EROFS);
+    }
+    if access_allowed(&st, mode, uid, gid) {
         Ok(())
     } else {
         Err(LinuxError::EACCES)

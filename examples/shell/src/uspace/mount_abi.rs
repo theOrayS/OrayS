@@ -2,13 +2,17 @@ use axerrno::LinuxError;
 use linux_raw_sys::general;
 use std::string::{String, ToString};
 
-use super::UserProcess;
 use super::fd_table::resolve_dirfd_path;
 use super::linux_abi::{ST_MODE_DIR, ST_MODE_TYPE_MASK, neg_errno};
 use super::runtime_paths::normalize_path;
 use super::user_memory::read_cstr;
+use super::{MountPoint, UserProcess};
 
-const SUPPORTED_MOUNT_FLAGS: u32 = general::MS_BIND | general::MS_REC | general::MS_SILENT;
+const SUPPORTED_MOUNT_FLAGS: u32 = general::MS_BIND
+    | general::MS_REC
+    | general::MS_SILENT
+    | general::MS_RDONLY
+    | general::MS_REMOUNT;
 
 const SUPPORTED_UMOUNT_FLAGS: u32 = general::MNT_FORCE
     | general::MNT_DETACH
@@ -19,24 +23,55 @@ const SUPPORTED_UMOUNT_FLAGS: u32 = general::MNT_FORCE
 impl UserProcess {
     pub(super) fn translate_mount_path(&self, path: &str) -> String {
         let mount_points = self.mount_points.lock();
-        let mut best: Option<(&str, &str)> = None;
-        for (target, source) in mount_points.iter() {
+        let mut best: Option<(&str, &MountPoint)> = None;
+        for (target, mount) in mount_points.iter() {
             if mount_path_rest(path, target.as_str()).is_none() {
                 continue;
             }
             if best.is_none_or(|(best_target, _)| target.len() > best_target.len()) {
-                best = Some((target.as_str(), source.as_str()));
+                best = Some((target.as_str(), mount));
             }
         }
-        let Some((target, source)) = best else {
+        let Some((target, mount)) = best else {
             return path.to_string();
         };
         let rest = mount_path_rest(path, target).unwrap_or("");
-        join_mount_source(source, rest)
+        join_mount_source(mount.source_root.as_str(), rest)
     }
 
-    fn add_mount_point(&self, target: String, source_root: String) {
-        self.mount_points.lock().insert(target, source_root);
+    pub(super) fn path_on_readonly_mount(&self, path: &str) -> bool {
+        let mount_points = self.mount_points.lock();
+        let mut best: Option<(&str, bool)> = None;
+        for (target, mount) in mount_points.iter() {
+            if mount_path_rest(path, target.as_str()).is_none() {
+                continue;
+            }
+            if best.is_none_or(|(best_target, _)| target.len() > best_target.len()) {
+                best = Some((target.as_str(), mount.readonly));
+            }
+        }
+        best.is_some_and(|(_, readonly)| readonly)
+    }
+
+    fn add_mount_point(&self, target: String, source_root: String, readonly: bool, remount: bool) {
+        let mut mount_points = self.mount_points.lock();
+        if remount {
+            if let Some(mount) = mount_points.get_mut(target.as_str()) {
+                mount.readonly = readonly;
+                return;
+            }
+        }
+        mount_points.insert(
+            target,
+            MountPoint {
+                source_root,
+                readonly,
+            },
+        );
+    }
+
+    fn has_mount_point(&self, target: &str) -> bool {
+        self.mount_points.lock().contains_key(target)
     }
 
     fn remove_mount_point(&self, target: &str) -> bool {
@@ -76,6 +111,9 @@ pub(super) fn sys_mount(
     if let Err(err) = ensure_mount_target_directory(process, target_path.as_str()) {
         return neg_errno(err);
     }
+    if flags & general::MS_REMOUNT != 0 && !process.has_mount_point(target_path.as_str()) {
+        return neg_errno(LinuxError::EINVAL);
+    }
     let source_root = match resolve_mount_source(
         process,
         source.as_deref(),
@@ -86,7 +124,9 @@ pub(super) fn sys_mount(
         Ok(source_root) => source_root,
         Err(err) => return neg_errno(err),
     };
-    process.add_mount_point(target_path, source_root);
+    let readonly = flags & general::MS_RDONLY != 0;
+    let remount = flags & general::MS_REMOUNT != 0;
+    process.add_mount_point(target_path, source_root, readonly, remount);
     0
 }
 

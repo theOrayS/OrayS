@@ -43,6 +43,7 @@ mod user_memory;
 
 use fd_table::FdTable;
 use linux_abi::*;
+use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 pub use process_lifecycle::run_user_program;
@@ -50,11 +51,16 @@ pub use process_lifecycle::run_user_program;
 pub use process_lifecycle::run_user_program_in;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in_timeout;
-use process_lifecycle::ProcessTeardown;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
 
 struct AxNamespaceImpl;
+
+#[derive(Clone)]
+struct MountPoint {
+    source_root: String,
+    readonly: bool,
+}
 
 struct UserProcess {
     aspace: Mutex<AddrSpace>,
@@ -79,7 +85,7 @@ struct UserProcess {
     path_symlinks: Mutex<BTreeMap<String, String>>,
     path_xattrs: Mutex<BTreeMap<String, BTreeMap<String, Vec<u8>>>>,
     umask: AtomicU32,
-    mount_points: Arc<Mutex<BTreeMap<String, String>>>,
+    mount_points: Arc<Mutex<BTreeMap<String, MountPoint>>>,
     shm_attachments: Mutex<BTreeMap<usize, (i32, usize)>>,
     real_uid: AtomicU32,
     uid: AtomicU32,

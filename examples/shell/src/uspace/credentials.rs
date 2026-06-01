@@ -450,6 +450,11 @@ pub(super) fn apply_chown_metadata(
     owner: Option<u32>,
     group: Option<u32>,
 ) -> isize {
+    if let Some(path) = path.as_deref() {
+        if process.path_on_readonly_mount(path) {
+            return neg_errno(LinuxError::EROFS);
+        }
+    }
     if !chown_allowed(process, st, owner, group) {
         return neg_errno(LinuxError::EPERM);
     }
