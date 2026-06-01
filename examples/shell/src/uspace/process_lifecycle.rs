@@ -14,6 +14,7 @@ use std::string::String;
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::fd_table::release_posix_record_locks_for_process;
 use super::futex;
 use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
 use super::program_loader::load_program_image;
@@ -58,7 +59,7 @@ impl ProcessTeardown {
 
     pub(super) fn run(
         &self,
-        _pid: i32,
+        pid: i32,
         aspace: &Mutex<AddrSpace>,
         fds: &Mutex<FdTable>,
         children: &Mutex<Vec<ChildTask>>,
@@ -67,6 +68,7 @@ impl ProcessTeardown {
             return;
         }
 
+        release_posix_record_locks_for_process(pid);
         aspace.lock().clear();
         {
             let mut fds = fds.lock();

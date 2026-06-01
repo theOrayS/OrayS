@@ -12,15 +12,14 @@ use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_STICKY,
-    MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME,
-    ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
-    ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    DEFAULT_NOFILE_LIMIT, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG,
+    RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -41,12 +40,14 @@ use super::synthetic_fs::{
     synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
+use super::task_registry::user_thread_entry_by_process_pid;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value,
+    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
+    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -196,7 +197,7 @@ pub(super) fn sys_fallocate(
 }
 
 pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
-    match process.fds.lock().close(fd as i32) {
+    match process.fds.lock().close_for_process(process, fd as i32) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -637,7 +638,7 @@ pub(super) fn sys_dup3(process: &UserProcess, oldfd: usize, newfd: usize, flags:
     match process
         .fds
         .lock()
-        .dup3(oldfd as i32, newfd as i32, flags as u32)
+        .dup3(process, oldfd as i32, newfd as i32, flags as u32)
     {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
@@ -1084,6 +1085,20 @@ impl FdTable {
         self.close_slot(fd as usize)
     }
 
+    pub(super) fn close_for_process(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+    ) -> Result<(), LinuxError> {
+        if !(0..self.entries.len() as i32).contains(&fd) || self.entries[fd as usize].is_none() {
+            return Err(LinuxError::EBADF);
+        }
+        if let Some(FdEntry::File(file)) = self.entries[fd as usize].as_ref() {
+            release_posix_record_locks_for_file_owner(record_lock_key(file), process.pid());
+        }
+        self.close_slot(fd as usize)
+    }
+
     pub(super) fn close_all(&mut self) {
         for idx in 0..self.entries.len() {
             let _ = self.close_slot(idx);
@@ -1168,7 +1183,13 @@ impl FdTable {
         self.insert_min_with_flags(entry, min_fd as usize, fd_flags & general::FD_CLOEXEC)
     }
 
-    pub(super) fn dup3(&mut self, oldfd: i32, newfd: i32, flags: u32) -> Result<i32, LinuxError> {
+    pub(super) fn dup3(
+        &mut self,
+        process: &UserProcess,
+        oldfd: i32,
+        newfd: i32,
+        flags: u32,
+    ) -> Result<i32, LinuxError> {
         if oldfd == newfd {
             return Err(LinuxError::EINVAL);
         }
@@ -1187,7 +1208,7 @@ impl FdTable {
             self.entries.resize_with(newfd + 1, || None);
             self.fd_flags.resize(newfd + 1, 0);
         } else if self.entries[newfd].is_some() {
-            let _ = self.close(newfd as i32);
+            let _ = self.close_for_process(process, newfd as i32);
         }
         if self.fd_flags.len() <= newfd {
             self.fd_flags.resize(newfd + 1, 0);
@@ -1814,7 +1835,8 @@ impl FdTable {
                 _ => Ok(0),
             },
             general::F_GETLK => self.fcntl_getlk(process, fd, arg),
-            general::F_SETLK | general::F_SETLKW => self.fcntl_setlk(process, fd, arg),
+            general::F_SETLK => self.fcntl_setlk(process, fd, arg, false),
+            general::F_SETLKW => self.fcntl_setlk(process, fd, arg, true),
             general::F_GETLEASE => self.fcntl_getlease(fd),
             general::F_SETLEASE => self.fcntl_setlease(fd, arg as u32),
             _ => Err(LinuxError::EINVAL),
@@ -1836,10 +1858,24 @@ impl FdTable {
         fd: i32,
         arg: usize,
     ) -> Result<i32, LinuxError> {
-        self.entry(fd)?;
         let mut lock: general::flock = read_user_value(process, arg)?;
         validate_flock(&lock)?;
-        lock.l_type = general::F_UNLCK as _;
+        let (key, request) = match self.entry(fd)? {
+            FdEntry::File(file) => (
+                record_lock_key(file),
+                normalize_record_lock(file, process, &lock)?,
+            ),
+            _ => return Err(LinuxError::EBADF),
+        };
+        if let Some(conflict) = first_record_lock_conflict(key, &request) {
+            lock.l_type = conflict.typ;
+            lock.l_whence = general::SEEK_SET as _;
+            lock.l_start = conflict.start as _;
+            lock.l_len = conflict.len as _;
+            lock.l_pid = conflict.owner_pid as _;
+        } else {
+            lock.l_type = general::F_UNLCK as _;
+        }
         if write_user_value(process, arg, &lock) == 0 {
             Ok(0)
         } else {
@@ -1852,10 +1888,23 @@ impl FdTable {
         process: &UserProcess,
         fd: i32,
         arg: usize,
+        wait: bool,
     ) -> Result<i32, LinuxError> {
-        self.entry(fd)?;
         let lock: general::flock = read_user_value(process, arg)?;
         validate_flock(&lock)?;
+        let (key, request) = match self.entry(fd)? {
+            FdEntry::File(file) => {
+                if !record_lock_access_allowed(file, lock.l_type as u32) {
+                    return Err(LinuxError::EBADF);
+                }
+                (
+                    record_lock_key(file),
+                    normalize_record_lock(file, process, &lock)?,
+                )
+            }
+            _ => return Err(LinuxError::EBADF),
+        };
+        apply_record_lock(key, request, wait)?;
         Ok(0)
     }
 
@@ -1988,6 +2037,228 @@ fn validate_flock(lock: &general::flock) -> Result<(), LinuxError> {
     match lock.l_whence as u32 {
         general::SEEK_SET | general::SEEK_CUR | general::SEEK_END => Ok(()),
         _ => Err(LinuxError::EINVAL),
+    }
+}
+
+#[derive(Clone)]
+struct PosixRecordLock {
+    owner_pid: i32,
+    typ: i16,
+    start: i64,
+    len: i64,
+}
+
+impl PosixRecordLock {
+    fn end(&self) -> i64 {
+        if self.len == 0 {
+            i64::MAX
+        } else {
+            self.start.saturating_add(self.len)
+        }
+    }
+
+    fn overlaps(&self, other: &Self) -> bool {
+        self.start < other.end() && other.start < self.end()
+    }
+
+    fn conflicts_with(&self, request: &Self) -> bool {
+        if self.owner_pid == request.owner_pid || !self.overlaps(request) {
+            return false;
+        }
+        match request.typ as u32 {
+            general::F_RDLCK => self.typ as u32 == general::F_WRLCK,
+            general::F_WRLCK => {
+                matches!(self.typ as u32, general::F_RDLCK | general::F_WRLCK)
+            }
+            _ => false,
+        }
+    }
+}
+
+fn posix_record_lock_table() -> &'static Mutex<BTreeMap<u64, Vec<PosixRecordLock>>> {
+    static POSIX_RECORD_LOCKS: LazyInit<Mutex<BTreeMap<u64, Vec<PosixRecordLock>>>> =
+        LazyInit::new();
+    if !POSIX_RECORD_LOCKS.is_inited() {
+        POSIX_RECORD_LOCKS.init_once(Mutex::new(BTreeMap::new()));
+    }
+    &POSIX_RECORD_LOCKS
+}
+
+fn record_lock_key(file: &FileEntry) -> u64 {
+    path_inode(Some(file.path.as_str()))
+}
+
+fn record_lock_access_allowed(file: &FileEntry, typ: u32) -> bool {
+    match typ {
+        general::F_RDLCK => file_is_readable(file.status_flags),
+        general::F_WRLCK => file_is_writable(file.status_flags),
+        general::F_UNLCK => true,
+        _ => false,
+    }
+}
+
+fn normalize_record_lock(
+    file: &FileEntry,
+    process: &UserProcess,
+    lock: &general::flock,
+) -> Result<PosixRecordLock, LinuxError> {
+    let base = match lock.l_whence as u32 {
+        general::SEEK_SET => 0,
+        general::SEEK_CUR => {
+            i64::try_from(*file.offset.lock()).map_err(|_| LinuxError::EOVERFLOW)?
+        }
+        general::SEEK_END => i64::try_from(file.file.get_attr().map_err(LinuxError::from)?.size())
+            .map_err(|_| LinuxError::EOVERFLOW)?,
+        _ => return Err(LinuxError::EINVAL),
+    };
+    let mut start = base
+        .checked_add(lock.l_start as i64)
+        .ok_or(LinuxError::EINVAL)?;
+    let mut len = lock.l_len as i64;
+    if len < 0 {
+        start = start.checked_add(len).ok_or(LinuxError::EINVAL)?;
+        len = len.checked_neg().ok_or(LinuxError::EINVAL)?;
+    }
+    if start < 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    if len != 0 {
+        start.checked_add(len).ok_or(LinuxError::EINVAL)?;
+    }
+    Ok(PosixRecordLock {
+        owner_pid: process.pid(),
+        typ: lock.l_type,
+        start,
+        len,
+    })
+}
+
+fn lock_len_from_range(start: i64, end: i64) -> i64 {
+    if end == i64::MAX {
+        0
+    } else {
+        end.saturating_sub(start)
+    }
+}
+
+fn cleanup_dead_record_locks(locks: &mut Vec<PosixRecordLock>, current_pid: i32) {
+    locks.retain(|lock| {
+        lock.owner_pid == current_pid || user_thread_entry_by_process_pid(lock.owner_pid).is_some()
+    });
+}
+
+fn merge_record_locks(locks: &mut Vec<PosixRecordLock>) {
+    locks.sort_by_key(|lock| (lock.owner_pid, lock.typ, lock.start, lock.end()));
+    let mut merged: Vec<PosixRecordLock> = Vec::new();
+    for lock in locks.drain(..) {
+        if let Some(last) = merged.last_mut() {
+            if last.owner_pid == lock.owner_pid && last.typ == lock.typ && lock.start <= last.end()
+            {
+                let end = last.end().max(lock.end());
+                last.len = lock_len_from_range(last.start, end);
+                continue;
+            }
+        }
+        merged.push(lock);
+    }
+    *locks = merged;
+}
+
+fn remove_record_lock_range(locks: &mut Vec<PosixRecordLock>, request: &PosixRecordLock) {
+    let request_end = request.end();
+    let mut next = Vec::new();
+    for lock in locks.drain(..) {
+        if lock.owner_pid != request.owner_pid || !lock.overlaps(request) {
+            next.push(lock);
+            continue;
+        }
+        let lock_end = lock.end();
+        if lock.start < request.start {
+            next.push(PosixRecordLock {
+                len: lock_len_from_range(lock.start, request.start),
+                ..lock.clone()
+            });
+        }
+        if request_end < lock_end {
+            next.push(PosixRecordLock {
+                start: request_end,
+                len: lock_len_from_range(request_end, lock_end),
+                ..lock
+            });
+        }
+    }
+    *locks = next;
+}
+
+fn first_record_lock_conflict(key: u64, request: &PosixRecordLock) -> Option<PosixRecordLock> {
+    let mut table = posix_record_lock_table().lock();
+    let locks = table.get_mut(&key)?;
+    cleanup_dead_record_locks(locks, request.owner_pid);
+    locks.sort_by_key(|lock| (lock.start, lock.end(), lock.owner_pid));
+    let conflict = locks
+        .iter()
+        .find(|lock| lock.conflicts_with(request))
+        .cloned();
+    if locks.is_empty() {
+        table.remove(&key);
+    }
+    conflict
+}
+
+fn apply_record_lock(key: u64, request: PosixRecordLock, wait: bool) -> Result<(), LinuxError> {
+    loop {
+        let mut table = posix_record_lock_table().lock();
+        let locks = table.entry(key).or_insert_with(Vec::new);
+        cleanup_dead_record_locks(locks, request.owner_pid);
+        if request.typ as u32 != general::F_UNLCK
+            && locks.iter().any(|lock| lock.conflicts_with(&request))
+        {
+            if !wait {
+                if locks.is_empty() {
+                    table.remove(&key);
+                }
+                return Err(LinuxError::EAGAIN);
+            }
+            drop(table);
+            axtask::yield_now();
+            continue;
+        }
+        remove_record_lock_range(locks, &request);
+        if request.typ as u32 != general::F_UNLCK {
+            locks.push(request);
+            merge_record_locks(locks);
+        }
+        if locks.is_empty() {
+            table.remove(&key);
+        }
+        return Ok(());
+    }
+}
+
+fn release_posix_record_locks_for_file_owner(key: u64, owner_pid: i32) {
+    let mut table = posix_record_lock_table().lock();
+    let should_remove = if let Some(locks) = table.get_mut(&key) {
+        locks.retain(|lock| lock.owner_pid != owner_pid);
+        locks.is_empty()
+    } else {
+        false
+    };
+    if should_remove {
+        table.remove(&key);
+    }
+}
+
+pub(super) fn release_posix_record_locks_for_process(owner_pid: i32) {
+    let mut table = posix_record_lock_table().lock();
+    let empty_keys: Vec<u64> = table
+        .iter_mut()
+        .filter_map(|(key, locks)| {
+            locks.retain(|lock| lock.owner_pid != owner_pid);
+            locks.is_empty().then_some(*key)
+        })
+        .collect();
+    for key in empty_keys {
+        table.remove(&key);
     }
 }
 
