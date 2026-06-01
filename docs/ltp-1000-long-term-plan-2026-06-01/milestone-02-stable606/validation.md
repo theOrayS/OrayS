@@ -573,3 +573,42 @@ Parser summary:
 - Regression four-way report: 11 clean rows across RV + LA x musl + glibc; `setrlimit04` is the only newly banked row from this follow-up.
 
 Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.
+
+
+## clock_gettime04 evidence-only validation
+
+Pre-follow-up evidence:
+
+- `clock_gettime04` was clean for RV musl+glibc inside `rv-mm-time-followup-scout-20260601T192613Z.log`, while the same mixed scout retained real failures/TFAIL/TBROK/TCONF rows for other mm/wait/getcwd cases. Only the clean `clock_gettime04` row was eligible for further confirmation; the failed rows remain non-countable.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-clock-gettime04-rescout-20260601T193254Z.log \
+  target/ltp-1000-milestone-02-stable606/la-clock-gettime04-rescout-20260601T192915Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime02,clock_gettime04,gettimeofday01,gettimeofday02,times01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime02,clock_gettime04,gettimeofday01,gettimeofday02,times01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV targeted raw/summary: `target/ltp-1000-milestone-02-stable606/rv-clock-gettime04-rescout-20260601T193254Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA targeted raw/summary: `target/ltp-1000-milestone-02-stable606/la-clock-gettime04-rescout-20260601T192915Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Isolated four-way report: `target/ltp-1000-milestone-02-stable606/clock-gettime04-isolated-rv-la.promotion-candidates.txt`, `.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-clock-time-regression-20260601T193006Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-clock-time-regression-20260601T193006Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/clock-time-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Isolated four-way report: 1 candidate, `clock_gettime04`.
+- RV regression subset: 10 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 10 PASS / 0 FAIL, no parser caveats.
+- Regression four-way report: 5 clean rows across RV + LA x musl + glibc; `clock_gettime04` is the only newly banked row from this follow-up.
+
+Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.

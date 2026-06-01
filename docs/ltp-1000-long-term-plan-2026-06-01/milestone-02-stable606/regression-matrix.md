@@ -254,3 +254,24 @@ Evidence:
   - `setrlimit04` is clean across RV + LA x musl + glibc.
 - Regression four-way report: `target/ltp-1000-milestone-02-stable606/setrlimit-exec-regression-rv-la.promotion-candidates.txt`
   - All eleven rows clean across RV + LA x musl + glibc; only `setrlimit04` is new relative to current stable and previously banked rows.
+
+
+## clock_gettime04 / clock-time evidence-only regression set
+
+Rationale: no code changed in this follow-up, but the case belongs to the time syscall lane and was protected with adjacent stable clock/gettimeofday/times anchors before banking.
+
+Cases:
+
+- New candidate: `clock_gettime04`
+- Existing stable anchors: `clock_gettime02`, `gettimeofday01`, `gettimeofday02`, `times01`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-clock-time-regression-20260601T193006Z.summary.txt`
+  - 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-clock-time-regression-20260601T193006Z.summary.txt`
+  - 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Isolated targeted four-way report: `target/ltp-1000-milestone-02-stable606/clock-gettime04-isolated-rv-la.promotion-candidates.txt`
+  - `clock_gettime04` is clean across RV + LA x musl + glibc.
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/clock-time-regression-rv-la.promotion-candidates.txt`
+  - All five rows clean across RV + LA x musl + glibc; only `clock_gettime04` is new relative to current stable and previously banked rows.

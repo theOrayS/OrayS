@@ -291,3 +291,20 @@ POSIX/Linux-visible impact:
 - Signal/futex/mmap/user-pointer copy impact: none beyond normal exec image replacement.
 - Resource/lifetime risk: moderate-low. This broadens the standard utility exec surface but is constrained by an explicit busybox applet allowlist and by real-file precedence; RV/LA rlimit/exec/wait regression protects adjacent process behavior.
 - Maintenance boundary: this is a compatibility shim for the bundled busybox root, not a general PATH resolver or package manager. Future additions should extend the applet allowlist deliberately.
+
+
+## Additional clock_gettime04 evidence-only follow-up on 2026-06-02
+
+Files changed: none.
+
+Behavior:
+
+- No kernel, syscall, libc-root, or synthetic filesystem behavior was changed for this follow-up.
+- `clock_gettime04` was only revalidated and added to the milestone-02 candidate bank based on targeted RV/LA x musl/glibc parser-clean evidence.
+
+POSIX/Linux-visible impact:
+
+- Syscall/errno/flag/ABI impact: none in this commit; existing `clock_gettime` behavior was observed to satisfy this case.
+- FD/signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: low for this documentation-only update. The adjacent RV/LA regression subset protects existing clock/gettimeofday/times anchors.
+- Maintenance boundary: this does not broaden time syscall semantics; future time-lane promotions still need separate targeted evidence and adjacent regression proof.

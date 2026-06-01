@@ -299,3 +299,12 @@ waitpid01
 wait401
 wait402
 waitid01
+
+
+## clock_gettime04 evidence-only follow-up
+
+clock_gettime04
+clock_gettime02
+gettimeofday01
+gettimeofday02
+times01
