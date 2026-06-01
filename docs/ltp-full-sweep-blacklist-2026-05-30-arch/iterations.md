@@ -293,9 +293,11 @@ Pending runs will append: command, raw log path, parser summary, marker audit, c
 - Suite summaries: `ltp-musl` passed=598 failed=1729 timed_out=27; `ltp-glibc` passed=606 failed=1725 timed_out=28.
 - Blacklist delta: none.  This is the first closed RV full-sweep with the RV-only overlay; skipped/blacklisted cases are not counted as PASS or stable-promotion evidence.
 
-## 2026-05-31 follow-up: remote-submission blacklist mode
+## 2026-05-31 follow-up: remote-submission blacklist mode (superseded on 2026-06-01)
 
 User requirement: submitting this experimental branch to online evaluation should run the blacklist full-sweep mode, not the stable list.
+
+Note: this default was later reverted in the 2026-06-01 online-friendly stable-default follow-up below after remote score-table evidence showed the full sweep is not score-friendly as an implicit online path.
 
 Change:
 
@@ -325,3 +327,31 @@ Result:
 - `strings kernel-rv` showed the RV-only `kill10` overlay and common entries such as `pthserv` embedded in the built submission kernel.
 - `strings kernel-la` showed LA-only entries such as `creat07` / `fsync02` and common entries such as `pthserv` embedded in the built submission kernel.
 - This is build-mode wiring only; the closed runtime evidence remains `rv-arch002` and `la-arch012` above.
+
+## 2026-06-01 follow-up: online-friendly stable default
+
+Remote score-table evidence showed that making `make` / `make all` default to the full all-minus-blacklist sweep is not score-friendly: the remote evaluator can spend time/output budget in the long sweep before preserving the known high-value stable whitelist coverage, and the LA blacklist currently excludes two stable-list cases (`fcntl16`, `write01`).  The blacklist closure remains useful experimental evidence, but it should not be the implicit online scoring path.
+
+Change:
+
+- `REMOTE_LTP_CASES ?= stable` is restored as the default for `make` / `make all`.
+- `make all REMOTE_LTP_CASES=blacklist` remains the explicit opt-in path for the closed full-sweep blacklist experiment.
+- The Makefile only requires and injects `REMOTE_LTP_BLACKLIST_*_FILE` contents when `REMOTE_LTP_CASES` is one of `blacklist`, `all-minus-blacklist`, or `sweep:blacklist`.
+- Local `./run-eval.sh rv|la`, `make kernel-rv`, and `make kernel-la` behavior remains opt-in for blacklist mode unless their env vars are explicitly provided.
+
+Validation:
+
+```bash
+make -n all
+make -n all REMOTE_LTP_CASES=blacklist
+make all
+python3 -m json.tool docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json
+git diff --check -- Makefile docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-report.md docs/ltp-full-sweep-blacklist-2026-05-30-arch/iterations.md docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json
+```
+
+Result:
+
+- Default `make -n all` shows `LTP_CASES="stable"` for both RV and LA and does not inject blacklist env variables.
+- Opt-in `make -n all REMOTE_LTP_CASES=blacklist` still shows `LTP_CASES="blacklist"` plus RV/LA blacklist env injection.
+- `make all` completed with the stable default and regenerated `kernel-rv` / `kernel-la`; disk stayed at `/` and `/root` 59G size, 23G used, 34G available, 41% used before and after.
+- This is build-mode wiring only; no new full LTP runtime claim is made in this follow-up.
