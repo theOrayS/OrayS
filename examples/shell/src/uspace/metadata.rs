@@ -6,23 +6,26 @@ use axerrno::LinuxError;
 use axfs::fops::{FileAttr, FileType, OpenOptions};
 use linux_raw_sys::general;
 use std::string::{String, ToString};
+use std::vec::Vec;
 
-use super::UserProcess;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{FdEntry, resolve_dirfd_path};
+use super::fd_table::{resolve_dirfd_path, FdEntry};
 use super::linux_abi::{
-    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
-    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
-    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
-    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
+    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
+    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
+    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
+    STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
+    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYSFS_MAGIC, TMPFS_MAGIC,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
-use super::user_memory::{read_cstr, validate_user_write, write_user_bytes, write_user_value};
+use super::user_memory::{read_cstr, read_user_bytes, write_user_bytes, write_user_value};
+use super::UserProcess;
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 const LINUX_PATH_MAX: usize = 4096;
+const XATTR_CREATE: usize = 0x1;
+const XATTR_REPLACE: usize = 0x2;
 
 pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general::stat {
     let st_mode = file_type_mode(attr.file_type()) | attr.perm().bits() as u32;
@@ -105,6 +108,28 @@ impl UserProcess {
         self.path_symlinks.lock().get(path).cloned()
     }
 
+    pub(super) fn path_symlink_names_in_dir(&self, dir: &str) -> Vec<String> {
+        let prefix = if dir == "/" {
+            String::from("/")
+        } else {
+            let mut prefix = dir.trim_end_matches('/').to_string();
+            prefix.push('/');
+            prefix
+        };
+        self.path_symlinks
+            .lock()
+            .keys()
+            .filter_map(|path| {
+                let name = path.strip_prefix(prefix.as_str())?;
+                if name.is_empty() || name.contains('/') {
+                    None
+                } else {
+                    Some(name.to_string())
+                }
+            })
+            .collect()
+    }
+
     pub(super) fn resolve_path_symlink(&self, path: &str) -> Result<Option<String>, LinuxError> {
         let mut current = path.to_string();
         for _ in 0..40 {
@@ -128,6 +153,60 @@ impl UserProcess {
         st.st_blksize = 512;
         st.st_blocks = 0;
         Some(st)
+    }
+
+    fn set_path_xattr(
+        &self,
+        path: String,
+        name: String,
+        value: Vec<u8>,
+        flags: usize,
+    ) -> Result<(), LinuxError> {
+        if flags & !(XATTR_CREATE | XATTR_REPLACE) != 0 {
+            return Err(LinuxError::EINVAL);
+        }
+        let mut all_xattrs = self.path_xattrs.lock();
+        let attrs = all_xattrs.entry(path).or_default();
+        let exists = attrs.contains_key(name.as_str());
+        if flags & XATTR_CREATE != 0 && exists {
+            return Err(LinuxError::EEXIST);
+        }
+        if flags & XATTR_REPLACE != 0 && !exists {
+            return Err(LinuxError::ENODATA);
+        }
+        attrs.insert(name, value);
+        Ok(())
+    }
+
+    fn get_path_xattr(&self, path: &str, name: &str) -> Result<Vec<u8>, LinuxError> {
+        self.path_xattrs
+            .lock()
+            .get(path)
+            .and_then(|attrs| attrs.get(name).cloned())
+            .ok_or(LinuxError::ENODATA)
+    }
+
+    fn list_path_xattrs(&self, path: &str) -> Vec<u8> {
+        let mut out = Vec::new();
+        if let Some(attrs) = self.path_xattrs.lock().get(path) {
+            for name in attrs.keys() {
+                out.extend_from_slice(name.as_bytes());
+                out.push(0);
+            }
+        }
+        out
+    }
+
+    fn remove_path_xattr(&self, path: &str, name: &str) -> Result<(), LinuxError> {
+        let mut all_xattrs = self.path_xattrs.lock();
+        let attrs = all_xattrs.get_mut(path).ok_or(LinuxError::ENODATA)?;
+        if attrs.remove(name).is_none() {
+            return Err(LinuxError::ENODATA);
+        }
+        if attrs.is_empty() {
+            all_xattrs.remove(path);
+        }
+        Ok(())
     }
 
     pub(super) fn clear_path_chown_special_bits(&self, path: &str, current_mode: u32) {
@@ -532,6 +611,204 @@ pub(super) fn sys_fchown(process: &UserProcess, fd: usize, owner: usize, group: 
     apply_chown_metadata(process, path, &st, owner, group)
 }
 
+fn resolve_xattr_path(
+    process: &UserProcess,
+    dirfd: i32,
+    path: &str,
+    follow_symlink: bool,
+) -> Result<String, LinuxError> {
+    if path.is_empty() {
+        return Err(LinuxError::ENOENT);
+    }
+    if path.len() >= LINUX_PATH_MAX {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+    let mut fds = process.fds.lock();
+    let resolved_path = fds.resolve_path(process, dirfd, path)?;
+    if !follow_symlink && process.path_symlink_stat(resolved_path.as_str()).is_some() {
+        return Ok(resolved_path);
+    }
+    let (record_path, _) = fds.path_stat(process, dirfd, path)?;
+    Ok(record_path)
+}
+
+fn resolve_fd_xattr_path(process: &UserProcess, fd: i32) -> Result<String, LinuxError> {
+    let mut fds = process.fds.lock();
+    if matches!(fds.entry(fd), Ok(FdEntry::Path(_))) {
+        return Err(LinuxError::EBADF);
+    }
+    let (path, _) = fds.stat_with_recorded_path(process, fd)?;
+    path.ok_or(LinuxError::ENODATA)
+}
+
+fn read_xattr_name(process: &UserProcess, name: usize) -> Result<String, LinuxError> {
+    if name == 0 {
+        return Err(LinuxError::EFAULT);
+    }
+    let name = read_cstr(process, name)?;
+    if name.is_empty() {
+        return Err(LinuxError::ERANGE);
+    }
+    Ok(name)
+}
+
+fn sys_setxattr_for_path(
+    process: &UserProcess,
+    path: String,
+    name: usize,
+    value: usize,
+    size: usize,
+    flags: usize,
+) -> isize {
+    let name = match read_xattr_name(process, name) {
+        Ok(name) => name,
+        Err(err) => return neg_errno(err),
+    };
+    let value = match read_user_bytes(process, value, size) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    process
+        .set_path_xattr(path, name, value, flags)
+        .map_or_else(neg_errno, |_| 0)
+}
+
+fn sys_getxattr_for_path(
+    process: &UserProcess,
+    path: String,
+    name: usize,
+    value: usize,
+    size: usize,
+) -> isize {
+    let name = match read_xattr_name(process, name) {
+        Ok(name) => name,
+        Err(err) => return neg_errno(err),
+    };
+    let bytes = match process.get_path_xattr(path.as_str(), name.as_str()) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    if value == 0 || size == 0 {
+        return bytes.len() as isize;
+    }
+    if size < bytes.len() {
+        return neg_errno(LinuxError::ERANGE);
+    }
+    write_user_bytes(process, value, bytes.as_slice())
+        .map_or_else(neg_errno, |_| bytes.len() as isize)
+}
+
+fn sys_listxattr_for_path(process: &UserProcess, path: String, list: usize, size: usize) -> isize {
+    let bytes = process.list_path_xattrs(path.as_str());
+    if list == 0 || size == 0 {
+        return bytes.len() as isize;
+    }
+    if size < bytes.len() {
+        return neg_errno(LinuxError::ERANGE);
+    }
+    write_user_bytes(process, list, bytes.as_slice())
+        .map_or_else(neg_errno, |_| bytes.len() as isize)
+}
+
+fn sys_removexattr_for_path(process: &UserProcess, path: String, name: usize) -> isize {
+    let name = match read_xattr_name(process, name) {
+        Ok(name) => name,
+        Err(err) => return neg_errno(err),
+    };
+    process
+        .remove_path_xattr(path.as_str(), name.as_str())
+        .map_or_else(neg_errno, |_| 0)
+}
+
+pub(super) fn sys_setxattr(
+    process: &UserProcess,
+    pathname: usize,
+    name: usize,
+    value: usize,
+    size: usize,
+    flags: usize,
+) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), true) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_setxattr_for_path(process, path, name, value, size, flags)
+}
+
+pub(super) fn sys_lsetxattr(
+    process: &UserProcess,
+    pathname: usize,
+    name: usize,
+    value: usize,
+    size: usize,
+    flags: usize,
+) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), false) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_setxattr_for_path(process, path, name, value, size, flags)
+}
+
+pub(super) fn sys_fsetxattr(
+    process: &UserProcess,
+    fd: usize,
+    name: usize,
+    value: usize,
+    size: usize,
+    flags: usize,
+) -> isize {
+    let path = match resolve_fd_xattr_path(process, fd as i32) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_setxattr_for_path(process, path, name, value, size, flags)
+}
+
+pub(super) fn sys_getxattr(
+    process: &UserProcess,
+    pathname: usize,
+    name: usize,
+    value: usize,
+    size: usize,
+) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), true) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_getxattr_for_path(process, path, name, value, size)
+}
+
+pub(super) fn sys_lgetxattr(
+    process: &UserProcess,
+    pathname: usize,
+    name: usize,
+    value: usize,
+    size: usize,
+) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), false) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_getxattr_for_path(process, path, name, value, size)
+}
+
 pub(super) fn sys_fgetxattr(
     process: &UserProcess,
     fd: usize,
@@ -539,19 +816,85 @@ pub(super) fn sys_fgetxattr(
     value: usize,
     size: usize,
 ) -> isize {
-    if name == 0 {
-        return neg_errno(LinuxError::EFAULT);
-    }
-    if value != 0 && size != 0 {
-        if let Err(err) = validate_user_write(process, value, size) {
-            return neg_errno(err);
-        }
-    }
-    match process.fds.lock().entry(fd as i32) {
-        Ok(FdEntry::Path(_)) => neg_errno(LinuxError::EBADF),
-        Ok(_) => neg_errno(LinuxError::ENODATA),
-        Err(err) => neg_errno(err),
-    }
+    let path = match resolve_fd_xattr_path(process, fd as i32) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_getxattr_for_path(process, path, name, value, size)
+}
+
+pub(super) fn sys_listxattr(
+    process: &UserProcess,
+    pathname: usize,
+    list: usize,
+    size: usize,
+) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), true) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_listxattr_for_path(process, path, list, size)
+}
+
+pub(super) fn sys_llistxattr(
+    process: &UserProcess,
+    pathname: usize,
+    list: usize,
+    size: usize,
+) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), false) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_listxattr_for_path(process, path, list, size)
+}
+
+pub(super) fn sys_flistxattr(process: &UserProcess, fd: usize, list: usize, size: usize) -> isize {
+    let path = match resolve_fd_xattr_path(process, fd as i32) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_listxattr_for_path(process, path, list, size)
+}
+
+pub(super) fn sys_removexattr(process: &UserProcess, pathname: usize, name: usize) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), true) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_removexattr_for_path(process, path, name)
+}
+
+pub(super) fn sys_lremovexattr(process: &UserProcess, pathname: usize, name: usize) -> isize {
+    let pathname = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let path = match resolve_xattr_path(process, general::AT_FDCWD, pathname.as_str(), false) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_removexattr_for_path(process, path, name)
+}
+
+pub(super) fn sys_fremovexattr(process: &UserProcess, fd: usize, name: usize) -> isize {
+    let path = match resolve_fd_xattr_path(process, fd as i32) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    sys_removexattr_for_path(process, path, name)
 }
 
 pub(super) fn sys_fchownat(
@@ -894,6 +1237,8 @@ pub(super) fn sys_statx(
                 Ok(st) => st,
                 Err(err) => return neg_errno(err),
             }
+        } else if path.is_empty() {
+            return neg_errno(LinuxError::ENOENT);
         } else if flags & general::AT_SYMLINK_NOFOLLOW != 0 {
             let resolved_path = {
                 let table = process.fds.lock();
@@ -957,7 +1302,13 @@ pub(super) fn sys_readlinkat(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
+    if path.len() >= LINUX_PATH_MAX {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
     let resolved_path = if path.is_empty() {
+        if dirfd as i32 == general::AT_FDCWD {
+            return neg_errno(LinuxError::ENOENT);
+        }
         let table = process.fds.lock();
         match table.entry(dirfd as i32).and_then(|entry| {
             fd_entry_path(entry)
@@ -974,6 +1325,19 @@ pub(super) fn sys_readlinkat(
             Err(err) => return neg_errno(err),
         }
     };
+    if process.fs_uid() != 0 {
+        let mut table = process.fds.lock();
+        match table.parent_dirs_searchable(
+            process,
+            resolved_path.as_str(),
+            process.fs_uid(),
+            process.fs_gid(),
+        ) {
+            Ok(true) => {}
+            Ok(false) => return neg_errno(LinuxError::EACCES),
+            Err(err) => return neg_errno(err),
+        }
+    }
     if let Some(fd) = proc_self_fd_number(resolved_path.as_str()) {
         let target = {
             let table = process.fds.lock();

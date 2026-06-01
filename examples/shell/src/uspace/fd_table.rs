@@ -606,7 +606,7 @@ pub(super) fn sys_getdents64(process: &UserProcess, fd: usize, dirp: usize, coun
     if let Err(err) = validate_user_write(process, dirp, count) {
         return neg_errno(err);
     }
-    let bytes = match process.fds.lock().getdents64(fd as i32, count) {
+    let bytes = match process.fds.lock().getdents64(process, fd as i32, count) {
         Ok(bytes) => bytes,
         Err(err) => return neg_errno(err),
     };
@@ -1218,7 +1218,12 @@ impl FdTable {
         Ok(newfd as i32)
     }
 
-    pub(super) fn getdents64(&mut self, fd: i32, max_len: usize) -> Result<Vec<u8>, LinuxError> {
+    pub(super) fn getdents64(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        max_len: usize,
+    ) -> Result<Vec<u8>, LinuxError> {
         let entry = self.entry_mut(fd)?;
         let FdEntry::Directory(dir) = entry else {
             return Err(LinuxError::ENOTDIR);
@@ -1234,6 +1239,7 @@ impl FdTable {
             core::array::from_fn(|_| fops::DirEntry::default());
         let count = dir.dir.read_dir(&mut read_buf).map_err(LinuxError::from)?;
         let mut out = Vec::new();
+        let mut seen_names = Vec::new();
         for item in read_buf[..count].iter() {
             let name = item.name_as_bytes();
             let reclen = align_up(
@@ -1246,6 +1252,9 @@ impl FdTable {
             let entry_path = core::str::from_utf8(name)
                 .ok()
                 .and_then(|name| normalize_path(dir.path.as_str(), name));
+            if let Ok(name) = core::str::from_utf8(name) {
+                seen_names.push(name.to_string());
+            }
             dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
             let start = out.len();
             out.resize(start + reclen, 0);
@@ -1264,6 +1273,38 @@ impl FdTable {
             }
             let name_start = start + offset_of!(general::linux_dirent64, d_name);
             out[name_start..name_start + name.len()].copy_from_slice(name);
+        }
+        for name in process.path_symlink_names_in_dir(dir.path.as_str()) {
+            if seen_names.iter().any(|seen| seen == &name) {
+                continue;
+            }
+            let name_bytes = name.as_bytes();
+            let reclen = align_up(
+                offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
+                8,
+            );
+            if out.len() + reclen > max_len {
+                break;
+            }
+            let entry_path = normalize_path(dir.path.as_str(), name.as_str());
+            dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
+            let start = out.len();
+            out.resize(start + reclen, 0);
+            unsafe {
+                let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
+                ptr::write_unaligned(
+                    dirent,
+                    general::linux_dirent64 {
+                        d_ino: path_inode(entry_path.as_deref()) as _,
+                        d_off: dir.next_dirent_cookie as _,
+                        d_reclen: reclen as _,
+                        d_type: general::DT_LNK as u8,
+                        d_name: Default::default(),
+                    },
+                );
+            }
+            let name_start = start + offset_of!(general::linux_dirent64, d_name);
+            out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
         }
         Ok(out)
     }

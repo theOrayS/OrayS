@@ -26,8 +26,10 @@ use super::linux_abi::neg_errno;
 use super::memory_map::{sys_brk, sys_mmap, sys_mprotect, sys_msync, sys_munmap};
 use super::memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use super::metadata::{
-    sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fgetxattr, sys_fstat,
-    sys_fstatfs, sys_newfstatat, sys_readlinkat, sys_statfs, sys_statx, sys_symlinkat,
+    sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fgetxattr,
+    sys_flistxattr, sys_fremovexattr, sys_fsetxattr, sys_fstat, sys_fstatfs, sys_getxattr,
+    sys_lgetxattr, sys_listxattr, sys_llistxattr, sys_lremovexattr, sys_lsetxattr, sys_newfstatat,
+    sys_readlinkat, sys_removexattr, sys_setxattr, sys_statfs, sys_statx, sys_symlinkat,
     sys_truncate, sys_umask, sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
@@ -157,9 +159,45 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_truncate => sys_truncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_ftruncate => sys_ftruncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchmod => sys_fchmod(&process, tf.arg0(), tf.arg1()),
+        general::__NR_setxattr => sys_setxattr(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_lsetxattr => sys_lsetxattr(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_fsetxattr => sys_fsetxattr(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_getxattr => {
+            sys_getxattr(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
+        general::__NR_lgetxattr => {
+            sys_lgetxattr(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
         general::__NR_fgetxattr => {
             sys_fgetxattr(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
+        general::__NR_listxattr => sys_listxattr(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_llistxattr => sys_llistxattr(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_flistxattr => sys_flistxattr(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_removexattr => sys_removexattr(&process, tf.arg0(), tf.arg1()),
+        general::__NR_lremovexattr => sys_lremovexattr(&process, tf.arg0(), tf.arg1()),
+        general::__NR_fremovexattr => sys_fremovexattr(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchmodat => sys_fchmodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), 0),
         general::__NR_fchmodat2 => {
             sys_fchmodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
