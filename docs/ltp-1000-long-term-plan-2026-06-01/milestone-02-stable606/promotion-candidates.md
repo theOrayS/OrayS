@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 41, so promotion is blocked.
+- Current candidate bank after this preflight: at most 42, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -180,3 +180,17 @@ Updated candidate-bank note after the proc-fd follow-up: 21 deferred rows + `soc
   - `rv-mknod-vfs-regression-20260601T190520Z.log` and `la-mknod-vfs-regression-20260601T190623Z.log` both report 26 PASS / 0 FAIL for `mknod03,mknod04,mknod09` plus stable/setgid/permission anchors.
 
 Updated candidate-bank note after the mknod mode-errno follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` = at most 41 plausible cases, still short of stable606.
+
+### fchownat02
+
+- Pre-fix RV scout state: `fchownat02` failed nofollow symlink rows because `fchownat(..., AT_SYMLINK_NOFOLLOW)` updated the target metadata while subsequent `lstat` still showed the symlink owner/group as 0.
+- Fix: generic `fchownat` nofollow handling now selects the final synthetic symlink path as the metadata record, and synthetic symlink `lstat` applies recorded owner/group metadata. Non-symlink and fd/empty-path behavior is unchanged.
+- Current evidence:
+  - `rv-fchownat02-nofollow-20260601T191133Z.log`: RV musl + glibc PASS for `fchownat02`, parser-clean.
+  - `la-fchownat02-nofollow-20260601T191212Z.log`: LA musl + glibc PASS for `fchownat02`, parser-clean.
+  - `fchownat02-nofollow-rv-la.promotion-candidates.txt`: one four-way candidate, `fchownat02`.
+- Adjacent regression evidence:
+  - `rv-fchownat-symlink-regression-20260601T191310Z.log` and `la-fchownat-symlink-regression-20260601T191417Z.log` both report 32 PASS / 0 FAIL for `fchownat02` plus symlink/readlink/lstat/chown/fchmod anchors.
+  - `fchownat-symlink-regression-rv-la.promotion-candidates.txt` shows all sixteen rows clean across RV + LA x musl + glibc; only `fchownat02` is new relative to current stable and previously banked rows.
+
+Updated candidate-bank note after the fchownat nofollow follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` + `fchownat02` = at most 42 plausible cases, still short of stable606.

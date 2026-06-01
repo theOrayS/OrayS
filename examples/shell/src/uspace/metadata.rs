@@ -152,6 +152,10 @@ impl UserProcess {
         st.st_size = target.len() as _;
         st.st_blksize = 512;
         st.st_blocks = 0;
+        if let Some((uid, gid)) = self.path_owner(path) {
+            st.st_uid = uid;
+            st.st_gid = gid;
+        }
         Some(st)
     }
 
@@ -997,9 +1001,25 @@ pub(super) fn sys_fchownat(
         }
     } else {
         let mut fds = process.fds.lock();
-        let (resolved_path, st) = match fds.path_stat(process, dirfd as i32, path.as_str()) {
-            Ok(result) => result,
-            Err(err) => return neg_errno(err),
+        let (resolved_path, st) = if flags & general::AT_SYMLINK_NOFOLLOW != 0 {
+            let resolved_path = match resolve_dirfd_path(process, &fds, dirfd as i32, path.as_str())
+            {
+                Ok(path) => path,
+                Err(err) => return neg_errno(err),
+            };
+            let st = match process.path_symlink_stat(resolved_path.as_str()) {
+                Some(st) => st,
+                None => match fds.stat_path(process, dirfd as i32, path.as_str()) {
+                    Ok(st) => st,
+                    Err(err) => return neg_errno(err),
+                },
+            };
+            (resolved_path, st)
+        } else {
+            match fds.path_stat(process, dirfd as i32, path.as_str()) {
+                Ok(result) => result,
+                Err(err) => return neg_errno(err),
+            }
         };
         match fds.parent_dirs_searchable(
             process,

@@ -266,3 +266,22 @@ chmod06
 chown04
 fchmod06
 fchown04
+
+## fchownat symlink nofollow follow-up
+
+fchownat02
+symlink01
+symlink02
+readlink01
+readlinkat01
+lstat01
+lstat01_64
+chown01
+chown02
+chown03
+fchownat01
+fchmodat01
+chown04
+fchown04
+chmod07
+fchmod02

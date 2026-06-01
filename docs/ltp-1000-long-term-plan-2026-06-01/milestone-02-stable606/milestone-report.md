@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`.
-- Current candidate bank size for stable606 planning: at most 41 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`.
+- Current candidate bank size for stable606 planning: at most 42 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -227,3 +227,22 @@ Targeted evidence:
 - `la-mknod-vfs-regression-20260601T190623Z.log`: LA mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 41, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+## fchownat02 symlink nofollow metadata follow-up
+
+A generic symlink ownership metadata improvement was added after the mknod mode-errno work:
+
+- `fchownat(..., AT_SYMLINK_NOFOLLOW)` now operates on the final symlink metadata record when the resolved final path is a synthetic symlink instead of following to the target.
+- Synthetic symlink `lstat` rows now apply recorded path ownership so later nofollow stat checks can observe `lchown`-style changes.
+- Non-symlink paths and empty-path fd behavior keep the existing `fchownat` flow. No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-fchownat02-nofollow-20260601T191133Z.log`: `fchownat02` RV musl+glibc PASS, parser-clean.
+- `la-fchownat02-nofollow-20260601T191212Z.log`: `fchownat02` LA musl+glibc PASS, parser-clean.
+- `fchownat02-nofollow-rv-la.promotion-candidates.txt`: combined four-way report; `fchownat02` is clean across RV + LA x musl + glibc.
+- `rv-fchownat-symlink-regression-20260601T191310Z.log`: RV symlink/chown regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `la-fchownat-symlink-regression-20260601T191417Z.log`: LA symlink/chown regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `fchownat-symlink-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `fchownat02` as the only new not-yet-stable candidate from this follow-up.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 42, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.

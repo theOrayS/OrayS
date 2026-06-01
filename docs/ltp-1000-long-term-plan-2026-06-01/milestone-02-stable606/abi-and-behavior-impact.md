@@ -248,3 +248,24 @@ POSIX/Linux-visible impact:
 - Signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: low. The change only narrows the pre-create mode validation branch before any filesystem mutation; RV/LA targeted and VFS regression subsets protect adjacent mknod/open/creat/chmod/chown cases.
 - Maintenance boundary: this is an errno/order compatibility fix, not a full Linux device-node implementation. Future device-node support must revisit the `EPERM` branch with real capability and special-file semantics.
+
+## Additional fchownat symlink nofollow behavior change on 2026-06-02
+
+File:
+
+- `examples/shell/src/uspace/metadata.rs`
+
+Behavior:
+
+- `fchownat(..., AT_SYMLINK_NOFOLLOW)` now checks whether the final resolved path is a synthetic symlink and, when it is, applies ownership metadata to that symlink path rather than to the target path.
+- Synthetic symlink `lstat` now overlays recorded owner/group metadata, so subsequent nofollow stat operations observe prior nofollow chown changes.
+- Non-symlink paths keep the existing `fchownat` path-stat flow, and `AT_EMPTY_PATH` fd behavior is unchanged.
+
+POSIX/Linux-visible impact:
+
+- Syscall/flag surface affected: `fchownat` with `AT_SYMLINK_NOFOLLOW`; `lstat`/`newfstatat(..., AT_SYMLINK_NOFOLLOW)` visible uid/gid for synthetic symlinks.
+- Errno impact: no new errno branches for successful symlink nofollow ownership changes; existing unsupported flags, empty-path, readonly-mount, and permission checks remain in place.
+- FD impact: none for descriptor allocation/dup/close. FD-relative path resolution is reused for the nofollow path.
+- Signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: low. The change reuses the existing per-process path owner map and only changes which path key is selected for final synthetic symlinks; RV/LA symlink/chown regression protects adjacent stable cases.
+- Maintenance boundary: this models synthetic symlink ownership metadata. It does not implement a full Linux inode/symlink permission model or cross-process persistent filesystem metadata.

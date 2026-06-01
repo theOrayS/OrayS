@@ -497,3 +497,41 @@ Parser summary:
 - LA regression subset: 26 PASS / 0 FAIL, no parser caveats.
 
 Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.
+
+## fchownat symlink nofollow validation
+
+Pre-fix evidence:
+
+- In the post-proc-fd RV rescout, `fchownat02` failed both libcs because `AT_SYMLINK_NOFOLLOW` ownership changes were not visible through symlink `lstat`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fchownat02 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fchownat02 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-fchownat02-nofollow-20260601T191133Z.log \
+  target/ltp-1000-milestone-02-stable606/la-fchownat02-nofollow-20260601T191212Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fchownat02,symlink01,symlink02,readlink01,readlinkat01,lstat01,lstat01_64,chown01,chown02,chown03,fchownat01,fchmodat01,chown04,fchown04,chmod07,fchmod02 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fchownat02,symlink01,symlink02,readlink01,readlinkat01,lstat01,lstat01_64,chown01,chown02,chown03,fchownat01,fchmodat01,chown04,fchown04,chmod07,fchmod02 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV targeted raw/summary: `target/ltp-1000-milestone-02-stable606/rv-fchownat02-nofollow-20260601T191133Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA targeted raw/summary: `target/ltp-1000-milestone-02-stable606/la-fchownat02-nofollow-20260601T191212Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/fchownat02-nofollow-rv-la.promotion-candidates.txt`, `.derived.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-fchownat-symlink-regression-20260601T191310Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-fchownat-symlink-regression-20260601T191417Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/fchownat-symlink-regression-rv-la.promotion-candidates.txt`, `.derived.sha256`
+
+Parser summary:
+
+- RV targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: 1 candidate, `fchownat02`.
+- RV regression subset: 32 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 32 PASS / 0 FAIL, no parser caveats.
+- Regression four-way report: 16 clean rows across RV + LA x musl + glibc; `fchownat02` is the only newly banked row from this follow-up.
+
+Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.
