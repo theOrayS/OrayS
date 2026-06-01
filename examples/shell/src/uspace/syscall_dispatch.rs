@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{SYSCALL, register_trap_handler};
+use axhal::trap::{register_trap_handler, SYSCALL};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -65,7 +65,7 @@ use super::task_context::{
 };
 use super::time_abi::{
     sys_adjtimex, sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime,
-    sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_times,
+    sys_getitimer, sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_times,
 };
 use super::user_memory::sys_getrandom;
 
@@ -294,6 +294,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_gettimeofday => sys_gettimeofday(&process, tf.arg0(), tf.arg1()),
         general::__NR_adjtimex => sys_adjtimex(&process, tf.arg0()),
         general::__NR_getrandom => sys_getrandom(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_getitimer => sys_getitimer(&process, tf.arg0() as i32, tf.arg1()),
         general::__NR_setitimer => sys_setitimer(&process, tf.arg0() as i32, tf.arg1(), tf.arg2()),
         general::__NR_times => sys_times(&process, tf.arg0()),
         general::__NR_getrusage => sys_getrusage(&process, tf.arg0() as i32, tf.arg1()),

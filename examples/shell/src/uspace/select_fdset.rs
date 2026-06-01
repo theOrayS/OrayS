@@ -3,8 +3,8 @@ use core::mem::size_of;
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 
-use super::linux_abi::{BITS_PER_USIZE, FD_SET_WORDS, FD_SETSIZE, neg_errno};
-use super::signal_abi::current_unblocked_signal_pending;
+use super::linux_abi::{neg_errno, BITS_PER_USIZE, FD_SETSIZE, FD_SET_WORDS};
+use super::signal_abi::{current_unblocked_signal_pending, install_temporary_signal_mask};
 use super::user_memory::{read_user_value, write_user_value};
 use super::{FdTable, UserProcess};
 
@@ -20,6 +20,13 @@ struct UserPollFd {
     fd: i32,
     events: i16,
     revents: i16,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct PselectSigmaskArg {
+    ss: usize,
+    ss_len: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -131,11 +138,23 @@ pub(super) fn sys_pselect6(
     writefds: usize,
     exceptfds: usize,
     timeout: usize,
-    _sigmask: usize,
+    sigmask: usize,
 ) -> isize {
     if nfds < 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    let _signal_mask_guard = if sigmask == 0 {
+        None
+    } else {
+        let arg = match read_user_value::<PselectSigmaskArg>(process, sigmask) {
+            Ok(arg) => arg,
+            Err(err) => return neg_errno(err),
+        };
+        match install_temporary_signal_mask(process, arg.ss, arg.ss_len) {
+            Ok(guard) => guard,
+            Err(err) => return neg_errno(err),
+        }
+    };
     let nfds = (nfds as usize).min(FD_SETSIZE);
     let read_bits = match read_fd_set(process, readfds) {
         Ok(bits) => bits,
@@ -249,8 +268,11 @@ fn poll_one_fd(table: &FdTable, pollfd: &mut UserPollFd) -> bool {
         pollfd.revents = POLLNVAL;
         return true;
     }
-    if pollfd.events & (POLLIN | POLLPRI) != 0 && table.poll(pollfd.fd, SelectMode::Read) {
-        pollfd.revents |= pollfd.events & (POLLIN | POLLPRI);
+    if pollfd.events & POLLIN != 0 && table.poll(pollfd.fd, SelectMode::Read) {
+        pollfd.revents |= POLLIN;
+    }
+    if pollfd.events & POLLPRI != 0 && table.poll(pollfd.fd, SelectMode::Except) {
+        pollfd.revents |= POLLPRI;
     }
     if pollfd.events & POLLOUT != 0 && table.poll(pollfd.fd, SelectMode::Write) {
         pollfd.revents |= POLLOUT;
@@ -283,12 +305,16 @@ pub(super) fn sys_ppoll(
     fds: usize,
     nfds: usize,
     timeout: usize,
-    _sigmask: usize,
-    _sigsetsize: usize,
+    sigmask: usize,
+    sigsetsize: usize,
 ) -> isize {
     if nfds > FD_SETSIZE {
         return neg_errno(LinuxError::EINVAL);
     }
+    let _signal_mask_guard = match install_temporary_signal_mask(process, sigmask, sigsetsize) {
+        Ok(guard) => guard,
+        Err(err) => return neg_errno(err),
+    };
     let deadline = match read_pselect_deadline(process, timeout) {
         Ok(deadline) => deadline,
         Err(err) => return neg_errno(err),
