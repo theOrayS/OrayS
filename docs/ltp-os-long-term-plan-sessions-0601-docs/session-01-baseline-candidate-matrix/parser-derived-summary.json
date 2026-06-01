@@ -1,0 +1,162 @@
+{
+  "first_targeted_batch": [
+    "getitimer01",
+    "ppoll01",
+    "select02",
+    "diotest4",
+    "execve05",
+    "readlinkat02",
+    "epoll_create02",
+    "nice04",
+    "clone04",
+    "clock_gettime04",
+    "clock_nanosleep02",
+    "nanosleep01",
+    "poll02",
+    "pselect01",
+    "pselect01_64",
+    "settimeofday01",
+    "time-schedule",
+    "fpathconf01",
+    "pathconf01",
+    "rename14",
+    "mknod08",
+    "mknodat01",
+    "diotest1",
+    "diotest2",
+    "diotest3",
+    "diotest5",
+    "diotest6",
+    "mprotect05",
+    "mmap001",
+    "mmap15",
+    "mmap17",
+    "mmap19",
+    "futex_wait02",
+    "futex_wait04",
+    "futex_wake01",
+    "kill02",
+    "tkill01",
+    "tkill02",
+    "vfork01",
+    "vfork02"
+  ],
+  "first_targeted_batch_count": 40,
+  "full_sweep_summaries": {
+    "la": {
+      "closed": true,
+      "enosys": 1279,
+      "internal": {
+        "TBROK": 1031,
+        "TCONF": 1936,
+        "TFAIL": 4041
+      },
+      "marker_audit": {
+        "incomplete_count": 0,
+        "panic_count": 0,
+        "resource_failure_count": 0,
+        "trap_like_count": 0
+      },
+      "panic_trap": 0,
+      "run_id": "la-arch012",
+      "selection": [
+        {
+          "line": 932,
+          "text": "ltp case list: all-minus-blacklist skipped=416 (1952 cases, timeout 15s)"
+        },
+        {
+          "line": 39534,
+          "text": "ltp case list: all-minus-blacklist skipped=419 (1956 cases, timeout 15s)"
+        }
+      ],
+      "wrapper": {
+        "fail_count": 2698,
+        "pass_count": 1207,
+        "raw_fail_markers": 3908,
+        "raw_pass_markers": 0,
+        "raw_run_markers": 3908,
+        "raw_skip_markers": 0,
+        "raw_timeout_markers": 53,
+        "timeout_count": 53
+      }
+    },
+    "rv": {
+      "closed": true,
+      "enosys": 1280,
+      "internal": {
+        "TBROK": 1043,
+        "TCONF": 2663,
+        "TFAIL": 4058
+      },
+      "marker_audit": {
+        "incomplete_count": 0,
+        "panic_count": 0,
+        "resource_failure_count": 0,
+        "trap_like_count": 0
+      },
+      "panic_trap": 0,
+      "run_id": "rv-arch002",
+      "selection": [
+        {
+          "line": 989,
+          "text": "ltp case list: all-minus-blacklist skipped=41 (2327 cases, timeout 15s)"
+        },
+        {
+          "line": 43762,
+          "text": "ltp case list: all-minus-blacklist skipped=44 (2331 cases, timeout 15s)"
+        }
+      ],
+      "wrapper": {
+        "fail_count": 3453,
+        "pass_count": 1204,
+        "raw_fail_markers": 4658,
+        "raw_pass_markers": 0,
+        "raw_run_markers": 4658,
+        "raw_skip_markers": 0,
+        "raw_timeout_markers": 55,
+        "timeout_count": 55
+      }
+    }
+  },
+  "inputs": {
+    "la": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/la-arch012.log",
+    "rv": "target/ltp-full-sweep-blacklist-2026-05-30-arch/raw/rv-arch002.log"
+  },
+  "promotion_candidate_report": {
+    "blocked_count": 1768,
+    "candidate_count": 563,
+    "clean_candidates_already_in_stable460": 457,
+    "clean_candidates_not_in_stable460": 106,
+    "lane_counts_for_clean_not_stable": {
+      "VFS/metadata/path": 7,
+      "futex/process/IPC": 21,
+      "mmap/mm/resource": 18,
+      "network/proc/synthetic": 4,
+      "other/low-priority or harness": 48,
+      "time/select/signal": 8
+    },
+    "required_arches": [
+      "la",
+      "rv"
+    ],
+    "required_libcs": [
+      "glibc",
+      "musl"
+    ]
+  },
+  "session": "01-baseline-candidate-matrix",
+  "sha256": {
+    "la": "41a5fdbba4a56a4ea76a168d2c9c6aa1e86a572d09de734a43a5365ec52c84df",
+    "rv": "70a3f9cab0c5c7a9a2743f168cabfd2eaafb7c01565b1630a02f9604aca5f096"
+  },
+  "stable_count": {
+    "duplicates": 0,
+    "total": 460,
+    "unique": 460
+  },
+  "summary_json": {
+    "la": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/summaries/la-arch012-summary.json",
+    "rv": "docs/ltp-full-sweep-blacklist-2026-05-30-arch/summaries/rv-arch002-summary.json"
+  },
+  "team_runtime_note": "omx team 5:executor was attempted after context snapshot, but OMX refused because the leader worktree contains pre-existing unrelated dirty/untracked files; no unrelated files were stashed, committed, or reverted."
+}
