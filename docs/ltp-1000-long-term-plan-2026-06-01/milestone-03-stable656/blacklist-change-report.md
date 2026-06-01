@@ -15,6 +15,10 @@ No blacklist changes were made in this checkpoint.
 | `mmap10_1` | missing testcase inventory | excluded from promotion; no blacklist change |
 | `vma02` | `TCONF` libnuma requirement | excluded from promotion; no blacklist change |
 
+## Closed arch-sweep mining
+
+Re-mining `rv-arch002.log` and `la-arch012.log` did not change the blacklist. The not-stable four-way-clean filter was empty, and remaining failures/TCONF/TBROK/TFAIL/ENOSYS/timeout rows are blocker evidence only.
+
 ## Boundary
 
 These failures are not hidden. They are not counted as PASS, not promoted to stable, and not converted into blacklist credit. If future full-sweep lanes need temporary blacklist isolation, the report must record the severe-blocker reason, source, and removal condition separately.

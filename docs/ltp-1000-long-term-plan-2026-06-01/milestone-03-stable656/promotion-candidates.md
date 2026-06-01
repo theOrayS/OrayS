@@ -21,6 +21,14 @@ Combined parser report:
 
 `readlinkat02` is RV-clean but LA musl still has `TFAIL`, so it is not eligible. `fsync02`, `nice05`, `mincore03`, `shmat1`, `futex_wait05`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `select02`, and `execve05` remain blocked or incomplete for the reasons in `validation.md` and the combined parser report.
 
+## Closed arch-sweep mining result
+
+Closed sweep artifact:
+
+- `target/ltp-1000-milestone-03-stable656/arch-sweep-rv002-la012-not-stable606-20260601T224223Z.promotion-candidates.txt`
+
+Result: the report contains 563 historical four-way-clean candidates overall, but the live-stable606 filter file is empty. No additional not-yet-stable four-way-clean case can be promoted from these closed logs.
+
 ## Stable-list decision
 
 Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 2.
