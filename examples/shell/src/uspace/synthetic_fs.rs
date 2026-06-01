@@ -1,12 +1,11 @@
 use axerrno::LinuxError;
 use linux_raw_sys::general;
-use memory_addr::PAGE_SIZE_4K;
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
-use super::UserProcess;
-use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry};
+use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry};
 use super::linux_abi::{
     DEFAULT_GROUP_CONTENT, DEFAULT_PASSWD_CONTENT, ETC_GROUP_PATH, ETC_PASSWD_PATH,
     PROC_SELF_MAPS_PATH, USER_ASPACE_BASE, USER_STACK_SIZE, USER_STACK_TOP,
@@ -14,6 +13,9 @@ use super::linux_abi::{
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
 use super::task_registry::{user_thread_entry_by_process_pid, user_thread_entry_by_tid};
+use super::UserProcess;
+
+const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 
 fn proc_maps_perms(prot: u32, shared: bool) -> String {
     let mut perms = String::new();
@@ -87,6 +89,91 @@ pub(super) fn proc_self_maps_fd_entry(process: &UserProcess) -> FdEntry {
 pub(super) fn proc_self_maps_path_entry(process: &UserProcess) -> FdEntry {
     let content_len = proc_self_maps_content(process).len();
     FdEntry::Path(PathEntry::synthetic_file(PROC_SELF_MAPS_PATH, content_len))
+}
+
+fn proc_pagemap_target_path(process: &UserProcess, path: &str) -> Option<(String, i32)> {
+    let normalized = normalize_path("/", path)?;
+    if normalized == PROC_SELF_PAGEMAP_PATH {
+        return Some((normalized, process.pid()));
+    }
+    let rest = normalized.strip_prefix("/proc/")?;
+    let pid_text = rest.strip_suffix("/pagemap")?;
+    pid_text.parse::<i32>().ok().map(|pid| (normalized, pid))
+}
+
+fn proc_pagemap_snapshot(target: &UserProcess, path: String) -> ProcPagemapEntry {
+    let brk = *target.brk.lock();
+    let text_start = USER_ASPACE_BASE;
+    let text_end = text_start + PAGE_SIZE_4K;
+    let heap_start = align_down(brk.start, PAGE_SIZE_4K);
+    let heap_end = align_up(brk.end.max(brk.start + PAGE_SIZE_4K), PAGE_SIZE_4K);
+    let stack_top = align_down(USER_STACK_TOP, PAGE_SIZE_4K);
+    let stack_base = stack_top.saturating_sub(USER_STACK_SIZE);
+    let mut ranges = Vec::new();
+    ranges.push((text_start, text_end));
+    ranges.push((heap_start, heap_end));
+    ranges.push((stack_base, stack_top));
+    for region in target.mmap_regions() {
+        ranges.push((region.start, region.end()));
+    }
+    ranges.sort_by_key(|(start, _)| *start);
+
+    let aspace = target.aspace.lock();
+    let mut present_ranges = Vec::<(u64, u64)>::new();
+    for (start, end) in ranges {
+        let mut page = align_down(start, PAGE_SIZE_4K);
+        let end = align_up(end.max(start), PAGE_SIZE_4K);
+        while page < end {
+            if aspace.page_table().query(VirtAddr::from(page)).is_ok() {
+                push_present_pagemap_page(&mut present_ranges, (page / PAGE_SIZE_4K) as u64);
+            }
+            match page.checked_add(PAGE_SIZE_4K) {
+                Some(next) => page = next,
+                None => break,
+            }
+        }
+    }
+    let max_page = USER_STACK_TOP.div_ceil(PAGE_SIZE_4K) as u64;
+    ProcPagemapEntry {
+        path,
+        present_ranges: Arc::new(present_ranges),
+        offset: 0,
+        size: max_page.saturating_mul(core::mem::size_of::<u64>() as u64),
+    }
+}
+
+fn push_present_pagemap_page(ranges: &mut Vec<(u64, u64)>, page_index: u64) {
+    if let Some((_, end)) = ranges.last_mut() {
+        if *end == page_index {
+            *end = end.saturating_add(1);
+            return;
+        }
+        if *end > page_index {
+            return;
+        }
+    }
+    ranges.push((page_index, page_index.saturating_add(1)));
+}
+
+pub(super) fn proc_pagemap_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, pid) = proc_pagemap_target_path(process, path)?;
+    if pid == process.pid() {
+        return Some(FdEntry::ProcPagemap(proc_pagemap_snapshot(process, path)));
+    }
+    user_thread_entry_by_process_pid(pid)
+        .map(|entry| FdEntry::ProcPagemap(proc_pagemap_snapshot(entry.process.as_ref(), path)))
+}
+
+pub(super) fn proc_pagemap_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, pid) = proc_pagemap_target_path(process, path)?;
+    if pid != process.pid() && user_thread_entry_by_process_pid(pid).is_none() {
+        return None;
+    }
+    let max_page = USER_STACK_TOP.div_ceil(PAGE_SIZE_4K);
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        path.as_str(),
+        max_page.saturating_mul(core::mem::size_of::<u64>()),
+    )))
 }
 
 fn proc_stat_target_process(process: &UserProcess, path: &str) -> Option<(i32, UserProcessStat)> {
