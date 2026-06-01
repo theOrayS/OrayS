@@ -154,3 +154,49 @@ Parser summary:
 - RV regression subset: 22 PASS / 0 FAIL, no parser caveats.
 - LA regression subset: 22 PASS / 0 FAIL, no parser caveats.
 - New four-way not-yet-stable candidates from this fix: `mmap04`, `vma01`.
+
+
+## times03 CPU accounting validation
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=times03 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=times03 LTP_CASE_TIMEOUT_SECS=120 timeout 60m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-times03-postfix-20260601T164216Z.log \
+  target/ltp-1000-milestone-02-stable606/la-times03-postfix-20260601T164436Z.log
+```
+
+Artifacts:
+
+- RV singleton raw/summary: `target/ltp-1000-milestone-02-stable606/rv-times03-postfix-20260601T164216Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA singleton raw/summary: `target/ltp-1000-milestone-02-stable606/la-times03-postfix-20260601T164436Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way report: `target/ltp-1000-milestone-02-stable606/times03-rv-la-postfix.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV singleton: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA singleton: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Four-way candidate report: 1 candidate, `times03`.
+
+## times03 adjacent time regression subset
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=times01,times03,gettimeofday01,gettimeofday02,clock_gettime02 LTP_CASE_TIMEOUT_SECS=60 timeout 50m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=times01,times03,gettimeofday01,gettimeofday02,clock_gettime02 LTP_CASE_TIMEOUT_SECS=120 timeout 70m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-times03-regression-20260601T164708Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-times03-regression-20260601T164956Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way report: `target/ltp-1000-milestone-02-stable606/times03-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV regression subset: 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA regression subset: 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `times01`, `times03`, `gettimeofday01`, `gettimeofday02`, and `clock_gettime02` all clean across RV + LA x musl + glibc; only `times03` is new relative to current stable list.

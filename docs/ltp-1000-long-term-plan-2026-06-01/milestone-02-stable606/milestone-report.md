@@ -71,4 +71,23 @@ Targeted evidence:
 - `la-proc-maps-mmap-regression-20260601T162755Z.log`: LA mmap/proc maps regression subset 22 PASS / 0 FAIL, no internal caveats.
 - `proc-maps-mmap-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the eleven clean rows, new not-yet-stable candidates are `mmap04` and `vma01`.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 25, still short of +50, and no final stable606 gate has been run.
+Promotion remained blocked after the proc-maps fix: the stable606 candidate bank was at most 25, still short of +50, and no final stable606 gate had been run.
+
+
+## times03 CPU accounting follow-up
+
+A generic `times()` accounting improvement was added after the proc-maps work:
+
+- `UserProcess` now records a process start clock tick and waited-child user/system tick totals.
+- `times()` now returns `USER_HZ` clock ticks instead of milliseconds and fills `tms_utime`, `tms_stime`, `tms_cutime`, and `tms_cstime` from process lifetime and waited-child accounting.
+- `wait4`/`waitid` accumulate an exited waited child's self and descendant CPU counters before teardown.
+
+Targeted evidence:
+
+- `rv-times03-postfix-20260601T164216Z.log`: `times03` RV musl+glibc PASS, parser-clean.
+- `la-times03-postfix-20260601T164436Z.log`: `times03` LA musl+glibc PASS, parser-clean.
+- `rv-times03-regression-20260601T164708Z.log`: RV time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `la-times03-regression-20260601T164956Z.log`: LA time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `times03-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the five clean rows, the new not-yet-stable candidate is `times03`.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 26, still short of +50, and no final stable606 gate has been run.

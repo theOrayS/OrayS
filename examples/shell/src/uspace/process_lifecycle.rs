@@ -266,6 +266,9 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         virtual_timer_interval_us: AtomicU64::new(0),
         prof_timer_deadline_us: AtomicU64::new(0),
         prof_timer_interval_us: AtomicU64::new(0),
+        start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
+        waited_child_user_ticks: AtomicU64::new(0),
+        waited_child_system_ticks: AtomicU64::new(0),
         eval_watchdog_deadline_us: AtomicU64::new(0),
         child_wait_blocked: AtomicBool::new(false),
         syscall_wait_blocked: AtomicBool::new(false),
@@ -518,13 +521,7 @@ impl UserProcess {
         self.shared_mmap_ranges.lock().push((start, size, flags));
     }
 
-    pub(super) fn record_mmap_region(
-        &self,
-        start: usize,
-        size: usize,
-        prot: u32,
-        shared: bool,
-    ) {
+    pub(super) fn record_mmap_region(&self, start: usize, size: usize, prot: u32, shared: bool) {
         let Some(end) = start.checked_add(size) else {
             return;
         };
@@ -700,6 +697,9 @@ impl UserProcess {
             virtual_timer_interval_us: AtomicU64::new(0),
             prof_timer_deadline_us: AtomicU64::new(0),
             prof_timer_interval_us: AtomicU64::new(0),
+            start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
+            waited_child_user_ticks: AtomicU64::new(0),
+            waited_child_system_ticks: AtomicU64::new(0),
             eval_watchdog_deadline_us: AtomicU64::new(
                 self.eval_watchdog_deadline_us.load(Ordering::Acquire),
             ),
@@ -818,6 +818,21 @@ impl UserProcess {
         };
         let status = child.process.wait_status();
         let child_pid = child.pid;
+        let child_usage = super::time_abi::process_times(child.process.as_ref());
+        self.waited_child_user_ticks.fetch_add(
+            child_usage
+                .tms_utime
+                .saturating_add(child_usage.tms_cutime)
+                .max(0) as u64,
+            Ordering::AcqRel,
+        );
+        self.waited_child_system_ticks.fetch_add(
+            child_usage
+                .tms_stime
+                .saturating_add(child_usage.tms_cstime)
+                .max(0) as u64,
+            Ordering::AcqRel,
+        );
         let _ = child.task.join();
         child.process.teardown();
         drop(child);

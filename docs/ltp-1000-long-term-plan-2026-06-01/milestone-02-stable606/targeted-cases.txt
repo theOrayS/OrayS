@@ -148,3 +148,12 @@ mmap10
 mmap11
 mincore01
 mprotect05
+
+
+## times03 CPU accounting targeted/regression cases
+
+times03
+times01
+gettimeofday01
+gettimeofday02
+clock_gettime02
