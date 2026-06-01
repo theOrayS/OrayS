@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`.
-- Current candidate bank size for stable606 planning: at most 42 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`, `setrlimit04`.
+- Current candidate bank size for stable606 planning: at most 43 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -246,3 +246,22 @@ Targeted evidence:
 - `fchownat-symlink-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `fchownat02` as the only new not-yet-stable candidate from this follow-up.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 42, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+## setrlimit04 busybox applet exec follow-up
+
+A generic exec compatibility improvement was added after the fchownat nofollow work:
+
+- Missing `/bin/<applet>` and `/usr/bin/<applet>` paths are mapped to the current libc root's busybox when `<applet>` is in the existing busybox applet allowlist and no real file exists at the requested path.
+- `argv[0]` is normalized to the applet basename for those fallback execs, preserving the existing `/bin/sh` compatibility path while adding other standard busybox applets such as `true` generically.
+- Existing real files still win; no LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-setrlimit04-bin-true-20260601T191920Z.log`: `setrlimit04` RV musl+glibc PASS, parser-clean.
+- `la-setrlimit04-bin-true-20260601T191959Z.log`: `setrlimit04` LA musl+glibc PASS, parser-clean.
+- `setrlimit04-bin-true-rv-la.promotion-candidates.txt`: combined four-way report; `setrlimit04` is clean across RV + LA x musl + glibc.
+- `rv-setrlimit-exec-regression-20260601T192057Z.log`: RV rlimit/exec/wait regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `la-setrlimit-exec-regression-20260601T192159Z.log`: LA rlimit/exec/wait regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `setrlimit-exec-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eleven rows are clean, with `setrlimit04` as the only new not-yet-stable candidate from this follow-up.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 43, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.

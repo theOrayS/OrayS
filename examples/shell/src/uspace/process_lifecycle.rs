@@ -16,27 +16,27 @@ use std::vec::Vec;
 
 use super::fd_table::release_posix_record_locks_for_process;
 use super::futex;
-use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
+use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
-use super::runtime_paths::current_cwd;
+use super::runtime_paths::{current_cwd, is_busybox_applet_name};
 use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_registered};
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
-    UserTaskExt,
+    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
+    user_pc,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    live_user_thread_count, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
+    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
 };
-use super::{ChildTask, FdTable, UserProcess, NO_EXIT_GROUP_CODE};
+use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -324,8 +324,21 @@ fn existing_busybox_for_exec_root(exec_root: &str) -> Option<String> {
     })
 }
 
+fn standard_bin_busybox_applet_name(path: &str) -> Option<&str> {
+    let applet = path
+        .strip_prefix("/bin/")
+        .or_else(|| path.strip_prefix("/usr/bin/"))?;
+    if applet.is_empty() || applet.contains('/') || !is_busybox_applet_name(applet) {
+        None
+    } else {
+        Some(applet)
+    }
+}
+
 fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [String]) -> String {
-    let needs_busybox = matches!(path.as_str(), "/bin/sh" | "/busybox" | "/bin/busybox")
+    let applet_name = standard_bin_busybox_applet_name(path.as_str());
+    let needs_busybox = (matches!(path.as_str(), "/busybox" | "/bin/busybox")
+        || applet_name.is_some())
         && !matches!(std::fs::metadata(path.as_str()), Ok(meta) if meta.is_file());
     if !needs_busybox {
         return path;
@@ -334,10 +347,10 @@ fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [S
     let Some(busybox) = existing_busybox_for_exec_root(process.exec_root().as_str()) else {
         return path;
     };
-    if path == "/bin/sh" {
+    if let Some(applet) = applet_name {
         if let Some(argv0) = argv.first_mut() {
-            if argv0 == "/bin/sh" || argv0.ends_with("/sh") {
-                *argv0 = "sh".into();
+            if argv0 == path.as_str() || argv0.rsplit('/').next() == Some(applet) {
+                *argv0 = applet.into();
             }
         }
     }

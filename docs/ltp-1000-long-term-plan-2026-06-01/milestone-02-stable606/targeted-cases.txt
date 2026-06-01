@@ -285,3 +285,17 @@ chown04
 fchown04
 chmod07
 fchmod02
+
+## setrlimit04 busybox applet exec follow-up
+
+setrlimit04
+setrlimit01
+setrlimit02
+setrlimit03
+getrlimit01
+getrlimit02
+fork01
+waitpid01
+wait401
+wait402
+waitid01

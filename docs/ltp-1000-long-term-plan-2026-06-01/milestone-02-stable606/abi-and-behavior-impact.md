@@ -269,3 +269,25 @@ POSIX/Linux-visible impact:
 - Signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: low. The change reuses the existing per-process path owner map and only changes which path key is selected for final synthetic symlinks; RV/LA symlink/chown regression protects adjacent stable cases.
 - Maintenance boundary: this models synthetic symlink ownership metadata. It does not implement a full Linux inode/symlink permission model or cross-process persistent filesystem metadata.
+
+## Additional busybox applet exec fallback behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/process_lifecycle.rs`
+- `examples/shell/src/uspace/runtime_paths.rs`
+
+Behavior:
+
+- When `execve` targets a missing `/bin/<name>` or `/usr/bin/<name>` path and `<name>` is in the existing busybox applet allowlist, the loader falls back to the current libc root's busybox binary.
+- `argv[0]` is normalized to the applet basename for the fallback, matching busybox applet dispatch expectations.
+- Existing real files at the requested path still take precedence; `/busybox` and `/bin/busybox` compatibility is preserved.
+
+POSIX/Linux-visible impact:
+
+- Syscall/path surface affected: `execve`/`execvp`/`execlp` of standard busybox applet paths under `/bin` and `/usr/bin` when those files are absent from the guest root.
+- Errno impact: a missing applet path that can be served by busybox now succeeds instead of returning `ENOENT`; names outside the allowlist and missing busybox binaries still fail as before.
+- FD impact: successful exec still runs the existing `FD_CLOEXEC` close path; descriptor allocation/dup/close semantics are unchanged.
+- Signal/futex/mmap/user-pointer copy impact: none beyond normal exec image replacement.
+- Resource/lifetime risk: moderate-low. This broadens the standard utility exec surface but is constrained by an explicit busybox applet allowlist and by real-file precedence; RV/LA rlimit/exec/wait regression protects adjacent process behavior.
+- Maintenance boundary: this is a compatibility shim for the bundled busybox root, not a general PATH resolver or package manager. Future additions should extend the applet allowlist deliberately.

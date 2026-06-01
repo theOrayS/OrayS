@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 42, so promotion is blocked.
+- Current candidate bank after this preflight: at most 43, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -194,3 +194,17 @@ Updated candidate-bank note after the mknod mode-errno follow-up: 21 deferred ro
   - `fchownat-symlink-regression-rv-la.promotion-candidates.txt` shows all sixteen rows clean across RV + LA x musl + glibc; only `fchownat02` is new relative to current stable and previously banked rows.
 
 Updated candidate-bank note after the fchownat nofollow follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` + `fchownat02` = at most 42 plausible cases, still short of stable606.
+
+### setrlimit04
+
+- Pre-fix RV scout state: `setrlimit04` failed because `execlp(/bin/true, /bin/true, ...)` returned `ENOENT`.
+- Fix: generic exec fallback for missing `/bin/<busybox-applet>` and `/usr/bin/<busybox-applet>` paths. The applet name must be in the existing busybox allowlist, real filesystem files still take precedence, and `argv[0]` is normalized to the applet basename.
+- Current evidence:
+  - `rv-setrlimit04-bin-true-20260601T191920Z.log`: RV musl + glibc PASS for `setrlimit04`, parser-clean.
+  - `la-setrlimit04-bin-true-20260601T191959Z.log`: LA musl + glibc PASS for `setrlimit04`, parser-clean.
+  - `setrlimit04-bin-true-rv-la.promotion-candidates.txt`: one four-way candidate, `setrlimit04`.
+- Adjacent regression evidence:
+  - `rv-setrlimit-exec-regression-20260601T192057Z.log` and `la-setrlimit-exec-regression-20260601T192159Z.log` both report 22 PASS / 0 FAIL for `setrlimit04` plus stable rlimit/fork/wait anchors.
+  - `setrlimit-exec-regression-rv-la.promotion-candidates.txt` shows all eleven rows clean across RV + LA x musl + glibc; only `setrlimit04` is new relative to current stable and previously banked rows.
+
+Updated candidate-bank note after the busybox applet exec follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` + `fchownat02` + `setrlimit04` = at most 43 plausible cases, still short of stable606.
