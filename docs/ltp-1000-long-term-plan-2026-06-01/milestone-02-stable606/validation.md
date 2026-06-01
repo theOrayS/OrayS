@@ -612,3 +612,57 @@ Parser summary:
 - Regression four-way report: 5 clean rows across RV + LA x musl + glibc; `clock_gettime04` is the only newly banked row from this follow-up.
 
 Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.
+
+
+## legacy clean-tail evidence-only validation
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=locktests,ltpServer,stress LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=locktests,ltpServer,stress LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-legacy-clean-tail-scout-20260601T194031Z.log \
+  target/ltp-1000-milestone-02-stable606/la-legacy-clean-tail-scout-20260601T194116Z.log
+```
+
+Artifacts:
+
+- RV raw/summary: `target/ltp-1000-milestone-02-stable606/rv-legacy-clean-tail-scout-20260601T194031Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA raw/summary: `target/ltp-1000-milestone-02-stable606/la-legacy-clean-tail-scout-20260601T194116Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Four-way report: `target/ltp-1000-milestone-02-stable606/legacy-clean-tail-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV targeted: 6 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 6 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Four-way report: 3 candidates: `locktests`, `ltpServer`, `stress`; blocked/incomplete 0.
+
+Non-LTP caveat: these rows are helper/harness-style LTP binaries and were banked only as named cases. They do not prove broad stress, lock, or server semantics. Full stable606 promotion and full all-minus-blacklist sweep were not run.
+
+## Non-countable follow-up scout validation
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=sched_setaffinity01,signal01,nice04,clone04,gethostname02,gethostid01,getpgid01,kill05,kill10 LTP_CASE_TIMEOUT_SECS=90 timeout 80m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=readlinkat02,readlink03,statx01,statx04,fcntl30,pipe15,pipe2_03,writev03,pwritev03 LTP_CASE_TIMEOUT_SECS=90 timeout 80m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=readlinkat02 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-02-stable606/rv-light-process-scout-20260601T193756Z.log
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-02-stable606/rv-vfs-fd-remainder-scout-20260601T194216Z.log
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-02-stable606/la-readlinkat02-rescout-20260601T194310Z.log
+```
+
+Artifacts:
+
+- Process/signal/scheduler RV scout: `target/ltp-1000-milestone-02-stable606/rv-light-process-scout-20260601T193756Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- VFS/FD RV scout: `target/ltp-1000-milestone-02-stable606/rv-vfs-fd-remainder-scout-20260601T194216Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA readlinkat follow-up: `target/ltp-1000-milestone-02-stable606/la-readlinkat02-rescout-20260601T194310Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+
+Parser summary and promotion decision:
+
+- RV process/signal/scheduler scout: 0 PASS / 8 FAIL, internal `TFAIL=5`, `TBROK=3`, `TCONF=1`, timeout matches 1, panic/trap matches 1; `kill10` is UNKNOWN with panic/trap. Counted candidates: 0.
+- RV VFS/FD remainder scout: 2 PASS / 16 FAIL, internal `TFAIL=4`, `TBROK=10`, `TCONF=2`; only `readlinkat02` was RV clean. Counted candidates: 0 from this batch until four-way proof exists.
+- LA readlinkat02 follow-up: 1 PASS / 1 FAIL; LA musl has one `TFAIL`, so `readlinkat02` is blocked and not banked.
+
+These failures remain visible and non-countable; no blacklist/SKIP/status0 evidence was used.

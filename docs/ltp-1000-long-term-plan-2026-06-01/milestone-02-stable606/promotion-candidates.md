@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 44, so promotion is blocked.
+- Current candidate bank after this preflight: at most 47, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -223,3 +223,22 @@ Updated candidate-bank note after the busybox applet exec follow-up: 21 deferred
   - `clock-time-regression-rv-la.promotion-candidates.txt` shows all five rows clean across RV + LA x musl + glibc; only `clock_gettime04` is new relative to current stable and previously banked rows.
 
 Updated candidate-bank note after the clock_gettime04 evidence-only follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` + `fchownat02` + `setrlimit04` + `clock_gettime04` = at most 44 plausible cases, still short of stable606.
+
+
+### locktests, ltpServer, and stress
+
+- Pre-follow-up state: these were the remaining clean-tail rows from archived scouting that were not present in the live stable556 list and not already banked for milestone-02.
+- Fix: none. This is evidence-only banking of three named LTP helper/harness-style binaries after fresh four-way parser-clean validation.
+- Current evidence:
+  - `rv-legacy-clean-tail-scout-20260601T194031Z.log`: RV musl + glibc PASS for `locktests`, `ltpServer`, and `stress`, parser-clean.
+  - `la-legacy-clean-tail-scout-20260601T194116Z.log`: LA musl + glibc PASS for all three cases, parser-clean.
+  - `legacy-clean-tail-rv-la.promotion-candidates.txt`: three four-way candidates: `locktests`, `ltpServer`, and `stress`.
+- Boundary: these rows are countable only as the named LTP cases. They are not a broad claim that all stress, locking, or server behavior is complete.
+
+Updated candidate-bank note after the legacy clean-tail follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` + `pipe07` + `mknod03` + `mknod04` + `mknod09` + `fchownat02` + `setrlimit04` + `clock_gettime04` + `locktests` + `ltpServer` + `stress` = at most 47 plausible cases, still short of stable606.
+
+### Non-countable post-clock scouts
+
+- `rv-light-process-scout-20260601T193756Z.log`: no clean rows; 0 PASS / 8 FAIL, `TFAIL=5`, `TBROK=3`, `TCONF=1`, timeout matches 1, panic/trap matches 1. `kill10` stayed UNKNOWN with panic/trap and is a blocker, not evidence.
+- `rv-vfs-fd-remainder-scout-20260601T194216Z.log`: only `readlinkat02` was RV clean; the batch still had 16 wrapper FAIL rows and internal `TFAIL/TBROK/TCONF` caveats.
+- `la-readlinkat02-rescout-20260601T194310Z.log`: LA glibc passed, but LA musl failed with one `TFAIL`; `readlinkat02` is not banked.

@@ -308,3 +308,20 @@ POSIX/Linux-visible impact:
 - FD/signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: low for this documentation-only update. The adjacent RV/LA regression subset protects existing clock/gettimeofday/times anchors.
 - Maintenance boundary: this does not broaden time syscall semantics; future time-lane promotions still need separate targeted evidence and adjacent regression proof.
+
+
+## Additional legacy clean-tail evidence-only follow-up on 2026-06-02
+
+Files changed: none.
+
+Behavior:
+
+- No kernel, syscall, libc-root, synthetic filesystem, FD, signal, futex, mmap, or user-pointer behavior was changed for this follow-up.
+- `locktests`, `ltpServer`, and `stress` were only revalidated and added to the milestone-02 candidate bank based on targeted RV/LA x musl/glibc parser-clean evidence.
+
+POSIX/Linux-visible impact:
+
+- Syscall/errno/flag/ABI impact: none in this commit.
+- FD/signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: low for this documentation-only update. The observed free-frame deltas in the parser summaries remain within the normal targeted-run cleanup evidence, but they do not substitute for a broad stress/resource proof.
+- Maintenance boundary: these helper/harness-style rows are countable only as named LTP cases after four-way parser-clean evidence. They must not be cited as broad proof of complete stress, lock, network-server, or scheduler semantics.

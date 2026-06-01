@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`, `setrlimit04`, `clock_gettime04`.
-- Current candidate bank size for stable606 planning: at most 44 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`, `setrlimit04`, `clock_gettime04`, `locktests`, `ltpServer`, `stress`.
+- Current candidate bank size for stable606 planning: at most 47 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -281,3 +281,26 @@ Targeted evidence:
 - `clock-time-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all five rows are clean, with `clock_gettime04` as the only new row relative to the current stable list.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 44, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+
+## legacy clean-tail evidence-only follow-up
+
+No kernel behavior change was required for this follow-up. Three remaining archived clean-tail rows were revalidated as named LTP cases, not as broad stress/locking semantic proof.
+
+Targeted evidence:
+
+- `rv-legacy-clean-tail-scout-20260601T194031Z.log`: `locktests`, `ltpServer`, and `stress` RV musl+glibc PASS, parser-clean.
+- `la-legacy-clean-tail-scout-20260601T194116Z.log`: `locktests`, `ltpServer`, and `stress` LA musl+glibc PASS, parser-clean.
+- `legacy-clean-tail-rv-la.promotion-candidates.txt`: combined four-way report; all three rows are clean across RV + LA x musl + glibc.
+
+Maintenance boundary: these are helper/harness-style LTP binary rows. They may be counted only as the named cases after four-way parser-clean proof; they are not evidence that the kernel has complete stress, lock, or network-server semantics.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 47, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+## Non-countable follow-up scouts kept visible
+
+Two later scouts remain blockers, not promotion evidence:
+
+- `rv-light-process-scout-20260601T193756Z.log`: 0 PASS / 8 FAIL, internal `TFAIL=5`, `TBROK=3`, `TCONF=1`, timeout matches 1, panic/trap matches 1. `kill10` ended as UNKNOWN with panic/trap, so the batch is not countable.
+- `rv-vfs-fd-remainder-scout-20260601T194216Z.log`: 2 PASS / 16 FAIL, internal `TFAIL=4`, `TBROK=10`, `TCONF=2`; only `readlinkat02` was RV clean.
+- `la-readlinkat02-rescout-20260601T194310Z.log`: LA glibc passed but LA musl failed with one `TFAIL`, so `readlinkat02` is not banked.
