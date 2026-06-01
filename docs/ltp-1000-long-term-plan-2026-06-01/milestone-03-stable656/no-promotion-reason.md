@@ -1,12 +1,12 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint found three four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint found four four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 3 (`fsync02`, `futex_wait01`, `sched_setaffinity01`).
+- Current four-way-clean new candidate pool: 4 (`fsync02`, `futex_wait01`, `futex_wait03`, `sched_setaffinity01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
 Because the candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
@@ -21,7 +21,7 @@ The following blockers prevent counting additional rows:
 | `mmap10_1` | missing testcase in both guest LTP trees |
 | `mmap13` | expected SIGBUS is not delivered (`TFAIL`) |
 | `vma02` | libnuma `TCONF` |
-| `futex_wait03` | timeout in both libcs |
+| old `futex_wait03` scout row | superseded timeout evidence; current RV/LA targeted reruns are parser-clean after `/proc/<pid>/stat` sleeping-state repair |
 | `kill10` | severe panic/trap during RV VFS/process scout; evidence cannot be promoted |
 | `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
 | `readlinkat02` | RV clean, but LA musl `TFAIL`; rerun after code inspection still 1 PASS / 1 FAIL |
@@ -36,4 +36,4 @@ The following blockers prevent counting additional rows:
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `fsync02`, `futex_wait01`, and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `fsync02`, `futex_wait01`, `futex_wait03`, and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.

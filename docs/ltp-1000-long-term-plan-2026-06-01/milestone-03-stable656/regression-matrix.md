@@ -94,6 +94,13 @@ Adjacent regression candidates:
 - timeout/EINTR-related wait and signal-mask cases
 - task teardown/wakeup lifetime smoke tests
 
+Closed futex/proc regression after procfs sleeping-state repair:
+
+- Cases: `futex_wait02`, `futex_wait04`, `futex_wake01`, `proc01`, `waitpid04`.
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.summary.txt`
+- Result: 10/10 wrapper PASS on each arch, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
 ## If fixing SysV shm / resource lifetime
 
 Primary retest case:

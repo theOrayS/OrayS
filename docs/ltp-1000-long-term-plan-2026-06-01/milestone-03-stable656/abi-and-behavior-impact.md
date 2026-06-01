@@ -1,6 +1,6 @@
 # Milestone 03 stable656 ABI and behavior impact
 
-This checkpoint includes two generic Linux/POSIX-visible behavior fixes and several scout-only evidence updates.
+This checkpoint includes three generic Linux/POSIX-visible behavior fixes and several scout-only evidence updates.
 
 ## Code changes
 
@@ -15,6 +15,13 @@ File: `examples/shell/src/uspace/resource_sched.rs`
 File: `examples/shell/src/uspace/metadata.rs`
 
 `generic_statfs` now clamps the synthetic free-block count to the current in-memory regular-file capacity guardrail (`MAX_IN_MEMORY_FILE_SIZE / STATFS_BLOCK_SIZE`) before computing `f_blocks`, `f_bfree`, `f_bavail`, and derived `statvfs` fields. The previous value exposed the global allocator's free pages, which could substantially overstate the amount a single temporary regular file can safely grow before the in-memory file limit returns `ENOSPC`.
+
+
+### Synthetic `/proc/<pid>/stat` sleeping-state reporting
+
+File: `examples/shell/src/uspace/synthetic_fs.rs`
+
+`/proc/<pid>/stat` now reports process state `S` when any live thread in the process has the existing `UserTaskExt::futex_wait` marker set. This exposes futex wait blocking through the synthetic procfs state field instead of reporting such a process as always runnable. The change is generic process-state reporting; it does not inspect LTP case names, paths, or outputs.
 
 ## User-visible ABI / errno impact
 
@@ -36,16 +43,24 @@ File: `examples/shell/src/uspace/metadata.rs`
 - Error numbers, syscall numbers, struct layouts, flag constants, FD semantics, signal delivery, futex behavior, mmap ABI, and user-pointer layout are unchanged by this capacity-reporting change.
 - The change is intentionally generic: it does not check LTP case names or paths, and it reflects the current synthetic filesystem's per-file capacity boundary.
 
+
+### `/proc/<pid>/stat`
+
+- User-visible file affected: `/proc/<pid>/stat` field 3 process state.
+- New visible behavior: a process with any live thread blocked in futex wait reports `S` until the futex wait marker is cleared.
+- Existing behavior preserved: exited processes still report `Z`; child-wait/syscall-wait blocked processes still report `S`; otherwise live processes report `R`.
+- Syscall numbers, errno values, FD tables, signal delivery, futex wait/wake return values, mmap ABI, and user-pointer layouts are unchanged by this reporting-only repair.
+
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 3/50 for stable656 (`fsync02`, `futex_wait01`, `sched_setaffinity01`).
+- Candidate pool after this checkpoint: 4/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `sched_setaffinity01`).
 
 ## Behavior gaps exposed but not fixed
 
 1. `mmap05` / `munmap01`: likely recoverable user page-fault signal delivery gaps.
 2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
-3. `futex_wait03`: futex wait timeout path does not complete within the case timeout.
+3. `futex_wait05`: futex timeout/slept-too-long semantics remain unclosed.
 4. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects `bufsiz == 0`, so the remaining issue is an LA-musl call-boundary/root-cause problem, not a safe syscall special case.
 5. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
 6. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.

@@ -3,7 +3,7 @@
 Date: 2026-06-02
 Branch: `dev/1000ltp-plan`
 Head at first scout: `e9a64d35`
-Head during post-fix targeted runs: after `3ee6ee06` plus local `metadata.rs` capacity-reporting change
+Head during post-fix targeted runs: after `3ee6ee06` plus local `metadata.rs` capacity-reporting and `synthetic_fs.rs` proc-state changes
 
 ## Stable count before/after
 
@@ -174,6 +174,79 @@ ENOSYS/not implemented matches: 0
 panic/trap matches: 0
 Promotion candidates: 1
 ```
+
+## `futex_wait03` procfs sleeping-state proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait03 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait03 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
+
+Decision: `futex_wait03` is now four-way clean after the generic synthetic `/proc/<pid>/stat` sleeping-state repair and enters the future candidate pool.
+
+## Adjacent futex/proc regression subset
+
+Cases: `futex_wait02,futex_wait04,futex_wake01,proc01,waitpid04`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait02,futex_wait04,futex_wake01,proc01,waitpid04 LTP_CASE_TIMEOUT_SECS=90 timeout 40m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait02,futex_wait04,futex_wake01,proc01,waitpid04 LTP_CASE_TIMEOUT_SECS=90 timeout 40m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-futex-proc-regression-20260601T232144Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-futex-proc-regression-20260601T232232Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 10
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: the adjacent futex/proc/wait stable subset did not regress.
 
 ## RV divergence scout and LA readlink confirmation
 
@@ -406,23 +479,27 @@ python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la -
   target/ltp-1000-milestone-03-stable656/rv-sched-setaffinity01-postfix-20260601T222738Z.log \
   target/ltp-1000-milestone-03-stable656/la-sched-setaffinity01-postfix-20260601T222823Z.log \
   target/ltp-1000-milestone-03-stable656/rv-fsync02-statfs-clamp-20260601T225748Z.log \
-  target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.log
+  target/ltp-1000-milestone-03-stable656/la-fsync02-statfs-clamp-20260601T225836Z.log \
+  target/ltp-1000-milestone-03-stable656/rv-futex-wait03-proc-sleep-20260601T232011Z.log \
+  target/ltp-1000-milestone-03-stable656/la-futex-wait03-proc-sleep-20260601T232052Z.log
 ```
 
 Artifacts:
 
-- Promotion report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean3-20260601T230334Z.promotion-candidates.txt`
-- Checksums: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean3-20260601T230334Z.derived.sha256`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean4-20260601T232334Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean4-20260601T232334Z.derived.sha256`
 
 Parser result:
 
 ```text
 Required arches: la, rv
 Required libcs: glibc, musl
-Promotion candidates: 3
+Promotion candidates: 4
 Blocked/incomplete cases: 0
-Candidates: fsync02, futex_wait01, sched_setaffinity01
+Candidates: fsync02, futex_wait01, futex_wait03, sched_setaffinity01
 ```
+
+Decision: this clean4 report is the current candidate-pool proof. The older clean3 report remains historical only.
 
 ## Closed arch full-sweep mining against live stable606
 
@@ -461,15 +538,15 @@ Observed requirement: after switching to user `nobody`, `nice(-10)` expects fail
 
 ## Gate outcome
 
-- Targeted RV: clean for `fsync02`, `futex_wait01`, and `sched_setaffinity01`; other scout rows blocked as documented.
-- Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix and the statfs capacity clamp.
-- LA confirmation: clean for `fsync02`, `futex_wait01`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
-- musl + glibc: clean only for the three candidate rows.
+- Targeted RV: clean for `fsync02`, `futex_wait01`, `futex_wait03`, and `sched_setaffinity01`; other scout rows blocked as documented.
+- Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix, statfs capacity clamp, and procfs futex-sleeping state repair.
+- LA confirmation: clean for `fsync02`, `futex_wait01`, `futex_wait03`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
+- musl + glibc: clean only for the four candidate rows.
 - Parser blockers: still present in scout rows; they are not counted.
 - Stable list: unchanged at `606/606/0`.
 
 ## Unverified items
 
-- No stable656 promotion gate because the candidate pool has only 3/50 required new cases.
+- No stable656 promotion gate because the candidate pool has only 4/50 required new cases.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait03`, `futex_wait05`, `shmat1`, `nice04`, or LA musl `readlinkat02`.
+- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait05`, `shmat1`, `nice04`, or LA musl `readlinkat02`.

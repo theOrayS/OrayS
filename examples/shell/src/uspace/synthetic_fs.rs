@@ -1,3 +1,5 @@
+use core::sync::atomic::Ordering;
+
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 use memory_addr::{VirtAddr, PAGE_SIZE_4K};
@@ -12,7 +14,10 @@ use super::linux_abi::{
 };
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
-use super::task_registry::{user_thread_entry_by_process_pid, user_thread_entry_by_tid};
+use super::task_context::task_ext;
+use super::task_registry::{
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
+};
 use super::UserProcess;
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
@@ -215,13 +220,12 @@ impl UserProcessStat {
             .chars()
             .take(15)
             .collect();
-        let state = if process
-            .live_threads
-            .load(core::sync::atomic::Ordering::Acquire)
-            == 0
-        {
+        let state = if process.live_threads.load(Ordering::Acquire) == 0 {
             'Z'
-        } else if process.is_child_wait_blocked() || process.is_syscall_wait_blocked() {
+        } else if process.is_child_wait_blocked()
+            || process.is_syscall_wait_blocked()
+            || process_has_futex_waiter(process)
+        {
             'S'
         } else {
             'R'
@@ -235,6 +239,16 @@ impl UserProcessStat {
             locked_mmap_kb: process.locked_mmap_kb(),
         }
     }
+}
+
+fn process_has_futex_waiter(process: &UserProcess) -> bool {
+    user_thread_entries_by_process_pid(process.pid())
+        .into_iter()
+        .any(|entry| {
+            task_ext(&entry.task)
+                .map(|ext| ext.futex_wait.load(Ordering::Acquire) != 0)
+                .unwrap_or(false)
+        })
 }
 
 fn proc_pid_stat_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
