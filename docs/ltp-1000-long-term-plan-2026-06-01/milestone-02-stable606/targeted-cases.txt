@@ -162,3 +162,18 @@ clock_gettime02
 ## MAP_LOCKED / VmLck follow-up
 
 mmap14
+
+## /proc/self/pagemap / mmap12 follow-up
+
+mmap12
+mmap01
+mmap02
+mmap03
+mmap04
+mmap06
+mmap09
+mmap11
+mmap14
+mincore01
+mprotect05
+vma01

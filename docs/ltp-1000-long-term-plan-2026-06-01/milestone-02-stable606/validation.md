@@ -249,3 +249,64 @@ Parser summary:
 - RV regression subset: 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - LA regression subset: 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: all twelve rows clean across RV + LA x musl + glibc; only `mmap14` is new relative to the current stable list and already-banked `mmap04`/`vma01`.
+
+## mmap12 /proc/self/pagemap validation
+
+Pre-fix evidence from the 80-case RV scout:
+
+- `mmap12` failed in both musl and glibc with `pagemap failed: ENOENT (2)` because `/proc/self/pagemap` did not exist.
+- The relevant upstream LTP case (`mmap12.c`, LTP 20240524) opens `/proc/self/pagemap`, seeks to one pagemap entry per mapped page, and requires bit 63 (`present`) to be set after a `MAP_POPULATE` file mapping: https://raw.githubusercontent.com/linux-test-project/ltp/20240524/testcases/kernel/syscalls/mmap/mmap12.c
+
+Commands:
+
+```bash
+LTP_CASES=mmap12 ./run-eval.sh rv
+LTP_CASES=mmap12 ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates \
+  target/ltp-1000-milestone-02-stable606/rv-mmap12-postfix-20260601T173127Z.log \
+  target/ltp-1000-milestone-02-stable606/la-mmap12-postfix-20260601T173441Z.log
+sha256sum <mmap12 singleton raw/summary/report files> > \
+  target/ltp-1000-milestone-02-stable606/mmap12-postfix-evidence.sha256
+```
+
+Artifacts:
+
+- RV singleton raw/summary: `target/ltp-1000-milestone-02-stable606/rv-mmap12-postfix-20260601T173127Z.log`, `.summary.txt`
+- LA singleton raw/summary: `target/ltp-1000-milestone-02-stable606/la-mmap12-postfix-20260601T173441Z.log`, `.summary.txt`
+- Four-way singleton report: `target/ltp-1000-milestone-02-stable606/mmap12-rv-la-postfix.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-02-stable606/mmap12-postfix-evidence.sha256`
+
+Parser summary:
+
+- RV singleton: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA singleton: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Four-way candidate report: 1 candidate, `mmap12`.
+
+## mmap12 adjacent mmap/proc regression subset
+
+Commands:
+
+```bash
+LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap06,mmap09,mmap11,mmap12,mmap14,mincore01,mprotect05,vma01 ./run-eval.sh rv
+LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap06,mmap09,mmap11,mmap12,mmap14,mincore01,mprotect05,vma01 ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-mmap12-regression-20260601T174051Z.log \
+  target/ltp-1000-milestone-02-stable606/la-mmap12-regression-20260601T174435Z.log
+sha256sum <mmap12 regression raw/summary/report files> > \
+  target/ltp-1000-milestone-02-stable606/mmap12-regression-evidence.sha256
+```
+
+Artifacts:
+
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-mmap12-regression-20260601T174051Z.log`, `.summary.txt`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-mmap12-regression-20260601T174435Z.log`, `.summary.txt`
+- Four-way regression report: `target/ltp-1000-milestone-02-stable606/mmap12-regression-rv-la.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-02-stable606/mmap12-regression-evidence.sha256`
+
+Parser summary:
+
+- RV regression subset: 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA regression subset: 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: all twelve rows clean across RV + LA x musl + glibc; `mmap12` is the new not-yet-stable candidate from this fix.
+
+Non-LTP caveat: the full evaluator still reports existing `iperf-glibc` failures in these QEMU runs. They are outside the LTP parser gate and are not counted as LTP promotion evidence.

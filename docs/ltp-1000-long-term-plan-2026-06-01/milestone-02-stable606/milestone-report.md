@@ -32,7 +32,7 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
 - New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`.
-- Current candidate bank size for stable606 planning: at most 27 cases, still short of the +50 milestone.
+- Current candidate bank size for stable606 planning: at most 28 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -110,3 +110,22 @@ Targeted evidence:
 - `mmap14-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the twelve clean rows, the new not-yet-stable candidate from this follow-up is `mmap14`.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 27, still short of +50, and no final stable606 gate has been run.
+
+## mmap12 /proc/self/pagemap follow-up
+
+A generic synthetic pagemap improvement was added after the `mmap14` work:
+
+- `/proc/self/pagemap` and `/proc/<pid>/pagemap` are now exposed as read-only synthetic procfs files.
+- The fd implementation supports sparse `lseek`/`read` at pagemap-entry offsets and returns one native-endian `u64` per virtual page.
+- Bit 63 (`present`) is set for pages visible in the process text approximation, heap, stack, and current tracked mmap regions when the pagemap file is opened. PFN/soft-dirty/swap bits remain intentionally zero.
+
+Targeted evidence:
+
+- `rv-mmap12-postfix-20260601T173127Z.log`: `mmap12` RV musl+glibc PASS, parser-clean.
+- `la-mmap12-postfix-20260601T173441Z.log`: `mmap12` LA musl+glibc PASS, parser-clean.
+- `mmap12-rv-la-postfix.promotion-candidates.txt`: combined four-way report; `mmap12` is clean across RV + LA x musl + glibc.
+- `rv-mmap12-regression-20260601T174051Z.log`: RV mmap/proc/pagemap regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `la-mmap12-regression-20260601T174435Z.log`: LA mmap/proc/pagemap regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `mmap12-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twelve rows are clean, with `mmap12` as the new not-yet-stable candidate from this follow-up.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 28, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.

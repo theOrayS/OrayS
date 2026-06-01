@@ -34,10 +34,11 @@ use super::runtime_paths::{
 use super::select_fdset::SelectMode;
 use super::synthetic_fs::{
     dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
-    proc_comm_path_entry, proc_pid_stat_fd_entry, proc_pid_stat_path_entry,
-    proc_pid_status_fd_entry, proc_pid_status_path_entry, proc_self_maps_fd_entry,
-    proc_self_maps_is_writable_open, proc_self_maps_path_entry, synthetic_file_is_writable_open,
-    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
+    proc_comm_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
+    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
+    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
+    synthetic_file_is_writable_open, synthetic_userdb_content, synthetic_userdb_fd_entry,
+    synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
@@ -69,6 +70,7 @@ pub(super) enum FdEntry {
     Directory(DirectoryEntry),
     Path(PathEntry),
     MemoryFile(MemoryFileEntry),
+    ProcPagemap(ProcPagemapEntry),
     Pipe(PipeEndpoint),
     Socket(SocketEntry),
     LocalSocket(LocalSocketEntry),
@@ -109,6 +111,14 @@ pub(super) struct MemoryFileEntry {
     pub(super) path: String,
     pub(super) data: Arc<Vec<u8>>,
     pub(super) offset: usize,
+}
+
+#[derive(Clone)]
+pub(super) struct ProcPagemapEntry {
+    pub(super) path: String,
+    pub(super) present_ranges: Arc<Vec<(u64, u64)>>,
+    pub(super) offset: u64,
+    pub(super) size: u64,
 }
 
 pub(super) fn read_file_at_into(
@@ -952,7 +962,8 @@ impl FdTable {
                 | FdEntry::Rtc
                 | FdEntry::File(_)
                 | FdEntry::Directory(_)
-                | FdEntry::MemoryFile(_) => true,
+                | FdEntry::MemoryFile(_)
+                | FdEntry::ProcPagemap(_) => true,
                 FdEntry::Path(_) => false,
                 FdEntry::Pipe(pipe) => pipe.poll().readable,
                 FdEntry::Socket(socket) => socket.poll(mode),
@@ -966,7 +977,10 @@ impl FdTable {
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc => true,
                 FdEntry::File(_) => true,
-                FdEntry::Directory(_) | FdEntry::Path(_) | FdEntry::MemoryFile(_) => false,
+                FdEntry::Directory(_)
+                | FdEntry::Path(_)
+                | FdEntry::MemoryFile(_)
+                | FdEntry::ProcPagemap(_) => false,
                 FdEntry::Pipe(pipe) => pipe.poll().writable,
                 FdEntry::Socket(socket) => socket.poll(mode),
                 FdEntry::LocalSocket(socket) => socket.poll(mode),
@@ -991,6 +1005,7 @@ impl FdTable {
                 file_entry_read(file, dst)
             }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
+            FdEntry::ProcPagemap(file) => Ok(file.read(dst)),
             FdEntry::Directory(_) => Err(LinuxError::EISDIR),
             FdEntry::Pipe(pipe) => pipe.read(dst),
             FdEntry::Socket(socket) => socket.read(dst),
@@ -1128,7 +1143,9 @@ impl FdTable {
             FdEntry::DevNull => Ok(()),
             FdEntry::BlockDevice(_) => Ok(()),
             FdEntry::Rtc => Ok(()),
-            FdEntry::Path(_) | FdEntry::MemoryFile(_) => Err(LinuxError::EBADF),
+            FdEntry::Path(_) | FdEntry::MemoryFile(_) | FdEntry::ProcPagemap(_) => {
+                Err(LinuxError::EBADF)
+            }
             _ => Err(LinuxError::EINVAL),
         }
     }
@@ -1153,6 +1170,7 @@ impl FdTable {
             FdEntry::Directory(_) => Err(LinuxError::EISDIR),
             FdEntry::Path(_) => Err(LinuxError::EBADF),
             FdEntry::MemoryFile(file) => file.seek(pos),
+            FdEntry::ProcPagemap(file) => file.seek(pos),
             FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
             FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
             _ => Err(LinuxError::ESPIPE),
@@ -1630,6 +1648,7 @@ impl FdTable {
             FdEntry::Directory(dir) => Ok(file_attr_to_stat(&dir.attr, Some(dir.path.as_str()))),
             FdEntry::Path(path) => Ok(path.stat()),
             FdEntry::MemoryFile(file) => Ok(file.stat()),
+            FdEntry::ProcPagemap(file) => Ok(file.stat()),
             FdEntry::Pipe(pipe) => Ok(pipe.stat()),
             FdEntry::Socket(socket) => Ok(socket.stat()),
             FdEntry::LocalSocket(socket) => Ok(socket.stat()),
@@ -1684,6 +1703,11 @@ impl FdTable {
                 path.stat(),
             )),
             Ok(FdEntry::MemoryFile(file)) => Ok(apply_recorded_path_metadata(
+                process,
+                file.path.as_str(),
+                file.stat(),
+            )),
+            Ok(FdEntry::ProcPagemap(file)) => Ok(apply_recorded_path_metadata(
                 process,
                 file.path.as_str(),
                 file.stat(),
@@ -2070,6 +2094,59 @@ impl MemoryFileEntry {
     }
 }
 
+impl ProcPagemapEntry {
+    const PRESENT: u64 = 1u64 << 63;
+    const ENTRY_SIZE: u64 = size_of::<u64>() as u64;
+
+    pub(super) fn read(&mut self, dst: &mut [u8]) -> usize {
+        if self.offset >= self.size {
+            return 0;
+        }
+        let available = (self.size - self.offset).min(dst.len() as u64) as usize;
+        let mut written = 0usize;
+        while written < available {
+            let page_index = self.offset / Self::ENTRY_SIZE;
+            let entry_offset = (self.offset % Self::ENTRY_SIZE) as usize;
+            let entry = self.page_entry(page_index).to_ne_bytes();
+            let copy_len = cmp::min(entry.len() - entry_offset, available - written);
+            dst[written..written + copy_len]
+                .copy_from_slice(&entry[entry_offset..entry_offset + copy_len]);
+            self.offset += copy_len as u64;
+            written += copy_len;
+        }
+        written
+    }
+
+    pub(super) fn stat(&self) -> general::stat {
+        PathEntry::synthetic_file(self.path.as_str(), self.size as usize).stat()
+    }
+
+    pub(super) fn seek(&mut self, pos: SeekFrom) -> Result<u64, LinuxError> {
+        let next = match pos {
+            SeekFrom::Start(offset) => offset as i128,
+            SeekFrom::Current(offset) => self.offset as i128 + offset as i128,
+            SeekFrom::End(offset) => self.size as i128 + offset as i128,
+        };
+        if !(0..=u64::MAX as i128).contains(&next) {
+            return Err(LinuxError::EINVAL);
+        }
+        self.offset = next as u64;
+        Ok(self.offset)
+    }
+
+    fn page_entry(&self, page_index: u64) -> u64 {
+        if self
+            .present_ranges
+            .iter()
+            .any(|(start, end)| *start <= page_index && page_index < *end)
+        {
+            Self::PRESENT
+        } else {
+            0
+        }
+    }
+}
+
 fn validate_flock(lock: &general::flock) -> Result<(), LinuxError> {
     match lock.l_type as u32 {
         general::F_RDLCK | general::F_WRLCK | general::F_UNLCK => {}
@@ -2431,6 +2508,7 @@ impl FdEntry {
             Self::Directory(dir) => Ok(Self::Directory(dir.clone())),
             Self::Path(path) => Ok(Self::Path(path.clone())),
             Self::MemoryFile(file) => Ok(Self::MemoryFile(file.clone())),
+            Self::ProcPagemap(file) => Ok(Self::ProcPagemap(file.clone())),
             Self::Pipe(pipe) => Ok(Self::Pipe(pipe.clone())),
             Self::Socket(socket) => socket.duplicate().map(Self::Socket),
             Self::LocalSocket(socket) => Ok(Self::LocalSocket(socket.duplicate())),
@@ -2777,6 +2855,19 @@ fn open_candidates(
             } else {
                 proc_self_maps_fd_entry(process)
             });
+        }
+        if let Some(entry) = if path_only {
+            proc_pagemap_path_entry(process, path.as_str())
+        } else {
+            proc_pagemap_fd_entry(process, path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
         }
         if let Some(entry) = if path_only {
             proc_pid_stat_path_entry(process, path.as_str())

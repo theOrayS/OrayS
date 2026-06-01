@@ -103,3 +103,22 @@ Evidence:
   - 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/mmap14-regression-rv-la.promotion-candidates.txt`
   - All twelve rows clean across RV + LA x musl + glibc; `mmap14` is the new candidate row.
+
+## mmap12 /proc/self/pagemap regression set
+
+Rationale: the code change affects synthetic `/proc/self/pagemap` path lookup plus fd `read/lseek/stat` behavior. The protected subset combines the new pagemap candidate with existing mmap/proc maps, mincore, mprotect, and locked-mmap anchors.
+
+Cases:
+
+- New candidate: `mmap12`
+- Already banked candidates: `mmap04`, `vma01`, `mmap14`
+- Existing stable anchors: `mmap01`, `mmap02`, `mmap03`, `mmap06`, `mmap09`, `mmap11`, `mincore01`, `mprotect05`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-mmap12-regression-20260601T174051Z.summary.txt`
+  - 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-mmap12-regression-20260601T174435Z.summary.txt`
+  - 24 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/mmap12-regression-rv-la.promotion-candidates.txt`
+  - All twelve rows clean across RV + LA x musl + glibc; `mmap12` is the new candidate row.

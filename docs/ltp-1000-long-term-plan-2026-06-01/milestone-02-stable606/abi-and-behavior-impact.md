@@ -112,3 +112,27 @@ POSIX/Linux-visible impact:
 - Signal/futex/user-pointer copy impact: none.
 - mmap/resource caveat: this is locked-range accounting plus eager population in a no-swap teaching kernel. It does not yet implement full Linux `mlock(2)`/`RLIMIT_MEMLOCK` enforcement or page-reclaim interaction.
 - Resource/lifetime risk: moderate-low. Metadata is per-process, cloned on fork, cleared on exec, and reduced on unmap; the RV/LA regression subset protects stable mmap/mincore/mprotect anchors.
+
+## Additional /proc/self/pagemap behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/fd_table.rs`
+- `examples/shell/src/uspace/synthetic_fs.rs`
+- `examples/shell/src/uspace/metadata.rs`
+
+Behavior:
+
+- `/proc/self/pagemap` and `/proc/<pid>/pagemap` are now exposed as read-only synthetic procfs files.
+- A new fd entry supports sparse `lseek` and `read` for pagemap offsets without materializing a huge file.
+- Reads return native-endian `u64` pagemap entries with bit 63 (`present`) set for pages that are present in a snapshot taken at open time across the executable approximation, heap, stack, and tracked mmap ranges.
+- PFN, soft-dirty, swapped, file/shared, exclusive, and other Linux pagemap bits are intentionally not exposed; those fields remain zero.
+
+POSIX/Linux-visible impact:
+
+- Procfs ABI affected: `open/read/lseek/stat` on `/proc/self/pagemap` and `/proc/<pid>/pagemap` now work for existing process ids. O_PATH/stat path lookup is supported through the existing synthetic-path machinery.
+- Errno impact: missing proc pids still fail as absent synthetic paths; write/truncate/create modes remain rejected by the existing read-only synthetic procfs open checks.
+- FD impact: a pagemap fd has its own seek offset and is duplicated on fork like other fd table entries.
+- mmap/resource impact: `MAP_POPULATE`-visible present pages can now be observed through pagemap. This is a snapshot-on-open model, not a live kernel pagemap; callers that expect Linux's continuously changing pagemap bits remain outside the current compatibility boundary.
+- Signal/futex/user-pointer copy impact: none.
+- Resource/lifetime risk: moderate-low. The fd stores coalesced present page-index ranges rather than a full address-space-sized byte vector; the RV/LA regression subset protects existing mmap/mincore/mprotect/proc maps anchors.

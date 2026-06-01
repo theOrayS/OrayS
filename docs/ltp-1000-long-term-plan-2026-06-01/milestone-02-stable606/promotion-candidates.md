@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 27, so promotion is blocked.
+- Current candidate bank after this preflight: at most 28, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -93,3 +93,17 @@ Updated candidate-bank note after the time follow-up: 21 deferred rows + `socket
   - `mmap14-regression-rv-la.promotion-candidates.txt` shows all twelve rows clean across RV + LA x musl + glibc; only `mmap14` is a new not-yet-stable candidate from this follow-up.
 
 Updated candidate-bank note after the mmap14 follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` = at most 27 plausible cases, still short of stable606.
+
+### mmap12
+
+- Pre-fix RV scout state: both musl and glibc failed one internal TFAIL row because `/proc/self/pagemap` was absent (`ENOENT`).
+- Fix: generic synthetic `/proc/self/pagemap` and `/proc/<pid>/pagemap` support with sparse read/lseek and present-bit snapshots from the current process mappings. No LTP case/path/process/output is hardcoded.
+- Current evidence:
+  - `rv-mmap12-postfix-20260601T173127Z.log`: RV musl + glibc PASS for `mmap12`, parser-clean.
+  - `la-mmap12-postfix-20260601T173441Z.log`: LA musl + glibc PASS for `mmap12`, parser-clean.
+  - `mmap12-rv-la-postfix.promotion-candidates.txt`: one four-way candidate, `mmap12`.
+- Adjacent regression evidence:
+  - `rv-mmap12-regression-20260601T174051Z.log` and `la-mmap12-regression-20260601T174435Z.log` both report 24 PASS / 0 FAIL for `mmap12` plus mmap/proc stable anchors.
+  - `mmap12-regression-rv-la.promotion-candidates.txt` shows all twelve rows clean across RV + LA x musl + glibc; only `mmap12` is the new not-yet-stable candidate from this follow-up.
+
+Updated candidate-bank note after the mmap12 follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` = at most 28 plausible cases, still short of stable606.
