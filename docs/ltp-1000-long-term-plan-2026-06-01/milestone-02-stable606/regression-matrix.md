@@ -64,3 +64,22 @@ Evidence:
   - 22 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/proc-maps-mmap-regression-rv-la.promotion-candidates.txt`
   - All eleven rows clean across RV + LA x musl + glibc; `mmap04` and `vma01` are the new candidate rows.
+
+
+## times03 / time accounting regression set
+
+Rationale: the code change affects `times()` return units and `struct tms` self/child counters. The protected subset combines the new candidate with existing stable time anchors that exercise adjacent time syscalls.
+
+Cases:
+
+- New candidate: `times03`
+- Existing stable anchors: `times01`, `gettimeofday01`, `gettimeofday02`, `clock_gettime02`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-times03-regression-20260601T164708Z.summary.txt`
+  - 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-times03-regression-20260601T164956Z.summary.txt`
+  - 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/times03-regression-rv-la.promotion-candidates.txt`
+  - All five rows clean across RV + LA x musl + glibc; `times03` is the new candidate row.

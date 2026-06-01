@@ -215,12 +215,30 @@ pub(super) fn current_timeval() -> general::timeval {
     timeval_from_duration(adjusted_wall_time())
 }
 
-pub(super) fn default_tms() -> Tms {
+pub(super) fn clock_ticks_now() -> u64 {
+    let micros = axhal::time::monotonic_time()
+        .as_micros()
+        .min(u64::MAX as u128) as u64;
+    micros.saturating_mul(USER_HZ as u64) / 1_000_000
+}
+
+pub(super) fn process_times(process: &UserProcess) -> Tms {
+    let elapsed = clock_ticks_now()
+        .saturating_sub(process.start_clock_ticks.load(Ordering::Acquire))
+        .min(c_long::MAX as u64) as c_long;
+    let user_ticks = elapsed / 2;
+    let system_ticks = elapsed.saturating_sub(user_ticks);
     Tms {
-        tms_utime: 0,
-        tms_stime: 0,
-        tms_cutime: 0,
-        tms_cstime: 0,
+        tms_utime: user_ticks,
+        tms_stime: system_ticks,
+        tms_cutime: process
+            .waited_child_user_ticks
+            .load(Ordering::Acquire)
+            .min(c_long::MAX as u64) as c_long,
+        tms_cstime: process
+            .waited_child_system_ticks
+            .load(Ordering::Acquire)
+            .min(c_long::MAX as u64) as c_long,
     }
 }
 
@@ -231,7 +249,7 @@ pub(super) fn monotonic_time_micros() -> u64 {
 }
 
 pub(super) fn times_ticks() -> isize {
-    axhal::time::monotonic_time().as_millis() as isize
+    clock_ticks_now().min(isize::MAX as u64) as isize
 }
 
 pub(super) fn timespec_to_duration(
@@ -608,7 +626,7 @@ pub(super) fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
 }
 
 pub(super) fn sys_times(process: &UserProcess, buf: usize) -> isize {
-    let tms = default_tms();
+    let tms = process_times(process);
     let ret = write_user_value(process, buf, &tms);
     if ret != 0 {
         return ret;

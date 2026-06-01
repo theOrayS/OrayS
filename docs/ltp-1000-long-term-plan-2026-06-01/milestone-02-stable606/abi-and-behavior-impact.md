@@ -64,3 +64,25 @@ POSIX/Linux-visible impact:
 - No actual page-table permissions are weakened; `mmap_prot_to_flags` still keeps implementation-internal read access where needed, while procfs prints the requested Linux-visible protection bits.
 - FD, signal, futex, and user-pointer copy semantics are unchanged.
 - Resource/lifetime risk: moderate-low. Metadata is per-process and cleared on exec; the regression subset protects existing stable mmap/mincore/mprotect anchors on both RV and LA.
+
+
+## Additional times() behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/mod.rs`
+- `examples/shell/src/uspace/process_lifecycle.rs`
+- `examples/shell/src/uspace/time_abi.rs`
+
+Behavior:
+
+- `times()` now fills `struct tms` self and waited-child counters instead of returning all-zero `tms_*` fields.
+- The `times()` return value now uses `USER_HZ` clock ticks rather than raw milliseconds.
+- `wait4`/`waitid` account waited-child self plus descendant ticks before child teardown.
+
+POSIX/Linux-visible impact:
+
+- `tms_utime`, `tms_stime`, `tms_cutime`, and `tms_cstime` become monotonic, nonzero after real process lifetime/child work, and visible to both musl and glibc callers.
+- Accounting is still coarse: self user/system ticks are wall-clock-derived and split between user/system time rather than scheduler-precise CPU sampling. This is more truthful than the prior all-zero stub but remains a maintenance boundary for future scheduler-level CPU accounting.
+- FD, signal delivery, futex, mmap permissions, and user-pointer copy semantics are unchanged.
+- Resource/lifetime risk: low. Added counters are per-process atomics and are only accumulated when a child is actually waited/reaped; regression subset protects existing time anchors on RV and LA.

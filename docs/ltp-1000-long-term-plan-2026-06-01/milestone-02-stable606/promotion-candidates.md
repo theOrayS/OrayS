@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 25, so promotion is blocked.
+- Current candidate bank after this preflight: at most 26, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -62,4 +62,19 @@ Do not update `LTP_STABLE_CASES` yet. The candidate bank is short of 50 and some
 - Adjacent regression evidence:
   - `rv-proc-maps-mmap-regression-20260601T162607Z.log` and `la-proc-maps-mmap-regression-20260601T162755Z.log` both report 22 PASS / 0 FAIL for `mmap04,vma01` plus stable mmap/mincore/mprotect anchors.
 
-Updated candidate-bank note: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` = at most 25 plausible cases, still short of stable606.
+Updated candidate-bank note before the time follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` = at most 25 plausible cases, still short of stable606.
+
+
+### times03
+
+- Pre-fix RV scout state: both musl and glibc failed six internal TFAIL rows because `times()` reported zero self and waited-child CPU counters.
+- Fix: generic per-process `times()` accounting now records process start ticks, returns `USER_HZ` clock ticks, and accumulates waited-child user/system counters on `wait4`/`waitid`; no case-specific special-casing.
+- Current evidence:
+  - `rv-times03-postfix-20260601T164216Z.log`: RV musl + glibc PASS for `times03`, parser-clean.
+  - `la-times03-postfix-20260601T164436Z.log`: LA musl + glibc PASS for `times03`, parser-clean.
+  - `times03-rv-la-postfix.promotion-candidates.txt`: one four-way candidate, `times03`.
+- Adjacent regression evidence:
+  - `rv-times03-regression-20260601T164708Z.log` and `la-times03-regression-20260601T164956Z.log` both report 10 PASS / 0 FAIL for `times03` plus stable time anchors `times01`, `gettimeofday01`, `gettimeofday02`, and `clock_gettime02`.
+  - `times03-regression-rv-la.promotion-candidates.txt` shows all five rows clean across RV + LA x musl + glibc; only `times03` is a new not-yet-stable candidate from this fix.
+
+Updated candidate-bank note after the time follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` = at most 26 plausible cases, still short of stable606.
