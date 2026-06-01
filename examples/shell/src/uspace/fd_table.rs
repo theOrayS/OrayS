@@ -12,14 +12,15 @@ use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
-    DEFAULT_NOFILE_LIMIT, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG,
-    RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
-    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_TYPE_MASK,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
+    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
+    ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -44,11 +45,10 @@ use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
-    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value,
 };
-use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -1535,10 +1535,9 @@ impl FdTable {
         if axfs::api::metadata(abs_path.as_str()).is_ok() {
             return Err(LinuxError::EEXIST);
         }
-        check_parent_write_search_permission(process, abs_path.as_str())?;
+        let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
         directory_create_dir(abs_path.as_str())?;
-        process.set_path_mode(abs_path.clone(), process.apply_umask(mode));
-        process.set_path_owner(abs_path, Some(process.fs_uid()), Some(process.fs_gid()));
+        record_created_path_metadata(process, abs_path, mode, true, &parent_st);
         Ok(())
     }
 
@@ -1565,17 +1564,12 @@ impl FdTable {
         if axfs::api::metadata(abs_path.as_str()).is_ok() {
             return Err(LinuxError::EEXIST);
         }
-        check_parent_write_search_permission(process, abs_path.as_str())?;
+        let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
         let mut opts = OpenOptions::new();
         opts.write(true);
         opts.create_new(true);
         File::open(abs_path.as_str(), &opts).map_err(LinuxError::from)?;
-        process.set_path_mode(abs_path.clone(), process.apply_umask(mode));
-        process.set_path_owner(
-            abs_path.clone(),
-            Some(process.fs_uid()),
-            Some(process.fs_gid()),
-        );
+        record_created_path_metadata(process, abs_path.clone(), mode, false, &parent_st);
         if node_type == ST_MODE_FIFO {
             process.set_path_special_mode(abs_path, ST_MODE_FIFO);
         } else {
@@ -2740,6 +2734,27 @@ fn check_parent_write_search_permission(
     Ok(parent_st)
 }
 
+fn record_created_path_metadata(
+    process: &UserProcess,
+    path: String,
+    requested_mode: u32,
+    is_directory: bool,
+    parent_st: &general::stat,
+) {
+    let parent_setgid = parent_st.st_mode & FILE_MODE_SET_GID != 0;
+    let mut mode = process.apply_umask(requested_mode);
+    if is_directory && parent_setgid {
+        mode |= FILE_MODE_SET_GID;
+    }
+    let gid = if parent_setgid {
+        parent_st.st_gid as u32
+    } else {
+        process.fs_gid()
+    };
+    process.set_path_mode(path.clone(), mode);
+    process.set_path_owner(path, Some(process.fs_uid()), Some(gid));
+}
+
 fn check_sticky_parent_permission(
     process: &UserProcess,
     parent_st: &general::stat,
@@ -3017,11 +3032,15 @@ fn open_candidates(
                 return Err(LinuxError::EPERM);
             }
         }
-        if created_by_this_open {
-            check_parent_write_search_permission(process, path.as_str())?;
+        let create_parent_st = if created_by_this_open {
+            Some(check_parent_write_search_permission(
+                process,
+                path.as_str(),
+            )?)
         } else {
             check_open_permission(process, path.as_str(), flags)?;
-        }
+            None
+        };
         match File::open(path.as_str(), file_opts) {
             Ok(file) if path_only => {
                 let attr = file.get_attr().map_err(LinuxError::from)?;
@@ -3029,12 +3048,9 @@ fn open_candidates(
             }
             Ok(file) => {
                 if created_by_this_open {
-                    process.set_path_mode(path.clone(), process.apply_umask(mode));
-                    process.set_path_owner(
-                        path.clone(),
-                        Some(process.fs_uid()),
-                        Some(process.fs_gid()),
-                    );
+                    if let Some(parent_st) = create_parent_st.as_ref() {
+                        record_created_path_metadata(process, path.clone(), mode, false, parent_st);
+                    }
                 }
                 return Ok(FdEntry::File(FileEntry {
                     file,

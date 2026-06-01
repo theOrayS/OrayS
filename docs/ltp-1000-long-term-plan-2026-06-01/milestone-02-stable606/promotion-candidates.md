@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 28, so promotion is blocked.
+- Current candidate bank after this preflight: at most 30, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -107,3 +107,17 @@ Updated candidate-bank note after the mmap14 follow-up: 21 deferred rows + `sock
   - `mmap12-regression-rv-la.promotion-candidates.txt` shows all twelve rows clean across RV + LA x musl + glibc; only `mmap12` is the new not-yet-stable candidate from this follow-up.
 
 Updated candidate-bank note after the mmap12 follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` = at most 28 plausible cases, still short of stable606.
+
+### open10 and creat08
+
+- Pre-fix RV scout state: both musl and glibc failed in `dir_b/*` rows because files created under a setgid parent directory kept the process gid (`65534`) instead of inheriting the parent directory gid (`1`).
+- Fix: generic create-path metadata recording now inherits gid from setgid parent directories for `open(O_CREAT)`, `creat()`, `mkdirat()`, and `mknodat()` paths; new subdirectories also inherit the setgid bit. No case-specific special-casing.
+- Current evidence:
+  - `rv-open-creat-setgid-postfix-20260601T180048Z.log`: RV musl + glibc PASS for `open10,creat08`, parser-clean.
+  - `la-open-creat-setgid-postfix-20260601T180132Z.log`: LA musl + glibc PASS for `open10,creat08`, parser-clean.
+  - `open-creat-setgid-rv-la-postfix.promotion-candidates.txt`: two four-way candidates, `open10` and `creat08`.
+- Adjacent regression evidence:
+  - `rv-open-creat-setgid-regression-20260601T180236Z.log` and `la-open-creat-setgid-regression-20260601T180348Z.log` both report 32 PASS / 0 FAIL for `open10,creat08` plus stable VFS metadata anchors.
+  - `open-creat-setgid-regression-rv-la.promotion-candidates.txt` shows all sixteen rows clean across RV + LA x musl + glibc; only `open10` and `creat08` are new relative to the current stable list.
+
+Updated candidate-bank note after the open/creat setgid follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` = at most 30 plausible cases, still short of stable606.
