@@ -535,3 +535,41 @@ Parser summary:
 - Regression four-way report: 16 clean rows across RV + LA x musl + glibc; `fchownat02` is the only newly banked row from this follow-up.
 
 Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.
+
+## setrlimit04 busybox applet exec validation
+
+Pre-fix evidence:
+
+- In the post-proc-fd RV rescout, `setrlimit04` failed both libcs because `execlp(/bin/true, /bin/true, ...)` returned `ENOENT`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=setrlimit04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=setrlimit04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl \
+  target/ltp-1000-milestone-02-stable606/rv-setrlimit04-bin-true-20260601T191920Z.log \
+  target/ltp-1000-milestone-02-stable606/la-setrlimit04-bin-true-20260601T191959Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=setrlimit01,setrlimit02,setrlimit03,setrlimit04,getrlimit01,getrlimit02,fork01,waitpid01,wait401,wait402,waitid01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=setrlimit01,setrlimit02,setrlimit03,setrlimit04,getrlimit01,getrlimit02,fork01,waitpid01,wait401,wait402,waitid01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV targeted raw/summary: `target/ltp-1000-milestone-02-stable606/rv-setrlimit04-bin-true-20260601T191920Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA targeted raw/summary: `target/ltp-1000-milestone-02-stable606/la-setrlimit04-bin-true-20260601T191959Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/setrlimit04-bin-true-rv-la.promotion-candidates.txt`, `.derived.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-setrlimit-exec-regression-20260601T192057Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-setrlimit-exec-regression-20260601T192159Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/setrlimit-exec-regression-rv-la.promotion-candidates.txt`, `.derived.sha256`
+
+Parser summary:
+
+- RV targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 2 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: 1 candidate, `setrlimit04`.
+- RV regression subset: 22 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 22 PASS / 0 FAIL, no parser caveats.
+- Regression four-way report: 11 clean rows across RV + LA x musl + glibc; `setrlimit04` is the only newly banked row from this follow-up.
+
+Non-LTP caveat: these are targeted LTP gates only. Full stable606 promotion and full all-minus-blacklist sweep were not run.

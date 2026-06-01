@@ -234,3 +234,23 @@ Evidence:
   - `fchownat02` is clean across RV + LA x musl + glibc.
 - Regression four-way report: `target/ltp-1000-milestone-02-stable606/fchownat-symlink-regression-rv-la.promotion-candidates.txt`
   - All sixteen rows clean across RV + LA x musl + glibc; only `fchownat02` is new relative to current stable and previously banked rows.
+
+## setrlimit04 busybox applet exec regression set
+
+Rationale: the code change affects exec path compatibility for missing `/bin`/`/usr/bin` busybox applets. The protected subset combines the new candidate with stable rlimit, fork, wait, and waitid anchors that exercise process lifetime after exec/fork.
+
+Cases:
+
+- New candidate: `setrlimit04`
+- Existing stable anchors: `setrlimit01`, `setrlimit02`, `setrlimit03`, `getrlimit01`, `getrlimit02`, `fork01`, `waitpid01`, `wait401`, `wait402`, `waitid01`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-setrlimit-exec-regression-20260601T192057Z.summary.txt`
+  - 22 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-setrlimit-exec-regression-20260601T192159Z.summary.txt`
+  - 22 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/setrlimit04-bin-true-rv-la.promotion-candidates.txt`
+  - `setrlimit04` is clean across RV + LA x musl + glibc.
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/setrlimit-exec-regression-rv-la.promotion-candidates.txt`
+  - All eleven rows clean across RV + LA x musl + glibc; only `setrlimit04` is new relative to current stable and previously banked rows.

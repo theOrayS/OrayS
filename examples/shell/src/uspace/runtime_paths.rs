@@ -52,7 +52,7 @@ pub(super) fn normalize_path(base: &str, path: &str) -> Option<String> {
     Some(normalized)
 }
 
-fn is_busybox_applet_name(name: &str) -> bool {
+pub(super) fn is_busybox_applet_name(name: &str) -> bool {
     matches!(
         name,
         "[" | "ash"
