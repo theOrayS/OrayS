@@ -345,3 +345,37 @@ Parser summary:
 - RV regression subset: 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - LA regression subset: 32 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined regression report: all sixteen rows clean across RV + LA x musl + glibc; only `open10` and `creat08` are new relative to current stable list.
+
+
+## chmod07 / fchmod02 group database validation
+
+Pre-fix evidence from the 80-case RV scout:
+
+- `chmod07` and `fchmod02` failed in both musl and glibc during test setup because `getgrnam(users)` failed and the fallback `getgrnam(daemon)` also failed.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chmod07,fchmod02 LTP_CASE_TIMEOUT_SECS=90 timeout 50m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chmod07,fchmod02 LTP_CASE_TIMEOUT_SECS=90 timeout 50m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl   target/ltp-1000-milestone-02-stable606/rv-groupdb-chmod-fchmod-20260601T181203Z.log   target/ltp-1000-milestone-02-stable606/la-groupdb-chmod-fchmod-20260601T181243Z.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chmod05,chmod07,fchmod02,chown01,chown02,chown03,open01,creat01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chmod05,chmod07,fchmod02,chown01,chown02,chown03,open01,creat01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV singleton raw/summary: `target/ltp-1000-milestone-02-stable606/rv-groupdb-chmod-fchmod-20260601T181203Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA singleton raw/summary: `target/ltp-1000-milestone-02-stable606/la-groupdb-chmod-fchmod-20260601T181243Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way singleton report: `target/ltp-1000-milestone-02-stable606/groupdb-chmod-fchmod-rv-la.promotion-candidates.txt`, `.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-groupdb-chmod-regression-20260601T181338Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-groupdb-chmod-regression-20260601T181429Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way regression report: `target/ltp-1000-milestone-02-stable606/groupdb-chmod-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV singleton: 4 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA singleton: 4 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- RV regression subset: 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA regression subset: 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined regression report: all eight rows clean across RV + LA x musl + glibc; only `chmod07` and `fchmod02` are new relative to current stable list.

@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 30, so promotion is blocked.
+- Current candidate bank after this preflight: at most 32, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -121,3 +121,18 @@ Updated candidate-bank note after the mmap12 follow-up: 21 deferred rows + `sock
   - `open-creat-setgid-regression-rv-la.promotion-candidates.txt` shows all sixteen rows clean across RV + LA x musl + glibc; only `open10` and `creat08` are new relative to the current stable list.
 
 Updated candidate-bank note after the open/creat setgid follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` = at most 30 plausible cases, still short of stable606.
+
+
+### chmod07 and fchmod02
+
+- Pre-fix RV scout state: both cases failed in both musl and glibc during setup because `/etc/group` did not contain `users`, and the fallback `daemon` group was also absent (`getgrnam(...)` TBROK).
+- Fix: generic synthetic `/etc/group` content now includes conventional `daemon` and `users` groups alongside `root` and `nogroup`. No case-specific special-casing.
+- Current evidence:
+  - `rv-groupdb-chmod-fchmod-20260601T181203Z.log`: RV musl + glibc PASS for `chmod07,fchmod02`, parser-clean.
+  - `la-groupdb-chmod-fchmod-20260601T181243Z.log`: LA musl + glibc PASS for `chmod07,fchmod02`, parser-clean.
+  - `groupdb-chmod-fchmod-rv-la.promotion-candidates.txt`: two four-way candidates, `chmod07` and `fchmod02`.
+- Adjacent regression evidence:
+  - `rv-groupdb-chmod-regression-20260601T181338Z.log` and `la-groupdb-chmod-regression-20260601T181429Z.log` both report 16 PASS / 0 FAIL for `chmod05,chmod07,fchmod02,chown01,chown02,chown03,open01,creat01`.
+  - `groupdb-chmod-regression-rv-la.promotion-candidates.txt` shows all eight rows clean across RV + LA x musl + glibc; only `chmod07` and `fchmod02` are new relative to the current stable list.
+
+Updated candidate-bank note after the group database follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` = at most 32 plausible cases, still short of stable606.

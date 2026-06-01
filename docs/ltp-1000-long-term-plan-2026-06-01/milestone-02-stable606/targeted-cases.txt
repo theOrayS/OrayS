@@ -196,3 +196,15 @@ chown02
 chown03
 mkdir04
 mknod02
+
+
+## chmod07 / fchmod02 group database follow-up
+
+chmod07
+fchmod02
+chmod05
+chown01
+chown02
+chown03
+open01
+creat01
