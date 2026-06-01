@@ -7,7 +7,7 @@ This file records candidate evidence only. It is **not** a stable606 promotion l
 - Current stable: 556 total / 556 unique / 0 duplicate.
 - Stable list changes: none.
 - Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 32, so promotion is blocked.
+- Current candidate bank after this preflight: at most 37, so promotion is blocked.
 
 ## Deferred clean bank from milestone-01
 
@@ -136,3 +136,17 @@ Updated candidate-bank note after the open/creat setgid follow-up: 21 deferred r
   - `groupdb-chmod-regression-rv-la.promotion-candidates.txt` shows all eight rows clean across RV + LA x musl + glibc; only `chmod07` and `fchmod02` are new relative to the current stable list.
 
 Updated candidate-bank note after the group database follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` = at most 32 plausible cases, still short of stable606.
+
+### access04, chmod06, chown04, fchmod06, and fchown04
+
+- Pre-fix RV scout state: all five cases TBROK or TFAIL around `mount(..., tmpfs, MS_REMOUNT|MS_RDONLY, ...)` and missing read-only filesystem errno semantics. `chown04` also exposed an inaccessible-prefix errno ordering issue.
+- Fix: generic per-process mount metadata now records `MS_RDONLY` state on valid remounts, and VFS metadata/write-permission paths return `EROFS` for write-like operations under read-only mounts. Chown path handling checks parent search permission before ownership checks. No case-specific special-casing.
+- Current evidence:
+  - `rv-tmpfs-readonly-metadata-20260601T182849Z.log`: RV musl + glibc PASS for all five cases, parser-clean.
+  - `la-tmpfs-readonly-metadata-20260601T182942Z.log`: LA musl + glibc PASS for all five cases, parser-clean.
+  - `tmpfs-readonly-rv-la.promotion-candidates.txt`: five four-way candidates: `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`.
+- Adjacent regression evidence:
+  - `rv-tmpfs-readonly-regression-20260601T183034Z.log` and `la-tmpfs-readonly-regression-20260601T183152Z.log` both report 30 PASS / 0 FAIL for the five new rows plus stable VFS/permission anchors.
+  - `tmpfs-readonly-regression-rv-la.promotion-candidates.txt` shows all fifteen rows clean across RV + LA x musl + glibc; only `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` are new relative to the current stable list.
+
+Updated candidate-bank note after the tmpfs read-only mount follow-up: 21 deferred rows + `socket01` + tentative `nanosleep01` + `mmap04` + `vma01` + `times03` + `mmap14` + `mmap12` + `open10` + `creat08` + `chmod07` + `fchmod02` + `access04` + `chmod06` + `chown04` + `fchmod06` + `fchown04` = at most 37 plausible cases, still short of stable606.

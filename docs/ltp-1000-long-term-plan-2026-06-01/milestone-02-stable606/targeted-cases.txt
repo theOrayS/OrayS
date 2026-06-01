@@ -208,3 +208,21 @@ chown02
 chown03
 open01
 creat01
+
+## tmpfs read-only mount metadata follow-up
+
+access04
+chmod06
+chown04
+fchmod06
+fchown04
+access01
+access02
+chmod05
+chmod07
+fchmod02
+chown01
+chown02
+chown03
+open01
+creat01

@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`.
-- Current candidate bank size for stable606 planning: at most 32 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`.
+- Current candidate bank size for stable606 planning: at most 37 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -168,3 +168,23 @@ Targeted evidence:
 - `groupdb-chmod-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eight rows are clean, with `chmod07` and `fchmod02` as the new not-yet-stable candidates from this follow-up.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 32, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+## tmpfs read-only remount metadata follow-up
+
+A generic mount/VFS metadata improvement was added after the group database work:
+
+- `mount(..., MS_REMOUNT|MS_RDONLY, "tmpfs")` is now accepted only for an existing mount point and records the mount as read-only in per-process mount metadata.
+- Path translation keeps mount source-root plus read-only state, and write-capable metadata paths now return `EROFS` when operating under a read-only mount.
+- Parent search permission is checked before chown metadata permission checks so inaccessible path prefixes surface `EACCES` instead of a later ownership `EPERM`.
+- No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-tmpfs-readonly-metadata-20260601T182849Z.log`: `access04,chmod06,chown04,fchmod06,fchown04` RV musl+glibc PASS, parser-clean.
+- `la-tmpfs-readonly-metadata-20260601T182942Z.log`: same five cases LA musl+glibc PASS, parser-clean.
+- `tmpfs-readonly-rv-la.promotion-candidates.txt`: combined four-way report; five candidates are clean across RV + LA x musl + glibc.
+- `rv-tmpfs-readonly-regression-20260601T183034Z.log`: RV VFS permission regression subset 30 PASS / 0 FAIL, no internal caveats.
+- `la-tmpfs-readonly-regression-20260601T183152Z.log`: LA VFS permission regression subset 30 PASS / 0 FAIL, no internal caveats.
+- `tmpfs-readonly-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all fifteen rows are clean, with `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` as the new not-yet-stable candidates from this follow-up.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 37, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.

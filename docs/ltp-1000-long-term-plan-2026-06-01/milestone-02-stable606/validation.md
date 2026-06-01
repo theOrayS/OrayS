@@ -379,3 +379,34 @@ Parser summary:
 - RV regression subset: 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - LA regression subset: 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined regression report: all eight rows clean across RV + LA x musl + glibc; only `chmod07` and `fchmod02` are new relative to current stable list.
+
+## tmpfs read-only remount metadata validation
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=access04,chmod06,chown04,fchmod06,fchown04 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=access04,chmod06,chown04,fchmod06,fchown04 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=access04,chmod06,chown04,fchmod06,fchown04,access01,access02,chmod05,chmod07,fchmod02,chown01,chown02,chown03,open01,creat01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=access04,chmod06,chown04,fchmod06,fchown04,access01,access02,chmod05,chmod07,fchmod02,chown01,chown02,chown03,open01,creat01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV targeted raw/summary: `target/ltp-1000-milestone-02-stable606/rv-tmpfs-readonly-metadata-20260601T182849Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- LA targeted raw/summary: `target/ltp-1000-milestone-02-stable606/la-tmpfs-readonly-metadata-20260601T182942Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/tmpfs-readonly-rv-la.promotion-candidates.txt`, `.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-tmpfs-readonly-regression-20260601T183034Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-tmpfs-readonly-regression-20260601T183152Z.log`, `.summary.txt`, `.summary.json`, `.sha256`, `.derived.sha256`
+- Regression four-way report: `target/ltp-1000-milestone-02-stable606/tmpfs-readonly-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV targeted: 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA targeted: 10 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: 5 candidates: `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`.
+- RV regression subset: 30 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 30 PASS / 0 FAIL, no parser caveats.
+- Regression four-way report: 15 clean rows across RV + LA x musl + glibc.
+
+The first attempted RV rebuild used the nonexistent `LinuxError::ReadOnlyFilesystem` variant and stopped at compile time before any LTP cases ran. It was corrected to the generated errno variant `LinuxError::EROFS`; that failed compile log is not promotion evidence.

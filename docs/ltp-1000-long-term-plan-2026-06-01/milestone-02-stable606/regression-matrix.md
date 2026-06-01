@@ -159,3 +159,21 @@ Evidence:
   - 16 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/groupdb-chmod-regression-rv-la.promotion-candidates.txt`
   - All eight rows clean across RV + LA x musl + glibc; `chmod07` and `fchmod02` are the new candidate rows.
+
+## tmpfs read-only mount metadata regression set
+
+Rationale: the code change affects `mount` flag acceptance, per-process mount translation, read-only mount errno handling, and VFS metadata permission ordering. The protected subset combines the five new candidates with existing stable access/chmod/chown/open/creat anchors.
+
+Cases:
+
+- New candidates: `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`
+- Existing stable anchors: `access01`, `access02`, `chmod05`, `chmod07`, `fchmod02`, `chown01`, `chown02`, `chown03`, `open01`, `creat01`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-tmpfs-readonly-regression-20260601T183034Z.summary.txt`
+  - 30 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-tmpfs-readonly-regression-20260601T183152Z.summary.txt`
+  - 30 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/tmpfs-readonly-regression-rv-la.promotion-candidates.txt`
+  - All fifteen rows clean across RV + LA x musl + glibc; `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` are the new candidate rows.

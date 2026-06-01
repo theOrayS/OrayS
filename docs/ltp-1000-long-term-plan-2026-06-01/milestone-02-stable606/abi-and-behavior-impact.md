@@ -177,3 +177,29 @@ POSIX/Linux-visible impact:
 - FD impact: none beyond the existing read-only synthetic-file fd behavior.
 - Signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: low. This is static byte content consumed by existing synthetic-file plumbing; RV/LA regression protects chmod/chown/open/creat anchors.
+
+## Additional tmpfs read-only mount metadata behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/mod.rs`
+- `examples/shell/src/uspace/mount_abi.rs`
+- `examples/shell/src/uspace/metadata.rs`
+- `examples/shell/src/uspace/credentials.rs`
+- `examples/shell/src/uspace/fd_table.rs`
+
+Behavior:
+
+- Per-process mount table entries now store a source root and a read-only flag instead of only the source path string.
+- `mount(..., MS_REMOUNT|MS_RDONLY, ...)` is accepted for existing mount points and updates the recorded read-only state; `MS_REMOUNT` on a non-mounted target still fails with `EINVAL`.
+- Write-like file metadata paths (`access(..., W_OK)`, `truncate`, `fchmod`, `fchmodat`, `chown`/`fchownat`, open/create parent write checks) detect when the resolved path sits under a read-only mount and return `EROFS`.
+- Chown path handling now preserves Linux errno ordering for inaccessible path prefixes by returning `EACCES` before ownership permission checks.
+
+POSIX/Linux-visible impact:
+
+- Syscall/flag surface affected: `mount` flag handling for `MS_RDONLY|MS_REMOUNT`, `access`/`faccessat`, `chmod`/`fchmod`/`fchmodat`, `chown`/`fchownat`, `truncate`, and open/create permission checks.
+- Errno impact: write-like operations below a read-only mounted subtree now return `EROFS` instead of succeeding or falling through to `EPERM`; inaccessible parent prefixes for chown-style path operations return `EACCES`.
+- FD impact: existing fd paths are used to identify read-only mount membership for `fchmod` and fd-relative `fchmodat`; descriptor allocation/dup/close semantics are unchanged.
+- Signal/futex/mmap/user-pointer copy impact: none.
+- Resource/lifetime risk: moderate-low. Mount state is still per-process shared metadata, now with one extra boolean and source-root string per mount point. The RV/LA regression subset protects adjacent stable VFS permission and metadata cases.
+- Maintenance boundary: this is read-only mount metadata sufficient for VFS errno semantics. It does not implement a full Linux VFS superblock layer, shared mount namespaces, or bind-mount read-only propagation beyond the current synthetic mount table model.

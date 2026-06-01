@@ -8,19 +8,19 @@ use linux_raw_sys::general;
 use std::string::{String, ToString};
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{resolve_dirfd_path, FdEntry};
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
-    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
-    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
-    STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
-    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYSFS_MAGIC, TMPFS_MAGIC,
+    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
+    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
+    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
+    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
+    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
 use super::user_memory::{read_cstr, read_user_bytes, write_user_bytes, write_user_value};
-use super::UserProcess;
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 const LINUX_PATH_MAX: usize = 4096;
@@ -328,7 +328,13 @@ pub(super) fn sys_faccessat(
             Err(err) => return neg_errno(err),
         }
     };
-    if parents_searchable && access_allowed(&stat, mode, uid, gid) {
+    if !parents_searchable {
+        return neg_errno_code(LINUX_EACCES);
+    }
+    if mode & ACCESS_W_OK != 0 && process.path_on_readonly_mount(resolved_path.as_str()) {
+        return neg_errno(LinuxError::EROFS);
+    }
+    if access_allowed(&stat, mode, uid, gid) {
         0
     } else {
         neg_errno_code(LINUX_EACCES)
@@ -381,6 +387,9 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
     };
     if st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
         return neg_errno(LinuxError::EISDIR);
+    }
+    if process.path_on_readonly_mount(target_path.as_str()) {
+        return neg_errno(LinuxError::EROFS);
     }
     if !access_allowed(&st, ACCESS_W_OK, process.fs_uid(), process.fs_gid()) {
         return neg_errno(LinuxError::EACCES);
@@ -447,6 +456,11 @@ pub(super) fn sys_fchmod(process: &UserProcess, fd: usize, mode: usize) -> isize
             Err(err) => return neg_errno(err),
         }
     };
+    if let Some(path) = path.as_deref() {
+        if process.path_on_readonly_mount(path) {
+            return neg_errno(LinuxError::EROFS);
+        }
+    }
     if !chmod_permission_allowed(process, &st) {
         return neg_errno(LinuxError::EPERM);
     }
@@ -486,6 +500,11 @@ pub(super) fn sys_fchmodat(
             Ok((path, st)) => (path, st),
             Err(err) => return neg_errno(err),
         };
+        if let Some(path) = path.as_deref() {
+            if process.path_on_readonly_mount(path) {
+                return neg_errno(LinuxError::EROFS);
+            }
+        }
         if !chmod_permission_allowed(process, &st) {
             return neg_errno(LinuxError::EPERM);
         }
@@ -510,6 +529,9 @@ pub(super) fn sys_fchmodat(
                         Ok(st) => st,
                         Err(err) => return neg_errno(err),
                     };
+                    if process.path_on_readonly_mount(cwd.as_str()) {
+                        return neg_errno(LinuxError::EROFS);
+                    }
                     if !chmod_permission_allowed(process, &st) {
                         return neg_errno(LinuxError::EPERM);
                     }
@@ -529,6 +551,11 @@ pub(super) fn sys_fchmodat(
                 Err(err) => return neg_errno(err),
             }
         };
+        if let Some(path) = path.as_deref() {
+            if process.path_on_readonly_mount(path) {
+                return neg_errno(LinuxError::EROFS);
+            }
+        }
         if !chmod_permission_allowed(process, &st) {
             return neg_errno(LinuxError::EPERM);
         }
@@ -560,6 +587,9 @@ pub(super) fn sys_fchmodat(
             Ok(st) => st,
             Err(err) => return neg_errno(err),
         };
+        if process.path_on_readonly_mount(resolved_path.as_str()) {
+            return neg_errno(LinuxError::EROFS);
+        }
         if !chmod_permission_allowed(process, &st) {
             return neg_errno(LinuxError::EPERM);
         }
@@ -568,6 +598,9 @@ pub(super) fn sys_fchmodat(
     }
     match fds.stat_path(process, dirfd as i32, path.as_str()) {
         Ok(st) => {
+            if process.path_on_readonly_mount(resolved_path.as_str()) {
+                return neg_errno(LinuxError::EROFS);
+            }
             if !chmod_permission_allowed(process, &st) {
                 return neg_errno(LinuxError::EPERM);
             }
@@ -967,6 +1000,16 @@ pub(super) fn sys_fchownat(
             Ok(result) => result,
             Err(err) => return neg_errno(err),
         };
+        match fds.parent_dirs_searchable(
+            process,
+            resolved_path.as_str(),
+            process.fs_uid(),
+            process.fs_gid(),
+        ) {
+            Ok(true) => {}
+            Ok(false) => return neg_errno(LinuxError::EACCES),
+            Err(err) => return neg_errno(err),
+        }
         (Some(resolved_path), st)
     };
     apply_chown_metadata(process, record_path, &st, owner, group)
