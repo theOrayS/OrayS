@@ -268,6 +268,19 @@ const LTP_STABLE_CASES: &[&str] = &[
     "tkill02",
     "vfork01",
     "vfork02",
+    "accept01", "clock_nanosleep02", "data_space", "dirty",
+    "fcntl19_64", "fcntl20", "fcntl20_64", "fcntl21",
+    "fcntl21_64", "fcntl22_64", "fs_perms", "ioctl_ns07",
+    "listen01", "mlockall01", "mmap-corruption01", "mmstress_dummy",
+    "newuname01", "page01", "page02", "poll02",
+    "pselect01", "pselect01_64", "readdir01", "sbrk02",
+    "settimeofday01", "socket02", "socketpair02", "stack_space",
+    "time-schedule", "ulimit01", "utsname01", "utsname04",
+    "nextafter01", "genacos", "genasin", "genatan",
+    "genceil", "gencos", "gencosh", "genexp",
+    "genfabs", "genfloor", "genfmod", "genj0",
+    "genj1", "genldexp", "genlgamma", "genlog",
+    "genlog10", "genpow",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
