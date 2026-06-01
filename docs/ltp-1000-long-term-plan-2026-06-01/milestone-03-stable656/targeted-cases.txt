@@ -1,0 +1,14 @@
+# Milestone 03 stable656 targeted cases
+# Unit: LTP case name. This file records candidates/scout rows only; none were promoted.
+
+## RV G009 mm/futex scout run 2026-06-02
+mmap05
+munmap01
+mmap10_1
+mmap13
+vma02
+futex_wait03
+
+## Promotion result
+# 0 promoted from this scout.
+# Reasons are documented in no-promotion-reason.md and validation.md.
