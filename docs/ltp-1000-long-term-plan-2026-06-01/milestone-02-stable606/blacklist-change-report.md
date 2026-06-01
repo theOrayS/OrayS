@@ -22,3 +22,12 @@ No blacklist changes were made for the `setrlimit04` follow-up. The case was val
 ## clock_gettime04 evidence-only follow-up
 
 No blacklist changes were made for the `clock_gettime04` follow-up. The case was validated through targeted RV/LA x musl/glibc parser-clean runs and adjacent time regression subsets; no SKIP/status0/blacklist evidence was counted. The unrelated failed rows in the earlier mixed RV mm/time scout remain visible and non-countable.
+
+
+## legacy clean-tail evidence-only follow-up
+
+No blacklist changes were made for the `locktests`, `ltpServer`, and `stress` follow-up. The cases were validated through targeted RV/LA x musl/glibc parser-clean runs; no SKIP/status0/blacklist/full-sweep partial evidence was counted.
+
+## Non-countable post-clock scouts
+
+No failed row from `rv-light-process-scout-20260601T193756Z.log`, `rv-vfs-fd-remainder-scout-20260601T194216Z.log`, or `la-readlinkat02-rescout-20260601T194310Z.log` was moved to blacklist. The timeout, panic/trap, TFAIL/TBROK/TCONF, and LA-musl `readlinkat02` failure remain visible blockers and non-countable evidence.

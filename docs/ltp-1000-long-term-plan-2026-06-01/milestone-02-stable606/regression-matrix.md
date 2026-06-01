@@ -275,3 +275,26 @@ Evidence:
   - `clock_gettime04` is clean across RV + LA x musl + glibc.
 - Regression four-way report: `target/ltp-1000-milestone-02-stable606/clock-time-regression-rv-la.promotion-candidates.txt`
   - All five rows clean across RV + LA x musl + glibc; only `clock_gettime04` is new relative to current stable and previously banked rows.
+
+
+## legacy clean-tail evidence-only matrix
+
+Rationale: no code changed, so there is no new syscall-lane regression set. The protected claim is limited to fresh four-way parser-clean proof for three named helper/harness-style LTP binaries.
+
+Cases:
+
+- New candidates: `locktests`, `ltpServer`, `stress`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-legacy-clean-tail-scout-20260601T194031Z.summary.txt`
+  - 6 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-legacy-clean-tail-scout-20260601T194116Z.summary.txt`
+  - 6 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Four-way report: `target/ltp-1000-milestone-02-stable606/legacy-clean-tail-rv-la.promotion-candidates.txt`
+  - `locktests`, `ltpServer`, and `stress` are clean across RV + LA x musl + glibc.
+
+## Non-countable scout blockers
+
+- `rv-light-process-scout-20260601T193756Z.summary.txt`: 0 PASS / 8 FAIL with TFAIL/TBROK/TCONF, one timeout, and one panic/trap. No regression protection or candidate credit is claimed.
+- `rv-vfs-fd-remainder-scout-20260601T194216Z.summary.txt`: 2 PASS / 16 FAIL with TFAIL/TBROK/TCONF; the only RV-clean row, `readlinkat02`, failed LA musl in `la-readlinkat02-rescout-20260601T194310Z.summary.txt` and remains blocked.

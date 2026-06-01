@@ -308,3 +308,55 @@ clock_gettime02
 gettimeofday01
 gettimeofday02
 times01
+
+
+## legacy clean-tail evidence-only follow-up
+
+locktests
+ltpServer
+stress
+
+## Non-countable process/signal/scheduler scout
+
+sched_setaffinity01
+signal01
+nice04
+clone04
+gethostname02
+gethostid01
+getpgid01
+kill05
+kill10
+
+## Non-countable VFS/FD remainder scout
+
+readlinkat02
+readlink03
+statx01
+statx04
+fcntl30
+pipe15
+pipe2_03
+writev03
+pwritev03
+
+## Explicitly not promoted from the post-clock scouts
+
+sched_setaffinity01
+signal01
+nice04
+clone04
+gethostname02
+gethostid01
+getpgid01
+kill05
+kill10
+readlinkat02
+readlink03
+statx01
+statx04
+fcntl30
+pipe15
+pipe2_03
+writev03
+pwritev03
