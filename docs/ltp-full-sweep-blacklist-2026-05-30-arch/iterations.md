@@ -328,7 +328,7 @@ Result:
 - `strings kernel-la` showed LA-only entries such as `creat07` / `fsync02` and common entries such as `pthserv` embedded in the built submission kernel.
 - This is build-mode wiring only; the closed runtime evidence remains `rv-arch002` and `la-arch012` above.
 
-## 2026-06-01 follow-up: online-friendly stable default
+## 2026-06-01 follow-up: online-friendly stable default (superseded by stable-first superset)
 
 Remote score-table evidence showed that making `make` / `make all` default to the full all-minus-blacklist sweep is not score-friendly: the remote evaluator can spend time/output budget in the long sweep before preserving the known high-value stable whitelist coverage, and the LA blacklist currently excludes two stable-list cases (`fcntl16`, `write01`).  The blacklist closure remains useful experimental evidence, but it should not be the implicit online scoring path.
 
@@ -355,3 +355,43 @@ Result:
 - Opt-in `make -n all REMOTE_LTP_CASES=blacklist` still shows `LTP_CASES="blacklist"` plus RV/LA blacklist env injection.
 - `make all` completed with the stable default and regenerated `kernel-rv` / `kernel-la`; disk stayed at `/` and `/root` 59G size, 23G used, 34G available, 41% used before and after.
 - This is build-mode wiring only; no new full LTP runtime claim is made in this follow-up.
+
+## 2026-06-01 follow-up: stable-first score-safe superset default
+
+Clarification: the intended online-friendly strategy is not pure stable-only.  It is stable first, then non-stable full-sweep extras after applying the blacklist:
+
+```text
+LTP_STABLE_CASES + (all guest LTP binaries - LTP_STABLE_CASES - blacklist)
+```
+
+Change:
+
+- Added `LTP_CASES=stable-plus-blacklist` with aliases `score-blacklist` and `stable-plus-all-minus-blacklist`.
+- `selected_ltp_cases()` now builds the stable list first, removes stable duplicates from the directory sweep, removes active blacklist entries from the remaining extras, then appends those extras.
+- The default mode applies blacklist only to the extra suffix, so LA experimental blacklist entries that overlap stable (`fcntl16`, `write01`) do not suppress the stable whitelist run.
+- `REMOTE_LTP_CASES ?= stable-plus-blacklist` is now the default for `make` / `make all`.
+- `make all REMOTE_LTP_CASES=stable` remains the pure stable-only escape hatch.
+- `make all REMOTE_LTP_CASES=blacklist` remains the pure all-minus-blacklist experiment.
+
+Planned validation for this follow-up:
+
+```bash
+make -n all
+make -n all REMOTE_LTP_CASES=stable
+make -n all REMOTE_LTP_CASES=blacklist
+rustfmt +nightly-2025-05-20 --edition 2024 --check examples/shell/src/cmd.rs
+df -h / /root
+make all
+df -h / /root
+python3 -m json.tool docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json
+git diff --check -- Makefile examples/shell/src/cmd.rs docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-report.md docs/ltp-full-sweep-blacklist-2026-05-30-arch/iterations.md docs/ltp-full-sweep-blacklist-2026-05-30-arch/final-quality-gate.json
+```
+
+Result:
+
+- Default `make -n all` shows `LTP_CASES="stable-plus-blacklist"` plus RV/LA blacklist env injection.
+- `make -n all REMOTE_LTP_CASES=stable` shows `LTP_CASES="stable"` for both RV and LA with no blacklist env injection.
+- `make -n all REMOTE_LTP_CASES=blacklist` shows pure `LTP_CASES="blacklist"` plus RV/LA blacklist env injection.
+- `rustfmt +nightly-2025-05-20 --edition 2024 --check examples/shell/src/cmd.rs` passed.
+- `make all` completed with the stable-plus-blacklist default and regenerated `kernel-rv` / `kernel-la`; disk stayed at `/` and `/root` 59G size, 23G used, 34G available, 41% used before and after.
+- This is build-mode wiring plus selection-order implementation; no new full LTP runtime claim is made in this follow-up.

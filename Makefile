@@ -81,16 +81,17 @@ KERNEL_RV_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
 KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
-# Remote official evaluation invokes `make` / `make all` with no extra args and
-# is score-oriented, so default to the curated stable whitelist.  Full-sweep
-# blacklist remains available as an explicit experiment:
+# Remote official evaluation invokes `make` / `make all` with no extra args.
+# Run the curated stable whitelist first, then score extra all-minus-blacklist
+# cases.  Pure stable and pure blacklist remain available as explicit modes:
+#   make all REMOTE_LTP_CASES=stable
 #   make all REMOTE_LTP_CASES=blacklist
-REMOTE_LTP_CASES ?= stable
+REMOTE_LTP_CASES ?= stable-plus-blacklist
 REMOTE_LTP_BLACKLIST_DIR ?= $(CURDIR)/docs/ltp-full-sweep-blacklist-2026-05-30-arch
 REMOTE_LTP_BLACKLIST_COMMON_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-common.txt
 REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
 REMOTE_LTP_BLACKLIST_LA_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-la.txt
-REMOTE_LTP_BLACKLIST_MODES := blacklist all-minus-blacklist sweep:blacklist
+REMOTE_LTP_BLACKLIST_MODES := blacklist all-minus-blacklist sweep:blacklist score-blacklist stable-plus-blacklist stable-plus-all-minus-blacklist
 REMOTE_LTP_USES_BLACKLIST := $(filter $(REMOTE_LTP_BLACKLIST_MODES),$(REMOTE_LTP_CASES))
 TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
 RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
