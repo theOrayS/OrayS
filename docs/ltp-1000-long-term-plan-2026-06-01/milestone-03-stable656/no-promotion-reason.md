@@ -1,29 +1,35 @@
 # Milestone 03 stable656 no-promotion reason
 
-No case from the 2026-06-02 G009 scout is eligible for stable promotion.
+This checkpoint found two four-way-clean future candidates, but no stable promotion is performed yet.
 
-## Blocking evidence
+## Why no stable list update happened
 
-Promotion candidate report:
+- Live stable baseline: `606 total / 606 unique / 0 duplicate`.
+- Next milestone target: `656 unique`.
+- Current four-way-clean new candidate pool: 2 (`futex_wait01`, `sched_setaffinity01`).
+- Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
-- Required arches: RV only for this scout
-- Required libcs: glibc, musl
-- Promotion candidates: 0
-- Blocked/incomplete cases: 6
+Because the candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
 
-Blocked rows:
+## Blocking evidence kept visible
 
-| Case | Reason |
+The following blockers prevent counting additional rows:
+
+| Case / lane | Blocking reason |
 | --- | --- |
-| `futex_wait03` | both libcs timeout and wrapper FAIL |
-| `mmap05` | both libcs wrapper FAIL with `TBROK`; test killed by SIGSEGV |
-| `mmap10_1` | missing testcase in both guest LTP trees; not countable |
-| `mmap13` | both libcs wrapper FAIL with `TFAIL`; SIGBUS signal not received |
-| `munmap01` | both libcs wrapper FAIL code 139 |
-| `vma02` | both libcs wrapper FAIL with `TCONF`; libnuma requirement not satisfied |
+| `mmap05`, `munmap01` | user fault / SIGSEGV handling remains broken (`TBROK` or code 139) |
+| `mmap10_1` | missing testcase in both guest LTP trees |
+| `mmap13` | expected SIGBUS is not delivered (`TFAIL`) |
+| `vma02` | libnuma `TCONF` |
+| `futex_wait03` | timeout in both libcs |
+| `kill10` | severe panic/trap during RV VFS/process scout; evidence cannot be promoted |
+| `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
+| `readlinkat02` | RV clean, but LA musl `TFAIL`; not four-way clean |
+| `select02`, `sched_rr_get_interval03`, `setpriority01` | wrapper PASS rows include `TCONF`; not promotion evidence |
+| `fsync02`, `nice05`, `mincore03`, `futex_wait05`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `execve05` | fail, TFAIL/TBROK/TCONF/ENOSYS, or incomplete arch matrix remains |
 
 ## Decision
 
 - Do not edit `LTP_STABLE_CASES`.
-- Do not treat blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Do not run LA or stable regression promotion gates for these rows until a fresh RV run has parser-clean wrapper PASS for both libcs.
+- Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
+- Keep `futex_wait01` and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.

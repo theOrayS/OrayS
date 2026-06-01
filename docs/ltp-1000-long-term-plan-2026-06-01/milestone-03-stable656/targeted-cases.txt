@@ -1,5 +1,6 @@
 # Milestone 03 stable656 targeted cases
-# Unit: LTP case name. This file records candidates/scout rows only; none were promoted.
+# Unit: LTP case name. This file records scout/fix/regression rows; only rows listed under
+# "Four-way clean candidate pool" are currently eligible for a future promotion batch.
 
 ## RV G009 mm/futex scout run 2026-06-02
 mmap05
@@ -9,6 +10,64 @@ mmap13
 vma02
 futex_wait03
 
+## RV VFS/process scout run 2026-06-02
+openat02
+openat03
+mknod07
+mknodat02
+rename03
+rename04
+rename05
+nice04
+clone04
+sched_rr_get_interval03
+sched_setaffinity01
+setpriority01
+signal01
+creat07
+fsync02
+kill10
+nice05
+
+## RV G009 mixed safe scout run 2026-06-02
+fsync02
+nice05
+mincore03
+shmat1
+futex_wait01
+futex_wait05
+
+## RV full-sweep divergence/high-yield scout run 2026-06-02
+readlinkat02
+atof01
+fptest01
+fptest02
+epoll_create02
+diotest4
+select02
+execve05
+
+## Targeted repair / confirmation rows
+sched_setaffinity01
+futex_wait01
+readlinkat02
+
+## Adjacent stable regression subset for sched_setaffinity01 fix
+sched_getaffinity01
+sched_setparam01
+sched_setparam02
+sched_setparam03
+sched_setparam04
+sched_setparam05
+sched_setscheduler01
+sched_setscheduler02
+sched_setscheduler03
+setpriority02
+
+## Four-way clean candidate pool (not yet promoted)
+futex_wait01
+sched_setaffinity01
+
 ## Promotion result
-# 0 promoted from this scout.
-# Reasons are documented in no-promotion-reason.md and validation.md.
+# 0 promoted in this checkpoint.
+# Reason: only 2 new four-way-clean unique candidates are available, below the +50 milestone gate.
