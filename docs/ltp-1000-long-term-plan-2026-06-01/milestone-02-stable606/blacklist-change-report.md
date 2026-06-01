@@ -17,3 +17,8 @@ No blacklist changes were made for the `fchownat02` follow-up. The case was vali
 ## setrlimit04 busybox applet exec follow-up
 
 No blacklist changes were made for the `setrlimit04` follow-up. The case was validated through targeted RV/LA x musl/glibc parser-clean runs and adjacent rlimit/exec/wait regression subsets; no SKIP/status0/blacklist evidence was counted.
+
+
+## clock_gettime04 evidence-only follow-up
+
+No blacklist changes were made for the `clock_gettime04` follow-up. The case was validated through targeted RV/LA x musl/glibc parser-clean runs and adjacent time regression subsets; no SKIP/status0/blacklist evidence was counted. The unrelated failed rows in the earlier mixed RV mm/time scout remain visible and non-countable.

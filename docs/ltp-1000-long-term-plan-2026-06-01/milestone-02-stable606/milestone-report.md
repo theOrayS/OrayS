@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`, `setrlimit04`.
-- Current candidate bank size for stable606 planning: at most 43 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`, `setrlimit04`, `clock_gettime04`.
+- Current candidate bank size for stable606 planning: at most 44 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -265,3 +265,19 @@ Targeted evidence:
 - `setrlimit-exec-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eleven rows are clean, with `setrlimit04` as the only new not-yet-stable candidate from this follow-up.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 43, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+
+## clock_gettime04 evidence-only follow-up
+
+No kernel behavior change was required for this follow-up; the case was isolated from the mixed mm/time RV scout and then re-run as a targeted clock/time validation lane.
+
+Targeted evidence:
+
+- `rv-clock-gettime04-rescout-20260601T193254Z.log`: `clock_gettime04` RV musl+glibc PASS, parser-clean.
+- `la-clock-gettime04-rescout-20260601T192915Z.log`: `clock_gettime04` LA musl+glibc PASS, parser-clean.
+- `clock-gettime04-isolated-rv-la.promotion-candidates.txt`: isolated four-way report; `clock_gettime04` is clean across RV + LA x musl + glibc.
+- `rv-clock-time-regression-20260601T193006Z.log`: RV clock/time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `la-clock-time-regression-20260601T193006Z.log`: LA clock/time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `clock-time-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all five rows are clean, with `clock_gettime04` as the only new row relative to the current stable list.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 44, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
