@@ -26,7 +26,7 @@ The following blockers prevent counting additional rows:
 | `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
 | `readlinkat02` | RV clean, but LA musl `TFAIL`; rerun after code inspection still 1 PASS / 1 FAIL |
 | `fsync02` | isolated RV rerun still 1 PASS / 1 FAIL with glibc `TBROK=1` |
-| `nice04` | source expects `nice(-10)` to fail with `EPERM`; current `setpriority` syscall errno boundary is not safely changed without libc/root-cause work |
+| `nice04` | RV musl gets `EACCES` for `nice(-10)`, but stable `setpriority02` source requires direct unprivileged `setpriority` lowering to return `EACCES`; no safe kernel errno flip |
 | closed arch sweep | 563 four-way-clean historical rows, but zero not-yet-stable rows after filtering live stable606 |
 | `select02`, `sched_rr_get_interval03`, `setpriority01` | wrapper PASS rows include `TCONF`; not promotion evidence |
 | `nice05`, `mincore03`, `futex_wait05`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `execve05` | fail, TFAIL/TBROK/TCONF/ENOSYS, or incomplete arch matrix remains |
