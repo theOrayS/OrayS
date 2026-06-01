@@ -81,15 +81,17 @@ KERNEL_RV_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
 KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
-# This experimental branch is meant to be submitted to the official evaluator
-# as a blacklist full-sweep.  Keep local targets opt-in, but make the default
-# remote-submission path (`make` / `make all`) compile the chosen sweep mode and
-# per-arch blacklist overlays into kernel-rv/kernel-la.
-REMOTE_LTP_CASES ?= blacklist
+# Remote official evaluation invokes `make` / `make all` with no extra args and
+# is score-oriented, so default to the curated stable whitelist.  Full-sweep
+# blacklist remains available as an explicit experiment:
+#   make all REMOTE_LTP_CASES=blacklist
+REMOTE_LTP_CASES ?= stable
 REMOTE_LTP_BLACKLIST_DIR ?= $(CURDIR)/docs/ltp-full-sweep-blacklist-2026-05-30-arch
 REMOTE_LTP_BLACKLIST_COMMON_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-common.txt
 REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
 REMOTE_LTP_BLACKLIST_LA_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-la.txt
+REMOTE_LTP_BLACKLIST_MODES := blacklist all-minus-blacklist sweep:blacklist
+REMOTE_LTP_USES_BLACKLIST := $(filter $(REMOTE_LTP_BLACKLIST_MODES),$(REMOTE_LTP_CASES))
 TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
 RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
 LA_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-la.img
@@ -288,6 +290,25 @@ la_aux_drive := \
 endif
 
 all:
+ifeq ($(REMOTE_LTP_USES_BLACKLIST),)
+	LTP_CASES="$(REMOTE_LTP_CASES)" \
+		$(MAKE) test_build ARCH=riscv64 BUS=mmio \
+		KERNEL_FEATURES="$(KERNEL_RV_FEATURES)" \
+		APP_FEATURES="$(KERNEL_RV_APP_FEATURES)" \
+		AXCONFIG_WRITES="$(KERNEL_RV_AXCONFIG_WRITES)" \
+		OUT_DIR=$(KERNEL_RV_OUT_DIR) \
+		OUT_CONFIG=$(KERNEL_RV_CONFIG) \
+		TARGET_DIR=$(KERNEL_RV_TARGET_DIR)
+	LTP_CASES="$(REMOTE_LTP_CASES)" \
+		$(MAKE) test_build ARCH=loongarch64 BUS=pci \
+		PLAT_CONFIG="$(REMOTE_LA_PLAT_CONFIG)" \
+		KERNEL_FEATURES="$(KERNEL_LA_FEATURES)" \
+		APP_FEATURES="$(KERNEL_LA_APP_FEATURES)" \
+		AXCONFIG_WRITES="$(KERNEL_LA_AXCONFIG_WRITES)" \
+		OUT_DIR=$(KERNEL_LA_OUT_DIR) \
+		OUT_CONFIG=$(KERNEL_LA_CONFIG) \
+		TARGET_DIR=$(KERNEL_LA_TARGET_DIR)
+else
 	@test -f "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)" || { printf 'missing REMOTE_LTP_BLACKLIST_COMMON_FILE: %s\n' "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)" >&2; exit 1; }
 	@test -f "$(REMOTE_LTP_BLACKLIST_RV_FILE)" || { printf 'missing REMOTE_LTP_BLACKLIST_RV_FILE: %s\n' "$(REMOTE_LTP_BLACKLIST_RV_FILE)" >&2; exit 1; }
 	LTP_CASES="$(REMOTE_LTP_CASES)" \
@@ -312,6 +333,7 @@ all:
 		OUT_DIR=$(KERNEL_LA_OUT_DIR) \
 		OUT_CONFIG=$(KERNEL_LA_CONFIG) \
 		TARGET_DIR=$(KERNEL_LA_TARGET_DIR)
+endif
 
 include scripts/make/utils.mk
 include scripts/make/build.mk
