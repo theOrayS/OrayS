@@ -4,7 +4,7 @@
 目标仓库：`/root/oskernel2026-orays`
 建议起点分支：当前 `dev/long-term-plan-0601` 或从最新 Session 8 commit 新建 `dev/ltp-stable506-to-520-plus`
 当前最高可信 stable：`506 total / 506 unique / 0 duplicate`
-上轮 final report：`docs/ltp-os-long-term-plan-sessions-0601-docs/session-08-integration-final-gate/final-report.md`
+上轮 final report：`docs/archive/ltp-os-long-term-plan-2026-06-01/ltp-os-long-term-plan-sessions-0601-docs/session-08-integration-final-gate/final-report.md`
 
 ````text
 我要继续 `/root/oskernel2026-orays` 的 LTP/OS 长期完善任务，从 stable506 冲 stable520+，并补 Optional Session 9/10 的质量审计。
@@ -20,8 +20,8 @@
 - `docs/agent-workflow/coding-boundaries.md`
 - `docs/agent-workflow/collaboration-and-delivery.md`
 - `docs/agent-workflow/branch-policy.md`
-- `docs/ltp-os-long-term-plan-sessions-0601-docs/session-08-integration-final-gate/final-report.md`
-- `docs/ltp-os-long-term-plan-sessions-0601-docs/session-08-integration-final-gate/validation.md`
+- `docs/archive/ltp-os-long-term-plan-2026-06-01/ltp-os-long-term-plan-sessions-0601-docs/session-08-integration-final-gate/final-report.md`
+- `docs/archive/ltp-os-long-term-plan-2026-06-01/ltp-os-long-term-plan-sessions-0601-docs/session-08-integration-final-gate/validation.md`
 
 Live 复核，不要只信本提示词：
 ```bash
