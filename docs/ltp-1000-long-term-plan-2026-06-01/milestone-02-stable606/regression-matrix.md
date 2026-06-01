@@ -196,3 +196,21 @@ Evidence:
   - 40 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/proc-fd-regression-rv-la.promotion-candidates.txt`
   - All twenty rows clean across RV + LA x musl + glibc; `pipe07` is the new candidate row.
+
+## mknod mode errno regression set
+
+Rationale: the code change affects `mknodat()` file-type validation and errno ordering before node creation. The protected subset combines the new mknod candidates with existing mknod/open/creat/chmod/chown anchors and already-banked VFS metadata candidates.
+
+Cases:
+
+- New candidates: `mknod03`, `mknod04`, `mknod09`
+- Existing stable or already-banked anchors: `mknod02`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-mknod-vfs-regression-20260601T190520Z.summary.txt`
+  - 26 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-mknod-vfs-regression-20260601T190623Z.summary.txt`
+  - 26 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Targeted four-way report: `target/ltp-1000-milestone-02-stable606/mknod-mode-rv-la.promotion-candidates.txt`
+  - `mknod03`, `mknod04`, and `mknod09` are clean across RV + LA x musl + glibc.

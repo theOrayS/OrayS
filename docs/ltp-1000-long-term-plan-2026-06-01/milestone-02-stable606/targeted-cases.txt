@@ -250,3 +250,19 @@ readlinkat01
 fcntl01
 fcntl02
 fcntl03
+
+## mknod mode errno follow-up
+
+mknod03
+mknod04
+mknod09
+mknod02
+open10
+creat08
+chmod07
+fchmod02
+access04
+chmod06
+chown04
+fchmod06
+fchown04

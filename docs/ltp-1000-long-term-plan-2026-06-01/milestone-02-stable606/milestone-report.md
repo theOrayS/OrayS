@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`.
-- Current candidate bank size for stable606 planning: at most 38 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`.
+- Current candidate bank size for stable606 planning: at most 41 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -208,3 +208,22 @@ Targeted evidence:
 - `proc-fd-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twenty rows are clean, with `pipe07` as the new not-yet-stable candidate from this follow-up.
 
 Promotion remains blocked: the stable606 candidate bank is now at most 38, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+
+## mknod03 / mknod04 / mknod09 mode-errno follow-up
+
+A generic `mknodat()` mode validation improvement was added after the `/proc/self/fd` work:
+
+- Regular files and FIFOs remain the only creatable node types in the current synthetic filesystem model.
+- Character/block devices still return `EPERM`, preserving the existing no-`CAP_MKNOD`/no-device-node boundary.
+- Invalid or nonsensical file-type encodings such as `S_IFMT`, directory, symlink, and socket type bits now return `EINVAL` instead of the previous catch-all `EPERM`.
+- No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-mknod-mode-rescout-20260601T190332Z.log`: `mknod03,mknod04,mknod09` RV musl+glibc PASS, parser-clean.
+- `la-mknod-mode-rescout-20260601T190415Z.log`: `mknod03,mknod04,mknod09` LA musl+glibc PASS, parser-clean.
+- `mknod-mode-rv-la.promotion-candidates.txt`: combined four-way report; `mknod03`, `mknod04`, and `mknod09` are clean across RV + LA x musl + glibc.
+- `rv-mknod-vfs-regression-20260601T190520Z.log`: RV mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
+- `la-mknod-vfs-regression-20260601T190623Z.log`: LA mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 41, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
