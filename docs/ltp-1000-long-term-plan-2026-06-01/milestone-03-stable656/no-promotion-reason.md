@@ -26,6 +26,7 @@ The following blockers prevent counting additional rows:
 | `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
 | `readlinkat02` | RV clean, but LA musl `TFAIL`; rerun after code inspection still 1 PASS / 1 FAIL |
 | pre-fix `fsync02` row | old isolated RV rerun had glibc `TBROK=1`; superseded by post-fix proof but retained as failed evidence |
+| `openat02` | post-statfs-clamp isolated RV rerun still fails both musl and glibc with `TBROK` setup `ENOSPC`; no LA rerun or promotion accounting |
 | `nice04` | RV musl gets `EACCES` for `nice(-10)`, but stable `setpriority02` source requires direct unprivileged `setpriority` lowering to return `EACCES`; no safe kernel errno flip |
 | closed arch sweep | 563 four-way-clean historical rows, but zero not-yet-stable rows after filtering live stable606 |
 | `select02`, `sched_rr_get_interval03`, `setpriority01` | wrapper PASS rows include `TCONF`; not promotion evidence |

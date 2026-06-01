@@ -80,6 +80,36 @@ Promotion candidates: 0
 
 Caveat: `kill10` caused panic/trap and early stop before glibc group; no row from this shard is promotion evidence.
 
+## RV `openat02` post-statfs-clamp scout
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-03-stable656/rv-openat02-post-statfs-scout-20260601T231156Z.log`
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-openat02-post-statfs-scout-20260601T231156Z.summary.txt`
+- JSON: `target/ltp-1000-milestone-03-stable656/rv-openat02-post-statfs-scout-20260601T231156Z.summary.json`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-openat02-post-statfs-scout-20260601T231156Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/rv-openat02-post-statfs-scout-20260601T231156Z.derived.sha256`
+
+Parser summary:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 2
+Internal TFAIL/TBROK/TCONF: 4 ({'TBROK': 4})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 0
+```
+
+Decision: the generic statfs capacity clamp that fixed `fsync02` is not sufficient for `openat02`; both RV musl and RV glibc still hit setup `write(...,7) failed: errno=ENOSPC(28)`. `openat02` remains blocked and is not eligible for LA rerun or promotion accounting until its file-growth/space accounting path is diagnosed separately.
+
 ## RV mixed safe scout and LA futex confirmation
 
 Mixed RV cases: `fsync02,nice05,mincore03,shmat1,futex_wait01,futex_wait05`.
