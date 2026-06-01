@@ -281,6 +281,19 @@ const LTP_STABLE_CASES: &[&str] = &[
     "genfabs", "genfloor", "genfmod", "genj0",
     "genj1", "genldexp", "genlgamma", "genlog",
     "genlog10", "genpow",
+    "modify_ldt01", "modify_ldt02", "modify_ldt03", "print_caps",
+    "test_ioctl", "tst_kvcmp", "tst_ncpus", "tst_ncpus_conf",
+    "tst_ncpus_max", "tst_supported_fs", "fanotify_child", "genload",
+    "gensin", "gensinh", "gensqrt", "gentan",
+    "gentanh", "geny0", "geny1", "tst_exit",
+    "tst_hexdump", "socket01", "nanosleep01", "mmap04",
+    "vma01", "times03", "mmap14", "mmap12",
+    "open10", "creat08", "chmod07", "fchmod02",
+    "access04", "chmod06", "chown04", "fchmod06",
+    "fchown04", "pipe07", "mknod03", "mknod04",
+    "mknod09", "fchownat02", "setrlimit04", "clock_gettime04",
+    "locktests", "ltpServer", "stress", "fcntl30",
+    "mknod01", "pipe15",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[

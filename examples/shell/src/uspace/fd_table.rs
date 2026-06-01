@@ -12,15 +12,14 @@ use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
-    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
-    ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
+    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
+    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -45,10 +44,11 @@ use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value,
+    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
+    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -806,17 +806,19 @@ pub(super) fn sys_mknodat(
     dirfd: usize,
     pathname: usize,
     mode: usize,
-    _dev: usize,
+    dev: usize,
 ) -> isize {
     let path = match read_cstr(process, pathname) {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    match process
-        .fds
-        .lock()
-        .mknodat(process, dirfd as i32, path.as_str(), mode as u32)
-    {
+    match process.fds.lock().mknodat(
+        process,
+        dirfd as i32,
+        path.as_str(),
+        mode as u32,
+        dev as u64,
+    ) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -1623,6 +1625,7 @@ impl FdTable {
         dirfd: i32,
         path: &str,
         mode: u32,
+        dev: u64,
     ) -> Result<(), LinuxError> {
         if path.is_empty() {
             return Err(LinuxError::ENOENT);
@@ -1634,6 +1637,7 @@ impl FdTable {
         let node_type = match node_type {
             0 | ST_MODE_FILE => ST_MODE_FILE,
             ST_MODE_FIFO => ST_MODE_FIFO,
+            ST_MODE_CHR | ST_MODE_BLK if process.fs_uid() == 0 => node_type,
             ST_MODE_CHR | ST_MODE_BLK => return Err(LinuxError::EPERM),
             ST_MODE_DIR | ST_MODE_LNK | ST_MODE_SOCKET | ST_MODE_TYPE_MASK => {
                 return Err(LinuxError::EINVAL);
@@ -1650,10 +1654,19 @@ impl FdTable {
         opts.create_new(true);
         File::open(abs_path.as_str(), &opts).map_err(LinuxError::from)?;
         record_created_path_metadata(process, abs_path.clone(), mode, false, &parent_st);
-        if node_type == ST_MODE_FIFO {
-            process.set_path_special_mode(abs_path, ST_MODE_FIFO);
-        } else {
-            process.remove_path_special_mode(abs_path.as_str());
+        match node_type {
+            ST_MODE_FIFO => {
+                process.set_path_special_mode(abs_path.clone(), ST_MODE_FIFO);
+                process.remove_path_rdev(abs_path.as_str());
+            }
+            ST_MODE_CHR | ST_MODE_BLK => {
+                process.set_path_special_mode(abs_path.clone(), node_type);
+                process.set_path_rdev(abs_path, dev);
+            }
+            _ => {
+                process.remove_path_special_mode(abs_path.as_str());
+                process.remove_path_rdev(abs_path.as_str());
+            }
         }
         Ok(())
     }
@@ -1704,6 +1717,7 @@ impl FdTable {
         };
         if removed.is_ok() {
             process.remove_path_special_mode(abs_path.as_str());
+            process.remove_path_rdev(abs_path.as_str());
         }
         removed
     }
@@ -2095,6 +2109,15 @@ impl PathEntry {
         Self {
             path: path.into(),
             mode: ST_MODE_FIFO | (mode & 0o7777),
+            size: 0,
+            blocks: 0,
+        }
+    }
+
+    pub(super) fn special_node(path: &str, ty: u32, mode: u32) -> Self {
+        Self {
+            path: path.into(),
+            mode: (ty & ST_MODE_TYPE_MASK) | (mode & 0o7777),
             size: 0,
             blocks: 0,
         }
@@ -3089,6 +3112,26 @@ fn open_candidates(
             } else {
                 FdEntry::Rtc
             });
+        }
+        if let Some(special_type @ (ST_MODE_CHR | ST_MODE_BLK)) =
+            process.path_special_mode(path.as_str())
+        {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
+                return Err(LinuxError::EEXIST);
+            }
+            check_open_permission(process, path.as_str(), flags)?;
+            if path_only {
+                let mode = process.path_mode(path.as_str()).unwrap_or(0o600);
+                return Ok(FdEntry::Path(PathEntry::special_node(
+                    path.as_str(),
+                    special_type,
+                    mode,
+                )));
+            }
+            return Err(LinuxError::ENXIO);
         }
         if process.path_special_mode(path.as_str()) == Some(ST_MODE_FIFO) {
             if prefer_dir {

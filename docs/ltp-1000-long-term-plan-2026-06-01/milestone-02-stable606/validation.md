@@ -666,3 +666,114 @@ Parser summary and promotion decision:
 - LA readlinkat02 follow-up: 1 PASS / 1 FAIL; LA musl has one `TFAIL`, so `readlinkat02` is blocked and not banked.
 
 These failures remain visible and non-countable; no blacklist/SKIP/status0 evidence was used.
+
+
+<!-- stable606-final-closure:start -->
+## Final stable606 validation closure on 2026-06-02
+
+### Live stable count
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import re
+text = Path('examples/shell/src/cmd.rs').read_text()
+start = text.index('const LTP_STABLE_CASES')
+end = text.index('];', start)
+cases = re.findall(r'"([^"]+)"', text[start:end])
+print(len(cases), len(set(cases)), len(cases) - len(set(cases)))
+PY
+# 606 606 0
+```
+
+### Team-state reconciliation for stale nudges
+
+```bash
+omx team status complete-dev-1000ltp-c632b4a0
+# No team state found for complete-dev-1000ltp-c632b4a0
+```
+
+The requested mailbox file under `/root/.omx-runs/run-20260601071305-5c04/.omx/state/team/complete-dev-1000ltp-c632b4a0/mailbox/leader-fixed.json` was absent. The durable session state reported `active=False`, `current_phase=cancelled`, `lifecycle_outcome=finished`, `run_outcome=finish`, `completed_at=2026-06-01T17:22:55.786Z`, so later worker nudges were treated as stale and no worker was assigned.
+
+### Final RV full stable gate
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=120 timeout 180m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs glibc,musl target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z.log
+```
+
+Artifacts: raw log, summary, JSON, and promotion report share prefix `target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z`.
+
+Parser summary:
+
+- PASS LTP CASE: 1212
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 4 (`TCONF=4`, all `read02`)
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+- Suite summaries: `ltp-musl` 606 passed / 0 failed; `ltp-glibc` 606 passed / 0 failed.
+
+### First LA full gate: preserved non-promotion evidence
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=150 timeout 210m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-20260601T203354Z.log
+```
+
+This run exited 143 and is not promotion evidence. It had 579 `PASS LTP CASE`, 2 wrapper FAIL, 6 internal caveats (`TCONF=2`, `TBROK=4`), one timeout match, and no ENOSYS or panic/trap. The visible blockers were `rename14`, `kill02`, and a later stalled `times03` segment; they were re-run below.
+
+Checksums for this non-promotion evidence:
+
+- `b5c6263c13b28b7c1c1b06d790f0356ed3922d5afd47b25901745cdc7b87ce4b  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-20260601T203354Z.log`
+- `c6290bd30f2083bae9a78c4712301a5e04a34ede21829d9ff8b097789983163c  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-20260601T203354Z.summary.txt`
+- `04507f03386c2e7dc7e01ca42c2f5fd5a90aa9cde6e5bdf847151fe4e9b33056  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-20260601T203354Z.summary.json`
+- `de38605ec712b43b45f9b7857015f95c9a0256b68706f1a8b06e0c6826ab4ce3  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-20260601T203354Z.promotion-candidates.txt`
+
+### LA recovery evidence after first full-gate stall
+
+- `la-regression-rename14-kill02-times03-20260601T210237Z.log`: 6 `PASS LTP CASE`, 0 wrapper FAIL, 0 internal TFAIL/TBROK/TCONF, 0 timeout, 0 ENOSYS, 0 panic/trap.
+- `la-local-order-shard-457-489-20260601T210637Z.log`: 66 `PASS LTP CASE`, 0 wrapper FAIL, 0 internal TFAIL/TBROK/TCONF, 0 timeout, 0 ENOSYS, 0 panic/trap.
+- Cases file for the shard: `target/ltp-1000-milestone-02-stable606/la-local-order-shard-457-489.cases`.
+
+### Final LA full stable retry
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=180 timeout 240m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la --promotion-libcs glibc,musl target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log
+```
+
+Artifacts: raw log, summary, JSON, and promotion report share prefix `target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z`.
+
+Parser summary:
+
+- PASS LTP CASE: 1212
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 4 (`TCONF=4`, all `read02`)
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+- Suite summaries: `ltp-musl` 606 passed / 0 failed; `ltp-glibc` 606 passed / 0 failed.
+
+### Combined RV + LA promotion report
+
+```bash
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs glibc,musl   target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z.log   target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log   > target/ltp-1000-milestone-02-stable606/stable606-final-rv-la.promotion-candidates.txt
+```
+
+- Combined report: 605 parser-clean candidates and one blocked/incomplete case, `read02`.
+- Blocked reason: `read02` has `TCONF=2` in each of `la:glibc`, `la:musl`, `rv:glibc`, and `rv:musl`.
+- This is an inherited stable506 caveat and is not a new stable606 regression; it remains disclosed rather than hidden.
+
+Final checksums for the LA retry and combined report:
+
+- `b02c163661e303034e8bf6ea81001ba901256e354f8a76a7ccfbd6b4babf31dd  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log`
+- `d0a87a10917776ba19d943bbc55f05803852096fc1ab65129c561f1c69b56941  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.summary.txt`
+- `401d8031b42989eb4dae7b5e54df4db017f60edaf1f06c1a7bf856cac9261106  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.summary.json`
+- `7ba78dc6fef66d679079adb79aa42173872fbf54528f93ebe11e2fa0c1a07dca  target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.promotion-candidates.txt`
+- `d6d8d8f0a7ada57b77f67375ea1dccbd956734af511d6b16837fefeceeabdbae  target/ltp-1000-milestone-02-stable606/stable606-final-rv-la.promotion-candidates.txt`
+<!-- stable606-final-closure:end -->
