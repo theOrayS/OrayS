@@ -51,6 +51,17 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     let file_pid_max = proc_root.clone().lookup("./sys/kernel/pid_max")?;
     file_pid_max.write_at(0, b"4194304\n")?;
 
+    proc_root.create("sys/fs", VfsNodeType::Dir)?;
+    proc_root.create("sys/fs/pipe-max-size", VfsNodeType::File)?;
+    let file_pipe_max_size = proc_root.clone().lookup("./sys/fs/pipe-max-size")?;
+    file_pipe_max_size.write_at(0, b"4096\n")?;
+    proc_root.create("sys/fs/pipe-user-pages-soft", VfsNodeType::File)?;
+    let file_pipe_user_pages_soft = proc_root.clone().lookup("./sys/fs/pipe-user-pages-soft")?;
+    file_pipe_user_pages_soft.write_at(0, b"128\n")?;
+    proc_root.create("sys/fs/pipe-user-pages-hard", VfsNodeType::File)?;
+    let file_pipe_user_pages_hard = proc_root.clone().lookup("./sys/fs/pipe-user-pages-hard")?;
+    file_pipe_user_pages_hard.write_at(0, b"0\n")?;
+
     proc_root.create("sys/net", VfsNodeType::Dir)?;
     proc_root.create("sys/net/core", VfsNodeType::Dir)?;
     proc_root.create("sys/net/core/somaxconn", VfsNodeType::File)?;

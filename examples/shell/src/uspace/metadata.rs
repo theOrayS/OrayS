@@ -8,19 +8,19 @@ use linux_raw_sys::general;
 use std::string::{String, ToString};
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{FdEntry, resolve_dirfd_path};
+use super::fd_table::{resolve_dirfd_path, FdEntry};
 use super::linux_abi::{
-    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
-    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
-    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX,
-    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
+    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
+    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
+    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
+    STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYSFS_MAGIC, TMPFS_MAGIC,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
 use super::user_memory::{read_cstr, read_user_bytes, write_user_bytes, write_user_value};
+use super::UserProcess;
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 const LINUX_PATH_MAX: usize = 4096;
@@ -67,6 +67,18 @@ impl UserProcess {
 
     pub(super) fn path_special_mode(&self, path: &str) -> Option<u32> {
         self.path_special_modes.lock().get(path).copied()
+    }
+
+    pub(super) fn set_path_rdev(&self, path: String, rdev: u64) {
+        self.path_rdevs.lock().insert(path, rdev);
+    }
+
+    pub(super) fn remove_path_rdev(&self, path: &str) {
+        self.path_rdevs.lock().remove(path);
+    }
+
+    pub(super) fn path_rdev(&self, path: &str) -> Option<u64> {
+        self.path_rdevs.lock().get(path).copied()
     }
 
     pub(super) fn apply_umask(&self, mode: u32) -> u32 {
@@ -245,6 +257,9 @@ pub(super) fn apply_recorded_path_metadata(
 ) -> general::stat {
     if let Some(ty) = process.path_special_mode(path) {
         st.st_mode = (st.st_mode & !ST_MODE_TYPE_MASK) | ty;
+        if matches!(ty, ST_MODE_CHR | ST_MODE_BLK) {
+            st.st_rdev = process.path_rdev(path).unwrap_or(0) as _;
+        }
     }
     if let Some(mode) = process.path_mode(path) {
         st.st_mode = (st.st_mode & !FILE_MODE_PERMISSION_MASK) | mode;

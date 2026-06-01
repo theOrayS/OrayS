@@ -39,9 +39,9 @@ References used for the semantic boundary:
 - glibc `nice.c` behavior maps `EACCES` to `EPERM`: https://codebrowser.dev/glibc/glibc/sysdeps/posix/nice.c.html
 - musl patch discussion for the same `nice()` errno mapping: https://www.openwall.com/lists/musl/2021/06/29/1
 
-## Stable-list ABI impact
+## Initial preflight stable-list ABI impact (superseded)
 
-None in this preflight. `LTP_STABLE_CASES` is unchanged at 556/556/0.
+The initial preflight had no stable-list change. The final section below supersedes this with `LTP_STABLE_CASES` at 606/606/0.
 
 ## Additional procfs/mmap behavior change on 2026-06-02
 
@@ -325,3 +325,65 @@ POSIX/Linux-visible impact:
 - FD/signal/futex/mmap/user-pointer copy impact: none.
 - Resource/lifetime risk: low for this documentation-only update. The observed free-frame deltas in the parser summaries remain within the normal targeted-run cleanup evidence, but they do not substitute for a broad stress/resource proof.
 - Maintenance boundary: these helper/harness-style rows are countable only as named LTP cases after four-way parser-clean evidence. They must not be cited as broad proof of complete stress, lock, network-server, or scheduler semantics.
+
+
+<!-- stable606-final-closure:start -->
+## Final stable606 ABI and behavior impact
+
+This final section covers the code changes directly associated with closing the last stable606 gap (`fcntl30`, `mknod01`, and `pipe15`) and the stable-list promotion to 606.
+
+### `/proc/sys/fs/pipe-*` synthetic procfs entries
+
+Files:
+
+- `kernel/fs/axfs/src/mounts.rs`
+
+Behavior:
+
+- Adds read-only synthetic files under `/proc/sys/fs`:
+  - `/proc/sys/fs/pipe-max-size` -> `4096
+`
+  - `/proc/sys/fs/pipe-user-pages-soft` -> `128
+`
+  - `/proc/sys/fs/pipe-user-pages-hard` -> `0
+`
+- The values are intentionally aligned with the kernel-visible pipe buffer size and the local `RLIMIT_NOFILE`/resource envelope rather than Linux host defaults that would imply unsupported resize capacity.
+
+POSIX/Linux-visible impact:
+
+- Affected surface: path lookup/read for procfs sysctl-like files used by pipe/fcntl tests.
+- Errno/FD impact: existing open/read/close behavior handles these synthetic read-only files; no new writable sysctl behavior is implemented.
+- Pipe semantics: no new pipe resize support is claimed. Existing `F_GETPIPE_SZ`/`F_SETPIPE_SZ` behavior remains bounded by the current pipe implementation.
+- Signal/futex/mmap/user-pointer impact: none.
+- Resource/lifetime risk: low; values are static synthetic metadata.
+
+### Metadata-only char/block device nodes
+
+Files:
+
+- `examples/shell/src/uspace/mod.rs`
+- `examples/shell/src/uspace/process_lifecycle.rs`
+- `examples/shell/src/uspace/metadata.rs`
+- `examples/shell/src/uspace/fd_table.rs`
+
+Behavior:
+
+- Root `mknod`/`mknodat` can create placeholder char/block node paths and records both special file type and `st_rdev` metadata.
+- `stat`, `lstat`, `fstatat`, `statx`, and `O_PATH` observation paths expose the recorded `S_IFCHR`/`S_IFBLK` type and `st_rdev`.
+- Normal open of a synthetic char/block node returns `ENXIO`; no real device driver or device I/O is added.
+- `O_CREAT|O_EXCL` on an existing metadata-only node returns `EEXIST`.
+- `unlinkat` removes the matching synthetic `st_rdev` metadata alongside the special-mode metadata.
+- Fork clones the process-local metadata maps so child observation remains consistent.
+
+POSIX/Linux-visible impact:
+
+- Affected syscalls: `mknod`, `mknodat`, `open`, `openat`, `stat`, `lstat`, `fstatat`, `statx`, `unlinkat`.
+- Errno impact: non-root char/block creation remains `EPERM`; unsupported node types remain `EINVAL`; regular open of metadata-only device nodes is `ENXIO`.
+- FD impact: `O_PATH` opens can create an observation-only path entry; regular read/write device FD semantics are not introduced.
+- Signal/futex/mmap/user-pointer impact: none.
+- Resource/lifetime risk: moderate-low. The metadata is process-local synthetic state; it is sufficient for pathname/stat semantics but deliberately not a general device filesystem.
+
+### Stable-list ABI impact
+
+`examples/shell/src/cmd.rs::LTP_STABLE_CASES` now contains 606 total / 606 unique / 0 duplicate cases. The visible evaluator behavior is that the `stable` LTP selection runs 606 cases per libc on each architecture, while keeping inherited `read02` TCONF caveats visible in parser summaries.
+<!-- stable606-final-closure:end -->

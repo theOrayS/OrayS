@@ -1,9 +1,10 @@
-# milestone-02-stable606 regression matrix preflight
+# milestone-02-stable606 regression matrix
 
 ## Stable baseline
 
-- Current stable count: 556 total / 556 unique / 0 duplicate.
-- Stable list changed in this preflight: no.
+- Current stable count: 606 total / 606 unique / 0 duplicate.
+- Stable list changed in this milestone: yes, +50 unique cases from the live 556 baseline.
+- Earlier preflight-only rows below are retained for traceability; final stable606 gate rows supersede the original "Not run yet" note.
 
 ## Socket errno fix regression set
 
@@ -41,11 +42,9 @@ Evidence:
 
 Caveat: the earlier grouped RV scout had one musl timing TFAIL, so this row needs grouped revalidation before final promotion.
 
-## Not run yet
+## Superseded pre-final gaps
 
-- Full stable606 RV + LA x musl + glibc gate.
-- Broad stable regression beyond the socket-adjacent subset.
-- LA full-sweep shard from G010.
+The earlier preflight had not yet run the full stable606 RV + LA x musl + glibc gate. That gap is now superseded by the final stable606 gate below. The LA full-sweep shard from G010 remains outside this milestone and is not promotion evidence.
 
 ## Proc maps / mmap regression set
 
@@ -298,3 +297,33 @@ Evidence:
 
 - `rv-light-process-scout-20260601T193756Z.summary.txt`: 0 PASS / 8 FAIL with TFAIL/TBROK/TCONF, one timeout, and one panic/trap. No regression protection or candidate credit is claimed.
 - `rv-vfs-fd-remainder-scout-20260601T194216Z.summary.txt`: 2 PASS / 16 FAIL with TFAIL/TBROK/TCONF; the only RV-clean row, `readlinkat02`, failed LA musl in `la-readlinkat02-rescout-20260601T194310Z.summary.txt` and remains blocked.
+
+
+<!-- stable606-final-closure:start -->
+## Final stable606 gate matrix
+
+| Scope | Arch | Evidence | Parser result | Promotion decision |
+| --- | --- | --- | --- | --- |
+| Full stable606 gate | RV | `rv-stable606-final-gate-20260601T200557Z.summary.txt` | 1212 PASS, 0 FAIL, 4 inherited `read02` TCONF, 0 timeout/ENOSYS/panic/trap | Counts for stable606 with caveat disclosed |
+| First full stable606 gate | LA | `la-stable606-final-gate-20260601T203354Z.summary.txt` | 579 PASS, 2 FAIL, `TCONF=2`, `TBROK=4`, 1 timeout, exit 143 | Non-promotion evidence only |
+| Recovery subset | LA | `la-regression-rename14-kill02-times03-20260601T210237Z.summary.txt` | 6 PASS, 0 FAIL, no internal caveats | Confirms first-run blockers were not accepted as regressions |
+| Local-order shard 457-489 | LA | `la-local-order-shard-457-489-20260601T210637Z.summary.txt` | 66 PASS, 0 FAIL, no internal caveats | Protects the failed first-run neighborhood |
+| Fresh full stable606 retry | LA | `la-stable606-final-gate-retry-20260601T211001Z.summary.txt` | 1212 PASS, 0 FAIL, 4 inherited `read02` TCONF, 0 timeout/ENOSYS/panic/trap | Counts for stable606 with caveat disclosed |
+| Combined RV + LA report | RV+LA | `stable606-final-rv-la.promotion-candidates.txt` | 605 parser-clean rows, 1 inherited `read02` caveat row | Supports +50 stable-list promotion; does not hide read02 |
+
+## Final mknod/pipe regression set
+
+Rationale: the final code changes affect synthetic procfs pipe sysctl visibility and metadata-only device-node observation.
+
+Cases:
+
+- New candidates: `fcntl30`, `mknod01`, `pipe15`
+- Adjacent/non-counted scout: `statx01` remains non-countable because it still emitted `TCONF` in the mixed run.
+
+Evidence:
+
+- RV proc-sys pipe rescout: `rv-proc-sys-pipe-rescout-20260602T195459Z.summary.txt` reports 4 PASS / 0 FAIL, no parser caveats for `fcntl30,pipe15`.
+- LA proc-sys pipe rescout: `la-proc-sys-pipe-rescout-20260602T195603Z.summary.txt` reports 4 PASS / 0 FAIL, no parser caveats for `fcntl30,pipe15`.
+- RV final mknod/pipe clean subset: `rv-mknod-pipe-clean-postfix-20260601T200327Z.summary.txt` reports 6 PASS / 0 FAIL, no parser caveats for `fcntl30,mknod01,pipe15`.
+- LA final mknod/pipe clean subset: `la-mknod-pipe-clean-postfix-20260601T200416Z.summary.txt` reports 6 PASS / 0 FAIL, no parser caveats for `fcntl30,mknod01,pipe15`.
+<!-- stable606-final-closure:end -->

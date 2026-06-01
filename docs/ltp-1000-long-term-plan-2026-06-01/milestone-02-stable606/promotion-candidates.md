@@ -1,13 +1,75 @@
-# milestone-02-stable606 promotion candidates preflight
+# milestone-02-stable606 promotion candidates and final decision
 
 ## Status
 
-This file records candidate evidence only. It is **not** a stable606 promotion list.
+This file contains both historical candidate evidence and the final stable606 promotion decision.
 
-- Current stable: 556 total / 556 unique / 0 duplicate.
-- Stable list changes: none.
-- Required new unique cases for milestone-02: 50.
-- Current candidate bank after this preflight: at most 47, so promotion is blocked.
+- Current stable: 606 total / 606 unique / 0 duplicate.
+- Stable list change: +50 unique cases from live baseline 556.
+- Final RV gate: wrapper 606/606 on musl + glibc; parser 1212 PASS, 0 FAIL, 4 inherited `read02` TCONF, no timeout/ENOSYS/panic/trap.
+- Final LA gate retry: wrapper 606/606 on musl + glibc; parser 1212 PASS, 0 FAIL, 4 inherited `read02` TCONF, no timeout/ENOSYS/panic/trap.
+- Combined RV+LA report: 605 parser-clean rows plus the pre-existing `read02` TCONF caveat. No blacklist/SKIP/status0 evidence is counted.
+- Earlier preflight "blocked" notes below are retained as traceability and are superseded by this final section.
+
+## Final +50 promoted cases
+
+- `modify_ldt01`
+- `modify_ldt02`
+- `modify_ldt03`
+- `print_caps`
+- `test_ioctl`
+- `tst_kvcmp`
+- `tst_ncpus`
+- `tst_ncpus_conf`
+- `tst_ncpus_max`
+- `tst_supported_fs`
+- `fanotify_child`
+- `genload`
+- `gensin`
+- `gensinh`
+- `gensqrt`
+- `gentan`
+- `gentanh`
+- `geny0`
+- `geny1`
+- `tst_exit`
+- `tst_hexdump`
+- `socket01`
+- `nanosleep01`
+- `mmap04`
+- `vma01`
+- `times03`
+- `mmap14`
+- `mmap12`
+- `open10`
+- `creat08`
+- `chmod07`
+- `fchmod02`
+- `access04`
+- `chmod06`
+- `chown04`
+- `fchmod06`
+- `fchown04`
+- `pipe07`
+- `mknod03`
+- `mknod04`
+- `mknod09`
+- `fchownat02`
+- `setrlimit04`
+- `clock_gettime04`
+- `locktests`
+- `ltpServer`
+- `stress`
+- `fcntl30`
+- `mknod01`
+- `pipe15`
+
+## Final non-counted rows
+
+- `read02`: retained in stable as an inherited baseline caveat; not presented as newly parser-clean.
+- `statx01`: still `TCONF` in the mixed mknod/statx/pipe run and not promoted.
+- The first LA full gate with `rename14`/`kill02`/`times03` failures: preserved as non-promotion evidence and superseded by targeted LA recovery plus the fresh full LA retry.
+- Any blacklist/SKIP/status0/full-sweep partial TPASS row: not counted.
 
 ## Deferred clean bank from milestone-01
 
@@ -45,9 +107,9 @@ These 21 cases were four-way clean in milestone-01 combined proof but intentiona
 - `getdents02`, `sched_rr_get_interval03`, `setpriority01`: wrapper PASS but TCONF/ENOSYS caveats remain; not promotion candidates.
 - VFS/device rows such as `openat02`, `mknodat02`, `rename03` remain blocked by real ENOSPC/device/mount/metadata behavior.
 
-## Promotion decision
+## Superseded pre-final promotion decision
 
-Do not update `LTP_STABLE_CASES` yet. The candidate bank is short of 50 and some candidates need grouped regression confirmation.
+This earlier preflight decision is superseded by the final stable606 closure above. `LTP_STABLE_CASES` is now updated to 606 after full RV + LA x musl + glibc gate evidence.
 
 ### mmap04 and vma01
 

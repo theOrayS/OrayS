@@ -31,3 +31,15 @@ No blacklist changes were made for the `locktests`, `ltpServer`, and `stress` fo
 ## Non-countable post-clock scouts
 
 No failed row from `rv-light-process-scout-20260601T193756Z.log`, `rv-vfs-fd-remainder-scout-20260601T194216Z.log`, or `la-readlinkat02-rescout-20260601T194310Z.log` was moved to blacklist. The timeout, panic/trap, TFAIL/TBROK/TCONF, and LA-musl `readlinkat02` failure remain visible blockers and non-countable evidence.
+
+
+<!-- stable606-final-closure:start -->
+## Final stable606 blacklist decision
+
+No blacklist changes were made for the final stable606 promotion.
+
+- The first LA full-gate failure was not hidden behind blacklist; it remains documented as non-promotion evidence and was followed by targeted recovery plus a fresh full LA retry.
+- `statx01` was not blacklisted and not promoted; its `TCONF` remains visible.
+- No SKIP/status0/full-sweep partial TPASS evidence was counted.
+- The final stable606 gate is based on explicit RV + LA x musl + glibc stable runs and parser summaries.
+<!-- stable606-final-closure:end -->

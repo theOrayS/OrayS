@@ -1,4 +1,83 @@
-# milestone-02-stable606 preflight report
+<!-- stable606-final-closure:start -->
+## Final stable606 closure on 2026-06-02
+
+The milestone is closed with `LTP_STABLE_CASES` at 606 total / 606 unique / 0 duplicate. The +50 promoted rows are:
+
+- `modify_ldt01`
+- `modify_ldt02`
+- `modify_ldt03`
+- `print_caps`
+- `test_ioctl`
+- `tst_kvcmp`
+- `tst_ncpus`
+- `tst_ncpus_conf`
+- `tst_ncpus_max`
+- `tst_supported_fs`
+- `fanotify_child`
+- `genload`
+- `gensin`
+- `gensinh`
+- `gensqrt`
+- `gentan`
+- `gentanh`
+- `geny0`
+- `geny1`
+- `tst_exit`
+- `tst_hexdump`
+- `socket01`
+- `nanosleep01`
+- `mmap04`
+- `vma01`
+- `times03`
+- `mmap14`
+- `mmap12`
+- `open10`
+- `creat08`
+- `chmod07`
+- `fchmod02`
+- `access04`
+- `chmod06`
+- `chown04`
+- `fchmod06`
+- `fchown04`
+- `pipe07`
+- `mknod03`
+- `mknod04`
+- `mknod09`
+- `fchownat02`
+- `setrlimit04`
+- `clock_gettime04`
+- `locktests`
+- `ltpServer`
+- `stress`
+- `fcntl30`
+- `mknod01`
+- `pipe15`
+
+Final gate evidence:
+
+- RV stable gate: `target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z.log`.
+  - Command: `OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=120 timeout 180m ./run-eval.sh rv`.
+  - Wrapper: `ltp cases: 606 passed, 0 failed, 0 timed out`; `ltp-musl` 606/0 and `ltp-glibc` 606/0.
+  - Parser: 1212 `PASS LTP CASE`, 0 wrapper FAIL, 4 internal `TCONF`, 0 timeout, 0 ENOSYS/not-implemented, 0 panic/trap.
+- LA stable gate retry: `target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log`.
+  - Command: `OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=180 timeout 240m ./run-eval.sh la`.
+  - Wrapper: `ltp cases: 606 passed, 0 failed, 0 timed out`; `ltp-musl` 606/0 and `ltp-glibc` 606/0.
+  - Parser: 1212 `PASS LTP CASE`, 0 wrapper FAIL, 4 internal `TCONF`, 0 timeout, 0 ENOSYS/not-implemented, 0 panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/stable606-final-rv-la.promotion-candidates.txt` reports 605 parser-clean rows and one blocked/incomplete row, `read02`, because each arch/libc combo records the already-known `TCONF=2` caveat.
+
+Caveat boundary:
+
+- The `read02` TCONF rows are inherited from the stable506 final gate and are explicitly retained as a known baseline caveat, not a new stable606 regression.
+- The first LA full gate (`la-stable606-final-gate-20260601T203354Z.log`) exited 143 after `rename14`, `kill02`, and later `times03` stalled/failed in that run; it is preserved as non-promotion evidence. Follow-up targeted `rename14,kill02,times03` and local-order shard 457-489 runs were parser-clean, and the fresh LA stable retry above is the promotion evidence.
+
+Implementation boundary for the final three additional cases:
+
+- `/proc/sys/fs/pipe-max-size`, `/proc/sys/fs/pipe-user-pages-soft`, and `/proc/sys/fs/pipe-user-pages-hard` are synthetic read-only procfs entries aligned with the kernel's visible pipe capacity/NOFILE resource envelope; this closed `fcntl30` and `pipe15` without pretending unsupported pipe resize capacity exists.
+- Root-created `mknod`/`mknodat` char/block nodes now record synthetic file type and `st_rdev`; `O_PATH`/stat/statx/lstat can observe the metadata, while normal open returns `ENXIO`. Non-root char/block creation still returns `EPERM`; invalid node types still return `EINVAL`. This closed `mknod01` without adding real device I/O.
+<!-- stable606-final-closure:end -->
+
+# milestone-02-stable606 final promotion report
 
 ## Goal
 
@@ -6,11 +85,12 @@ Promote the live stable baseline from 556 to the next milestone target of 606 tr
 
 ## Current result
 
-- Current stable list: 556 total / 556 unique / 0 duplicate.
+- Current stable list: 606 total / 606 unique / 0 duplicate.
 - Target for this milestone: 606 total / 606 unique / 0 duplicate.
-- Milestone status: **not complete / no stable promotion yet**.
-- Stable list update in this preflight: none.
-- Ultragoal checkpoint for G009: not run, because stable606 gate is not closed.
+- Milestone status: **complete / promoted** with the inherited `read02` TCONF caveat still disclosed.
+- Stable list update in this milestone: +50 unique cases from the live 556 baseline.
+- Ultragoal checkpoint for G009: not included in this git commit; the durable team run was already inactive/finished and this commit records the leader-owned promotion evidence.
+- Historical preflight sections below remain for traceability; this final result supersedes earlier "not complete" notes.
 
 ## Evidence generated in this preflight
 
@@ -42,7 +122,7 @@ The initial preflight included one kernel-visible errno fix in `examples/shell/s
 - Other invalid AF_INET socket types now return `EINVAL` instead of `ESOCKTNOSUPPORT`.
 - No LTP case/path/process/output is hardcoded.
 
-No stable-list ABI surface changes are made in this preflight. See `abi-and-behavior-impact.md` for details, the proc-maps impact boundary, and the deliberately rejected `nice04` errno shortcut.
+At the initial preflight stage, no stable-list ABI surface change was made. The final stable606 ABI impact is recorded in `abi-and-behavior-impact.md`; this historical note is retained for the proc-maps impact boundary and the deliberately rejected `nice04` errno shortcut.
 
 ## Risk and caveats
 
@@ -53,7 +133,7 @@ No stable-list ABI surface changes are made in this preflight. See `abi-and-beha
 
 ## Next step
 
-Continue G009 with real semantic fixes or low-risk clean candidates until at least 50 new unique cases can pass the full RV + LA x musl + glibc promotion gate. Do not update `LTP_STABLE_CASES` or checkpoint G009 from this preflight alone.
+Milestone-02 is promoted to stable606. Continue toward the next 50-case milestone (stable656) only after preserving the stable606 final gate evidence and keeping the inherited `read02` caveat visible.
 
 ## Additional G009 progress on 2026-06-02
 
@@ -71,7 +151,7 @@ Targeted evidence:
 - `la-proc-maps-mmap-regression-20260601T162755Z.log`: LA mmap/proc maps regression subset 22 PASS / 0 FAIL, no internal caveats.
 - `proc-maps-mmap-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the eleven clean rows, new not-yet-stable candidates are `mmap04` and `vma01`.
 
-Promotion remained blocked after the proc-maps fix: the stable606 candidate bank was at most 25, still short of +50, and no final stable606 gate had been run.
+At this historical checkpoint, promotion remained blocked after the proc-maps fix: the stable606 candidate bank was at most 25, still short of +50, and no final stable606 gate had been run.
 
 
 ## times03 CPU accounting follow-up
@@ -90,7 +170,7 @@ Targeted evidence:
 - `la-times03-regression-20260601T164956Z.log`: LA time regression subset 10 PASS / 0 FAIL, no internal caveats.
 - `times03-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the five clean rows, the new not-yet-stable candidate is `times03`.
 
-Promotion remained blocked after the time follow-up: the stable606 candidate bank was at most 26, still short of +50, and no final stable606 gate had been run.
+At this historical checkpoint, promotion remained blocked after the time follow-up: the stable606 candidate bank was at most 26, still short of +50, and no final stable606 gate had been run.
 
 
 ## mmap14 MAP_LOCKED / VmLck follow-up
@@ -109,7 +189,7 @@ Targeted evidence:
 - `la-mmap14-regression-20260601T171057Z.log`: LA mmap/proc regression subset 24 PASS / 0 FAIL, no internal caveats.
 - `mmap14-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the twelve clean rows, the new not-yet-stable candidate from this follow-up is `mmap14`.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 27, still short of +50, and no final stable606 gate has been run.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 27, still short of +50, and no final stable606 gate has been run.
 
 ## mmap12 /proc/self/pagemap follow-up
 
@@ -128,7 +208,7 @@ Targeted evidence:
 - `la-mmap12-regression-20260601T174435Z.log`: LA mmap/proc/pagemap regression subset 24 PASS / 0 FAIL, no internal caveats.
 - `mmap12-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twelve rows are clean, with `mmap12` as the new not-yet-stable candidate from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 28, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 28, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 ## open10 / creat08 setgid inheritance follow-up
 
@@ -147,7 +227,7 @@ Targeted evidence:
 - `la-open-creat-setgid-regression-20260601T180348Z.log`: LA VFS metadata regression subset 32 PASS / 0 FAIL, no internal caveats.
 - `open-creat-setgid-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `open10` and `creat08` as the new not-yet-stable candidates from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 30, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 30, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 
 ## chmod07 / fchmod02 group database follow-up
@@ -167,7 +247,7 @@ Targeted evidence:
 - `la-groupdb-chmod-regression-20260601T181429Z.log`: LA chmod/chown/open/creat regression subset 16 PASS / 0 FAIL, no internal caveats.
 - `groupdb-chmod-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eight rows are clean, with `chmod07` and `fchmod02` as the new not-yet-stable candidates from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 32, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 32, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 ## tmpfs read-only remount metadata follow-up
 
@@ -187,7 +267,7 @@ Targeted evidence:
 - `la-tmpfs-readonly-regression-20260601T183152Z.log`: LA VFS permission regression subset 30 PASS / 0 FAIL, no internal caveats.
 - `tmpfs-readonly-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all fifteen rows are clean, with `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` as the new not-yet-stable candidates from this follow-up.
 
-Promotion remained blocked after the tmpfs read-only mount follow-up: the stable606 candidate bank was at most 37, still short of +50, and no final stable606 gate had been run. Stable list remained 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked after the tmpfs read-only mount follow-up: the stable606 candidate bank was at most 37, still short of +50, and no final stable606 gate had been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 
 ## /proc/self/fd directory follow-up
@@ -207,7 +287,7 @@ Targeted evidence:
 - `la-proc-fd-regression-20260601T185013Z.log`: LA pipe/proc-fd/readlink/fcntl regression subset 40 PASS / 0 FAIL, no internal caveats.
 - `proc-fd-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twenty rows are clean, with `pipe07` as the new not-yet-stable candidate from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 38, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 38, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 ## mknod03 / mknod04 / mknod09 mode-errno follow-up
 
@@ -226,7 +306,7 @@ Targeted evidence:
 - `rv-mknod-vfs-regression-20260601T190520Z.log`: RV mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
 - `la-mknod-vfs-regression-20260601T190623Z.log`: LA mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 41, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 41, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 ## fchownat02 symlink nofollow metadata follow-up
 
@@ -245,7 +325,7 @@ Targeted evidence:
 - `la-fchownat-symlink-regression-20260601T191417Z.log`: LA symlink/chown regression subset 32 PASS / 0 FAIL, no internal caveats.
 - `fchownat-symlink-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `fchownat02` as the only new not-yet-stable candidate from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 42, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 42, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 ## setrlimit04 busybox applet exec follow-up
 
@@ -264,7 +344,7 @@ Targeted evidence:
 - `la-setrlimit-exec-regression-20260601T192159Z.log`: LA rlimit/exec/wait regression subset 22 PASS / 0 FAIL, no internal caveats.
 - `setrlimit-exec-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eleven rows are clean, with `setrlimit04` as the only new not-yet-stable candidate from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 43, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 43, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 
 ## clock_gettime04 evidence-only follow-up
@@ -280,7 +360,7 @@ Targeted evidence:
 - `la-clock-time-regression-20260601T193006Z.log`: LA clock/time regression subset 10 PASS / 0 FAIL, no internal caveats.
 - `clock-time-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all five rows are clean, with `clock_gettime04` as the only new row relative to the current stable list.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 44, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 44, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 
 ## legacy clean-tail evidence-only follow-up
@@ -295,7 +375,7 @@ Targeted evidence:
 
 Maintenance boundary: these are helper/harness-style LTP binary rows. They may be counted only as the named cases after four-way parser-clean proof; they are not evidence that the kernel has complete stress, lock, or network-server semantics.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 47, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 47, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
 
 ## Non-countable follow-up scouts kept visible
 
