@@ -76,6 +76,7 @@ struct UserProcess {
     path_special_modes: Mutex<BTreeMap<String, u32>>,
     path_owners: Mutex<BTreeMap<String, (u32, u32)>>,
     path_symlinks: Mutex<BTreeMap<String, String>>,
+    path_xattrs: Mutex<BTreeMap<String, BTreeMap<String, Vec<u8>>>>,
     umask: AtomicU32,
     mount_points: Arc<Mutex<BTreeMap<String, String>>>,
     shm_attachments: Mutex<BTreeMap<usize, (i32, usize)>>,

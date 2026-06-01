@@ -228,6 +228,14 @@ const LTP_STABLE_CASES: &[&str] = &[
     "mknod05",
     "getitimer01",
     "ppoll01",
+    "fpathconf01",
+    "pathconf01",
+    "rename14",
+    "mknod08",
+    "mknodat01",
+    "getxattr01",
+    "listxattr01",
+    "statx03",
 
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
