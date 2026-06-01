@@ -86,6 +86,6 @@ Adjacent regression candidates:
 - `vma02`: do not include until libnuma-related `TCONF` is resolved and both libcs are parser-clean.
 - `readlinkat02`: do not include until LA musl is parser-clean; add readlink/readlinkat and user-pointer boundary regressions once a root-cause fix exists.
 - `fsync02`: do not include until glibc-side `TBROK` is gone; retest with write/fsync/syncfs and free-space-sensitive VFS rows.
-- `nice04`: do not include until the `nice()` wrapper errno boundary is fixed without regressing `setpriority02`.
+- `nice04`: do not include until the `nice()` wrapper errno boundary is fixed without regressing `setpriority02`; use `nice04-errno-boundary-report.md` as the handoff.
 - closed arch sweep: no extra stable606-missing four-way-clean rows remain; use the matrices only for blocker prioritization.
 - `kill10`: do not include broad batches until the panic/trap is isolated.

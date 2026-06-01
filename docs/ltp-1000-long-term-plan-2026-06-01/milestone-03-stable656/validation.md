@@ -325,7 +325,7 @@ Decision: the closed arch sweep is exhausted for immediate post-stable606 promot
 
 Source inspected: `/root/oskernel2026-orays-clean-stable520/docs/ltp-score-improvement-2026-05-28-phase-b/raw/ltp-source/nice_nice04.c`.
 
-Observed requirement: after switching to user `nobody`, `nice(-10)` expects failure with `errno == EPERM`. Current kernel `setpriority` lowering path returns Linux `EACCES` semantics for non-root callers that try to lower nice, and stable `setpriority02` protects that syscall-level behavior. Therefore `nice04` is not changed in this checkpoint; it remains a libc-wrapper/errno-boundary investigation rather than a safe kernel errno flip.
+Observed requirement: after switching to user `nobody`, `nice(-10)` expects failure with `errno == EPERM`. Current kernel `setpriority` lowering path returns Linux `EACCES` semantics for non-root callers that try to lower nice, and stable `setpriority02` explicitly protects that syscall-level behavior. Detailed report: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/nice04-errno-boundary-report.md`. Therefore `nice04` is not changed in this checkpoint; it remains a libc-wrapper/errno-boundary investigation rather than a safe kernel errno flip.
 
 ## Gate outcome
 

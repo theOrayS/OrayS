@@ -39,7 +39,7 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 | --- | --- | --- |
 | `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL=1` on rerun | inspect LA-musl call boundary; do not special-case syscall `bufsiz=1` |
 | `fsync02` | RV musl PASS; RV glibc `TBROK=1` in isolated rerun | inspect free-space/setup behavior before any VFS fix |
-| `nice04` | LTP `nice(-10)` expects `EPERM`; kernel `setpriority` lowering path currently returns `EACCES` | root-cause libc wrapper vs syscall errno without regressing `setpriority02` |
+| `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
 | `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |
 | `futex_wait03` / `futex_wait05` | timeout or slept-too-long semantics | narrow futex timeout/EINTR lane with stable futex regressions |
 | `mmap05` / `munmap01` / `mmap13` | SIGSEGV/SIGBUS delivery gaps | narrow mmap fault-signal lane with signal + mmap regressions |
