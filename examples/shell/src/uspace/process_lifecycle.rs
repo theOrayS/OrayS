@@ -226,6 +226,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         aspace: Mutex::new(aspace),
         brk: Mutex::new(image.brk),
         shared_mmap_ranges: Mutex::new(Vec::new()),
+        mmap_ranges: Mutex::new(Vec::new()),
         fds: Mutex::new(FdTable::new()),
         cwd: Mutex::new(cwd.into()),
         exec_root: Mutex::new(image.exec_root.clone()),
@@ -300,6 +301,7 @@ fn exec_program(
     };
     *process.brk.lock() = image.brk;
     process.shared_mmap_ranges.lock().clear();
+    process.mmap_ranges.lock().clear();
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
     Ok((image.entry, image.stack_ptr, image.argc))
@@ -516,6 +518,99 @@ impl UserProcess {
         self.shared_mmap_ranges.lock().push((start, size, flags));
     }
 
+    pub(super) fn record_mmap_region(
+        &self,
+        start: usize,
+        size: usize,
+        prot: u32,
+        shared: bool,
+    ) {
+        let Some(end) = start.checked_add(size) else {
+            return;
+        };
+        self.forget_mmap_region(start, end);
+        let mut ranges = self.mmap_ranges.lock();
+        ranges.push(super::UserMmapRegion {
+            start,
+            size,
+            prot,
+            shared,
+        });
+        ranges.sort_by_key(|region| region.start);
+    }
+
+    pub(super) fn protect_mmap_region(&self, start: usize, end: usize, prot: u32) {
+        let mut ranges = self.mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for region in old {
+            let region_end = region.end();
+            if region_end <= start || region.start >= end {
+                ranges.push(region);
+                continue;
+            }
+            if region.start < start {
+                ranges.push(super::UserMmapRegion {
+                    start: region.start,
+                    size: start - region.start,
+                    prot: region.prot,
+                    shared: region.shared,
+                });
+            }
+            let protected_start = region.start.max(start);
+            let protected_end = region_end.min(end);
+            if protected_end > protected_start {
+                ranges.push(super::UserMmapRegion {
+                    start: protected_start,
+                    size: protected_end - protected_start,
+                    prot,
+                    shared: region.shared,
+                });
+            }
+            if region_end > end {
+                ranges.push(super::UserMmapRegion {
+                    start: end,
+                    size: region_end - end,
+                    prot: region.prot,
+                    shared: region.shared,
+                });
+            }
+        }
+        ranges.sort_by_key(|region| region.start);
+    }
+
+    pub(super) fn forget_mmap_region(&self, start: usize, end: usize) {
+        let mut ranges = self.mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for region in old {
+            let region_end = region.end();
+            if region_end <= start || region.start >= end {
+                ranges.push(region);
+                continue;
+            }
+            if region.start < start {
+                ranges.push(super::UserMmapRegion {
+                    start: region.start,
+                    size: start - region.start,
+                    prot: region.prot,
+                    shared: region.shared,
+                });
+            }
+            if region_end > end {
+                ranges.push(super::UserMmapRegion {
+                    start: end,
+                    size: region_end - end,
+                    prot: region.prot,
+                    shared: region.shared,
+                });
+            }
+        }
+        ranges.sort_by_key(|region| region.start);
+    }
+
+    pub(super) fn mmap_regions(&self) -> Vec<super::UserMmapRegion> {
+        self.mmap_ranges.lock().clone()
+    }
+
     pub(super) fn forget_mmap_range(&self, start: usize, end: usize) {
         self.shared_mmap_ranges
             .lock()
@@ -565,6 +660,7 @@ impl UserProcess {
             aspace: Mutex::new(aspace),
             brk: Mutex::new(*self.brk.lock()),
             shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
+            mmap_ranges: Mutex::new(self.mmap_regions()),
             fds: Mutex::new(self.fds.lock().fork_copy()?),
             cwd: Mutex::new(self.cwd()),
             exec_root: Mutex::new(self.exec_root()),

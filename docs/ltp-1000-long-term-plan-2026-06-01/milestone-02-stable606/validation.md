@@ -127,3 +127,30 @@ Parser summary:
 - No final `LTP_CASES=stable` RV/LA gate for stable606 was run.
 - No LA full-sweep shard evidence was generated in this preflight.
 - No `LTP_STABLE_CASES` update was made.
+
+## proc-self-maps mmap/vma fix validation
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,vma01 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,vma01 LTP_CASE_TIMEOUT_SECS=90 timeout 60m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,vma01,mmap01,mmap02,mmap03,mmap06,mmap09,mmap10,mmap11,mincore01,mprotect05 LTP_CASE_TIMEOUT_SECS=90 timeout 75m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,vma01,mmap01,mmap02,mmap03,mmap06,mmap09,mmap10,mmap11,mincore01,mprotect05 LTP_CASE_TIMEOUT_SECS=90 timeout 75m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV singleton raw/summary: `target/ltp-1000-milestone-02-stable606/rv-proc-maps-mmap-vma-postfix2-20260601T162318Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA singleton raw/summary: `target/ltp-1000-milestone-02-stable606/la-proc-maps-mmap-vma-postfix-20260601T162441Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- RV regression raw/summary: `target/ltp-1000-milestone-02-stable606/rv-proc-maps-mmap-regression-20260601T162607Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- LA regression raw/summary: `target/ltp-1000-milestone-02-stable606/la-proc-maps-mmap-regression-20260601T162755Z.log`, `.summary.txt`, `.summary.json`, `.promotion-candidates.txt`, `.sha256`, `.derived.sha256`
+- Four-way report: `target/ltp-1000-milestone-02-stable606/proc-maps-mmap-regression-rv-la.promotion-candidates.txt`, `.sha256`
+
+Parser summary:
+
+- RV singleton: 4 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA singleton: 4 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- RV regression subset: 22 PASS / 0 FAIL, no parser caveats.
+- LA regression subset: 22 PASS / 0 FAIL, no parser caveats.
+- New four-way not-yet-stable candidates from this fix: `mmap04`, `vma01`.

@@ -199,6 +199,9 @@ pub(super) fn sys_mmap(
     {
         let mut aspace = process.aspace.lock();
         if map_fixed {
+            if let Some(end) = target.checked_add(size) {
+                process.forget_mmap_region(target, end);
+            }
             let _ = aspace.unmap(VirtAddr::from(target), size);
         }
         if let Err(err) = aspace.map_alloc(VirtAddr::from(target), size, map_flags, populate) {
@@ -251,6 +254,7 @@ pub(super) fn sys_mmap(
     if shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, size, map_flags);
     }
+    process.record_mmap_region(target, size, prot as u32, shared);
     target as isize
 }
 
@@ -297,6 +301,7 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
             return 0;
         }
     }
+    process.forget_mmap_region(start, end);
     process.forget_mmap_range(start, end);
     let unmap_result = process
         .aspace
@@ -408,6 +413,7 @@ pub(super) fn sys_mprotect(
     let mut aspace = _process.aspace.lock();
     match aspace.protect(VirtAddr::from(start), end - start, prot_flags) {
         Ok(()) => {
+            _process.protect_mmap_region(start, end, _prot as u32);
             // Thread stacks are typically created as PROT_NONE mappings and then
             // flipped to writable with mprotect(). Pre-fault only the stack-top
             // pages so the first user-space writes succeed without turning the

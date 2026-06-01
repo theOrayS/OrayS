@@ -42,3 +42,25 @@ References used for the semantic boundary:
 ## Stable-list ABI impact
 
 None in this preflight. `LTP_STABLE_CASES` is unchanged at 556/556/0.
+
+## Additional procfs/mmap behavior change on 2026-06-02
+
+Files:
+
+- `examples/shell/src/uspace/mod.rs`
+- `examples/shell/src/uspace/process_lifecycle.rs`
+- `examples/shell/src/uspace/memory_map.rs`
+- `examples/shell/src/uspace/synthetic_fs.rs`
+
+Behavior:
+
+- `UserProcess` now tracks user-created mmap regions as synthetic procfs metadata.
+- `/proc/self/maps` now includes parseable dynamic mmap ranges with current `rwx` protection bits and `p/s` private/shared state.
+- `MAP_FIXED`, `munmap`, `mprotect`, `exec`, and `fork` update/preserve the synthetic map list.
+
+POSIX/Linux-visible impact:
+
+- `/proc/self/maps` becomes more truthful for anonymous mmap, vma-adjacency, and protection-display tests.
+- No actual page-table permissions are weakened; `mmap_prot_to_flags` still keeps implementation-internal read access where needed, while procfs prints the requested Linux-visible protection bits.
+- FD, signal, futex, and user-pointer copy semantics are unchanged.
+- Resource/lifetime risk: moderate-low. Metadata is per-process and cleared on exec; the regression subset protects existing stable mmap/mincore/mprotect anchors on both RV and LA.
