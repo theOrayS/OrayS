@@ -23,7 +23,7 @@ use super::fd_table::{
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
-use super::memory_map::{sys_brk, sys_mmap, sys_mprotect, sys_msync, sys_munmap};
+use super::memory_map::{sys_brk, sys_mincore, sys_mmap, sys_mprotect, sys_msync, sys_munmap};
 use super::memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use super::metadata::{
     sys_faccessat, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fgetxattr,
@@ -388,6 +388,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
             tf.arg5(),
         ),
+        general::__NR_mincore => sys_mincore(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_mprotect => sys_mprotect(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_msync => sys_msync(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_munmap => sys_munmap(&process, tf, tf.arg0(), tf.arg1()),
