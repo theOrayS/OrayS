@@ -31,8 +31,8 @@ Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
 ## Candidate bank after this preflight
 
 - Deferred four-way clean bank inherited from milestone-01: 21 cases.
-- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`.
-- Current candidate bank size for stable606 planning: at most 37 cases, still short of the +50 milestone.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`.
+- Current candidate bank size for stable606 planning: at most 38 cases, still short of the +50 milestone.
 
 ## User-visible behavior / ABI impact
 
@@ -187,4 +187,24 @@ Targeted evidence:
 - `la-tmpfs-readonly-regression-20260601T183152Z.log`: LA VFS permission regression subset 30 PASS / 0 FAIL, no internal caveats.
 - `tmpfs-readonly-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all fifteen rows are clean, with `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` as the new not-yet-stable candidates from this follow-up.
 
-Promotion remains blocked: the stable606 candidate bank is now at most 37, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.
+Promotion remained blocked after the tmpfs read-only mount follow-up: the stable606 candidate bank was at most 37, still short of +50, and no final stable606 gate had been run. Stable list remained 556 total / 556 unique / 0 duplicate.
+
+
+## /proc/self/fd directory follow-up
+
+A generic procfs FD-directory improvement was added after the tmpfs read-only mount work:
+
+- `/proc/self/fd`, `/proc/<current-pid>/fd`, and `/dev/fd` can now be opened as read-only synthetic directories.
+- `getdents64` on those directories enumerates `.`, `..`, and the process's currently open numeric fd entries dynamically, with numeric entries exposed as symlink-like `DT_LNK` rows.
+- Directory fd behavior is generic (`read`/file-like I/O returns directory errors, `fstat`/path stat report a directory mode, `O_PATH` works through the existing synthetic path machinery). No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-proc-fd-pipe07-20260601T184539Z.log`: `pipe07` RV musl+glibc PASS, parser-clean.
+- `la-proc-fd-pipe07-20260601T184915Z.log`: `pipe07` LA musl+glibc PASS, parser-clean.
+- `proc-fd-pipe07-rv-la.promotion-candidates.txt`: combined four-way report; `pipe07` is clean across RV + LA x musl + glibc.
+- `rv-proc-fd-regression-20260601T185013Z.log`: RV pipe/proc-fd/readlink/fcntl regression subset 40 PASS / 0 FAIL, no internal caveats.
+- `la-proc-fd-regression-20260601T185013Z.log`: LA pipe/proc-fd/readlink/fcntl regression subset 40 PASS / 0 FAIL, no internal caveats.
+- `proc-fd-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twenty rows are clean, with `pipe07` as the new not-yet-stable candidate from this follow-up.
+
+Promotion remains blocked: the stable606 candidate bank is now at most 38, still short of +50, and no final stable606 gate has been run. Stable list remains 556 total / 556 unique / 0 duplicate.

@@ -177,3 +177,22 @@ Evidence:
   - 30 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
 - Combined report: `target/ltp-1000-milestone-02-stable606/tmpfs-readonly-regression-rv-la.promotion-candidates.txt`
   - All fifteen rows clean across RV + LA x musl + glibc; `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` are the new candidate rows.
+
+
+## /proc/self/fd / pipe07 regression set
+
+Rationale: the code change affects synthetic procfs fd-directory open/stat/getdents behavior and could interact with pipe fd accounting, procfs path lookup, readlink expectations, and fcntl descriptor operations. The protected subset combines the new candidate with existing stable pipe, proc, readlink, and fcntl anchors.
+
+Cases:
+
+- New candidate: `pipe07`
+- Existing stable anchors: `pipe01`, `pipe02`, `pipe03`, `pipe04`, `pipe05`, `pipe06`, `pipe08`, `pipe09`, `pipe10`, `pipe14`, `pipe2_01`, `pipe2_02`, `pipe2_04`, `proc01`, `readlink01`, `readlinkat01`, `fcntl01`, `fcntl02`, `fcntl03`
+
+Evidence:
+
+- RV: `target/ltp-1000-milestone-02-stable606/rv-proc-fd-regression-20260601T185013Z.summary.txt`
+  - 40 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- LA: `target/ltp-1000-milestone-02-stable606/la-proc-fd-regression-20260601T185013Z.summary.txt`
+  - 40 PASS / 0 FAIL, no TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/proc-fd-regression-rv-la.promotion-candidates.txt`
+  - All twenty rows clean across RV + LA x musl + glibc; `pipe07` is the new candidate row.
