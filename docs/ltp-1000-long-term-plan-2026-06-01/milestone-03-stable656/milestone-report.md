@@ -178,12 +178,28 @@ Targeted result: `munmap01` is RV + LA x musl + glibc parser-clean with zero `TF
 
 Regression result: `mmap01`, `mmap02`, `mmap03`, `mmap04`, `mmap09`, `mmap12`, `signal03`, `sigaction01`, `rt_sigaction01`, `rt_sigprocmask01`, `sigprocmask01`, and `waitpid04` are parser-clean on RV and LA, 24/24 wrapper PASS on each arch.
 
+### `mmap13` file-backed SIGBUS-on-EOF repair
+
+Artifacts:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.summary.txt`
+- RV adjacent regression summary: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.summary.txt`
+- LA adjacent regression summary: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.summary.txt`
+- Combined clean7 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.txt`
+
+Targeted result: `mmap13` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Regression result: `mmap01`, `mmap02`, `mmap03`, `mmap04`, `mmap09`, `mmap12`, `signal03`, `sigaction01`, `rt_sigaction01`, `rt_sigprocmask01`, `sigprocmask01`, and `waitpid04` are parser-clean on RV and LA, 24/24 wrapper PASS on each arch.
+
+Caveat: the pre-fix RV log `rv-mmap13-current-20260602T005657Z.log` remains blocker history, and a TTY-launched RV rerun stopped before guest output; neither is counted as promotion evidence. The counted proof is the non-TTY RV/LA targeted pair above.
+
 ### Combined candidate pool
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
-- Candidates: 6 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `munmap01`, `sched_setaffinity01`)
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.txt`
+- Candidates: 7 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `sched_setaffinity01`)
 - Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
 
 An earlier combined report that included the old mixed scout is intentionally not used for the current pool because it mixes the pre-fix `fsync02` `TBROK` row with the post-fix `fsync02` proof.
@@ -212,16 +228,16 @@ Parser result: 1 PASS / 1 FAIL; RV glibc is clean, but RV musl has `TBROK=1` and
 
 ## Conclusion
 
-Six new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
+Seven new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
 
 - `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 - No milestone promotion commit is created for stable656 yet.
-- The scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, precise timer-list wakeup repair, and catchable synchronous SIGSEGV repair are kept as generic behavior work with closed targeted and regression evidence.
-- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current six-case pool.
+- The scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, precise timer-list wakeup repair, catchable synchronous SIGSEGV repair, and file-backed mmap SIGBUS repair are kept as generic behavior work with closed targeted and regression evidence.
+- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current seven-case pool.
 
 ## Risks / next steps
 
-1. Accumulate 44 more four-way-clean candidates before editing the stable list for stable656.
+1. Accumulate 43 more four-way-clean candidates before editing the stable list for stable656.
 2. Isolate `kill10` panic/trap before broad process/signal shards.
 3. Do not count LA musl `readlinkat02`: root cause is now documented as musl's zero-size wrapper rewrite into a one-byte syscall, and a kernel `bufsiz=1` special case would break valid direct Linux truncation semantics.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.

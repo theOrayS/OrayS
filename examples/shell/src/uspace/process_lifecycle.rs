@@ -16,7 +16,7 @@ use std::vec::Vec;
 
 use super::fd_table::release_posix_record_locks_for_process;
 use super::futex;
-use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
+use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::{current_cwd, is_busybox_applet_name};
@@ -24,19 +24,19 @@ use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_reg
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
-    UserTaskExt,
+    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
+    user_pc,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    live_user_thread_count, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
+    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
 };
-use super::{ChildTask, FdTable, UserProcess, NO_EXIT_GROUP_CODE};
+use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -226,6 +226,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         aspace: Mutex::new(aspace),
         brk: Mutex::new(image.brk),
         shared_mmap_ranges: Mutex::new(Vec::new()),
+        mmap_sigbus_ranges: Mutex::new(Vec::new()),
         mmap_ranges: Mutex::new(Vec::new()),
         fds: Mutex::new(FdTable::new()),
         cwd: Mutex::new(cwd.into()),
@@ -305,6 +306,7 @@ fn exec_program(
     };
     *process.brk.lock() = image.brk;
     process.shared_mmap_ranges.lock().clear();
+    process.mmap_sigbus_ranges.lock().clear();
     process.mmap_ranges.lock().clear();
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
@@ -535,6 +537,40 @@ impl UserProcess {
         self.shared_mmap_ranges.lock().push((start, size, flags));
     }
 
+    pub(super) fn record_mmap_sigbus_range(&self, start: usize, end: usize) {
+        if end <= start {
+            return;
+        }
+        let mut ranges = self.mmap_sigbus_ranges.lock();
+        ranges.push((start, end));
+        ranges.sort_by_key(|(range_start, _)| *range_start);
+    }
+
+    pub(super) fn fault_in_mmap_sigbus_range(&self, addr: usize) -> bool {
+        self.mmap_sigbus_ranges
+            .lock()
+            .iter()
+            .any(|(start, end)| addr >= *start && addr < *end)
+    }
+
+    fn forget_mmap_sigbus_range(&self, start: usize, end: usize) {
+        let mut ranges = self.mmap_sigbus_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for (range_start, range_end) in old {
+            if range_end <= start || range_start >= end {
+                ranges.push((range_start, range_end));
+                continue;
+            }
+            if range_start < start {
+                ranges.push((range_start, start));
+            }
+            if range_end > end {
+                ranges.push((end, range_end));
+            }
+        }
+        ranges.sort_by_key(|(range_start, _)| *range_start);
+    }
+
     pub(super) fn record_mmap_region(
         &self,
         start: usize,
@@ -601,6 +637,7 @@ impl UserProcess {
     }
 
     pub(super) fn forget_mmap_region(&self, start: usize, end: usize) {
+        self.forget_mmap_sigbus_range(start, end);
         let mut ranges = self.mmap_ranges.lock();
         let old = core::mem::take(&mut *ranges);
         for region in old {
@@ -633,6 +670,10 @@ impl UserProcess {
 
     pub(super) fn mmap_regions(&self) -> Vec<super::UserMmapRegion> {
         self.mmap_ranges.lock().clone()
+    }
+
+    fn mmap_sigbus_ranges(&self) -> Vec<(usize, usize)> {
+        self.mmap_sigbus_ranges.lock().clone()
     }
 
     pub(super) fn locked_mmap_kb(&self) -> usize {
@@ -687,12 +728,23 @@ impl UserProcess {
                     .protect(start, size, flags)
                     .map_err(LinuxError::from)?;
             }
+            for (start, end) in self.mmap_sigbus_ranges() {
+                let start = VirtAddr::from(start);
+                let size = end - start.as_usize();
+                parent_aspace
+                    .protect(start, size, MappingFlags::USER)
+                    .map_err(LinuxError::from)?;
+                aspace
+                    .protect(start, size, MappingFlags::USER)
+                    .map_err(LinuxError::from)?;
+            }
         }
 
         Ok(Arc::new(UserProcess {
             aspace: Mutex::new(aspace),
             brk: Mutex::new(*self.brk.lock()),
             shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
+            mmap_sigbus_ranges: Mutex::new(self.mmap_sigbus_ranges()),
             mmap_ranges: Mutex::new(self.mmap_regions()),
             fds: Mutex::new(self.fds.lock().fork_copy()?),
             cwd: Mutex::new(self.cwd()),

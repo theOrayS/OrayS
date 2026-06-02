@@ -203,3 +203,36 @@ Boundary: the current evidence is RV glibc-clean but RV musl TBROK/SIGSEGV, with
 - `clone04`: do not include while RV musl is killed by SIGSEGV/TBROK; classify the musl wrapper boundary before changing kernel clone semantics.
 - closed arch sweep: no extra stable606-missing four-way-clean rows remain; use the matrices only for blocker prioritization.
 - `kill10`: do not include broad batches until the panic/trap is isolated.
+
+## Completed regression for file-backed mmap `SIGBUS` beyond EOF
+
+Changed surfaces: `examples/shell/src/uspace/memory_map.rs` file-backed mmap population/page-fault signal selection plus `examples/shell/src/uspace/process_lifecycle.rs` and `examples/shell/src/uspace/mod.rs` mmap beyond-EOF range lifetime tracking.
+
+Targeted proof:
+
+- RV `mmap13`: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.summary.txt`
+- LA `mmap13`: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.txt`
+
+Result: `mmap13` is four-way parser-clean and joins the not-yet-promoted candidate pool. The older RV `mmap13` log remains pre-fix blocker evidence, and the TTY-aborted RV rerun is not counted.
+
+Adjacent stable regression subset:
+
+- `mmap01`
+- `mmap02`
+- `mmap03`
+- `mmap04`
+- `mmap09`
+- `mmap12`
+- `signal03`
+- `sigaction01`
+- `rt_sigaction01`
+- `rt_sigprocmask01`
+- `sigprocmask01`
+- `waitpid04`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.summary.txt`
+- Result: 24/24 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
