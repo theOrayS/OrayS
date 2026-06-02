@@ -141,7 +141,7 @@ Maintenance boundary: this is a minimal residency/prefault implementation, not f
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 10/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
+- Candidate pool after this checkpoint: 14/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
 
 ## Behavior gaps exposed but not fixed
 
@@ -167,3 +167,13 @@ A local temporary change made `poll`/`ppoll` wait loops observe `pending_exit_gr
 No epoll source change is retained in this checkpoint. The singleton rescout documents existing behavior only: RV musl `epoll_create(0/-1)` still reaches an ENOSYS-returning old-ABI/libc-wrapper path, while LA wrapper-PASSes but emits old `__NR_epoll_create` `TCONF` rows.
 
 Visible ABI/POSIX impact: none from this documentation update. Syscall numbers, errno behavior, FD table semantics, epoll readiness behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged. A future fix must be generic epoll compatibility work, not an LTP-name/path/output special case, and must not hide parser-visible `TCONF` rows as promotion evidence.
+
+
+## G009 mm/mincore/mprotect evidence-only impact
+
+No source change is retained for the latest clean4 confirmation. The new evidence relies on already-documented generic memory behavior:
+
+- `mincore02` and `mincore04` are covered by the lazy-VMA validity/residency and `mlock` prefault behavior documented above.
+- `mprotect02` and `mprotect04` exercise existing user protection and signal/fault behavior; this checkpoint only proves their RV + LA x musl + glibc parser-clean status.
+
+Visible ABI/POSIX impact from this documentation/evidence update: none. Syscall numbers, errno behavior, flag constants, FD semantics, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint. Future fixes for the blocked G009 mlock/mmap/mprotect rows must remain generic and prove adjacent regressions before promotion.

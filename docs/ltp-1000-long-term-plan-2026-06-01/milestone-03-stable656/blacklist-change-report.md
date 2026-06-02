@@ -40,3 +40,8 @@ Two RV singleton runs on 2026-06-02 confirmed that `kill10` is not merely a nois
 ## `epoll_create02` blocker update
 
 No blacklist change was made for `epoll_create02`. The focused singleton evidence is an ordinary unresolved compatibility/parser-clean blocker: RV musl has `TFAIL=2` / `ENOSYS=2`, and LA still has old-ABI `TCONF` rows despite wrapper PASS. These rows stay visible, are not counted as PASS, and are not converted into blacklist credit.
+
+
+## G009 mm/mlock/mmap scout blocker update
+
+No blacklist change was made for the latest RV G009 mm/mlock/mmap scout. Four rows (`mincore02`, `mincore04`, `mprotect02`, `mprotect04`) became four-way-clean after LA confirmation and are counted only as future candidates. The remaining RV rows (`mlock02`, `mlock05`, `mlock201`, `mlock202`, `mlock203`, `mlockall02`, `mlockall03`, `munlock02`, `munlockall01`, `mprotect01`, `mprotect03`, `mmap08`, `mmap16`, `mmap18`, `mmap20`) retain visible `TFAIL/TBROK/TCONF` blocker evidence. They are not hidden, not blacklisted for credit, not LA-confirmed, and not counted as stable promotion evidence.
