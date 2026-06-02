@@ -3,7 +3,7 @@
 Date: 2026-06-02
 Branch: `dev/1000ltp-plan`
 Head at first scout: `e9a64d35`
-Head during post-fix targeted runs: after `3ee6ee06` plus local `metadata.rs` capacity-reporting and `synthetic_fs.rs` proc-state changes
+Head during post-fix targeted runs: after `3ee6ee06` plus local `metadata.rs` capacity-reporting, `synthetic_fs.rs` proc-state, and timer-list/periodic-deadline changes
 
 ## Stable count before/after
 
@@ -468,7 +468,7 @@ ENOSYS/not implemented matches: 0
 panic/trap matches: 0
 ```
 
-## Combined candidate pool
+## Combined candidate pool before `futex_wait05`
 
 Command:
 
@@ -499,7 +499,7 @@ Blocked/incomplete cases: 0
 Candidates: fsync02, futex_wait01, futex_wait03, sched_setaffinity01
 ```
 
-Decision: this clean4 report is the current candidate-pool proof. The older clean3 report remains historical only.
+Decision: this clean4 report is historical after the later `futex_wait05` update; the current clean5 proof is recorded below.
 
 ## Closed arch full-sweep mining against live stable606
 
@@ -538,15 +538,110 @@ Observed requirement: after switching to user `nobody`, `nice(-10)` expects fail
 
 ## Gate outcome
 
-- Targeted RV: clean for `fsync02`, `futex_wait01`, `futex_wait03`, and `sched_setaffinity01`; other scout rows blocked as documented.
-- Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix, statfs capacity clamp, and procfs futex-sleeping state repair.
-- LA confirmation: clean for `fsync02`, `futex_wait01`, `futex_wait03`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
-- musl + glibc: clean only for the four candidate rows.
+- Targeted RV: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; other scout rows blocked as documented.
+- Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, and precise timer-list wakeup repair.
+- LA confirmation: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
+- musl + glibc: clean only for the five candidate rows.
 - Parser blockers: still present in scout rows; they are not counted.
 - Stable list: unchanged at `606/606/0`.
 
 ## Unverified items
 
-- No stable656 promotion gate because the candidate pool has only 4/50 required new cases.
+- No stable656 promotion gate because the candidate pool has only 5/50 required new cases.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `futex_wait05`, `shmat1`, `nice04`, or LA musl `readlinkat02`.
+- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `shmat1`, `nice04`, or LA musl `readlinkat02`.
+
+
+## `futex_wait05` precise timer-list proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait05 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait05 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
+
+Decision: `futex_wait05` is now four-way clean after the generic timer-list precise wakeup and periodic-deadline preservation repair.
+
+## Adjacent timer/futex regression subset
+
+Cases: `futex_wait01,futex_wait02,futex_wait03,futex_wait04,futex_wait05,futex_wake01,proc01,waitpid04,nanosleep01,clock_nanosleep02`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait01,futex_wait02,futex_wait03,futex_wait04,futex_wait05,futex_wake01,proc01,waitpid04,nanosleep01,clock_nanosleep02 LTP_CASE_TIMEOUT_SECS=90 timeout 50m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=futex_wait01,futex_wait02,futex_wait03,futex_wait04,futex_wait05,futex_wake01,proc01,waitpid04,nanosleep01,clock_nanosleep02 LTP_CASE_TIMEOUT_SECS=90 timeout 50m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-timer-futex-regression-periodic-fix-20260601T235036Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-timer-futex-regression-periodic-fix-20260601T235036Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-timer-futex-regression-periodic-fix-20260601T235036Z.derived.sha256`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-periodic-fix-20260601T234827Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-periodic-fix-20260601T234827Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-periodic-fix-20260601T234827Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 20
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Non-countable repair history:
+
+- `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-20260601T234109Z.log` was terminated with exit code 143 before LTP cases completed because the TTY-launched QEMU process stopped; it is not evidence.
+- `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-20260601T234340Z.log` was terminated with exit code 143 after hanging in pre-fix `futex_wait05`; it exposed the periodic-deadline drift and is not promotion evidence.
+
+## Combined clean candidate pool after `futex_wait05`
+
+Artifact:
+
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.derived.sha256`
+
+Parser promotion report:
+
+```text
+Promotion candidates: 5
+Blocked/incomplete cases: 0
+Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, sched_setaffinity01
+```
+
+## Gate outcome after this update
+
+- Live stable list remains `606 total / 606 unique / 0 duplicate`.
+- Current clean candidate pool is 5/50 for stable656.
+- No `LTP_STABLE_CASES` edit is made because 45 more four-way-clean unique cases are still required.
+- All counted `futex_wait05` and timer/futex regression summaries are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`.

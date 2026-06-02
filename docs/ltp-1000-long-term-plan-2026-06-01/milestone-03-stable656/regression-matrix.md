@@ -55,6 +55,36 @@ Regression evidence:
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-statfs-regression-statfs-clamp-20260601T230122Z.summary.txt`
 - Result: 14/14 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 
+
+## Completed regression for precise timer-list wakeups
+
+Changed surfaces: `kernel/task/axtask/src/timers.rs` timed wakeup programming and `kernel/runtime/axruntime/src/lib.rs` periodic timer deadline preservation.
+
+Targeted promotion proof:
+
+- RV `futex_wait05`: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.summary.txt`
+- LA `futex_wait05`: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.summary.txt`
+
+Adjacent regression subset:
+
+- `futex_wait01`
+- `futex_wait02`
+- `futex_wait03`
+- `futex_wait04`
+- `futex_wait05`
+- `futex_wake01`
+- `proc01`
+- `waitpid04`
+- `nanosleep01`
+- `clock_nanosleep02`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-timer-futex-regression-periodic-fix-20260601T235036Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-periodic-fix-20260601T234827Z.summary.txt`
+- Result: 20/20 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Caveat: two earlier LA attempts (`la-timer-futex-regression-20260601T234109Z` and `la-timer-futex-regression-20260601T234340Z`) were terminated and are not counted; the second exposed the periodic-deadline drift fixed here.
+
 ## If fixing recoverable user SIGSEGV / page-fault signal delivery
 
 Primary retest cases:
@@ -86,6 +116,8 @@ Primary retest cases:
 
 - `futex_wait03`
 - `futex_wait05`
+
+Closed precise-timer regression after this repair is listed above. Additional changes in this lane should rerun at least the same subset.
 
 Adjacent regression candidates:
 

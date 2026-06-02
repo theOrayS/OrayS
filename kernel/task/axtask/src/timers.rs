@@ -2,11 +2,11 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use kernel_guard::NoOp;
 use lazyinit::LazyInit;
-use timer_list::{TimeValue, TimerEvent, TimerList};
+use timer_list::{TimerEvent, TimerList};
 
-use axhal::time::wall_time;
+use axhal::time::{epochoffset_nanos, set_oneshot_timer, wall_time, TimeValue, NANOS_PER_SEC};
 
-use crate::{AxTaskRef, select_run_queue};
+use crate::{select_run_queue, AxTaskRef};
 
 static TIMER_TICKET_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -35,11 +35,39 @@ impl TimerEvent for TaskWakeupEvent {
     }
 }
 
+fn program_next_precise_deadline(timer_list: &TimerList<TaskWakeupEvent>) {
+    let Some(deadline) = timer_list.next_deadline() else {
+        return;
+    };
+    let now = wall_time();
+    if deadline <= now {
+        return;
+    }
+
+    // The runtime keeps a 100Hz periodic scheduler tick.  Timed waits with a
+    // deadline before the next periodic tick need a one-shot interrupt at the
+    // actual timer-list deadline; otherwise short POSIX waits are rounded up to
+    // the next 10ms tick.  Do not reprogram far-future timers here: those would
+    // unnecessarily postpone the periodic scheduler tick.
+    let periodic_interval =
+        core::time::Duration::from_nanos((NANOS_PER_SEC / axconfig::TICKS_PER_SEC as u64).max(1));
+    if deadline > now + periodic_interval {
+        return;
+    }
+
+    let monotonic_deadline = deadline
+        .as_nanos()
+        .saturating_sub(epochoffset_nanos() as u128)
+        .min(u64::MAX as u128) as u64;
+    set_oneshot_timer(monotonic_deadline);
+}
+
 pub fn set_alarm_wakeup(deadline: TimeValue, task: AxTaskRef) {
     TIMER_LIST.with_current(|timer_list| {
         let ticket_id = TIMER_TICKET_ID.fetch_add(1, Ordering::AcqRel);
         task.set_timer_ticket(ticket_id);
         timer_list.set(deadline, TaskWakeupEvent { ticket_id, task });
+        program_next_precise_deadline(timer_list);
     })
 }
 
@@ -57,6 +85,7 @@ pub fn check_events() {
             break;
         }
     }
+    TIMER_LIST.with_current(|timer_list| program_next_precise_deadline(timer_list));
 }
 
 pub fn init() {

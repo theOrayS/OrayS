@@ -17,6 +17,13 @@ File: `examples/shell/src/uspace/metadata.rs`
 `generic_statfs` now clamps the synthetic free-block count to the current in-memory regular-file capacity guardrail (`MAX_IN_MEMORY_FILE_SIZE / STATFS_BLOCK_SIZE`) before computing `f_blocks`, `f_bfree`, `f_bavail`, and derived `statvfs` fields. The previous value exposed the global allocator's free pages, which could substantially overstate the amount a single temporary regular file can safely grow before the in-memory file limit returns `ENOSPC`.
 
 
+
+### Timer-list sub-tick wakeups and periodic tick preservation
+
+Files: `kernel/task/axtask/src/timers.rs`, `kernel/runtime/axruntime/src/lib.rs`
+
+Timed task wakeups whose timer-list deadline falls before the next 100Hz scheduler tick now program a one-shot hardware timer for the actual deadline. The runtime timer interrupt now preserves the next periodic scheduler tick deadline when an earlier precise timer fires, so repeated sub-tick waits cannot push the scheduler tick arbitrarily far into the future. This is a generic timer/lifetime fix; it does not inspect LTP case names, process names, paths, or outputs.
+
 ### Synthetic `/proc/<pid>/stat` sleeping-state reporting
 
 File: `examples/shell/src/uspace/synthetic_fs.rs`
@@ -51,21 +58,28 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 - Existing behavior preserved: exited processes still report `Z`; child-wait/syscall-wait blocked processes still report `S`; otherwise live processes report `R`.
 - Syscall numbers, errno values, FD tables, signal delivery, futex wait/wake return values, mmap ABI, and user-pointer layouts are unchanged by this reporting-only repair.
 
+
+### Timed waits / sleeps / futex timeouts
+
+- Syscall-visible behavior affected: timed futex waits, `nanosleep`, `clock_nanosleep`, and other task waits backed by `set_alarm_wakeup` can now wake at sub-10ms deadlines instead of being rounded to the next periodic scheduler tick.
+- Scheduler behavior preserved: periodic 100Hz scheduler ticks remain bounded even when many precise one-shot timer interrupts occur before the next periodic tick.
+- Error numbers, syscall numbers, struct layouts, FD semantics, signal masks, futex wait/wake return values, mmap ABI, and user-pointer layouts are unchanged by this timing precision repair.
+- Risk boundary: timer changes can affect latency and wakeup ordering; future changes must keep timer/futex/sleep regression subsets parser-clean on RV and LA before broad promotion.
+
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 4/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `sched_setaffinity01`).
+- Candidate pool after this checkpoint: 5/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `sched_setaffinity01`).
 
 ## Behavior gaps exposed but not fixed
 
 1. `mmap05` / `munmap01`: likely recoverable user page-fault signal delivery gaps.
 2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
-3. `futex_wait05`: futex timeout/slept-too-long semantics remain unclosed.
-4. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects `bufsiz == 0`, so the remaining issue is an LA-musl call-boundary/root-cause problem, not a safe syscall special case.
-5. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
-6. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
-7. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
+3. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects `bufsiz == 0`, so the remaining issue is an LA-musl call-boundary/root-cause problem, not a safe syscall special case.
+4. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
+5. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
+6. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
 
 ## Maintenance boundary
 
-Both code changes are generic behavior fixes, not LTP case-name special cases. Future fixes must stay generic and must not hardcode LTP case names, paths, processes, or outputs. Signal/futex/mmap/SysV and filesystem-capacity changes require adjacent regression sets before any stable promotion.
+All code changes in this checkpoint are generic behavior fixes, not LTP case-name special cases. Future fixes must stay generic and must not hardcode LTP case names, paths, processes, or outputs. Signal/futex/mmap/SysV and filesystem-capacity changes require adjacent regression sets before any stable promotion.

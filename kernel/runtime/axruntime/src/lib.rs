@@ -211,7 +211,7 @@ pub fn rust_main(cpu_id: usize, arg: usize) -> ! {
 
 #[cfg(feature = "alloc")]
 fn init_allocator() {
-    use axhal::mem::{MemRegionFlags, memory_regions, phys_to_virt};
+    use axhal::mem::{memory_regions, phys_to_virt, MemRegionFlags};
 
     info!("Initialize global memory allocator...");
     info!("  use {} allocator.", axalloc::global_allocator().name());
@@ -254,7 +254,13 @@ fn init_interrupt() {
         if now_ns >= deadline {
             deadline = now_ns + PERIODIC_INTERVAL_NANOS;
         }
-        unsafe { NEXT_DEADLINE.write_current_raw(deadline + PERIODIC_INTERVAL_NANOS) };
+        // Keep the periodic tick deadline as the next periodic scheduler tick,
+        // not the tick after it.  Other kernel subsystems may program an
+        // earlier one-shot timer for sub-tick wakeups.  When such an early
+        // interrupt arrives, preserving `deadline` prevents repeated precise
+        // timers from pushing the scheduler tick arbitrarily far into the
+        // future.
+        unsafe { NEXT_DEADLINE.write_current_raw(deadline) };
         axhal::time::set_oneshot_timer(deadline);
     }
 
