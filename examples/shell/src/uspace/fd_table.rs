@@ -96,6 +96,7 @@ pub(super) struct DirectoryEntry {
     pub(super) attr: FileAttr,
     pub(super) path: String,
     next_dirent_cookie: u64,
+    synthetic_dirents_emitted: bool,
 }
 
 #[derive(Clone)]
@@ -1144,6 +1145,13 @@ impl FdTable {
         matches!(self.entry(fd), Ok(FdEntry::BlockDevice(_)))
     }
 
+    pub(super) fn is_dev_zero(&self, fd: i32) -> bool {
+        matches!(
+            self.entry(fd),
+            Ok(FdEntry::File(FileEntry { path, .. })) if path == "/dev/zero"
+        )
+    }
+
     pub(super) fn pipe_available_read(&self, fd: i32) -> Result<usize, LinuxError> {
         match self.entry(fd)? {
             FdEntry::Pipe(pipe) => Ok(pipe.available_read()),
@@ -1347,7 +1355,8 @@ impl FdTable {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EINVAL);
                 }
-                if size <= MAX_IN_MEMORY_FILE_SIZE {
+                let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+                if size <= physical_size || size < MAX_IN_MEMORY_FILE_SIZE {
                     file.file.truncate(size).map_err(LinuxError::from)?;
                 }
                 process.truncate_path_sparse_file(file.path.clone(), size);
@@ -1523,69 +1532,72 @@ impl FdTable {
             let name_start = start + offset_of!(general::linux_dirent64, d_name);
             out[name_start..name_start + name.len()].copy_from_slice(name);
         }
-        for name in process.path_symlink_names_in_dir(dir.path.as_str()) {
-            if seen_names.iter().any(|seen| seen == &name) {
-                continue;
-            }
-            let name_bytes = name.as_bytes();
-            let reclen = align_up(
-                offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
-                8,
-            );
-            if out.len() + reclen > max_len {
-                break;
-            }
-            let entry_path = normalize_path(dir.path.as_str(), name.as_str());
-            dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
-            let start = out.len();
-            out.resize(start + reclen, 0);
-            unsafe {
-                let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
-                ptr::write_unaligned(
-                    dirent,
-                    general::linux_dirent64 {
-                        d_ino: path_inode(entry_path.as_deref()) as _,
-                        d_off: dir.next_dirent_cookie as _,
-                        d_reclen: reclen as _,
-                        d_type: general::DT_LNK as u8,
-                        d_name: Default::default(),
-                    },
+        if count == 0 && !dir.synthetic_dirents_emitted {
+            for name in process.path_symlink_names_in_dir(dir.path.as_str()) {
+                if seen_names.iter().any(|seen| seen == &name) {
+                    continue;
+                }
+                let name_bytes = name.as_bytes();
+                let reclen = align_up(
+                    offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
+                    8,
                 );
+                if out.len() + reclen > max_len {
+                    break;
+                }
+                let entry_path = normalize_path(dir.path.as_str(), name.as_str());
+                dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
+                let start = out.len();
+                out.resize(start + reclen, 0);
+                unsafe {
+                    let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
+                    ptr::write_unaligned(
+                        dirent,
+                        general::linux_dirent64 {
+                            d_ino: path_inode(entry_path.as_deref()) as _,
+                            d_off: dir.next_dirent_cookie as _,
+                            d_reclen: reclen as _,
+                            d_type: general::DT_LNK as u8,
+                            d_name: Default::default(),
+                        },
+                    );
+                }
+                let name_start = start + offset_of!(general::linux_dirent64, d_name);
+                out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
             }
-            let name_start = start + offset_of!(general::linux_dirent64, d_name);
-            out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
-        }
-        for &name in synthetic_block_device_names_in_dir(dir.path.as_str()) {
-            if seen_names.iter().any(|seen| seen == name) {
-                continue;
-            }
-            let name_bytes = name.as_bytes();
-            let reclen = align_up(
-                offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
-                8,
-            );
-            if out.len() + reclen > max_len {
-                break;
-            }
-            let entry_path = normalize_path(dir.path.as_str(), name);
-            dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
-            let start = out.len();
-            out.resize(start + reclen, 0);
-            unsafe {
-                let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
-                ptr::write_unaligned(
-                    dirent,
-                    general::linux_dirent64 {
-                        d_ino: path_inode(entry_path.as_deref()) as _,
-                        d_off: dir.next_dirent_cookie as _,
-                        d_reclen: reclen as _,
-                        d_type: general::DT_BLK as u8,
-                        d_name: Default::default(),
-                    },
+            for &name in synthetic_block_device_names_in_dir(dir.path.as_str()) {
+                if seen_names.iter().any(|seen| seen == name) {
+                    continue;
+                }
+                let name_bytes = name.as_bytes();
+                let reclen = align_up(
+                    offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
+                    8,
                 );
+                if out.len() + reclen > max_len {
+                    break;
+                }
+                let entry_path = normalize_path(dir.path.as_str(), name);
+                dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
+                let start = out.len();
+                out.resize(start + reclen, 0);
+                unsafe {
+                    let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
+                    ptr::write_unaligned(
+                        dirent,
+                        general::linux_dirent64 {
+                            d_ino: path_inode(entry_path.as_deref()) as _,
+                            d_off: dir.next_dirent_cookie as _,
+                            d_reclen: reclen as _,
+                            d_type: general::DT_BLK as u8,
+                            d_name: Default::default(),
+                        },
+                    );
+                }
+                let name_start = start + offset_of!(general::linux_dirent64, d_name);
+                out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
             }
-            let name_start = start + offset_of!(general::linux_dirent64, d_name);
-            out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
+            dir.synthetic_dirents_emitted = true;
         }
         Ok(out)
     }
@@ -3788,6 +3800,7 @@ pub(super) fn open_dir_entry(path: &str) -> Result<FdEntry, LinuxError> {
         attr,
         path: path.into(),
         next_dirent_cookie: 0,
+        synthetic_dirents_emitted: false,
     }))
 }
 

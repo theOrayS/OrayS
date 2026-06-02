@@ -179,6 +179,7 @@ pub(super) fn sys_mmap(
     let shared = flags_u32 & general::MAP_SHARED != 0;
     let map_fixed = flags_u32 & general::MAP_FIXED != 0;
     let locked = flags_u32 & general::MAP_LOCKED != 0;
+    let dev_zero = !anonymous && process.fds.lock().is_dev_zero(fd as i32);
     if !anonymous {
         if let Err(err) = process.fds.lock().mmap_validate_file_fd(fd as i32) {
             return neg_errno(err);
@@ -230,7 +231,8 @@ pub(super) fn sys_mmap(
     if anonymous && size <= 0x40000 {
         user_trace!("user-mmap: target={target:#x} len={size:#x} prot={prot:#x} flags={flags:#x}");
     }
-    let populate = !anonymous || shared || locked;
+    let file_backed = !anonymous && !dev_zero;
+    let populate = file_backed || shared || locked;
     {
         let mut aspace = process.aspace.lock();
         if map_fixed {
@@ -243,7 +245,7 @@ pub(super) fn sys_mmap(
     }
 
     let mut sigbus_range = None;
-    if !anonymous {
+    if file_backed {
         const FILE_MMAP_COPY_CHUNK: usize = PAGE_SIZE_4K;
         let mut copied = 0usize;
         let mut buf = [0u8; FILE_MMAP_COPY_CHUNK];
