@@ -176,3 +176,15 @@ Latest artifacts:
 - Current clean35 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean35-shmat04-ipcstat-abi-20260602T150918Z.md`
 
 Decision: add `adjtimex01`, `adjtimex03`, `sigaltstack02`, `shmt04`, and `shmat04` to the future promotion pool. `shmat04` specifically depends on the generic `shmctl(IPC_STAT)` user ABI repair that copies the 112-byte Linux 64-bit `shmid_ds` layout instead of zeroing a guessed 128-byte range. Current pool is 35/50, so no stable-list edit is made.
+
+## time/timer scout clean3 update
+
+Latest artifacts:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt`
+- LA clean3 confirmation: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt`
+- Combined clean38 report: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`
+
+Decision: add `getitimer02`, `setitimer02`, and `times03` to the future promotion pool. The RV scout also records 22 surrounding blocker cases with visible TCONF/TBROK/TFAIL/ENOSYS/timeout markers; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 38/50, so no stable-list edit is made.
+
+Promising next mining direction: move back to VFS/path and small FD/IO rows for the remaining 12 candidates; timerfd/POSIX timer rows need real timerfd/POSIX timer syscall support and should not be broad-promoted from partial TPASS.

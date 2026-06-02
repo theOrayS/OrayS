@@ -149,3 +149,13 @@ The 2026-06-02 generic `shmctl(IPC_STAT)` ABI repair added one future candidate 
 - Combined clean35 report: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`
 
 The newly clean case is `shmat04`, increasing the pool from 34/50 to 35/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.
+
+## time/timer clean3 no-promotion update
+
+The 2026-06-02 time/timer scout and LA confirmation added three future candidates without crossing the stable656 gate:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt`
+- LA confirmation summary: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt`
+- Combined clean38 report: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`
+
+The newly clean cases are `getitimer02`, `setitimer02`, and `times03`, increasing the pool from 35/50 to 38/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.

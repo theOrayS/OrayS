@@ -89,3 +89,7 @@ No blacklist change was made for the mmap/munlock repair. `mmap20` and `munlock0
 ## epoll_create1 clean2 blacklist update
 
 No blacklist change was made for the epoll_create1 repair. `epoll_create1_01` and `epoll_create1_02` are tracked only as future clean candidates after RV + LA x musl+glibc parser-clean proof. `epoll_create02` remains visible blocker evidence: musl's old wrapper maps the invalid legacy-size check onto valid `epoll_create1(0)`, and old-ABI/TCONF history is not hidden or counted. No blacklist/SKIP/status0 credit is taken.
+
+## time/timer clean3 blacklist status
+
+No blacklist was added, removed, or used for promotion accounting in the time/timer clean3 checkpoint. RV-blocked rows remain visible parser blockers and are not counted as PASS.

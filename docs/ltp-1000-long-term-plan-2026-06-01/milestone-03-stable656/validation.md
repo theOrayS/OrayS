@@ -1938,3 +1938,43 @@ Combined: promotion candidates `shmat04` and already-counted `shmt04`, blocked/i
 ```
 
 Decision: `shmat04` enters the future stable656 candidate pool. `shmt04` is revalidated but was already counted. Stable list remains unchanged at `606/606/0`; pool is 35/50.
+
+## time/timer clean3 validation
+
+RV scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_getres01,clock_gettime01,clock_gettime03,clock_nanosleep01,clock_nanosleep03,clock_settime03,nanosleep02,getitimer02,setitimer01,setitimer02,times03,timerfd01,timerfd02,timerfd04,timerfd_create01,timerfd_gettime01,timerfd_settime01,timerfd_settime02,timer_delete01,timer_delete02,timer_getoverrun01,timer_gettime01,timer_settime01,timer_settime02,timer_settime03 LTP_CASE_TIMEOUT_SECS=60 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.log
+```
+
+LA confirmation command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=getitimer02,setitimer02,times03 LTP_CASE_TIMEOUT_SECS=60 timeout 20m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.log target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.log
+```
+
+Artifacts:
+
+- RV raw/summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.log`, `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.derived.sha256`.
+- RV candidate report: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.promotion-candidates.txt`.
+- LA raw/summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.log`, `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.derived.sha256`.
+- LA candidate report: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.promotion-candidates.txt`.
+- Combined candidate report/checksum: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`, `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.derived.sha256`.
+
+Parser summaries:
+
+```text
+RV scout: PASS LTP CASE 8, FAIL LTP CASE 42, Internal TFAIL/TBROK/TCONF 64 (TCONF=34, TBROK=14, TFAIL=16), timeout 4, ENOSYS 17, panic/trap 0.
+RV clean candidates from that scout: getitimer02, setitimer02, times03.
+LA confirmation for clean candidates: PASS LTP CASE 6, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+Combined RV+LA: promotion candidates getitimer02, setitimer02, times03; blocked/incomplete rows 22.
+```
+
+Unverified/deferred: no LA was run for the RV-blocked rows because their RV parser output already has visible TFAIL/TBROK/TCONF/ENOSYS/timeout blockers and they are not promotion candidates.

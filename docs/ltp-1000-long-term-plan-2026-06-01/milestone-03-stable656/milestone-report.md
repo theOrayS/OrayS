@@ -602,3 +602,24 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 15 cases short.
 - Maintenance caveat: this checkpoint fixes the visible `IPC_STAT` user ABI size/layout boundary; it does not add full SysV shm attach refcount/lifetime reclamation.
+
+## time/timer clean3 checkpoint
+
+A time/timer scout found three already-generic rows that are clean enough for the future stable656 pool without any source edit.
+
+Code changes retained in this checkpoint: none.
+
+Evidence:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt` — 8 PASS / 42 FAIL across musl+glibc; `getitimer02`, `setitimer02`, and `times03` are the only parser-clean RV candidates.
+- LA confirmation: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt` — 6 PASS / 0 FAIL for the three candidates, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Combined RV+LA report: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt` — 3 candidates and 22 blocked/incomplete rows.
+- Combined clean38 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean38-time-timer-clean3-20260602T152824Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `getitimer02`, `setitimer02`, `times03`.
+- Candidate pool: 38/50.
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 12 cases short.
+- Remaining blockers from this scout keep visible parser caveats and must not be counted until fixed and revalidated.

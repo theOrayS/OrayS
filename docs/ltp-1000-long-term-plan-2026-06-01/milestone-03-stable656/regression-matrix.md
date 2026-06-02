@@ -553,3 +553,15 @@ Targeted proof:
 Result: `shmat04` is newly RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap. `shmt04` was revalidated in the same subset and remains clean.
 
 Protected boundary: `shmctl(IPC_STAT)` must copy exactly the Linux 64-bit `shmid_ds` ABI struct size for RV/LA. Future SysV shm lifetime/refcount work must rerun `shmat04`, `shmt04`, and the existing stable SysV shm subset before promotion accounting.
+
+## time/timer clean3 evidence matrix
+
+Targeted proof:
+
+- RV time/timer scout: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt`
+- LA clean3 confirmation: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt`
+- Combined promotion report: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`
+
+Result: `getitimer02`, `setitimer02`, and `times03` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap on the counted rows.
+
+No source changed in this checkpoint, so no behavior-regression subset was required beyond the RV/LA targeted proof. The surrounding RV scout rows remain a visible blocker matrix for future timer work: `clock_getres01` has TCONF, `clock_gettime01` and `setitimer01` timeout, and timerfd/POSIX timer rows retain ENOSYS/TBROK/TFAIL/TCONF blockers.
