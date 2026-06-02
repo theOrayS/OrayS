@@ -6,14 +6,16 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Promotion candidates: 19
-- Blocked/incomplete cases in this clean proof set: 20 (`mmap05`, `mknod07`, `mknodat02`, `rename03`, `rename04`, and the current RV G009 mlock/mmap/mprotect blocker rows)
+- Promotion candidates: 21
+- Blocked/incomplete cases in this clean proof set: 30 (`mmap05`, `mknod07`, `mknodat02`, `rename03`, `rename04`, and the current RV G009 mlock/mmap/mprotect blocker rows)
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
+| `fcntl11_64` | RV fcntl/FD scout and LA clean2 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `fcntl15` | RV fcntl/FD scout and LA clean2 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `fstatfs01` | after generic `LTP_DEV=/dev/vda` exposure plus synthetic block-device stat/getdents and true `NAME_MAX=63` reporting, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `fstatfs01_64` | same generic device/NAME_MAX repair as `fstatfs01`; RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `statfs01` | same generic device/NAME_MAX repair as `fstatfs01`; RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
@@ -62,7 +64,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 19.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 21.
 
 ## `openat03` non-candidate note
 
@@ -115,6 +117,18 @@ A generic device setup follow-up grew the clean pool without editing the stable 
 - LA clean5 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.summary.txt` — the five RV-clean rows are parser-clean for musl+glibc.
 - Combined clean19 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`.
 
-Newly evidenced four-way-clean cases: `fstatfs01`, `fstatfs01_64`, `rename05`, `statfs01`, and `statvfs01`. Current pool: 19/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+Newly evidenced four-way-clean cases: `fstatfs01`, `fstatfs01_64`, `rename05`, `statfs01`, and `statvfs01`. Pool at that checkpoint: 19/50 before the later FD/fcntl clean2 update. Stable list remains `606 total / 606 unique / 0 duplicate`.
 
 Blocked rows from the same proof set stay outside the pool: `mknod07` and `mknodat02` are parser-visible `TCONF` because `mkfs.ext2` is missing in the guest; `rename03` and `rename04` are parser-visible `TFAIL` rename-semantic blockers. None is blacklisted or counted as PASS.
+
+## FD/fcntl clean2 scout update
+
+A documentation/evidence-only FD scout grew the clean pool without editing the stable list:
+
+- RV fcntl scout summary: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.txt` — `fcntl15` and `fcntl11_64` are parser-clean for musl+glibc; the surrounding fcntl rows keep visible timeout/TCONF/TFAIL/TBROK blockers.
+- LA clean2 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt` — both RV-clean rows are parser-clean for musl+glibc.
+- Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`.
+
+Newly evidenced four-way-clean cases: `fcntl11_64` and `fcntl15`. Current pool: 21/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+
+Blocked rows from the same RV scout stay outside the pool: `fcntl17` timed out on both libcs; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` retain parser-visible `TCONF`; `fcntl27` and `fcntl31` retain parser-visible `TFAIL`; `fcntl34`, `fcntl38`, and `fcntl39` retain parser-visible `TBROK`. None is blacklisted or counted as PASS.

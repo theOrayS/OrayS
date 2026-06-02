@@ -1506,3 +1506,60 @@ LA: PASS LTP CASE 6, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, E
 `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The pool becomes 19/50, still below the stable656 +50 gate, so `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 `mknod07` and `mknodat02` remain non-promotable because the final RV run reaches setup but emits parser-visible `TCONF` for missing `mkfs.ext2`. `rename03` and `rename04` remain non-promotable because they now reach real assertions but retain parser-visible `TFAIL`. No blacklist/SKIP/status0/full-sweep row is counted.
+
+## RV FD/fcntl scout and LA clean2 confirmation
+
+Date: 2026-06-02. This was an evidence-only FD/fcntl scout; no source or stable-list edit was made.
+
+RV scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fcntl15,fcntl17,fcntl24,fcntl25,fcntl26,fcntl27,fcntl31,fcntl34,fcntl37,fcntl38,fcntl39,fcntl11_64 LTP_CASE_TIMEOUT_SECS=90 timeout 40m ./run-eval.sh rv
+```
+
+LA confirmation command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=fcntl15,fcntl11_64 LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.derived.sha256`
+- Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
+
+RV parser summary:
+
+```text
+PASS LTP CASE: 4
+FAIL LTP CASE: 20
+Internal TFAIL/TBROK/TCONF: 26 ({'TCONF': 14, 'TFAIL': 6, 'TBROK': 6})
+timeout matches: 2
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Suite summaries: ltp-musl 2 passed / 10 failed; ltp-glibc 2 passed / 10 failed
+```
+
+LA clean2 parser summary:
+
+```text
+PASS LTP CASE: 4
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Suite summaries: ltp-musl 2 passed / 0 failed; ltp-glibc 2 passed / 0 failed
+```
+
+Decision: `fcntl15` and `fcntl11_64` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The pool becomes 21/50, still below the stable656 +50 gate, so `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+The rest of the RV scout is blocker evidence only: `fcntl17` timed out for both libcs; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` retain `TCONF`; `fcntl27` and `fcntl31` retain `TFAIL`; `fcntl34`, `fcntl38`, and `fcntl39` retain `TBROK`. These rows were not LA-confirmed and are not counted.

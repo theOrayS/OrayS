@@ -1,15 +1,15 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint found nineteen four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint found twenty-one four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 19 (`fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
+- Current four-way-clean new candidate pool: 21 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
-Because the 19-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
+Because the 21-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
 
 ## Blocking evidence kept visible
 
@@ -37,7 +37,7 @@ The following blockers prevent counting additional rows:
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01` in `promotion-candidates.md` for the next accumulation batch.
 
 ## `epoll_create02` blocker update
 
@@ -90,3 +90,15 @@ The generic `LTP_DEV=/dev/vda` plus synthetic block-device exposure and true `NA
 The newly clean cases are `fstatfs01`, `fstatfs01_64`, `rename05`, `statfs01`, and `statvfs01`, increasing the pool from 14/50 to 19/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 
 The same evidence keeps remaining rows visible and non-promotable: `mknod07` and `mknodat02` need guest `mkfs.ext2` support or another generic ext2 setup path; `rename03` and `rename04` now reach real assertions but still report parser-visible `TFAIL`. No blacklist/SKIP/status0/TCONF/TBROK/TFAIL row is counted.
+
+## FD/fcntl clean2 no-promotion update
+
+The 2026-06-02 RV fcntl scout plus LA confirmation added two future candidates without crossing the stable656 gate:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt`
+- Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
+
+The newly clean cases are `fcntl11_64` and `fcntl15`, increasing the pool from 19/50 to 21/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
+
+The same RV scout keeps remaining fcntl rows visible and non-promotable: `fcntl17` timeout; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` TCONF; `fcntl27` and `fcntl31` TFAIL; `fcntl34`, `fcntl38`, and `fcntl39` TBROK. No blacklist/SKIP/status0/TCONF/TBROK/TFAIL/timeout row is counted.

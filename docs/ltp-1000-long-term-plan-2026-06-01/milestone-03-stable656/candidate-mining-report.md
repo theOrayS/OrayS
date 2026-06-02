@@ -12,6 +12,8 @@ Record the current post-stable606 candidate search state so later G009/G010 work
 
 | Case | Evidence | Status |
 | --- | --- | --- |
+| `fcntl11_64` | RV fcntl/FD scout plus LA clean2 confirmation, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
+| `fcntl15` | RV fcntl/FD scout plus LA clean2 confirmation, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `fsync02` | RV/LA targeted post-`generic_statfs` clamp runs, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `futex_wait01` | RV isolated rerun + LA confirmation, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `futex_wait03` | RV/LA targeted reruns after synthetic `/proc/<pid>/stat` futex-sleeping repair, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
@@ -27,7 +29,7 @@ Record the current post-stable606 candidate search state so later G009/G010 work
 | `sched_setaffinity01` | RV/LA targeted postfix runs, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `signal01` | RV/LA targeted reruns after synthetic `/proc/<pid>/stat` sleeping-state reporting covered `rt_sigsuspend` and libc `pause()`/`ppoll` waiters, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 
-Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`.
+Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`.
 
 A stale combined report that included the old RV mixed scout still marks `fsync02` blocked because it contains the pre-fix glibc `TBROK`; do not use that artifact for current promotion accounting.
 
@@ -62,7 +64,7 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 
 ## Promotion decision
 
-No `LTP_STABLE_CASES` edit is justified. The candidate pool is 14/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.
+No `LTP_STABLE_CASES` edit is justified. The candidate pool is 21/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.
 
 ## `epoll_create02` focused rescout
 
@@ -80,9 +82,9 @@ Latest artifacts:
 
 - RV scout: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.summary.txt`
 - LA clean4 confirmation: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.summary.txt`
-- Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`
+- Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
 
-Decision: add `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` to the future promotion pool. The RV scout also records 15 surrounding blocker cases with `TFAIL/TBROK/TCONF`; those rows are not eligible for LA confirmation or promotion accounting. Current pool is 14/50, so no stable-list edit is made.
+Decision: add `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` to the future promotion pool. The RV scout also records 15 surrounding blocker cases with `TFAIL/TBROK/TCONF`; those rows are not eligible for LA confirmation or promotion accounting. Current pool is 21/50, so no stable-list edit is made.
 
 ## `statfs01` family RV setup-device blocker
 
@@ -103,3 +105,13 @@ RV-only scout artifact: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-r
 | `mknod07`, `mknodat02`, `rename03`, `rename04`, `rename05` | RV musl+glibc all fail in LTP device setup with `TBROK=14`; raw log reports `No free devices found` / `Failed to acquire device`; promotion report has 0 candidates / 5 blocked | classify guest block-device/free-device support before rerunning; do not treat these rows as mknod/rename ABI proof, do not LA-confirm until RV setup is parser-clean |
 
 This scout does not change the current four-way-clean pool. It remains 14/50 for stable656.
+
+## FD/fcntl scout update
+
+Latest artifacts:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.txt`
+- LA clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt`
+- Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
+
+Decision: add `fcntl11_64` and `fcntl15` to the future promotion pool. The RV scout also records ten surrounding blocker cases (`fcntl17`, `fcntl24`, `fcntl25`, `fcntl26`, `fcntl27`, `fcntl31`, `fcntl34`, `fcntl37`, `fcntl38`, `fcntl39`) with timeout/TCONF/TFAIL/TBROK; those rows are not eligible for LA confirmation or promotion accounting. Current pool is 21/50, so no stable-list edit is made.
