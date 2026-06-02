@@ -389,3 +389,14 @@ Current blocker evidence:
 - Promotion report: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.promotion-candidates.txt` — 0 candidates / 4 blocked.
 
 Future generic device/free-block-device support must first make this RV setup parser-clean. Then rerun LA confirmation plus adjacent statfs/fstatfs/statvfs and device/mount setup regressions before any stable promotion accounting.
+
+## VFS-C mknod/rename setup-device regression boundary
+
+No source change was retained for the RV `mknod07,mknodat02,rename03,rename04,rename05` scout, so no adjacent regression subset is counted here.
+
+Current blocker evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.txt` — 0 wrapper PASS / 10 wrapper FAIL, `TBROK=14`, zero timeout/ENOSYS/panic/trap.
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.promotion-candidates.txt` — 0 candidates / 5 blocked.
+
+Future generic device/free-block-device support must first make this RV setup parser-clean. Then rerun LA confirmation plus adjacent mknod/mknodat/rename and device/mount setup regressions before any stable promotion accounting.

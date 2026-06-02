@@ -369,3 +369,17 @@ Artifacts:
 Result: this RV-only scout produced 0 wrapper PASS / 8 wrapper FAIL across musl+glibc. The parser reports `TBROK=8`, with zero timeout, ENOSYS, panic, or trap. The raw log shows each row failing in LTP setup with `tst_device.c:147 TINFO: No free devices found` followed by `tst_device.c:354 TBROK: Failed to acquire device`.
 
 Decision: these rows are blocker evidence only. They are not statfs ABI proof and not stable656 candidates because RV is not parser-clean and LA was not run. Current candidate pool remains 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+## VFS-C `mknod07,mknodat02,rename03,rename04,rename05` RV device-acquire blocker checkpoint
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.json`
+- RV promotion-candidate report: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.promotion-candidates.txt`
+- RV derived checksums: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.derived.sha256`
+
+Result: this RV-only VFS-C scout produced 0 wrapper PASS / 10 wrapper FAIL across musl+glibc. The parser reports `TBROK=14`, with zero timeout, ENOSYS, panic, or trap. The raw log shows all rows failing in LTP setup with `No free devices found` / `Failed to acquire device` from `tst_device.c`.
+
+Decision: these rows are blocker evidence only. They are not mknod/rename ABI proof and not stable656 candidates because RV is parser-unclean and LA was not run. Current candidate pool remains 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
