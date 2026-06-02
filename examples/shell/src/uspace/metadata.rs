@@ -735,7 +735,11 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
         Ok(file) => file,
         Err(err) => return neg_errno(LinuxError::from(err)),
     };
-    if length <= MAX_IN_MEMORY_FILE_SIZE {
+    let physical_size = match file.get_attr() {
+        Ok(attr) => attr.size(),
+        Err(err) => return neg_errno(LinuxError::from(err)),
+    };
+    if length <= physical_size || length < MAX_IN_MEMORY_FILE_SIZE {
         if let Err(err) = file.truncate(length) {
             return neg_errno(LinuxError::from(err));
         }
