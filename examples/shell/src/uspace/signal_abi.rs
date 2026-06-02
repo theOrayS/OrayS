@@ -6,16 +6,17 @@ use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use axhal::trap::PageFaultFlags;
-use axhal::trap::{register_trap_handler, register_user_return_handler, USER_EXCEPTION};
+use axhal::trap::{USER_EXCEPTION, register_trap_handler, register_user_return_handler};
 use linux_raw_sys::general;
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 
+use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
-    neg_errno, KERNEL_SIGSET_BYTES, SIGABRT_NUM, SIGALRM_NUM, SIGCANCEL_NUM, SIGCHLD_NUM,
-    SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM, SIGQUIT_NUM, SIGSEGV_NUM,
-    SIGSTOP_NUM, SIGTERM_NUM, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW,
+    KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM,
+    SIGCANCEL_NUM, SIGCHLD_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
+    SIGQUIT_NUM, SIGSEGV_NUM, SIGSTOP_NUM, SIGTERM_NUM, neg_errno,
 };
 #[cfg(target_arch = "loongarch64")]
 use super::linux_abi::{LOONGARCH_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_DISABLE};
@@ -25,15 +26,14 @@ use super::linux_abi::{RISCV_SIGTRAMP_CODE, SA_NODEFER_FLAG, SI_TKILL_CODE, SS_D
 use super::memory_map::{align_down, align_up, user_mapping_flags};
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
-use super::task_context::{current_task_ext, current_tid, UserTaskExt};
+use super::task_context::{UserTaskExt, current_task_ext, current_tid};
 use super::task_registry::{
-    user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
-    user_thread_entry_by_tid, user_thread_entry_for_process, UserThreadEntry,
+    UserThreadEntry, user_thread_entries_by_process_group, user_thread_entry_by_process_pid,
+    user_thread_entry_by_tid, user_thread_entry_for_process,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
 };
-use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -123,6 +123,36 @@ pub(super) fn signal_is_blocked(ext: &UserTaskExt, sig: i32) -> bool {
     }
     let bit = signal_mask_bit(sig);
     bit != 0 && ext.signal_mask.load(Ordering::Acquire) & bit != 0
+}
+
+pub(super) fn queue_current_synchronous_signal(sig: i32) -> bool {
+    let Some(ext) = current_task_ext() else {
+        return false;
+    };
+    if signal_is_blocked(ext, sig)
+        || ext.signal_frame.load(Ordering::Acquire) != 0
+        || ext.pending_signal.load(Ordering::Acquire) != 0
+    {
+        return false;
+    }
+    let action = ext
+        .process
+        .signal_actions
+        .lock()
+        .get(&(sig as usize))
+        .copied()
+        .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+    let handler = action
+        .sa_handler_kernel
+        .map(|func| func as usize)
+        .unwrap_or(0);
+    if handler <= 1 {
+        return false;
+    }
+    let Some(entry) = user_thread_entry_by_tid(current_tid()) else {
+        return false;
+    };
+    deliver_user_signal(&entry, sig, 0).is_ok()
 }
 
 pub(super) fn current_sigcancel_pending() -> bool {

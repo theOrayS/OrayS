@@ -155,7 +155,7 @@ Artifacts:
 - LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.summary.txt`
 - RV timer/futex regression summary: `target/ltp-1000-milestone-03-stable656/rv-timer-futex-regression-periodic-fix-20260601T235036Z.summary.txt`
 - LA timer/futex regression summary: `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-periodic-fix-20260601T234827Z.summary.txt`
-- Combined clean5 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.promotion-candidates.txt`
+- Combined clean6 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
 
 Targeted result: `futex_wait05` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 
@@ -163,13 +163,28 @@ Regression result: `futex_wait01`, `futex_wait02`, `futex_wait03`, `futex_wait04
 
 Caveat: an initial LA run launched through a TTY stopped before guest output, and a later LA regression attempt hung inside pre-fix `futex_wait05`; both terminated logs are retained only as non-countable repair history. The counted evidence is the post-periodic-deadline-fix targeted and regression set above.
 
+
+### `mmap05,munmap01` catchable synchronous SIGSEGV repair
+
+Artifacts:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.summary.txt`
+- RV adjacent regression summary: `target/ltp-1000-milestone-03-stable656/rv-sync-sigsegv-regression-20260602T002800Z.summary.txt`
+- LA adjacent regression summary: `target/ltp-1000-milestone-03-stable656/la-sync-sigsegv-regression-20260602T003046Z.summary.txt`
+- Combined clean6 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
+
+Targeted result: `munmap01` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap. `mmap05` is RV-clean but remains blocked because LA musl and LA glibc both report `TFAIL=1` / SIGSEGV signal not received.
+
+Regression result: `mmap01`, `mmap02`, `mmap03`, `mmap04`, `mmap09`, `mmap12`, `signal03`, `sigaction01`, `rt_sigaction01`, `rt_sigprocmask01`, `sigprocmask01`, and `waitpid04` are parser-clean on RV and LA, 24/24 wrapper PASS on each arch.
+
 ### Combined candidate pool
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.promotion-candidates.txt`
-- Candidates: 5 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `sched_setaffinity01`)
-- Blocked/incomplete: 0 in this clean proof set
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
+- Candidates: 6 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `munmap01`, `sched_setaffinity01`)
+- Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
 
 An earlier combined report that included the old mixed scout is intentionally not used for the current pool because it mixes the pre-fix `fsync02` `TBROK` row with the post-fix `fsync02` proof.
 
@@ -197,19 +212,20 @@ Parser result: 1 PASS / 1 FAIL; RV glibc is clean, but RV musl has `TBROK=1` and
 
 ## Conclusion
 
-Five new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
+Six new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
 
 - `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 - No milestone promotion commit is created for stable656 yet.
-- The scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, and precise timer-list wakeup repair are kept as generic behavior work with closed targeted and regression evidence.
-- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current five-case pool.
+- The scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, precise timer-list wakeup repair, and catchable synchronous SIGSEGV repair are kept as generic behavior work with closed targeted and regression evidence.
+- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current six-case pool.
 
 ## Risks / next steps
 
-1. Accumulate 45 more four-way-clean candidates before editing the stable list for stable656.
+1. Accumulate 44 more four-way-clean candidates before editing the stable list for stable656.
 2. Isolate `kill10` panic/trap before broad process/signal shards.
 3. Do not count LA musl `readlinkat02`: root cause is now documented as musl's zero-size wrapper rewrite into a one-byte syscall, and a kernel `bufsiz=1` special case would break valid direct Linux truncation semantics.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
-5. Treat `clone04` as a libc-wrapper/clone ABI boundary until RV musl no longer SIGSEGV/TBROK and clone/process/futex regressions are closed.
-6. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
-7. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS/SIGSEGV evidence visible; none counts toward stable promotion.
+5. Treat `mmap05` as a LoongArch mmap/protection-fault signal blocker; do not count the RV-only clean row.
+6. Treat `clone04` as a libc-wrapper/clone ABI boundary until RV musl no longer SIGSEGV/TBROK and clone/process/futex regressions are closed.
+7. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
+8. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS/SIGSEGV evidence visible; none counts toward stable promotion.

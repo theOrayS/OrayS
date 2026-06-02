@@ -587,9 +587,9 @@ Decision: `clone04` remains blocked. RV glibc is clean (`NULL stack : EINVAL (22
 
 ## Unverified items
 
-- No stable656 promotion gate because the candidate pool has only 5/50 required new cases.
+- No stable656 promotion gate because the candidate pool currently has only 6/50 required new cases.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `shmat1`, `nice04`, or `clone04`; LA musl `readlinkat02` is documented as non-promotable from the kernel side unless the libc/test boundary changes.
+- No fixes yet for `kill10`, LA `mmap05`, `mmap13`, `shmat1`, `nice04`, or `clone04`; `munmap01` is fixed below and enters the clean pool, while LA musl `readlinkat02` is documented as non-promotable from the kernel side unless the libc/test boundary changes.
 
 
 ## `futex_wait05` precise timer-list proof
@@ -664,7 +664,7 @@ Non-countable repair history:
 - `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-20260601T234109Z.log` was terminated with exit code 143 before LTP cases completed because the TTY-launched QEMU process stopped; it is not evidence.
 - `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-20260601T234340Z.log` was terminated with exit code 143 after hanging in pre-fix `futex_wait05`; it exposed the periodic-deadline drift and is not promotion evidence.
 
-## Combined clean candidate pool after `futex_wait05`
+## Historical combined clean candidate pool after `futex_wait05`
 
 Artifact:
 
@@ -679,9 +679,103 @@ Blocked/incomplete cases: 0
 Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, sched_setaffinity01
 ```
 
-## Gate outcome after this update
+## Gate outcome after sync-SIGSEGV update
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
-- Current clean candidate pool is 5/50 for stable656.
-- No `LTP_STABLE_CASES` edit is made because 45 more four-way-clean unique cases are still required.
-- All counted `futex_wait05` and timer/futex regression summaries are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`.
+- Current clean candidate pool is 6/50 for stable656.
+- No `LTP_STABLE_CASES` edit is made because 44 more four-way-clean unique cases are still required.
+- Counted targeted and regression summaries for `futex_wait05`, `munmap01`, timer/futex, and mmap/signal adjacency are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; `mmap05` remains blocked on LA `TFAIL`.
+
+
+## `mmap05,munmap01` catchable synchronous `SIGSEGV` proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap05,munmap01 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap05,munmap01 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.derived.sha256`
+
+RV parser summary:
+
+```text
+PASS LTP CASE: 4
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 2 (`mmap05`, `munmap01` on RV only)
+```
+
+LA parser summary:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 2
+Internal TFAIL/TBROK/TCONF: 2 ({'TFAIL': 2})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1 (`munmap01`)
+Blocked: `mmap05` LA musl+glibc `TFAIL=1` / SIGSEGV signal not received
+```
+
+Decision: `munmap01` is four-way parser-clean and enters the future candidate pool. `mmap05` remains blocked on LA and is not counted.
+
+## Adjacent stable regression for catchable synchronous `SIGSEGV`
+
+Regression cases: `mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,signal03,sigaction01,rt_sigaction01,rt_sigprocmask01,sigprocmask01,waitpid04`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,signal03,sigaction01,rt_sigaction01,rt_sigprocmask01,sigprocmask01,waitpid04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,signal03,sigaction01,rt_sigaction01,rt_sigprocmask01,sigprocmask01,waitpid04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-sync-sigsegv-regression-20260602T002800Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-sync-sigsegv-regression-20260602T002800Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-sync-sigsegv-regression-20260602T002800Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-sync-sigsegv-regression-20260602T002800Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-sync-sigsegv-regression-20260602T003046Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-sync-sigsegv-regression-20260602T003046Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-sync-sigsegv-regression-20260602T003046Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-sync-sigsegv-regression-20260602T003046Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 24
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+## Combined clean6 candidate pool
+
+Combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
+Checksum: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.sha256`
+
+```text
+Promotion candidates: 6
+Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, munmap01, sched_setaffinity01
+Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
+```
