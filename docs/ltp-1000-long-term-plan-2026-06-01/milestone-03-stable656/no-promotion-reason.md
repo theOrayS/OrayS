@@ -114,3 +114,13 @@ The 2026-06-02 rename metadata/inode fix added one future candidate without cros
 The newly clean case is `rename01`, increasing the pool from 21/50 to 22/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 
 The broad RV VFS/path scout remains blocker evidence only: wrapper-PASS `statx01`/`getdents02` rows include parser-visible `TCONF`; hard-link/linkat rows expose `ENOSYS`/TCONF/setup blockers; `stat03`, `stat03_64`, `getdents01`, and `readlink03` retain TFAIL semantics; missing guest binaries are not evidence. No blacklist/SKIP/status0/TCONF/TBROK/TFAIL/timeout row is counted.
+
+## Rename03/rename04 clean2 no-promotion update
+
+The 2026-06-02 generic rename semantics repair added two future candidates, `rename03` and `rename04`, after RV + LA x musl + glibc parser-clean targeted proof:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.summary.txt`
+- Combined clean24 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt`
+
+The pool increased from 22/50 to 24/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/timeout/ENOSYS/panic/trap row is counted.

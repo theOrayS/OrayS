@@ -454,3 +454,17 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 28 cases short.
 - Remaining blockers from this lane: hard-link/linkat support is still absent or setup-blocked; `stat03`/`stat03_64` and `readlink03` retain real errno/loop/path semantic blockers; `statx01`/`getdents02` wrapper-PASS rows retain parser-visible `TCONF` and are not counted.
+
+### `rename03,rename04` directory replacement repair
+
+Artifacts:
+
+- RV rename targeted summary: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.summary.txt`
+- LA rename targeted summary: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.summary.txt`
+- RV clean-only statfs/rename05 retarget summary: `target/ltp-1000-milestone-03-stable656/rv-statfs-rename05-clean-retarget-20260602T050521Z.summary.txt`
+- Combined clean24 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/rename03-04-clean24-20260602T050630Z.derived.sha256`
+
+Targeted result: `rename03` and `rename04` are RV + LA x musl + glibc parser-clean after generic source/destination type handling in `axfs::root::rename`. Adjacent rename rows `rename01` and `rename05` stayed clean on both arches.
+
+Regression result: the clean-only combined report now contains 24 four-way-clean future candidates. This does not cross the 50-case stable656 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.

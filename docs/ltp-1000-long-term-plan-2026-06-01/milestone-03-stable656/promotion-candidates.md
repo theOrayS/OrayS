@@ -149,3 +149,19 @@ A VFS/path scout first exposed no immediately promotable clean rows but identifi
 Newly evidenced four-way-clean case: `rename01`. Current pool: 22/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
 
 Blocked rows from the scout stay outside the pool: `link02`, `link04`, and `link05` retain generic `ENOSYS`/hard-link blockers; `linkat01`, `linkat02`, `renameat01`, `statx04`, `statx05`, `writev03`, `getdents01`, `readlink03`, `stat03`, and `stat03_64` retain visible TCONF/TFAIL/setup or semantic blockers; missing guest testcase binaries (`link01`, `link03`, `rename02`, `renameat02`, `unlink01`, `chmod02`, `readlink02`) are not evidence. None is blacklisted or counted as PASS.
+
+## Rename03/rename04 clean2 update
+
+A generic `axfs::root::rename` semantics repair grew the future pool without editing the stable list. The repair is not LTP-specific: destination replacement now checks source and destination object types before removal, allows directory-over-empty-directory replacement, preserves file-over-directory `EISDIR`, returns directory-over-file `ENOTDIR`, and treats an identical old/new path as success.
+
+Evidence:
+
+- RV rename targeted summary: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.summary.txt` — `rename01`, `rename03`, `rename04`, and `rename05` are parser-clean for musl+glibc; zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA rename targeted summary: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.summary.txt` — the same four rows are parser-clean for musl+glibc; zero internal markers or fatal signatures.
+- RV clean-only statfs/rename05 retarget summary: `target/ltp-1000-milestone-03-stable656/rv-statfs-rename05-clean-retarget-20260602T050521Z.summary.txt` — regenerates clean `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` evidence without mixing old `rename03/rename04` failures into the combined parser report.
+- Combined clean24 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt`.
+- Checksums: `target/ltp-1000-milestone-03-stable656/rename03-04-clean24-20260602T050630Z.derived.sha256`.
+
+Newly evidenced four-way-clean cases: `rename03` and `rename04`. Current pool: 24/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+The earlier VFS-C setup-device/TFAIL notes are superseded only for `rename03` and `rename04`; they remain historical repair context and are not counted as promotion evidence. `mknod07` and `mknodat02` remain outside the pool because they still require a generic ext2/device setup path.

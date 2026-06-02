@@ -1638,3 +1638,62 @@ LA: PASS LTP CASE 2, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, E
 Decision: `rename01` is now RV + LA x musl + glibc parser-clean and enters the future candidate pool. The pool becomes 22/50, still below the stable656 +50 gate, so `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 The RV scout's other rows are blocker evidence only. `statx01` and `getdents02` wrapper-PASS on RV but contain parser-visible `TCONF`, so they are not candidates. Hard-link/linkat rows retain visible ENOSYS/TCONF/setup blockers; `stat03`, `stat03_64`, `getdents01`, and `readlink03` retain real semantic `TFAIL` blockers; missing guest binaries are not counted.
+
+## `rename03`/`rename04` directory replacement proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=rename03,rename04,rename05,rename01 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=rename03,rename04,rename05,rename01 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs01,fstatfs01,fstatfs01_64,statvfs01,rename05 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+python3 scripts/ltp_summary.py --promotion-candidates <clean-only evidence logs>
+```
+
+Artifacts:
+
+- RV rename raw log: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.log`
+- RV rename summary: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.summary.txt`
+- RV rename JSON: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.summary.json`
+- LA rename raw log: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.log`
+- LA rename summary: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.summary.txt`
+- LA rename JSON: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.summary.json`
+- RV clean-only statfs/rename05 retarget raw log: `target/ltp-1000-milestone-03-stable656/rv-statfs-rename05-clean-retarget-20260602T050521Z.log`
+- RV clean-only statfs/rename05 retarget summary: `target/ltp-1000-milestone-03-stable656/rv-statfs-rename05-clean-retarget-20260602T050521Z.summary.txt`
+- Combined clean24 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/rename03-04-clean24-20260602T050630Z.derived.sha256`
+
+Parser result on RV rename targeted proof:
+
+```text
+PASS LTP CASE: 8
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Parser result on LA rename targeted proof:
+
+```text
+PASS LTP CASE: 8
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Parser result on RV clean-only statfs/rename05 retarget proof:
+
+```text
+PASS LTP CASE: 10
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Combined clean-only report result: 24 promotion candidates, 26 blocked/incomplete. `rename03` and `rename04` are the only newly added clean cases in this step. The stable list remains unchanged because the pool is still 24/50.

@@ -3,9 +3,9 @@
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axfs_vfs::{VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult};
-use axns::{ResArc, def_resource};
+use axns::{def_resource, ResArc};
 use axsync::Mutex;
 use core::array;
 use lazyinit::LazyInit;
@@ -496,9 +496,27 @@ pub(crate) fn set_current_dir(path: &str) -> AxResult {
 }
 
 pub(crate) fn rename(old: &str, new: &str) -> AxResult {
-    if parent_node_of(None, new).lookup(new).is_ok() {
-        warn!("dst file already exist, now remove it");
-        remove_file(None, new)?;
+    if old == new {
+        return Ok(());
+    }
+
+    let old_node = lookup(None, old)?;
+    let old_is_dir = old_node.get_attr()?.is_dir();
+
+    if let Ok(new_node) = parent_node_of(None, new).lookup(new) {
+        let new_is_dir = new_node.get_attr()?.is_dir();
+        match (old_is_dir, new_is_dir) {
+            (true, true) => {
+                warn!("dst dir already exist, now remove it");
+                remove_dir(None, new)?;
+            }
+            (true, false) => return Err(AxError::NotADirectory),
+            (false, true) => return Err(AxError::IsADirectory),
+            (false, false) => {
+                warn!("dst file already exist, now remove it");
+                remove_file(None, new)?;
+            }
+        }
     }
     parent_node_of(None, old).rename(old, new)
 }
