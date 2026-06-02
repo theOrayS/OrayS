@@ -1,15 +1,15 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint has thirty four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint has thirty five four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 30 (`epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
+- Current four-way-clean new candidate pool: 35 (`adjtimex01`, `adjtimex03`, `epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `shmat04`, `shmt04`, `signal01`, `sigaltstack02`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
-Because the 30-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
+Because the 35-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
 
 ## Blocking evidence kept visible
 
@@ -37,7 +37,7 @@ The following blockers prevent counting additional rows:
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `adjtimex01`, `adjtimex03`, `epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `shmat04`, `shmt04`, `signal01`, `sigaltstack02`, `stat03`, `stat03_64`, `statfs01`, `statvfs01` in `promotion-candidates.md` for the next accumulation batch.
 
 ## `epoll_create02` blocker update
 
@@ -46,7 +46,7 @@ The 2026-06-02 singleton rescout confirms `epoll_create02` remains non-promotabl
 - RV: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt` reports RV musl wrapper FAIL 33 with `TFAIL=2` and `ENOSYS=2`; RV glibc wrapper PASSes but still has `TCONF=1`.
 - LA: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` has wrapper PASS for both libcs but `TCONF=2` remains.
 
-Because the promotion gate requires wrapper PASS **and** parser-clean summaries on RV + LA x musl + glibc, this row is excluded from the candidate pool; after the later G009 clean4 update the pool was 14/50 before the LTP device/NAME_MAX clean5 update below.
+Because the 35-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
 
 
 ## G009 clean4 no-promotion update
@@ -138,3 +138,14 @@ The final-code RV/LA targeted reruns added two future candidates without crossin
 The newly clean cases are `epoll_create1_01` and `epoll_create1_02`, increasing the pool from 28/50 to 30/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 
 `epoll_create02` is explicitly not counted: glibc now reaches the corrected `size <= 0` EINVAL path, but musl's old `epoll_create(size)` wrapper reaches the kernel as `epoll_create1(0)`, which is valid for `epoll_create1_01`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.
+
+
+## shmat04 clean1 no-promotion update
+
+The 2026-06-02 generic `shmctl(IPC_STAT)` ABI repair added one future candidate without crossing the stable656 gate:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt`
+- Combined clean35 report: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`
+
+The newly clean case is `shmat04`, increasing the pool from 34/50 to 35/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.

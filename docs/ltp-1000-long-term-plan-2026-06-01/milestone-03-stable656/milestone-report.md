@@ -578,3 +578,27 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 16 cases short.
 - Maintenance caveat: `sigaltstack02` proves syscall-visible alternate-stack state and errno handling, not handler delivery on the alternate stack.
+
+
+## shmat04 IPC_STAT ABI clean1 checkpoint
+
+A generic SysV shm user-copy ABI repair converted `shmat04` into a future stable656 candidate without editing `LTP_STABLE_CASES`.
+
+Code change retained in this checkpoint:
+
+1. `examples/shell/src/uspace/sysv_shm.rs::sys_shmctl(IPC_STAT)` now writes a Linux 64-bit `shmid_ds`-compatible `#[repr(C)]` structure (112 bytes) through `write_user_value` instead of clearing a guessed 128-byte range. It records key/mode/requested-size metadata and avoids glibc stack-canary overwrite while keeping unsupported/full lifetime semantics explicit.
+
+Evidence:
+
+- RV targeted proof: `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt` — 4 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted proof: `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt` — 4 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Combined clean35 report: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`.
+- Audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean35-shmat04-ipcstat-abi-20260602T150918Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean case: `shmat04`.
+- Candidate pool: 35/50.
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 15 cases short.
+- Maintenance caveat: this checkpoint fixes the visible `IPC_STAT` user ABI size/layout boundary; it does not add full SysV shm attach refcount/lifetime reclamation.

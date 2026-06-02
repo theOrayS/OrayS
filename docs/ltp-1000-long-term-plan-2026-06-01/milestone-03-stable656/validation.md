@@ -1909,3 +1909,32 @@ LA: PASS LTP CASE 14, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, 
 Decision: `adjtimex01`, `adjtimex03`, `shmt04`, and `sigaltstack02` are RV + LA x musl + glibc parser-clean and enter the future candidate pool. Combined with the previous clean30 audit, the current not-yet-promoted pool is 34/50; stable list remains unchanged at `606/606/0`.
 
 Boundary: `sigaltstack` now records and reports alternate-stack state and errno validation, but signal delivery still uses the existing signal-frame path rather than switching to the alternate stack. Future signal-delivery work must not count this syscall-only proof as full alternate-stack delivery semantics.
+
+
+## shmat04 IPC_STAT ABI targeted validation
+
+Targeted commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=shmat04,shmt04 LTP_CASE_TIMEOUT_SECS=60 timeout 20m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=shmat04,shmt04 LTP_CASE_TIMEOUT_SECS=60 timeout 20m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la \
+  target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.log \
+  target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.log
+```
+
+Artifacts:
+
+- RV raw/summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.log`, `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.derived.sha256`.
+- LA raw/summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.log`, `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.derived.sha256`.
+- Combined promotion report/checksum: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`, `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.derived.sha256`.
+
+Parser summaries:
+
+```text
+RV: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+Combined: promotion candidates `shmat04` and already-counted `shmt04`, blocked/incomplete 0.
+```
+
+Decision: `shmat04` enters the future stable656 candidate pool. `shmt04` is revalidated but was already counted. Stable list remains unchanged at `606/606/0`; pool is 35/50.

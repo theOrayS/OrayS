@@ -333,3 +333,22 @@ Maintenance boundary: `sigaltstack` is currently syscall-state support, not full
 Regression evidence: `adjtimex01`, `adjtimex03`, `sigaltstack02`, and `shmt04` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.txt`). Adjacent time/signal stable subsets are parser-clean on both arches (`target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.txt`).
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 34/50 (`adjtimex01`, `adjtimex03`, `epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `shmt04`, `signal01`, `sigaltstack02`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
+
+
+## SysV shm IPC_STAT user ABI impact
+
+Changed file: `examples/shell/src/uspace/sysv_shm.rs`.
+
+User-visible behavior:
+
+- `shmctl(shmid, IPC_STAT, buf)` now copies a `#[repr(C)]` Linux 64-bit `shmid_ds`-compatible structure of 112 bytes instead of clearing `16 * sizeof(usize)` bytes (128 bytes on RV/LA). This prevents overwriting libc stack objects that allocate exactly `struct shmid_ds` while preserving normal successful metadata queries.
+- The copied structure exposes the segment key, mode bits from `shmget(..., shmflg)`, and the originally requested segment size. Other fields remain conservative zero values in the existing lightweight SysV shm model.
+- Invalid/null user buffers still return the existing user-copy `EFAULT` path through `write_user_value`; unsupported `shmctl` commands still return `EINVAL`.
+
+ABI/POSIX surface: syscall numbers and command constants are unchanged. The intentional visible ABI change is the user-memory copy layout/size for `IPC_STAT`, aligning it with Linux 64-bit `asm-generic` `shmid64_ds` used by RISC-V and LoongArch. FD, signal, futex, mmap, path, and scheduler behavior are unchanged.
+
+Lifetime/resource risk: this does not implement full SysV shm attach refcounting or reclamation. `shm_nattch` remains conservatively reported as 0 because the current process-local attachment map is cloned across fork without a global lifetime counter. Future SysV shm work must add a real cross-process refcount/free model before promoting stress/lifetime cases.
+
+Regression evidence: `shmat04` and already-counted `shmt04` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt`).
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 35/50.
