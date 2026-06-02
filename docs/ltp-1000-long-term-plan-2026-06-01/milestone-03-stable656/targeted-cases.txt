@@ -58,6 +58,9 @@ futex_wait03
 futex_wait05
 clone04
 # clone04 singleton rescout: RV glibc PASS, RV musl TBROK/SIGSEGV; non-promotable libc-wrapper boundary until fixed.
+mmap05
+munmap01
+# mmap05/munmap01 sync-SIGSEGV targeted run: munmap01 four-way clean; mmap05 RV-clean but LA TFAIL, non-promotable.
 
 ## Closed arch-sweep mining rows
 # Unit remains LTP case. The closed RV/LA arch matrices were mined as a whole;
@@ -85,6 +88,20 @@ statfs03_64
 statvfs02
 
 
+## Adjacent sync-SIGSEGV regression subset for munmap01 candidate
+mmap01
+mmap02
+mmap03
+mmap04
+mmap09
+mmap12
+signal03
+sigaction01
+rt_sigaction01
+rt_sigprocmask01
+sigprocmask01
+waitpid04
+
 ## Adjacent timer/futex regression subset for precise timed-wait fix
 futex_wait01
 futex_wait02
@@ -102,8 +119,9 @@ fsync02
 futex_wait01
 futex_wait03
 futex_wait05
+munmap01
 sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 5 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 6 new four-way-clean unique candidates are available, below the +50 milestone gate.

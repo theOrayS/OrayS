@@ -24,6 +24,12 @@ Files: `kernel/task/axtask/src/timers.rs`, `kernel/runtime/axruntime/src/lib.rs`
 
 Timed task wakeups whose timer-list deadline falls before the next 100Hz scheduler tick now program a one-shot hardware timer for the actual deadline. The runtime timer interrupt now preserves the next periodic scheduler tick deadline when an earlier precise timer fires, so repeated sub-tick waits cannot push the scheduler tick arbitrarily far into the future. This is a generic timer/lifetime fix; it does not inspect LTP case names, process names, paths, or outputs.
 
+### Catchable synchronous `SIGSEGV` for unmapped user faults
+
+Files: `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/signal_abi.rs`
+
+Unhandled user page faults now first check whether the current thread has an installed, unblocked user `SIGSEGV` handler and no signal frame/pending synchronous signal already in flight. If so, the kernel queues the existing user-signal delivery path and returns to user mode so the handler can run. If no catchable handler exists, or the signal is blocked/already pending, the existing fatal `SIGSEGV` exit-group behavior is preserved. The change is generic fault/signal handling; it does not inspect LTP case names, paths, process names, or outputs.
+
 ### Synthetic `/proc/<pid>/stat` sleeping-state reporting
 
 File: `examples/shell/src/uspace/synthetic_fs.rs`
@@ -51,6 +57,13 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 - The change is intentionally generic: it does not check LTP case names or paths, and it reflects the current synthetic filesystem's per-file capacity boundary.
 
 
+### User page faults / `SIGSEGV`
+
+- Syscall-visible behavior affected: memory accesses to unmapped user addresses after `mmap`/`munmap` can now deliver a catchable `SIGSEGV` when the process installed a handler.
+- Existing fatal behavior is preserved for default disposition, ignored/no handler, blocked signal, already-active signal frame, or already-pending synchronous signal cases.
+- Error numbers, syscall numbers, struct layouts, FD semantics, futex values, mmap return values, and user-pointer layouts are unchanged by this delivery-path repair.
+- Risk boundary: this relies on the existing `user_return_hook` signal-frame injection path; future changes must keep mmap/signal/wait regression subsets clean on RV and LA.
+
 ### `/proc/<pid>/stat`
 
 - User-visible file affected: `/proc/<pid>/stat` field 3 process state.
@@ -69,11 +82,11 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 5/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `sched_setaffinity01`).
+- Candidate pool after this checkpoint: 6/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `munmap01`, `sched_setaffinity01`).
 
 ## Behavior gaps exposed but not fixed
 
-1. `mmap05` / `munmap01`: likely recoverable user page-fault signal delivery gaps.
+1. `mmap05`: RV is now parser-clean, but LA musl+glibc still do not receive the expected `SIGSEGV`; treat as a LoongArch permission/protection-fault signal lane.
 2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
 3. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects syscall-visible `bufsiz == 0`. Source audit found musl rewrites user `bufsize == 0` into a dummy one-byte syscall, so preserving valid direct `readlinkat(..., bufsiz=1)` truncation semantics takes priority over a kernel special case.
 4. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.

@@ -16,9 +16,10 @@ Record the current post-stable606 candidate search state so later G009/G010 work
 | `futex_wait01` | RV isolated rerun + LA confirmation, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `futex_wait03` | RV/LA targeted reruns after synthetic `/proc/<pid>/stat` futex-sleeping repair, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `futex_wait05` | RV/LA targeted reruns after generic precise timer-list wakeup plus periodic tick preservation, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
+| `munmap01` | RV/LA targeted reruns after catchable synchronous `SIGSEGV` delivery for unmapped user faults, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `sched_setaffinity01` | RV/LA targeted postfix runs, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 
-Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.promotion-candidates.txt`.
+Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`.
 
 A stale combined report that included the old RV mixed scout still marks `fsync02` blocked because it contains the pre-fix glibc `TBROK`; do not use that artifact for current promotion accounting.
 
@@ -47,9 +48,10 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 | `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
 | `clone04` | RV glibc clean, but RV musl is killed by SIGSEGV/TBROK; raw log points to the upstream musl `clone.c` NULL-stack wrapper fix | keep blocked; classify libc-wrapper boundary first, then require RV musl closure plus clone/vfork/futex/signal/wait regressions before any LA rerun or promotion |
 | `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |
-| `mmap05` / `munmap01` / `mmap13` | SIGSEGV/SIGBUS delivery gaps | narrow mmap fault-signal lane with signal + mmap regressions |
+| `mmap05` | RV now clean, but LA musl+glibc still report `TFAIL=1` / SIGSEGV signal not received | LoongArch mmap/protection-fault signal lane; do not promote until LA is parser-clean |
+| `mmap13` | SIGBUS-on-EOF is still not delivered (`TFAIL`) | file-backed mmap/SIGBUS lane with VFS truncation and signal regressions |
 | `shmat1` | long/hung mixed scout | SysV shm/resource lifetime lane, isolated timeout first |
 
 ## Promotion decision
 
-No `LTP_STABLE_CASES` edit is justified. The candidate pool is 5/50 for stable656, and all blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.
+No `LTP_STABLE_CASES` edit is justified. The candidate pool is 6/50 for stable656, and all blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.

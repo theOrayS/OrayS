@@ -85,12 +85,46 @@ Regression evidence:
 - Result: 20/20 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 - Caveat: two earlier LA attempts (`la-timer-futex-regression-20260601T234109Z` and `la-timer-futex-regression-20260601T234340Z`) were terminated and are not counted; the second exposed the periodic-deadline drift fixed here.
 
+
+## Completed regression for catchable synchronous `SIGSEGV` delivery
+
+Changed surfaces: `examples/shell/src/uspace/memory_map.rs` user page-fault handling and `examples/shell/src/uspace/signal_abi.rs` synchronous signal queueing helper.
+
+Targeted proof:
+
+- RV `mmap05,munmap01`: `target/ltp-1000-milestone-03-stable656/rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.summary.txt`
+- LA `mmap05,munmap01`: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
+
+Result: `munmap01` is four-way parser-clean and joins the not-yet-promoted candidate pool. `mmap05` is RV-clean but remains blocked because LA musl and LA glibc both report `TFAIL=1` / SIGSEGV signal not received.
+
+Adjacent stable regression subset:
+
+- `mmap01`
+- `mmap02`
+- `mmap03`
+- `mmap04`
+- `mmap09`
+- `mmap12`
+- `signal03`
+- `sigaction01`
+- `rt_sigaction01`
+- `rt_sigprocmask01`
+- `sigprocmask01`
+- `waitpid04`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-sync-sigsegv-regression-20260602T002800Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-sync-sigsegv-regression-20260602T003046Z.summary.txt`
+- Result: 24/24 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
 ## If fixing recoverable user SIGSEGV / page-fault signal delivery
 
 Primary retest cases:
 
 - `mmap05`
-- `munmap01`
+- `munmap01` (now four-way clean; keep here only for future regressions around this signal path)
 
 Adjacent stable/regression candidates:
 
