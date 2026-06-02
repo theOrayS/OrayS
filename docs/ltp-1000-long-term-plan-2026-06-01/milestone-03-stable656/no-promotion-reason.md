@@ -159,3 +159,13 @@ The 2026-06-02 time/timer scout and LA confirmation added three future candidate
 - Combined clean38 report: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`
 
 The newly clean cases are `getitimer02`, `setitimer02`, and `times03`, increasing the pool from 35/50 to 38/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.
+
+## lstat clean2 no-promotion update
+
+The 2026-06-02 VFS/path scout and LA confirmation added two future candidates without crossing the stable656 gate:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-simple-scout-20260602T153210+0800.summary.txt`
+- LA confirmation summary: `target/ltp-1000-milestone-03-stable656/la-lstat-clean2-20260602T153351+0800.summary.txt`
+- Combined clean40 report: `target/ltp-1000-milestone-03-stable656/combined-lstat-clean2-20260602T153433+0800.promotion-candidates.txt`
+
+The newly clean cases are `lstat02` and `lstat02_64`, increasing the pool from 38/50 to 40/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.

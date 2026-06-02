@@ -565,3 +565,15 @@ Targeted proof:
 Result: `getitimer02`, `setitimer02`, and `times03` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap on the counted rows.
 
 No source changed in this checkpoint, so no behavior-regression subset was required beyond the RV/LA targeted proof. The surrounding RV scout rows remain a visible blocker matrix for future timer work: `clock_getres01` has TCONF, `clock_gettime01` and `setitimer01` timeout, and timerfd/POSIX timer rows retain ENOSYS/TBROK/TFAIL/TCONF blockers.
+
+## lstat clean2 evidence matrix
+
+Targeted proof:
+
+- RV VFS/path scout: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-simple-scout-20260602T153210+0800.summary.txt`
+- LA lstat clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-lstat-clean2-20260602T153351+0800.summary.txt`
+- Combined promotion report: `target/ltp-1000-milestone-03-stable656/combined-lstat-clean2-20260602T153433+0800.promotion-candidates.txt`
+
+Result: `lstat02` and `lstat02_64` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap on the counted rows.
+
+No source changed in this checkpoint, so no behavior-regression subset was required beyond the RV/LA targeted proof. The surrounding RV scout rows remain a visible blocker matrix for future VFS/path work.

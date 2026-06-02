@@ -623,3 +623,24 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 12 cases short.
 - Remaining blockers from this scout keep visible parser caveats and must not be counted until fixed and revalidated.
+
+## lstat clean2 checkpoint
+
+A VFS/path scout found two already-generic `lstat` rows that are clean enough for the future stable656 pool without any source edit.
+
+Code changes retained in this checkpoint: none.
+
+Evidence:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-simple-scout-20260602T153210+0800.summary.txt` — 5 PASS / 39 FAIL across musl+glibc; `lstat02` and `lstat02_64` are the only parser-clean RV candidates.
+- LA confirmation: `target/ltp-1000-milestone-03-stable656/la-lstat-clean2-20260602T153351+0800.summary.txt` — 4 PASS / 0 FAIL for the two candidates, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Combined RV+LA report: `target/ltp-1000-milestone-03-stable656/combined-lstat-clean2-20260602T153433+0800.promotion-candidates.txt` — 2 candidates and 20 blocked/incomplete rows.
+- Combined clean40 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean40-lstat-clean2-20260602T153433Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `lstat02`, `lstat02_64`.
+- Candidate pool: 40/50.
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 10 cases short.
+- Remaining VFS/path rows from this scout keep visible parser caveats and must not be counted until fixed and revalidated.
