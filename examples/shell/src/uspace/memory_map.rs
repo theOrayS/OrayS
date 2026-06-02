@@ -414,14 +414,45 @@ pub(super) fn sys_mincore(process: &UserProcess, addr: usize, len: usize, vec: u
     }
     let aspace = process.aspace.lock();
     for page in PageIter4K::new(VirtAddr::from(addr), VirtAddr::from(end)).unwrap() {
-        if aspace.page_table().query(page).is_err() {
+        let query = aspace.query_address(page);
+        if !query.area_found {
             return neg_errno(LinuxError::ENOMEM);
         }
-        residency.push(1);
+        residency.push(u8::from(query.pte_mapped || query.shared_metadata));
     }
     drop(aspace);
 
     write_user_bytes(process, vec, residency.as_slice()).map_or_else(neg_errno, |_| 0)
+}
+
+pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize {
+    if len == 0 {
+        return 0;
+    }
+    let start = align_down(addr, PAGE_SIZE_4K);
+    let Some(raw_end) = addr.checked_add(len) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if end <= start || end > USER_STACK_TOP {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+
+    let mut aspace = process.aspace.lock();
+    for page in PageIter4K::new(VirtAddr::from(start), VirtAddr::from(end)).unwrap() {
+        if !aspace.query_address(page).area_found {
+            return neg_errno(LinuxError::ENOMEM);
+        }
+    }
+    if aspace
+        .populate_range(VirtAddr::from(start), end - start, PageFaultFlags::READ)
+        .is_err()
+    {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+    0
 }
 
 pub(super) fn sys_mprotect(

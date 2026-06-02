@@ -6,10 +6,10 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean10-mincore03-mincore-mlock-20260602T032401Z.promotion-candidates.txt`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Promotion candidates: 9
+- Promotion candidates: 10
 - Blocked/incomplete cases in this clean proof set: 1 (`mmap05`, LA `TFAIL`)
 
 | Case | Evidence | Decision |
@@ -18,6 +18,7 @@ Clean combined parser report:
 | `futex_wait01` | RV isolated rerun plus LA confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `futex_wait03` | after synthetic `/proc/<pid>/stat` reports futex waiters as sleeping, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `futex_wait05` | after generic sub-tick timer-list wakeups plus preserving the periodic tick deadline, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `mincore03` | after `mincore` distinguishes valid lazy VMA pages from unmapped pages and `mlock` prefaults mapped ranges, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `munmap01` | after catchable synchronous `SIGSEGV` delivery for unmapped user faults, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `mmap13` | after generic file-backed mmap beyond-EOF pages are protected and translated to catchable `SIGBUS`, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `openat02` | after generic POSIX-layer sparse logical-size/data handling for large file holes, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
@@ -35,10 +36,11 @@ Clean combined parser report:
 - `rv-mmap13-sigbus-final-20260602T012111Z.log` and `la-mmap13-sigbus-final-20260602T012141Z.log` provide the current `mmap13` proof; adjacent mmap/signal regression summaries are `rv-mmap13-sigbus-regression-20260602T011329Z.summary.txt` and `la-mmap13-sigbus-regression-20260602T011433Z.summary.txt`.
 - `rv-openat02-sparse-largefile-20260602T014202Z.log` and `la-openat02-sparse-largefile-20260602T014245Z.log` provide the current `openat02` proof; adjacent VFS/FD regression summaries are `rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.summary.txt` and `la-openat02-adjacent-stable-clean-regression-20260602T014545Z.summary.txt`. The earlier `rv-openat02-post-statfs-scout-20260601T231156Z.log` remains pre-fix blocker history only.
 - `rv-signal01-poll-wait-20260602T024843Z.log` and `la-signal01-poll-wait-20260602T024926Z.log` provide the current `signal01` proof; adjacent signal/poll/proc regression summaries are `rv-signal-poll-regression-20260602T025025Z.summary.txt` and `la-signal-poll-regression-20260602T025204Z.summary.txt`. The interrupted `rv-signal01-proc-sleep-20260602T024336Z.log` is obsolete non-countable repair history only.
+- `rv-mincore03-mincore-mlock-20260602T032124Z.log` and `la-mincore03-mincore-mlock-20260602T032208Z.log` provide the current `mincore03` proof; adjacent mincore/mlock/mmap regression summaries are `rv-mincore03-adjacent-regression-20260602T032259Z.summary.txt` and `la-mincore03-adjacent-regression-20260602T032401Z.summary.txt`. The earlier mixed scout `mincore03` `TBROK` rows are pre-fix blocker history only.
 
 ## Blocked / incomplete rows outside the clean pool
 
-`readlinkat02` is RV-clean and LA-glibc-clean but LA musl still has `TFAIL`, so it is not eligible. The current root-cause audit treats it as a libc/test boundary: musl converts user `bufsize == 0` into a one-byte dummy syscall, and a kernel-side `bufsiz=1` special case would break valid Linux truncation semantics. `clone04` is RV glibc-clean but RV musl is killed by SIGSEGV/TBROK; the singleton log points to a musl `clone.c` wrapper boundary, so it stays outside the clean pool. `mmap05` remains blocked on LA musl+glibc `TFAIL` even though RV is clean. `nice05`, `mincore03`, `shmat1`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `select02`, and `execve05` remain blocked or incomplete for the reasons in `validation.md` and the historical combined/scout reports. The pre-fix `fsync02` `TBROK` row is superseded by post-fix proof, but the old log remains documented as failed evidence.
+`readlinkat02` is RV-clean and LA-glibc-clean but LA musl still has `TFAIL`, so it is not eligible. The current root-cause audit treats it as a libc/test boundary: musl converts user `bufsize == 0` into a one-byte dummy syscall, and a kernel-side `bufsiz=1` special case would break valid Linux truncation semantics. `clone04` is RV glibc-clean but RV musl is killed by SIGSEGV/TBROK; the singleton log points to a musl `clone.c` wrapper boundary, so it stays outside the clean pool. `mmap05` remains blocked on LA musl+glibc `TFAIL` even though RV is clean. `nice05`, `shmat1`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `select02`, and `execve05` remain blocked or incomplete for the reasons in `validation.md` and the historical combined/scout reports. The pre-fix `fsync02` `TBROK` row is superseded by post-fix proof, but the old log remains documented as failed evidence.
 
 ## Closed arch-sweep mining result
 
@@ -50,7 +52,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 9.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 10.
 
 ## `openat03` non-candidate note
 

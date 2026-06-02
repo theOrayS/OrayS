@@ -893,7 +893,7 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
 - At this point in the evidence timeline, the clean candidate pool was 7/50 for stable656.
-- No `LTP_STABLE_CASES` edit was made because 43 more four-way-clean unique cases were still required.
+- No `LTP_STABLE_CASES` edit was made at that historical checkpoint because 43 more four-way-clean unique cases were still required; later `openat02`, `signal01`, and `mincore03` evidence supersedes the current pool count to 10/50.
 - Counted targeted and regression summaries for `mmap13` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix and TTY-aborted RV logs remain visible as non-countable history.
 
 
@@ -1044,7 +1044,7 @@ panic/trap matches: 0
 
 Observed LTP marker: `openat03.c:56: O_TMPFILE not supported`; wrapper status remains FAIL code 32 for both musl and glibc on RV and LA. This evidence is intentionally non-promotable because the parser sees `TCONF`, but it closes the safety claim that unsupported `O_TMPFILE` no longer causes panic/trap in the targeted RV/LA runs.
 
-Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after the later `signal01` repair below, the current pool is 9/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after later `signal01` and `mincore03` repairs below, the current pool is 10/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 ## `signal01` signal/poll sleeping-state proof
 
@@ -1164,3 +1164,78 @@ Case-matrix observation:
 - The following RV glibc group starts with the reduced free-frame count and immediately panics in the allocator: `memory allocation of 262144 bytes failed`.
 
 Decision: `kill10` is isolated as a severe cleanup/resource-lifetime blocker. A temporary generic `poll`/`ppoll` exit-group cleanup hypothesis was tested and rejected because the same timeout, persistent frame leak, and glibc allocator panic remained. The temporary source edit was removed, and no `kill10` evidence is eligible for promotion.
+
+
+## `mincore03` mincore/mlock residency proof
+
+The earlier mixed RV scout showed `mincore03` as non-promotable because both libcs hit `TBROK` with `mincore failed: ENOMEM`. The retained repair is generic: `mincore(2)` now treats pages inside an existing lazy VMA as valid but non-resident until a PTE/shared mapping exists, while `mlock(2)` validates and prefaults mapped ranges.
+
+Targeted commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mincore03 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mincore03 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-mincore03-mincore-mlock-20260602T032124Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mincore03-mincore-mlock-20260602T032124Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-mincore03-mincore-mlock-20260602T032124Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-mincore03-mincore-mlock-20260602T032124Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-mincore03-mincore-mlock-20260602T032208Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mincore03-mincore-mlock-20260602T032208Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-mincore03-mincore-mlock-20260602T032208Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-mincore03-mincore-mlock-20260602T032208Z.derived.sha256`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean10-mincore03-mincore-mlock-20260602T032401Z.promotion-candidates.txt`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
+
+Decision: `mincore03` is now RV + LA x musl + glibc parser-clean and enters the future candidate pool. Stable list remains unchanged until the +50 milestone gate is met.
+
+Evidence hygiene note: the raw `.log` files include an automatically appended `# LTP summary` block after the guest output. Fresh parser spot-checks use the pre-summary guest-output segment (or the generated `.summary.txt`) so summary-table headings are not double-counted as raw testcase output.
+
+## Adjacent mincore/mlock/mmap regression subset
+
+Cases: `mincore01,mlock01,mlock03,mlock04,munlock01,mlockall01,mmap01,mmap02,mmap03,mmap04`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mincore01,mlock01,mlock03,mlock04,munlock01,mlockall01,mmap01,mmap02,mmap03,mmap04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mincore01,mlock01,mlock03,mlock04,munlock01,mlockall01,mmap01,mmap02,mmap03,mmap04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 20
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: the adjacent mincore/mlock/mmap subset did not regress on RV or LA. The current clean candidate pool is 10/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.

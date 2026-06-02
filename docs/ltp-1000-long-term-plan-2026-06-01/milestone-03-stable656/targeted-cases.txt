@@ -129,7 +129,7 @@ sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 9 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 10 new four-way-clean unique candidates are available, below the +50 milestone gate.
 
 ## File-backed mmap SIGBUS-on-EOF targeted proof
 mmap13
@@ -225,6 +225,35 @@ fsync02
 futex_wait01
 futex_wait03
 futex_wait05
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+signal01
+
+
+## mincore03 mincore/mlock targeted proof
+mincore03
+# mincore03 proof: RV/LA x musl/glibc clean after generic mincore lazy-VMA validity/residency handling and mlock mapped-range prefault; not promoted until +50 batch.
+
+## Adjacent mincore/mlock/mmap regression subset for mincore03
+mincore01
+mlock01
+mlock03
+mlock04
+munlock01
+mlockall01
+mmap01
+mmap02
+mmap03
+mmap04
+
+## Four-way clean candidate pool after mincore03 mincore/mlock repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore03
 mmap13
 munmap01
 openat02
