@@ -186,3 +186,18 @@ mmap13
 munmap01
 openat02
 sched_setaffinity01
+
+## O_TMPFILE/openat03 blocker validation
+openat03
+# Rejected O_TMPFILE/linkat emulation: RV openat03 panic/trap in deep nested-directory phase; not promotable.
+# Retained generic unsupported gate: RV/LA x musl/glibc deterministic TCONF/wrapper FAIL with zero timeout/ENOSYS/panic/trap; not promotable.
+
+## Four-way clean candidate pool after openat03 unsupported-gate validation (unchanged; not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+openat02
+sched_setaffinity01

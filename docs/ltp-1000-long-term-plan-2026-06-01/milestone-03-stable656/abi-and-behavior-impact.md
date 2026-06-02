@@ -104,6 +104,16 @@ User-visible behavior affected: generic large sparse regular files can now be cr
 
 Maintenance boundary: sparse metadata is currently maintained in the process-level POSIX emulation state and copied across fork/clone, not in the underlying filesystem. Future work that needs cross-process persistence must move this into a shared file/inode-level abstraction and rerun VFS/FD/mmap regressions. The implementation is generic and does not inspect LTP case names, paths, processes, or outputs.
 
+### `O_TMPFILE` unsupported-gate behavior
+
+Files: `examples/shell/src/uspace/fd_table.rs`
+
+Syscall-visible behavior affected: `open`/`openat` flag handling for `O_TMPFILE`. Before this checkpoint, `O_TMPFILE` could be partially interpreted through its `O_DIRECTORY` bit and proceed into ordinary directory-open paths. The retained generic gate now rejects unsupported anonymous temporary-file creation explicitly: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP` (`ENOTSUP` as observed by LTP). Missing path candidates still propagate the ordinary missing-path error through the existing candidate selection logic.
+
+No real anonymous inode, linkable unnamed file, or `linkat(AT_EMPTY_PATH)` materialization is implemented here. Error numbers for ordinary non-`O_TMPFILE` opens, FD allocation, close-on-exec handling, file status flags, signal delivery, futex behavior, mmap layout, struct layout, and user-pointer ABI are unchanged. The change is intentionally generic and does not inspect any LTP case name, path, process, or output.
+
+Promotion boundary: current `openat03` RV/LA targeted summaries are deterministic and panic-free but contain `TCONF`/wrapper FAIL, so they are non-promotable. Real promotion requires a generic `O_TMPFILE` design plus deep-directory VFS stability evidence and adjacent open/link/unlink/rename regression gates on RV and LA.
+
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
@@ -117,6 +127,7 @@ Maintenance boundary: sparse metadata is currently maintained in the process-lev
 4. `clone04`: RV glibc confirms the kernel/glibc path returns `EINVAL` for a NULL stack, but RV musl is killed by SIGSEGV/TBROK before a clean wrapper PASS. No code change was made; treat it as a libc-wrapper boundary until a generic clone ABI fix can be proven without regressing clone/vfork/futex/wait behavior.
 5. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
 6. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
+7. `openat03`: real `O_TMPFILE` support remains absent; a rejected emulation/linkat attempt panicked on RV during nested-directory creation, while the retained generic gate reports unsupported semantics as `TCONF`/wrapper FAIL without panic.
 
 ## Maintenance boundary
 

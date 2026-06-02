@@ -982,3 +982,66 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 - Current clean candidate pool is 8/50 for stable656.
 - No `LTP_STABLE_CASES` edit is made because 42 more four-way-clean unique cases are still required.
 - Counted targeted and regression summaries for `openat02` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix RV scout remains visible as non-countable history.
+
+## `openat03` O_TMPFILE unsupported-gate blocker
+
+Context: a larger in-memory `O_TMPFILE`/`linkat` implementation was attempted, but RV `openat03` hit a kernel panic/trap during the testcase's deep nested-directory phase. That patch was rejected and removed. The retained source change is a minimal generic `O_TMPFILE` gate in `open_candidates`: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP` instead of accidentally handing out a directory fd.
+
+Build command:
+
+```bash
+make A=examples/shell ARCH=riscv64
+```
+
+Build result: success; both `kernel-rv` and `kernel-la` were produced, with only pre-existing vendor/axnet warnings.
+
+Rejected implementation evidence:
+
+- RV panic summary: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-20260602T021349Z.summary.txt`
+- RV trace panic summary: `target/ltp-1000-milestone-03-stable656/rv-openat03-trace-20260602T022058Z.summary.txt`
+
+Parser result for each rejected RV run:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 1
+```
+
+The trace run reached `openat03` test02 nested directory creation (`tst02_49`) before the supervisor page fault, so this is treated as a VFS/deep-directory robustness blocker, not as promotion evidence.
+
+Retained unsupported-gate validation commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat03 LTP_CASE_TIMEOUT_SECS=120 timeout 25m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat03 LTP_CASE_TIMEOUT_SECS=120 timeout 25m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-enotsup-20260602T022658Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-enotsup-20260602T022658Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-openat03-otmpfile-enotsup-20260602T022748Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-openat03-otmpfile-enotsup-20260602T022748Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-openat03-otmpfile-enotsup-20260602T022748Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 2
+Internal TFAIL/TBROK/TCONF: 4 ({'TCONF': 4})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Observed LTP marker: `openat03.c:56: O_TMPFILE not supported`; wrapper status remains FAIL code 32 for both musl and glibc on RV and LA. This evidence is intentionally non-promotable because the parser sees `TCONF`, but it closes the safety claim that unsupported `O_TMPFILE` no longer causes panic/trap in the targeted RV/LA runs.
+
+Decision: `openat03` is not added to the candidate pool. Candidate pool remains 8/50 for stable656, and `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.

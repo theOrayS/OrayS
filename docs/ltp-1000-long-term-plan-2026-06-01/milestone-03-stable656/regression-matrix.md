@@ -270,3 +270,21 @@ Regression evidence:
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.summary.txt`
 - Result: 22/22 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 - Caveat: `rv-openat02-adjacent-stable-regression-20260602T014338Z.summary.txt` additionally included `read02`, which wrapper-PASSed but emitted existing O_DIRECT `TCONF`; that 12-case shard is not counted as parser-clean evidence.
+
+## `openat03` O_TMPFILE unsupported-gate blocker
+
+Changed surface: `examples/shell/src/uspace/fd_table.rs` `open_candidates` handling for `O_TMPFILE` flags.
+
+Rejected implementation evidence:
+
+- RV panic summary: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-20260602T021349Z.summary.txt`
+- RV trace panic summary: `target/ltp-1000-milestone-03-stable656/rv-openat03-trace-20260602T022058Z.summary.txt`
+- Result: both runs have `panic/trap matches: 1`; the implementation was removed and is not promotion evidence.
+
+Retained unsupported-gate targeted evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`
+- Result: both arches run musl+glibc to deterministic `TCONF=4` / wrapper FAIL with zero timeout, ENOSYS, panic, or trap.
+
+Regression decision: no stable regression subset is counted from this blocker because `openat03` remains unsupported and non-promotable. Before revisiting, require a design for real generic `O_TMPFILE`/link materialization plus adjacent VFS cases around open/openat/link/linkat/unlink/rename/deep directory handling on RV and LA.

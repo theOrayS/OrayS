@@ -270,3 +270,11 @@ Clean combined parser report:
 - Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
 
 Stable list remains unchanged at `606/606/0`; the current pool is 8/50, below the +50 stable656 gate.
+
+### `openat03` O_TMPFILE unsupported-gate blocker
+
+A broader in-memory `O_TMPFILE`/`linkat` emulation was attempted and rejected: RV `openat03` panicked during the deep nested-directory phase, so the patch was removed rather than hidden or counted. Evidence is retained at `rv-openat03-otmpfile-20260602T021349Z.summary.txt` and `rv-openat03-trace-20260602T022058Z.summary.txt`, both with `panic/trap matches: 1`.
+
+The retained source change is only a generic unsupported-feature gate in `fd_table.rs`: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP` instead of accidentally returning a directory fd through the `O_DIRECTORY` bit. Targeted RV and LA summaries (`rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`, `la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`) now show zero timeout, ENOSYS, panic, or trap, but they still contain `TCONF=4` and wrapper FAIL for musl+glibc.
+
+Decision: this is honest blocker evidence only. `openat03` is not in the candidate pool; the pool remains 8/50, stable list remains `606/606/0`, and a future attempt must first solve real generic `O_TMPFILE` semantics plus the deep-directory VFS panic.
