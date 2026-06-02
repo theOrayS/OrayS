@@ -81,6 +81,7 @@ struct UserProcess {
     nice: AtomicI32,
     signal_actions: Mutex<BTreeMap<usize, general::kernel_sigaction>>,
     path_modes: Mutex<BTreeMap<String, u32>>,
+    path_inodes: Mutex<BTreeMap<String, u64>>,
     path_special_modes: Mutex<BTreeMap<String, u32>>,
     path_rdevs: Mutex<BTreeMap<String, u64>>,
     path_owners: Mutex<BTreeMap<String, (u32, u32)>>,

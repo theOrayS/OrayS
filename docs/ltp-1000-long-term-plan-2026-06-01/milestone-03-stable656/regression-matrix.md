@@ -437,3 +437,27 @@ No source change was retained for this evidence-only checkpoint, so no adjacent 
 - Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`.
 
 Result: `fcntl15` and `fcntl11_64` join the not-yet-promoted candidate pool. Future fixes for blocked fcntl rows must first make RV parser-clean, then rerun LA confirmation plus adjacent fcntl/FD/lock regression subsets before any promotion accounting.
+
+## Completed regression for rename metadata/inode preservation
+
+Changed surfaces: `examples/shell/src/uspace/mod.rs`, `examples/shell/src/uspace/process_lifecycle.rs`, `examples/shell/src/uspace/metadata.rs`, and `examples/shell/src/uspace/fd_table.rs` path metadata tracking plus successful `renameat2(flags=0)` metadata migration.
+
+Targeted proof:
+
+- RV `rename01`: `target/ltp-1000-milestone-03-stable656/rv-rename01-inode-confirm-20260602T044855Z.summary.txt`
+- LA `rename01`: `target/ltp-1000-milestone-03-stable656/la-rename01-inode-confirm-20260602T044855Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`
+
+Result: `rename01` is four-way parser-clean and joins the not-yet-promoted candidate pool.
+
+Adjacent regression subset:
+
+- `rename05`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-rename-inode-retarget-20260602T044708Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-rename-inode-retarget-20260602T044751Z.summary.txt`
+- Result: `rename01,rename05` produce 4/4 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Remaining regression boundary: this does not implement `link(2)` or full hard-link/nlink semantics. Future link/rename fixes must first make RV parser-clean, then rerun LA confirmation plus adjacent `rename01`, `rename05`, link/linkat, stat/statx, and unlink regression subsets before any promotion accounting.

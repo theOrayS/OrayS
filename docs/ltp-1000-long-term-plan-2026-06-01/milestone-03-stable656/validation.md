@@ -1563,3 +1563,78 @@ Suite summaries: ltp-musl 2 passed / 0 failed; ltp-glibc 2 passed / 0 failed
 Decision: `fcntl15` and `fcntl11_64` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The pool becomes 21/50, still below the stable656 +50 gate, so `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 The rest of the RV scout is blocker evidence only: `fcntl17` timed out for both libcs; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` retain `TCONF`; `fcntl27` and `fcntl31` retain `TFAIL`; `fcntl34`, `fcntl38`, and `fcntl39` retain `TBROK`. These rows were not LA-confirmed and are not counted.
+
+## VFS/path scout and rename inode confirmation
+
+Date: 2026-06-02. This checkpoint first ran a broad RV VFS/path scout, then retained a generic rename metadata fix after `rename01` exposed non-preserved inode numbers across successful `rename()`.
+
+RV scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=link01,link02,link03,link04,link05,linkat01,linkat02,rename01,rename02,renameat01,renameat02,stat03,stat03_64,statx01,statx04,statx05,getdents01,getdents02,unlink01,readlink03,writev03,chmod02,readlink02 LTP_CASE_TIMEOUT_SECS=90 timeout 50m ./run-eval.sh rv
+```
+
+Targeted confirmation commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=rename01,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=rename01,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=rename01 LTP_CASE_TIMEOUT_SECS=90 timeout 20m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=rename01 LTP_CASE_TIMEOUT_SECS=90 timeout 20m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV scout raw log: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-link-statx-scout-20260602T044314Z.log`
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-link-statx-scout-20260602T044314Z.summary.txt`
+- RV scout JSON/checksums/promotion report: `rv-vfs-path-link-statx-scout-20260602T044314Z.summary.json`, `rv-vfs-path-link-statx-scout-20260602T044314Z.derived.sha256`, `rv-vfs-path-link-statx-scout-20260602T044314Z.promotion-candidates.txt`
+- RV rename01+rename05 regression summary: `target/ltp-1000-milestone-03-stable656/rv-rename-inode-retarget-20260602T044708Z.summary.txt`
+- LA rename01+rename05 regression summary: `target/ltp-1000-milestone-03-stable656/la-rename-inode-retarget-20260602T044751Z.summary.txt`
+- RV rename01 singleton summary: `target/ltp-1000-milestone-03-stable656/rv-rename01-inode-confirm-20260602T044855Z.summary.txt`
+- LA rename01 singleton summary: `target/ltp-1000-milestone-03-stable656/la-rename01-inode-confirm-20260602T044855Z.summary.txt`
+- Combined clean22 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`
+
+RV scout parser summary:
+
+```text
+PASS LTP CASE: 4
+FAIL LTP CASE: 42
+Internal TFAIL/TBROK/TCONF: 79 ({'TFAIL': 53, 'TCONF': 26})
+timeout matches: 0
+ENOSYS/not implemented matches: 34
+panic/trap matches: 0
+Suite summaries: ltp-musl 2 passed / 21 failed; ltp-glibc 2 passed / 21 failed
+```
+
+RV rename01+rename05 regression parser summary:
+
+```text
+PASS LTP CASE: 4
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+LA rename01+rename05 regression parser summary:
+
+```text
+PASS LTP CASE: 4
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+RV/LA rename01 singleton summaries:
+
+```text
+RV: PASS LTP CASE 2, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 2, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Decision: `rename01` is now RV + LA x musl + glibc parser-clean and enters the future candidate pool. The pool becomes 22/50, still below the stable656 +50 gate, so `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+The RV scout's other rows are blocker evidence only. `statx01` and `getdents02` wrapper-PASS on RV but contain parser-visible `TCONF`, so they are not candidates. Hard-link/linkat rows retain visible ENOSYS/TCONF/setup blockers; `stat03`, `stat03_64`, `getdents01`, and `readlink03` retain real semantic `TFAIL` blockers; missing guest binaries are not counted.

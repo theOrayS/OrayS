@@ -222,3 +222,20 @@ No source change is retained for the 2026-06-02 FD/fcntl scout. The artifact rec
 Visible ABI/POSIX impact from this documentation update: none. Syscall numbers, errno behavior, file-lock/OFD-lock semantics, FD ownership/lease behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint.
 
 Future fcntl work must remain generic. In particular, `fcntl17` needs lock/wakeup timeout diagnosis; `fcntl24`/`fcntl25`/`fcntl26` need a non-tmpfs or generic lease-capable setup path before TCONF can disappear; `fcntl27`, `fcntl31`, and `fcntl34` need real lease/owner/OFD-lock semantics; `fcntl38`/`fcntl39` need a generic kconfig/capability boundary decision. None of these blocker rows is promotion evidence.
+
+## Rename metadata/inode preservation impact
+
+Files: `examples/shell/src/uspace/mod.rs`, `examples/shell/src/uspace/process_lifecycle.rs`, `examples/shell/src/uspace/metadata.rs`, `examples/shell/src/uspace/fd_table.rs`.
+
+The POSIX emulation layer now records per-path inode overrides and migrates recorded metadata when `renameat2(..., flags=0)` succeeds. Before this change, stat-style `st_ino` values were derived from the pathname hash, so a successful `rename(old, new)` made the same file or directory appear to have a different inode. The new path metadata migration preserves the old object's inode at the new path and also moves recorded mode, owner, special-device, symlink, xattr, and sparse-file metadata while clearing stale target-side recorded metadata when appropriate.
+
+User-visible behavior:
+
+- `stat()`/`fstatat()`/statx-derived inode values for a file or directory now remain stable across successful `rename()` within the current process metadata model.
+- `unlinkat()` removes recorded inode metadata for deleted paths, avoiding stale inode overrides for later unrelated creations.
+- No syscall numbers, struct layouts, flag constants, FD allocation rules, signal/futex/mmap/user-pointer layouts, or block-device semantics changed.
+- This is still not hard-link support: `link(2)`/`linkat(2)` remain generic blockers where the underlying implementation is absent or setup emits parser-visible TCONF/ENOSYS.
+
+Regression evidence: `rename01` and adjacent existing candidate `rename05` are parser-clean on RV and LA for musl+glibc after the change (`rv-rename-inode-retarget-20260602T044708Z.summary.txt`, `la-rename-inode-retarget-20260602T044751Z.summary.txt`). Singleton `rename01` proof is also parser-clean on RV and LA (`rv-rename01-inode-confirm-20260602T044855Z.summary.txt`, `la-rename01-inode-confirm-20260602T044855Z.summary.txt`).
+
+Maintenance boundary: this is a generic metadata-lifetime fix, not an LTP case/path/output special case. Future rename/link work must preserve Linux/POSIX visible errno and inode/link-count semantics and must not emulate hard links by copying data without proving shared object identity and nlink behavior.

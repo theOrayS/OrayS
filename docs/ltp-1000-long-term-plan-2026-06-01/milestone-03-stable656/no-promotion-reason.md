@@ -102,3 +102,15 @@ The 2026-06-02 RV fcntl scout plus LA confirmation added two future candidates w
 The newly clean cases are `fcntl11_64` and `fcntl15`, increasing the pool from 19/50 to 21/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 
 The same RV scout keeps remaining fcntl rows visible and non-promotable: `fcntl17` timeout; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` TCONF; `fcntl27` and `fcntl31` TFAIL; `fcntl34`, `fcntl38`, and `fcntl39` TBROK. No blacklist/SKIP/status0/TCONF/TBROK/TFAIL/timeout row is counted.
+
+## Rename01 clean1 no-promotion update
+
+The 2026-06-02 rename metadata/inode fix added one future candidate without crossing the stable656 gate:
+
+- RV rename01 singleton summary: `target/ltp-1000-milestone-03-stable656/rv-rename01-inode-confirm-20260602T044855Z.summary.txt`
+- LA rename01 singleton summary: `target/ltp-1000-milestone-03-stable656/la-rename01-inode-confirm-20260602T044855Z.summary.txt`
+- Combined clean22 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`
+
+The newly clean case is `rename01`, increasing the pool from 21/50 to 22/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
+
+The broad RV VFS/path scout remains blocker evidence only: wrapper-PASS `statx01`/`getdents02` rows include parser-visible `TCONF`; hard-link/linkat rows expose `ENOSYS`/TCONF/setup blockers; `stat03`, `stat03_64`, `getdents01`, and `readlink03` retain TFAIL semantics; missing guest binaries are not evidence. No blacklist/SKIP/status0/TCONF/TBROK/TFAIL/timeout row is counted.

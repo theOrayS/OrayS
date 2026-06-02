@@ -718,7 +718,7 @@ pub(super) fn sys_renameat2(
     };
     match axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()) {
         Ok(()) => {
-            process.move_path_sparse_file(old_abs_path.as_str(), new_abs_path);
+            process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
             0
         }
         Err(err) => neg_errno(LinuxError::from(err)),
@@ -1733,6 +1733,7 @@ impl FdTable {
             directory_remove_file(abs_path.as_str())
         };
         if removed.is_ok() {
+            process.remove_path_inode(abs_path.as_str());
             process.remove_path_special_mode(abs_path.as_str());
             process.remove_path_rdev(abs_path.as_str());
             process.clear_path_sparse_file(abs_path.as_str());
