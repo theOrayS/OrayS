@@ -294,6 +294,19 @@ const LTP_STABLE_CASES: &[&str] = &[
     "mknod09", "fchownat02", "setrlimit04", "clock_gettime04",
     "locktests", "ltpServer", "stress", "fcntl30",
     "mknod01", "pipe15",
+    "adjtimex01", "adjtimex03", "epoll_create1_01", "epoll_create1_02",
+    "fcntl11_64", "fcntl15", "fstatfs01", "fstatfs01_64",
+    "fsync02", "futex_wait01", "futex_wait03", "futex_wait05",
+    "getitimer02", "lstat02", "lstat02_64", "mincore02",
+    "mincore03", "mincore04", "mmap13", "mmap20",
+    "mprotect02", "mprotect04", "munlock02", "munmap01",
+    "open07", "open12", "openat02", "pause01",
+    "pause02", "rename01", "rename03", "rename04",
+    "rename05", "sched_setaffinity01", "setitimer02", "shmat04",
+    "shmt04", "signal01", "sigaltstack02", "stat03",
+    "stat03_64", "statfs01", "statvfs01", "utime01",
+    "utime02", "utime03", "utime04", "utime05",
+    "utime06", "utime07",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[

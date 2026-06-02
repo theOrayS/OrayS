@@ -4,7 +4,7 @@ Date: 2026-06-02
 Branch: `dev/1000ltp-plan`
 Baseline before this checkpoint: `606 total / 606 unique / 0 duplicate`
 Target milestone: stable656
-Status: **not achieved; stable list unchanged**
+Status: **achieved; stable list updated to 656 total / 656 unique / 0 duplicate**
 
 ## Objective
 
@@ -686,3 +686,34 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 6 cases short.
 - Remaining signal/wait rows from this scout keep visible parser caveats or wrapper-fail events and must not be counted until fixed and revalidated.
+
+
+## Final stable656 promotion gate (2026-06-02T16:39+08:00)
+
+Status: **achieved**. `LTP_STABLE_CASES` now reports `656 total / 656 unique / 0 duplicate`.
+
+Promoted new50 unique cases:
+
+`adjtimex01, adjtimex03, epoll_create1_01, epoll_create1_02, fcntl11_64, fcntl15, fstatfs01, fstatfs01_64, fsync02, futex_wait01, futex_wait03, futex_wait05, getitimer02, lstat02, lstat02_64, mincore02, mincore03, mincore04, mmap13, mmap20, mprotect02, mprotect04, munlock02, munmap01, open07, open12, openat02, pause01, pause02, rename01, rename03, rename04, rename05, sched_setaffinity01, setitimer02, shmat04, shmt04, signal01, sigaltstack02, stat03, stat03_64, statfs01, statvfs01, utime01, utime02, utime03, utime04, utime05, utime06, utime07`
+
+Important de-dup note: `times03` was present in the earlier clean44 accumulation but was already in the live stable list, so it was excluded from the +50 promotion batch. The seven `utime01`..`utime07` rows completed the final unique set after generic timestamp-overlay repair.
+
+Final parser-clean evidence:
+
+- RV final gate: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.summary.txt`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.promotion-rv.md`
+- LA final gate: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.summary.txt`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.promotion-la.md`
+- LA futex hang reproducer/repair proof: `target/ltp-1000-milestone-03-stable656/la-futex-wait01-timer-safe-deadline-20260602T163142+0800.summary.txt`
+- RV/LA `utime01`..`utime07` proof: `target/ltp-1000-milestone-03-stable656/rv-utime-utimensat-postfix-20260602T160121+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-utime-clean7-postfix-20260602T160227+0800.summary.txt`
+
+Parser result: RV `100 PASS / 0 FAIL`; LA `100 PASS / 0 FAIL`; both have `50 passed, 0 failed` for musl and glibc, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS/not-implemented, panic/trap, and zero UNKNOWN rows.
+
+Non-counted evidence hygiene:
+
+- `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe-20260602T163236+0800.log` is not promotion evidence because the first rerun accidentally passed the literal `NEW50=` prefix from the helper file and was terminated during build before any valid LTP matrix.
+- Earlier partial LA logs with `futex_wait01` UNKNOWN were killed/reproduced during diagnosis and are retained only as blocker-repair history.
+
+Conclusion: milestone-03 reaches stable656 without blacklist/SKIP/status0 credit and without hiding any parser-visible failures.

@@ -408,3 +408,45 @@ Maintenance boundary: do not generalize this proof to the surrounding signal/wai
 Regression evidence: `pause01` and `pause02` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt`); combined RV+LA candidate report is `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt`.
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 44/50.
+
+
+## Final stable656 promotion gate (2026-06-02T16:39+08:00)
+
+Status: **achieved**. `LTP_STABLE_CASES` now reports `656 total / 656 unique / 0 duplicate`.
+
+Promoted new50 unique cases:
+
+`adjtimex01, adjtimex03, epoll_create1_01, epoll_create1_02, fcntl11_64, fcntl15, fstatfs01, fstatfs01_64, fsync02, futex_wait01, futex_wait03, futex_wait05, getitimer02, lstat02, lstat02_64, mincore02, mincore03, mincore04, mmap13, mmap20, mprotect02, mprotect04, munlock02, munmap01, open07, open12, openat02, pause01, pause02, rename01, rename03, rename04, rename05, sched_setaffinity01, setitimer02, shmat04, shmt04, signal01, sigaltstack02, stat03, stat03_64, statfs01, statvfs01, utime01, utime02, utime03, utime04, utime05, utime06, utime07`
+
+Important de-dup note: `times03` was present in the earlier clean44 accumulation but was already in the live stable list, so it was excluded from the +50 promotion batch. The seven `utime01`..`utime07` rows completed the final unique set after generic timestamp-overlay repair.
+
+Final parser-clean evidence:
+
+- RV final gate: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.summary.txt`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.promotion-rv.md`
+- LA final gate: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.summary.txt`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.promotion-la.md`
+- LA futex hang reproducer/repair proof: `target/ltp-1000-milestone-03-stable656/la-futex-wait01-timer-safe-deadline-20260602T163142+0800.summary.txt`
+- RV/LA `utime01`..`utime07` proof: `target/ltp-1000-milestone-03-stable656/rv-utime-utimensat-postfix-20260602T160121+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-utime-clean7-postfix-20260602T160227+0800.summary.txt`
+
+Parser result: RV `100 PASS / 0 FAIL`; LA `100 PASS / 0 FAIL`; both have `50 passed, 0 failed` for musl and glibc, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS/not-implemented, panic/trap, and zero UNKNOWN rows.
+
+Non-counted evidence hygiene:
+
+- `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe-20260602T163236+0800.log` is not promotion evidence because the first rerun accidentally passed the literal `NEW50=` prefix from the helper file and was terminated during build before any valid LTP matrix.
+- Earlier partial LA logs with `futex_wait01` UNKNOWN were killed/reproduced during diagnosis and are retained only as blocker-repair history.
+
+Conclusion: milestone-03 reaches stable656 without blacklist/SKIP/status0 credit and without hiding any parser-visible failures.
+
+## Final stable656 ABI/POSIX impact summary
+
+Changed syscall-visible behavior in the final gate:
+
+- `utimensat`/`utime` path timestamps: the shell userspace now records per-path atime/mtime overlays and applies them through `stat`/`lstat`/`statx` metadata. `UTIME_NOW`, `UTIME_OMIT`, explicit timestamps, `AT_EMPTY_PATH`, and `AT_SYMLINK_NOFOLLOW` are handled generically. Permission failures remain visible as normal errno (`EACCES`/`EPERM`/`EFAULT`/`EINVAL`/`ENOENT`/`EROFS` as applicable); no LTP case names or outputs are hardcoded.
+- Rename/unlink metadata lifetime: path timestamp overlays move with `rename` and are removed on `unlinkat`, matching the existing synthetic metadata maps for ownership/mode/xattr. This is a per-path syntheticfs behavior improvement; no struct layout or syscall number changes.
+- Timer/futex robustness: `axtask` one-shot timer programming now floors sub-millisecond or already-near deadlines to a safe near-future monotonic deadline before calling the platform timer backend. User-visible effect is that very short timed waits may be rounded up to about 1 ms rather than being lost to a platform counter underflow race. This preserves timeout closure and avoids indefinite futex/sleep waits; it does not change futex op numbers, errno names, userspace ABI structs, FD semantics, signal layout, mmap layout, or user pointer copy rules.
+- Stable-list behavior: `LTP_STABLE_CASES` increases from `606` to `656` unique names. This only changes the evaluator's `stable` batch selection; it does not fake wrapper results or alter test binaries.
+
+Known resource/lifetime caveat: the parser-clean summaries still show expected per-case free-frame deltas in several LTP processes (for example first-process libc/runtime setup and `fsync02` scratch data). These are recorded in the summary tables and are not hidden. No panic/trap/timeout/UNKNOWN rows remain in the final promoted RV/LA new50 gates.

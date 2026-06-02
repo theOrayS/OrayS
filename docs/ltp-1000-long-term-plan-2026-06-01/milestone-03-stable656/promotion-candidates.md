@@ -1,8 +1,8 @@
 # Milestone 03 stable656 promotion candidates
 
-This file records the current candidate pool for the next +50 stable milestone. It is **not** a stable-list update.
+This file preserves the candidate-pool history and records the final +50 promotion. Final status: **promoted to stable656** (`656 total / 656 unique / 0 duplicate`). Older “not promoted yet” row decisions below are superseded by the final stable656 promotion gate section at the end of this file.
 
-## Current four-way clean candidates
+## Candidate accumulation history (superseded by final gate)
 
 Clean evidence set:
 
@@ -15,46 +15,46 @@ Clean evidence set:
 - Current clean35 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean35-shmat04-ipcstat-abi-20260602T150918Z.md`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Current four-way-clean not-yet-promoted candidates: 35
-- Remaining before stable656 +50 gate: 15
+- Final four-way-clean promoted candidates: 50
+- Remaining before stable656 +50 gate: 0
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
-| `adjtimex01` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `clock_adjtime(CLOCK_REALTIME, ...)` dispatch | keep in candidate pool; not promoted until +50 batch is complete |
-| `adjtimex03` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `clock_adjtime(CLOCK_REALTIME, ...)` dispatch | keep in candidate pool; not promoted until +50 batch is complete |
-| `epoll_create1_01` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | keep in candidate pool; not promoted until +50 batch is complete |
-| `epoll_create1_02` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | keep in candidate pool; not promoted until +50 batch is complete |
-| `fcntl11_64` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `fcntl15` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `fstatfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `fstatfs01_64` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `fsync02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `futex_wait01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `futex_wait03` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `futex_wait05` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mincore02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mincore03` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mincore04` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mmap13` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mmap20` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
-| `mprotect02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mprotect04` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `munlock02` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
-| `munmap01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `openat02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `rename01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `rename03` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `rename04` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `rename05` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `sched_setaffinity01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `shmat04` | current RV/LA shmat04/shmt04 targeted gates are parser-clean for musl+glibc after generic `shmctl(IPC_STAT)` copies the Linux 64-bit `shmid_ds` ABI struct instead of overwriting a guessed 128-byte buffer | keep in candidate pool; not promoted until +50 batch is complete |
-| `shmt04` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc; existing SysV shm behavior now has four-way evidence | keep in candidate pool; not promoted until +50 batch is complete |
-| `signal01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `sigaltstack02` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `sigaltstack` state/errno handling | keep in candidate pool; not promoted until +50 batch is complete |
-| `stat03` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `stat03_64` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `statfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `statvfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `adjtimex01` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `clock_adjtime(CLOCK_REALTIME, ...)` dispatch | promoted by final stable656 gate |
+| `adjtimex03` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `clock_adjtime(CLOCK_REALTIME, ...)` dispatch | promoted by final stable656 gate |
+| `epoll_create1_01` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | promoted by final stable656 gate |
+| `epoll_create1_02` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | promoted by final stable656 gate |
+| `fcntl11_64` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `fcntl15` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `fstatfs01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `fstatfs01_64` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `fsync02` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `futex_wait01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `futex_wait03` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `futex_wait05` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `mincore02` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `mincore03` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `mincore04` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `mmap13` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `mmap20` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | promoted by final stable656 gate |
+| `mprotect02` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `mprotect04` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `munlock02` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | promoted by final stable656 gate |
+| `munmap01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `openat02` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `rename01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `rename03` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | promoted by final stable656 gate |
+| `rename04` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | promoted by final stable656 gate |
+| `rename05` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `sched_setaffinity01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `shmat04` | current RV/LA shmat04/shmt04 targeted gates are parser-clean for musl+glibc after generic `shmctl(IPC_STAT)` copies the Linux 64-bit `shmid_ds` ABI struct instead of overwriting a guessed 128-byte buffer | promoted by final stable656 gate |
+| `shmt04` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc; existing SysV shm behavior now has four-way evidence | promoted by final stable656 gate |
+| `signal01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `sigaltstack02` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `sigaltstack` state/errno handling | promoted by final stable656 gate |
+| `stat03` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | promoted by final stable656 gate |
+| `stat03_64` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | promoted by final stable656 gate |
+| `statfs01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
+| `statvfs01` | see the parser-clean evidence and historical checkpoint notes below | promoted by final stable656 gate |
 
 ## Evidence hygiene notes
 
@@ -320,3 +320,34 @@ Evidence:
 Newly evidenced four-way-clean cases: `pause01` and `pause02`. Current pool: 44/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 Blocked rows from the same scout stay outside the pool: signal/wait/kill rows retain visible `TFAIL`/`TBROK` or wrapper-fail events. None is blacklisted or counted as PASS.
+
+
+## Final stable656 promotion gate (2026-06-02T16:39+08:00)
+
+Status: **achieved**. `LTP_STABLE_CASES` now reports `656 total / 656 unique / 0 duplicate`.
+
+Promoted new50 unique cases:
+
+`adjtimex01, adjtimex03, epoll_create1_01, epoll_create1_02, fcntl11_64, fcntl15, fstatfs01, fstatfs01_64, fsync02, futex_wait01, futex_wait03, futex_wait05, getitimer02, lstat02, lstat02_64, mincore02, mincore03, mincore04, mmap13, mmap20, mprotect02, mprotect04, munlock02, munmap01, open07, open12, openat02, pause01, pause02, rename01, rename03, rename04, rename05, sched_setaffinity01, setitimer02, shmat04, shmt04, signal01, sigaltstack02, stat03, stat03_64, statfs01, statvfs01, utime01, utime02, utime03, utime04, utime05, utime06, utime07`
+
+Important de-dup note: `times03` was present in the earlier clean44 accumulation but was already in the live stable list, so it was excluded from the +50 promotion batch. The seven `utime01`..`utime07` rows completed the final unique set after generic timestamp-overlay repair.
+
+Final parser-clean evidence:
+
+- RV final gate: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.summary.txt`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-stable656-new50-post-timer-safe-20260602T163655+0800.promotion-rv.md`
+- LA final gate: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.summary.txt`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe2-20260602T163306+0800.promotion-la.md`
+- LA futex hang reproducer/repair proof: `target/ltp-1000-milestone-03-stable656/la-futex-wait01-timer-safe-deadline-20260602T163142+0800.summary.txt`
+- RV/LA `utime01`..`utime07` proof: `target/ltp-1000-milestone-03-stable656/rv-utime-utimensat-postfix-20260602T160121+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-utime-clean7-postfix-20260602T160227+0800.summary.txt`
+
+Parser result: RV `100 PASS / 0 FAIL`; LA `100 PASS / 0 FAIL`; both have `50 passed, 0 failed` for musl and glibc, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS/not-implemented, panic/trap, and zero UNKNOWN rows.
+
+Non-counted evidence hygiene:
+
+- `target/ltp-1000-milestone-03-stable656/la-stable656-new50-final-timer-safe-20260602T163236+0800.log` is not promotion evidence because the first rerun accidentally passed the literal `NEW50=` prefix from the helper file and was terminated during build before any valid LTP matrix.
+- Earlier partial LA logs with `futex_wait01` UNKNOWN were killed/reproduced during diagnosis and are retained only as blocker-repair history.
+
+Conclusion: milestone-03 reaches stable656 without blacklist/SKIP/status0 credit and without hiding any parser-visible failures.
