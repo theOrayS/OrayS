@@ -49,3 +49,9 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 ## Stable-list decision
 
 Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 8.
+
+## `openat03` non-candidate note
+
+`openat03` is explicitly outside the clean pool. A larger `O_TMPFILE`/`linkat` emulation attempt was rejected after RV targeted validation produced a supervisor page fault during the testcase's deep nested-directory phase (`rv-openat03-otmpfile-20260602T021349Z.summary.txt` and `rv-openat03-trace-20260602T022058Z.summary.txt`, both `panic/trap matches: 1`).
+
+The retained generic change only makes unsupported `O_TMPFILE` fail honestly: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP`. Current RV and LA targeted summaries (`rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`, `la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`) show zero timeout/ENOSYS/panic/trap but `TCONF=4` and wrapper FAIL, so this is blocker evidence only and must not be counted toward stable656.

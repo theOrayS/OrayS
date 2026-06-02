@@ -25,3 +25,7 @@ Re-mining `rv-arch002.log` and `la-arch012.log` did not change the blacklist. Th
 ## Boundary
 
 These failures are not hidden. They are not counted as PASS, not promoted to stable, and not converted into blacklist credit. If future full-sweep lanes need temporary blacklist isolation, the report must record the severe-blocker reason, source, and removal condition separately.
+
+## `openat03` blocker update
+
+No blacklist entry was added for `openat03`. The rejected `O_TMPFILE`/`linkat` emulation produced RV panic/trap evidence and was removed; the retained generic unsupported gate produces visible `TCONF`/wrapper FAIL on RV/LA x musl/glibc with zero panic/trap. This is an ordinary unresolved feature/VFS robustness blocker, not blacklist credit and not promotion evidence.

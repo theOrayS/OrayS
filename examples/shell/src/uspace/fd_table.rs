@@ -3054,6 +3054,10 @@ fn fcntl_setfl_flags(flags: u32) -> u32 {
     flags & (general::O_APPEND | general::O_NONBLOCK | general::O_DIRECT | general::O_NOATIME)
 }
 
+fn tmpfile_requested(flags: u32) -> bool {
+    flags & general::O_TMPFILE == general::O_TMPFILE
+}
+
 fn open_candidates(
     process: &UserProcess,
     candidates: &[String],
@@ -3062,6 +3066,7 @@ fn open_candidates(
     mode: u32,
 ) -> Result<FdEntry, LinuxError> {
     let prefer_dir = flags & general::O_DIRECTORY != 0;
+    let wants_tmpfile = tmpfile_requested(flags);
     let path_only = flags & O_PATH_FLAG != 0;
     let mut path_opts = OpenOptions::new();
     if path_only {
@@ -3082,6 +3087,16 @@ fn open_candidates(
             }
         } else if let Some(resolved_path) = process.resolve_path_symlink(path.as_str())? {
             return open_candidates(process, &[resolved_path], opts, flags, mode);
+        }
+        if wants_tmpfile {
+            if flags & general::O_ACCMODE == general::O_RDONLY {
+                return Err(LinuxError::EINVAL);
+            }
+            match open_dir_entry(path.as_str()) {
+                Ok(_) => return Err(LinuxError::EOPNOTSUPP),
+                Err(err) => record_missing_candidate(&mut last_err, err)?,
+            }
+            continue;
         }
         if let Some(proc_fd_path) = proc_fd_dir_path(process, path.as_str()) {
             if !path_only
