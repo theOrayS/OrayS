@@ -71,7 +71,7 @@ pub(super) const FILE_MODE_GROUP_EXECUTE: u32 = 0o0010;
 pub(super) const CHOWN_ID_UNCHANGED: u32 = u32::MAX;
 
 pub(super) const STATFS_BLOCK_SIZE: i64 = 4096;
-pub(super) const STATFS_NAME_MAX: i64 = 255;
+pub(super) const STATFS_NAME_MAX: i64 = 63;
 pub(super) const TMPFS_MAGIC: i64 = 0x0102_1994;
 pub(super) const PROC_SUPER_MAGIC: i64 = 0x9fa0;
 pub(super) const SYSFS_MAGIC: i64 = 0x6265_6572;

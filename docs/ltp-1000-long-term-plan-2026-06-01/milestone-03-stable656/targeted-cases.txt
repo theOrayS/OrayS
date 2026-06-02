@@ -337,7 +337,7 @@ statvfs01
 
 ## Promotion result after statfs01-family RV scout
 # 0 promoted in this checkpoint.
-# Reason: statfs01/fstatfs01/fstatfs01_64/statvfs01 are RV parser-unclean setup blockers; clean candidate pool remains 14/50.
+# Historical note: before the later LTP device/NAME_MAX repair, statfs01/fstatfs01/fstatfs01_64/statvfs01 were RV parser-unclean setup blockers and the clean candidate pool remained 14/50.
 
 ## RV VFS-C mknod/rename device-acquire blocker scout 2026-06-02
 mknod07
@@ -350,4 +350,55 @@ rename05
 
 ## Promotion result after VFS-C mknod/rename RV scout
 # 0 promoted in this checkpoint.
-# Reason: mknod07/mknodat02/rename03/rename04/rename05 are RV parser-unclean setup blockers; clean candidate pool remains 14/50.
+# Historical note: before the later LTP device/NAME_MAX repair, mknod07/mknodat02/rename03/rename04/rename05 were RV parser-unclean setup blockers and the clean candidate pool remained 14/50.
+
+## LTP device/NAME_MAX repair retests 2026-06-02
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+mknod07
+mknodat02
+rename03
+rename04
+rename05
+# Enumeration-only RV retest still failed setup. After global LTP_DEV and NAME_MAX=63, statfs01/fstatfs01/fstatfs01_64/statvfs01/rename05 became RV-clean; mknod07/mknodat02 remain TCONF, rename03/rename04 remain TFAIL.
+
+## LA LTP device clean5 confirmation 2026-06-02
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+rename05
+# LA result: all five rows are musl+glibc parser-clean; combined RV/LA matrix makes them future candidates, not stable promotions yet.
+
+## Adjacent regression subset for global LTP_DEV and NAME_MAX=63
+chdir01
+pathconf01
+fpathconf01
+# RV and LA x musl/glibc parser-clean after the wrapper/device/NAME_MAX changes.
+
+## Four-way clean candidate pool after LTP device/NAME_MAX clean5 confirmation (not yet promoted)
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Promotion result after LTP device/NAME_MAX clean5 confirmation
+# 0 promoted in this checkpoint.
+# Reason: 19 new four-way-clean unique candidates are available, below the +50 stable656 gate.

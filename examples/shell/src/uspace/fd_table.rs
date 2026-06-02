@@ -25,7 +25,7 @@ use super::memory_map::align_up;
 use super::metadata::{
     apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dirent_type,
     fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs,
-    path_inode, stdio_stat, synthetic_char_stat_for_path,
+    path_inode, stdio_stat, synthetic_block_stat_for_path, synthetic_char_stat_for_path,
 };
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
@@ -57,7 +57,11 @@ pub(super) struct FdTable {
 
 const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
 const LINUX_PATH_MAX: usize = 4096;
-const LINUX_NAME_MAX: usize = 255;
+// axfs_vfs::VfsDirEntry stores 63 bytes of d_name.  Enforce and report that
+// real backing limit at the POSIX boundary instead of accepting longer names
+// that would later panic during directory enumeration.
+const LINUX_NAME_MAX: usize = 63;
+const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
 
 pub(super) enum FdEntry {
     Stdin,
@@ -1347,6 +1351,38 @@ impl FdTable {
             let name_start = start + offset_of!(general::linux_dirent64, d_name);
             out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
         }
+        for &name in synthetic_block_device_names_in_dir(dir.path.as_str()) {
+            if seen_names.iter().any(|seen| seen == name) {
+                continue;
+            }
+            let name_bytes = name.as_bytes();
+            let reclen = align_up(
+                offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
+                8,
+            );
+            if out.len() + reclen > max_len {
+                break;
+            }
+            let entry_path = normalize_path(dir.path.as_str(), name);
+            dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
+            let start = out.len();
+            out.resize(start + reclen, 0);
+            unsafe {
+                let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
+                ptr::write_unaligned(
+                    dirent,
+                    general::linux_dirent64 {
+                        d_ino: path_inode(entry_path.as_deref()) as _,
+                        d_off: dir.next_dirent_cookie as _,
+                        d_reclen: reclen as _,
+                        d_type: general::DT_BLK as u8,
+                        d_name: Default::default(),
+                    },
+                );
+            }
+            let name_start = start + offset_of!(general::linux_dirent64, d_name);
+            out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
+        }
         Ok(out)
     }
 
@@ -2144,6 +2180,9 @@ impl PathEntry {
     pub(super) fn stat(&self) -> general::stat {
         if self.mode & ST_MODE_TYPE_MASK == ST_MODE_CHR {
             return synthetic_char_stat_for_path(self.path.as_str(), self.mode);
+        }
+        if self.mode & ST_MODE_TYPE_MASK == ST_MODE_BLK {
+            return synthetic_block_stat_for_path(self.path.as_str(), self.mode);
         }
         let mut st: general::stat = unsafe { core::mem::zeroed() };
         st.st_dev = 1;
@@ -3362,10 +3401,23 @@ fn path_entry_from_directory(dir: DirectoryEntry) -> FdEntry {
 }
 
 fn is_synthetic_block_device_path(path: &str) -> bool {
-    matches!(
-        normalize_path("/", path).as_deref(),
-        Some("/dev/vda" | "/dev/sda" | "/dev/xvda")
-    )
+    let Some(path) = normalize_path("/", path) else {
+        return false;
+    };
+    let Some(name) = path.strip_prefix("/dev/") else {
+        return false;
+    };
+    !name.contains('/')
+        && SYNTHETIC_BLOCK_DEVICE_NAMES
+            .iter()
+            .any(|candidate| *candidate == name)
+}
+
+fn synthetic_block_device_names_in_dir(path: &str) -> &'static [&'static str] {
+    match normalize_path("/", path).as_deref() {
+        Some("/dev") => SYNTHETIC_BLOCK_DEVICE_NAMES,
+        _ => &[],
+    }
 }
 
 fn record_missing_candidate(last_err: &mut LinuxError, err: LinuxError) -> Result<(), LinuxError> {

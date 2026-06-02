@@ -893,7 +893,7 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
 - At this point in the evidence timeline, the clean candidate pool was 7/50 for stable656.
-- No `LTP_STABLE_CASES` edit was made at that historical checkpoint because 43 more four-way-clean unique cases were still required; later `openat02`, `signal01`, `mincore03`, and G009 clean4 evidence supersedes the current pool count to 14/50.
+- No `LTP_STABLE_CASES` edit was made at that historical checkpoint because 43 more four-way-clean unique cases were still required; later `openat02`, `signal01`, `mincore03`, and G009 clean4 evidence superseded that pool count to 14/50 before the LTP device/NAME_MAX clean5 update raised it to 19/50.
 - Counted targeted and regression summaries for `mmap13` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix and TTY-aborted RV logs remain visible as non-countable history.
 
 
@@ -1044,7 +1044,7 @@ panic/trap matches: 0
 
 Observed LTP marker: `openat03.c:56: O_TMPFILE not supported`; wrapper status remains FAIL code 32 for both musl and glibc on RV and LA. This evidence is intentionally non-promotable because the parser sees `TCONF`, but it closes the safety claim that unsupported `O_TMPFILE` no longer causes panic/trap in the targeted RV/LA runs.
 
-Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after later `signal01`, `mincore03`, and G009 clean4 evidence, the current pool is 14/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after later `signal01`, `mincore03`, and G009 clean4 evidence, the pool was 14/50 before the LTP device/NAME_MAX clean5 update raised it to 19/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 ## `signal01` signal/poll sleeping-state proof
 
@@ -1238,7 +1238,7 @@ ENOSYS/not implemented matches: 0
 panic/trap matches: 0
 ```
 
-Decision: the adjacent mincore/mlock/mmap subset did not regress on RV or LA. At the mincore03 checkpoint the clean candidate pool was 10/50; after the later G009 clean4 confirmation it is 14/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: the adjacent mincore/mlock/mmap subset did not regress on RV or LA. At the mincore03 checkpoint the clean candidate pool was 10/50; after the later G009 clean4 confirmation it was 14/50 before the LTP device/NAME_MAX clean5 update raised it to 19/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 ## `epoll_create02` singleton boundary confirmation
 
@@ -1322,7 +1322,7 @@ panic/trap matches: 0
 Suite summaries: ltp-musl 4 passed / 0 failed; ltp-glibc 4 passed / 0 failed
 ```
 
-Decision: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The other RV scout rows remain blocker evidence because they retain parser-visible `TFAIL/TBROK/TCONF` and were not LA-confirmed. Current candidate pool is 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The other RV scout rows remain blocker evidence because they retain parser-visible `TFAIL/TBROK/TCONF` and were not LA-confirmed. Candidate pool was 14/50 at that checkpoint; `LTP_STABLE_CASES` remained `606 total / 606 unique / 0 duplicate`.
 
 ## RV statfs01-family device-acquire blocker scout
 
@@ -1357,7 +1357,7 @@ Promotion candidates: 0; blocked/incomplete cases: 4
 
 Raw-log diagnostic: `strings` over the RV log shows every case entering LTP setup and failing with `No free devices found` / `Failed to acquire device`. This is a visible setup-device blocker, not promotion-clean statfs/statvfs behavior evidence.
 
-Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remains 14/50 and stable remains `606 total / 606 unique / 0 duplicate`.
+Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remained 14/50 at that checkpoint and stable remained `606 total / 606 unique / 0 duplicate`.
 
 ## RV VFS-C mknod/rename device-acquire blocker scout
 
@@ -1392,4 +1392,117 @@ Promotion candidates: 0; blocked/incomplete cases: 5
 
 Raw-log diagnostic: `strings` over the RV log shows every case entering LTP setup and failing with `No free devices found` / `Failed to acquire device`. This is a visible setup-device blocker, not promotion-clean mknod/rename behavior evidence.
 
-Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remains 14/50 and stable remains `606 total / 606 unique / 0 duplicate`.
+Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remained 14/50 at that checkpoint and stable remained `606 total / 606 unique / 0 duplicate`.
+
+## LTP device/NAME_MAX repair and clean5 confirmation
+
+Date: 2026-06-02. This closes the earlier setup-device blocker for the statfs family and `rename05` without promoting stable cases yet.
+
+### Commands
+
+Enumeration-only RV retest (insufficient, blocker history):
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs01,fstatfs01,fstatfs01_64,statvfs01,mknod07,mknodat02,rename03,rename04,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+```
+
+RV retest after global `LTP_DEV=/dev/vda` but before true NAME_MAX reporting (repair history; not countable because of panic/trap):
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs01,fstatfs01,fstatfs01_64,statvfs01,mknod07,mknodat02,rename03,rename04,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+```
+
+Final RV retest after `LTP_DEV=/dev/vda`, `/dev` block-device enumeration/stat, and `NAME_MAX=63` reporting:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs01,fstatfs01,fstatfs01_64,statvfs01,mknod07,mknodat02,rename03,rename04,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+```
+
+LA confirmation for the RV-clean subset:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs01,fstatfs01,fstatfs01_64,statvfs01,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Adjacent regression subset after global `LTP_DEV` and NAME_MAX changes:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chdir01,pathconf01,fpathconf01 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chdir01,pathconf01,fpathconf01 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+### Artifacts
+
+- RV enumeration-only retest: `target/ltp-1000-milestone-03-stable656/rv-device-enumeration-retest-20260602T041227Z.log`
+- RV enumeration-only summary: `target/ltp-1000-milestone-03-stable656/rv-device-enumeration-retest-20260602T041227Z.summary.txt`
+- RV enumeration-only checksums: `target/ltp-1000-milestone-03-stable656/rv-device-enumeration-retest-20260602T041227Z.derived.sha256`
+- RV pre-NAME_MAX panic retest: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-vda-device-retest-20260602T041431Z.log`
+- RV pre-NAME_MAX summary: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-vda-device-retest-20260602T041431Z.summary.txt`
+- RV pre-NAME_MAX checksums: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-vda-device-retest-20260602T041431Z.derived.sha256`
+- RV `statvfs01` singleton after NAME_MAX fix: `target/ltp-1000-milestone-03-stable656/rv-statvfs01-ltpdev-namemax-retest-20260602T041604Z.summary.txt`
+- RV final 9-case retest summary: `target/ltp-1000-milestone-03-stable656/rv-device-cases-ltpdev-namemax-retest-20260602T041654Z.summary.txt`
+- RV final 9-case checksums: `target/ltp-1000-milestone-03-stable656/rv-device-cases-ltpdev-namemax-retest-20260602T041654Z.derived.sha256`
+- LA clean5 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.summary.txt`
+- LA clean5 checksums: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.derived.sha256`
+- RV regression subset summary: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-namemax-regression-subset-20260602T041926Z.summary.txt`
+- LA regression subset summary: `target/ltp-1000-milestone-03-stable656/la-ltpdev-namemax-regression-subset-20260602T042012Z.summary.txt`
+- Combined clean19 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`
+
+### Parser results
+
+Enumeration-only RV retest:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 18
+Internal TFAIL/TBROK/TCONF: 22 ({'TBROK': 22})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Pre-NAME_MAX RV retest:
+
+```text
+PASS LTP CASE: 3
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 1
+```
+
+Final RV 9-case retest:
+
+```text
+PASS LTP CASE: 10
+FAIL LTP CASE: 8
+Internal TFAIL/TBROK/TCONF: 18 ({'TCONF': 8, 'TFAIL': 10})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+LA clean5 confirmation:
+
+```text
+PASS LTP CASE: 10
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Regression subset after the global wrapper/NAME_MAX change:
+
+```text
+RV: PASS LTP CASE 6, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 6, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+### Decision
+
+`statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The pool becomes 19/50, still below the stable656 +50 gate, so `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+`mknod07` and `mknodat02` remain non-promotable because the final RV run reaches setup but emits parser-visible `TCONF` for missing `mkfs.ext2`. `rename03` and `rename04` remain non-promotable because they now reach real assertions but retain parser-visible `TFAIL`. No blacklist/SKIP/status0/full-sweep row is counted.

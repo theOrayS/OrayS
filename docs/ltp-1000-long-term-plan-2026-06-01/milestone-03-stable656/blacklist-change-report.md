@@ -53,3 +53,11 @@ No blacklist change was made for `statfs01`, `fstatfs01`, `fstatfs01_64`, or `st
 ## VFS-C mknod/rename setup-device blocker update
 
 No blacklist change was made for `mknod07`, `mknodat02`, `rename03`, `rename04`, or `rename05`. The RV scout is an ordinary visible setup blocker: both libcs fail with `TBROK` because LTP cannot acquire a free device. These rows are not hidden, not counted as PASS, and not converted into blacklist credit. Removal condition: generic device acquisition support must make the RV run parser-clean before any LA confirmation or stable promotion accounting.
+
+## LTP device/NAME_MAX clean5 blacklist update
+
+No blacklist change was made for the generic device/NAME_MAX repair.
+
+The earlier `statfs01` family and VFS-C setup-device blocker notes are partially superseded, not hidden: `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` are now four-way parser-clean and are tracked only as future candidates. `mknod07` and `mknodat02` still expose parser-visible `TCONF` because the guest lacks `mkfs.ext2`; `rename03` and `rename04` still expose parser-visible `TFAIL` rename-semantics failures. These rows remain visible blockers, are not blacklisted for credit, and are not counted as stable PASS.
+
+Removal condition for the remaining blockers: implement a generic ext2/device setup path for `mknod07`/`mknodat02` and generic rename semantics for `rename03`/`rename04`, then prove RV + LA x musl+glibc parser-clean summaries plus adjacent regression evidence.
