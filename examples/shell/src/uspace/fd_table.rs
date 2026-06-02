@@ -1787,6 +1787,28 @@ impl FdTable {
         dirfd: i32,
         path: &str,
     ) -> Result<general::stat, LinuxError> {
+        self.stat_path_inner(process, dirfd, path, true)
+    }
+
+    fn stat_path_inner(
+        &mut self,
+        process: &UserProcess,
+        dirfd: i32,
+        path: &str,
+        check_parent_search: bool,
+    ) -> Result<general::stat, LinuxError> {
+        if check_parent_search && process.fs_uid() != 0 {
+            let resolved_path = resolve_dirfd_path(process, self, dirfd, path)?;
+            match self.parent_dirs_searchable(
+                process,
+                resolved_path.as_str(),
+                process.fs_uid(),
+                process.fs_gid(),
+            )? {
+                true => {}
+                false => return Err(LinuxError::EACCES),
+            }
+        }
         match open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0) {
             Ok(FdEntry::DevNull) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
             Ok(FdEntry::BlockDevice(dev)) => {
@@ -1883,7 +1905,10 @@ impl FdTable {
         for component in &components[..components.len() - 1] {
             parent.push('/');
             parent.push_str(component);
-            let st = self.stat_path(process, general::AT_FDCWD, parent.as_str())?;
+            let st = self.stat_path_inner(process, general::AT_FDCWD, parent.as_str(), false)?;
+            if st.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
+                return Err(LinuxError::ENOTDIR);
+            }
             if !access_allowed(&st, ACCESS_X_OK, uid, gid) {
                 return Ok(false);
             }
@@ -3116,6 +3141,10 @@ fn open_candidates(
     let mut last_err = LinuxError::ENOENT;
     for path in candidates {
         if flags & O_NOFOLLOW_FLAG != 0 {
+            let resolved_path = process.resolve_parent_symlinks(path.as_str())?;
+            if resolved_path != *path {
+                return open_candidates(process, &[resolved_path], opts, flags, mode);
+            }
             if process.path_symlink(path.as_str()).is_some() {
                 if prefer_dir {
                     return Err(LinuxError::ENOTDIR);

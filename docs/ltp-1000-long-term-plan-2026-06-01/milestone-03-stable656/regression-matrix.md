@@ -470,3 +470,14 @@ Remaining regression boundary: this does not implement `link(2)` or full hard-li
 | Combined-report hygiene after old mixed TFAIL history | `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, `rename05` | `rv-statfs-rename05-clean-retarget-20260602T050521Z.summary.txt`; old LA clean5 summary; `combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt` | clean-only parser inputs produce 24 candidates without counting old `rename03/rename04` TFAIL rows |
 
 Remaining nearby blockers: `mknod07` and `mknodat02` still need generic ext2/device setup support; they are not promoted or blacklisted here.
+
+## Stat/readlink path traversal regression slice
+
+| Change | Protected cases | Evidence | Result |
+| --- | --- | --- | --- |
+| Component-wise symlink traversal with parent-only resolution for readlink/lstat-style syscalls | `readlink03`, `stat03`, `stat03_64` | `rv-readlink-stat-path-nonrecursive-20260602T052206Z.summary.txt`; `la-readlink-stat-path-nonrecursive-20260602T052251Z.summary.txt` | `stat03` and `stat03_64` are RV + LA x musl+glibc PASS, parser zero internal/fatal markers; `readlink03` stays blocked by LA musl `TFAIL=1` |
+| Nonrecursive parent directory search-permission check for `stat_path` | `stat01`, `stat02`, `stat01_64`, `stat02_64`, `lstat01`, `lstat01_64`, `fstatat01`, `readlink01`, `readlinkat01`, `openat01`, `rename14` | `rv-stat-readlink-stable-regression-20260602T052501Z.summary.txt`; `la-stat-readlink-stable-regression-20260602T052706Z.summary.txt` | RV + LA x musl+glibc PASS, parser zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap |
+
+Repair-history boundary: `rv-readlink-stat-path-20260602T051956Z.summary.txt` recorded a parser-visible panic/trap from recursive parent-search checking and is not promotion evidence. The retained implementation uses `stat_path_inner(..., check_parent_search=false)` while checking ancestors, and the clean regression subset proves the panic is closed for this lane.
+
+Remaining nearby blockers: `readlink03` needs a generic LA musl zero-size-buffer boundary fix or documented classification with parser-clean evidence; hard-link/linkat/statx/getdents blockers from the broader VFS/path scout remain outside this candidate pool.

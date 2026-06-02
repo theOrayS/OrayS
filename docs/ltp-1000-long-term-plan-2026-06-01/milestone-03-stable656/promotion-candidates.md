@@ -165,3 +165,17 @@ Evidence:
 Newly evidenced four-way-clean cases: `rename03` and `rename04`. Current pool: 24/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 The earlier VFS-C setup-device/TFAIL notes are superseded only for `rename03` and `rename04`; they remain historical repair context and are not counted as promotion evidence. `mknod07` and `mknodat02` remain outside the pool because they still require a generic ext2/device setup path.
+
+## Stat/readlink path traversal clean2 update
+
+A generic stat/readlink path traversal repair grew the future pool without editing the stable list:
+
+- First RV repair-history summary: `target/ltp-1000-milestone-03-stable656/rv-readlink-stat-path-20260602T051956Z.summary.txt` — not countable because `stat03` hit a parser-visible panic/trap before the nonrecursive parent-search fix.
+- Fixed RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-readlink-stat-path-nonrecursive-20260602T052206Z.summary.txt` — `readlink03`, `stat03`, and `stat03_64` are parser-clean for musl+glibc.
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-readlink-stat-path-nonrecursive-20260602T052251Z.summary.txt` — `stat03` and `stat03_64` are parser-clean for musl+glibc; `readlink03` remains blocked by LA musl `TFAIL=1`.
+- Regression summaries: `rv-stat-readlink-stable-regression-20260602T052501Z.summary.txt` and `la-stat-readlink-stable-regression-20260602T052706Z.summary.txt` — adjacent stable stat/lstat/fstatat/readlink/openat/rename rows are parser-clean on both arches.
+- Combined clean26 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.txt`.
+
+Newly evidenced four-way-clean cases: `stat03` and `stat03_64`. Current pool: 26/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+`readlink03` stays outside the pool: RV musl/glibc and LA glibc are clean, but LA musl still has parser-visible `TFAIL=1` on the zero-size-buffer case. This row is neither hidden nor blacklisted, and it is not counted as PASS.

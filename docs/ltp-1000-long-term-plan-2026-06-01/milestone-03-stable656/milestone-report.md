@@ -468,3 +468,31 @@ Artifacts:
 Targeted result: `rename03` and `rename04` are RV + LA x musl + glibc parser-clean after generic source/destination type handling in `axfs::root::rename`. Adjacent rename rows `rename01` and `rename05` stayed clean on both arches.
 
 Regression result: the clean-only combined report now contains 24 four-way-clean future candidates. This does not cross the 50-case stable656 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
+
+## Stat/readlink path traversal clean2 checkpoint
+
+A generic path/stat repair converted `stat03` and `stat03_64` into future promotion candidates without editing `LTP_STABLE_CASES`.
+
+Code changes retained in this checkpoint:
+
+1. `examples/shell/src/uspace/metadata.rs` now resolves symlinks component-by-component for pathname traversal, with a 40-hop `ELOOP` guard. `readlink`/`lstat`-style paths resolve parent symlinks while preserving the final symlink when required.
+2. `examples/shell/src/uspace/fd_table.rs::stat_path` now checks parent directory search permission for non-root callers and returns `EACCES` when an ancestor lacks execute/search permission.
+3. Parent directory traversal now returns `ENOTDIR` when a non-directory appears in a path prefix, instead of reporting a misleading permission failure.
+4. `newfstatat` now returns `ENOENT` for an empty pathname unless `AT_EMPTY_PATH` is explicitly supplied.
+5. `O_NOFOLLOW` open handling resolves parent symlinks before deciding whether the final component is a symlink.
+
+Evidence:
+
+- First RV attempt: `target/ltp-1000-milestone-03-stable656/rv-readlink-stat-path-20260602T051956Z.summary.txt` — `readlink03` passed, but `stat03` hit a parser-visible panic/trap due recursive parent-search checking. This log is blocker/repair history only and is not counted.
+- Fixed RV targeted proof: `target/ltp-1000-milestone-03-stable656/rv-readlink-stat-path-nonrecursive-20260602T052206Z.summary.txt` — `readlink03`, `stat03`, and `stat03_64` are parser-clean for musl+glibc; zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted proof: `target/ltp-1000-milestone-03-stable656/la-readlink-stat-path-nonrecursive-20260602T052251Z.summary.txt` — `stat03` and `stat03_64` are parser-clean for musl+glibc; `readlink03` remains blocked because LA musl has parser-visible `TFAIL=1` for the zero-size-buffer case.
+- Adjacent stable regression: `target/ltp-1000-milestone-03-stable656/rv-stat-readlink-stable-regression-20260602T052501Z.summary.txt` and `target/ltp-1000-milestone-03-stable656/la-stat-readlink-stable-regression-20260602T052706Z.summary.txt` — `stat01`, `stat02`, `stat01_64`, `stat02_64`, `lstat01`, `lstat01_64`, `fstatat01`, `readlink01`, `readlinkat01`, `openat01`, and `rename14` are parser-clean on both arches and libcs.
+- Combined clean26 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.txt`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `stat03`, `stat03_64`.
+- Candidate pool: 26/50 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 24 cases short.
+- Remaining blocker from this step: `readlink03` remains outside the pool until LA musl zero-size-buffer behavior can be fixed or classified with parser-clean evidence; it is not blacklisted or counted as PASS.

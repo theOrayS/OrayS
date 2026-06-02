@@ -218,15 +218,57 @@ impl UserProcess {
     }
 
     pub(super) fn resolve_path_symlink(&self, path: &str) -> Result<Option<String>, LinuxError> {
-        let mut current = path.to_string();
-        for _ in 0..40 {
-            let Some(target) = self.path_symlink(current.as_str()) else {
-                return Ok((current != path).then_some(current));
-            };
-            current = normalize_symlink_target(current.as_str(), target.as_str())
-                .ok_or(LinuxError::EINVAL)?;
+        let current = self.resolve_path_symlinks(path, true)?;
+        Ok((current != path).then_some(current))
+    }
+
+    pub(super) fn resolve_parent_symlinks(&self, path: &str) -> Result<String, LinuxError> {
+        self.resolve_path_symlinks(path, false)
+    }
+
+    fn resolve_path_symlinks(&self, path: &str, follow_final: bool) -> Result<String, LinuxError> {
+        let mut current = normalize_path("/", path).ok_or(LinuxError::EINVAL)?;
+        let mut traversals = 0;
+
+        loop {
+            let components: Vec<&str> =
+                current.split('/').filter(|part| !part.is_empty()).collect();
+            if components.is_empty() {
+                return Ok(current);
+            }
+
+            let mut prefix = String::new();
+            let mut changed = false;
+            for (idx, component) in components.iter().enumerate() {
+                prefix.push('/');
+                prefix.push_str(component);
+
+                let is_final = idx + 1 == components.len();
+                if is_final && !follow_final {
+                    continue;
+                }
+                let Some(target) = self.path_symlink(prefix.as_str()) else {
+                    continue;
+                };
+                traversals += 1;
+                if traversals > 40 {
+                    return Err(LinuxError::ELOOP);
+                }
+                let target = normalize_symlink_target(prefix.as_str(), target.as_str())
+                    .ok_or(LinuxError::EINVAL)?;
+                let suffix = components[idx + 1..].join("/");
+                current = if suffix.is_empty() {
+                    target
+                } else {
+                    normalize_path(target.as_str(), suffix.as_str()).ok_or(LinuxError::EINVAL)?
+                };
+                changed = true;
+                break;
+            }
+            if !changed {
+                return Ok(current);
+            }
         }
-        Err(LinuxError::ELOOP)
     }
 
     pub(super) fn path_symlink_stat(&self, path: &str) -> Option<general::stat> {
@@ -1403,6 +1445,8 @@ pub(super) fn sys_newfstatat(
             Ok(st) => st,
             Err(err) => return neg_errno(err),
         }
+    } else if path.is_empty() {
+        return neg_errno(LinuxError::ENOENT);
     } else {
         if flags & general::AT_SYMLINK_NOFOLLOW != 0 {
             let resolved_path = {
@@ -1412,14 +1456,18 @@ pub(super) fn sys_newfstatat(
                     Err(err) => return neg_errno(err),
                 }
             };
+            let resolved_path = match process.resolve_parent_symlinks(resolved_path.as_str()) {
+                Ok(path) => path,
+                Err(err) => return neg_errno(err),
+            };
             if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
                 st
             } else {
-                match process
-                    .fds
-                    .lock()
-                    .stat_path(process, dirfd as i32, path.as_str())
-                {
+                match process.fds.lock().stat_path(
+                    process,
+                    general::AT_FDCWD,
+                    resolved_path.as_str(),
+                ) {
                     Ok(st) => st,
                     Err(err) => return neg_errno(err),
                 }
@@ -1606,6 +1654,10 @@ pub(super) fn sys_readlinkat(
             Ok(path) => path,
             Err(err) => return neg_errno(err),
         }
+    };
+    let resolved_path = match process.resolve_parent_symlinks(resolved_path.as_str()) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
     };
     if process.fs_uid() != 0 {
         let mut table = process.fds.lock();
