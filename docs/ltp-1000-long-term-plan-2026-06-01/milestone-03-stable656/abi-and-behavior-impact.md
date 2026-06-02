@@ -141,7 +141,7 @@ Maintenance boundary: this is a minimal residency/prefault implementation, not f
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 19/50 for stable656 (`fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
+- Candidate pool after this checkpoint: 21/50 for stable656 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
 
 ## Behavior gaps exposed but not fixed
 
@@ -214,3 +214,11 @@ User-visible impact:
 Regression evidence: `chdir01`, `pathconf01`, and `fpathconf01` are parser-clean on RV and LA for musl+glibc after the change (`rv-ltpdev-namemax-regression-subset-20260602T041926Z.summary.txt`, `la-ltpdev-namemax-regression-subset-20260602T042012Z.summary.txt`).
 
 Maintenance boundary: this is not full Linux loop-device or disk formatting support. `mknod07` and `mknodat02` still need a generic way to satisfy their ext2 setup (`mkfs.ext2` is absent); `rename03` and `rename04` now expose real rename semantic failures. Future device work must remain generic and rerun device/statfs/mknod/rename plus adjacent pathconf/chdir regressions before promotion.
+
+## FD/fcntl evidence-only impact
+
+No source change is retained for the 2026-06-02 FD/fcntl scout. The artifact records current behavior only: `fcntl15` and `fcntl11_64` are RV + LA x musl+glibc parser-clean; surrounding fcntl rows retain visible timeout/TCONF/TFAIL/TBROK blockers.
+
+Visible ABI/POSIX impact from this documentation update: none. Syscall numbers, errno behavior, file-lock/OFD-lock semantics, FD ownership/lease behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint.
+
+Future fcntl work must remain generic. In particular, `fcntl17` needs lock/wakeup timeout diagnosis; `fcntl24`/`fcntl25`/`fcntl26` need a non-tmpfs or generic lease-capable setup path before TCONF can disappear; `fcntl27`, `fcntl31`, and `fcntl34` need real lease/owner/OFD-lock semantics; `fcntl38`/`fcntl39` need a generic kconfig/capability boundary decision. None of these blocker rows is promotion evidence.

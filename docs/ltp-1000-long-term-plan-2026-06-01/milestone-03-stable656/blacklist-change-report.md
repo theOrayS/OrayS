@@ -61,3 +61,10 @@ No blacklist change was made for the generic device/NAME_MAX repair.
 The earlier `statfs01` family and VFS-C setup-device blocker notes are partially superseded, not hidden: `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` are now four-way parser-clean and are tracked only as future candidates. `mknod07` and `mknodat02` still expose parser-visible `TCONF` because the guest lacks `mkfs.ext2`; `rename03` and `rename04` still expose parser-visible `TFAIL` rename-semantics failures. These rows remain visible blockers, are not blacklisted for credit, and are not counted as stable PASS.
 
 Removal condition for the remaining blockers: implement a generic ext2/device setup path for `mknod07`/`mknodat02` and generic rename semantics for `rename03`/`rename04`, then prove RV + LA x musl+glibc parser-clean summaries plus adjacent regression evidence.
+
+
+## FD/fcntl clean2 blacklist update
+
+No blacklist change was made for the FD/fcntl scout. `fcntl15` and `fcntl11_64` are tracked only as future candidates after RV/LA confirmation. The remaining fcntl rows keep parser-visible timeout/TCONF/TFAIL/TBROK evidence and are not hidden, blacklisted for credit, or counted as stable PASS.
+
+Removal condition for the remaining blockers: implement generic fcntl/lock/lease/owner or setup support as appropriate, then prove RV + LA x musl+glibc parser-clean summaries plus adjacent FD/fcntl regression evidence.

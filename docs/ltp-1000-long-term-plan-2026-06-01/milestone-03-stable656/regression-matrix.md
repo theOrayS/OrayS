@@ -426,3 +426,14 @@ Regression evidence:
 - Result: 6/6 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 
 Remaining regression boundary: `mknod07` and `mknodat02` are not regression-clean promotion rows because `mkfs.ext2` is absent and parser-visible `TCONF` remains; `rename03` and `rename04` are real semantic `TFAIL` blockers. Future fixes must rerun the same device/statfs/mknod/rename set plus this regression subset on RV and LA.
+
+
+## FD/fcntl scout and clean2 confirmation boundary
+
+No source change was retained for this evidence-only checkpoint, so no adjacent stable regression subset is counted here. The proof closes two candidate rows and keeps surrounding blockers visible:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.txt` — `fcntl15` and `fcntl11_64` are parser-clean for musl+glibc; the remaining fcntl rows retain timeout/TCONF/TFAIL/TBROK blockers.
+- LA confirmation summary: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt` — the two clean rows are parser-clean for musl+glibc.
+- Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`.
+
+Result: `fcntl15` and `fcntl11_64` join the not-yet-promoted candidate pool. Future fixes for blocked fcntl rows must first make RV parser-clean, then rerun LA confirmation plus adjacent fcntl/FD/lock regression subsets before any promotion accounting.

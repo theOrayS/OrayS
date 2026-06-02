@@ -410,3 +410,21 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 31 cases short.
 - Remaining blockers from this lane: `mknod07`/`mknodat02` need generic ext2/device setup (`mkfs.ext2` absent); `rename03`/`rename04` need generic rename semantics repair.
+
+
+## FD/fcntl clean2 checkpoint
+
+A documentation/evidence-only FD/fcntl scout converted two not-yet-stable rows into future promotion candidates without changing source or `LTP_STABLE_CASES`.
+
+Evidence:
+
+- RV fcntl scout: `target/ltp-1000-milestone-03-stable656/rv-fcntl-fd-scout-20260602T043210Z.summary.txt` — 4 PASS / 20 FAIL, with `TCONF=14`, `TFAIL=6`, `TBROK=6`, timeout=2, and no ENOSYS/panic/trap. Clean RV rows are `fcntl15` and `fcntl11_64`.
+- LA clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt` — 4 PASS / 0 FAIL, zero internal markers, timeout, ENOSYS, panic/trap.
+- Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`.
+
+Current conclusion:
+
+- Candidate pool: 21/50 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 29 cases short.
+- Remaining blockers from this lane: `fcntl17` timeout; `fcntl24`/`fcntl25`/`fcntl26`/`fcntl37` `TCONF`; `fcntl27`/`fcntl31` `TFAIL`; `fcntl34`/`fcntl38`/`fcntl39` `TBROK`.

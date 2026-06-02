@@ -402,3 +402,50 @@ statvfs01
 ## Promotion result after LTP device/NAME_MAX clean5 confirmation
 # 0 promoted in this checkpoint.
 # Reason: 19 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## RV FD/fcntl scout 2026-06-02
+fcntl15
+fcntl17
+fcntl24
+fcntl25
+fcntl26
+fcntl27
+fcntl31
+fcntl34
+fcntl37
+fcntl38
+fcntl39
+fcntl11_64
+# RV result: fcntl15/fcntl11_64 are musl+glibc parser-clean; remaining fcntl rows retain timeout/TCONF/TFAIL/TBROK blocker evidence.
+
+## LA FD/fcntl clean2 confirmation 2026-06-02
+fcntl15
+fcntl11_64
+# LA result: both rows are musl+glibc parser-clean; combined RV/LA matrix makes them future candidates, not stable promotions yet.
+
+## Four-way clean candidate pool after FD/fcntl clean2 confirmation (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Promotion result after FD/fcntl clean2 confirmation
+# 0 promoted in this checkpoint.
+# Reason: 21 new four-way-clean unique candidates are available, below the +50 stable656 gate.
