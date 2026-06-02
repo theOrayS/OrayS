@@ -28,6 +28,7 @@ The following blockers prevent counting additional rows:
 | pre-fix `fsync02` row | old isolated RV rerun had glibc `TBROK=1`; superseded by post-fix proof but retained as failed evidence |
 | `openat02` | post-statfs-clamp isolated RV rerun still fails both musl and glibc with `TBROK` setup `ENOSPC`; no LA rerun or promotion accounting |
 | `nice04` | RV musl gets `EACCES` for `nice(-10)`, but stable `setpriority02` source requires direct unprivileged `setpriority` lowering to return `EACCES`; no safe kernel errno flip |
+| `clone04` | RV glibc PASSes the NULL-stack `EINVAL` check, but RV musl is killed by SIGSEGV/TBROK; raw log hints at a musl `clone.c` wrapper fix, so it is not counted or LA-confirmed from this failed RV gate |
 | closed arch sweep | 563 four-way-clean historical rows, but zero not-yet-stable rows after filtering live stable606 |
 | `select02`, `sched_rr_get_interval03`, `setpriority01` | wrapper PASS rows include `TCONF`; not promotion evidence |
 | `nice05`, `mincore03`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `execve05` | fail, TFAIL/TBROK/TCONF/ENOSYS, or incomplete arch matrix remains |

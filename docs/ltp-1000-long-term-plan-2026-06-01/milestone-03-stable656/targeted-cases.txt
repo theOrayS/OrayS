@@ -56,6 +56,8 @@ fsync02
 openat02
 futex_wait03
 futex_wait05
+clone04
+# clone04 singleton rescout: RV glibc PASS, RV musl TBROK/SIGSEGV; non-promotable libc-wrapper boundary until fixed.
 
 ## Closed arch-sweep mining rows
 # Unit remains LTP case. The closed RV/LA arch matrices were mined as a whole;

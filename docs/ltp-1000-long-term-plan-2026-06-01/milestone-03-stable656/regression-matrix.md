@@ -145,11 +145,27 @@ Adjacent regression candidates:
 - process exit and address-space teardown cases
 - resource telemetry checks on RV and LA
 
+## If fixing `clone04` / clone wrapper NULL-stack handling
+
+Primary retest case:
+
+- `clone04`
+
+Adjacent regression candidates:
+
+- clone syscall family: `clone01`, `clone03`, `clone06`, `clone07` if present in guest inventory
+- process creation/teardown: `fork01`, `vfork01`, `vfork02`, `waitpid04`, `waitid01`
+- thread teardown and TLS-adjacent smoke: `set_tid_address01`, futex wait/wake cases
+- signal/wait delivery sanity for children killed by invalid clone usage
+
+Boundary: the current evidence is RV glibc-clean but RV musl TBROK/SIGSEGV, with an LTP hint toward a musl `clone.c` wrapper fix. Do not promote until RV musl is parser-clean and the adjacent clone/process/futex subset remains clean on RV and LA.
+
 ## Non-promotion rows
 
 - `mmap10_1`: do not include until the guest LTP inventory contains the binary.
 - `vma02`: do not include until libnuma-related `TCONF` is resolved and both libcs are parser-clean.
 - `readlinkat02`: do not include while LA musl remains parser-unclean; current audit shows musl rewrites user `bufsize == 0` into a one-byte syscall, so any future change must preserve direct `readlinkat(..., bufsiz=1)` truncation semantics and include readlink/readlinkat plus user-pointer boundary regressions.
 - `nice04`: do not include until the `nice()` wrapper errno boundary is fixed without regressing `setpriority02`; use `nice04-errno-boundary-report.md` as the handoff.
+- `clone04`: do not include while RV musl is killed by SIGSEGV/TBROK; classify the musl wrapper boundary before changing kernel clone semantics.
 - closed arch sweep: no extra stable606-missing four-way-clean rows remain; use the matrices only for blocker prioritization.
 - `kill10`: do not include broad batches until the panic/trap is isolated.
