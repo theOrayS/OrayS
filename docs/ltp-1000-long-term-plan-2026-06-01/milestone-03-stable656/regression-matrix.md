@@ -520,3 +520,23 @@ Adjacent regression subset:
 - Result: 12/12 wrapper PASS on each arch, zero internal markers/fatal signatures.
 
 Remaining nearby blockers: `epoll_create02` stays non-promotable because musl's legacy wrapper hides the invalid `size` argument by issuing valid `epoll_create1(0)`. Full `epoll_ctl`/`epoll_wait` semantics are not implemented by this descriptor-creation repair.
+
+
+## clock_adjtime/sigaltstack time-signal regression matrix
+
+Targeted proof:
+
+- RV `adjtimex01,adjtimex03,sigaltstack02,shmt04`: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.txt`
+- LA `adjtimex01,adjtimex03,sigaltstack02,shmt04`: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.txt`
+- Incremental promotion report: `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt`
+
+Result: `adjtimex01`, `adjtimex03`, `shmt04`, and `sigaltstack02` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Adjacent regression subset:
+
+- Cases: `clock_gettime02`, `clock_nanosleep02`, `nanosleep01`, `rt_sigaction01`, `rt_sigprocmask01`, `sigaction01`, `sigprocmask01`.
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.txt`
+- Result: 14/14 wrapper PASS on each arch, zero internal markers/fatal signatures.
+
+Remaining nearby boundary: `sigaltstack` does not yet switch signal delivery to the alternate stack; this checkpoint protects syscall-visible state/errno semantics only. Future signal delivery work must rerun this stable time/signal subset plus signal-delivery-specific cases before promotion accounting.

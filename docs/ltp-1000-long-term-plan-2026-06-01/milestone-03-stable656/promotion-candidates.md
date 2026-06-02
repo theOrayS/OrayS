@@ -9,13 +9,17 @@ Clean evidence set:
 - Previous clean28 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean28-mmap20-munlock02-20260602T054508Z.md`
 - Current epoll_create1 clean2 parser report: `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.txt`
 - Current clean30 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean30-epoll-create1-20260602T061430Z.md`
+- Current clock/sigaltstack/shmt04 clean4 parser report: `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt`
+- Current clean34 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean34-clock-sigaltstack-shmt04-20260602T143805Z.md`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Current four-way-clean not-yet-promoted candidates: 30
-- Remaining before stable656 +50 gate: 20
+- Current four-way-clean not-yet-promoted candidates: 34
+- Remaining before stable656 +50 gate: 16
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
+| `adjtimex01` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `clock_adjtime(CLOCK_REALTIME, ...)` dispatch | keep in candidate pool; not promoted until +50 batch is complete |
+| `adjtimex03` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `clock_adjtime(CLOCK_REALTIME, ...)` dispatch | keep in candidate pool; not promoted until +50 batch is complete |
 | `epoll_create1_01` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | keep in candidate pool; not promoted until +50 batch is complete |
 | `epoll_create1_02` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | keep in candidate pool; not promoted until +50 batch is complete |
 | `fcntl11_64` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
@@ -41,7 +45,9 @@ Clean evidence set:
 | `rename04` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `rename05` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `sched_setaffinity01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `shmt04` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc; existing SysV shm behavior now has four-way evidence | keep in candidate pool; not promoted until +50 batch is complete |
 | `signal01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `sigaltstack02` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `sigaltstack` state/errno handling | keep in candidate pool; not promoted until +50 batch is complete |
 | `stat03` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `stat03_64` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `statfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
@@ -222,3 +228,20 @@ Evidence:
 Newly evidenced four-way-clean cases: `epoll_create1_01` and `epoll_create1_02`. Current pool: 30/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 `epoll_create02` remains outside the pool: glibc/axlibc `epoll_create(size)` now rejects `size <= 0`, but musl reaches the kernel as valid `epoll_create1(0)` and therefore cannot prove the invalid old-size argument at the syscall boundary. The row stays visible as blocker evidence only.
+
+## clock_adjtime/sigaltstack/shmt04 clean4 update
+
+Generic `clock_adjtime` dispatch, per-thread `sigaltstack` syscall-state handling, and four-way `shmt04` confirmation grew the future pool without editing the stable list.
+
+Evidence:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.txt` — `adjtimex01`, `adjtimex03`, `shmt04`, and `sigaltstack02` are parser-clean for musl+glibc; zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.txt` — same parser-clean result for musl+glibc.
+- Incremental clean4 report: `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt`.
+- RV time/signal regression summary: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.txt` — 14 PASS / 0 FAIL, parser zero internal/fatal markers.
+- LA time/signal regression summary: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.txt` — 14 PASS / 0 FAIL, parser zero internal/fatal markers.
+- Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean34-clock-sigaltstack-shmt04-20260602T143805Z.md`.
+
+Newly evidenced four-way-clean cases: `adjtimex01`, `adjtimex03`, `shmt04`, and `sigaltstack02`. Current pool: 34/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+`sigaltstack` support in this checkpoint is syscall-state/errno behavior only; full alternate-stack signal delivery remains a future signal-lane boundary and is not claimed by this candidate proof.
