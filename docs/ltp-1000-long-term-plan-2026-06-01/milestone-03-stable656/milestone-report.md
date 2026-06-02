@@ -1,4 +1,4 @@
-# Milestone 03 stable656 report - G009 scout, scheduler permission, and statfs capacity repair
+# Milestone 03 stable656 report - G009 scout, scheduler/statfs/procfs/timer repairs
 
 Date: 2026-06-02
 Branch: `dev/1000ltp-plan`
@@ -15,7 +15,10 @@ Continue the post-stable606 G009 lane without weakening the promotion gate. This
 1. `examples/shell/src/uspace/resource_sched.rs::sys_sched_setaffinity` checks scheduler target permissions with the existing `can_set_sched_target` helper before accepting an otherwise valid CPU0 affinity mask. This fixes the generic Linux behavior where an unprivileged caller should not be able to set affinity for a root/other-owned target.
 2. `examples/shell/src/uspace/metadata.rs::generic_statfs` clamps synthetic reported free blocks to the in-memory regular-file capacity (`MAX_IN_MEMORY_FILE_SIZE / STATFS_BLOCK_SIZE`) instead of exposing the full global allocator free-page count. This keeps `statfs`/`fstatfs`/`statvfs` free-space reporting conservative relative to the current file-size guardrail and prevents tests that size writes from `fstatvfs().f_bavail` from being driven into setup-time `ENOSPC`.
 
-Neither change hardcodes an LTP case name, path, process, or expected output.
+3. `examples/shell/src/uspace/synthetic_fs.rs` reports `/proc/<pid>/stat` state `S` for live processes with futex-waiting threads.
+4. `kernel/task/axtask/src/timers.rs` programs precise one-shot wakeups for timer-list deadlines before the next 100Hz periodic tick, and `kernel/runtime/axruntime/src/lib.rs` preserves the periodic tick deadline when such early precise timer interrupts fire.
+
+None of these changes hardcodes an LTP case name, path, process, or expected output.
 
 ## Evidence summary
 
@@ -141,12 +144,29 @@ Targeted result: `futex_wait03` is RV + LA x musl + glibc parser-clean with zero
 
 Regression result: `futex_wait02`, `futex_wait04`, `futex_wake01`, `proc01`, and `waitpid04` are parser-clean on RV and LA, 10/10 wrapper PASS on each arch.
 
+
+### `futex_wait05` precise timer-list repair
+
+Artifacts:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-futex-wait05-periodic-fix-20260601T235234Z.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-futex-wait05-periodic-fix-20260601T235323Z.summary.txt`
+- RV timer/futex regression summary: `target/ltp-1000-milestone-03-stable656/rv-timer-futex-regression-periodic-fix-20260601T235036Z.summary.txt`
+- LA timer/futex regression summary: `target/ltp-1000-milestone-03-stable656/la-timer-futex-regression-periodic-fix-20260601T234827Z.summary.txt`
+- Combined clean5 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.promotion-candidates.txt`
+
+Targeted result: `futex_wait05` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Regression result: `futex_wait01`, `futex_wait02`, `futex_wait03`, `futex_wait04`, `futex_wait05`, `futex_wake01`, `proc01`, `waitpid04`, `nanosleep01`, and `clock_nanosleep02` are parser-clean on RV and LA, 20/20 wrapper PASS on each arch.
+
+Caveat: an initial LA run launched through a TTY stopped before guest output, and a later LA regression attempt hung inside pre-fix `futex_wait05`; both terminated logs are retained only as non-countable repair history. The counted evidence is the post-periodic-deadline-fix targeted and regression set above.
+
 ### Combined candidate pool
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean4-20260601T232334Z.promotion-candidates.txt`
-- Candidates: 4 (`fsync02`, `futex_wait01`, `futex_wait03`, `sched_setaffinity01`)
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean5-periodic-fix-20260601T235428Z.promotion-candidates.txt`
+- Candidates: 5 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `sched_setaffinity01`)
 - Blocked/incomplete: 0 in this clean proof set
 
 An earlier combined report that included the old mixed scout is intentionally not used for the current pool because it mixes the pre-fix `fsync02` `TBROK` row with the post-fix `fsync02` proof.
@@ -164,16 +184,16 @@ Parser result: 0/2 wrapper PASS, `TBROK=4`, zero timeout, ENOSYS, panic/trap. Bo
 
 ## Conclusion
 
-Four new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
+Five new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
 
 - `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 - No milestone promotion commit is created for stable656 yet.
-- The scheduler permission fix, statfs capacity clamp, and procfs futex-sleeping state repair are kept as generic behavior work with closed targeted and regression evidence.
-- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current four-case pool.
+- The scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, and precise timer-list wakeup repair are kept as generic behavior work with closed targeted and regression evidence.
+- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current five-case pool.
 
 ## Risks / next steps
 
-1. Accumulate 46 more four-way-clean candidates before editing the stable list for stable656.
+1. Accumulate 45 more four-way-clean candidates before editing the stable list for stable656.
 2. Isolate `kill10` panic/trap before broad process/signal shards.
 3. Diagnose LA musl `readlinkat02` before counting the RV-clean row; the current syscall body already rejects `bufsiz == 0`, so do not special-case the LA musl `bufsiz=1` boundary without root cause.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.

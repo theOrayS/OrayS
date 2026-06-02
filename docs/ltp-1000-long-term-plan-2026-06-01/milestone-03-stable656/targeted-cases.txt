@@ -54,6 +54,7 @@ readlinkat02
 fsync02
 openat02
 futex_wait03
+futex_wait05
 
 ## Closed arch-sweep mining rows
 # Unit remains LTP case. The closed RV/LA arch matrices were mined as a whole;
@@ -80,12 +81,26 @@ statfs03
 statfs03_64
 statvfs02
 
+
+## Adjacent timer/futex regression subset for precise timed-wait fix
+futex_wait01
+futex_wait02
+futex_wait03
+futex_wait04
+futex_wait05
+futex_wake01
+proc01
+waitpid04
+nanosleep01
+clock_nanosleep02
+
 ## Four-way clean candidate pool (not yet promoted)
 fsync02
 futex_wait01
 futex_wait03
+futex_wait05
 sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 4 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 5 new four-way-clean unique candidates are available, below the +50 milestone gate.

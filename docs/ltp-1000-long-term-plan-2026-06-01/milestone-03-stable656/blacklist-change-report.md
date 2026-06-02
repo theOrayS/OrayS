@@ -8,6 +8,7 @@ No blacklist changes were made in this checkpoint.
 | --- | --- | --- |
 | `kill10` | RV scout produced panic/trap / early stop before glibc group | not blacklisted here; severe blocker recorded for isolated diagnosis |
 | old `futex_wait03` scout row | timeout in both libcs before procfs repair | not blacklisted here; superseded by current clean targeted evidence |
+| old `futex_wait05` scout/terminated rows | slept-too-long or incomplete LA regression before precise timer/periodic-deadline repair | not blacklisted here; superseded by current clean targeted and regression evidence |
 | `shmat1` | mixed scout had long/hung behavior and was manually terminated | not blacklisted here; evidence is scouting-only |
 | `mmap05` | `TBROK` / killed by SIGSEGV | not blacklisted here; recorded as repair candidate |
 | `munmap01` | wrapper FAIL code 139 | not blacklisted here; recorded as repair candidate |
