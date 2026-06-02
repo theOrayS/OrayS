@@ -115,3 +115,14 @@ Latest artifacts:
 - Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
 
 Decision: add `fcntl11_64` and `fcntl15` to the future promotion pool. The RV scout also records ten surrounding blocker cases (`fcntl17`, `fcntl24`, `fcntl25`, `fcntl26`, `fcntl27`, `fcntl31`, `fcntl34`, `fcntl37`, `fcntl38`, `fcntl39`) with timeout/TCONF/TFAIL/TBROK; those rows are not eligible for LA confirmation or promotion accounting. Current pool is 21/50, so no stable-list edit is made.
+
+## Rename03/rename04 clean2 update
+
+Latest artifacts:
+
+- RV rename proof: `target/ltp-1000-milestone-03-stable656/rv-rename-dir-overwrite-20260602T050256Z.summary.txt`
+- LA rename proof: `target/ltp-1000-milestone-03-stable656/la-rename-dir-overwrite-20260602T050346Z.summary.txt`
+- RV clean-only statfs/rename05 retarget: `target/ltp-1000-milestone-03-stable656/rv-statfs-rename05-clean-retarget-20260602T050521Z.summary.txt`
+- Combined clean24 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt`
+
+Decision: add `rename03` and `rename04` to the future promotion pool. The previous mixed `rv-device-cases-ltpdev-namemax-retest` log is retained as blocker history but intentionally excluded from the clean24 combined parser report because it contains pre-fix `rename03/rename04` TFAIL rows. Current pool is 24/50, so no stable-list edit is made.

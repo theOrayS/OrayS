@@ -68,3 +68,7 @@ Removal condition for the remaining blockers: implement a generic ext2/device se
 No blacklist change was made for the FD/fcntl scout. `fcntl15` and `fcntl11_64` are tracked only as future candidates after RV/LA confirmation. The remaining fcntl rows keep parser-visible timeout/TCONF/TFAIL/TBROK evidence and are not hidden, blacklisted for credit, or counted as stable PASS.
 
 Removal condition for the remaining blockers: implement generic fcntl/lock/lease/owner or setup support as appropriate, then prove RV + LA x musl+glibc parser-clean summaries plus adjacent FD/fcntl regression evidence.
+
+## Rename03/rename04 blocker closure update
+
+No blacklist change was made for the rename repair. The previous visible `rename03`/`rename04` blockers are closed by generic `axfs::root::rename` source/destination type handling and are now tracked only as future clean candidates after RV + LA x musl+glibc parser-clean proof. The old TFAIL logs remain repair history and are not hidden or counted. `mknod07` and `mknodat02` remain visible non-promotable setup blockers; no blacklist credit is taken.

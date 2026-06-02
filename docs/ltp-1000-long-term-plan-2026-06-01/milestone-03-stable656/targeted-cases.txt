@@ -512,3 +512,44 @@ statvfs01
 ## Promotion result after rename01 inode confirmation
 # 0 promoted in this checkpoint.
 # Reason: 22 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## Rename directory replacement targeted proof
+rename01
+rename03
+rename04
+rename05
+# RV/LA x musl/glibc parser-clean after generic axfs rename source/destination type handling.
+
+## Clean-only statfs/rename05 retarget for combined report hygiene
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+rename05
+# RV clean-only retarget avoids mixing old rename03/rename04 TFAIL history into the clean24 promotion-candidate report.
+
+## Four-way clean candidate pool after rename03/rename04 repair (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01

@@ -239,3 +239,20 @@ User-visible behavior:
 Regression evidence: `rename01` and adjacent existing candidate `rename05` are parser-clean on RV and LA for musl+glibc after the change (`rv-rename-inode-retarget-20260602T044708Z.summary.txt`, `la-rename-inode-retarget-20260602T044751Z.summary.txt`). Singleton `rename01` proof is also parser-clean on RV and LA (`rv-rename01-inode-confirm-20260602T044855Z.summary.txt`, `la-rename01-inode-confirm-20260602T044855Z.summary.txt`).
 
 Maintenance boundary: this is a generic metadata-lifetime fix, not an LTP case/path/output special case. Future rename/link work must preserve Linux/POSIX visible errno and inode/link-count semantics and must not emulate hard links by copying data without proving shared object identity and nlink behavior.
+
+## Rename03/rename04 directory replacement repair impact
+
+Changed file: `kernel/fs/axfs/src/root.rs`.
+
+User-visible behavior:
+
+- `rename(old_file, existing_file)` still removes the destination file and renames the source file.
+- `rename(old_file, existing_dir)` now reliably returns `EISDIR` instead of attempting to remove the directory as a file.
+- `rename(old_dir, existing_file)` now returns `ENOTDIR` instead of deleting the destination file first or surfacing a misleading later error.
+- `rename(old_dir, existing_empty_dir)` now removes the empty destination directory and renames the source directory into its place.
+- `rename(old_dir, existing_non_empty_dir)` now preserves the destination and returns the underlying non-empty-directory error (`ENOTEMPTY`/`DirectoryNotEmpty` path) through `remove_dir`.
+- `rename(path, path)` now succeeds without mutating the filesystem.
+
+ABI/POSIX surface: no struct layout, syscall number, FD table, signal, futex, mmap, or user-pointer ABI changed. The visible syscall impact is limited to generic `rename`/`renameat` errno and replacement semantics for existing destinations. This intentionally aligns closer to Linux/POSIX rename behavior and is not keyed to LTP names or paths.
+
+Lifetime/resource risk: the repair looks up the source before removing any destination, reducing destructive failure risk when the source is absent. Destination directory replacement still relies on existing `remove_dir` emptiness and permission checks, so non-empty directories and protected paths remain guarded.

@@ -461,3 +461,12 @@ Regression evidence:
 - Result: `rename01,rename05` produce 4/4 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
 
 Remaining regression boundary: this does not implement `link(2)` or full hard-link/nlink semantics. Future link/rename fixes must first make RV parser-clean, then rerun LA confirmation plus adjacent `rename01`, `rename05`, link/linkat, stat/statx, and unlink regression subsets before any promotion accounting.
+
+## Rename directory replacement regression slice
+
+| Change | Protected cases | Evidence | Result |
+| --- | --- | --- | --- |
+| Generic `axfs::root::rename` source/destination type handling | `rename01`, `rename03`, `rename04`, `rename05` | `rv-rename-dir-overwrite-20260602T050256Z.summary.txt`; `la-rename-dir-overwrite-20260602T050346Z.summary.txt` | RV + LA x musl+glibc PASS, parser zero internal markers/fatal signatures |
+| Combined-report hygiene after old mixed TFAIL history | `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, `rename05` | `rv-statfs-rename05-clean-retarget-20260602T050521Z.summary.txt`; old LA clean5 summary; `combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt` | clean-only parser inputs produce 24 candidates without counting old `rename03/rename04` TFAIL rows |
+
+Remaining nearby blockers: `mknod07` and `mknodat02` still need generic ext2/device setup support; they are not promoted or blacklisted here.
