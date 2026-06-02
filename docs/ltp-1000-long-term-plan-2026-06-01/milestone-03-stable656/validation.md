@@ -1358,3 +1358,38 @@ Promotion candidates: 0; blocked/incomplete cases: 4
 Raw-log diagnostic: `strings` over the RV log shows every case entering LTP setup and failing with `No free devices found` / `Failed to acquire device`. This is a visible setup-device blocker, not promotion-clean statfs/statvfs behavior evidence.
 
 Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remains 14/50 and stable remains `606 total / 606 unique / 0 duplicate`.
+
+## RV VFS-C mknod/rename device-acquire blocker scout
+
+Date: 2026-06-02. This was a VFS create/rename/path setup-boundary scout for remaining not-stable VFS-C rows. No source or stable-list edit was made.
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mknod07,mknodat02,rename03,rename04,rename05 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.json`
+- RV promotion-candidate report: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.derived.sha256`
+
+Parser result:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 10
+Internal TFAIL/TBROK/TCONF: 14 ({'TBROK': 14})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Suite summaries: ltp-musl 0 passed / 5 failed; ltp-glibc 0 passed / 5 failed
+Promotion candidates: 0; blocked/incomplete cases: 5
+```
+
+Raw-log diagnostic: `strings` over the RV log shows every case entering LTP setup and failing with `No free devices found` / `Failed to acquire device`. This is a visible setup-device blocker, not promotion-clean mknod/rename behavior evidence.
+
+Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remains 14/50 and stable remains `606 total / 606 unique / 0 duplicate`.

@@ -93,3 +93,13 @@ RV-only scout artifact: `target/ltp-1000-milestone-03-stable656/rv-statfs01-fami
 | `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01` | RV musl+glibc all fail in LTP device setup with `TBROK=8`; raw log reports `No free devices found` / `Failed to acquire device`; promotion report has 0 candidates / 4 blocked | classify guest block-device/free-device support before rerunning; do not treat these rows as statfs ABI proof, do not LA-confirm until RV setup is parser-clean |
 
 This scout does not change the current four-way-clean pool. It remains 14/50 for stable656.
+
+## VFS-C mknod/rename RV setup-device blocker
+
+RV-only scout artifact: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.txt`.
+
+| Case/lane | Current blocker | Next useful action |
+| --- | --- | --- |
+| `mknod07`, `mknodat02`, `rename03`, `rename04`, `rename05` | RV musl+glibc all fail in LTP device setup with `TBROK=14`; raw log reports `No free devices found` / `Failed to acquire device`; promotion report has 0 candidates / 5 blocked | classify guest block-device/free-device support before rerunning; do not treat these rows as mknod/rename ABI proof, do not LA-confirm until RV setup is parser-clean |
+
+This scout does not change the current four-way-clean pool. It remains 14/50 for stable656.

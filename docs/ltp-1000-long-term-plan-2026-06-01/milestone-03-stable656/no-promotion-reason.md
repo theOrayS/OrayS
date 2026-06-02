@@ -68,3 +68,13 @@ The RV scout for `statfs01`, `fstatfs01`, `fstatfs01_64`, and `statvfs01` did no
 - Raw-log diagnosis: LTP setup reports `No free devices found` / `Failed to acquire device`.
 
 These four rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remains unchanged and the pool remains 14/50.
+
+## VFS-C mknod/rename no-promotion update
+
+The RV scout for `mknod07`, `mknodat02`, `rename03`, `rename04`, and `rename05` did not add candidates:
+
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.txt`
+- Parser result: 0 PASS / 10 FAIL, with `TBROK=14` and zero timeout/ENOSYS/panic/trap.
+- Raw-log diagnosis: LTP setup reports `No free devices found` / `Failed to acquire device`.
+
+These five rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remains unchanged and the pool remains 14/50.

@@ -89,3 +89,13 @@ The 2026-06-02 RV scout for `statfs01`, `fstatfs01`, `fstatfs01_64`, and `statvf
 - Result: 0 wrapper PASS / 8 wrapper FAIL, `TBROK=8`, no timeout/ENOSYS/panic/trap.
 
 The raw log shows LTP setup failing to acquire a free device for all four cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and do not affect the 14-case candidate pool.
+
+## VFS-C mknod/rename non-candidate note
+
+The 2026-06-02 RV scout for `mknod07`, `mknodat02`, `rename03`, `rename04`, and `rename05` is outside the clean pool:
+
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.summary.txt`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.promotion-candidates.txt`
+- Result: 0 wrapper PASS / 10 wrapper FAIL, `TBROK=14`, no timeout/ENOSYS/panic/trap.
+
+The raw log shows LTP setup failing to acquire a free device for all five cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and do not affect the 14-case candidate pool.

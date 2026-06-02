@@ -49,3 +49,7 @@ No blacklist change was made for the latest RV G009 mm/mlock/mmap scout. Four ro
 ## `statfs01` family setup-device blocker update
 
 No blacklist change was made for `statfs01`, `fstatfs01`, `fstatfs01_64`, or `statvfs01`. The RV scout is an ordinary visible setup blocker: both libcs fail with `TBROK` because LTP cannot acquire a free device. These rows are not hidden, not counted as PASS, and not converted into blacklist credit. Removal condition: generic device acquisition support must make the RV run parser-clean before any LA confirmation or stable promotion accounting.
+
+## VFS-C mknod/rename setup-device blocker update
+
+No blacklist change was made for `mknod07`, `mknodat02`, `rename03`, `rename04`, or `rename05`. The RV scout is an ordinary visible setup blocker: both libcs fail with `TBROK` because LTP cannot acquire a free device. These rows are not hidden, not counted as PASS, and not converted into blacklist credit. Removal condition: generic device acquisition support must make the RV run parser-clean before any LA confirmation or stable promotion accounting.

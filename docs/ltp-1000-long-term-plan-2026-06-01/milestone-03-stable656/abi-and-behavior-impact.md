@@ -185,3 +185,11 @@ No source change is retained for the `statfs01,fstatfs01,fstatfs01_64,statvfs01`
 Visible ABI/POSIX impact from this documentation update: none. Syscall numbers, errno behavior, `statfs`/`statvfs` struct layout, FD semantics, block-device behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint.
 
 Future work must implement or expose a generic device-acquisition model if these tests are to reach their statfs assertions. It must not hardcode LTP case names, paths, device names, or outputs, and it must rerun adjacent statfs/fstatfs/statvfs plus mount/device setup regressions before promotion.
+
+## VFS-C mknod/rename evidence-only impact
+
+No source change is retained for the `mknod07,mknodat02,rename03,rename04,rename05` RV scout. The new artifact records current setup behavior only: LTP cannot acquire a free device on RV and emits parser-visible `TBROK` for both musl and glibc.
+
+Visible ABI/POSIX impact from this documentation update: none. Syscall numbers, errno behavior, `mknod`/`mknodat` mode/dev semantics, `rename` path semantics, FD behavior, block-device behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint.
+
+Future work must implement or expose a generic device-acquisition model if these tests are to reach their VFS assertions. It must not hardcode LTP case names, paths, device names, or outputs, and it must rerun adjacent mknod/mknodat/rename plus mount/device setup regressions before promotion.

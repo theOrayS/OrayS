@@ -338,3 +338,16 @@ statvfs01
 ## Promotion result after statfs01-family RV scout
 # 0 promoted in this checkpoint.
 # Reason: statfs01/fstatfs01/fstatfs01_64/statvfs01 are RV parser-unclean setup blockers; clean candidate pool remains 14/50.
+
+## RV VFS-C mknod/rename device-acquire blocker scout 2026-06-02
+mknod07
+mknodat02
+rename03
+rename04
+rename05
+# RV result: all five cases fail both musl and glibc with parser-visible TBROK from LTP device setup (`No free devices found` / `Failed to acquire device`).
+# LA was not run because RV did not satisfy the promotion gate.
+
+## Promotion result after VFS-C mknod/rename RV scout
+# 0 promoted in this checkpoint.
+# Reason: mknod07/mknodat02/rename03/rename04/rename05 are RV parser-unclean setup blockers; clean candidate pool remains 14/50.
