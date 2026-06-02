@@ -6,7 +6,7 @@ No blacklist changes were made in this checkpoint.
 
 | Case | Blocker type | Blacklist decision |
 | --- | --- | --- |
-| `kill10` | RV scout produced panic/trap / early stop before glibc group | not blacklisted here; severe blocker recorded for isolated diagnosis |
+| `kill10` | isolated RV singleton reproduces musl timeout, persistent post-cleanup frame leak, and glibc allocator panic; temporary poll/exit-group cleanup hypothesis rejected | not blacklisted here; severe blocker remains; removal requires normal RV/LA x musl/glibc completion with no timeout, panic/trap, or resource-pollution delta |
 | old `futex_wait03` scout row | timeout in both libcs before procfs repair | not blacklisted here; superseded by current clean targeted evidence |
 | old `futex_wait05` scout/terminated rows | slept-too-long or incomplete LA regression before precise timer/periodic-deadline repair | not blacklisted here; superseded by current clean targeted and regression evidence |
 | old `signal01` scout row | timeout before poll-wait proc-state repair | not blacklisted here; superseded by current clean targeted evidence |
@@ -30,3 +30,8 @@ These failures are not hidden. They are not counted as PASS, not promoted to sta
 ## `openat03` blocker update
 
 No blacklist entry was added for `openat03`. The rejected `O_TMPFILE`/`linkat` emulation produced RV panic/trap evidence and was removed; the retained generic unsupported gate produces visible `TCONF`/wrapper FAIL on RV/LA x musl/glibc with zero panic/trap. This is an ordinary unresolved feature/VFS robustness blocker, not blacklist credit and not promotion evidence.
+
+
+## `kill10` isolated blocker update
+
+Two RV singleton runs on 2026-06-02 confirmed that `kill10` is not merely a noisy broad-shard artifact. Both runs show musl wrapper FAIL 137 after the 120s timeout, about `-129185` free frames after cleanup, then an immediate glibc allocator panic. A temporary generic `poll`/`ppoll` pending-exit cleanup change did not alter the parser result or resource delta and was removed. No blacklist credit or promotion credit is taken from these rows.

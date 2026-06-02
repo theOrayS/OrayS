@@ -262,7 +262,7 @@ Seven new unique cases are currently four-way clean, but stable656 requires 50 n
 ## Risks / next steps
 
 1. Accumulate 43 more four-way-clean candidates before editing the stable list for stable656.
-2. Isolate `kill10` panic/trap before broad process/signal shards.
+2. Fix `kill10` cleanup/resource-lifetime blocker before broad process/signal shards; singleton RV evidence now confirms musl timeout, persistent frame leak, and following glibc allocator panic, while the poll/exit cleanup hypothesis was rejected.
 3. Do not count LA musl `readlinkat02`: root cause is now documented as musl's zero-size wrapper rewrite into a one-byte syscall, and a kernel `bufsiz=1` special case would break valid direct Linux truncation semantics.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
 5. Treat `mmap05` as a LoongArch mmap/protection-fault signal blocker; do not count the RV-only clean row.
@@ -302,3 +302,8 @@ A broader in-memory `O_TMPFILE`/`linkat` emulation was attempted and rejected: R
 The retained source change is only a generic unsupported-feature gate in `fd_table.rs`: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP` instead of accidentally returning a directory fd through the `O_DIRECTORY` bit. Targeted RV and LA summaries (`rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`, `la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`) now show zero timeout, ENOSYS, panic, or trap, but they still contain `TCONF=4` and wrapper FAIL for musl+glibc.
 
 Decision: this is honest blocker evidence only. `openat03` is not in the candidate pool; at this point in the evidence timeline the pool remained 8/50, stable list remained `606/606/0`, and a future attempt must first solve real generic `O_TMPFILE` semantics plus the deep-directory VFS panic.
+
+
+## `kill10` isolated blocker checkpoint
+
+A 2026-06-02 RV singleton rerun reproduced `kill10` as a severe blocker outside broad-shard noise: musl wrapper FAIL 137 after 120s, persistent free-frame delta around `-129185` after cleanup, and immediate glibc allocator panic. A temporary generic `poll`/`ppoll` exit-group cleanup hypothesis was tested and removed because it did not change the parser summary or resource delta. `kill10` remains excluded from promotion and from broad batches until cleanup/lifetime behavior is repaired.

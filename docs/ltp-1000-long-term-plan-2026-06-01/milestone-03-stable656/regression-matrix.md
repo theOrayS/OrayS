@@ -202,7 +202,7 @@ Boundary: the current evidence is RV glibc-clean but RV musl TBROK/SIGSEGV, with
 - `nice04`: do not include until the `nice()` wrapper errno boundary is fixed without regressing `setpriority02`; use `nice04-errno-boundary-report.md` as the handoff.
 - `clone04`: do not include while RV musl is killed by SIGSEGV/TBROK; classify the musl wrapper boundary before changing kernel clone semantics.
 - closed arch sweep: no extra stable606-missing four-way-clean rows remain; use the matrices only for blocker prioritization.
-- `kill10`: do not include broad batches until the panic/trap is isolated.
+- `kill10`: do not include broad batches until the isolated timeout + post-cleanup frame leak + following glibc allocator panic is fixed; poll/exit cleanup was tested and rejected as insufficient.
 
 ## Completed regression for file-backed mmap `SIGBUS` beyond EOF
 
@@ -321,3 +321,8 @@ Regression evidence:
 - RV summary: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.summary.txt`
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.summary.txt`
 - Result: 24/24 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+
+## `kill10` resource-lifetime regression boundary
+
+Current blocker evidence protects against treating case-local timeout cleanup as harmless. Any future `kill10` or process-group signal cleanup patch must rerun an isolated RV singleton first and prove all of the following before broad process/signal shards resume: no musl timeout, no persistent post-cleanup frame leak comparable to `-129185` frames, no allocator panic in the following glibc group, and parser-clean summaries for both libcs. Only after that should LA confirmation and adjacent process/signal regressions run.
