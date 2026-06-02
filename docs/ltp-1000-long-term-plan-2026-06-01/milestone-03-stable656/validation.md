@@ -546,9 +546,39 @@ Source inspected: `/root/oskernel2026-orays-clean-stable520/docs/ltp-score-impro
 
 Observed requirement: after switching to user `nobody`, `nice(-10)` expects failure with `errno == EPERM`. Current kernel `setpriority` lowering path returns Linux `EACCES` semantics for non-root callers that try to lower nice, and stable `setpriority02` explicitly protects that syscall-level behavior. Detailed report: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/nice04-errno-boundary-report.md`. Therefore `nice04` is not changed in this checkpoint; it remains a libc-wrapper/errno-boundary investigation rather than a safe kernel errno flip.
 
+## RV `clone04` singleton rescout
+
+Command captured in run meta:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clone04 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.log`
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.summary.txt`
+- JSON: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.summary.json`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.promotion-candidates.txt`
+- Checksums: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.derived.sha256`
+
+Parser summary:
+
+```text
+PASS LTP CASE: 1
+FAIL LTP CASE: 1
+Internal TFAIL/TBROK/TCONF: 1 ({'TBROK': 1})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 0
+```
+
+Decision: `clone04` remains blocked. RV glibc is clean (`NULL stack : EINVAL (22)`), but RV musl is killed by SIGSEGV/TBROK. The raw log's LTP hint points to a musl `clone.c` fix (`https://git.musl-libc.org/cgit/musl/commit/src/linux/clone.c?id=fa4a8abd06a4`), so treat this as a libc-wrapper boundary until proven otherwise; do not promote or run LA confirmation from this failed RV gate.
+
 ## Gate outcome
 
-- Targeted RV: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; other scout rows blocked as documented.
+- Targeted RV: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; other scout rows remain blocked, including `clone04` due RV musl TBROK/SIGSEGV.
 - Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, and precise timer-list wakeup repair.
 - LA confirmation: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL` from the audited libc/test zero-size wrapper boundary.
 - musl + glibc: clean only for the five candidate rows.
@@ -559,7 +589,7 @@ Observed requirement: after switching to user `nobody`, `nice(-10)` expects fail
 
 - No stable656 promotion gate because the candidate pool has only 5/50 required new cases.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `shmat1`, or `nice04`; LA musl `readlinkat02` is documented as non-promotable from the kernel side unless the libc/test boundary changes.
+- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `shmat1`, `nice04`, or `clone04`; LA musl `readlinkat02` is documented as non-promotable from the kernel side unless the libc/test boundary changes.
 
 
 ## `futex_wait05` precise timer-list proof

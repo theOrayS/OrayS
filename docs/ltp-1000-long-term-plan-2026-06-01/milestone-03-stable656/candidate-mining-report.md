@@ -45,10 +45,11 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 | `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL=1`; musl turns `bufsize == 0` into a dummy one-byte `readlinkat` syscall, so the kernel only sees `bufsiz=1` | keep non-promotable as a libc/test boundary; do not special-case kernel `bufsiz=1` because direct Linux `readlinkat(..., bufsiz=1)` truncation must remain valid |
 | `openat02` | post-statfs-clamp isolated RV rerun still has musl+glibc `TBROK` setup `ENOSPC` | keep blocked; diagnose file-growth/space accounting separately before any LA rerun |
 | `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
+| `clone04` | RV glibc clean, but RV musl is killed by SIGSEGV/TBROK; raw log points to the upstream musl `clone.c` NULL-stack wrapper fix | keep blocked; classify libc-wrapper boundary first, then require RV musl closure plus clone/vfork/futex/signal/wait regressions before any LA rerun or promotion |
 | `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |
 | `mmap05` / `munmap01` / `mmap13` | SIGSEGV/SIGBUS delivery gaps | narrow mmap fault-signal lane with signal + mmap regressions |
 | `shmat1` | long/hung mixed scout | SysV shm/resource lifetime lane, isolated timeout first |
 
 ## Promotion decision
 
-No `LTP_STABLE_CASES` edit is justified. The candidate pool is 5/50 for stable656, and all blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic` caveats.
+No `LTP_STABLE_CASES` edit is justified. The candidate pool is 5/50 for stable656, and all blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.

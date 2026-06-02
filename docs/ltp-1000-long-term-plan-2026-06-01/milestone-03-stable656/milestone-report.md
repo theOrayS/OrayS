@@ -184,6 +184,17 @@ Artifacts:
 
 Parser result: 0/2 wrapper PASS, `TBROK=4`, zero timeout, ENOSYS, panic/trap. Both RV musl and RV glibc still hit setup `ENOSPC` after the statfs clamp, so `openat02` remains a blocker and is not counted in the clean pool.
 
+### `clone04` RV singleton rescout
+
+Artifacts:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-clone04-singleton-20260602T001435Z.derived.sha256`
+
+Parser result: 1 PASS / 1 FAIL; RV glibc is clean, but RV musl has `TBROK=1` and is killed by SIGSEGV. Promotion candidates: 0. The raw log's LTP hint points to a musl `clone.c` wrapper fix, so this row is recorded as a libc-wrapper boundary and is not LA-confirmed or promoted from the failed RV gate.
+
 ## Conclusion
 
 Five new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
@@ -199,5 +210,6 @@ Five new unique cases are currently four-way clean, but stable656 requires 50 ne
 2. Isolate `kill10` panic/trap before broad process/signal shards.
 3. Do not count LA musl `readlinkat02`: root cause is now documented as musl's zero-size wrapper rewrite into a one-byte syscall, and a kernel `bufsiz=1` special case would break valid direct Linux truncation semantics.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
-5. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
-6. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS evidence visible; none counts toward stable promotion.
+5. Treat `clone04` as a libc-wrapper/clone ABI boundary until RV musl no longer SIGSEGV/TBROK and clone/process/futex regressions are closed.
+6. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
+7. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS/SIGSEGV evidence visible; none counts toward stable promotion.

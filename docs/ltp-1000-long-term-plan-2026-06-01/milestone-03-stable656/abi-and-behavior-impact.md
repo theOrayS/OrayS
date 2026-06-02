@@ -77,8 +77,9 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
 3. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects syscall-visible `bufsiz == 0`. Source audit found musl rewrites user `bufsize == 0` into a dummy one-byte syscall, so preserving valid direct `readlinkat(..., bufsiz=1)` truncation semantics takes priority over a kernel special case.
 4. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
-5. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
-6. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
+5. `clone04`: RV glibc confirms the kernel/glibc path returns `EINVAL` for a NULL stack, but RV musl is killed by SIGSEGV/TBROK before a clean wrapper PASS. No code change was made; treat it as a libc-wrapper boundary until a generic clone ABI fix can be proven without regressing clone/vfork/futex/wait behavior.
+6. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
+7. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
 
 ## Maintenance boundary
 
