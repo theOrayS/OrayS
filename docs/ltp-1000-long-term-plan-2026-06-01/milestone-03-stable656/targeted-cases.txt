@@ -326,3 +326,15 @@ signal01
 ## Promotion result after G009 clean4 confirmation
 # 0 promoted in this checkpoint.
 # Reason: only 14 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## RV statfs01-family device-acquire blocker scout 2026-06-02
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+# RV result: all four cases fail both musl and glibc with parser-visible TBROK from LTP device setup (`No free devices found` / `Failed to acquire device`).
+# LA was not run because RV did not satisfy the promotion gate.
+
+## Promotion result after statfs01-family RV scout
+# 0 promoted in this checkpoint.
+# Reason: statfs01/fstatfs01/fstatfs01_64/statvfs01 are RV parser-unclean setup blockers; clean candidate pool remains 14/50.

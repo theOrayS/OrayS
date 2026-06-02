@@ -45,3 +45,7 @@ No blacklist change was made for `epoll_create02`. The focused singleton evidenc
 ## G009 mm/mlock/mmap scout blocker update
 
 No blacklist change was made for the latest RV G009 mm/mlock/mmap scout. Four rows (`mincore02`, `mincore04`, `mprotect02`, `mprotect04`) became four-way-clean after LA confirmation and are counted only as future candidates. The remaining RV rows (`mlock02`, `mlock05`, `mlock201`, `mlock202`, `mlock203`, `mlockall02`, `mlockall03`, `munlock02`, `munlockall01`, `mprotect01`, `mprotect03`, `mmap08`, `mmap16`, `mmap18`, `mmap20`) retain visible `TFAIL/TBROK/TCONF` blocker evidence. They are not hidden, not blacklisted for credit, not LA-confirmed, and not counted as stable promotion evidence.
+
+## `statfs01` family setup-device blocker update
+
+No blacklist change was made for `statfs01`, `fstatfs01`, `fstatfs01_64`, or `statvfs01`. The RV scout is an ordinary visible setup blocker: both libcs fail with `TBROK` because LTP cannot acquire a free device. These rows are not hidden, not counted as PASS, and not converted into blacklist credit. Removal condition: generic device acquisition support must make the RV run parser-clean before any LA confirmation or stable promotion accounting.

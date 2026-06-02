@@ -79,3 +79,13 @@ A follow-up RV scout plus LA confirmation grew the clean pool without editing th
 - Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`.
 
 Newly evidenced four-way-clean cases: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04`. Current pool: 14/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+
+## `statfs01` family non-candidate note
+
+The 2026-06-02 RV scout for `statfs01`, `fstatfs01`, `fstatfs01_64`, and `statvfs01` is outside the clean pool:
+
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.summary.txt`
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.promotion-candidates.txt`
+- Result: 0 wrapper PASS / 8 wrapper FAIL, `TBROK=8`, no timeout/ENOSYS/panic/trap.
+
+The raw log shows LTP setup failing to acquire a free device for all four cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and do not affect the 14-case candidate pool.

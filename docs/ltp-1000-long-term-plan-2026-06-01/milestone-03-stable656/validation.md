@@ -1323,3 +1323,38 @@ Suite summaries: ltp-musl 4 passed / 0 failed; ltp-glibc 4 passed / 0 failed
 ```
 
 Decision: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The other RV scout rows remain blocker evidence because they retain parser-visible `TFAIL/TBROK/TCONF` and were not LA-confirmed. Current candidate pool is 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+## RV statfs01-family device-acquire blocker scout
+
+Date: 2026-06-02. This was a VFS/statfs setup-boundary scout after the earlier `generic_statfs` capacity-clamp regression passed adjacent stable rows. No source or stable-list edit was made.
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=statfs01,fstatfs01,fstatfs01_64,statvfs01 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.summary.json`
+- RV promotion-candidate report: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.derived.sha256`
+
+Parser result:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 8
+Internal TFAIL/TBROK/TCONF: 8 ({'TBROK': 8})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Suite summaries: ltp-musl 0 passed / 4 failed; ltp-glibc 0 passed / 4 failed
+Promotion candidates: 0; blocked/incomplete cases: 4
+```
+
+Raw-log diagnostic: `strings` over the RV log shows every case entering LTP setup and failing with `No free devices found` / `Failed to acquire device`. This is a visible setup-device blocker, not promotion-clean statfs/statvfs behavior evidence.
+
+Decision: no LA confirmation was run, no blacklist change was made, and no stable promotion is allowed from this shard. Candidate pool remains 14/50 and stable remains `606 total / 606 unique / 0 duplicate`.

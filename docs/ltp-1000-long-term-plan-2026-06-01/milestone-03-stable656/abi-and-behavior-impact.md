@@ -177,3 +177,11 @@ No source change is retained for the latest clean4 confirmation. The new evidenc
 - `mprotect02` and `mprotect04` exercise existing user protection and signal/fault behavior; this checkpoint only proves their RV + LA x musl + glibc parser-clean status.
 
 Visible ABI/POSIX impact from this documentation/evidence update: none. Syscall numbers, errno behavior, flag constants, FD semantics, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint. Future fixes for the blocked G009 mlock/mmap/mprotect rows must remain generic and prove adjacent regressions before promotion.
+
+## `statfs01` family evidence-only impact
+
+No source change is retained for the `statfs01,fstatfs01,fstatfs01_64,statvfs01` RV scout. The new artifact records current setup behavior only: LTP cannot acquire a free device on RV and emits parser-visible `TBROK` for both musl and glibc.
+
+Visible ABI/POSIX impact from this documentation update: none. Syscall numbers, errno behavior, `statfs`/`statvfs` struct layout, FD semantics, block-device behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint.
+
+Future work must implement or expose a generic device-acquisition model if these tests are to reach their statfs assertions. It must not hardcode LTP case names, paths, device names, or outputs, and it must rerun adjacent statfs/fstatfs/statvfs plus mount/device setup regressions before promotion.

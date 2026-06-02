@@ -83,3 +83,13 @@ Latest artifacts:
 - Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`
 
 Decision: add `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` to the future promotion pool. The RV scout also records 15 surrounding blocker cases with `TFAIL/TBROK/TCONF`; those rows are not eligible for LA confirmation or promotion accounting. Current pool is 14/50, so no stable-list edit is made.
+
+## `statfs01` family RV setup-device blocker
+
+RV-only scout artifact: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.summary.txt`.
+
+| Case/lane | Current blocker | Next useful action |
+| --- | --- | --- |
+| `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01` | RV musl+glibc all fail in LTP device setup with `TBROK=8`; raw log reports `No free devices found` / `Failed to acquire device`; promotion report has 0 candidates / 4 blocked | classify guest block-device/free-device support before rerunning; do not treat these rows as statfs ABI proof, do not LA-confirm until RV setup is parser-clean |
+
+This scout does not change the current four-way-clean pool. It remains 14/50 for stable656.
