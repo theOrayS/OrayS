@@ -367,3 +367,14 @@ Current singleton evidence:
 - LA: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` — both libcs wrapper PASS but with `TCONF=2`.
 
 No regression subset is counted because no source change was retained and the case is not parser-clean. Any future generic epoll compatibility patch must first make `epoll_create02` parser-clean on RV and LA for musl+glibc, then run adjacent FD/epoll regressions covering at least invalid-size `epoll_create`, valid `epoll_create1` fd lifetime, `close`, `fcntl(F_GETFD/F_SETFD)`, `epoll_ctl`, and `epoll_wait` readiness/error paths.
+
+
+## G009 mm/mlock/mmap scout and clean4 confirmation boundary
+
+No new source change was retained for this evidence-only checkpoint, so no adjacent stable regression subset is counted here. The proof closes four additional candidate rows and keeps surrounding blockers visible:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.summary.txt` — `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` are parser-clean for musl+glibc; the remaining mlock/mmap/mprotect rows retain `TFAIL/TBROK/TCONF` blockers.
+- LA confirmation summary: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.summary.txt` — the four clean rows are parser-clean for musl+glibc.
+- Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`.
+
+Result: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` join the not-yet-promoted candidate pool. Future fixes for the blocked mlock/mmap/mprotect rows must first make RV parser-clean, then rerun LA confirmation plus adjacent mincore/mlock/munlock/mprotect/mmap regression subsets before any promotion accounting.

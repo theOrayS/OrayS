@@ -893,7 +893,7 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
 - At this point in the evidence timeline, the clean candidate pool was 7/50 for stable656.
-- No `LTP_STABLE_CASES` edit was made at that historical checkpoint because 43 more four-way-clean unique cases were still required; later `openat02`, `signal01`, and `mincore03` evidence supersedes the current pool count to 10/50.
+- No `LTP_STABLE_CASES` edit was made at that historical checkpoint because 43 more four-way-clean unique cases were still required; later `openat02`, `signal01`, `mincore03`, and G009 clean4 evidence supersedes the current pool count to 14/50.
 - Counted targeted and regression summaries for `mmap13` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix and TTY-aborted RV logs remain visible as non-countable history.
 
 
@@ -1044,7 +1044,7 @@ panic/trap matches: 0
 
 Observed LTP marker: `openat03.c:56: O_TMPFILE not supported`; wrapper status remains FAIL code 32 for both musl and glibc on RV and LA. This evidence is intentionally non-promotable because the parser sees `TCONF`, but it closes the safety claim that unsupported `O_TMPFILE` no longer causes panic/trap in the targeted RV/LA runs.
 
-Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after later `signal01` and `mincore03` repairs below, the current pool is 10/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after later `signal01`, `mincore03`, and G009 clean4 evidence, the current pool is 14/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 ## `signal01` signal/poll sleeping-state proof
 
@@ -1238,7 +1238,7 @@ ENOSYS/not implemented matches: 0
 panic/trap matches: 0
 ```
 
-Decision: the adjacent mincore/mlock/mmap subset did not regress on RV or LA. The current clean candidate pool is 10/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: the adjacent mincore/mlock/mmap subset did not regress on RV or LA. At the mincore03 checkpoint the clean candidate pool was 10/50; after the later G009 clean4 confirmation it is 14/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 ## `epoll_create02` singleton boundary confirmation
 
@@ -1268,3 +1268,58 @@ Parser result:
 - LA: 2 wrapper PASS / 0 wrapper FAIL, but both libcs include the same old-ABI `TCONF`; there is no timeout, ENOSYS, panic, or trap on LA.
 
 Decision: `epoll_create02` is not promotion evidence. The RV musl ENOSYS path and the parser-visible old-ABI `TCONF` prevent a four-way parser-clean stable gate. No `LTP_STABLE_CASES` edit is made.
+
+
+## G009 mm/mlock/mmap RV scout and LA clean4 confirmation
+
+Date: 2026-06-02. This was an evidence-only checkpoint after the prior generic `mincore`/`mlock` and existing `mprotect` behavior; no stable-list edit was made.
+
+RV scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mincore02,mincore04,mlock02,mlock05,mlock201,mlock202,mlock203,mlockall02,mlockall03,munlock02,munlockall01,mprotect01,mprotect02,mprotect03,mprotect04,mmap08,mmap16,mmap18,mmap20 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+```
+
+LA confirmation command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mincore02,mincore04,mprotect02,mprotect04 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.derived.sha256`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`
+
+RV parser summary:
+
+```text
+PASS LTP CASE: 8
+FAIL LTP CASE: 30
+Internal TFAIL/TBROK/TCONF: 60 ({'TFAIL': 50, 'TBROK': 4, 'TCONF': 6})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Suite summaries: ltp-musl 4 passed / 15 failed; ltp-glibc 4 passed / 15 failed
+```
+
+LA clean4 parser summary:
+
+```text
+PASS LTP CASE: 8
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Suite summaries: ltp-musl 4 passed / 0 failed; ltp-glibc 4 passed / 0 failed
+```
+
+Decision: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` are now RV + LA x musl + glibc parser-clean and enter the future candidate pool. The other RV scout rows remain blocker evidence because they retain parser-visible `TFAIL/TBROK/TCONF` and were not LA-confirmed. Current candidate pool is 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.

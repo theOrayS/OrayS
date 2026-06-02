@@ -129,7 +129,7 @@ sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 10 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 14 new four-way-clean unique candidates are currently available, below the +50 milestone gate.
 
 ## File-backed mmap SIGBUS-on-EOF targeted proof
 mmap13
@@ -276,3 +276,53 @@ munmap01
 openat02
 sched_setaffinity01
 signal01
+
+
+## RV G009 mm/mlock/mmap scout run 2026-06-02
+mincore02
+mincore04
+mlock02
+mlock05
+mlock201
+mlock202
+mlock203
+mlockall02
+mlockall03
+munlock02
+munlockall01
+mprotect01
+mprotect02
+mprotect03
+mprotect04
+mmap08
+mmap16
+mmap18
+mmap20
+# Scout result: mincore02/mincore04/mprotect02/mprotect04 RV-clean; remaining rows retain parser-visible TFAIL/TBROK/TCONF and are blocker evidence only.
+
+## LA G009 clean4 confirmation run 2026-06-02
+mincore02
+mincore04
+mprotect02
+mprotect04
+# LA result: all four rows are musl+glibc parser-clean; combined RV/LA matrix makes them future candidates, not stable promotions yet.
+
+## Four-way clean candidate pool after G009 clean4 confirmation (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+sched_setaffinity01
+signal01
+
+## Promotion result after G009 clean4 confirmation
+# 0 promoted in this checkpoint.
+# Reason: only 14 new four-way-clean unique candidates are available, below the +50 stable656 gate.

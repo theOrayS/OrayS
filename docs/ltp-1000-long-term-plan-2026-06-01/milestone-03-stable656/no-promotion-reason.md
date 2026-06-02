@@ -1,15 +1,15 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint found ten four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint found fourteen four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 10 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
+- Current four-way-clean new candidate pool: 14 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
-Because the candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
+Because the 14-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
 
 ## Blocking evidence kept visible
 
@@ -31,13 +31,13 @@ The following blockers prevent counting additional rows:
 | `openat03` | real `O_TMPFILE` remains unsupported: the rejected emulation/linkat patch produced RV panic/trap in the deep nested-directory phase; the retained generic gate returns `EOPNOTSUPP`/`EINVAL`, yielding honest `TCONF` and wrapper FAIL on RV/LA x musl/glibc |
 | closed arch sweep | 563 four-way-clean historical rows, but zero not-yet-stable rows after filtering live stable606 |
 | `select02`, `sched_rr_get_interval03`, `setpriority01` | wrapper PASS rows include `TCONF`; not promotion evidence |
-| `nice05`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `execve05` | fail, TFAIL/TBROK/TCONF/ENOSYS, or incomplete arch matrix remains |
+| `nice05`, `mlock02`, `mlock05`, `mlock201`, `mlock202`, `mlock203`, `mlockall02`, `mlockall03`, `munlock02`, `munlockall01`, `mprotect01`, `mprotect03`, `mmap08`, `mmap16`, `mmap18`, `mmap20`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `execve05` | fail, TFAIL/TBROK/TCONF/ENOSYS, or incomplete arch matrix remains |
 
 ## Decision
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, and `signal01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `sched_setaffinity01`, and `signal01` in `promotion-candidates.md` for the next accumulation batch.
 
 ## `epoll_create02` blocker update
 
@@ -46,4 +46,15 @@ The 2026-06-02 singleton rescout confirms `epoll_create02` remains non-promotabl
 - RV: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt` reports RV musl wrapper FAIL 33 with `TFAIL=2` and `ENOSYS=2`; RV glibc wrapper PASSes but still has `TCONF=1`.
 - LA: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` has wrapper PASS for both libcs but `TCONF=2` remains.
 
-Because the promotion gate requires wrapper PASS **and** parser-clean summaries on RV + LA x musl + glibc, this row is excluded from the current 10/50 candidate pool.
+Because the promotion gate requires wrapper PASS **and** parser-clean summaries on RV + LA x musl + glibc, this row is excluded from the candidate pool; after the later G009 clean4 update the current pool is 14/50.
+
+
+## G009 clean4 no-promotion update
+
+The latest G009 mm/mlock/mmap scout found four additional RV-clean rows and the LA confirmation proved them parser-clean on both libcs:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-g009-mm-mlock-mmap-scout-20260602T034405Z.summary.txt`
+- LA clean4 summary: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.summary.txt`
+- Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`
+
+These four rows (`mincore02`, `mincore04`, `mprotect02`, `mprotect04`) increase the pool to 14/50. They do not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged.
