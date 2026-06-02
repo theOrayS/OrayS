@@ -20,8 +20,9 @@ Record the current post-stable606 candidate search state so later G009/G010 work
 | `mmap13` | RV/LA targeted reruns after file-backed mmap beyond-EOF pages are protected and delivered as catchable `SIGBUS`, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `openat02` | RV/LA targeted reruns after generic sparse logical-size/data handling for large-file holes, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `sched_setaffinity01` | RV/LA targeted postfix runs, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
+| `signal01` | RV/LA targeted reruns after synthetic `/proc/<pid>/stat` sleeping-state reporting covered `rt_sigsuspend` and libc `pause()`/`ppoll` waiters, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 
-Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.txt`.
+Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`.
 
 A stale combined report that included the old RV mixed scout still marks `fsync02` blocked because it contains the pre-fix glibc `TBROK`; do not use that artifact for current promotion accounting.
 
@@ -55,4 +56,4 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 
 ## Promotion decision
 
-No `LTP_STABLE_CASES` edit is justified. The candidate pool is 8/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.
+No `LTP_STABLE_CASES` edit is justified. The candidate pool is 9/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.

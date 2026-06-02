@@ -288,3 +288,36 @@ Retained unsupported-gate targeted evidence:
 - Result: both arches run musl+glibc to deterministic `TCONF=4` / wrapper FAIL with zero timeout, ENOSYS, panic, or trap.
 
 Regression decision: no stable regression subset is counted from this blocker because `openat03` remains unsupported and non-promotable. Before revisiting, require a design for real generic `O_TMPFILE`/link materialization plus adjacent VFS cases around open/openat/link/linkat/unlink/rename/deep directory handling on RV and LA.
+
+## Completed regression for signal/poll proc-state reporting
+
+Changed surfaces: `examples/shell/src/uspace/task_context.rs` wait markers, `examples/shell/src/uspace/signal_abi.rs::sys_rt_sigsuspend`, `examples/shell/src/uspace/select_fdset.rs::sys_poll_until`, and `examples/shell/src/uspace/synthetic_fs.rs` `/proc/<pid>/stat` state selection.
+
+Targeted proof:
+
+- RV `signal01`: `target/ltp-1000-milestone-03-stable656/rv-signal01-poll-wait-20260602T024843Z.summary.txt`
+- LA `signal01`: `target/ltp-1000-milestone-03-stable656/la-signal01-poll-wait-20260602T024926Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
+
+Result: `signal01` is four-way parser-clean and joins the not-yet-promoted candidate pool. The earlier RV `rv-signal01-proc-sleep-20260602T024336Z.summary.txt` run still timed out before the poll-wait marker was added and remains repair history only.
+
+Adjacent stable regression subset:
+
+- `signal02`
+- `signal03`
+- `signal04`
+- `signal05`
+- `sigaction01`
+- `rt_sigaction01`
+- `sigprocmask01`
+- `rt_sigprocmask01`
+- `ppoll01`
+- `pselect01`
+- `poll02`
+- `waitpid04`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.summary.txt`
+- Result: 24/24 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.

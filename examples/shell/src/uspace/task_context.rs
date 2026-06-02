@@ -1,5 +1,5 @@
 use core::mem::size_of;
-use core::sync::atomic::{AtomicI32, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
 
 use axerrno::LinuxError;
 use axhal::context::{TrapFrame, UspaceContext};
@@ -31,6 +31,8 @@ pub(super) struct UserTaskExt {
     /// maskable signals around fork. `u64::MAX` means no restore is pending.
     pub(super) fork_signal_mask_restore: AtomicU64,
     pub(super) sigsuspend_restore_mask: AtomicU64,
+    pub(super) signal_wait: AtomicBool,
+    pub(super) poll_wait: AtomicBool,
     pub(super) futex_wait: AtomicUsize,
     pub(super) robust_list_head: AtomicUsize,
     pub(super) robust_list_len: AtomicUsize,
@@ -51,6 +53,8 @@ impl UserTaskExt {
             signal_mask: AtomicU64::new(signal_mask),
             fork_signal_mask_restore: AtomicU64::new(u64::MAX),
             sigsuspend_restore_mask: AtomicU64::new(u64::MAX),
+            signal_wait: AtomicBool::new(false),
+            poll_wait: AtomicBool::new(false),
             futex_wait: AtomicUsize::new(0),
             robust_list_head: AtomicUsize::new(0),
             robust_list_len: AtomicUsize::new(0),
