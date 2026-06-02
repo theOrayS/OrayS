@@ -141,7 +141,7 @@ Maintenance boundary: this is a minimal residency/prefault implementation, not f
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 21/50 for stable656 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
+- Candidate pool after the historical FD/fcntl checkpoint was 21/50; the latest mmap/munlock checkpoint below supersedes the current count to 28/50.
 
 ## Behavior gaps exposed but not fixed
 
@@ -275,3 +275,22 @@ ABI/POSIX surface: syscall numbers, struct layouts, FD allocation, signal masks,
 Lifetime/resource risk: the first local RV attempt exposed a recursion bug in parent-search checking and produced a parser-visible panic/trap. The retained implementation avoids that recursion by using an internal non-checking `stat_path_inner` while inspecting ancestors. Adjacent stat/lstat/fstatat/readlink/openat/rename regression subsets are parser-clean on RV and LA.
 
 Maintenance boundary: future path/link/stat work must preserve parent-vs-final symlink semantics, the 40-hop `ELOOP` guard, and non-root directory search-permission checks. Any hard-link/linkat/statx/getdents fix must rerun this stat/readlink regression subset before promotion accounting.
+
+## mmap fd/flag validation and munlock range validation impact
+
+Changed files: `examples/shell/src/uspace/fd_table.rs`, `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/syscall_dispatch.rs`.
+
+User-visible behavior:
+
+- `mmap(MAP_SHARED_VALIDATE | unsupported_bits, ...)` now returns `EOPNOTSUPP` for unsupported validation bits, rather than silently accepting unknown bits. Ordinary supported mapping flags keep the previous behavior.
+- Non-anonymous `mmap` validates the fd before reserving or mapping virtual address space. Invalid descriptors return `EBADF`; unreadable regular files return `EACCES`; directory/proc-fd directory descriptors return `EISDIR`; pipe/socket/local-socket descriptors return `ESPIPE`.
+- `munlock(addr, len)` is now dispatched through `sys_munlock` and validates the full page-rounded mapped range. `len == 0` still succeeds; overflow, ranges beyond the user address limit, and any unmapped page return `ENOMEM`.
+- `mlock(addr, len)` shares the same mapped-range validator before prefaulting pages through the existing `populate_range` path.
+
+ABI/POSIX surface: syscall numbers, struct layouts, mmap flag numeric values, FD table layout, signal masks, futex values, and user-pointer ABI are unchanged. The visible change is limited to generic `mmap`/`mlock`/`munlock` errno behavior.
+
+Maintenance boundary: this is still not full Linux memory-lock accounting. `mlock02` remains blocked because `RLIMIT_MEMLOCK`/capability semantics are not implemented. `mmap08` remains blocked because diagnostic evidence shows the tested fd is still a readable temp-file descriptor at mmap time, so the EBADF case is not reached. Future fd-lifetime or memory-lock accounting fixes must keep the mmap/mincore/mprotect/munlock regression subset parser-clean on RV and LA before promotion.
+
+Regression evidence: `mmap20` and `munlock02` are parser-clean on RV and LA for musl+glibc (`rv-mmap20-munlock02-targeted-20260602T054424Z.summary.txt`, `la-mmap20-munlock02-targeted-20260602T054508Z.summary.txt`). Adjacent regression subsets are parser-clean on both arches (`rv-mmap-munlock-regression-20260602T054554Z.summary.txt`, `la-mmap-munlock-regression-20260602T054705Z.summary.txt`).
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 28/50 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`, `mmap20`, `munlock02`).

@@ -1471,6 +1471,23 @@ impl FdTable {
         read_regular_file_at(process, file, offset, dst)
     }
 
+    pub(super) fn mmap_validate_file_fd(&mut self, fd: i32) -> Result<(), LinuxError> {
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if file_is_readable(file.status_flags) {
+                    Ok(())
+                } else {
+                    Err(LinuxError::EACCES)
+                }
+            }
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
     pub(super) fn insert_with_flags(
         &mut self,
         entry: FdEntry,

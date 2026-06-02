@@ -481,3 +481,22 @@ Remaining nearby blockers: `mknod07` and `mknodat02` still need generic ext2/dev
 Repair-history boundary: `rv-readlink-stat-path-20260602T051956Z.summary.txt` recorded a parser-visible panic/trap from recursive parent-search checking and is not promotion evidence. The retained implementation uses `stat_path_inner(..., check_parent_search=false)` while checking ancestors, and the clean regression subset proves the panic is closed for this lane.
 
 Remaining nearby blockers: `readlink03` needs a generic LA musl zero-size-buffer boundary fix or documented classification with parser-clean evidence; hard-link/linkat/statx/getdents blockers from the broader VFS/path scout remain outside this candidate pool.
+
+## mmap20/munlock02 mmap-range regression matrix
+
+Targeted proof:
+
+- RV `mmap20,munlock02`: `target/ltp-1000-milestone-03-stable656/rv-mmap20-munlock02-targeted-20260602T054424Z.summary.txt`
+- LA `mmap20,munlock02`: `target/ltp-1000-milestone-03-stable656/la-mmap20-munlock02-targeted-20260602T054508Z.summary.txt`
+- Incremental promotion report: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt`
+
+Result: `mmap20` and `munlock02` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Adjacent regression subset:
+
+- Cases: `mmap01`, `mmap02`, `mmap03`, `mmap04`, `mmap09`, `mmap12`, `mmap13`, `munmap01`, `munlock01`, `mincore02`, `mincore03`, `mincore04`, `mprotect02`, `mprotect04`.
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mmap-munlock-regression-20260602T054554Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mmap-munlock-regression-20260602T054705Z.summary.txt`
+- Result: 28/28 wrapper PASS on each arch, zero internal markers/fatal signatures.
+
+Repair-history boundary: `rv-mmap-munlock-errno-targeted-20260602T053636Z.summary.txt` is not promotion evidence because `mmap08` and `mlock02` still fail. The `rv-mmap08-debug-*` logs are diagnostic-only fd-lifetime evidence.

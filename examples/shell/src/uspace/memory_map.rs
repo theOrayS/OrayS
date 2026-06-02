@@ -158,10 +158,32 @@ pub(super) fn sys_mmap(
         general::MAP_SHARED | general::MAP_PRIVATE | general::MAP_SHARED_VALIDATE => {}
         _ => return neg_errno(LinuxError::EINVAL),
     }
+    const MMAP_COMMON_SUPPORTED_FLAGS: u32 = general::MAP_TYPE
+        | general::MAP_FIXED
+        | general::MAP_ANONYMOUS
+        | general::MAP_POPULATE
+        | general::MAP_NONBLOCK
+        | general::MAP_STACK
+        | general::MAP_FIXED_NOREPLACE
+        | general::MAP_GROWSDOWN
+        | general::MAP_DENYWRITE
+        | general::MAP_EXECUTABLE
+        | general::MAP_LOCKED
+        | general::MAP_NORESERVE;
+    if flags_u32 & general::MAP_TYPE == general::MAP_SHARED_VALIDATE
+        && flags_u32 & !MMAP_COMMON_SUPPORTED_FLAGS != 0
+    {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
     let anonymous = flags_u32 & general::MAP_ANONYMOUS != 0;
     let shared = flags_u32 & general::MAP_SHARED != 0;
     let map_fixed = flags_u32 & general::MAP_FIXED != 0;
     let locked = flags_u32 & general::MAP_LOCKED != 0;
+    if !anonymous {
+        if let Err(err) = process.fds.lock().mmap_validate_file_fd(fd as i32) {
+            return neg_errno(err);
+        }
+    }
     let request_addr = if addr == 0 {
         None
     } else {
@@ -426,26 +448,12 @@ pub(super) fn sys_mincore(process: &UserProcess, addr: usize, len: usize, vec: u
 }
 
 pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize {
-    if len == 0 {
-        return 0;
-    }
-    let start = align_down(addr, PAGE_SIZE_4K);
-    let Some(raw_end) = addr.checked_add(len) else {
-        return neg_errno(LinuxError::ENOMEM);
+    let (start, end) = match validate_lock_range(process, addr, len) {
+        Ok(Some(range)) => range,
+        Ok(None) => return 0,
+        Err(err) => return neg_errno(err),
     };
-    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
-        return neg_errno(LinuxError::ENOMEM);
-    };
-    if end <= start || end > USER_STACK_TOP {
-        return neg_errno(LinuxError::ENOMEM);
-    }
-
     let mut aspace = process.aspace.lock();
-    for page in PageIter4K::new(VirtAddr::from(start), VirtAddr::from(end)).unwrap() {
-        if !aspace.query_address(page).area_found {
-            return neg_errno(LinuxError::ENOMEM);
-        }
-    }
     if aspace
         .populate_range(VirtAddr::from(start), end - start, PageFaultFlags::READ)
         .is_err()
@@ -453,6 +461,37 @@ pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize
         return neg_errno(LinuxError::ENOMEM);
     }
     0
+}
+
+pub(super) fn sys_munlock(process: &UserProcess, addr: usize, len: usize) -> isize {
+    match validate_lock_range(process, addr, len) {
+        Ok(_) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+fn validate_lock_range(
+    process: &UserProcess,
+    addr: usize,
+    len: usize,
+) -> Result<Option<(usize, usize)>, LinuxError> {
+    if len == 0 {
+        return Ok(None);
+    }
+    let start = align_down(addr, PAGE_SIZE_4K);
+    let raw_end = addr.checked_add(len).ok_or(LinuxError::ENOMEM)?;
+    let end = align_up_checked(raw_end, PAGE_SIZE_4K).ok_or(LinuxError::ENOMEM)?;
+    if end <= start || end > USER_STACK_TOP {
+        return Err(LinuxError::ENOMEM);
+    }
+
+    let aspace = process.aspace.lock();
+    for page in PageIter4K::new(VirtAddr::from(start), VirtAddr::from(end)).unwrap() {
+        if !aspace.query_address(page).area_found {
+            return Err(LinuxError::ENOMEM);
+        }
+    }
+    Ok(Some((start, end)))
 }
 
 pub(super) fn sys_mprotect(

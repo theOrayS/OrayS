@@ -605,3 +605,66 @@ statvfs01
 ## Promotion result after stat03/stat03_64 path repair
 # 0 promoted in this checkpoint.
 # Reason: 26 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## mmap20/munlock02 targeted proof
+mmap08
+mmap20
+mlock02
+munlock02
+# Initial RV run is repair history only: mmap20 and munlock02 are clean, mmap08 and mlock02 remain blocked.
+
+## mmap20/munlock02 clean targeted proof
+mmap20
+munlock02
+# RV and LA x musl/glibc parser-clean after generic mmap flag/fd validation and munlock range validation.
+
+## mmap/munlock adjacent regression subset
+mmap01
+mmap02
+mmap03
+mmap04
+mmap09
+mmap12
+mmap13
+munmap01
+munlock01
+mincore02
+mincore03
+mincore04
+mprotect02
+mprotect04
+# RV and LA x musl/glibc parser-clean; used as regression evidence, not as extra candidate-count input.
+
+## Four-way clean candidate pool after mmap20/munlock02 repair (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+stat03
+stat03_64
+statfs01
+statvfs01
+mmap20
+munlock02
+
+## Promotion result after mmap20/munlock02 repair
+# 0 promoted in this checkpoint.
+# Reason: 28 new four-way-clean unique candidates are available, below the +50 stable656 gate.
