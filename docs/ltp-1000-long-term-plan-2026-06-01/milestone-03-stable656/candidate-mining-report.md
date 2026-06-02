@@ -212,3 +212,15 @@ Latest artifacts:
 Decision: add `open07` and `open12` to the future promotion pool. The RV scout also records 14 surrounding blocker cases with visible TBROK/TCONF/ENOSYS or wrapper-fail events; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 42/50, so no stable-list edit is made.
 
 Next useful action: focus remaining 8 candidates on small process/signal/futex or targeted existing-clean rows; broad VFS/FD rows in this scout need generic setup/errno fixes before re-scouting.
+
+## pause clean2 signal/wait update
+
+Latest artifacts:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt`
+- LA clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt`
+- Combined clean44 report: `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt`
+
+Decision: add `pause01` and `pause02` to the future promotion pool. The RV scout also records 19 surrounding blocker cases with visible TFAIL/TBROK or wrapper-fail events; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 44/50, so no stable-list edit is made.
+
+Next useful action: find 6 more low-risk candidates, likely via small existing-clean rows or fork/exec/process scout shards; do not broaden blocked signal/wait rows without generic fixes.

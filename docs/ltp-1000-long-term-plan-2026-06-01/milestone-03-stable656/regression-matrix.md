@@ -589,3 +589,15 @@ Targeted proof:
 Result: `open07` and `open12` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap on the counted rows.
 
 No source changed in this checkpoint, so no behavior-regression subset was required beyond the RV/LA targeted proof. The surrounding RV scout rows remain a visible blocker matrix for future FD/VFS/IO work.
+
+## pause clean2 evidence matrix
+
+Targeted proof:
+
+- RV signal/wait scout: `target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt`
+- LA pause clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt`
+- Combined promotion report: `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt`
+
+Result: `pause01` and `pause02` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap on the counted rows.
+
+No source changed in this checkpoint, so no behavior-regression subset was required beyond the RV/LA targeted proof. The surrounding RV scout rows remain a visible blocker matrix for future signal/wait work.

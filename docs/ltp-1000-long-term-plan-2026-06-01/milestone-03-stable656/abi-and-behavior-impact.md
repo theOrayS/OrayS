@@ -394,3 +394,17 @@ Maintenance boundary: do not generalize this proof to the surrounding FD/VFS/IO 
 Regression evidence: `open07` and `open12` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.summary.txt`); combined RV+LA candidate report is `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.promotion-candidates.txt`.
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 42/50.
+
+## pause clean2 evidence-only impact
+
+Changed files: none in this checkpoint.
+
+User-visible behavior: unchanged. The evidence confirms the existing `pause(2)` behavior for `pause01`/`pause02` is parser-clean on RV and LA for both musl and glibc.
+
+ABI/POSIX surface: syscall numbers, struct layouts, errno mappings, fd-table behavior, signal masks/delivery, futex/mmap/user-pointer ABI, and process wait behavior are unchanged by this checkpoint.
+
+Maintenance boundary: do not generalize this proof to the surrounding signal/wait rows. The same RV scout keeps kill/sigaction/sigpending/sigwait/waitpid rows visibly blocked by `TFAIL`/`TBROK` or wrapper-fail events.
+
+Regression evidence: `pause01` and `pause02` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt`); combined RV+LA candidate report is `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt`.
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 44/50.
