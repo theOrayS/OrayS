@@ -573,6 +573,59 @@ pub(super) fn sys_rt_sigaction(
     0
 }
 
+fn current_sigaltstack(ext: &UserTaskExt) -> general::sigaltstack {
+    let mut flags = ext.sigaltstack_flags.load(Ordering::Acquire);
+    if flags & SS_DISABLE == 0 && ext.signal_frame.load(Ordering::Acquire) != 0 {
+        flags |= general::SS_ONSTACK as i32;
+    }
+    general::sigaltstack {
+        ss_sp: ext.sigaltstack_sp.load(Ordering::Acquire) as *mut core::ffi::c_void,
+        ss_flags: flags,
+        ss_size: ext.sigaltstack_size.load(Ordering::Acquire),
+    }
+}
+
+pub(super) fn sys_sigaltstack(process: &UserProcess, ss: usize, old_ss: usize) -> isize {
+    let Some(ext) = current_task_ext() else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+
+    if old_ss != 0 {
+        let old = current_sigaltstack(ext);
+        let ret = write_user_value(process, old_ss, &old);
+        if ret != 0 {
+            return ret;
+        }
+    }
+
+    if ss == 0 {
+        return 0;
+    }
+    if ext.signal_frame.load(Ordering::Acquire) != 0 {
+        return neg_errno(LinuxError::EPERM);
+    }
+
+    let next = match read_user_value::<general::sigaltstack>(process, ss) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    let allowed_flags = (SS_DISABLE as u32) | general::SS_AUTODISARM;
+    let next_flags = next.ss_flags as u32;
+    if next_flags & !allowed_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if next_flags & SS_DISABLE as u32 == 0 && next.ss_size < general::MINSIGSTKSZ as u64 {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+
+    ext.sigaltstack_sp
+        .store(next.ss_sp as usize, Ordering::Release);
+    ext.sigaltstack_flags
+        .store(next.ss_flags, Ordering::Release);
+    ext.sigaltstack_size.store(next.ss_size, Ordering::Release);
+    0
+}
+
 pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
     #[cfg(target_arch = "riscv64")]
     {

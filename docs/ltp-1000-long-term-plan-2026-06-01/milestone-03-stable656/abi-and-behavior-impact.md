@@ -314,3 +314,22 @@ Maintenance boundary: this is not a full epoll implementation. Future `epoll_ctl
 Regression evidence: `epoll_create1_01` and `epoll_create1_02` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.txt`). Adjacent FD/flag subsets are parser-clean on both arches (`target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.txt`).
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 30/50 (`epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
+
+
+## clock_adjtime and sigaltstack syscall-state impact
+
+Changed files: `examples/shell/src/uspace/time_abi.rs`, `examples/shell/src/uspace/signal_abi.rs`, `examples/shell/src/uspace/syscall_dispatch.rs`, `examples/shell/src/uspace/task_context.rs`.
+
+User-visible behavior:
+
+- `clock_adjtime(CLOCK_REALTIME, tx)` is now dispatched through the userspace syscall bridge and reuses the existing `adjtimex` ABI handling. Read-only/default `timex` queries return the same conservative `TIME_OK` state as `adjtimex`; unsupported clock IDs return `EINVAL`.
+- `sigaltstack(ss, old_ss)` now records per-thread `ss_sp`, `ss_flags`, and `ss_size`, returns the previous state through `old_ss`, validates unknown flag bits with `EINVAL`, rejects undersized enabled stacks with `ENOMEM`, and rejects stack changes while already in a signal frame with `EPERM`.
+- `shmt04` is included as evidence-only: no SysV shm code changed in this checkpoint, but RV + LA x musl/glibc parser-clean proof now closes that candidate row.
+
+ABI/POSIX surface: syscall numbers, struct layouts, fd-table layout, futex values, mmap layout, and user-pointer copy ABI are unchanged. The visible syscall impact is limited to removing `ENOSYS` for generic `clock_adjtime`/`sigaltstack` calls and exposing Linux-like errno/state behavior for those existing ABI structs.
+
+Maintenance boundary: `sigaltstack` is currently syscall-state support, not full alternate-stack signal delivery. Future work that delivers handlers on the alternate stack must preserve the recorded state semantics and rerun the adjacent signal regression subset before promotion accounting. `clock_adjtime` intentionally only accepts `CLOCK_REALTIME` in this bridge; future support for dynamic or CPU clocks must not weaken the existing `adjtimex` permission/errno checks.
+
+Regression evidence: `adjtimex01`, `adjtimex03`, `sigaltstack02`, and `shmt04` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.txt`). Adjacent time/signal stable subsets are parser-clean on both arches (`target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.txt`).
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 34/50 (`adjtimex01`, `adjtimex03`, `epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `shmt04`, `signal01`, `sigaltstack02`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).

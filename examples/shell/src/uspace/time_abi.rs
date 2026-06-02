@@ -11,7 +11,7 @@ use super::signal_abi::deliver_user_signal;
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 
@@ -623,6 +623,13 @@ pub(super) fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
         return ret;
     }
     TIME_OK
+}
+
+pub(super) fn sys_clock_adjtime(process: &UserProcess, clk_id: usize, tx: usize) -> isize {
+    if clk_id != general::CLOCK_REALTIME as usize {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    sys_adjtimex(process, tx)
 }
 
 pub(super) fn sys_times(process: &UserProcess, buf: usize) -> isize {

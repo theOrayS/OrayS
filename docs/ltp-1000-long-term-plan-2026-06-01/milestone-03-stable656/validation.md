@@ -1858,3 +1858,54 @@ LA: PASS LTP CASE 12, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, 
 Decision: `epoll_create1_01` and `epoll_create1_02` are RV + LA x musl + glibc parser-clean and enter the future candidate pool. Combined with the previous clean28 audit, the current not-yet-promoted pool is 30/50; stable list remains unchanged at `606/606/0`.
 
 `epoll_create02` remains blocker evidence only. `rv-epoll-create02-create1-20260602T060510Z.summary.txt` shows the kernel now exposes `epoll_create1(0)`, but musl's `epoll_create(size)` wrapper converts the invalid old-size call into valid `epoll_create1(0)`, so invalid `size` is not visible at the syscall boundary. Do not make `epoll_create1(0)` invalid to satisfy that old-wrapper row.
+
+
+## `adjtimex01`/`adjtimex03`/`sigaltstack02`/`shmt04` targeted proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=adjtimex01,adjtimex03,sigaltstack02,shmt04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=adjtimex01,adjtimex03,sigaltstack02,shmt04 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py <log>
+python3 scripts/ltp_summary.py --json <log>
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.log target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.log
+```
+
+Artifacts:
+
+- RV raw/meta: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.log`, `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.log.meta`
+- RV summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.derived.sha256`
+- LA raw/meta: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.log`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.log.meta`
+- LA summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.derived.sha256`
+- Incremental clean4 report/checksum: `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt`, `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt.sha256`
+
+Targeted parser summaries:
+
+```text
+RV: PASS LTP CASE 8, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 8, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Adjacent time/signal regression commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime02,clock_nanosleep02,nanosleep01,rt_sigaction01,rt_sigprocmask01,sigaction01,sigprocmask01 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime02,clock_nanosleep02,nanosleep01,rt_sigaction01,rt_sigprocmask01,sigaction01,sigprocmask01 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+```
+
+Regression artifacts:
+
+- RV summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.derived.sha256`
+- LA summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.derived.sha256`
+
+Regression parser summaries:
+
+```text
+RV: PASS LTP CASE 14, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 14, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Decision: `adjtimex01`, `adjtimex03`, `shmt04`, and `sigaltstack02` are RV + LA x musl + glibc parser-clean and enter the future candidate pool. Combined with the previous clean30 audit, the current not-yet-promoted pool is 34/50; stable list remains unchanged at `606/606/0`.
+
+Boundary: `sigaltstack` now records and reports alternate-stack state and errno validation, but signal delivery still uses the existing signal-frame path rather than switching to the alternate stack. Future signal-delivery work must not count this syscall-only proof as full alternate-stack delivery semantics.

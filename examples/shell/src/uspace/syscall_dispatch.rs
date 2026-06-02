@@ -57,7 +57,7 @@ use super::select_fdset::sys_poll;
 use super::select_fdset::{sys_ppoll, sys_pselect6};
 use super::signal_abi::{
     sys_kill, sys_rt_sigaction, sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigreturn,
-    sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_tgkill, sys_tkill,
+    sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill, sys_tkill,
 };
 use super::system_info::{
     sys_getrusage, sys_prctl, sys_sethostname, sys_sysinfo, sys_syslog, sys_uname,
@@ -68,8 +68,8 @@ use super::task_context::{
     sys_set_tid_address, user_pc,
 };
 use super::time_abi::{
-    sys_adjtimex, sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime,
-    sys_getitimer, sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_times,
+    sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep,
+    sys_clock_settime, sys_getitimer, sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_times,
 };
 use super::user_memory::sys_getrandom;
 
@@ -334,6 +334,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_clock_getres => sys_clock_getres(&process, tf.arg0(), tf.arg1()),
         general::__NR_gettimeofday => sys_gettimeofday(&process, tf.arg0(), tf.arg1()),
         general::__NR_adjtimex => sys_adjtimex(&process, tf.arg0()),
+        general::__NR_clock_adjtime => sys_clock_adjtime(&process, tf.arg0(), tf.arg1()),
         general::__NR_getrandom => sys_getrandom(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_getitimer => sys_getitimer(&process, tf.arg0() as i32, tf.arg1()),
         general::__NR_setitimer => sys_setitimer(&process, tf.arg0() as i32, tf.arg1(), tf.arg2()),
@@ -485,6 +486,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             sys_rt_sigaction(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
         general::__NR_rt_sigreturn => sys_rt_sigreturn(&process),
+        general::__NR_sigaltstack => sys_sigaltstack(&process, tf.arg0(), tf.arg1()),
         general::__NR_rt_sigprocmask => {
             sys_rt_sigprocmask(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }

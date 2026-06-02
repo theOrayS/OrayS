@@ -549,3 +549,32 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 20 cases short.
 - Remaining blocker from this step: `epoll_create02` remains outside the pool because musl maps old `epoll_create(size)` to valid `epoll_create1(0)`, while the promotion gate requires parser-clean musl+glibc proof on both arches.
+
+
+## clock_adjtime/sigaltstack/shmt04 clean4 checkpoint
+
+Generic time/signal syscall-state repairs and a SysV shm evidence closure converted four rows into future promotion candidates without editing `LTP_STABLE_CASES`.
+
+Code changes retained in this checkpoint:
+
+1. `examples/shell/src/uspace/syscall_dispatch.rs` now dispatches `__NR_clock_adjtime` and `__NR_sigaltstack` in the shell userspace syscall bridge.
+2. `examples/shell/src/uspace/time_abi.rs::sys_clock_adjtime` accepts `CLOCK_REALTIME` and delegates to existing `adjtimex` semantics, preserving `EINVAL` for unsupported clocks and the existing `adjtimex` permission/errno rules.
+3. `examples/shell/src/uspace/task_context.rs` records per-thread alternate signal-stack state.
+4. `examples/shell/src/uspace/signal_abi.rs::sys_sigaltstack` copies out old state, validates flags/size, stores new state, and reports `SS_ONSTACK` while inside an existing signal frame. This is syscall-state support, not full alternate-stack signal delivery.
+
+Evidence:
+
+- RV targeted proof: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-shmt04-targeted-20260602T143608+0800.summary.txt` — 8 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted proof: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-shmt04-targeted-20260602T143702+0800.summary.txt` — 8 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Incremental clean4 report: `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt` — 4 candidates, 0 blocked/incomplete rows.
+- RV adjacent time/signal regression: `target/ltp-1000-milestone-03-stable656/rv-clock-sigaltstack-adjacent-regression-20260602T143818+0800.summary.txt` — 14 PASS / 0 FAIL, parser-clean.
+- LA adjacent time/signal regression: `target/ltp-1000-milestone-03-stable656/la-clock-sigaltstack-adjacent-regression-20260602T143950+0800.summary.txt` — 14 PASS / 0 FAIL, parser-clean.
+- Combined clean34 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean34-clock-sigaltstack-shmt04-20260602T143805Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `adjtimex01`, `adjtimex03`, `shmt04`, `sigaltstack02`.
+- Candidate pool: 34/50 (`adjtimex01`, `adjtimex03`, `epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `shmt04`, `signal01`, `sigaltstack02`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 16 cases short.
+- Maintenance caveat: `sigaltstack02` proves syscall-visible alternate-stack state and errno handling, not handler delivery on the alternate stack.
