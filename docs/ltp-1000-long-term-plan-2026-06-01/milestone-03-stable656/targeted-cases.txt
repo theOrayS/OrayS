@@ -129,7 +129,7 @@ sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 6 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 8 new four-way-clean unique candidates are available, below the +50 milestone gate.
 
 ## File-backed mmap SIGBUS-on-EOF targeted proof
 mmap13
@@ -156,4 +156,33 @@ futex_wait03
 futex_wait05
 mmap13
 munmap01
+sched_setaffinity01
+
+
+## Sparse large-file openat02 targeted proof
+openat02
+# openat02 proof: RV/LA x musl/glibc clean after generic sparse logical-size/data handling for large-file holes; not promoted until +50 batch.
+
+## Adjacent VFS/FD regression subset for openat02 sparse-largefile repair
+openat01
+lseek01
+lseek02
+pread02
+pwrite02
+pwrite04
+ftruncate01
+truncate02
+read01
+write01
+write03
+# read02 was also run once in a 12-case RV observation shard, but it emits existing O_DIRECT TCONF and is not counted as parser-clean regression evidence.
+
+## Four-way clean candidate pool after openat02 sparse-largefile repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+openat02
 sched_setaffinity01

@@ -225,6 +225,111 @@ impl UserProcess {
         Ok(())
     }
 
+    pub(super) fn set_path_sparse_size(&self, path: String, size: u64) {
+        self.path_sparse_sizes.lock().insert(path, size);
+    }
+
+    pub(super) fn path_sparse_size(&self, path: &str) -> Option<u64> {
+        self.path_sparse_sizes.lock().get(path).copied()
+    }
+
+    pub(super) fn clear_path_sparse_file(&self, path: &str) {
+        self.path_sparse_sizes.lock().remove(path);
+        self.path_sparse_data.lock().remove(path);
+    }
+
+    pub(super) fn move_path_sparse_file(&self, old_path: &str, new_path: String) {
+        if let Some(size) = self.path_sparse_sizes.lock().remove(old_path) {
+            self.path_sparse_sizes.lock().insert(new_path.clone(), size);
+        }
+        if let Some(data) = self.path_sparse_data.lock().remove(old_path) {
+            self.path_sparse_data.lock().insert(new_path, data);
+        }
+    }
+
+    pub(super) fn truncate_path_sparse_file(&self, path: String, size: u64) {
+        self.path_sparse_sizes.lock().insert(path.clone(), size);
+
+        let mut all_data = self.path_sparse_data.lock();
+        let remove_empty = if let Some(extents) = all_data.get_mut(path.as_str()) {
+            let mut retained = Vec::new();
+            for (offset, data) in extents.drain(..) {
+                if offset >= size {
+                    continue;
+                }
+                let keep = cmp::min(data.len(), size.saturating_sub(offset) as usize);
+                if keep > 0 {
+                    retained.push((offset, data[..keep].to_vec()));
+                }
+            }
+            if retained.is_empty() {
+                true
+            } else {
+                *extents = retained;
+                false
+            }
+        } else {
+            false
+        };
+        if remove_empty {
+            all_data.remove(path.as_str());
+        }
+    }
+
+    pub(super) fn write_path_sparse_data(&self, path: String, offset: u64, data: &[u8]) {
+        let end = offset.saturating_add(data.len() as u64);
+        let logical_size = self.path_sparse_size(path.as_str()).unwrap_or(0).max(end);
+        self.set_path_sparse_size(path.clone(), logical_size);
+        if data.is_empty() {
+            return;
+        }
+
+        let mut all_data = self.path_sparse_data.lock();
+        let extents = all_data.entry(path).or_default();
+        let mut retained = Vec::new();
+        for (existing_offset, existing_data) in extents.drain(..) {
+            let existing_end = existing_offset.saturating_add(existing_data.len() as u64);
+            if existing_end <= offset || existing_offset >= end {
+                retained.push((existing_offset, existing_data));
+                continue;
+            }
+            if existing_offset < offset {
+                let keep = offset.saturating_sub(existing_offset) as usize;
+                retained.push((existing_offset, existing_data[..keep].to_vec()));
+            }
+            if existing_end > end {
+                let skip = end.saturating_sub(existing_offset) as usize;
+                retained.push((end, existing_data[skip..].to_vec()));
+            }
+        }
+        retained.push((offset, data.to_vec()));
+        retained.sort_by_key(|(extent_offset, _)| *extent_offset);
+        *extents = retained;
+    }
+
+    pub(super) fn copy_path_sparse_data(&self, path: &str, offset: u64, dst: &mut [u8]) {
+        if dst.is_empty() {
+            return;
+        }
+        let end = offset.saturating_add(dst.len() as u64);
+        let all_data = self.path_sparse_data.lock();
+        let Some(extents) = all_data.get(path) else {
+            return;
+        };
+        for (extent_offset, data) in extents {
+            let extent_end = extent_offset.saturating_add(data.len() as u64);
+            if extent_end <= offset || *extent_offset >= end {
+                continue;
+            }
+            let copy_start = (*extent_offset).max(offset);
+            let copy_end = extent_end.min(end);
+            let dst_start = copy_start.saturating_sub(offset) as usize;
+            let src_start = copy_start.saturating_sub(*extent_offset) as usize;
+            let len = copy_end.saturating_sub(copy_start) as usize;
+            dst[dst_start..dst_start + len].copy_from_slice(&data[src_start..src_start + len]);
+        }
+    }
+
     pub(super) fn clear_path_chown_special_bits(&self, path: &str, current_mode: u32) {
         let mode = self
             .path_mode(path)
@@ -267,6 +372,9 @@ pub(super) fn apply_recorded_path_metadata(
     if let Some((uid, gid)) = process.path_owner(path) {
         st.st_uid = uid;
         st.st_gid = gid;
+    }
+    if let Some(size) = process.path_sparse_size(path) {
+        st.st_size = size.min(i64::MAX as u64) as _;
     }
     st
 }
@@ -370,10 +478,6 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
     if length > process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current() {
         return neg_errno(LinuxError::EFBIG);
     }
-    if length > MAX_IN_MEMORY_FILE_SIZE {
-        return neg_errno(LinuxError::ENOSPC);
-    }
-
     let path = match read_cstr(process, pathname) {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
@@ -421,8 +525,13 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
         Ok(file) => file,
         Err(err) => return neg_errno(LinuxError::from(err)),
     };
-    file.truncate(length)
-        .map_or_else(|err| neg_errno(LinuxError::from(err)), |_| 0)
+    if length <= MAX_IN_MEMORY_FILE_SIZE {
+        if let Err(err) = file.truncate(length) {
+            return neg_errno(LinuxError::from(err));
+        }
+    }
+    process.truncate_path_sparse_file(target_path, length);
+    0
 }
 
 pub(super) fn sys_symlinkat(

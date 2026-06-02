@@ -16,7 +16,7 @@ use std::vec::Vec;
 
 use super::fd_table::release_posix_record_locks_for_process;
 use super::futex;
-use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
+use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::{current_cwd, is_busybox_applet_name};
@@ -24,19 +24,19 @@ use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_reg
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
-    user_pc,
+    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
+    UserTaskExt,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
+    live_user_thread_count, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
 };
-use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
+use super::{ChildTask, FdTable, UserProcess, NO_EXIT_GROUP_CODE};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -246,6 +246,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         path_owners: Mutex::new(BTreeMap::new()),
         path_symlinks: Mutex::new(BTreeMap::new()),
         path_xattrs: Mutex::new(BTreeMap::new()),
+        path_sparse_sizes: Mutex::new(BTreeMap::new()),
+        path_sparse_data: Mutex::new(BTreeMap::new()),
         umask: AtomicU32::new(0),
         mount_points: Arc::new(Mutex::new(BTreeMap::new())),
         shm_attachments: Mutex::new(BTreeMap::new()),
@@ -764,6 +766,8 @@ impl UserProcess {
             path_owners: Mutex::new(self.path_owners.lock().clone()),
             path_symlinks: Mutex::new(self.path_symlinks.lock().clone()),
             path_xattrs: Mutex::new(self.path_xattrs.lock().clone()),
+            path_sparse_sizes: Mutex::new(self.path_sparse_sizes.lock().clone()),
+            path_sparse_data: Mutex::new(self.path_sparse_data.lock().clone()),
             umask: AtomicU32::new(self.umask.load(Ordering::Acquire)),
             mount_points: self.mount_points.clone(),
             shm_attachments: Mutex::new(self.shm_attachments.lock().clone()),

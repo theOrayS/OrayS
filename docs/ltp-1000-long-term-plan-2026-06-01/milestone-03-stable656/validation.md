@@ -892,6 +892,93 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 ## Gate outcome after mmap13 SIGBUS update
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
-- Current clean candidate pool is 7/50 for stable656.
-- No `LTP_STABLE_CASES` edit is made because 43 more four-way-clean unique cases are still required.
+- Current clean candidate pool is 8/50 for stable656.
+- No `LTP_STABLE_CASES` edit is made because 42 more four-way-clean unique cases are still required.
 - Counted targeted and regression summaries for `mmap13` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix and TTY-aborted RV logs remain visible as non-countable history.
+
+
+## `openat02` sparse large-file proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-openat02-sparse-largefile-20260602T014202Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-openat02-sparse-largefile-20260602T014202Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-openat02-sparse-largefile-20260602T014202Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-openat02-sparse-largefile-20260602T014202Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-openat02-sparse-largefile-20260602T014245Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-openat02-sparse-largefile-20260602T014245Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-openat02-sparse-largefile-20260602T014245Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-openat02-sparse-largefile-20260602T014245Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: `openat02` is now RV + LA x musl + glibc parser-clean after generic sparse logical-size/data handling for large-file holes. The older `rv-openat02-post-statfs-scout-20260601T231156Z.log` remains pre-fix blocker history and is not counted.
+
+## Adjacent VFS/FD regression for sparse large-file handling
+
+Clean regression cases: `openat01,lseek01,lseek02,pread02,pwrite02,pwrite04,ftruncate01,truncate02,read01,write01,write03`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat01,lseek01,lseek02,pread02,pwrite02,pwrite04,ftruncate01,truncate02,read01,write01,write03 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=openat01,lseek01,lseek02,pread02,pwrite02,pwrite04,ftruncate01,truncate02,read01,write01,write03 LTP_CASE_TIMEOUT_SECS=90 timeout 45m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 22
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Non-countable observation: `rv-openat02-adjacent-stable-regression-20260602T014338Z.log` (checksums: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-regression-20260602T014338Z.derived.sha256`) also ran `read02`; wrapper rows passed, but `read02` emitted existing O_DIRECT `TCONF=4` across both libcs, so that 12-case shard is retained only as caveated observation and not counted as parser-clean regression evidence.
+
+## Combined clean8 candidate pool
+
+Combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.txt`
+Checksum: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.sha256`
+
+```text
+Promotion candidates: 8
+Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, mmap13, munmap01, openat02, sched_setaffinity01
+Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
+```
+
+## Gate outcome after openat02 sparse-largefile update
+
+- Live stable list remains `606 total / 606 unique / 0 duplicate`.
+- Current clean candidate pool is 8/50 for stable656.
+- No `LTP_STABLE_CASES` edit is made because 42 more four-way-clean unique cases are still required.
+- Counted targeted and regression summaries for `openat02` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix RV scout remains visible as non-countable history.

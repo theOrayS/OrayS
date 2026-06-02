@@ -18,9 +18,10 @@ Record the current post-stable606 candidate search state so later G009/G010 work
 | `futex_wait05` | RV/LA targeted reruns after generic precise timer-list wakeup plus periodic tick preservation, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `munmap01` | RV/LA targeted reruns after catchable synchronous `SIGSEGV` delivery for unmapped user faults, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `mmap13` | RV/LA targeted reruns after file-backed mmap beyond-EOF pages are protected and delivered as catchable `SIGBUS`, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
+| `openat02` | RV/LA targeted reruns after generic sparse logical-size/data handling for large-file holes, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 | `sched_setaffinity01` | RV/LA targeted postfix runs, both musl/glibc parser-clean | candidate, not promoted until +50 batch |
 
-Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.txt`.
+Clean combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.txt`.
 
 A stale combined report that included the old RV mixed scout still marks `fsync02` blocked because it contains the pre-fix glibc `TBROK`; do not use that artifact for current promotion accounting.
 
@@ -45,7 +46,7 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 | Case/lane | Current blocker | Next useful action |
 | --- | --- | --- |
 | `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL=1`; musl turns `bufsize == 0` into a dummy one-byte `readlinkat` syscall, so the kernel only sees `bufsiz=1` | keep non-promotable as a libc/test boundary; do not special-case kernel `bufsiz=1` because direct Linux `readlinkat(..., bufsiz=1)` truncation must remain valid |
-| `openat02` | post-statfs-clamp isolated RV rerun still has musl+glibc `TBROK` setup `ENOSPC` | keep blocked; diagnose file-growth/space accounting separately before any LA rerun |
+| pre-fix `openat02` row | old post-statfs-clamp isolated RV rerun had musl+glibc `TBROK` setup `ENOSPC` | superseded by post-sparse-largefile four-way proof; keep old log only as blocker history |
 | `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
 | `clone04` | RV glibc clean, but RV musl is killed by SIGSEGV/TBROK; raw log points to the upstream musl `clone.c` NULL-stack wrapper fix | keep blocked; classify libc-wrapper boundary first, then require RV musl closure plus clone/vfork/futex/signal/wait regressions before any LA rerun or promotion |
 | `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |
@@ -54,4 +55,4 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 
 ## Promotion decision
 
-No `LTP_STABLE_CASES` edit is justified. The candidate pool is 7/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.
+No `LTP_STABLE_CASES` edit is justified. The candidate pool is 8/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.

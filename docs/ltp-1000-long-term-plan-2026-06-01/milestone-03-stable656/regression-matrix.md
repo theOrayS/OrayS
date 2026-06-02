@@ -236,3 +236,37 @@ Regression evidence:
 - RV summary: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.summary.txt`
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.summary.txt`
 - Result: 24/24 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+
+## Completed regression for sparse large-file regular-file handling
+
+Changed surfaces: `examples/shell/src/uspace/fd_table.rs`, `examples/shell/src/uspace/metadata.rs`, `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/process_lifecycle.rs`, and `examples/shell/src/uspace/mod.rs` sparse logical-size/data tracking.
+
+Targeted proof:
+
+- RV `openat02`: `target/ltp-1000-milestone-03-stable656/rv-openat02-sparse-largefile-20260602T014202Z.summary.txt`
+- LA `openat02`: `target/ltp-1000-milestone-03-stable656/la-openat02-sparse-largefile-20260602T014245Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.txt`
+
+Result: `openat02` is four-way parser-clean and joins the not-yet-promoted candidate pool. The older RV `openat02` post-statfs-clamp scout remains pre-fix blocker evidence and is not counted.
+
+Adjacent stable clean regression subset:
+
+- `openat01`
+- `lseek01`
+- `lseek02`
+- `pread02`
+- `pwrite02`
+- `pwrite04`
+- `ftruncate01`
+- `truncate02`
+- `read01`
+- `write01`
+- `write03`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.summary.txt`
+- Result: 22/22 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Caveat: `rv-openat02-adjacent-stable-regression-20260602T014338Z.summary.txt` additionally included `read02`, which wrapper-PASSed but emitted existing O_DIRECT `TCONF`; that 12-case shard is not counted as parser-clean evidence.
