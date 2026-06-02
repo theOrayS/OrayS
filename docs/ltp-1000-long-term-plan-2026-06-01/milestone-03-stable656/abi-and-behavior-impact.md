@@ -380,3 +380,17 @@ Maintenance boundary: do not generalize this proof to the surrounding VFS/path r
 Regression evidence: `lstat02` and `lstat02_64` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-vfs-path-simple-scout-20260602T153210+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-lstat-clean2-20260602T153351+0800.summary.txt`); combined RV+LA candidate report is `target/ltp-1000-milestone-03-stable656/combined-lstat-clean2-20260602T153433+0800.promotion-candidates.txt`.
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 40/50.
+
+## open clean2 evidence-only impact
+
+Changed files: none in this checkpoint.
+
+User-visible behavior: unchanged. The evidence confirms the existing `open(2)` behavior for the `open07`/`open12` rows is parser-clean on RV and LA for both musl and glibc.
+
+ABI/POSIX surface: syscall numbers, struct layouts, errno mappings, fd-table behavior, signal/futex/mmap/user-pointer ABI, and path traversal behavior are unchanged by this checkpoint.
+
+Maintenance boundary: do not generalize this proof to the surrounding FD/VFS/IO rows. The same RV scout keeps `open11`, `open14`, `read03`, `write04`, and other selected rows visibly blocked by `TBROK`/`TCONF`/`ENOSYS` or wrapper-fail events.
+
+Regression evidence: `open07` and `open12` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.summary.txt`); combined RV+LA candidate report is `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.promotion-candidates.txt`.
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 42/50.

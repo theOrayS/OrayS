@@ -200,3 +200,15 @@ Latest artifacts:
 Decision: add `lstat02` and `lstat02_64` to the future promotion pool. The RV scout also records 20 surrounding blocker cases with visible TFAIL/TBROK/TCONF/ENOSYS markers; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 40/50, so no stable-list edit is made.
 
 Next useful action: continue targeted discovery in FD/IO and small process/signal rows for the remaining 10 clean candidates; VFS utime/mkdir/getcwd/fstat blockers need generic semantics before re-scouting.
+
+## open clean2 FD/VFS/IO update
+
+Latest artifacts:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.summary.txt`
+- LA clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.summary.txt`
+- Combined clean42 report: `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.promotion-candidates.txt`
+
+Decision: add `open07` and `open12` to the future promotion pool. The RV scout also records 14 surrounding blocker cases with visible TBROK/TCONF/ENOSYS or wrapper-fail events; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 42/50, so no stable-list edit is made.
+
+Next useful action: focus remaining 8 candidates on small process/signal/futex or targeted existing-clean rows; broad VFS/FD rows in this scout need generic setup/errno fixes before re-scouting.

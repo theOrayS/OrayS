@@ -644,3 +644,24 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 10 cases short.
 - Remaining VFS/path rows from this scout keep visible parser caveats and must not be counted until fixed and revalidated.
+
+## open clean2 checkpoint
+
+A FD/VFS/IO scout found two already-generic `open` rows that are clean enough for the future stable656 pool without any source edit.
+
+Code changes retained in this checkpoint: none.
+
+Evidence:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.summary.txt` — 4 PASS / 28 FAIL across musl+glibc; `open07` and `open12` are the only parser-clean RV candidates.
+- LA confirmation: `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.summary.txt` — 4 PASS / 0 FAIL for the two candidates, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Combined RV+LA report: `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.promotion-candidates.txt` — 2 candidates and 14 blocked/incomplete rows.
+- Combined clean42 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean42-open-clean2-20260602T153844Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `open07`, `open12`.
+- Candidate pool: 42/50.
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 8 cases short.
+- Remaining FD/VFS/IO rows from this scout keep visible parser caveats or wrapper-fail events and must not be counted until fixed and revalidated.
