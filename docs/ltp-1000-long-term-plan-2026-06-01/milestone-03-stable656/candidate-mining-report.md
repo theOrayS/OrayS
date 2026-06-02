@@ -188,3 +188,15 @@ Latest artifacts:
 Decision: add `getitimer02`, `setitimer02`, and `times03` to the future promotion pool. The RV scout also records 22 surrounding blocker cases with visible TCONF/TBROK/TFAIL/ENOSYS/timeout markers; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 38/50, so no stable-list edit is made.
 
 Promising next mining direction: move back to VFS/path and small FD/IO rows for the remaining 12 candidates; timerfd/POSIX timer rows need real timerfd/POSIX timer syscall support and should not be broad-promoted from partial TPASS.
+
+## lstat clean2 VFS/path update
+
+Latest artifacts:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-simple-scout-20260602T153210+0800.summary.txt`
+- LA clean2 confirmation: `target/ltp-1000-milestone-03-stable656/la-lstat-clean2-20260602T153351+0800.summary.txt`
+- Combined clean40 report: `target/ltp-1000-milestone-03-stable656/combined-lstat-clean2-20260602T153433+0800.promotion-candidates.txt`
+
+Decision: add `lstat02` and `lstat02_64` to the future promotion pool. The RV scout also records 20 surrounding blocker cases with visible TFAIL/TBROK/TCONF/ENOSYS markers; those rows are not eligible for LA confirmation or promotion accounting. The current pool is 40/50, so no stable-list edit is made.
+
+Next useful action: continue targeted discovery in FD/IO and small process/signal rows for the remaining 10 clean candidates; VFS utime/mkdir/getcwd/fstat blockers need generic semantics before re-scouting.

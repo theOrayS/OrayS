@@ -93,3 +93,7 @@ No blacklist change was made for the epoll_create1 repair. `epoll_create1_01` an
 ## time/timer clean3 blacklist status
 
 No blacklist was added, removed, or used for promotion accounting in the time/timer clean3 checkpoint. RV-blocked rows remain visible parser blockers and are not counted as PASS.
+
+## lstat clean2 blacklist status
+
+No blacklist was added, removed, or used for promotion accounting in the lstat clean2 checkpoint. RV-blocked VFS/path rows remain visible parser blockers and are not counted as PASS.

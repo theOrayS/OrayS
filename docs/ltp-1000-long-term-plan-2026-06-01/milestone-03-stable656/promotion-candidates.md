@@ -275,3 +275,18 @@ Evidence:
 Newly evidenced four-way-clean cases: `getitimer02`, `setitimer02`, and `times03`. Current pool: 38/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 Blocked rows from the same scout stay outside the pool: `clock_getres01` has parser-visible `TCONF`; `clock_gettime01` and `setitimer01` timeout; `clock_gettime03`, `clock_nanosleep03`, `timerfd*`, and related timer rows retain visible `TBROK`/`TFAIL`/`ENOSYS`/`TCONF`. None is blacklisted or counted as PASS.
+
+## lstat clean2 update
+
+A VFS/path scout grew the future pool without editing the stable list or changing source code.
+
+Evidence:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-simple-scout-20260602T153210+0800.summary.txt` — 5 wrapper PASS / 39 wrapper FAIL. `lstat02` and `lstat02_64` are parser-clean for musl+glibc; the surrounding rows retain visible TFAIL/TBROK/TCONF/ENOSYS blockers.
+- LA clean2 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-lstat-clean2-20260602T153351+0800.summary.txt` — the two RV-clean rows are parser-clean for musl+glibc; zero internal/fatal markers.
+- Combined clean2 report: `target/ltp-1000-milestone-03-stable656/combined-lstat-clean2-20260602T153433+0800.promotion-candidates.txt`.
+- Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean40-lstat-clean2-20260602T153433Z.md`.
+
+Newly evidenced four-way-clean cases: `lstat02` and `lstat02_64`. Current pool: 40/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+Blocked rows from the same scout stay outside the pool: utime/utimes/mkdir/rmdir/getcwd/fstat/symlink/unlink rows retain visible `TFAIL`/`TBROK`/`TCONF`/`ENOSYS` markers. None is blacklisted or counted as PASS.

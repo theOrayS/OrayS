@@ -904,3 +904,74 @@ times03
 ## Promotion result after time/timer clean3 evidence
 # 0 promoted in this checkpoint.
 # Reason: 38 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## VFS/path simple RV scout and LA lstat clean2 confirmation
+utime01
+utime02
+utime03
+utime04
+utime05
+utime06
+utime07
+utimes01
+utimensat01
+lstat02
+lstat02_64
+fstat02
+fstat02_64
+getcwd03
+getcwd04
+unlink09
+symlink03
+rmdir02
+mkdir02
+mkdir03
+mkdir09
+mkdirat02
+# LA confirmation reran only RV-clean candidates: lstat02,lstat02_64.
+
+## Four-way clean candidate pool after lstat clean2 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+lstat02
+lstat02_64
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after lstat clean2 evidence
+# 0 promoted in this checkpoint.
+# Reason: 40 new four-way-clean unique candidates are available, below the +50 stable656 gate.
