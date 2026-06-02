@@ -30,6 +30,12 @@ Files: `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/sig
 
 Unhandled user page faults now first check whether the current thread has an installed, unblocked user `SIGSEGV` handler and no signal frame/pending synchronous signal already in flight. If so, the kernel queues the existing user-signal delivery path and returns to user mode so the handler can run. If no catchable handler exists, or the signal is blocked/already pending, the existing fatal `SIGSEGV` exit-group behavior is preserved. The change is generic fault/signal handling; it does not inspect LTP case names, paths, process names, or outputs.
 
+### File-backed mmap `SIGBUS` for pages wholly beyond EOF
+
+Files: `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/process_lifecycle.rs`, `examples/shell/src/uspace/mod.rs`
+
+File-backed `mmap` now tracks the byte count actually populated from the file. Pages wholly beyond EOF are kept in the VMA bookkeeping but protected with user-only/no-read/write/execute permissions. If a later user fault hits one of these tracked beyond-EOF mmap ranges, the generic page-fault path queues `SIGBUS`; otherwise it keeps the existing `SIGSEGV` behavior. The page containing EOF remains mapped and zero-filled, matching Linux's partial-page behavior. This is a generic file-backed mmap/signal repair; it does not inspect LTP case names, paths, process names, or outputs.
+
 ### Synthetic `/proc/<pid>/stat` sleeping-state reporting
 
 File: `examples/shell/src/uspace/synthetic_fs.rs`
@@ -64,6 +70,14 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 - Error numbers, syscall numbers, struct layouts, FD semantics, futex values, mmap return values, and user-pointer layouts are unchanged by this delivery-path repair.
 - Risk boundary: this relies on the existing `user_return_hook` signal-frame injection path; future changes must keep mmap/signal/wait regression subsets clean on RV and LA.
 
+### File-backed `mmap` / `SIGBUS`
+
+- Syscall-visible behavior affected: accesses to file-backed mapping pages wholly beyond the populated file length can now deliver catchable `SIGBUS` instead of silently reading/writing zero-filled anonymous pages.
+- Existing partial-page behavior is preserved: the page containing EOF remains mapped and zero-filled. Anonymous mappings and file-backed bytes that were actually populated are not affected by the beyond-EOF `SIGBUS` marker.
+- Error numbers, syscall numbers, struct layouts, FD semantics, futex values, and mmap return values are unchanged by this repair.
+- Lifetime boundary: beyond-EOF `SIGBUS` ranges are cleared/split on `munmap`, replaced on overlapping `MAP_FIXED`, cleared on `exec`, and copied across `fork` with the rest of the user mappings.
+- Risk boundary: future file-backed mmap changes must keep `mmap13` plus adjacent mmap/signal regression subsets clean on RV and LA.
+
 ### `/proc/<pid>/stat`
 
 - User-visible file affected: `/proc/<pid>/stat` field 3 process state.
@@ -82,17 +96,16 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 6/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `munmap01`, `sched_setaffinity01`).
+- Candidate pool after this checkpoint: 7/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `sched_setaffinity01`).
 
 ## Behavior gaps exposed but not fixed
 
 1. `mmap05`: RV is now parser-clean, but LA musl+glibc still do not receive the expected `SIGSEGV`; an explicit TLB-flush experiment and temporary instrumentation did not close it. Treat as a LoongArch write-protect/page-modify lane, not a generic signal-queue issue.
-2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
-3. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects syscall-visible `bufsiz == 0`. Source audit found musl rewrites user `bufsize == 0` into a dummy one-byte syscall, so preserving valid direct `readlinkat(..., bufsiz=1)` truncation semantics takes priority over a kernel special case.
-4. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
-5. `clone04`: RV glibc confirms the kernel/glibc path returns `EINVAL` for a NULL stack, but RV musl is killed by SIGSEGV/TBROK before a clean wrapper PASS. No code change was made; treat it as a libc-wrapper boundary until a generic clone ABI fix can be proven without regressing clone/vfork/futex/wait behavior.
-6. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
-7. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
+2. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects syscall-visible `bufsiz == 0`. Source audit found musl rewrites user `bufsize == 0` into a dummy one-byte syscall, so preserving valid direct `readlinkat(..., bufsiz=1)` truncation semantics takes priority over a kernel special case.
+3. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
+4. `clone04`: RV glibc confirms the kernel/glibc path returns `EINVAL` for a NULL stack, but RV musl is killed by SIGSEGV/TBROK before a clean wrapper PASS. No code change was made; treat it as a libc-wrapper boundary until a generic clone ABI fix can be proven without regressing clone/vfork/futex/wait behavior.
+5. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
+6. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
 
 ## Maintenance boundary
 

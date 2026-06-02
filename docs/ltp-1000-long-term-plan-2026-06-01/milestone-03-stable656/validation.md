@@ -587,9 +587,9 @@ Decision: `clone04` remains blocked. RV glibc is clean (`NULL stack : EINVAL (22
 
 ## Unverified items
 
-- No stable656 promotion gate because the candidate pool currently has only 6/50 required new cases.
+- At the earlier sync-SIGSEGV checkpoint there was still no stable656 promotion gate because the candidate pool had only 6/50 required new cases; the later `mmap13` section below supersedes this count with 7/50.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, LA `mmap05`, `mmap13`, `shmat1`, `nice04`, or `clone04`; `munmap01` is fixed below and enters the clean pool, while LA musl `readlinkat02` is documented as non-promotable from the kernel side unless the libc/test boundary changes.
+- At that checkpoint there were no fixes yet for `kill10`, LA `mmap05`, `mmap13`, `shmat1`, `nice04`, or `clone04`; the later `mmap13` section below supersedes that blocker, while LA musl `readlinkat02` remains documented as non-promotable from the kernel side unless the libc/test boundary changes.
 
 
 ## `futex_wait05` precise timer-list proof
@@ -682,8 +682,8 @@ Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, sched_setaffinity
 ## Gate outcome after sync-SIGSEGV update
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
-- Current clean candidate pool is 6/50 for stable656.
-- No `LTP_STABLE_CASES` edit is made because 44 more four-way-clean unique cases are still required.
+- At this sync-SIGSEGV checkpoint the clean candidate pool was 6/50 for stable656.
+- No `LTP_STABLE_CASES` edit was made at that point because 44 more four-way-clean unique cases were still required; the later `mmap13` section below updates the pool to 7/50.
 - Counted targeted and regression summaries for `futex_wait05`, `munmap01`, timer/futex, and mmap/signal adjacency are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; `mmap05` remains blocked on LA `TFAIL`.
 
 
@@ -801,3 +801,97 @@ Artifacts:
 Parser result: the flush experiment kept `munmap01` clean (`PASS LTP CASE: 2`) but `mmap05` still failed both LA libcs (`FAIL LTP CASE: 2`, internal `TFAIL=2`). The debug rerun of `mmap05` alone also failed both LA libcs (`FAIL LTP CASE: 2`, internal `TFAIL=2`).
 
 Decision: `mmap05` remains non-promotable. The temporary explicit TLB-flush/debug instrumentation was removed; no production code change is retained from this failed hypothesis.
+
+## `mmap13` file-backed SIGBUS-on-EOF proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap13 LTP_CASE_TIMEOUT_SECS=90 timeout 12m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap13 LTP_CASE_TIMEOUT_SECS=90 timeout 12m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.summary.json`
+- RV promotion report: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.promotion-candidates.txt`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-final-20260602T012111Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.summary.json`
+- LA promotion report: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.promotion-candidates.txt`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-final-20260602T012141Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
+
+Decision: `mmap13` is now RV + LA x musl + glibc parser-clean after the generic file-backed mmap beyond-EOF `SIGBUS` repair.
+
+Non-countable repair history:
+
+- `target/ltp-1000-milestone-03-stable656/rv-mmap13-current-20260602T005657Z.log` is the pre-fix blocker evidence: RV musl and glibc both had `TFAIL=1` / `SIGBUS signal not received`.
+- `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-20260602T010506Z.log` was a TTY-launched local rerun that stopped before guest output and produced no LTP rows; it is not promotion evidence. The counted RV proof is the non-TTY run above.
+
+## Adjacent mmap/SIGBUS regression subset
+
+Cases: `mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,signal03,sigaction01,rt_sigaction01,rt_sigprocmask01,sigprocmask01,waitpid04`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,signal03,sigaction01,rt_sigaction01,rt_sigprocmask01,sigprocmask01,waitpid04 LTP_CASE_TIMEOUT_SECS=90 timeout 18m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,signal03,sigaction01,rt_sigaction01,rt_sigprocmask01,sigprocmask01,waitpid04 LTP_CASE_TIMEOUT_SECS=90 timeout 18m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-mmap13-sigbus-regression-20260602T011329Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-mmap13-sigbus-regression-20260602T011433Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 24
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: adjacent stable mmap/signal/wait regression did not regress on RV or LA.
+
+## Combined clean7 candidate pool
+
+Combined report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.txt`
+Checksum: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.sha256`
+
+```text
+Promotion candidates: 7
+Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, mmap13, munmap01, sched_setaffinity01
+Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
+```
+
+## Gate outcome after mmap13 SIGBUS update
+
+- Live stable list remains `606 total / 606 unique / 0 duplicate`.
+- Current clean candidate pool is 7/50 for stable656.
+- No `LTP_STABLE_CASES` edit is made because 43 more four-way-clean unique cases are still required.
+- Counted targeted and regression summaries for `mmap13` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix and TTY-aborted RV logs remain visible as non-countable history.

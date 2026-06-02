@@ -1,12 +1,12 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint found six four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint found seven four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 6 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `munmap01`, `sched_setaffinity01`).
+- Current four-way-clean new candidate pool: 7 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `sched_setaffinity01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
 Because the candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
@@ -19,7 +19,6 @@ The following blockers prevent counting additional rows:
 | --- | --- |
 | `mmap05` | RV is now clean after catchable synchronous `SIGSEGV`, but LA musl+glibc still report `TFAIL=1` / SIGSEGV signal not received; a local explicit TLB-flush experiment and temporary instrumentation left the TFAIL unchanged |
 | `mmap10_1` | missing testcase in both guest LTP trees |
-| `mmap13` | expected SIGBUS is not delivered (`TFAIL`) |
 | `vma02` | libnuma `TCONF` |
 | old `futex_wait03` scout row | superseded timeout evidence; current RV/LA targeted reruns are parser-clean after `/proc/<pid>/stat` sleeping-state repair |
 | `kill10` | severe panic/trap during RV VFS/process scout; evidence cannot be promoted |
@@ -37,4 +36,4 @@ The following blockers prevent counting additional rows:
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `munmap01`, and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, and `sched_setaffinity01` in `promotion-candidates.md` for the next accumulation batch.

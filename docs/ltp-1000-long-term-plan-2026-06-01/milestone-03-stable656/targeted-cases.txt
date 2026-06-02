@@ -130,3 +130,30 @@ sched_setaffinity01
 ## Promotion result
 # 0 promoted in this checkpoint.
 # Reason: only 6 new four-way-clean unique candidates are available, below the +50 milestone gate.
+
+## File-backed mmap SIGBUS-on-EOF targeted proof
+mmap13
+# mmap13 SIGBUS proof: RV/LA x musl/glibc clean after generic beyond-EOF mmap range tracking; not promoted until +50 batch.
+
+## Adjacent mmap/SIGBUS regression subset
+mmap01
+mmap02
+mmap03
+mmap04
+mmap09
+mmap12
+signal03
+sigaction01
+rt_sigaction01
+rt_sigprocmask01
+sigprocmask01
+waitpid04
+
+## Four-way clean candidate pool after mmap13 SIGBUS repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+sched_setaffinity01

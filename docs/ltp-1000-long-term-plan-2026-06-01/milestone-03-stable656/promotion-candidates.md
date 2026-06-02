@@ -6,10 +6,10 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean6-sync-sigsegv-20260602T003243Z.promotion-candidates.txt`
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean7-mmap13-sigbus-final-20260602T012225Z.promotion-candidates.txt`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Promotion candidates: 6
+- Promotion candidates: 7
 - Blocked/incomplete cases in this clean proof set: 1 (`mmap05`, LA `TFAIL`)
 
 | Case | Evidence | Decision |
@@ -19,6 +19,7 @@ Clean combined parser report:
 | `futex_wait03` | after synthetic `/proc/<pid>/stat` reports futex waiters as sleeping, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `futex_wait05` | after generic sub-tick timer-list wakeups plus preserving the periodic tick deadline, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `munmap01` | after catchable synchronous `SIGSEGV` delivery for unmapped user faults, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `mmap13` | after generic file-backed mmap beyond-EOF pages are protected and translated to catchable `SIGBUS`, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `sched_setaffinity01` | after generic permission fix, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 
 ## Evidence hygiene notes
@@ -29,6 +30,7 @@ Clean combined parser report:
 - `rv-futex-wait03-proc-sleep-20260601T232011Z.log` and `la-futex-wait03-proc-sleep-20260601T232052Z.log` provide the current `futex_wait03` proof; the older G009 scout timeout remains blocker history only.
 - `rv-futex-wait05-periodic-fix-20260601T235234Z.log` and `la-futex-wait05-periodic-fix-20260601T235323Z.log` provide the current `futex_wait05` proof; interrupted/terminated LA regression attempts are retained as non-countable repair history only.
 - `rv-mmap05-munmap01-sync-sigsegv-20260602T002516Z.log` and `la-mmap05-munmap01-sync-sigsegv-20260602T002606Z.log` provide the current `munmap01` proof. The same LA targeted log keeps `mmap05` blocked with `TFAIL=1` on both libcs, so only `munmap01` enters the clean pool.
+- `rv-mmap13-sigbus-final-20260602T012111Z.log` and `la-mmap13-sigbus-final-20260602T012141Z.log` provide the current `mmap13` proof; adjacent mmap/signal regression summaries are `rv-mmap13-sigbus-regression-20260602T011329Z.summary.txt` and `la-mmap13-sigbus-regression-20260602T011433Z.summary.txt`.
 
 ## Blocked / incomplete rows outside the clean pool
 
@@ -44,4 +46,4 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 6.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 7.

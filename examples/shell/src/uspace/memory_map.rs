@@ -117,11 +117,16 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         handled
     };
     if !handled && _from_user {
-        if queue_current_synchronous_signal(SIGSEGV_NUM) {
+        let signal = if process.fault_in_mmap_sigbus_range(vaddr.as_usize()) {
+            general::SIGBUS as i32
+        } else {
+            SIGSEGV_NUM
+        };
+        if queue_current_synchronous_signal(signal) {
             return true;
         }
-        process.request_signal_exit_group(SIGSEGV_NUM);
-        terminate_current_thread(process.as_ref(), 128 + SIGSEGV_NUM);
+        process.request_signal_exit_group(signal);
+        terminate_current_thread(process.as_ref(), 128 + signal);
     }
     #[cfg(target_arch = "loongarch64")]
     if handled {
@@ -197,6 +202,9 @@ pub(super) fn sys_mmap(
             .unwrap_or(USER_MMAP_BASE);
         start
     };
+    let Some(target_end) = target.checked_add(size) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
     if anonymous && size <= 0x40000 {
         user_trace!("user-mmap: target={target:#x} len={size:#x} prot={prot:#x} flags={flags:#x}");
     }
@@ -204,9 +212,7 @@ pub(super) fn sys_mmap(
     {
         let mut aspace = process.aspace.lock();
         if map_fixed {
-            if let Some(end) = target.checked_add(size) {
-                process.forget_mmap_region(target, end);
-            }
+            process.forget_mmap_region(target, target_end);
             let _ = aspace.unmap(VirtAddr::from(target), size);
         }
         if let Err(err) = aspace.map_alloc(VirtAddr::from(target), size, map_flags, populate) {
@@ -214,6 +220,7 @@ pub(super) fn sys_mmap(
         }
     }
 
+    let mut sigbus_range = None;
     if !anonymous {
         const FILE_MMAP_COPY_CHUNK: usize = PAGE_SIZE_4K;
         let mut copied = 0usize;
@@ -255,11 +262,35 @@ pub(super) fn sys_mmap(
                 break;
             }
         }
+        if copied < len {
+            let Some(valid_len) = align_up_checked(copied, PAGE_SIZE_4K) else {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::ENOMEM);
+            };
+            let Some(invalid_start) = target.checked_add(valid_len) else {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::ENOMEM);
+            };
+            if invalid_start < target_end {
+                if let Err(err) = process.aspace.lock().protect(
+                    VirtAddr::from(invalid_start),
+                    target_end - invalid_start,
+                    MappingFlags::USER,
+                ) {
+                    let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                    return neg_errno(LinuxError::from(err));
+                }
+                sigbus_range = Some((invalid_start, target_end));
+            }
+        }
     }
     if shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, size, map_flags);
     }
     process.record_mmap_region(target, size, prot as u32, shared, locked);
+    if let Some((start, end)) = sigbus_range {
+        process.record_mmap_sigbus_range(start, end);
+    }
     target as isize
 }
 
