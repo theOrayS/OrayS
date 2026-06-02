@@ -779,3 +779,25 @@ Promotion candidates: 6
 Candidates: fsync02, futex_wait01, futex_wait03, futex_wait05, munmap01, sched_setaffinity01
 Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 ```
+
+
+## LA `mmap05` write-protect/TLB experiment (non-promotable)
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap05,munmap01 LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap05 LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh la
+```
+
+Artifacts:
+
+- Flush experiment raw log: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-tlbflush-20260602T004430Z.log`
+- Flush experiment summary: `target/ltp-1000-milestone-03-stable656/la-mmap05-munmap01-tlbflush-20260602T004430Z.summary.txt`
+- Debug raw log: `target/ltp-1000-milestone-03-stable656/la-mmap05-debug-20260602T004819Z.log`
+- Debug summary: `target/ltp-1000-milestone-03-stable656/la-mmap05-debug-20260602T004819Z.summary.txt`
+- Detailed report: `mmap05-la-write-protect-report.md`
+
+Parser result: the flush experiment kept `munmap01` clean (`PASS LTP CASE: 2`) but `mmap05` still failed both LA libcs (`FAIL LTP CASE: 2`, internal `TFAIL=2`). The debug rerun of `mmap05` alone also failed both LA libcs (`FAIL LTP CASE: 2`, internal `TFAIL=2`).
+
+Decision: `mmap05` remains non-promotable. The temporary explicit TLB-flush/debug instrumentation was removed; no production code change is retained from this failed hypothesis.

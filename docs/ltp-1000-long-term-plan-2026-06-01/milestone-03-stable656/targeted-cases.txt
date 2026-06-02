@@ -61,6 +61,11 @@ clone04
 mmap05
 munmap01
 # mmap05/munmap01 sync-SIGSEGV targeted run: munmap01 four-way clean; mmap05 RV-clean but LA TFAIL, non-promotable.
+mmap05
+munmap01
+# LA mmap05/munmap01 explicit-TLB-flush experiment: munmap01 remains clean; mmap05 remains LA TFAIL.
+mmap05
+# LA mmap05 temporary instrumentation: post-mprotect page-table query shows READ|USER, but protected access still produced no SIGSEGV; non-promotable.
 
 ## Closed arch-sweep mining rows
 # Unit remains LTP case. The closed RV/LA arch matrices were mined as a whole;

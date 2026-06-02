@@ -17,7 +17,7 @@ The following blockers prevent counting additional rows:
 
 | Case / lane | Blocking reason |
 | --- | --- |
-| `mmap05` | RV is now clean after catchable synchronous `SIGSEGV`, but LA musl+glibc still report `TFAIL=1` / SIGSEGV signal not received |
+| `mmap05` | RV is now clean after catchable synchronous `SIGSEGV`, but LA musl+glibc still report `TFAIL=1` / SIGSEGV signal not received; a local explicit TLB-flush experiment and temporary instrumentation left the TFAIL unchanged |
 | `mmap10_1` | missing testcase in both guest LTP trees |
 | `mmap13` | expected SIGBUS is not delivered (`TFAIL`) |
 | `vma02` | libnuma `TCONF` |
