@@ -1,4 +1,5 @@
 use core::cmp;
+use core::mem::size_of;
 use core::sync::atomic::Ordering;
 
 use axalloc::global_allocator;
@@ -19,8 +20,11 @@ use super::linux_abi::{
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
-use super::user_memory::{read_cstr, read_user_bytes, write_user_bytes, write_user_value};
-use super::UserProcess;
+use super::time_abi::clock_gettime_timespec;
+use super::user_memory::{
+    read_cstr, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
+};
+use super::{PathTimes, UserProcess};
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 const DEV_VDA_RDEV: u64 = 65_024; // Linux makedev(254, 0), virtio block.
@@ -29,6 +33,60 @@ const DEV_XVDA_RDEV: u64 = 51_712; // Linux makedev(202, 0).
 const LINUX_PATH_MAX: usize = 4096;
 const XATTR_CREATE: usize = 0x1;
 const XATTR_REPLACE: usize = 0x2;
+const NSEC_PER_SEC: i64 = 1_000_000_000;
+
+#[derive(Clone, Copy)]
+enum UtimeSelection {
+    Set(general::timespec),
+    Now,
+    Omit,
+}
+
+#[derive(Clone, Copy)]
+struct UtimeRequest {
+    atime: UtimeSelection,
+    mtime: UtimeSelection,
+}
+
+impl UtimeRequest {
+    fn both_now(self) -> bool {
+        matches!(self.atime, UtimeSelection::Now) && matches!(self.mtime, UtimeSelection::Now)
+    }
+
+    fn both_omit(self) -> bool {
+        matches!(self.atime, UtimeSelection::Omit) && matches!(self.mtime, UtimeSelection::Omit)
+    }
+}
+
+impl PathTimes {
+    fn from_stat(st: &general::stat) -> Self {
+        Self {
+            atime: stat_timespec(st.st_atime, st.st_atime_nsec),
+            mtime: stat_timespec(st.st_mtime, st.st_mtime_nsec),
+            ctime: stat_timespec(st.st_ctime, st.st_ctime_nsec),
+        }
+    }
+
+    fn apply_to_stat(self, st: &mut general::stat) {
+        st.st_atime = self.atime.tv_sec as _;
+        st.st_atime_nsec = self.atime.tv_nsec.max(0) as _;
+        st.st_mtime = self.mtime.tv_sec as _;
+        st.st_mtime_nsec = self.mtime.tv_nsec.max(0) as _;
+        st.st_ctime = self.ctime.tv_sec as _;
+        st.st_ctime_nsec = self.ctime.tv_nsec.max(0) as _;
+    }
+}
+
+fn stat_timespec(sec: i64, nsec: u64) -> general::timespec {
+    general::timespec {
+        tv_sec: sec as _,
+        tv_nsec: cmp::min(nsec, (NSEC_PER_SEC - 1) as u64) as _,
+    }
+}
+
+fn realtime_timespec() -> Result<general::timespec, LinuxError> {
+    clock_gettime_timespec(general::CLOCK_REALTIME)
+}
 
 pub(super) fn file_attr_to_stat(attr: &FileAttr, path: Option<&str>) -> general::stat {
     let st_mode = file_type_mode(attr.file_type()) | attr.perm().bits() as u32;
@@ -56,6 +114,18 @@ impl UserProcess {
 
     pub(super) fn path_mode(&self, path: &str) -> Option<u32> {
         self.path_modes.lock().get(path).copied()
+    }
+
+    pub(super) fn set_path_times(&self, path: String, times: PathTimes) {
+        self.path_times.lock().insert(path, times);
+    }
+
+    pub(super) fn remove_path_times(&self, path: &str) {
+        self.path_times.lock().remove(path);
+    }
+
+    pub(super) fn path_times(&self, path: &str) -> Option<PathTimes> {
+        self.path_times.lock().get(path).copied()
     }
 
     pub(super) fn set_path_inode(&self, path: String, ino: u64) {
@@ -126,6 +196,14 @@ impl UserProcess {
             xattrs.remove(new_path.as_str());
         }
         drop(xattrs);
+
+        let mut times = self.path_times.lock();
+        if let Some(value) = times.remove(old_path) {
+            times.insert(new_path.clone(), value);
+        } else {
+            times.remove(new_path.as_str());
+        }
+        drop(times);
 
         self.move_path_sparse_file(old_path, new_path);
     }
@@ -284,6 +362,9 @@ impl UserProcess {
         if let Some((uid, gid)) = self.path_owner(path) {
             st.st_uid = uid;
             st.st_gid = gid;
+        }
+        if let Some(times) = self.path_times(path) {
+            times.apply_to_stat(&mut st);
         }
         Some(st)
     }
@@ -499,6 +580,9 @@ pub(super) fn apply_recorded_path_metadata(
     }
     if let Some(size) = process.path_sparse_size(path) {
         st.st_size = size.min(i64::MAX as u64) as _;
+    }
+    if let Some(times) = process.path_times(path) {
+        times.apply_to_stat(&mut st);
     }
     st
 }
@@ -1514,6 +1598,12 @@ fn stat_to_statx(st: general::stat) -> general::statx {
     stx.stx_dev_minor = ((st.st_dev as u64) & 0xff) as _;
     stx.stx_rdev_major = ((st.st_rdev as u64) >> 8) as _;
     stx.stx_rdev_minor = ((st.st_rdev as u64) & 0xff) as _;
+    stx.stx_atime.tv_sec = st.st_atime as _;
+    stx.stx_atime.tv_nsec = st.st_atime_nsec as _;
+    stx.stx_mtime.tv_sec = st.st_mtime as _;
+    stx.stx_mtime.tv_nsec = st.st_mtime_nsec as _;
+    stx.stx_ctime.tv_sec = st.st_ctime as _;
+    stx.stx_ctime.tv_nsec = st.st_ctime_nsec as _;
     stx
 }
 
@@ -1710,31 +1800,176 @@ pub(super) fn sys_utimensat(
     process: &UserProcess,
     dirfd: usize,
     pathname: usize,
-    _times: usize,
-    _flags: usize,
+    times: usize,
+    flags: usize,
 ) -> isize {
-    if pathname == 0 {
-        let table = process.fds.lock();
-        return if table.entry(dirfd as i32).is_ok() {
-            0
-        } else {
-            neg_errno(LinuxError::EBADF)
-        };
+    let flags = flags as u32;
+    let supported_flags = general::AT_SYMLINK_NOFOLLOW | general::AT_EMPTY_PATH;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
     }
-    let path = match read_cstr(process, pathname) {
-        Ok(path) => path,
+    let request = match read_utime_request(process, times) {
+        Ok(request) => request,
         Err(err) => return neg_errno(err),
     };
+
+    let (record_path, st) = match utimensat_target(process, dirfd as i32, pathname, flags) {
+        Ok(target) => target,
+        Err(err) => return neg_errno(err),
+    };
+
+    if request.both_omit() {
+        return 0;
+    }
+    if let Some(path) = record_path.as_deref() {
+        if process.path_on_readonly_mount(path) {
+            return neg_errno(LinuxError::EROFS);
+        }
+    }
+    if let Err(err) = check_utimensat_permission(process, &st, request) {
+        return neg_errno(err);
+    }
+
+    let Some(path) = record_path else {
+        return 0;
+    };
+    let now = match realtime_timespec() {
+        Ok(now) => now,
+        Err(err) => return neg_errno(err),
+    };
+    let current = process
+        .path_times(path.as_str())
+        .unwrap_or_else(|| PathTimes::from_stat(&st));
+    let new_times = PathTimes {
+        atime: apply_utime_selection(request.atime, current.atime, now),
+        mtime: apply_utime_selection(request.mtime, current.mtime, now),
+        ctime: now,
+    };
+    process.set_path_times(path, new_times);
+    0
+}
+
+fn read_utime_request(process: &UserProcess, times: usize) -> Result<UtimeRequest, LinuxError> {
+    if times == 0 {
+        return Ok(UtimeRequest {
+            atime: UtimeSelection::Now,
+            mtime: UtimeSelection::Now,
+        });
+    }
+    let atime = read_user_value::<general::timespec>(process, times)?;
+    let mtime_addr = times
+        .checked_add(size_of::<general::timespec>())
+        .ok_or(LinuxError::EFAULT)?;
+    let mtime = read_user_value::<general::timespec>(process, mtime_addr)?;
+    Ok(UtimeRequest {
+        atime: parse_utime_selection(atime)?,
+        mtime: parse_utime_selection(mtime)?,
+    })
+}
+
+fn parse_utime_selection(ts: general::timespec) -> Result<UtimeSelection, LinuxError> {
+    let nsec = ts.tv_nsec as i64;
+    if nsec == general::UTIME_NOW as i64 {
+        Ok(UtimeSelection::Now)
+    } else if nsec == general::UTIME_OMIT as i64 {
+        Ok(UtimeSelection::Omit)
+    } else if (0..NSEC_PER_SEC).contains(&nsec) {
+        Ok(UtimeSelection::Set(ts))
+    } else {
+        Err(LinuxError::EINVAL)
+    }
+}
+
+fn utimensat_target(
+    process: &UserProcess,
+    dirfd: i32,
+    pathname: usize,
+    flags: u32,
+) -> Result<(Option<String>, general::stat), LinuxError> {
+    if pathname == 0 {
+        return utimensat_fd_target(process, dirfd);
+    }
+    let path = read_cstr(process, pathname)?;
+    if path.len() >= LINUX_PATH_MAX {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+    if let Some(fd) = proc_self_fd_number(path.as_str()) {
+        return utimensat_fd_target(process, fd);
+    }
+    if path.is_empty() {
+        if flags & general::AT_EMPTY_PATH == 0 {
+            return Err(LinuxError::ENOENT);
+        }
+        return utimensat_fd_target(process, dirfd);
+    }
+
     let abs_path = {
         let table = process.fds.lock();
-        match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
-            Ok(path) => path,
-            Err(err) => return neg_errno(err),
-        }
+        resolve_dirfd_path(process, &table, dirfd, path.as_str())?
     };
-    match axfs::api::metadata(abs_path.as_str()) {
-        Ok(_) => 0,
-        Err(err) => neg_errno(LinuxError::from(err)),
+    if flags & general::AT_SYMLINK_NOFOLLOW != 0 {
+        let resolved_path = process.resolve_parent_symlinks(abs_path.as_str())?;
+        if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
+            return Ok((Some(resolved_path), st));
+        }
+        let st =
+            process
+                .fds
+                .lock()
+                .stat_path(process, general::AT_FDCWD, resolved_path.as_str())?;
+        return Ok((Some(resolved_path), st));
+    }
+
+    let resolved_path = process
+        .resolve_path_symlink(abs_path.as_str())?
+        .unwrap_or(abs_path);
+    let st = process
+        .fds
+        .lock()
+        .stat_path(process, general::AT_FDCWD, resolved_path.as_str())?;
+    Ok((Some(resolved_path), st))
+}
+
+fn utimensat_fd_target(
+    process: &UserProcess,
+    fd: i32,
+) -> Result<(Option<String>, general::stat), LinuxError> {
+    let mut table = process.fds.lock();
+    table.stat_with_recorded_path(process, fd)
+}
+
+fn check_utimensat_permission(
+    process: &UserProcess,
+    st: &general::stat,
+    request: UtimeRequest,
+) -> Result<(), LinuxError> {
+    let uid = process.fs_uid();
+    if uid == 0 {
+        return Ok(());
+    }
+    let owner = st.st_uid as u32 == uid;
+    if request.both_now() {
+        if owner || access_allowed(st, ACCESS_W_OK, uid, process.fs_gid()) {
+            Ok(())
+        } else {
+            Err(LinuxError::EACCES)
+        }
+    } else if owner {
+        Ok(())
+    } else {
+        Err(LinuxError::EPERM)
+    }
+}
+
+fn apply_utime_selection(
+    selection: UtimeSelection,
+    current: general::timespec,
+    now: general::timespec,
+) -> general::timespec {
+    match selection {
+        UtimeSelection::Set(ts) => ts,
+        UtimeSelection::Now => now,
+        UtimeSelection::Omit => current,
     }
 }
 

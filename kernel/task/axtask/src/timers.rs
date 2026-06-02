@@ -4,11 +4,14 @@ use kernel_guard::NoOp;
 use lazyinit::LazyInit;
 use timer_list::{TimerEvent, TimerList};
 
-use axhal::time::{epochoffset_nanos, set_oneshot_timer, wall_time, TimeValue, NANOS_PER_SEC};
+use axhal::time::{
+    epochoffset_nanos, monotonic_time_nanos, set_oneshot_timer, wall_time, TimeValue, NANOS_PER_SEC,
+};
 
 use crate::{select_run_queue, AxTaskRef};
 
 static TIMER_TICKET_ID: AtomicU64 = AtomicU64::new(1);
+const MIN_ONESHOT_DELAY_NANOS: u64 = 1_000_000;
 
 percpu_static! {
     TIMER_LIST: LazyInit<TimerList<TaskWakeupEvent>> = LazyInit::new(),
@@ -40,10 +43,6 @@ fn program_next_precise_deadline(timer_list: &TimerList<TaskWakeupEvent>) {
         return;
     };
     let now = wall_time();
-    if deadline <= now {
-        return;
-    }
-
     // The runtime keeps a 100Hz periodic scheduler tick.  Timed waits with a
     // deadline before the next periodic tick need a one-shot interrupt at the
     // actual timer-list deadline; otherwise short POSIX waits are rounded up to
@@ -59,7 +58,19 @@ fn program_next_precise_deadline(timer_list: &TimerList<TaskWakeupEvent>) {
         .as_nanos()
         .saturating_sub(epochoffset_nanos() as u128)
         .min(u64::MAX as u128) as u64;
-    set_oneshot_timer(monotonic_deadline);
+    let monotonic_now = monotonic_time_nanos();
+    // Avoid programming an already-expired (or sub-millisecond race-window)
+    // one-shot deadline. Some timer backends convert absolute nanoseconds into
+    // a relative counter delta, so a deadline that expires during programming
+    // can underflow into a huge sleep and strand timed waiters.
+    let safe_deadline = if monotonic_deadline <= monotonic_now
+        || monotonic_deadline - monotonic_now < MIN_ONESHOT_DELAY_NANOS
+    {
+        monotonic_now.saturating_add(MIN_ONESHOT_DELAY_NANOS)
+    } else {
+        monotonic_deadline
+    };
+    set_oneshot_timer(safe_deadline);
 }
 
 pub fn set_alarm_wakeup(deadline: TimeValue, task: AxTaskRef) {
