@@ -58,3 +58,12 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 ## Promotion decision
 
 No `LTP_STABLE_CASES` edit is justified. The candidate pool is 10/50 for stable656, and all remaining blocker rows retain their parser-visible `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/SIGSEGV` caveats.
+
+## `epoll_create02` focused rescout
+
+A singleton RV/LA rescout on 2026-06-02 kept `epoll_create02` outside the clean pool:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt` — 1 PASS / 1 FAIL, `TCONF=2`, `TFAIL=2`, `ENOSYS=2`; RV musl `epoll_create(0/-1)` reports `ENOSYS` instead of `EINVAL`.
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` — 2 PASS / 0 FAIL, but `TCONF=2` for the architecture-level old `__NR_epoll_create` variant.
+
+Next useful action: treat this as an epoll/libc-wrapper compatibility boundary, not as promotion evidence. A future fix must be generic and prove RV + LA x musl + glibc parser-clean results without hiding the upstream old-ABI `TCONF` row.
