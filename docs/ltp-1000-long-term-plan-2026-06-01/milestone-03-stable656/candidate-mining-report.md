@@ -42,7 +42,7 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 
 | Case/lane | Current blocker | Next useful action |
 | --- | --- | --- |
-| `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL=1` on rerun | inspect LA-musl call boundary; do not special-case syscall `bufsiz=1` |
+| `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL=1`; musl turns `bufsize == 0` into a dummy one-byte `readlinkat` syscall, so the kernel only sees `bufsiz=1` | keep non-promotable as a libc/test boundary; do not special-case kernel `bufsiz=1` because direct Linux `readlinkat(..., bufsiz=1)` truncation must remain valid |
 | `openat02` | post-statfs-clamp isolated RV rerun still has musl+glibc `TBROK` setup `ENOSPC` | keep blocked; diagnose file-growth/space accounting separately before any LA rerun |
 | `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
 | `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |

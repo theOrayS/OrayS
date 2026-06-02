@@ -24,7 +24,7 @@ The following blockers prevent counting additional rows:
 | old `futex_wait03` scout row | superseded timeout evidence; current RV/LA targeted reruns are parser-clean after `/proc/<pid>/stat` sleeping-state repair |
 | `kill10` | severe panic/trap during RV VFS/process scout; evidence cannot be promoted |
 | `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
-| `readlinkat02` | RV clean, but LA musl `TFAIL`; rerun after code inspection still 1 PASS / 1 FAIL |
+| `readlinkat02` | RV and LA glibc clean, but LA musl `TFAIL`; root-cause audit found musl converts user `bufsize == 0` to a dummy one-byte syscall, so a safe generic kernel fix is not available without breaking direct `bufsiz=1` semantics |
 | pre-fix `fsync02` row | old isolated RV rerun had glibc `TBROK=1`; superseded by post-fix proof but retained as failed evidence |
 | `openat02` | post-statfs-clamp isolated RV rerun still fails both musl and glibc with `TBROK` setup `ENOSPC`; no LA rerun or promotion accounting |
 | `nice04` | RV musl gets `EACCES` for `nice(-10)`, but stable `setpriority02` source requires direct unprivileged `setpriority` lowering to return `EACCES`; no safe kernel errno flip |
