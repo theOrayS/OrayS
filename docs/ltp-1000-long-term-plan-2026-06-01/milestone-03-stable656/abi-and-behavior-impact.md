@@ -93,10 +93,21 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 - Error numbers, syscall numbers, struct layouts, FD semantics, signal masks, futex wait/wake return values, mmap ABI, and user-pointer layouts are unchanged by this timing precision repair.
 - Risk boundary: timer changes can affect latency and wakeup ordering; future changes must keep timer/futex/sleep regression subsets parser-clean on RV and LA before broad promotion.
 
+
+### Sparse regular-file logical size/data for large holes
+
+Files: `examples/shell/src/uspace/fd_table.rs`, `examples/shell/src/uspace/metadata.rs`, `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/process_lifecycle.rs`, `examples/shell/src/uspace/mod.rs`
+
+The POSIX user-space layer now tracks per-path sparse logical size and sparse data extents when regular-file writes/truncates would otherwise require physically filling holes beyond the current in-memory file capacity. Reads from sparse holes return zeroes; writes beyond the physical capacity are stored as logical sparse extents; `stat`/`fstat`, `lseek(SEEK_END)`, `truncate`/`ftruncate`/`fallocate`, `pwrite`/`writev`/`sendfile`, and file-backed `mmap` preload consult the same logical view. `unlink`, `rename`, and `O_TRUNC` clear or move this sparse metadata.
+
+User-visible behavior affected: generic large sparse regular files can now be created and reopened without setup-time `ENOSPC` when the write only materializes a small tail extent after a large hole. Error numbers, syscall numbers, flag constants, FD table layout, signal semantics, futex values, and user-pointer ABI are unchanged. `RLIMIT_FSIZE` still returns `EFBIG` before sparse growth beyond the configured limit.
+
+Maintenance boundary: sparse metadata is currently maintained in the process-level POSIX emulation state and copied across fork/clone, not in the underlying filesystem. Future work that needs cross-process persistence must move this into a shared file/inode-level abstraction and rerun VFS/FD/mmap regressions. The implementation is generic and does not inspect LTP case names, paths, processes, or outputs.
+
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 7/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `sched_setaffinity01`).
+- Candidate pool after this checkpoint: 8/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`).
 
 ## Behavior gaps exposed but not fixed
 

@@ -245,3 +245,28 @@ Seven new unique cases are currently four-way clean, but stable656 requires 50 n
 6. Treat `clone04` as a libc-wrapper/clone ABI boundary until RV musl no longer SIGSEGV/TBROK and clone/process/futex regressions are closed.
 7. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
 8. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS/SIGSEGV evidence visible; none counts toward stable promotion.
+
+
+### `openat02` sparse large-file repair
+
+Artifacts:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-openat02-sparse-largefile-20260602T014202Z.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-openat02-sparse-largefile-20260602T014245Z.summary.txt`
+- RV adjacent clean regression summary: `target/ltp-1000-milestone-03-stable656/rv-openat02-adjacent-stable-clean-regression-20260602T014443Z.summary.txt`
+- LA adjacent clean regression summary: `target/ltp-1000-milestone-03-stable656/la-openat02-adjacent-stable-clean-regression-20260602T014545Z.summary.txt`
+- Combined clean8 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.txt`
+
+Targeted result: `openat02` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap after generic sparse logical-size/data handling for large regular-file holes.
+
+Regression result: `openat01`, `lseek01`, `lseek02`, `pread02`, `pwrite02`, `pwrite04`, `ftruncate01`, `truncate02`, `read01`, `write01`, and `write03` are parser-clean on RV and LA, 22/22 wrapper PASS on each arch. A broader RV-only observation shard that also included `read02` wrapper-PASSed but emitted existing O_DIRECT `TCONF=4`, so it is retained only as non-countable caveated observation.
+
+### Combined candidate pool after openat02
+
+Clean combined parser report:
+
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean8-openat02-sparse-largefile-20260602T014245Z.promotion-candidates.txt`
+- Candidates: 8 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`)
+- Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
+
+Stable list remains unchanged at `606/606/0`; the current pool is 8/50, below the +50 stable656 gate.

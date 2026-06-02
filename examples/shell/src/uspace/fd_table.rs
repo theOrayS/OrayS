@@ -128,24 +128,6 @@ pub(super) struct ProcPagemapEntry {
     pub(super) size: u64,
 }
 
-pub(super) fn read_file_at_into(
-    file: &File,
-    offset: u64,
-    dst: &mut [u8],
-) -> Result<usize, LinuxError> {
-    let mut filled = 0usize;
-    while filled < dst.len() {
-        let read = file
-            .read_at(offset + filled as u64, &mut dst[filled..])
-            .map_err(LinuxError::from)?;
-        if read == 0 {
-            break;
-        }
-        filled += read;
-    }
-    Ok(filled)
-}
-
 pub(super) fn sys_openat(
     process: &UserProcess,
     dirfd: usize,
@@ -179,7 +161,7 @@ pub(super) fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> 
     if length > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
     }
-    match process.fds.lock().truncate(fd as i32, length) {
+    match process.fds.lock().truncate(process, fd as i32, length) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -207,7 +189,7 @@ pub(super) fn sys_fallocate(
     if end > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
     }
-    match process.fds.lock().truncate(fd as i32, end) {
+    match process.fds.lock().truncate(process, fd as i32, end) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -225,7 +207,7 @@ pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usiz
         return recv_socket_data_to_user(process, socket.posix_fd, buf, count, 0);
     }
     with_writable_user_buffer(process, buf, count, |dst| {
-        process.fds.lock().read(fd as i32, dst)
+        process.fds.lock().read(process, fd as i32, dst)
     })
 }
 
@@ -244,7 +226,7 @@ pub(super) fn sys_pread64(
         process
             .fds
             .lock()
-            .read_file_at_into_fd(fd as i32, offset as u64, dst)
+            .read_file_at_into_fd(process, fd as i32, offset as u64, dst)
     })
 }
 
@@ -254,7 +236,7 @@ pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usi
         process
             .fds
             .lock()
-            .write(fd as i32, src, Some(file_size_limit))
+            .write(process, fd as i32, src, Some(file_size_limit))
     })
 }
 
@@ -270,10 +252,14 @@ pub(super) fn sys_pwrite64(
         return neg_errno(LinuxError::EINVAL);
     }
     with_readable_user_buffer(process, buf, count, |src| {
-        process
-            .fds
-            .lock()
-            .write_file_at(fd as i32, offset as u64, src)
+        let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+        process.fds.lock().write_file_at(
+            process,
+            fd as i32,
+            offset as u64,
+            src,
+            Some(file_size_limit),
+        )
     })
 }
 
@@ -299,7 +285,7 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
             let n = match process
                 .fds
                 .lock()
-                .write(fd as i32, &src, Some(file_size_limit))
+                .write(process, fd as i32, &src, Some(file_size_limit))
             {
                 Ok(v) => v,
                 Err(err) => return if written > 0 { written } else { neg_errno(err) },
@@ -333,7 +319,7 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
                 Ok(bytes) => bytes,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
-            let n = match process.fds.lock().read(fd as i32, &mut bytes) {
+            let n = match process.fds.lock().read(process, fd as i32, &mut bytes) {
                 Ok(v) => v,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
@@ -387,15 +373,15 @@ pub(super) fn sys_preadv(
                 Ok(bytes) => bytes,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
-            let n =
-                match process
-                    .fds
-                    .lock()
-                    .read_file_at_into_fd(fd as i32, next_offset, &mut bytes)
-                {
-                    Ok(v) => v,
-                    Err(err) => return if total > 0 { total } else { neg_errno(err) },
-                };
+            let n = match process.fds.lock().read_file_at_into_fd(
+                process,
+                fd as i32,
+                next_offset,
+                &mut bytes,
+            ) {
+                Ok(v) => v,
+                Err(err) => return if total > 0 { total } else { neg_errno(err) },
+            };
             if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
                 return if total > 0 { total } else { neg_errno(err) };
             }
@@ -453,6 +439,7 @@ pub(super) fn sys_pwritev(
     };
     let mut total = 0isize;
     let mut next_offset = offset as u64;
+    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     for entry in iov_entries {
         let mut base = entry.iov_base as usize;
         let mut remaining = entry.iov_len as usize;
@@ -465,11 +452,13 @@ pub(super) fn sys_pwritev(
                 Ok(bytes) => bytes,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
-            let n = match process
-                .fds
-                .lock()
-                .write_file_at(fd as i32, next_offset, &src)
-            {
+            let n = match process.fds.lock().write_file_at(
+                process,
+                fd as i32,
+                next_offset,
+                &src,
+                Some(file_size_limit),
+            ) {
                 Ok(v) => v,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
@@ -527,15 +516,15 @@ pub(super) fn sys_sendfile(
     {
         let mut table = process.fds.lock();
         let input_check = match offset {
-            Some(pos) => table.read_file_at_into_fd(in_fd as i32, pos, &mut []),
+            Some(pos) => table.read_file_at_into_fd(process, in_fd as i32, pos, &mut []),
             None => table
-                .read_file_at_current_offset_into_fd(in_fd as i32, &mut [])
+                .read_file_at_current_offset_into_fd(process, in_fd as i32, &mut [])
                 .map(|(_, read)| read),
         };
         if let Err(err) = input_check {
             return neg_errno(err);
         }
-        if let Err(err) = table.write(out_fd as i32, &[], Some(file_size_limit)) {
+        if let Err(err) = table.write(process, out_fd as i32, &[], Some(file_size_limit)) {
             return neg_errno(err);
         }
     }
@@ -556,9 +545,9 @@ pub(super) fn sys_sendfile(
         let read = {
             let mut table = process.fds.lock();
             match offset {
-                Some(pos) => table.read_file_at_into_fd(in_fd as i32, pos, &mut buf),
+                Some(pos) => table.read_file_at_into_fd(process, in_fd as i32, pos, &mut buf),
                 None => table
-                    .read_file_at_current_offset_into_fd(in_fd as i32, &mut buf)
+                    .read_file_at_current_offset_into_fd(process, in_fd as i32, &mut buf)
                     .map(|(_, read)| read),
             }
         };
@@ -573,21 +562,21 @@ pub(super) fn sys_sendfile(
                 };
             }
         };
-        let written =
-            match process
-                .fds
-                .lock()
-                .write(out_fd as i32, &buf[..read], Some(file_size_limit))
-            {
-                Ok(n) => n,
-                Err(err) => {
-                    return if copied > 0 {
-                        copied as isize
-                    } else {
-                        neg_errno(err)
-                    };
-                }
-            };
+        let written = match process.fds.lock().write(
+            process,
+            out_fd as i32,
+            &buf[..read],
+            Some(file_size_limit),
+        ) {
+            Ok(n) => n,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
         if let Some(pos) = offset.as_mut() {
             *pos = pos.saturating_add(written as u64);
         } else if let Err(err) = process
@@ -637,7 +626,7 @@ pub(super) fn sys_lseek(process: &UserProcess, fd: usize, offset: usize, whence:
     match process
         .fds
         .lock()
-        .lseek(fd as i32, offset as isize as i64, whence as u32)
+        .lseek(process, fd as i32, offset as isize as i64, whence as u32)
     {
         Ok(v) => v as isize,
         Err(err) => neg_errno(err),
@@ -724,7 +713,10 @@ pub(super) fn sys_renameat2(
         (old_abs, new_abs)
     };
     match axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()) {
-        Ok(()) => 0,
+        Ok(()) => {
+            process.move_path_sparse_file(old_abs_path.as_str(), new_abs_path);
+            0
+        }
         Err(err) => neg_errno(LinuxError::from(err)),
     }
 }
@@ -1000,7 +992,12 @@ impl FdTable {
         }
     }
 
-    pub(super) fn read(&mut self, fd: i32, dst: &mut [u8]) -> Result<usize, LinuxError> {
+    pub(super) fn read(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::Stdin => Ok(0),
             FdEntry::DevNull => Ok(0),
@@ -1013,7 +1010,7 @@ impl FdTable {
                 if !file_is_readable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
-                file_entry_read(file, dst)
+                file_entry_read(process, file, dst)
             }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
             FdEntry::ProcPagemap(file) => Ok(file.read(dst)),
@@ -1027,6 +1024,7 @@ impl FdTable {
 
     pub(super) fn write(
         &mut self,
+        process: &UserProcess,
         fd: i32,
         src: &[u8],
         file_size_limit: Option<u64>,
@@ -1043,8 +1041,7 @@ impl FdTable {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
-                let src = limit_file_write_len(file, src, file_size_limit)?;
-                file_entry_write(file, src)
+                file_entry_write(process, file, src, file_size_limit)
             }
             FdEntry::Pipe(pipe) => pipe.write(src),
             FdEntry::Socket(socket) => socket.write(src),
@@ -1055,9 +1052,11 @@ impl FdTable {
 
     pub(super) fn write_file_at(
         &mut self,
+        process: &UserProcess,
         fd: i32,
         offset: u64,
         src: &[u8],
+        file_size_limit: Option<u64>,
     ) -> Result<usize, LinuxError> {
         let FdEntry::File(file) = self.entry_mut(fd)? else {
             return match self.entry(fd)? {
@@ -1072,22 +1071,11 @@ impl FdTable {
             return Err(LinuxError::EBADF);
         }
         let base_offset = if file.status_flags & general::O_APPEND != 0 {
-            file.file.get_attr().map_err(LinuxError::from)?.size()
+            file_logical_size(process, file)?
         } else {
             offset
         };
-        let mut written = 0usize;
-        while written < src.len() {
-            let count = file
-                .file
-                .write_at(base_offset + written as u64, &src[written..])
-                .map_err(LinuxError::from)?;
-            if count == 0 {
-                break;
-            }
-            written += count;
-        }
-        Ok(written)
+        write_regular_file_at(process, file, base_offset, src, file_size_limit)
     }
 
     fn close_slot(&mut self, idx: usize) -> Result<(), LinuxError> {
@@ -1140,16 +1128,22 @@ impl FdTable {
         }
     }
 
-    pub(super) fn truncate(&mut self, fd: i32, size: u64) -> Result<(), LinuxError> {
+    pub(super) fn truncate(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        size: u64,
+    ) -> Result<(), LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EINVAL);
                 }
-                if size > MAX_IN_MEMORY_FILE_SIZE {
-                    return Err(LinuxError::ENOSPC);
+                if size <= MAX_IN_MEMORY_FILE_SIZE {
+                    file.file.truncate(size).map_err(LinuxError::from)?;
                 }
-                file.file.truncate(size).map_err(LinuxError::from)
+                process.truncate_path_sparse_file(file.path.clone(), size);
+                Ok(())
             }
             FdEntry::DevNull => Ok(()),
             FdEntry::BlockDevice(_) => Ok(()),
@@ -1161,7 +1155,13 @@ impl FdTable {
         }
     }
 
-    pub(super) fn lseek(&mut self, fd: i32, offset: i64, whence: u32) -> Result<u64, LinuxError> {
+    pub(super) fn lseek(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        offset: i64,
+        whence: u32,
+    ) -> Result<u64, LinuxError> {
         let pos = match whence {
             general::SEEK_SET => {
                 if offset < 0 {
@@ -1174,7 +1174,7 @@ impl FdTable {
             _ => return Err(LinuxError::EINVAL),
         };
         match self.entry_mut(fd)? {
-            FdEntry::File(file) => file_entry_seek(file, pos),
+            FdEntry::File(file) => file_entry_seek(process, file, pos),
             FdEntry::DevNull => Ok(0),
             FdEntry::BlockDevice(_) => Ok(0),
             FdEntry::Rtc => Ok(0),
@@ -1352,6 +1352,7 @@ impl FdTable {
 
     pub(super) fn read_file_at_into_fd(
         &mut self,
+        process: &UserProcess,
         fd: i32,
         offset: u64,
         dst: &mut [u8],
@@ -1368,11 +1369,12 @@ impl FdTable {
         if !file_is_readable(file.status_flags) {
             return Err(LinuxError::EBADF);
         }
-        read_file_at_into(&file.file, offset, dst)
+        read_regular_file_at(process, file, offset, dst)
     }
 
     pub(super) fn read_file_at_current_offset_into_fd(
         &mut self,
+        process: &UserProcess,
         fd: i32,
         dst: &mut [u8],
     ) -> Result<(u64, usize), LinuxError> {
@@ -1389,7 +1391,7 @@ impl FdTable {
             return Err(LinuxError::EBADF);
         }
         let offset = *file.offset.lock();
-        read_file_at_into(&file.file, offset, dst).map(|read| (offset, read))
+        read_regular_file_at(process, file, offset, dst).map(|read| (offset, read))
     }
 
     pub(super) fn advance_file_offset_fd(
@@ -1413,6 +1415,7 @@ impl FdTable {
 
     pub(super) fn mmap_read_file_at_into_fd(
         &mut self,
+        process: &UserProcess,
         fd: i32,
         offset: u64,
         dst: &mut [u8],
@@ -1429,7 +1432,7 @@ impl FdTable {
         if !file_is_readable(file.status_flags) {
             return Err(LinuxError::EACCES);
         }
-        read_file_at_into(&file.file, offset, dst)
+        read_regular_file_at(process, file, offset, dst)
     }
 
     pub(super) fn insert_with_flags(
@@ -1559,28 +1562,6 @@ fn get_proc_fd_dirents(
         index += 1;
     }
     Ok(out)
-}
-
-fn limit_file_write_len<'a>(
-    file: &mut FileEntry,
-    src: &'a [u8],
-    file_size_limit: Option<u64>,
-) -> Result<&'a [u8], LinuxError> {
-    let Some(limit) = file_size_limit else {
-        return Ok(src);
-    };
-    if limit == u64::MAX {
-        return Ok(src);
-    }
-    let offset = file
-        .file
-        .seek(SeekFrom::Current(0))
-        .map_err(LinuxError::from)?;
-    if offset >= limit {
-        return Err(LinuxError::EFBIG);
-    }
-    let allowed = limit.saturating_sub(offset) as usize;
-    Ok(&src[..src.len().min(allowed)])
 }
 
 impl FdTable {
@@ -1718,6 +1699,7 @@ impl FdTable {
         if removed.is_ok() {
             process.remove_path_special_mode(abs_path.as_str());
             process.remove_path_rdev(abs_path.as_str());
+            process.clear_path_sparse_file(abs_path.as_str());
         }
         removed
     }
@@ -2743,30 +2725,144 @@ fn file_is_writable(status_flags: u32) -> bool {
     )
 }
 
-fn file_entry_read(file: &mut FileEntry, dst: &mut [u8]) -> Result<usize, LinuxError> {
-    let mut offset = file.offset.lock();
-    let read = file.file.read_at(*offset, dst).map_err(LinuxError::from)?;
-    *offset = (*offset).saturating_add(read as u64);
-    Ok(read)
+fn file_logical_size(process: &UserProcess, file: &FileEntry) -> Result<u64, LinuxError> {
+    let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+    Ok(process
+        .path_sparse_size(file.path.as_str())
+        .unwrap_or(physical_size)
+        .max(physical_size))
 }
 
-fn file_entry_write(file: &mut FileEntry, src: &[u8]) -> Result<usize, LinuxError> {
-    let mut offset = file.offset.lock();
-    let write_offset = if file.status_flags & general::O_APPEND != 0 {
-        file.file.get_attr().map_err(LinuxError::from)?.size()
-    } else {
-        *offset
+fn read_regular_file_at(
+    process: &UserProcess,
+    file: &FileEntry,
+    offset: u64,
+    dst: &mut [u8],
+) -> Result<usize, LinuxError> {
+    if dst.is_empty() {
+        return Ok(0);
+    }
+    let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+    let logical_size = file_logical_size(process, file)?;
+    if offset >= logical_size {
+        return Ok(0);
+    }
+    let read_len = cmp::min(
+        dst.len(),
+        logical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
+    );
+    dst[..read_len].fill(0);
+    if offset < physical_size {
+        let physical_len = cmp::min(
+            read_len,
+            physical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
+        );
+        file.file
+            .read_at(offset, &mut dst[..physical_len])
+            .map_err(LinuxError::from)?;
+    }
+    process.copy_path_sparse_data(file.path.as_str(), offset, &mut dst[..read_len]);
+    Ok(read_len)
+}
+
+fn limit_regular_file_write_len<'a>(
+    src: &'a [u8],
+    file_size_limit: Option<u64>,
+    write_offset: u64,
+) -> Result<&'a [u8], LinuxError> {
+    if src.is_empty() {
+        return Ok(src);
+    }
+    let Some(limit) = file_size_limit else {
+        return Ok(src);
     };
-    let written = file
-        .file
-        .write_at(write_offset, src)
-        .map_err(LinuxError::from)?;
-    *offset = write_offset.saturating_add(written as u64);
+    if limit == u64::MAX {
+        return Ok(src);
+    }
+    if write_offset >= limit {
+        return Err(LinuxError::EFBIG);
+    }
+    let allowed = limit.saturating_sub(write_offset) as usize;
+    Ok(&src[..src.len().min(allowed)])
+}
+
+fn write_regular_file_at(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    write_offset: u64,
+    src: &[u8],
+    file_size_limit: Option<u64>,
+) -> Result<usize, LinuxError> {
+    let src = limit_regular_file_write_len(src, file_size_limit, write_offset)?;
+    if src.is_empty() {
+        return Ok(0);
+    }
+    let logical_before = file_logical_size(process, file)?;
+    let mut written = 0usize;
+    if write_offset < MAX_IN_MEMORY_FILE_SIZE {
+        let physical_len = cmp::min(
+            src.len(),
+            MAX_IN_MEMORY_FILE_SIZE
+                .saturating_sub(write_offset)
+                .min(usize::MAX as u64) as usize,
+        );
+        if physical_len > 0 {
+            let count = file
+                .file
+                .write_at(write_offset, &src[..physical_len])
+                .map_err(LinuxError::from)?;
+            written += count;
+            if count < physical_len {
+                let logical_after = logical_before.max(write_offset.saturating_add(written as u64));
+                process.set_path_sparse_size(file.path.clone(), logical_after);
+                return Ok(written);
+            }
+        }
+    }
+
+    if written < src.len() {
+        let sparse_offset = write_offset.saturating_add(written as u64);
+        process.write_path_sparse_data(file.path.clone(), sparse_offset, &src[written..]);
+        written = src.len();
+    }
+    let logical_after = logical_before.max(write_offset.saturating_add(written as u64));
+    process.set_path_sparse_size(file.path.clone(), logical_after);
     Ok(written)
 }
 
-fn file_entry_seek(file: &mut FileEntry, pos: SeekFrom) -> Result<u64, LinuxError> {
-    let size = file.file.get_attr().map_err(LinuxError::from)?.size();
+fn file_entry_read(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    dst: &mut [u8],
+) -> Result<usize, LinuxError> {
+    let current = *file.offset.lock();
+    let read = read_regular_file_at(process, file, current, dst)?;
+    *file.offset.lock() = current.saturating_add(read as u64);
+    Ok(read)
+}
+
+fn file_entry_write(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    src: &[u8],
+    file_size_limit: Option<u64>,
+) -> Result<usize, LinuxError> {
+    let write_offset = if file.status_flags & general::O_APPEND != 0 {
+        file_logical_size(process, file)?
+    } else {
+        *file.offset.lock()
+    };
+    let written = write_regular_file_at(process, file, write_offset, src, file_size_limit)?;
+    *file.offset.lock() = write_offset.saturating_add(written as u64);
+    Ok(written)
+}
+
+fn file_entry_seek(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    pos: SeekFrom,
+) -> Result<u64, LinuxError> {
+    let size = file_logical_size(process, file)?;
     let mut offset = file.offset.lock();
     let next = match pos {
         SeekFrom::Start(pos) => Some(pos),
@@ -3218,6 +3314,9 @@ fn open_candidates(
                     if let Some(parent_st) = create_parent_st.as_ref() {
                         record_created_path_metadata(process, path.clone(), mode, false, parent_st);
                     }
+                }
+                if flags & general::O_TRUNC != 0 {
+                    process.truncate_path_sparse_file(path.clone(), 0);
                 }
                 return Ok(FdEntry::File(FileEntry {
                     file,
