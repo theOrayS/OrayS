@@ -73,6 +73,8 @@ Artifacts:
 
 Parser result: 1 PASS / 1 FAIL; `TFAIL=1`, no timeout, ENOSYS, panic, or trap. The rerun confirms the existing blocker: LA glibc is clean, but LA musl is not promotion-clean.
 
+Root cause audit: `sys_readlinkat` already rejects syscall-visible `bufsiz == 0`, and LA syscall argument mapping preserves `arg3`. Upstream musl `readlinkat` rewrites user `bufsize == 0` into a dummy buffer with syscall `bufsize = 1`; the kernel cannot distinguish that from a valid direct one-byte readlink syscall. `readlinkat02` is therefore excluded from promotion as a libc/test boundary, not fixed by a kernel `bufsiz=1` special case.
+
 ### `fsync02` pre-fix isolated blocker and post-fix proof
 
 Pre-fix RV isolated artifacts:
@@ -195,7 +197,7 @@ Five new unique cases are currently four-way clean, but stable656 requires 50 ne
 
 1. Accumulate 45 more four-way-clean candidates before editing the stable list for stable656.
 2. Isolate `kill10` panic/trap before broad process/signal shards.
-3. Diagnose LA musl `readlinkat02` before counting the RV-clean row; the current syscall body already rejects `bufsiz == 0`, so do not special-case the LA musl `bufsiz=1` boundary without root cause.
+3. Do not count LA musl `readlinkat02`: root cause is now documented as musl's zero-size wrapper rewrite into a one-byte syscall, and a kernel `bufsiz=1` special case would break valid direct Linux truncation semantics.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
 5. Continue G009 with smaller, non-hanging shards around futex/SysV/resource and avoid running multiple QEMU instances against shared images.
 6. Keep all timeout/TCONF/TBROK/TFAIL/ENOSYS evidence visible; none counts toward stable promotion.

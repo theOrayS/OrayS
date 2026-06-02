@@ -75,7 +75,7 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 
 1. `mmap05` / `munmap01`: likely recoverable user page-fault signal delivery gaps.
 2. `mmap13`: file-backed mapping beyond EOF does not deliver expected `SIGBUS` behavior.
-3. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects `bufsiz == 0`, so the remaining issue is an LA-musl call-boundary/root-cause problem, not a safe syscall special case.
+3. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects syscall-visible `bufsiz == 0`. Source audit found musl rewrites user `bufsize == 0` into a dummy one-byte syscall, so preserving valid direct `readlinkat(..., bufsiz=1)` truncation semantics takes priority over a kernel special case.
 4. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
 5. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
 6. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.

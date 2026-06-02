@@ -51,6 +51,7 @@ execve05
 sched_setaffinity01
 futex_wait01
 readlinkat02
+# readlinkat02 root-cause audit: LA musl wrapper boundary; non-promotable without libc/test-side change.
 fsync02
 openat02
 futex_wait03

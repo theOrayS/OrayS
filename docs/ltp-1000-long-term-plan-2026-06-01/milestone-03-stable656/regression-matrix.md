@@ -149,7 +149,7 @@ Adjacent regression candidates:
 
 - `mmap10_1`: do not include until the guest LTP inventory contains the binary.
 - `vma02`: do not include until libnuma-related `TCONF` is resolved and both libcs are parser-clean.
-- `readlinkat02`: do not include until LA musl is parser-clean; add readlink/readlinkat and user-pointer boundary regressions once a root-cause fix exists.
+- `readlinkat02`: do not include while LA musl remains parser-unclean; current audit shows musl rewrites user `bufsize == 0` into a one-byte syscall, so any future change must preserve direct `readlinkat(..., bufsiz=1)` truncation semantics and include readlink/readlinkat plus user-pointer boundary regressions.
 - `nice04`: do not include until the `nice()` wrapper errno boundary is fixed without regressing `setpriority02`; use `nice04-errno-boundary-report.md` as the handoff.
 - closed arch sweep: no extra stable606-missing four-way-clean rows remain; use the matrices only for blocker prioritization.
 - `kill10`: do not include broad batches until the panic/trap is isolated.

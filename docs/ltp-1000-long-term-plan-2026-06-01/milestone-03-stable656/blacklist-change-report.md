@@ -13,6 +13,7 @@ No blacklist changes were made in this checkpoint.
 | `mmap05` | `TBROK` / killed by SIGSEGV | not blacklisted here; recorded as repair candidate |
 | `munmap01` | wrapper FAIL code 139 | not blacklisted here; recorded as repair candidate |
 | `mmap13` | `TFAIL` / SIGBUS signal not received | not blacklisted here; recorded as repair candidate |
+| `readlinkat02` | LA musl `TFAIL` from musl zero-size wrapper rewriting to a one-byte syscall | not blacklisted here; ordinary libc/test boundary and not promotion evidence |
 | `mmap10_1` | missing testcase inventory | excluded from promotion; no blacklist change |
 | `vma02` | `TCONF` libnuma requirement | excluded from promotion; no blacklist change |
 

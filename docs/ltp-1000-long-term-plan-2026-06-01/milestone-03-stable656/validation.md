@@ -310,6 +310,16 @@ Promotion candidates: 0
 
 Decision: unchanged blocker. LA glibc is clean, LA musl still fails the zero-size readlink boundary, and this case cannot be promoted.
 
+### LA `readlinkat02` root-cause audit
+
+Additional source audit on 2026-06-02:
+
+- Kernel side: `examples/shell/src/uspace/metadata.rs::sys_readlinkat` already returns `EINVAL` when the syscall-visible `bufsiz == 0`.
+- LA syscall argument side: `vendor/axcpu/src/loongarch64/context.rs` maps syscall arguments through `a0..a3`, so this is not a generic fourth-argument loss.
+- Musl side: upstream `src/unistd/readlinkat.c` (`https://git.musl-libc.org/cgit/musl/plain/src/unistd/readlinkat.c`) rewrites user `bufsize == 0` to a stack dummy buffer with syscall `bufsize = 1`, then converts a positive return back to `0`.
+
+The failing LA musl row is therefore not a safe kernel fix: the kernel cannot distinguish musl's dummy one-byte syscall from a valid direct `readlinkat(..., bufsiz=1)` call, and Linux permits truncation to a one-byte user buffer. Keep `readlinkat02` blocked/non-promotable unless the libc/test boundary changes; do not add a case-specific or `bufsiz=1` kernel special case.
+
 ## RV `fsync02` pre-fix isolated rerun
 
 Command captured in run meta:
@@ -540,7 +550,7 @@ Observed requirement: after switching to user `nobody`, `nice(-10)` expects fail
 
 - Targeted RV: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; other scout rows blocked as documented.
 - Adjacent stable regression subset: clean on RV and LA for the scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, and precise timer-list wakeup repair.
-- LA confirmation: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL`.
+- LA confirmation: clean for `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, and `sched_setaffinity01`; blocked for `readlinkat02` due LA musl `TFAIL` from the audited libc/test zero-size wrapper boundary.
 - musl + glibc: clean only for the five candidate rows.
 - Parser blockers: still present in scout rows; they are not counted.
 - Stable list: unchanged at `606/606/0`.
@@ -549,7 +559,7 @@ Observed requirement: after switching to user `nobody`, `nice(-10)` expects fail
 
 - No stable656 promotion gate because the candidate pool has only 5/50 required new cases.
 - No new broad all-minus-blacklist sweep in this checkpoint; only closed arch-sweep logs were re-mined, yielding zero non-stable four-way-clean rows.
-- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `shmat1`, `nice04`, or LA musl `readlinkat02`.
+- No fixes yet for `kill10`, `mmap05`, `munmap01`, `mmap13`, `shmat1`, or `nice04`; LA musl `readlinkat02` is documented as non-promotable from the kernel side unless the libc/test boundary changes.
 
 
 ## `futex_wait05` precise timer-list proof
