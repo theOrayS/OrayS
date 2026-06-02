@@ -449,3 +449,66 @@ statvfs01
 ## Promotion result after FD/fcntl clean2 confirmation
 # 0 promoted in this checkpoint.
 # Reason: 21 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## RV VFS/path/link/statx scout 2026-06-02
+link01
+link02
+link03
+link04
+link05
+linkat01
+linkat02
+rename01
+rename02
+renameat01
+renameat02
+stat03
+stat03_64
+statx01
+statx04
+statx05
+getdents01
+getdents02
+unlink01
+readlink03
+writev03
+chmod02
+readlink02
+# RV result: 0 parser-clean promotion candidates. statx01/getdents02 wrapper-PASS but contain parser-visible TCONF; remaining rows are FAIL/TCONF/TFAIL/ENOSYS/setup or missing-binary blockers.
+
+## Rename inode metadata targeted confirmation 2026-06-02
+rename01
+rename05
+# RV and LA x musl/glibc parser-clean after generic rename metadata/inode migration; rename05 is an adjacent already-clean regression row.
+
+## Rename01 singleton four-way clean proof 2026-06-02
+rename01
+# Singleton RV/LA x musl/glibc parser-clean logs are used in the clean22 combined report so rename05 is not double-counted.
+
+## Four-way clean candidate pool after rename01 inode confirmation (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Promotion result after rename01 inode confirmation
+# 0 promoted in this checkpoint.
+# Reason: 22 new four-way-clean unique candidates are available, below the +50 stable656 gate.

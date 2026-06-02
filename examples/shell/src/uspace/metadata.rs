@@ -58,6 +58,78 @@ impl UserProcess {
         self.path_modes.lock().get(path).copied()
     }
 
+    pub(super) fn set_path_inode(&self, path: String, ino: u64) {
+        self.path_inodes.lock().insert(path, ino.max(1));
+    }
+
+    pub(super) fn remove_path_inode(&self, path: &str) {
+        self.path_inodes.lock().remove(path);
+    }
+
+    pub(super) fn path_inode_override(&self, path: &str) -> Option<u64> {
+        self.path_inodes.lock().get(path).copied()
+    }
+
+    pub(super) fn move_path_metadata(&self, old_path: &str, new_path: String) {
+        let fallback_ino = path_inode(Some(old_path));
+        let ino = self
+            .path_inodes
+            .lock()
+            .remove(old_path)
+            .unwrap_or(fallback_ino);
+        self.set_path_inode(new_path.clone(), ino);
+
+        let mut modes = self.path_modes.lock();
+        if let Some(mode) = modes.remove(old_path) {
+            modes.insert(new_path.clone(), mode);
+        } else {
+            modes.remove(new_path.as_str());
+        }
+        drop(modes);
+
+        let mut special_modes = self.path_special_modes.lock();
+        if let Some(ty) = special_modes.remove(old_path) {
+            special_modes.insert(new_path.clone(), ty);
+        } else {
+            special_modes.remove(new_path.as_str());
+        }
+        drop(special_modes);
+
+        let mut rdevs = self.path_rdevs.lock();
+        if let Some(rdev) = rdevs.remove(old_path) {
+            rdevs.insert(new_path.clone(), rdev);
+        } else {
+            rdevs.remove(new_path.as_str());
+        }
+        drop(rdevs);
+
+        let mut owners = self.path_owners.lock();
+        if let Some(owner) = owners.remove(old_path) {
+            owners.insert(new_path.clone(), owner);
+        } else {
+            owners.remove(new_path.as_str());
+        }
+        drop(owners);
+
+        let mut symlinks = self.path_symlinks.lock();
+        if let Some(target) = symlinks.remove(old_path) {
+            symlinks.insert(new_path.clone(), target);
+        } else {
+            symlinks.remove(new_path.as_str());
+        }
+        drop(symlinks);
+
+        let mut xattrs = self.path_xattrs.lock();
+        if let Some(attrs) = xattrs.remove(old_path) {
+            xattrs.insert(new_path.clone(), attrs);
+        } else {
+            xattrs.remove(new_path.as_str());
+        }
+        drop(xattrs);
+
+        self.move_path_sparse_file(old_path, new_path);
+    }
+
     pub(super) fn set_path_special_mode(&self, path: String, ty: u32) {
         self.path_special_modes
             .lock()
@@ -244,9 +316,13 @@ impl UserProcess {
     pub(super) fn move_path_sparse_file(&self, old_path: &str, new_path: String) {
         if let Some(size) = self.path_sparse_sizes.lock().remove(old_path) {
             self.path_sparse_sizes.lock().insert(new_path.clone(), size);
+        } else {
+            self.path_sparse_sizes.lock().remove(new_path.as_str());
         }
         if let Some(data) = self.path_sparse_data.lock().remove(old_path) {
             self.path_sparse_data.lock().insert(new_path, data);
+        } else {
+            self.path_sparse_data.lock().remove(new_path.as_str());
         }
     }
 
@@ -375,6 +451,9 @@ pub(super) fn apply_recorded_path_metadata(
     if let Some((uid, gid)) = process.path_owner(path) {
         st.st_uid = uid;
         st.st_gid = gid;
+    }
+    if let Some(ino) = process.path_inode_override(path) {
+        st.st_ino = ino;
     }
     if let Some(size) = process.path_sparse_size(path) {
         st.st_size = size.min(i64::MAX as u64) as _;

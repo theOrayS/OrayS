@@ -6,10 +6,10 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Promotion candidates: 21
+- Promotion candidates: 22
 - Blocked/incomplete cases in this clean proof set: 30 (`mmap05`, `mknod07`, `mknodat02`, `rename03`, `rename04`, and the current RV G009 mlock/mmap/mprotect blocker rows)
 
 | Case | Evidence | Decision |
@@ -33,6 +33,7 @@ Clean combined parser report:
 | `munmap01` | after catchable synchronous `SIGSEGV` delivery for unmapped user faults, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `mmap13` | after generic file-backed mmap beyond-EOF pages are protected and translated to catchable `SIGBUS`, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `openat02` | after generic POSIX-layer sparse logical-size/data handling for large file holes, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `rename01` | after generic rename metadata migration preserves the source object inode across file and directory renames, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `sched_setaffinity01` | after generic permission fix, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `signal01` | after generic `/proc/<pid>/stat` sleeping-state reporting for `rt_sigsuspend`/`ppoll` waiters, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 
@@ -50,6 +51,8 @@ Clean combined parser report:
 - `rv-mincore03-mincore-mlock-20260602T032124Z.log` and `la-mincore03-mincore-mlock-20260602T032208Z.log` provide the current `mincore03` proof; adjacent mincore/mlock/mmap regression summaries are `rv-mincore03-adjacent-regression-20260602T032259Z.summary.txt` and `la-mincore03-adjacent-regression-20260602T032401Z.summary.txt`. The earlier mixed scout `mincore03` `TBROK` rows are pre-fix blocker history only.
 - `rv-g009-mm-mlock-mmap-scout-20260602T034405Z.log` and `la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.log` provide the current `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` proof. The same RV scout keeps the surrounding mlock/mmap/mprotect failures visible as blocker evidence; only the four parser-clean rows enter the pool.
 
+- `rv-rename01-inode-confirm-20260602T044855Z.log` and `la-rename01-inode-confirm-20260602T044855Z.log` provide the current `rename01` proof after generic rename metadata/inode migration. The two-case `rv-rename-inode-retarget-20260602T044708Z.log` / `la-rename-inode-retarget-20260602T044751Z.log` also protect existing `rename05`; the singleton logs are used for the clean22 combined report to avoid duplicate `rename05` rows.
+
 ## Blocked / incomplete rows outside the clean pool
 
 `readlinkat02` is RV-clean and LA-glibc-clean but LA musl still has `TFAIL`, so it is not eligible. The current root-cause audit treats it as a libc/test boundary: musl converts user `bufsize == 0` into a one-byte dummy syscall, and a kernel-side `bufsiz=1` special case would break valid Linux truncation semantics. `clone04` is RV glibc-clean but RV musl is killed by SIGSEGV/TBROK; the singleton log points to a musl `clone.c` wrapper boundary, so it stays outside the clean pool. `mmap05` remains blocked on LA musl+glibc `TFAIL` even though RV is clean. `nice05`, `shmat1`, `mlock02`, `mlock05`, `mlock201`, `mlock202`, `mlock203`, `mlockall02`, `mlockall03`, `munlock02`, `munlockall01`, `mprotect01`, `mprotect03`, `mmap08`, `mmap16`, `mmap18`, `mmap20`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `select02`, and `execve05` remain blocked or incomplete for the reasons in `validation.md` and the historical combined/scout reports. The pre-fix `fsync02` `TBROK` row is superseded by post-fix proof, but the old log remains documented as failed evidence.
@@ -64,7 +67,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 21.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 22.
 
 ## `openat03` non-candidate note
 
@@ -132,3 +135,17 @@ A documentation/evidence-only FD scout grew the clean pool without editing the s
 Newly evidenced four-way-clean cases: `fcntl11_64` and `fcntl15`. Current pool: 21/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
 
 Blocked rows from the same RV scout stay outside the pool: `fcntl17` timed out on both libcs; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` retain parser-visible `TCONF`; `fcntl27` and `fcntl31` retain parser-visible `TFAIL`; `fcntl34`, `fcntl38`, and `fcntl39` retain parser-visible `TBROK`. None is blacklisted or counted as PASS.
+
+## VFS/path scout and rename01 clean1 update
+
+A VFS/path scout first exposed no immediately promotable clean rows but identified a generic rename metadata bug: `rename01` failed because `st_ino` was derived from the post-rename pathname rather than preserved for the renamed object.
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-link-statx-scout-20260602T044314Z.summary.txt` — 4 wrapper PASS / 42 wrapper FAIL, with `TFAIL=53`, `TCONF=26`, `ENOSYS=34`, and no timeout/panic/trap. The PASS rows (`statx01`, `getdents02`) still contain parser-visible `TCONF`, so they are not candidates.
+- RV rename inode confirmation: `target/ltp-1000-milestone-03-stable656/rv-rename01-inode-confirm-20260602T044855Z.summary.txt` — `rename01` parser-clean for musl+glibc.
+- LA rename inode confirmation: `target/ltp-1000-milestone-03-stable656/la-rename01-inode-confirm-20260602T044855Z.summary.txt` — `rename01` parser-clean for musl+glibc.
+- Regression proof: `rv-rename-inode-retarget-20260602T044708Z.summary.txt` and `la-rename-inode-retarget-20260602T044751Z.summary.txt` both run `rename01,rename05` and are parser-clean for musl+glibc.
+- Combined clean22 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`.
+
+Newly evidenced four-way-clean case: `rename01`. Current pool: 22/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+
+Blocked rows from the scout stay outside the pool: `link02`, `link04`, and `link05` retain generic `ENOSYS`/hard-link blockers; `linkat01`, `linkat02`, `renameat01`, `statx04`, `statx05`, `writev03`, `getdents01`, `readlink03`, `stat03`, and `stat03_64` retain visible TCONF/TFAIL/setup or semantic blockers; missing guest testcase binaries (`link01`, `link03`, `rename02`, `renameat02`, `unlink01`, `chmod02`, `readlink02`) are not evidence. None is blacklisted or counted as PASS.

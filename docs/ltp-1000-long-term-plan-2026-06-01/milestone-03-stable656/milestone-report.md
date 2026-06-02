@@ -428,3 +428,29 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 29 cases short.
 - Remaining blockers from this lane: `fcntl17` timeout; `fcntl24`/`fcntl25`/`fcntl26`/`fcntl37` `TCONF`; `fcntl27`/`fcntl31` `TFAIL`; `fcntl34`/`fcntl38`/`fcntl39` `TBROK`.
+
+## Rename metadata/inode clean1 checkpoint
+
+A generic rename metadata repair converted `rename01` into a future promotion candidate without changing `LTP_STABLE_CASES`.
+
+Code changes retained in this checkpoint:
+
+1. `UserProcess` now tracks per-path inode overrides as process metadata.
+2. Successful `renameat2(..., flags=0)` now migrates recorded path metadata from the old path to the new path, including inode, mode, owner, special-device, symlink, xattr, and sparse-file state.
+3. `unlinkat()` now clears recorded inode metadata for deleted paths.
+
+Evidence:
+
+- RV broad VFS/path scout: `target/ltp-1000-milestone-03-stable656/rv-vfs-path-link-statx-scout-20260602T044314Z.summary.txt` — 4 PASS / 42 FAIL, but no parser-clean promotion candidates because wrapper-PASS rows still contain `TCONF` and the rest retain visible blockers.
+- RV rename01+rename05 regression: `target/ltp-1000-milestone-03-stable656/rv-rename-inode-retarget-20260602T044708Z.summary.txt` — 4 PASS / 0 FAIL, zero internal markers, timeout, ENOSYS, panic/trap.
+- LA rename01+rename05 regression: `target/ltp-1000-milestone-03-stable656/la-rename-inode-retarget-20260602T044751Z.summary.txt` — 4 PASS / 0 FAIL, zero internal markers, timeout, ENOSYS, panic/trap.
+- RV rename01 singleton: `target/ltp-1000-milestone-03-stable656/rv-rename01-inode-confirm-20260602T044855Z.summary.txt` — 2 PASS / 0 FAIL, parser-clean.
+- LA rename01 singleton: `target/ltp-1000-milestone-03-stable656/la-rename01-inode-confirm-20260602T044855Z.summary.txt` — 2 PASS / 0 FAIL, parser-clean.
+- Combined clean22 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`.
+
+Current conclusion:
+
+- Candidate pool: 22/50 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename01`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 28 cases short.
+- Remaining blockers from this lane: hard-link/linkat support is still absent or setup-blocked; `stat03`/`stat03_64` and `readlink03` retain real errno/loop/path semantic blockers; `statx01`/`getdents02` wrapper-PASS rows retain parser-visible `TCONF` and are not counted.
