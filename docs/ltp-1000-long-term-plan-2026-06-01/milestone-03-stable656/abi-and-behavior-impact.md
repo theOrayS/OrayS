@@ -1,6 +1,6 @@
 # Milestone 03 stable656 ABI and behavior impact
 
-This checkpoint includes three generic Linux/POSIX-visible behavior fixes and several scout-only evidence updates.
+This checkpoint includes generic Linux/POSIX-visible behavior fixes and several scout-only evidence updates.
 
 ## Code changes
 
@@ -40,7 +40,18 @@ File-backed `mmap` now tracks the byte count actually populated from the file. P
 
 File: `examples/shell/src/uspace/synthetic_fs.rs`
 
-`/proc/<pid>/stat` now reports process state `S` when any live thread in the process has the existing `UserTaskExt::futex_wait` marker set. This exposes futex wait blocking through the synthetic procfs state field instead of reporting such a process as always runnable. The change is generic process-state reporting; it does not inspect LTP case names, paths, or outputs.
+`/proc/<pid>/stat` now reports process state `S` when any live thread in the process has a futex wait marker, an `rt_sigsuspend` signal-wait marker, or a `poll`/`ppoll` wait marker set. This exposes common blocking waits through the synthetic procfs state field instead of reporting such a process as always runnable. The change is generic process-state reporting; it does not inspect LTP case names, paths, or outputs.
+
+
+### Signal and poll wait proc-state reporting
+
+Files: `examples/shell/src/uspace/task_context.rs`, `examples/shell/src/uspace/signal_abi.rs`, `examples/shell/src/uspace/select_fdset.rs`, `examples/shell/src/uspace/synthetic_fs.rs`
+
+`UserTaskExt` now carries explicit wait markers for `rt_sigsuspend` and `poll`/`ppoll` loops. The signal and poll syscall paths set these markers only while the current thread is actually yielding in the blocking wait. Synthetic `/proc/<pid>/stat` consults the live thread markers and reports state `S` for those waiters.
+
+User-visible behavior affected: `/proc/<pid>/stat` field 3 process state is more faithful for signal-waiting or poll-waiting processes, which lets generic wait-for-sleep probes observe blocked children. Syscall numbers, errno values, signal action semantics, signal masks, FD readiness results, poll return values, futex wait/wake return values, mmap ABI, and user-pointer layouts are unchanged.
+
+Maintenance boundary: these markers are reporting-only and must not be used as a scheduling primitive. Future changes to signal or poll wait loops should preserve marker clear-on-return and rerun signal/poll/proc regression subsets on RV and LA.
 
 ## User-visible ABI / errno impact
 
@@ -81,7 +92,7 @@ File: `examples/shell/src/uspace/synthetic_fs.rs`
 ### `/proc/<pid>/stat`
 
 - User-visible file affected: `/proc/<pid>/stat` field 3 process state.
-- New visible behavior: a process with any live thread blocked in futex wait reports `S` until the futex wait marker is cleared.
+- New visible behavior: a process with any live thread blocked in futex wait, `rt_sigsuspend`, or `poll`/`ppoll` wait reports `S` until the corresponding wait marker is cleared.
 - Existing behavior preserved: exited processes still report `Z`; child-wait/syscall-wait blocked processes still report `S`; otherwise live processes report `R`.
 - Syscall numbers, errno values, FD tables, signal delivery, futex wait/wake return values, mmap ABI, and user-pointer layouts are unchanged by this reporting-only repair.
 
@@ -117,7 +128,7 @@ Promotion boundary: current `openat03` RV/LA targeted summaries are deterministi
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 8/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`).
+- Candidate pool after this checkpoint: 9/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
 
 ## Behavior gaps exposed but not fixed
 

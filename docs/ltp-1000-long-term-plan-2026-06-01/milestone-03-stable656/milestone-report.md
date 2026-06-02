@@ -15,7 +15,7 @@ Continue the post-stable606 G009 lane without weakening the promotion gate. This
 1. `examples/shell/src/uspace/resource_sched.rs::sys_sched_setaffinity` checks scheduler target permissions with the existing `can_set_sched_target` helper before accepting an otherwise valid CPU0 affinity mask. This fixes the generic Linux behavior where an unprivileged caller should not be able to set affinity for a root/other-owned target.
 2. `examples/shell/src/uspace/metadata.rs::generic_statfs` clamps synthetic reported free blocks to the in-memory regular-file capacity (`MAX_IN_MEMORY_FILE_SIZE / STATFS_BLOCK_SIZE`) instead of exposing the full global allocator free-page count. This keeps `statfs`/`fstatfs`/`statvfs` free-space reporting conservative relative to the current file-size guardrail and prevents tests that size writes from `fstatvfs().f_bavail` from being driven into setup-time `ENOSPC`.
 
-3. `examples/shell/src/uspace/synthetic_fs.rs` reports `/proc/<pid>/stat` state `S` for live processes with futex-waiting threads.
+3. `examples/shell/src/uspace/task_context.rs`, `examples/shell/src/uspace/signal_abi.rs`, `examples/shell/src/uspace/select_fdset.rs`, and `examples/shell/src/uspace/synthetic_fs.rs` report `/proc/<pid>/stat` state `S` for live processes with futex, `rt_sigsuspend`, or `poll`/`ppoll` waiting threads.
 4. `kernel/task/axtask/src/timers.rs` programs precise one-shot wakeups for timer-list deadlines before the next 100Hz periodic tick, and `kernel/runtime/axruntime/src/lib.rs` preserves the periodic tick deadline when such early precise timer interrupts fire.
 
 None of these changes hardcodes an LTP case name, path, process, or expected output.
@@ -194,6 +194,30 @@ Regression result: `mmap01`, `mmap02`, `mmap03`, `mmap04`, `mmap09`, `mmap12`, `
 
 Caveat: the pre-fix RV log `rv-mmap13-current-20260602T005657Z.log` remains blocker history, and a TTY-launched RV rerun stopped before guest output; neither is counted as promotion evidence. The counted proof is the non-TTY RV/LA targeted pair above.
 
+
+### `signal01` signal/poll proc-state repair
+
+Artifacts:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-signal01-poll-wait-20260602T024843Z.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-signal01-poll-wait-20260602T024926Z.summary.txt`
+- RV adjacent regression summary: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.summary.txt`
+- LA adjacent regression summary: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.summary.txt`
+- Combined clean9 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
+
+Targeted result: `signal01` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Regression result: `signal02`, `signal03`, `signal04`, `signal05`, `sigaction01`, `rt_sigaction01`, `sigprocmask01`, `rt_sigprocmask01`, `ppoll01`, `pselect01`, `poll02`, and `waitpid04` are parser-clean on RV and LA, 24/24 wrapper PASS on each arch.
+
+Caveat: the intermediate `rv-signal01-proc-sleep-20260602T024336Z` run timed out before the poll-wait marker was added and is retained only as non-countable repair history.
+
+Combined pool after this repair:
+
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
+- Candidates: 9 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`)
+- Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
+- Stable list remains unchanged at `606/606/0`; the current pool is 9/50, below the +50 stable656 gate.
+
 ### Combined candidate pool
 
 Clean combined parser report:
@@ -269,7 +293,7 @@ Clean combined parser report:
 - Candidates: 8 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`)
 - Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
 
-Stable list remains unchanged at `606/606/0`; the current pool is 8/50, below the +50 stable656 gate.
+Stable list remained unchanged at `606/606/0`; at this point in the evidence timeline the pool was 8/50, below the +50 stable656 gate.
 
 ### `openat03` O_TMPFILE unsupported-gate blocker
 
@@ -277,4 +301,4 @@ A broader in-memory `O_TMPFILE`/`linkat` emulation was attempted and rejected: R
 
 The retained source change is only a generic unsupported-feature gate in `fd_table.rs`: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP` instead of accidentally returning a directory fd through the `O_DIRECTORY` bit. Targeted RV and LA summaries (`rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`, `la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`) now show zero timeout, ENOSYS, panic, or trap, but they still contain `TCONF=4` and wrapper FAIL for musl+glibc.
 
-Decision: this is honest blocker evidence only. `openat03` is not in the candidate pool; the pool remains 8/50, stable list remains `606/606/0`, and a future attempt must first solve real generic `O_TMPFILE` semantics plus the deep-directory VFS panic.
+Decision: this is honest blocker evidence only. `openat03` is not in the candidate pool; at this point in the evidence timeline the pool remained 8/50, stable list remained `606/606/0`, and a future attempt must first solve real generic `O_TMPFILE` semantics plus the deep-directory VFS panic.

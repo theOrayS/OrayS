@@ -738,9 +738,11 @@ pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: u
     ext.sigsuspend_restore_mask
         .store(old_mask, Ordering::Release);
     ext.signal_mask.store(suspend_mask, Ordering::Release);
+    ext.signal_wait.store(true, Ordering::Release);
 
     while !current_unblocked_signal_pending() {
         if let Some(code) = ext.process.pending_exit_group() {
+            ext.signal_wait.store(false, Ordering::Release);
             ext.sigsuspend_restore_mask
                 .store(NO_SIGSUSPEND_RESTORE_MASK, Ordering::Release);
             ext.signal_mask.store(old_mask, Ordering::Release);
@@ -752,6 +754,7 @@ pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: u
         }
         axtask::yield_now();
     }
+    ext.signal_wait.store(false, Ordering::Release);
 
     neg_errno(LinuxError::EINTR)
 }

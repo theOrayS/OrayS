@@ -225,6 +225,7 @@ impl UserProcessStat {
         } else if process.is_child_wait_blocked()
             || process.is_syscall_wait_blocked()
             || process_has_futex_waiter(process)
+            || process_has_signal_waiter(process)
         {
             'S'
         } else {
@@ -247,6 +248,19 @@ fn process_has_futex_waiter(process: &UserProcess) -> bool {
         .any(|entry| {
             task_ext(&entry.task)
                 .map(|ext| ext.futex_wait.load(Ordering::Acquire) != 0)
+                .unwrap_or(false)
+        })
+}
+
+fn process_has_signal_waiter(process: &UserProcess) -> bool {
+    user_thread_entries_by_process_pid(process.pid())
+        .into_iter()
+        .any(|entry| {
+            task_ext(&entry.task)
+                .map(|ext| {
+                    ext.signal_wait.load(Ordering::Acquire)
+                        || ext.poll_wait.load(Ordering::Acquire)
+                })
                 .unwrap_or(false)
         })
 }

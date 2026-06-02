@@ -1,10 +1,12 @@
 use core::mem::size_of;
+use core::sync::atomic::Ordering;
 
 use axerrno::LinuxError;
 use linux_raw_sys::general;
 
-use super::linux_abi::{neg_errno, BITS_PER_USIZE, FD_SETSIZE, FD_SET_WORDS};
+use super::linux_abi::{BITS_PER_USIZE, FD_SET_WORDS, FD_SETSIZE, neg_errno};
 use super::signal_abi::{current_unblocked_signal_pending, install_temporary_signal_mask};
+use super::task_context::current_task_ext;
 use super::user_memory::{read_user_value, write_user_value};
 use super::{FdTable, UserProcess};
 
@@ -364,6 +366,16 @@ fn sys_poll_until(
             axtask::yield_now();
             return 0;
         }
+        yield_poll_wait();
+    }
+}
+
+fn yield_poll_wait() {
+    if let Some(ext) = current_task_ext() {
+        ext.poll_wait.store(true, Ordering::Release);
+        axtask::yield_now();
+        ext.poll_wait.store(false, Ordering::Release);
+    } else {
         axtask::yield_now();
     }
 }

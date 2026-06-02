@@ -892,8 +892,8 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 ## Gate outcome after mmap13 SIGBUS update
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
-- Current clean candidate pool is 8/50 for stable656.
-- No `LTP_STABLE_CASES` edit is made because 42 more four-way-clean unique cases are still required.
+- At this point in the evidence timeline, the clean candidate pool was 7/50 for stable656.
+- No `LTP_STABLE_CASES` edit was made because 43 more four-way-clean unique cases were still required.
 - Counted targeted and regression summaries for `mmap13` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix and TTY-aborted RV logs remain visible as non-countable history.
 
 
@@ -979,8 +979,8 @@ Blocked/incomplete: mmap05 (LA musl+glibc TFAIL=1)
 ## Gate outcome after openat02 sparse-largefile update
 
 - Live stable list remains `606 total / 606 unique / 0 duplicate`.
-- Current clean candidate pool is 8/50 for stable656.
-- No `LTP_STABLE_CASES` edit is made because 42 more four-way-clean unique cases are still required.
+- At this point in the evidence timeline, the clean candidate pool was 8/50 for stable656.
+- No `LTP_STABLE_CASES` edit was made because 42 more four-way-clean unique cases were still required.
 - Counted targeted and regression summaries for `openat02` are parser-clean with zero `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap`; the pre-fix RV scout remains visible as non-countable history.
 
 ## `openat03` O_TMPFILE unsupported-gate blocker
@@ -1044,4 +1044,81 @@ panic/trap matches: 0
 
 Observed LTP marker: `openat03.c:56: O_TMPFILE not supported`; wrapper status remains FAIL code 32 for both musl and glibc on RV and LA. This evidence is intentionally non-promotable because the parser sees `TCONF`, but it closes the safety claim that unsupported `O_TMPFILE` no longer causes panic/trap in the targeted RV/LA runs.
 
-Decision: `openat03` is not added to the candidate pool. Candidate pool remains 8/50 for stable656, and `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: `openat03` is not added to the candidate pool. At this point in the evidence timeline, the candidate pool remained 8/50 for stable656; after the later `signal01` repair below, the current pool is 9/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+## `signal01` signal/poll sleeping-state proof
+
+Rejected intermediate evidence:
+
+- Raw log: `target/ltp-1000-milestone-03-stable656/rv-signal01-proc-sleep-20260602T024336Z.log`
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-signal01-proc-sleep-20260602T024336Z.summary.txt`
+
+This run was terminated after the first, `rt_sigsuspend`-only proc-state repair still left RV musl in timeout. It is repair-history evidence only and is not counted toward promotion.
+
+Final targeted commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=signal01 LTP_CASE_TIMEOUT_SECS=120 timeout 25m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=signal01 LTP_CASE_TIMEOUT_SECS=120 timeout 25m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-signal01-poll-wait-20260602T024843Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-signal01-poll-wait-20260602T024843Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-signal01-poll-wait-20260602T024843Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-signal01-poll-wait-20260602T024843Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-signal01-poll-wait-20260602T024926Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-signal01-poll-wait-20260602T024926Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-signal01-poll-wait-20260602T024926Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-signal01-poll-wait-20260602T024926Z.derived.sha256`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 2
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+Promotion candidates: 1
+```
+
+Decision: `signal01` is now RV + LA x musl + glibc parser-clean after the generic synthetic `/proc/<pid>/stat` sleeping-state repair covers both `rt_sigsuspend` and libc `pause()`/`ppoll` wait paths. It enters the future candidate pool; stable list remains unchanged until the +50 milestone gate is met.
+
+## Adjacent signal/poll/proc regression subset
+
+Cases: `signal02,signal03,signal04,signal05,sigaction01,rt_sigaction01,sigprocmask01,rt_sigprocmask01,ppoll01,pselect01,poll02,waitpid04`.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=signal02,signal03,signal04,signal05,sigaction01,rt_sigaction01,sigprocmask01,rt_sigprocmask01,ppoll01,pselect01,poll02,waitpid04 LTP_CASE_TIMEOUT_SECS=120 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=signal02,signal03,signal04,signal05,sigaction01,rt_sigaction01,sigprocmask01,rt_sigprocmask01,ppoll01,pselect01,poll02,waitpid04 LTP_CASE_TIMEOUT_SECS=120 timeout 35m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-signal-poll-regression-20260602T025025Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-signal-poll-regression-20260602T025204Z.derived.sha256`
+
+Parser result on each arch:
+
+```text
+PASS LTP CASE: 24
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: the adjacent stable signal/poll/proc subset did not regress on RV or LA.

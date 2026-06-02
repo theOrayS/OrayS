@@ -129,7 +129,7 @@ sched_setaffinity01
 
 ## Promotion result
 # 0 promoted in this checkpoint.
-# Reason: only 8 new four-way-clean unique candidates are available, below the +50 milestone gate.
+# Reason: only 9 new four-way-clean unique candidates are available, below the +50 milestone gate.
 
 ## File-backed mmap SIGBUS-on-EOF targeted proof
 mmap13
@@ -201,3 +201,32 @@ mmap13
 munmap01
 openat02
 sched_setaffinity01
+
+## Signal/poll proc-state targeted proof
+signal01
+# signal01 proof: RV/LA x musl/glibc clean after generic sleeping-state reporting for rt_sigsuspend/ppoll waiters; not promoted until +50 batch.
+
+## Adjacent signal/poll/proc regression subset for signal01 wait-state repair
+signal02
+signal03
+signal04
+signal05
+sigaction01
+rt_sigaction01
+sigprocmask01
+rt_sigprocmask01
+ppoll01
+pselect01
+poll02
+waitpid04
+
+## Four-way clean candidate pool after signal01 wait-state repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+signal01
