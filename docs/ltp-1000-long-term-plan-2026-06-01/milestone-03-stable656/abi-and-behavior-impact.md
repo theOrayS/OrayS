@@ -256,3 +256,22 @@ User-visible behavior:
 ABI/POSIX surface: no struct layout, syscall number, FD table, signal, futex, mmap, or user-pointer ABI changed. The visible syscall impact is limited to generic `rename`/`renameat` errno and replacement semantics for existing destinations. This intentionally aligns closer to Linux/POSIX rename behavior and is not keyed to LTP names or paths.
 
 Lifetime/resource risk: the repair looks up the source before removing any destination, reducing destructive failure risk when the source is absent. Destination directory replacement still relies on existing `remove_dir` emptiness and permission checks, so non-empty directories and protected paths remain guarded.
+
+## Stat/readlink path traversal and parent search-permission impact
+
+Changed files: `examples/shell/src/uspace/metadata.rs`, `examples/shell/src/uspace/fd_table.rs`.
+
+User-visible behavior:
+
+- Pathname resolution now follows symlinks in intermediate path components rather than only when the complete final pathname is a recorded symlink. More than 40 symlink traversals returns `ELOOP`.
+- `readlink`/`readlinkat` and `AT_SYMLINK_NOFOLLOW` stat-style calls resolve parent symlinks while preserving the final symlink when the syscall semantics require it.
+- Non-root `stat`/`fstatat` path lookup now checks execute/search permission on parent directories and returns `EACCES` when an ancestor is not searchable.
+- A non-directory component in a path prefix now returns `ENOTDIR` at the parent traversal boundary.
+- Empty pathname `newfstatat` without `AT_EMPTY_PATH` now returns `ENOENT`.
+- `O_NOFOLLOW` open handling resolves parent symlinks before applying the final-component symlink rejection.
+
+ABI/POSIX surface: syscall numbers, struct layouts, FD allocation, signal masks, futex behavior, mmap layout, and user-pointer ABI are unchanged. The visible syscall impact is limited to generic path traversal, symlink loop, search-permission, and errno semantics for stat/readlink/open path handling. The change is not keyed to LTP case names, paths, processes, or output strings.
+
+Lifetime/resource risk: the first local RV attempt exposed a recursion bug in parent-search checking and produced a parser-visible panic/trap. The retained implementation avoids that recursion by using an internal non-checking `stat_path_inner` while inspecting ancestors. Adjacent stat/lstat/fstatat/readlink/openat/rename regression subsets are parser-clean on RV and LA.
+
+Maintenance boundary: future path/link/stat work must preserve parent-vs-final symlink semantics, the 40-hop `ELOOP` guard, and non-root directory search-permission checks. Any hard-link/linkat/statx/getdents fix must rerun this stat/readlink regression subset before promotion accounting.

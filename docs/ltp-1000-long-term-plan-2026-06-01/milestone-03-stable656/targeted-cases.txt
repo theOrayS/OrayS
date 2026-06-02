@@ -553,3 +553,55 @@ sched_setaffinity01
 signal01
 statfs01
 statvfs01
+
+## Stat/readlink path traversal targeted proof
+readlink03
+stat03
+stat03_64
+# RV fixed run is parser-clean for all three cases; LA is parser-clean only for stat03/stat03_64. readlink03 remains blocked by LA musl TFAIL and is not counted.
+
+## Stat/readlink adjacent stable regression subset
+stat01
+stat02
+stat01_64
+stat02_64
+lstat01
+lstat01_64
+fstatat01
+readlink01
+readlinkat01
+openat01
+rename14
+# RV and LA x musl/glibc parser-clean after the nonrecursive parent-search fix.
+
+## Four-way clean candidate pool after stat03/stat03_64 path repair (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after stat03/stat03_64 path repair
+# 0 promoted in this checkpoint.
+# Reason: 26 new four-way-clean unique candidates are available, below the +50 stable656 gate.

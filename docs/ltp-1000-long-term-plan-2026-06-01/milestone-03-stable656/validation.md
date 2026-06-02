@@ -1697,3 +1697,70 @@ panic/trap matches: 0
 ```
 
 Combined clean-only report result: 24 promotion candidates, 26 blocked/incomplete. `rename03` and `rename04` are the only newly added clean cases in this step. The stable list remains unchanged because the pool is still 24/50.
+
+## `stat03`/`stat03_64` path traversal proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=readlink03,stat03,stat03_64 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=readlink03,stat03,stat03_64 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=readlink03,stat03,stat03_64 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stat01,stat02,stat01_64,stat02_64,lstat01,lstat01_64,fstatat01,readlink01,readlinkat01,openat01,rename14 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stat01,stat02,stat01_64,stat02_64,lstat01,lstat01_64,fstatat01,readlink01,readlinkat01,openat01,rename14 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+python3 scripts/ltp_summary.py <log>
+python3 scripts/ltp_summary.py --json <log>
+python3 scripts/ltp_summary.py --promotion-candidates <clean-only evidence logs>
+```
+
+Artifacts:
+
+- Initial RV repair-history raw log: `target/ltp-1000-milestone-03-stable656/rv-readlink-stat-path-20260602T051956Z.log`
+- Initial RV summary/JSON/checksum: `rv-readlink-stat-path-20260602T051956Z.summary.txt`, `rv-readlink-stat-path-20260602T051956Z.summary.json`, `rv-readlink-stat-path-20260602T051956Z.sha256`
+- Fixed RV raw log: `target/ltp-1000-milestone-03-stable656/rv-readlink-stat-path-nonrecursive-20260602T052206Z.log`
+- Fixed RV summary/JSON/checksum: `rv-readlink-stat-path-nonrecursive-20260602T052206Z.summary.txt`, `rv-readlink-stat-path-nonrecursive-20260602T052206Z.summary.json`, `rv-readlink-stat-path-nonrecursive-20260602T052206Z.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-readlink-stat-path-nonrecursive-20260602T052251Z.log`
+- LA summary/JSON/checksum: `la-readlink-stat-path-nonrecursive-20260602T052251Z.summary.txt`, `la-readlink-stat-path-nonrecursive-20260602T052251Z.summary.json`, `la-readlink-stat-path-nonrecursive-20260602T052251Z.sha256`
+- RV adjacent regression: `target/ltp-1000-milestone-03-stable656/rv-stat-readlink-stable-regression-20260602T052501Z.summary.txt`, `.summary.json`, `.sha256`
+- LA adjacent regression: `target/ltp-1000-milestone-03-stable656/la-stat-readlink-stable-regression-20260602T052706Z.summary.txt`, `.summary.json`, `.sha256`
+- Combined clean26 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.txt`
+- Combined report checksum: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.derived.sha256`
+
+Initial RV repair-history parser summary:
+
+```text
+readlink03 became RV-clean, but stat03/stat03_64 triggered a parser-visible panic/trap after recursive parent-directory search checking. This log is explicitly non-countable repair history.
+```
+
+Fixed RV targeted parser summary:
+
+```text
+PASS LTP CASE: 6
+FAIL LTP CASE: 0
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+LA targeted parser summary:
+
+```text
+PASS LTP CASE: 5
+FAIL LTP CASE: 1
+Internal TFAIL/TBROK/TCONF: 1 ({'TFAIL': 1})
+timeout matches: 0
+ENOSYS/not implemented matches: 0
+panic/trap matches: 0
+```
+
+Decision: `stat03` and `stat03_64` are RV + LA x musl + glibc parser-clean and enter the future candidate pool. `readlink03` remains blocked because LA musl is parser-visible `TFAIL`; the RV clean row and LA glibc clean row are not enough for promotion.
+
+Adjacent stable regression parser summaries:
+
+```text
+RV: PASS LTP CASE 22, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 22, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Combined clean-only report result: 26 promotion candidates, 27 blocked/incomplete. `stat03` and `stat03_64` are the only newly added clean cases in this step. The stable list remains unchanged because the pool is still 26/50.
