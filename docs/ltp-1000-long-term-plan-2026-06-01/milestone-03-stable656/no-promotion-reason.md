@@ -21,7 +21,7 @@ The following blockers prevent counting additional rows:
 | `mmap10_1` | missing testcase in both guest LTP trees |
 | `vma02` | libnuma `TCONF` |
 | old `futex_wait03` scout row | superseded timeout evidence; current RV/LA targeted reruns are parser-clean after `/proc/<pid>/stat` sleeping-state repair |
-| `kill10` | severe panic/trap during RV VFS/process scout; evidence cannot be promoted |
+| `kill10` | isolated RV singleton still times out in musl, leaves a persistent post-cleanup frame leak, and panics in the following glibc group; temporary poll/exit-group cleanup hypothesis rejected |
 | `shmat1` | mixed scout was manually terminated after hang/long run; evidence is scouting only |
 | `readlinkat02` | RV and LA glibc clean, but LA musl `TFAIL`; root-cause audit found musl converts user `bufsize == 0` to a dummy one-byte syscall, so a safe generic kernel fix is not available without breaking direct `bufsiz=1` semantics |
 | pre-fix `fsync02` row | old isolated RV rerun had glibc `TBROK=1`; superseded by post-fix proof but retained as failed evidence |

@@ -50,7 +50,7 @@ Result: the historical sweep report has 563 four-way-clean rows, but zero rows r
 | pre-fix `openat02` row | old post-statfs-clamp isolated RV rerun had musl+glibc `TBROK` setup `ENOSPC` | superseded by post-sparse-largefile four-way proof; keep old log only as blocker history |
 | `nice04` | RV musl `nice(-10)` gets `EACCES`; direct `setpriority02` source requires `EACCES` for the same unprivileged lowering class | keep blocked; see `nice04-errno-boundary-report.md`; do not flip `sys_setpriority` errno |
 | `clone04` | RV glibc clean, but RV musl is killed by SIGSEGV/TBROK; raw log points to the upstream musl `clone.c` NULL-stack wrapper fix | keep blocked; classify libc-wrapper boundary first, then require RV musl closure plus clone/vfork/futex/signal/wait regressions before any LA rerun or promotion |
-| `kill10` | RV panic/trap in scout | isolate before any broad process/signal shard |
+| `kill10` | isolated RV singleton timeout + persistent frame leak + following glibc allocator panic | keep out of broad process/signal shards until cleanup/resource lifetime is fixed; poll/exit cleanup hypothesis rejected |
 | `mmap05` | RV now clean, but LA musl+glibc still report `TFAIL=1` / SIGSEGV signal not received; explicit TLB-flush experiment and temporary LA instrumentation did not produce a page fault for the write-protected access | LoongArch write-protect/page-modify lane; keep non-promotable until LA `mmap05` is parser-clean and mmap/signal regressions stay clean |
 | `shmat1` | long/hung mixed scout | SysV shm/resource lifetime lane, isolated timeout first |
 

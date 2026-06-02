@@ -1122,3 +1122,45 @@ panic/trap matches: 0
 ```
 
 Decision: the adjacent stable signal/poll/proc subset did not regress on RV or LA.
+
+## RV `kill10` isolated severe-blocker confirmation
+
+Date: 2026-06-02.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=kill10 LTP_CASE_TIMEOUT_SECS=120 timeout 25m ./run-eval.sh rv
+# after testing and rejecting a temporary poll/exit-group cleanup hypothesis:
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=kill10 LTP_CASE_TIMEOUT_SECS=120 timeout 25m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- Pre-hypothesis raw log: `target/ltp-1000-milestone-03-stable656/rv-kill10-singleton-20260602T030343Z.log`
+- Pre-hypothesis summary: `target/ltp-1000-milestone-03-stable656/rv-kill10-singleton-20260602T030343Z.summary.txt`
+- Pre-hypothesis JSON: `target/ltp-1000-milestone-03-stable656/rv-kill10-singleton-20260602T030343Z.summary.json`
+- Pre-hypothesis checksums: `target/ltp-1000-milestone-03-stable656/rv-kill10-singleton-20260602T030343Z.derived.sha256`
+- Poll/exit cleanup hypothesis raw log: `target/ltp-1000-milestone-03-stable656/rv-kill10-poll-exit-cleanup-20260602T031039Z.log`
+- Poll/exit cleanup hypothesis summary: `target/ltp-1000-milestone-03-stable656/rv-kill10-poll-exit-cleanup-20260602T031039Z.summary.txt`
+- Poll/exit cleanup hypothesis JSON: `target/ltp-1000-milestone-03-stable656/rv-kill10-poll-exit-cleanup-20260602T031039Z.summary.json`
+- Poll/exit cleanup hypothesis checksums: `target/ltp-1000-milestone-03-stable656/rv-kill10-poll-exit-cleanup-20260602T031039Z.derived.sha256`
+
+Parser summary for both singleton runs:
+
+```text
+PASS LTP CASE: 0
+FAIL LTP CASE: 1
+Internal TFAIL/TBROK/TCONF: 0 ({})
+timeout matches: 1
+ENOSYS/not implemented matches: 0
+panic/trap matches: 1
+```
+
+Case-matrix observation:
+
+- RV musl `kill10` returns wrapper FAIL 137 after the 120s case timeout.
+- Free frames fall from about `258812` before the musl run to `129627` after cleanup, leaving a persistent negative delta of roughly `129185` frames.
+- The following RV glibc group starts with the reduced free-frame count and immediately panics in the allocator: `memory allocation of 262144 bytes failed`.
+
+Decision: `kill10` is isolated as a severe cleanup/resource-lifetime blocker. A temporary generic `poll`/`ppoll` exit-group cleanup hypothesis was tested and rejected because the same timeout, persistent frame leak, and glibc allocator panic remained. The temporary source edit was removed, and no `kill10` evidence is eligible for promotion.

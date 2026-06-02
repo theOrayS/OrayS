@@ -136,10 +136,15 @@ Promotion boundary: current `openat03` RV/LA targeted summaries are deterministi
 2. `readlinkat02`: RV clean but LA musl still fails on rerun; syscall code already rejects syscall-visible `bufsiz == 0`. Source audit found musl rewrites user `bufsize == 0` into a dummy one-byte syscall, so preserving valid direct `readlinkat(..., bufsiz=1)` truncation semantics takes priority over a kernel special case.
 3. `nice04`: LTP's `nice(-10)` path expects `EPERM`, while the current `setpriority` syscall-lowering path returns `EACCES`; keep stable `setpriority02` protected before changing this boundary.
 4. `clone04`: RV glibc confirms the kernel/glibc path returns `EINVAL` for a NULL stack, but RV musl is killed by SIGSEGV/TBROK before a clean wrapper PASS. No code change was made; treat it as a libc-wrapper boundary until a generic clone ABI fix can be proven without regressing clone/vfork/futex/wait behavior.
-5. `kill10`: severe panic/trap in RV scout; must be isolated before broad reruns.
+5. `kill10`: severe blocker is now isolated by singleton RV evidence: musl timeout, persistent post-cleanup frame leak, and following glibc allocator panic. A temporary `poll`/`ppoll` exit-group cleanup hypothesis was rejected and removed, so this checkpoint introduces no retained syscall/errno/flag/ABI change for `kill10`.
 6. `shmat1`: long/hung run was terminated manually; SysV shm/resource lifetime needs separate investigation.
 7. `openat03`: real `O_TMPFILE` support remains absent; a rejected emulation/linkat attempt panicked on RV during nested-directory creation, while the retained generic gate reports unsupported semantics as `TCONF`/wrapper FAIL without panic.
 
 ## Maintenance boundary
 
 All code changes in this checkpoint are generic behavior fixes, not LTP case-name special cases. Future fixes must stay generic and must not hardcode LTP case names, paths, processes, or outputs. Signal/futex/mmap/SysV and filesystem-capacity changes require adjacent regression sets before any stable promotion.
+
+
+## `kill10` rejected cleanup hypothesis
+
+A local temporary change made `poll`/`ppoll` wait loops observe `pending_exit_group()`, but RV singleton evidence stayed unchanged: musl still timed out, cleanup still left roughly half the free frames unreclaimed, and the following glibc group still hit allocator panic. The change was removed. Therefore the visible ABI/POSIX surface for this checkpoint is documentation-only: `kill10` remains a cleanup/resource-lifetime blocker, with no retained syscall number, errno, flag, FD, signal, futex, mmap, or user-pointer semantic change.
