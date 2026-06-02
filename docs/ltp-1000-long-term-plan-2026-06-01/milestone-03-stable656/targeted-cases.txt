@@ -259,3 +259,20 @@ munmap01
 openat02
 sched_setaffinity01
 signal01
+
+## epoll_create02 singleton blocker confirmation
+epoll_create02
+# RV singleton: musl wrapper FAIL with TFAIL/ENOSYS; glibc wrapper PASS with old-ABI TCONF.
+# LA singleton: both libcs wrapper PASS but old-ABI TCONF remains. Non-promotable.
+
+## Four-way clean candidate pool after epoll_create02 blocker confirmation (unchanged; not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore03
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+signal01

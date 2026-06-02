@@ -328,3 +328,13 @@ Combined pool after this repair:
 - Candidates: 10 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`)
 - Stable list remains unchanged at `606/606/0`; the current pool is 10/50, below the +50 stable656 gate.
 - No `LTP_STABLE_CASES` edit or stable656 milestone promotion commit is made at this checkpoint.
+
+## `epoll_create02` singleton blocker checkpoint
+
+Artifacts:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt`
+- RV/LA derived checksums: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.derived.sha256`, `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.derived.sha256`
+
+Result: `epoll_create02` is not a stable656 candidate. RV musl still FAILs with `TFAIL=2` and `ENOSYS=2`; RV glibc and both LA libcs wrapper-PASS but include parser-visible old-ABI `TCONF`. The current candidate pool therefore remains 10/50, and `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.

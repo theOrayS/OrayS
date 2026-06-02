@@ -358,3 +358,12 @@ Regression evidence:
 - RV summary: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.summary.txt`
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.summary.txt`
 - Result: 20/20 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+## `epoll_create02` blocker regression boundary
+
+Current singleton evidence:
+
+- RV: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt` — RV musl FAIL with `TFAIL=2` / `ENOSYS=2`, RV glibc PASS with `TCONF=1`.
+- LA: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` — both libcs wrapper PASS but with `TCONF=2`.
+
+No regression subset is counted because no source change was retained and the case is not parser-clean. Any future generic epoll compatibility patch must first make `epoll_create02` parser-clean on RV and LA for musl+glibc, then run adjacent FD/epoll regressions covering at least invalid-size `epoll_create`, valid `epoll_create1` fd lifetime, `close`, `fcntl(F_GETFD/F_SETFD)`, `epoll_ctl`, and `epoll_wait` readiness/error paths.

@@ -161,3 +161,9 @@ All code changes in this checkpoint are generic behavior fixes, not LTP case-nam
 ## `kill10` rejected cleanup hypothesis
 
 A local temporary change made `poll`/`ppoll` wait loops observe `pending_exit_group()`, but RV singleton evidence stayed unchanged: musl still timed out, cleanup still left roughly half the free frames unreclaimed, and the following glibc group still hit allocator panic. The change was removed. Therefore the visible ABI/POSIX surface for this checkpoint is documentation-only: `kill10` remains a cleanup/resource-lifetime blocker, with no retained syscall number, errno, flag, FD, signal, futex, mmap, or user-pointer semantic change.
+
+## `epoll_create02` documentation-only boundary
+
+No epoll source change is retained in this checkpoint. The singleton rescout documents existing behavior only: RV musl `epoll_create(0/-1)` still reaches an ENOSYS-returning old-ABI/libc-wrapper path, while LA wrapper-PASSes but emits old `__NR_epoll_create` `TCONF` rows.
+
+Visible ABI/POSIX impact: none from this documentation update. Syscall numbers, errno behavior, FD table semantics, epoll readiness behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged. A future fix must be generic epoll compatibility work, not an LTP-name/path/output special case, and must not hide parser-visible `TCONF` rows as promotion evidence.

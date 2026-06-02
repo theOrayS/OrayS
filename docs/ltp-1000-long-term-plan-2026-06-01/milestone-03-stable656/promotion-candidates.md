@@ -59,3 +59,7 @@ Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline
 `openat03` is explicitly outside the clean pool. A larger `O_TMPFILE`/`linkat` emulation attempt was rejected after RV targeted validation produced a supervisor page fault during the testcase's deep nested-directory phase (`rv-openat03-otmpfile-20260602T021349Z.summary.txt` and `rv-openat03-trace-20260602T022058Z.summary.txt`, both `panic/trap matches: 1`).
 
 The retained generic change only makes unsupported `O_TMPFILE` fail honestly: `O_TMPFILE|O_RDONLY` returns `EINVAL`, and `O_TMPFILE` against an existing directory returns `EOPNOTSUPP`. Current RV and LA targeted summaries (`rv-openat03-otmpfile-enotsup-20260602T022658Z.summary.txt`, `la-openat03-otmpfile-enotsup-20260602T022748Z.summary.txt`) show zero timeout/ENOSYS/panic/trap but `TCONF=4` and wrapper FAIL, so this is blocker evidence only and must not be counted toward stable656.
+
+## `epoll_create02` non-candidate note
+
+`epoll_create02` was rechecked as a singleton on RV and LA. It is still outside the clean pool: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt` shows RV musl wrapper FAIL with `TFAIL=2` and `ENOSYS=2`, while `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` wrapper-PASSes both libcs but retains parser-visible `TCONF=2`. This is blocked evidence only; no blacklist, SKIP, status0, or caveated wrapper PASS row is counted toward stable656.

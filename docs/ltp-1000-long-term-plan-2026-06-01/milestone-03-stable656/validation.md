@@ -1239,3 +1239,32 @@ panic/trap matches: 0
 ```
 
 Decision: the adjacent mincore/mlock/mmap subset did not regress on RV or LA. The current clean candidate pool is 10/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+
+## `epoll_create02` singleton boundary confirmation
+
+Date: 2026-06-02.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=epoll_create02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=epoll_create02 LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.log`
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.json`
+- RV checksums: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.derived.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.log`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.json`
+- LA checksums: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.derived.sha256`
+
+Parser result:
+
+- RV: 1 wrapper PASS / 1 wrapper FAIL. RV glibc wrapper PASSes but includes one architecture-level `TCONF`; RV musl FAILs with `TFAIL=2` and `ENOSYS=2` because libc `epoll_create(0/-1)` reaches a missing old-ABI path instead of returning `EINVAL`.
+- LA: 2 wrapper PASS / 0 wrapper FAIL, but both libcs include the same old-ABI `TCONF`; there is no timeout, ENOSYS, panic, or trap on LA.
+
+Decision: `epoll_create02` is not promotion evidence. The RV musl ENOSYS path and the parser-visible old-ABI `TCONF` prevent a four-way parser-clean stable gate. No `LTP_STABLE_CASES` edit is made.

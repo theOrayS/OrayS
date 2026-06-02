@@ -36,3 +36,7 @@ No blacklist entry was added for `openat03`. The rejected `O_TMPFILE`/`linkat` e
 ## `kill10` isolated blocker update
 
 Two RV singleton runs on 2026-06-02 confirmed that `kill10` is not merely a noisy broad-shard artifact. Both runs show musl wrapper FAIL 137 after the 120s timeout, about `-129185` free frames after cleanup, then an immediate glibc allocator panic. A temporary generic `poll`/`ppoll` pending-exit cleanup change did not alter the parser result or resource delta and was removed. No blacklist credit or promotion credit is taken from these rows.
+
+## `epoll_create02` blocker update
+
+No blacklist change was made for `epoll_create02`. The focused singleton evidence is an ordinary unresolved compatibility/parser-clean blocker: RV musl has `TFAIL=2` / `ENOSYS=2`, and LA still has old-ABI `TCONF` rows despite wrapper PASS. These rows stay visible, are not counted as PASS, and are not converted into blacklist credit.
