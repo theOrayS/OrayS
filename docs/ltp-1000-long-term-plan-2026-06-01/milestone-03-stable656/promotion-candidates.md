@@ -260,3 +260,18 @@ A generic `shmctl(IPC_STAT)` user ABI repair added one future candidate without 
 - Audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean35-shmat04-ipcstat-abi-20260602T150918Z.md`.
 
 Newly evidenced four-way-clean case: `shmat04`. `shmt04` was revalidated in the same gate but was already counted in clean34. Current candidate pool: 35/50; stable list remains `606 total / 606 unique / 0 duplicate`.
+
+## time/timer clean3 update
+
+A documentation/evidence-only time/timer scout grew the future pool without editing the stable list or changing source code.
+
+Evidence:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt` — 8 wrapper PASS / 42 wrapper FAIL. `getitimer02`, `setitimer02`, and `times03` are parser-clean for musl+glibc; the surrounding rows retain visible TFAIL/TBROK/TCONF/ENOSYS/timeout blockers.
+- LA clean3 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt` — the three RV-clean rows are parser-clean for musl+glibc; zero internal/fatal markers.
+- Combined clean3 report: `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`.
+- Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean38-time-timer-clean3-20260602T152824Z.md`.
+
+Newly evidenced four-way-clean cases: `getitimer02`, `setitimer02`, and `times03`. Current pool: 38/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+Blocked rows from the same scout stay outside the pool: `clock_getres01` has parser-visible `TCONF`; `clock_gettime01` and `setitimer01` timeout; `clock_gettime03`, `clock_nanosleep03`, `timerfd*`, and related timer rows retain visible `TBROK`/`TFAIL`/`ENOSYS`/`TCONF`. None is blacklisted or counted as PASS.

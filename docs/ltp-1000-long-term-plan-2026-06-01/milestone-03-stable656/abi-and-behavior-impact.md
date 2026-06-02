@@ -352,3 +352,17 @@ Lifetime/resource risk: this does not implement full SysV shm attach refcounting
 Regression evidence: `shmat04` and already-counted `shmt04` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt`).
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 35/50.
+
+## time/timer clean3 evidence-only impact
+
+Changed files: none in this checkpoint.
+
+User-visible behavior: unchanged. The evidence confirms the existing `getitimer(2)`, invalid-argument `setitimer(2)`, and `times(2)` behavior is parser-clean on RV and LA for both musl and glibc.
+
+ABI/POSIX surface: syscall numbers, struct layouts, errno mappings, fd-table behavior, signal masks/delivery, futex values, mmap layout, and user-pointer copy ABI are unchanged by this checkpoint.
+
+Maintenance boundary: do not generalize this proof to full timerfd/POSIX timer support. The same RV scout keeps `timerfd*` and POSIX timer cases visibly blocked by `ENOSYS`/`TBROK`/`TFAIL`/`TCONF`; `clock_gettime01` and `setitimer01` also timed out. Future timer work must fix those generic semantics and rerun targeted RV/LA parser gates before promotion accounting.
+
+Regression evidence: `getitimer02`, `setitimer02`, and `times03` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-time-timer-scout-20260602T152018+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-time-timer-clean3-20260602T152722+0800.summary.txt`); combined RV+LA candidate report is `target/ltp-1000-milestone-03-stable656/combined-time-timer-clean3-20260602T152824+0800.promotion-candidates.txt`.
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 38/50.

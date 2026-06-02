@@ -832,3 +832,75 @@ statvfs01
 ## Promotion result after shmat04 IPC_STAT ABI repair
 # 0 promoted in this checkpoint.
 # Reason: 35 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## time/timer RV scout and LA clean3 confirmation
+clock_getres01
+clock_gettime01
+clock_gettime03
+clock_nanosleep01
+clock_nanosleep03
+clock_settime03
+nanosleep02
+getitimer02
+setitimer01
+setitimer02
+times03
+timerfd01
+timerfd02
+timerfd04
+timerfd_create01
+timerfd_gettime01
+timerfd_settime01
+timerfd_settime02
+timer_delete01
+timer_delete02
+timer_getoverrun01
+timer_gettime01
+timer_settime01
+timer_settime02
+timer_settime03
+# LA confirmation reran only RV-clean candidates: getitimer02,setitimer02,times03.
+
+## Four-way clean candidate pool after time/timer clean3 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after time/timer clean3 evidence
+# 0 promoted in this checkpoint.
+# Reason: 38 new four-way-clean unique candidates are available, below the +50 stable656 gate.
