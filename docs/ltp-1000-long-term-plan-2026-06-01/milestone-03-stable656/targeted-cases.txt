@@ -781,3 +781,54 @@ statvfs01
 ## Promotion result after clock_adjtime/sigaltstack repair
 # 0 promoted in this checkpoint.
 # Reason: 34 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+
+## shmat04 IPC_STAT ABI targeted proof
+shmat04
+shmt04
+# RV and LA x musl/glibc parser-clean after generic shmctl(IPC_STAT) Linux 64-bit shmid_ds copy-size repair.
+
+## shmat04 SysV shm adjacent regression subset
+shmt04
+# Revalidated with shmat04 on RV and LA; shmt04 was already clean and remains parser-clean.
+
+## Four-way clean candidate pool after shmat04 IPC_STAT ABI repair (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after shmat04 IPC_STAT ABI repair
+# 0 promoted in this checkpoint.
+# Reason: 35 new four-way-clean unique candidates are available, below the +50 stable656 gate.

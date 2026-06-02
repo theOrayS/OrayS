@@ -18,14 +18,51 @@ use super::linux_abi::{
     SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
 };
 use super::memory_map::{align_down, align_up_checked, sys_munmap, user_mapping_flags};
-use super::user_memory::clear_user_bytes;
+use super::user_memory::write_user_value;
 
 #[derive(Clone)]
 struct SysvShmSegment {
     key: i32,
+    mode: u32,
+    requested_size: usize,
     size: usize,
     backing_vaddr: usize,
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct UserIpcPerm64 {
+    key: i32,
+    uid: u32,
+    gid: u32,
+    cuid: u32,
+    cgid: u32,
+    mode: u32,
+    seq: u16,
+    pad2: u16,
+    unused1: usize,
+    unused2: usize,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct UserShmidDs64 {
+    shm_perm: UserIpcPerm64,
+    shm_segsz: usize,
+    shm_atime: isize,
+    shm_dtime: isize,
+    shm_ctime: isize,
+    shm_cpid: i32,
+    shm_lpid: i32,
+    shm_nattch: usize,
+    unused4: usize,
+    unused5: usize,
+}
+
+// Linux 64-bit IPC user ABI: asm-generic/{ipcbuf,shmbuf}.h.  RISC-V and
+// LoongArch both use this shmid64_ds layout for shmctl(IPC_STAT).
+const _: [(); 48] = [(); size_of::<UserIpcPerm64>()];
+const _: [(); 112] = [(); size_of::<UserShmidDs64>()];
 
 static NEXT_SYSV_SHM_ID: AtomicI32 = AtomicI32::new(1);
 
@@ -48,6 +85,7 @@ fn removed_segments() -> &'static Mutex<Vec<SysvShmSegment>> {
 fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i32, LinuxError> {
     let key = key as i32;
     let flags = shmflg as i32;
+    let requested_size = size;
     let mut table = table().lock();
     if key != SYSV_IPC_PRIVATE {
         if let Some((shmid, segment)) = table.iter().find(|(_, segment)| segment.key == key) {
@@ -80,6 +118,8 @@ fn get_or_create(key: usize, size: usize, shmflg: usize) -> Result<i32, LinuxErr
         shmid,
         SysvShmSegment {
             key,
+            mode: (flags as u32) & 0o777,
+            requested_size,
             size,
             backing_vaddr,
         },
@@ -96,6 +136,23 @@ fn lookup(shmid: i32) -> Option<(usize, usize)> {
 
 fn contains(shmid: i32) -> bool {
     table().lock().contains_key(&shmid)
+}
+
+fn stat(shmid: i32) -> Option<UserShmidDs64> {
+    table().lock().get(&shmid).map(|segment| UserShmidDs64 {
+        shm_perm: UserIpcPerm64 {
+            key: segment.key,
+            mode: segment.mode,
+            ..UserIpcPerm64::default()
+        },
+        shm_segsz: segment.requested_size,
+        // This lightweight SysV SHM model does not yet maintain cross-process
+        // attach counters. Keep the exposed count conservative and, more
+        // importantly, copy exactly the Linux ABI struct size instead of a
+        // guessed byte count so libc stack objects are not overwritten.
+        shm_nattch: 0,
+        ..UserShmidDs64::default()
+    })
 }
 
 fn remove(shmid: i32) {
@@ -188,8 +245,12 @@ pub(super) fn sys_shmctl(process: &UserProcess, shmid: usize, cmd: usize, buf: u
         }
         SYSV_IPC_STAT => {
             if buf != 0 {
-                if let Err(err) = clear_user_bytes(process, buf, size_of::<usize>() * 16) {
-                    return neg_errno(err);
+                let Some(stat) = stat(shmid) else {
+                    return neg_errno(LinuxError::EINVAL);
+                };
+                let ret = write_user_value(process, buf, &stat);
+                if ret != 0 {
+                    return ret;
                 }
             }
             0

@@ -11,10 +11,12 @@ Clean evidence set:
 - Current clean30 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean30-epoll-create1-20260602T061430Z.md`
 - Current clock/sigaltstack/shmt04 clean4 parser report: `target/ltp-1000-milestone-03-stable656/combined-clock-sigaltstack-shmt04-20260602T143805+0800.promotion-candidates.txt`
 - Current clean34 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean34-clock-sigaltstack-shmt04-20260602T143805Z.md`
+- Current shmat04 IPC_STAT ABI parser report: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`
+- Current clean35 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean35-shmat04-ipcstat-abi-20260602T150918Z.md`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Current four-way-clean not-yet-promoted candidates: 34
-- Remaining before stable656 +50 gate: 16
+- Current four-way-clean not-yet-promoted candidates: 35
+- Remaining before stable656 +50 gate: 15
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
@@ -45,6 +47,7 @@ Clean evidence set:
 | `rename04` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `rename05` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `sched_setaffinity01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `shmat04` | current RV/LA shmat04/shmt04 targeted gates are parser-clean for musl+glibc after generic `shmctl(IPC_STAT)` copies the Linux 64-bit `shmid_ds` ABI struct instead of overwriting a guessed 128-byte buffer | keep in candidate pool; not promoted until +50 batch is complete |
 | `shmt04` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc; existing SysV shm behavior now has four-way evidence | keep in candidate pool; not promoted until +50 batch is complete |
 | `signal01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `sigaltstack02` | current RV/LA clock/sigaltstack/shmt04 targeted gates are parser-clean for musl+glibc after generic `sigaltstack` state/errno handling | keep in candidate pool; not promoted until +50 batch is complete |
@@ -85,7 +88,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 30.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 35.
 
 ## `openat03` non-candidate note
 
@@ -245,3 +248,15 @@ Evidence:
 Newly evidenced four-way-clean cases: `adjtimex01`, `adjtimex03`, `shmt04`, and `sigaltstack02`. Current pool: 34/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 `sigaltstack` support in this checkpoint is syscall-state/errno behavior only; full alternate-stack signal delivery remains a future signal-lane boundary and is not claimed by this candidate proof.
+
+
+## SysV shm IPC_STAT ABI clean1 update
+
+A generic `shmctl(IPC_STAT)` user ABI repair added one future candidate without editing the stable list:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt` — 4 PASS / 0 FAIL, zero internal markers/fatal signatures.
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt` — 4 PASS / 0 FAIL, zero internal markers/fatal signatures.
+- Combined clean35 report: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`.
+- Audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean35-shmat04-ipcstat-abi-20260602T150918Z.md`.
+
+Newly evidenced four-way-clean case: `shmat04`. `shmt04` was revalidated in the same gate but was already counted in clean34. Current candidate pool: 35/50; stable list remains `606 total / 606 unique / 0 duplicate`.

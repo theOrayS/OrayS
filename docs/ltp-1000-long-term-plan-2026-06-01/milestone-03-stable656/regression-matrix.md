@@ -540,3 +540,16 @@ Adjacent regression subset:
 - Result: 14/14 wrapper PASS on each arch, zero internal markers/fatal signatures.
 
 Remaining nearby boundary: `sigaltstack` does not yet switch signal delivery to the alternate stack; this checkpoint protects syscall-visible state/errno semantics only. Future signal delivery work must rerun this stable time/signal subset plus signal-delivery-specific cases before promotion accounting.
+
+
+## SysV shm IPC_STAT ABI regression matrix
+
+Targeted proof:
+
+- RV `shmat04,shmt04`: `target/ltp-1000-milestone-03-stable656/rv-shmat04-shmt04-ipcstat-abi-20260602T150702+0800.summary.txt`
+- LA `shmat04,shmt04`: `target/ltp-1000-milestone-03-stable656/la-shmat04-shmt04-ipcstat-abi-20260602T150805+0800.summary.txt`
+- Combined promotion report: `target/ltp-1000-milestone-03-stable656/combined-shmat04-shmt04-ipcstat-abi-20260602T150918+0800.promotion-candidates.txt`
+
+Result: `shmat04` is newly RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap. `shmt04` was revalidated in the same subset and remains clean.
+
+Protected boundary: `shmctl(IPC_STAT)` must copy exactly the Linux 64-bit `shmid_ds` ABI struct size for RV/LA. Future SysV shm lifetime/refcount work must rerun `shmat04`, `shmt04`, and the existing stable SysV shm subset before promotion accounting.
