@@ -1042,3 +1042,77 @@ times03
 ## Promotion result after open clean2 evidence
 # 0 promoted in this checkpoint.
 # Reason: 42 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## signal/wait RV scout and LA pause clean2 confirmation
+alarm01
+pause01
+pause02
+kill01
+kill04
+kill05
+sigaction03
+sigaction04
+sigaction05
+sigpending02
+sigprocmask02
+sigsuspend02
+sigwait01
+waitpid02
+waitpid05
+waitpid14
+waitpid15
+waitpid16
+waitpid17
+waitpid18
+waitpid19
+# LA confirmation reran only RV-clean candidates: pause01,pause02.
+
+## Four-way clean candidate pool after pause clean2 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+lstat02
+lstat02_64
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+open07
+open12
+openat02
+pause01
+pause02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after pause clean2 evidence
+# 0 promoted in this checkpoint.
+# Reason: 44 new four-way-clean unique candidates are available, below the +50 stable656 gate.

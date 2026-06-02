@@ -179,3 +179,13 @@ The 2026-06-02 FD/VFS/IO scout and LA confirmation added two future candidates w
 - Combined clean42 report: `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.promotion-candidates.txt`
 
 The newly clean cases are `open07` and `open12`, increasing the pool from 40/50 to 42/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.
+
+## pause clean2 no-promotion update
+
+The 2026-06-02 signal/wait scout and LA confirmation added two future candidates without crossing the stable656 gate:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt`
+- LA confirmation summary: `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt`
+- Combined clean44 report: `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt`
+
+The newly clean cases are `pause01` and `pause02`, increasing the pool from 42/50 to 44/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`. No blacklist/SKIP/status0/TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap row is counted.

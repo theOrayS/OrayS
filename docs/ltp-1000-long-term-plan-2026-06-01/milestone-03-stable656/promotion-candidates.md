@@ -305,3 +305,18 @@ Evidence:
 Newly evidenced four-way-clean cases: `open07` and `open12`. Current pool: 42/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 Blocked rows from the same scout stay outside the pool: `open11` retains `ENOSYS/TBROK`, `open14` retains `TCONF`, `read03`/`write04` retain `TBROK`, and the remaining rows have wrapper-fail events. None is blacklisted or counted as PASS.
+
+## pause clean2 update
+
+A signal/wait scout grew the future pool without editing the stable list or changing source code.
+
+Evidence:
+
+- RV scout summary: `target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt` — 4 wrapper PASS / 38 wrapper FAIL. `pause01` and `pause02` are parser-clean for musl+glibc; the surrounding rows retain visible TFAIL/TBROK or wrapper-fail events.
+- LA clean2 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt` — the two RV-clean rows are parser-clean for musl+glibc; zero internal/fatal markers.
+- Combined clean2 report: `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt`.
+- Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean44-pause-clean2-20260602T154237Z.md`.
+
+Newly evidenced four-way-clean cases: `pause01` and `pause02`. Current pool: 44/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+Blocked rows from the same scout stay outside the pool: signal/wait/kill rows retain visible `TFAIL`/`TBROK` or wrapper-fail events. None is blacklisted or counted as PASS.

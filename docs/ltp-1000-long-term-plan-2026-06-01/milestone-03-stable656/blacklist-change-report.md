@@ -101,3 +101,7 @@ No blacklist was added, removed, or used for promotion accounting in the lstat c
 ## open clean2 blacklist status
 
 No blacklist was added, removed, or used for promotion accounting in the open clean2 checkpoint. RV-blocked FD/VFS/IO rows remain visible parser blockers and are not counted as PASS.
+
+## pause clean2 blacklist status
+
+No blacklist was added, removed, or used for promotion accounting in the pause clean2 checkpoint. RV-blocked signal/wait rows remain visible parser blockers and are not counted as PASS.

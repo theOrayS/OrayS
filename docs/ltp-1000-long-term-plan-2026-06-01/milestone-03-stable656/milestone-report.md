@@ -665,3 +665,24 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 8 cases short.
 - Remaining FD/VFS/IO rows from this scout keep visible parser caveats or wrapper-fail events and must not be counted until fixed and revalidated.
+
+## pause clean2 checkpoint
+
+A signal/wait scout found two already-generic `pause` rows that are clean enough for the future stable656 pool without any source edit.
+
+Code changes retained in this checkpoint: none.
+
+Evidence:
+
+- RV scout: `target/ltp-1000-milestone-03-stable656/rv-signal-wait-scout-20260602T154048+0800.summary.txt` — 4 PASS / 38 FAIL across musl+glibc; `pause01` and `pause02` are the only parser-clean RV candidates.
+- LA confirmation: `target/ltp-1000-milestone-03-stable656/la-pause-clean2-20260602T154154+0800.summary.txt` — 4 PASS / 0 FAIL for the two candidates, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Combined RV+LA report: `target/ltp-1000-milestone-03-stable656/combined-pause-clean2-20260602T154237+0800.promotion-candidates.txt` — 2 candidates and 19 blocked/incomplete rows.
+- Combined clean44 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean44-pause-clean2-20260602T154237Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `pause01`, `pause02`.
+- Candidate pool: 44/50.
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 6 cases short.
+- Remaining signal/wait rows from this scout keep visible parser caveats or wrapper-fail events and must not be counted until fixed and revalidated.
