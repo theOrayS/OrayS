@@ -1764,3 +1764,46 @@ LA: PASS LTP CASE 22, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, 
 ```
 
 Combined clean-only report result: 26 promotion candidates, 27 blocked/incomplete. `stat03` and `stat03_64` are the only newly added clean cases in this step. The stable list remains unchanged because the pool is still 26/50.
+
+## `mmap20`/`munlock02` targeted proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap08,mmap20,mlock02,munlock02 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap20,munlock02 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap20,munlock02 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh la
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,mmap13,munmap01,munlock01,mincore02,mincore03,mincore04,mprotect02,mprotect04 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap01,mmap02,mmap03,mmap04,mmap09,mmap12,mmap13,munmap01,munlock01,mincore02,mincore03,mincore04,mprotect02,mprotect04 LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 35m ./run-eval.sh la
+python3 scripts/ltp_summary.py <log>
+python3 scripts/ltp_summary.py --json <log>
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-03-stable656/rv-mmap20-munlock02-targeted-20260602T054424Z.log target/ltp-1000-milestone-03-stable656/la-mmap20-munlock02-targeted-20260602T054508Z.log
+```
+
+Artifacts:
+
+- Initial RV repair-history log/summary: `target/ltp-1000-milestone-03-stable656/rv-mmap-munlock-errno-targeted-20260602T053636Z.log`, `.summary.txt`, `.summary.json`, `.sha256` — not countable because `mmap08` and `mlock02` remain parser-visible failures.
+- RV targeted raw log: `target/ltp-1000-milestone-03-stable656/rv-mmap20-munlock02-targeted-20260602T054424Z.log`
+- RV targeted summary/JSON/checksum: `rv-mmap20-munlock02-targeted-20260602T054424Z.summary.txt`, `rv-mmap20-munlock02-targeted-20260602T054424Z.summary.json`, `rv-mmap20-munlock02-targeted-20260602T054424Z.sha256`
+- LA targeted raw log: `target/ltp-1000-milestone-03-stable656/la-mmap20-munlock02-targeted-20260602T054508Z.log`
+- LA targeted summary/JSON/checksum: `la-mmap20-munlock02-targeted-20260602T054508Z.summary.txt`, `la-mmap20-munlock02-targeted-20260602T054508Z.summary.json`, `la-mmap20-munlock02-targeted-20260602T054508Z.sha256`
+- Incremental clean2 report/checksum: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt`, `.sha256`
+- RV regression summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-mmap-munlock-regression-20260602T054554Z.summary.txt`, `.summary.json`, `.sha256`
+- LA regression summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-mmap-munlock-regression-20260602T054705Z.summary.txt`, `.summary.json`, `.sha256`
+- Diagnostic-only `mmap08` fd logs: `rv-mmap08-debug-20260602T054205Z.log` and `rv-mmap08-debug-fdpath-20260602T054313Z.log`; these are not promotion evidence.
+
+Targeted parser summaries:
+
+```text
+RV: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Regression parser summaries:
+
+```text
+RV: PASS LTP CASE 28, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 28, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Promotion-candidate report result: 2 promotion candidates (`mmap20`, `munlock02`), 0 blocked/incomplete rows for the incremental proof. Combined with the previous clean26 audit, the current not-yet-promoted pool is 28/50; stable list remains unchanged at `606/606/0`.

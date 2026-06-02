@@ -496,3 +496,28 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 24 cases short.
 - Remaining blocker from this step: `readlink03` remains outside the pool until LA musl zero-size-buffer behavior can be fixed or classified with parser-clean evidence; it is not blacklisted or counted as PASS.
+
+## mmap20/munlock02 clean2 checkpoint
+
+A generic mmap/munlock errno repair converted two previously blocked mm rows into future promotion candidates without editing `LTP_STABLE_CASES`.
+
+Code changes retained in this checkpoint:
+
+1. `examples/shell/src/uspace/memory_map.rs::sys_mmap` now rejects unsupported `MAP_SHARED_VALIDATE` flag bits with `EOPNOTSUPP`, instead of treating unknown validation-only bits as ordinary accepted flags.
+2. Non-anonymous `mmap` now validates the fd before reserving/mapping user address space and returns generic descriptor errors (`EBADF`, `EACCES`, `EISDIR`, or `ESPIPE`) for invalid, unreadable, directory, pipe, or socket-like descriptors.
+3. `munlock` is now dispatched and validates the whole page-rounded mapped range, returning `ENOMEM` for unmapped, overflow, or out-of-user-range inputs; `mlock` reuses the same range validator before prefaulting.
+
+Evidence:
+
+- RV targeted proof: `target/ltp-1000-milestone-03-stable656/rv-mmap20-munlock02-targeted-20260602T054424Z.summary.txt` — 4 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted proof: `target/ltp-1000-milestone-03-stable656/la-mmap20-munlock02-targeted-20260602T054508Z.summary.txt` — 4 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Incremental clean2 report: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt` — 2 candidates, 0 blocked rows.
+- Adjacent regression: `rv-mmap-munlock-regression-20260602T054554Z.summary.txt` and `la-mmap-munlock-regression-20260602T054705Z.summary.txt` — 28 PASS / 0 FAIL on each arch, zero parser/fatal markers.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `mmap20`, `munlock02`.
+- Candidate pool: 28/50 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`, `mmap20`, `munlock02`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 22 cases short.
+- Remaining blockers from this step: `mmap08` still fails its EBADF expectation because diagnostic-only evidence shows fd 3 is still a readable temp-file descriptor at `mmap` time; `mlock02` still needs real `RLIMIT_MEMLOCK`/capability behavior.

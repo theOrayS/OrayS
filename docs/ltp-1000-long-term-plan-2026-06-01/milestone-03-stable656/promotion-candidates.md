@@ -4,38 +4,46 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 ## Current four-way clean candidates
 
-Clean combined parser report:
+Clean evidence set:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`
+- Previous clean26 parser report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.txt`
+- Current clean2 parser report: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt`
+- Milestone audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean28-mmap20-munlock02-20260602T054508Z.md`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Promotion candidates: 22
-- Blocked/incomplete cases in this clean proof set: 30 (`mmap05`, `mknod07`, `mknodat02`, `rename03`, `rename04`, and the current RV G009 mlock/mmap/mprotect blocker rows)
+- Current four-way-clean not-yet-promoted candidates: 28
+- Remaining before stable656 +50 gate: 22
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
-| `fcntl11_64` | RV fcntl/FD scout and LA clean2 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `fcntl15` | RV fcntl/FD scout and LA clean2 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `fstatfs01` | after generic `LTP_DEV=/dev/vda` exposure plus synthetic block-device stat/getdents and true `NAME_MAX=63` reporting, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `fstatfs01_64` | same generic device/NAME_MAX repair as `fstatfs01`; RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `statfs01` | same generic device/NAME_MAX repair as `fstatfs01`; RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `statvfs01` | after `statvfs().f_namemax` now reports the real 63-byte backing dirent capacity, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `rename05` | after generic `LTP_DEV=/dev/vda` setup reaches the actual same-filesystem rename assertion path, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `fsync02` | after the generic `statfs`/`fstatvfs` capacity clamp, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `futex_wait01` | RV isolated rerun plus LA confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `futex_wait03` | after synthetic `/proc/<pid>/stat` reports futex waiters as sleeping, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `futex_wait05` | after generic sub-tick timer-list wakeups plus preserving the periodic tick deadline, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `mincore03` | after `mincore` distinguishes valid lazy VMA pages from unmapped pages and `mlock` prefaults mapped ranges, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `mincore02` | RV G009 mm/mlock/mmap scout and LA clean4 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `mincore04` | RV G009 mm/mlock/mmap scout and LA clean4 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `mprotect02` | RV G009 mm/mlock/mmap scout and LA clean4 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `mprotect04` | RV G009 mm/mlock/mmap scout and LA clean4 confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `munmap01` | after catchable synchronous `SIGSEGV` delivery for unmapped user faults, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `mmap13` | after generic file-backed mmap beyond-EOF pages are protected and translated to catchable `SIGBUS`, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `openat02` | after generic POSIX-layer sparse logical-size/data handling for large file holes, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `rename01` | after generic rename metadata migration preserves the source object inode across file and directory renames, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `sched_setaffinity01` | after generic permission fix, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
-| `signal01` | after generic `/proc/<pid>/stat` sleeping-state reporting for `rt_sigsuspend`/`ppoll` waiters, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `fcntl11_64` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `fcntl15` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `fstatfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `fstatfs01_64` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `fsync02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `futex_wait01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `futex_wait03` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `futex_wait05` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mincore02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mincore03` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mincore04` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mmap13` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mprotect02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mprotect04` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `munmap01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `openat02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `rename01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `rename03` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `rename04` | generic rename source/destination type handling proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `rename05` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `sched_setaffinity01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `signal01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `stat03` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `stat03_64` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `statfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `statvfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mmap20` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
+| `munlock02` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
 
 ## Evidence hygiene notes
 
@@ -53,9 +61,11 @@ Clean combined parser report:
 
 - `rv-rename01-inode-confirm-20260602T044855Z.log` and `la-rename01-inode-confirm-20260602T044855Z.log` provide the current `rename01` proof after generic rename metadata/inode migration. The two-case `rv-rename-inode-retarget-20260602T044708Z.log` / `la-rename-inode-retarget-20260602T044751Z.log` also protect existing `rename05`; the singleton logs are used for the clean22 combined report to avoid duplicate `rename05` rows.
 
+- `rv-mmap20-munlock02-targeted-20260602T054424Z.log` and `la-mmap20-munlock02-targeted-20260602T054508Z.log` provide the current `mmap20`/`munlock02` proof. The incremental parser report `mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt` has 2 candidates and 0 blocked rows. The earlier mixed `rv-mmap-munlock-errno-targeted-20260602T053636Z.log` and debug-only `rv-mmap08-debug-*` logs are repair history only and are not counted.
+
 ## Blocked / incomplete rows outside the clean pool
 
-`readlinkat02` is RV-clean and LA-glibc-clean but LA musl still has `TFAIL`, so it is not eligible. The current root-cause audit treats it as a libc/test boundary: musl converts user `bufsize == 0` into a one-byte dummy syscall, and a kernel-side `bufsiz=1` special case would break valid Linux truncation semantics. `clone04` is RV glibc-clean but RV musl is killed by SIGSEGV/TBROK; the singleton log points to a musl `clone.c` wrapper boundary, so it stays outside the clean pool. `mmap05` remains blocked on LA musl+glibc `TFAIL` even though RV is clean. `nice05`, `shmat1`, `mlock02`, `mlock05`, `mlock201`, `mlock202`, `mlock203`, `mlockall02`, `mlockall03`, `munlock02`, `munlockall01`, `mprotect01`, `mprotect03`, `mmap08`, `mmap16`, `mmap18`, `mmap20`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `select02`, and `execve05` remain blocked or incomplete for the reasons in `validation.md` and the historical combined/scout reports. The pre-fix `fsync02` `TBROK` row is superseded by post-fix proof, but the old log remains documented as failed evidence.
+`readlinkat02` is RV-clean and LA-glibc-clean but LA musl still has `TFAIL`, so it is not eligible. The current root-cause audit treats it as a libc/test boundary: musl converts user `bufsize == 0` into a one-byte dummy syscall, and a kernel-side `bufsiz=1` special case would break valid Linux truncation semantics. `clone04` is RV glibc-clean but RV musl is killed by SIGSEGV/TBROK; the singleton log points to a musl `clone.c` wrapper boundary, so it stays outside the clean pool. `mmap05` remains blocked on LA musl+glibc `TFAIL` even though RV is clean. `nice05`, `shmat1`, `mlock02`, `mlock05`, `mlock201`, `mlock202`, `mlock203`, `mlockall02`, `mlockall03`, `munlockall01`, `mprotect01`, `mprotect03`, `mmap08`, `mmap16`, `mmap18`, `atof01`, `fptest01`, `fptest02`, `epoll_create02`, `diotest4`, `select02`, and `execve05` remain blocked or incomplete for the reasons in `validation.md` and the historical combined/scout reports. The pre-fix `fsync02` `TBROK` row is superseded by post-fix proof, but the old log remains documented as failed evidence.
 
 ## Closed arch-sweep mining result
 
@@ -67,7 +77,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 22.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 28.
 
 ## `openat03` non-candidate note
 
@@ -179,3 +189,16 @@ A generic stat/readlink path traversal repair grew the future pool without editi
 Newly evidenced four-way-clean cases: `stat03` and `stat03_64`. Current pool: 26/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 `readlink03` stays outside the pool: RV musl/glibc and LA glibc are clean, but LA musl still has parser-visible `TFAIL=1` on the zero-size-buffer case. This row is neither hidden nor blacklisted, and it is not counted as PASS.
+
+## mmap20/munlock02 clean2 update
+
+A generic mmap/munlock errno repair grew the future pool without editing the stable list:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-mmap20-munlock02-targeted-20260602T054424Z.summary.txt` — `mmap20` and `munlock02` are parser-clean for musl+glibc.
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-mmap20-munlock02-targeted-20260602T054508Z.summary.txt` — `mmap20` and `munlock02` are parser-clean for musl+glibc.
+- Incremental clean2 parser report: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt` — 2 promotion candidates, 0 blocked/incomplete rows.
+- Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean28-mmap20-munlock02-20260602T054508Z.md`.
+
+Newly evidenced four-way-clean cases: `mmap20` and `munlock02`. Current pool: 28/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+`mmap08` stays outside the pool: diagnostic-only runs show the tested fd is still a readable temporary file descriptor at mmap time, so the expected EBADF path is not yet proven by the generic fd validation. `mlock02` also stays outside the pool because real `RLIMIT_MEMLOCK`/capability semantics are still absent.

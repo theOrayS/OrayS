@@ -78,3 +78,9 @@ No blacklist change was made for the rename repair. The previous visible `rename
 No blacklist change was made for the stat/readlink repair. `stat03` and `stat03_64` are tracked only as future candidates after RV + LA x musl+glibc parser-clean proof. The initial RV panic/trap log is retained as repair history and is not counted. `readlink03` remains a visible non-promotable blocker because LA musl reports `TFAIL=1`; it is not hidden, blacklisted for credit, or counted as stable PASS.
 
 Removal condition for `readlink03`: provide a generic LA/musl-compatible zero-size-buffer behavior fix or classification that preserves valid direct `readlink/readlinkat` truncation semantics, then prove RV + LA x musl+glibc parser-clean summaries plus adjacent stat/readlink/open regression evidence.
+
+## mmap20/munlock02 clean2 blacklist update
+
+No blacklist change was made for the mmap/munlock repair. `mmap20` and `munlock02` are now tracked only as future clean candidates after RV + LA x musl+glibc parser-clean proof. The older RV G009 blocker note is partially superseded only for those two rows; the old failures remain repair history and are not hidden or counted.
+
+`mmap08` and `mlock02` remain visible non-promotable blockers. `mmap08` diagnostic-only logs show fd 3 is still a readable temporary file descriptor at mmap time, so the EBADF expectation is not yet closed by generic fd validation. `mlock02` requires real `RLIMIT_MEMLOCK`/capability semantics. Neither row is blacklisted for credit or counted as PASS.
