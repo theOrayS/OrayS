@@ -2,11 +2,12 @@ use core::sync::atomic::Ordering;
 
 use axerrno::LinuxError;
 use linux_raw_sys::general;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry};
 use super::linux_abi::{
     DEFAULT_GROUP_CONTENT, DEFAULT_PASSWD_CONTENT, ETC_GROUP_PATH, ETC_PASSWD_PATH,
@@ -18,7 +19,6 @@ use super::task_context::task_ext;
 use super::task_registry::{
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
 };
-use super::UserProcess;
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 
@@ -258,8 +258,7 @@ fn process_has_signal_waiter(process: &UserProcess) -> bool {
         .any(|entry| {
             task_ext(&entry.task)
                 .map(|ext| {
-                    ext.signal_wait.load(Ordering::Acquire)
-                        || ext.poll_wait.load(Ordering::Acquire)
+                    ext.signal_wait.load(Ordering::Acquire) || ext.poll_wait.load(Ordering::Acquire)
                 })
                 .unwrap_or(false)
         })

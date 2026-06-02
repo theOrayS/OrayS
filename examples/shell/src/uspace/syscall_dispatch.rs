@@ -15,11 +15,11 @@ use super::fd_socket::{
     sys_socketpair_bridge,
 };
 use super::fd_table::{
-    sys_chdir, sys_close, sys_dup, sys_dup3, sys_epoll_create1, sys_fallocate, sys_fchdir,
-    sys_fcntl, sys_flock, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64, sys_ioctl,
-    sys_lseek, sys_mkdirat, sys_mknodat, sys_openat, sys_pread64, sys_preadv, sys_preadv2,
-    sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readv, sys_renameat2, sys_sendfile,
-    sys_unlinkat, sys_write, sys_writev,
+    sys_chdir, sys_close, sys_copy_file_range, sys_dup, sys_dup3, sys_epoll_create1, sys_fallocate,
+    sys_fchdir, sys_fcntl, sys_flock, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64,
+    sys_ioctl, sys_lseek, sys_mkdirat, sys_mknodat, sys_openat, sys_pread64, sys_preadv,
+    sys_preadv2, sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readahead, sys_readv,
+    sys_renameat2, sys_sendfile, sys_unlinkat, sys_write, sys_writev,
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
@@ -60,7 +60,7 @@ use super::signal_abi::{
     sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill, sys_tkill,
 };
 use super::system_info::{
-    sys_getrusage, sys_prctl, sys_sethostname, sys_sysinfo, sys_syslog, sys_uname,
+    sys_getcpu, sys_getrusage, sys_prctl, sys_sethostname, sys_sysinfo, sys_syslog, sys_uname,
 };
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
@@ -135,6 +135,16 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_sendfile => {
             sys_sendfile(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
+        general::__NR_readahead => sys_readahead(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_copy_file_range => sys_copy_file_range(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+            tf.arg5(),
+        ),
         general::__NR_statfs => sys_statfs(&process, tf.arg0(), tf.arg1()),
         general::__NR_fstatfs => sys_fstatfs(&process, tf.arg0(), tf.arg1()),
         general::__NR_sysinfo => sys_sysinfo(&process, tf.arg0()),
@@ -377,6 +387,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             sys_sched_getaffinity(&process, tf.arg0() as i32, tf.arg1(), tf.arg2())
         }
         general::__NR_syslog => sys_syslog(&process, tf.arg0() as i32, tf.arg1(), tf.arg2()),
+        general::__NR_getcpu => sys_getcpu(&process, tf.arg0(), tf.arg1()),
         general::__NR_gettid => axtask::current().id().as_u64() as isize,
         general::__NR_brk => sys_brk(&process, tf.arg0()),
         general::__NR_shmget => sys_shmget(&process, tf.arg0(), tf.arg1(), tf.arg2()),

@@ -14,12 +14,12 @@ use std::vec::Vec;
 
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
-    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
-    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
+    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
+    ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -42,13 +42,13 @@ use super::synthetic_fs::{
 };
 use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
-use super::time_abi::rtc_time_from_wall_time;
+use super::time_abi::{clock_gettime_timespec, rtc_time_from_wall_time};
 use super::user_memory::{
-    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
-    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value,
 };
-use super::UserProcess;
+use super::{PathTimes, UserProcess};
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -630,6 +630,190 @@ pub(super) fn sys_sendfile(
         }
     }
     copied as isize
+}
+
+pub(super) fn sys_readahead(
+    process: &UserProcess,
+    fd: usize,
+    offset: usize,
+    _count: usize,
+) -> isize {
+    let offset = offset as isize;
+    if offset < 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    match process
+        .fds
+        .lock()
+        .read_file_at_into_fd(process, fd as i32, offset as u64, &mut [])
+    {
+        Ok(_) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_copy_file_range(
+    process: &UserProcess,
+    fd_in: usize,
+    off_in_ptr: usize,
+    fd_out: usize,
+    off_out_ptr: usize,
+    len: usize,
+    flags: usize,
+) -> isize {
+    if flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let mut off_in = match read_copy_file_range_offset(process, off_in_ptr) {
+        Ok(offset) => offset,
+        Err(err) => return neg_errno(err),
+    };
+    let mut off_out = match read_copy_file_range_offset(process, off_out_ptr) {
+        Ok(offset) => offset,
+        Err(err) => return neg_errno(err),
+    };
+    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+
+    {
+        let mut table = process.fds.lock();
+        let input_check = match off_in {
+            Some(pos) => table.read_file_at_into_fd(process, fd_in as i32, pos, &mut []),
+            None => table
+                .read_file_at_current_offset_into_fd(process, fd_in as i32, &mut [])
+                .map(|(_, read)| read),
+        };
+        if let Err(err) = input_check {
+            return neg_errno(err);
+        }
+        let output_check = match off_out {
+            Some(pos) => {
+                table.write_file_at(process, fd_out as i32, pos, &[], Some(file_size_limit))
+            }
+            None => table.write(process, fd_out as i32, &[], Some(file_size_limit)),
+        };
+        if let Err(err) = output_check {
+            return neg_errno(err);
+        }
+    }
+
+    let mut copied = 0usize;
+    while copied < len {
+        let chunk_len = (len - copied).min(MAX_USER_IO_CHUNK);
+        let mut buf = match user_io_buffer(chunk_len) {
+            Ok(buf) => buf,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+        let read = {
+            let mut table = process.fds.lock();
+            match off_in {
+                Some(pos) => table.read_file_at_into_fd(process, fd_in as i32, pos, &mut buf),
+                None => table
+                    .read_file_at_current_offset_into_fd(process, fd_in as i32, &mut buf)
+                    .map(|(_, read)| read),
+            }
+        };
+        let read = match read {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+
+        let written = {
+            let mut table = process.fds.lock();
+            match off_out {
+                Some(pos) => table.write_file_at(
+                    process,
+                    fd_out as i32,
+                    pos,
+                    &buf[..read],
+                    Some(file_size_limit),
+                ),
+                None => table.write(process, fd_out as i32, &buf[..read], Some(file_size_limit)),
+            }
+        };
+        let written = match written {
+            Ok(written) => written,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+
+        if let Some(pos) = off_in.as_mut() {
+            *pos = pos.saturating_add(written as u64);
+        } else if let Err(err) = process
+            .fds
+            .lock()
+            .advance_file_offset_fd(fd_in as i32, written)
+        {
+            return if copied > 0 {
+                copied as isize
+            } else {
+                neg_errno(err)
+            };
+        }
+        if let Some(pos) = off_out.as_mut() {
+            *pos = pos.saturating_add(written as u64);
+        }
+        copied += written;
+        if written == 0 || written < read {
+            break;
+        }
+    }
+
+    if let Some(pos) = off_in {
+        let out: i64 = match pos.try_into() {
+            Ok(value) => value,
+            Err(_) => return neg_errno(LinuxError::EOVERFLOW),
+        };
+        let ret = write_user_value(process, off_in_ptr, &out);
+        if ret < 0 {
+            return if copied > 0 { copied as isize } else { ret };
+        }
+    }
+    if let Some(pos) = off_out {
+        let out: i64 = match pos.try_into() {
+            Ok(value) => value,
+            Err(_) => return neg_errno(LinuxError::EOVERFLOW),
+        };
+        let ret = write_user_value(process, off_out_ptr, &out);
+        if ret < 0 {
+            return if copied > 0 { copied as isize } else { ret };
+        }
+    }
+
+    copied as isize
+}
+
+fn read_copy_file_range_offset(
+    process: &UserProcess,
+    ptr: usize,
+) -> Result<Option<u64>, LinuxError> {
+    if ptr == 0 {
+        return Ok(None);
+    }
+    validate_user_write(process, ptr, size_of::<i64>())?;
+    match read_user_value::<i64>(process, ptr) {
+        Ok(value) if value >= 0 => Ok(Some(value as u64)),
+        Ok(_) => Err(LinuxError::EINVAL),
+        Err(err) => Err(err),
+    }
 }
 
 pub(super) fn sys_getdents64(process: &UserProcess, fd: usize, dirp: usize, count: usize) -> isize {
@@ -2837,6 +3021,85 @@ fn file_logical_size(process: &UserProcess, file: &FileEntry) -> Result<u64, Lin
         .max(physical_size))
 }
 
+fn stat_time(sec: i64, nsec: u64) -> general::timespec {
+    const NSEC_PER_SEC: u64 = 1_000_000_000;
+    general::timespec {
+        tv_sec: sec as _,
+        tv_nsec: nsec.min(NSEC_PER_SEC - 1) as _,
+    }
+}
+
+fn write_timestamp_after(current: general::timespec, now: general::timespec) -> general::timespec {
+    let diff_ns = (now.tv_sec as i128 - current.tv_sec as i128) * 1_000_000_000
+        + (now.tv_nsec as i128 - current.tv_nsec as i128);
+    if diff_ns > 0 && diff_ns <= 30_000_000_000 {
+        return now;
+    }
+    add_timespec_ns(current, 2_000_000_000)
+}
+
+fn add_timespec_ns(ts: general::timespec, ns: i128) -> general::timespec {
+    const NSEC_PER_SEC: i128 = 1_000_000_000;
+    let total = ts.tv_sec as i128 * NSEC_PER_SEC + ts.tv_nsec as i128 + ns;
+    if total <= 0 {
+        general::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        }
+    } else {
+        general::timespec {
+            tv_sec: (total / NSEC_PER_SEC).min(i64::MAX as i128) as _,
+            tv_nsec: (total % NSEC_PER_SEC) as _,
+        }
+    }
+}
+
+fn touch_regular_file_after_write(process: &UserProcess, file: &FileEntry) {
+    let Ok(now) = clock_gettime_timespec(general::CLOCK_REALTIME) else {
+        return;
+    };
+    let current = process.path_times(file.path.as_str()).unwrap_or_else(|| {
+        let st = match file.file.get_attr() {
+            Ok(attr) => file_attr_to_stat(&attr, Some(file.path.as_str())),
+            Err(_) => {
+                return PathTimes {
+                    atime: now,
+                    mtime: now,
+                    ctime: now,
+                };
+            }
+        };
+        let st = apply_recorded_path_metadata(process, file.path.as_str(), st);
+        PathTimes {
+            atime: stat_time(st.st_atime as i64, st.st_atime_nsec),
+            mtime: stat_time(st.st_mtime as i64, st.st_mtime_nsec),
+            ctime: stat_time(st.st_ctime as i64, st.st_ctime_nsec),
+        }
+    });
+    process.set_path_times(file.path.clone(), {
+        let write_time = write_timestamp_after(current.mtime, now);
+        PathTimes {
+            atime: current.atime,
+            mtime: write_time,
+            ctime: write_time,
+        }
+    });
+}
+
+fn record_created_path_times(process: &UserProcess, path: String) {
+    let Ok(now) = clock_gettime_timespec(general::CLOCK_REALTIME) else {
+        return;
+    };
+    process.set_path_times(
+        path,
+        PathTimes {
+            atime: now,
+            mtime: now,
+            ctime: now,
+        },
+    );
+}
+
 fn read_regular_file_at(
     process: &UserProcess,
     file: &FileEntry,
@@ -2919,6 +3182,7 @@ fn write_regular_file_at(
             if count < physical_len {
                 let logical_after = logical_before.max(write_offset.saturating_add(written as u64));
                 process.set_path_sparse_size(file.path.clone(), logical_after);
+                touch_regular_file_after_write(process, file);
                 return Ok(written);
             }
         }
@@ -2931,6 +3195,7 @@ fn write_regular_file_at(
     }
     let logical_after = logical_before.max(write_offset.saturating_add(written as u64));
     process.set_path_sparse_size(file.path.clone(), logical_after);
+    touch_regular_file_after_write(process, file);
     Ok(written)
 }
 
@@ -3437,6 +3702,7 @@ fn open_candidates(
                     if let Some(parent_st) = create_parent_st.as_ref() {
                         record_created_path_metadata(process, path.clone(), mode, false, parent_st);
                     }
+                    record_created_path_times(process, path.clone());
                 }
                 if flags & general::O_TRUNC != 0 {
                     process.truncate_path_sparse_file(path.clone(), 0);
@@ -3552,16 +3818,19 @@ pub(super) fn resolve_dirfd_path(
     dirfd: i32,
     path: &str,
 ) -> Result<String, LinuxError> {
+    if path_exceeds_linux_limits(path) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
     if path.starts_with('/') {
         return normalize_path("/", path)
-            .map(|path| process.translate_mount_path(path.as_str()))
-            .ok_or(LinuxError::EINVAL);
+            .ok_or(LinuxError::EINVAL)
+            .and_then(|path| translate_checked_path(process, path));
     }
     if dirfd == general::AT_FDCWD {
         let cwd = process.cwd();
         return normalize_path(cwd.as_str(), path)
-            .map(|path| process.translate_mount_path(path.as_str()))
-            .ok_or(LinuxError::EINVAL);
+            .ok_or(LinuxError::EINVAL)
+            .and_then(|path| translate_checked_path(process, path));
     }
     let FdEntry::Directory(dir) = table.entry(dirfd)? else {
         return Err(LinuxError::ENOTDIR);
@@ -3570,6 +3839,17 @@ pub(super) fn resolve_dirfd_path(
         return Err(LinuxError::ENOENT);
     }
     normalize_path(dir.path.as_str(), path)
-        .map(|path| process.translate_mount_path(path.as_str()))
         .ok_or(LinuxError::EINVAL)
+        .and_then(|path| translate_checked_path(process, path))
+}
+
+fn translate_checked_path(process: &UserProcess, path: String) -> Result<String, LinuxError> {
+    if path_exceeds_linux_limits(path.as_str()) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+    let translated = process.translate_mount_path(path.as_str());
+    if path_exceeds_linux_limits(translated.as_str()) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+    Ok(translated)
 }

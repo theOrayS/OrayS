@@ -307,6 +307,20 @@ const LTP_STABLE_CASES: &[&str] = &[
     "stat03_64", "statfs01", "statvfs01", "utime01",
     "utime02", "utime03", "utime04", "utime05",
     "utime06", "utime07",
+    // stable706 milestone: RV/LA x musl/glibc parser-clean promotion cases.
+    "clock_adjtime01", "clock_adjtime02", "clock_getres01", "copy_file_range01",
+    "copy_file_range03", "creat06", "fcntl14_64", "fcntl15_64",
+    "fcntl30_64", "fgetxattr01", "fgetxattr03", "flistxattr01",
+    "flistxattr02", "flistxattr03", "fremovexattr01", "fremovexattr02",
+    "fsetxattr01", "fsync01", "futex_wake03", "getcpu01",
+    "getpeername01", "getsockname01", "getsockopt01", "lchown01",
+    "lchown02", "lgetxattr01", "lgetxattr02", "listxattr02",
+    "listxattr03", "llistxattr01", "llistxattr02", "llistxattr03",
+    "llseek01", "lremovexattr01", "munmap02", "pause03",
+    "removexattr01", "removexattr02", "rename06", "rename07",
+    "rename08", "rename10", "set_robust_list01", "setsockopt01",
+    "setxattr01", "sigaltstack01", "socketpair01", "statfs01_64",
+    "syslog11", "syslog12",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[

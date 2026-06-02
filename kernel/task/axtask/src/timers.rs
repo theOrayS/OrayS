@@ -5,10 +5,10 @@ use lazyinit::LazyInit;
 use timer_list::{TimerEvent, TimerList};
 
 use axhal::time::{
-    epochoffset_nanos, monotonic_time_nanos, set_oneshot_timer, wall_time, TimeValue, NANOS_PER_SEC,
+    NANOS_PER_SEC, TimeValue, epochoffset_nanos, monotonic_time_nanos, set_oneshot_timer, wall_time,
 };
 
-use crate::{select_run_queue, AxTaskRef};
+use crate::{AxTaskRef, select_run_queue};
 
 static TIMER_TICKET_ID: AtomicU64 = AtomicU64::new(1);
 const MIN_ONESHOT_DELAY_NANOS: u64 = 1_000_000;

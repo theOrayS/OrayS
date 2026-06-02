@@ -131,8 +131,10 @@ pub(super) const DEFAULT_SOCKET_BUFFER_SIZE: i32 = 64 * 1024;
 pub(super) const INTERRUPTIBLE_SOCKET_RECV_QUANTUM: core::time::Duration =
     core::time::Duration::from_millis(20);
 // Linux UAPI socket errno values used by both RV64 and LA64 targets here.
+pub(super) const LINUX_ENOPROTOOPT: u32 = 92;
 pub(super) const LINUX_EPROTONOSUPPORT: u32 = 93;
 pub(super) const LINUX_ESOCKTNOSUPPORT: u32 = 94;
+pub(super) const LINUX_EOPNOTSUPP: u32 = 95;
 pub(super) const LINUX_EAFNOSUPPORT: u32 = 97;
 
 pub(super) const LINUX_PERSONALITY_QUERY: usize = 0xffff_ffff;
