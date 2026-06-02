@@ -400,3 +400,29 @@ Current blocker evidence:
 - Promotion report: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.promotion-candidates.txt` — 0 candidates / 5 blocked.
 
 Future generic device/free-block-device support must first make this RV setup parser-clean. Then rerun LA confirmation plus adjacent mknod/mknodat/rename and device/mount setup regressions before any stable promotion accounting.
+
+## Completed regression for global LTP device exposure and filesystem NAME_MAX reporting
+
+Changed surfaces: `examples/shell/src/cmd.rs` LTP environment setup, `examples/shell/src/uspace/fd_table.rs` `/dev` enumeration/name limit and synthetic block-device stat routing, `examples/shell/src/uspace/metadata.rs` synthetic block rdev/stat metadata, and `examples/shell/src/uspace/linux_abi.rs` `statfs` name length.
+
+Targeted proof:
+
+- RV 9-case retest: `target/ltp-1000-milestone-03-stable656/rv-device-cases-ltpdev-namemax-retest-20260602T041654Z.summary.txt`
+- LA clean5 confirmation: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`
+
+Result: `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` are four-way parser-clean and join the not-yet-promoted candidate pool. The older enumeration-only run remains setup-blocker history, and the pre-NAME_MAX run remains panic/trap repair history.
+
+Adjacent stable regression subset:
+
+- `chdir01`
+- `pathconf01`
+- `fpathconf01`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-namemax-regression-subset-20260602T041926Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-ltpdev-namemax-regression-subset-20260602T042012Z.summary.txt`
+- Result: 6/6 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Remaining regression boundary: `mknod07` and `mknodat02` are not regression-clean promotion rows because `mkfs.ext2` is absent and parser-visible `TCONF` remains; `rename03` and `rename04` are real semantic `TFAIL` blockers. Future fixes must rerun the same device/statfs/mknod/rename set plus this regression subset on RV and LA.

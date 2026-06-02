@@ -6,14 +6,19 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 Clean combined parser report:
 
-- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`
+- `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Promotion candidates: 14
-- Blocked/incomplete cases in this clean proof set: 16 (`mmap05` plus the current RV G009 mlock/mmap/mprotect blocker rows)
+- Promotion candidates: 19
+- Blocked/incomplete cases in this clean proof set: 20 (`mmap05`, `mknod07`, `mknodat02`, `rename03`, `rename04`, and the current RV G009 mlock/mmap/mprotect blocker rows)
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
+| `fstatfs01` | after generic `LTP_DEV=/dev/vda` exposure plus synthetic block-device stat/getdents and true `NAME_MAX=63` reporting, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `fstatfs01_64` | same generic device/NAME_MAX repair as `fstatfs01`; RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `statfs01` | same generic device/NAME_MAX repair as `fstatfs01`; RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `statvfs01` | after `statvfs().f_namemax` now reports the real 63-byte backing dirent capacity, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
+| `rename05` | after generic `LTP_DEV=/dev/vda` setup reaches the actual same-filesystem rename assertion path, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `fsync02` | after the generic `statfs`/`fstatvfs` capacity clamp, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `futex_wait01` | RV isolated rerun plus LA confirmation are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `futex_wait03` | after synthetic `/proc/<pid>/stat` reports futex waiters as sleeping, RV and LA targeted gates are parser-clean for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
@@ -57,7 +62,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 14.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 19.
 
 ## `openat03` non-candidate note
 
@@ -78,7 +83,7 @@ A follow-up RV scout plus LA confirmation grew the clean pool without editing th
 - LA confirmation summary: `target/ltp-1000-milestone-03-stable656/la-g009-mincore-mprotect-clean4-confirm-20260602T034707Z.summary.txt` — 8 wrapper PASS / 0 wrapper FAIL, zero internal markers, timeout, ENOSYS, panic/trap.
 - Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`.
 
-Newly evidenced four-way-clean cases: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04`. Current pool: 14/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+Newly evidenced four-way-clean cases: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04`. Pool at that checkpoint: 14/50 before the later clean5 update. Stable list remains `606 total / 606 unique / 0 duplicate`.
 
 ## `statfs01` family non-candidate note
 
@@ -88,7 +93,7 @@ The 2026-06-02 RV scout for `statfs01`, `fstatfs01`, `fstatfs01_64`, and `statvf
 - Promotion report: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.promotion-candidates.txt`
 - Result: 0 wrapper PASS / 8 wrapper FAIL, `TBROK=8`, no timeout/ENOSYS/panic/trap.
 
-The raw log shows LTP setup failing to acquire a free device for all four cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and do not affect the 14-case candidate pool.
+The raw log shows LTP setup failing to acquire a free device for all four cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and did not affect the 14-case candidate pool at that checkpoint; the later clean5 update below supersedes the setup-blocker classification for `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` only.
 
 ## VFS-C mknod/rename non-candidate note
 
@@ -98,4 +103,18 @@ The 2026-06-02 RV scout for `mknod07`, `mknodat02`, `rename03`, `rename04`, and 
 - Promotion report: `target/ltp-1000-milestone-03-stable656/rv-vfs-c-mknod-rename-scout-20260602T040413Z.promotion-candidates.txt`
 - Result: 0 wrapper PASS / 10 wrapper FAIL, `TBROK=14`, no timeout/ENOSYS/panic/trap.
 
-The raw log shows LTP setup failing to acquire a free device for all five cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and do not affect the 14-case candidate pool.
+The raw log shows LTP setup failing to acquire a free device for all five cases. Because RV is parser-unclean and LA was not run, these rows are blocker evidence only and did not affect the 14-case candidate pool at that checkpoint; the later clean5 update below supersedes the setup-blocker classification for `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` only.
+
+## LTP device/NAME_MAX clean5 update
+
+A generic device setup follow-up grew the clean pool without editing the stable list:
+
+- RV enumeration-only retest summary: `target/ltp-1000-milestone-03-stable656/rv-device-enumeration-retest-20260602T041227Z.summary.txt` — still 0 PASS / 18 FAIL, `TBROK=22`; `/dev` enumeration alone was insufficient.
+- RV `LTP_DEV=/dev/vda` pre-NAME_MAX retest summary: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-vda-device-retest-20260602T041431Z.summary.txt` — 3 PASS before `statvfs01` hit a parser-visible panic/trap; this is repair history only.
+- RV final device/NAME_MAX retest summary: `target/ltp-1000-milestone-03-stable656/rv-device-cases-ltpdev-namemax-retest-20260602T041654Z.summary.txt` — `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05` are parser-clean for musl+glibc; `mknod07`, `mknodat02`, `rename03`, and `rename04` retain visible blockers.
+- LA clean5 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.summary.txt` — the five RV-clean rows are parser-clean for musl+glibc.
+- Combined clean19 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`.
+
+Newly evidenced four-way-clean cases: `fstatfs01`, `fstatfs01_64`, `rename05`, `statfs01`, and `statvfs01`. Current pool: 19/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+
+Blocked rows from the same proof set stay outside the pool: `mknod07` and `mknodat02` are parser-visible `TCONF` because `mkfs.ext2` is missing in the guest; `rename03` and `rename04` are parser-visible `TFAIL` rename-semantic blockers. None is blacklisted or counted as PASS.

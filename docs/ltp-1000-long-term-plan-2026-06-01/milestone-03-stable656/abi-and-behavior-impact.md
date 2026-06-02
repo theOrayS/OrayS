@@ -141,7 +141,7 @@ Maintenance boundary: this is a minimal residency/prefault implementation, not f
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 14/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
+- Candidate pool after this checkpoint: 19/50 for stable656 (`fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
 
 ## Behavior gaps exposed but not fixed
 
@@ -193,3 +193,24 @@ No source change is retained for the `mknod07,mknodat02,rename03,rename04,rename
 Visible ABI/POSIX impact from this documentation update: none. Syscall numbers, errno behavior, `mknod`/`mknodat` mode/dev semantics, `rename` path semantics, FD behavior, block-device behavior, signal/futex/mmap/user-pointer layout, and resource lifetime are unchanged by this checkpoint.
 
 Future work must implement or expose a generic device-acquisition model if these tests are to reach their VFS assertions. It must not hardcode LTP case names, paths, device names, or outputs, and it must rerun adjacent mknod/mknodat/rename plus mount/device setup regressions before promotion.
+
+## LTP device and filesystem NAME_MAX impact
+
+Files: `examples/shell/src/cmd.rs`, `examples/shell/src/uspace/fd_table.rs`, `examples/shell/src/uspace/metadata.rs`, `examples/shell/src/uspace/linux_abi.rs`.
+
+The LTP wrapper now provides a generic `LTP_DEV=/dev/vda` for LTP tests. This exposes the evaluator's existing synthetic block-backed test device to LTP setup instead of relying on an unimplemented Linux loop-device stack. The special `chdir01` filesystem override remains `tmpfs`, but the device variable is no longer case-local.
+
+The synthetic `/dev` directory now reports `vda`, `sda`, and `xvda` as block-device directory entries, and stat/statx-style metadata for those paths reports `S_IFBLK` with stable synthetic `st_rdev` values (`/dev/vda` as major 254 minor 0; `/dev/sda` as major 8 minor 0; `/dev/xvda` as major 202 minor 0). Opening `/dev/vda` still uses the existing synthetic block-device path; no host loop device, ext2 formatter, or hidden LTP case-name mapping is introduced.
+
+`statfs`/`statvfs` and pathname component validation now report/enforce the real backing name capacity of `axfs_vfs::VfsDirEntry`: 63 bytes. This is POSIX-visible through `f_namelen` / `_PC_NAME_MAX`-adjacent behavior and prevents valid-looking 255-byte component names from reaching a 63-byte dirent buffer and panicking. The change intentionally reduces the exposed limit to match the current filesystem implementation rather than overstating Linux's common 255-byte value.
+
+User-visible impact:
+
+- A generic LTP environment variable now points device-using tests at `/dev/vda`.
+- `/dev` enumeration and block-device metadata are more consistent with existing synthetic block-device opens.
+- `statfs().f_namelen` / `statvfs().f_namemax` now reports 63 on this filesystem; overlength components beyond 63 are rejected before VFS dirent construction.
+- Syscall numbers, struct layouts, FD allocation, signal/futex/mmap/user-pointer layouts, and ordinary non-device path behavior are otherwise unchanged.
+
+Regression evidence: `chdir01`, `pathconf01`, and `fpathconf01` are parser-clean on RV and LA for musl+glibc after the change (`rv-ltpdev-namemax-regression-subset-20260602T041926Z.summary.txt`, `la-ltpdev-namemax-regression-subset-20260602T042012Z.summary.txt`).
+
+Maintenance boundary: this is not full Linux loop-device or disk formatting support. `mknod07` and `mknodat02` still need a generic way to satisfy their ext2 setup (`mkfs.ext2` is absent); `rename03` and `rename04` now expose real rename semantic failures. Future device work must remain generic and rerun device/statfs/mknod/rename plus adjacent pathconf/chdir regressions before promotion.

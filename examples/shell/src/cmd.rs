@@ -1563,13 +1563,16 @@ fn ltp_case_env(case: &str, suite_dir: &str, helper_dir: &str, target_dir: &str)
         format!("LTPROOT={}/ltp", suite_dir.trim_end_matches('/')),
         "TMPDIR=/tmp/ltp-work".into(),
         format!("{LTP_CASE_TIMEOUT_ENV}={}", ltp_case_timeout_secs()),
+        // The evaluator exposes one synthetic block-backed test device.  Make
+        // it visible to LTP's generic device-acquire helper so tests do not
+        // depend on a Linux loop-device stack that this kernel does not model.
+        "LTP_DEV=/dev/vda".into(),
     ];
     if case == "chdir01" {
         // chdir01 needs an LTP test device only to mount a scratch filesystem.
         // The evaluator has no loop-device stack, so run the real test body on
         // tmpfs with a synthetic block device that satisfies the LTP framework's
         // size probe instead of allocating a 300 MiB loop image.
-        env.push("LTP_DEV=/dev/vda".into());
         env.push("LTP_FORCE_SINGLE_FS_TYPE=tmpfs".into());
         env.push("LTP_DEV_FS_TYPE=tmpfs".into());
     }

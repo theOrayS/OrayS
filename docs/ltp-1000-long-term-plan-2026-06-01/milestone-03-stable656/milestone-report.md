@@ -216,7 +216,7 @@ Combined pool after this repair:
 - `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
 - Candidates: 9 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`)
 - Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
-- Stable list remained unchanged at `606/606/0`; at that point in the evidence timeline the pool was 9/50. After the later `mincore03` proof it reached 10/50, and after the G009 clean4 checkpoint below the current pool is 14/50, still below the +50 stable656 gate.
+- Stable list remained unchanged at `606/606/0`; at that point in the evidence timeline the pool was 9/50. After the later `mincore03` proof it reached 10/50, and after the G009 clean4 checkpoint below the pool was 14/50 before the later LTP device/NAME_MAX clean5 update, still below the +50 stable656 gate.
 
 ### Combined candidate pool
 
@@ -326,7 +326,7 @@ Regression result: `mincore01`, `mlock01`, `mlock03`, `mlock04`, `munlock01`, `m
 Combined pool after this repair:
 
 - Candidates: 10 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`)
-- Stable list remains unchanged at `606/606/0`; after this mincore repair the pool was 10/50, and after the later G009 clean4 checkpoint the current pool is 14/50, still below the +50 stable656 gate.
+- Stable list remains unchanged at `606/606/0`; after this mincore repair the pool was 10/50, and after the later G009 clean4 checkpoint the pool was 14/50 before the LTP device/NAME_MAX clean5 update raised it to 19/50, still below the +50 stable656 gate.
 - No `LTP_STABLE_CASES` edit or stable656 milestone promotion commit is made at this checkpoint.
 
 ## `epoll_create02` singleton blocker checkpoint
@@ -337,7 +337,7 @@ Artifacts:
 - LA summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt`
 - RV/LA derived checksums: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.derived.sha256`, `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.derived.sha256`
 
-Result: `epoll_create02` is not a stable656 candidate. RV musl still FAILs with `TFAIL=2` and `ENOSYS=2`; RV glibc and both LA libcs wrapper-PASS but include parser-visible old-ABI `TCONF`. At that checkpoint the candidate pool remained 10/50; after the G009 clean4 checkpoint below the current pool is 14/50. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Result: `epoll_create02` is not a stable656 candidate. RV musl still FAILs with `TFAIL=2` and `ENOSYS=2`; RV glibc and both LA libcs wrapper-PASS but include parser-visible old-ABI `TCONF`. At that checkpoint the candidate pool remained 10/50; after the G009 clean4 checkpoint below the pool was 14/50 before the later LTP device/NAME_MAX clean5 update. `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
 
 
 ## G009 mm/mlock/mmap clean4 checkpoint
@@ -352,7 +352,7 @@ Result: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` are now four-wa
 
 Current conclusion after this checkpoint:
 
-- Candidate pool: 14/50 (`fsync02, futex_wait01, futex_wait03, futex_wait05, mincore02, mincore03, mincore04, mmap13, mprotect02, mprotect04, munmap01, openat02, sched_setaffinity01, signal01`).
+- Candidate pool at that checkpoint: 14/50 (`fsync02, futex_wait01, futex_wait03, futex_wait05, mincore02, mincore03, mincore04, mmap13, mprotect02, mprotect04, munmap01, openat02, sched_setaffinity01, signal01`), later superseded by the LTP device/NAME_MAX clean5 checkpoint below.
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 36 cases short.
 
@@ -368,7 +368,7 @@ Artifacts:
 
 Result: this RV-only scout produced 0 wrapper PASS / 8 wrapper FAIL across musl+glibc. The parser reports `TBROK=8`, with zero timeout, ENOSYS, panic, or trap. The raw log shows each row failing in LTP setup with `tst_device.c:147 TINFO: No free devices found` followed by `tst_device.c:354 TBROK: Failed to acquire device`.
 
-Decision: these rows are blocker evidence only. They are not statfs ABI proof and not stable656 candidates because RV is not parser-clean and LA was not run. Current candidate pool remains 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: these rows are blocker evidence only. They are not statfs ABI proof and not stable656 candidates because RV is not parser-clean and LA was not run. Candidate pool remained 14/50 at that checkpoint; `LTP_STABLE_CASES` remained `606 total / 606 unique / 0 duplicate`.
 
 ## VFS-C `mknod07,mknodat02,rename03,rename04,rename05` RV device-acquire blocker checkpoint
 
@@ -382,4 +382,31 @@ Artifacts:
 
 Result: this RV-only VFS-C scout produced 0 wrapper PASS / 10 wrapper FAIL across musl+glibc. The parser reports `TBROK=14`, with zero timeout, ENOSYS, panic, or trap. The raw log shows all rows failing in LTP setup with `No free devices found` / `Failed to acquire device` from `tst_device.c`.
 
-Decision: these rows are blocker evidence only. They are not mknod/rename ABI proof and not stable656 candidates because RV is parser-unclean and LA was not run. Current candidate pool remains 14/50; `LTP_STABLE_CASES` remains `606 total / 606 unique / 0 duplicate`.
+Decision: these rows are blocker evidence only. They are not mknod/rename ABI proof and not stable656 candidates because RV is parser-unclean and LA was not run. Candidate pool remained 14/50 at that checkpoint; `LTP_STABLE_CASES` remained `606 total / 606 unique / 0 duplicate`.
+
+## LTP device/NAME_MAX clean5 checkpoint
+
+A generic device-acquisition repair converted five previously blocked VFS/statfs rows into future promotion candidates without changing `LTP_STABLE_CASES`.
+
+Code changes retained in this checkpoint:
+
+1. `examples/shell/src/cmd.rs` now sets a generic `LTP_DEV=/dev/vda` for LTP runs, using the evaluator's existing synthetic block-backed test device instead of relying on an unimplemented Linux loop-device stack.
+2. `examples/shell/src/uspace/fd_table.rs` lists synthetic block devices under `/dev`, routes synthetic block-device stat lookups through shared metadata, and reports/enforces the real 63-byte filename component capacity used by `axfs_vfs::VfsDirEntry`.
+3. `examples/shell/src/uspace/metadata.rs` assigns stable synthetic `st_rdev` values for `/dev/vda`, `/dev/sda`, and `/dev/xvda`.
+4. `examples/shell/src/uspace/linux_abi.rs` reports `statfs` name length as 63 instead of 255, matching the backing dirent capacity and preventing the pre-fix `statvfs01` panic.
+
+Evidence:
+
+- Enumeration-only RV retest: `target/ltp-1000-milestone-03-stable656/rv-device-enumeration-retest-20260602T041227Z.summary.txt` — still 0 PASS / 18 FAIL, `TBROK=22`.
+- Pre-NAME_MAX RV retest: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-vda-device-retest-20260602T041431Z.summary.txt` — 3 PASS before `statvfs01` panic/trap; not countable.
+- Final RV retest: `target/ltp-1000-milestone-03-stable656/rv-device-cases-ltpdev-namemax-retest-20260602T041654Z.summary.txt` — 10 PASS / 8 FAIL, no timeout/ENOSYS/panic/trap; clean cases are `statfs01`, `fstatfs01`, `fstatfs01_64`, `statvfs01`, and `rename05`.
+- LA clean5 confirmation: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.summary.txt` — 10 PASS / 0 FAIL, zero internal markers, timeout, ENOSYS, panic/trap.
+- Regression subset: `target/ltp-1000-milestone-03-stable656/rv-ltpdev-namemax-regression-subset-20260602T041926Z.summary.txt` and `target/ltp-1000-milestone-03-stable656/la-ltpdev-namemax-regression-subset-20260602T042012Z.summary.txt` — `chdir01`, `pathconf01`, and `fpathconf01` are parser-clean on both arches and libcs.
+- Combined clean19 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`.
+
+Current conclusion:
+
+- Candidate pool: 19/50 (`fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 31 cases short.
+- Remaining blockers from this lane: `mknod07`/`mknodat02` need generic ext2/device setup (`mkfs.ext2` absent); `rename03`/`rename04` need generic rename semantics repair.

@@ -1,15 +1,15 @@
 # Milestone 03 stable656 no-promotion reason
 
-This checkpoint found fourteen four-way-clean future candidates, but no stable promotion is performed yet.
+This checkpoint found nineteen four-way-clean future candidates, but no stable promotion is performed yet.
 
 ## Why no stable list update happened
 
 - Live stable baseline: `606 total / 606 unique / 0 duplicate`.
 - Next milestone target: `656 unique`.
-- Current four-way-clean new candidate pool: 14 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
+- Current four-way-clean new candidate pool: 19 (`fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01`).
 - Required promotion batch size for this milestone: 50 unique cases with RV + LA x musl + glibc wrapper PASS and parser-clean summaries.
 
-Because the 14-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
+Because the 19-case candidate pool is below the +50 milestone boundary, `LTP_STABLE_CASES` remains unchanged.
 
 ## Blocking evidence kept visible
 
@@ -37,7 +37,7 @@ The following blockers prevent counting additional rows:
 
 - Do not edit `LTP_STABLE_CASES`.
 - Do not count blacklist/SKIP/status0/timeout/TCONF/TBROK/TFAIL rows as PASS.
-- Keep `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `sched_setaffinity01`, and `signal01` in `promotion-candidates.md` for the next accumulation batch.
+- Keep `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename05`, `sched_setaffinity01`, `signal01`, `statfs01`, `statvfs01` in `promotion-candidates.md` for the next accumulation batch.
 
 ## `epoll_create02` blocker update
 
@@ -46,7 +46,7 @@ The 2026-06-02 singleton rescout confirms `epoll_create02` remains non-promotabl
 - RV: `target/ltp-1000-milestone-03-stable656/rv-epoll-create02-singleton-20260602T033549Z.summary.txt` reports RV musl wrapper FAIL 33 with `TFAIL=2` and `ENOSYS=2`; RV glibc wrapper PASSes but still has `TCONF=1`.
 - LA: `target/ltp-1000-milestone-03-stable656/la-epoll-create02-singleton-20260602T033549Z.summary.txt` has wrapper PASS for both libcs but `TCONF=2` remains.
 
-Because the promotion gate requires wrapper PASS **and** parser-clean summaries on RV + LA x musl + glibc, this row is excluded from the candidate pool; after the later G009 clean4 update the current pool is 14/50.
+Because the promotion gate requires wrapper PASS **and** parser-clean summaries on RV + LA x musl + glibc, this row is excluded from the candidate pool; after the later G009 clean4 update the pool was 14/50 before the LTP device/NAME_MAX clean5 update below.
 
 
 ## G009 clean4 no-promotion update
@@ -67,7 +67,7 @@ The RV scout for `statfs01`, `fstatfs01`, `fstatfs01_64`, and `statvfs01` did no
 - Parser result: 0 PASS / 8 FAIL, with `TBROK=8` and zero timeout/ENOSYS/panic/trap.
 - Raw-log diagnosis: LTP setup reports `No free devices found` / `Failed to acquire device`.
 
-These four rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remains unchanged and the pool remains 14/50.
+These four rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remained unchanged and the pool remained 14/50 at that checkpoint; the later clean5 update below supersedes this setup-blocker classification for the five now-clean rows.
 
 ## VFS-C mknod/rename no-promotion update
 
@@ -77,4 +77,16 @@ The RV scout for `mknod07`, `mknodat02`, `rename03`, `rename04`, and `rename05` 
 - Parser result: 0 PASS / 10 FAIL, with `TBROK=14` and zero timeout/ENOSYS/panic/trap.
 - Raw-log diagnosis: LTP setup reports `No free devices found` / `Failed to acquire device`.
 
-These five rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remains unchanged and the pool remains 14/50.
+These five rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remained unchanged and the pool remained 14/50 at that checkpoint; the later clean5 update below supersedes this setup-blocker classification for the five now-clean rows.
+
+## LTP device/NAME_MAX clean5 no-promotion update
+
+The generic `LTP_DEV=/dev/vda` plus synthetic block-device exposure and true `NAME_MAX=63` repair moved five rows from setup-blocker history into the clean candidate pool:
+
+- RV final retest summary: `target/ltp-1000-milestone-03-stable656/rv-device-cases-ltpdev-namemax-retest-20260602T041654Z.summary.txt`
+- LA clean5 summary: `target/ltp-1000-milestone-03-stable656/la-device-clean5-ltpdev-namemax-retest-20260602T041803Z.summary.txt`
+- Combined clean19 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean19-ltpdev-namemax-20260602T041803Z.promotion-candidates.txt`
+
+The newly clean cases are `fstatfs01`, `fstatfs01_64`, `rename05`, `statfs01`, and `statvfs01`, increasing the pool from 14/50 to 19/50. This still does not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
+
+The same evidence keeps remaining rows visible and non-promotable: `mknod07` and `mknodat02` need guest `mkfs.ext2` support or another generic ext2 setup path; `rename03` and `rename04` now reach real assertions but still report parser-visible `TFAIL`. No blacklist/SKIP/status0/TCONF/TBROK/TFAIL row is counted.
