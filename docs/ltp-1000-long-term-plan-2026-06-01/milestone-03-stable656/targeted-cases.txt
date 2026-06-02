@@ -668,3 +668,58 @@ munlock02
 ## Promotion result after mmap20/munlock02 repair
 # 0 promoted in this checkpoint.
 # Reason: 28 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+
+## epoll_create1 targeted proof
+epoll_create1_01
+epoll_create1_02
+# RV and LA x musl/glibc parser-clean after generic __NR_epoll_create1 support and FD_CLOEXEC/unknown-flag validation.
+
+## epoll_create1 adjacent FD/flag regression subset
+close01
+fcntl01
+fcntl05
+dup01
+pipe2_01
+poll01
+# RV and LA x musl/glibc parser-clean; used as regression evidence, not as extra candidate-count input.
+
+## epoll_create02 blocker evidence
+epoll_create02
+# Not promoted: musl epoll_create(size) reaches the kernel as valid epoll_create1(0), so invalid legacy size cannot be proven at the syscall boundary without breaking epoll_create1_01.
+
+## Four-way clean candidate pool after epoll_create1 repair (not yet promoted)
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after epoll_create1 repair
+# 0 promoted in this checkpoint.
+# Reason: 30 new four-way-clean unique candidates are available, below the +50 stable656 gate.

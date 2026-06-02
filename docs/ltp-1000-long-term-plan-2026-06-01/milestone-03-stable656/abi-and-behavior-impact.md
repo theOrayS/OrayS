@@ -294,3 +294,23 @@ Maintenance boundary: this is still not full Linux memory-lock accounting. `mloc
 Regression evidence: `mmap20` and `munlock02` are parser-clean on RV and LA for musl+glibc (`rv-mmap20-munlock02-targeted-20260602T054424Z.summary.txt`, `la-mmap20-munlock02-targeted-20260602T054508Z.summary.txt`). Adjacent regression subsets are parser-clean on both arches (`rv-mmap-munlock-regression-20260602T054554Z.summary.txt`, `la-mmap-munlock-regression-20260602T054705Z.summary.txt`).
 
 Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 28/50 (`fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mprotect02`, `mprotect04`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`, `mmap20`, `munlock02`).
+
+
+## epoll_create1 descriptor and legacy epoll_create size validation impact
+
+Changed files: `examples/shell/src/uspace/fd_table.rs`, `examples/shell/src/uspace/syscall_dispatch.rs`, `api/arceos_posix_api/src/imp/io_mpx/epoll.rs`.
+
+User-visible behavior:
+
+- `epoll_create1(0)` and `epoll_create1(EPOLL_CLOEXEC)` now allocate an fd in the shell userspace syscall bridge instead of returning `ENOSYS`.
+- `epoll_create1` rejects any flag bit outside `EPOLL_CLOEXEC` with `EINVAL`, including high bits beyond the low 32-bit flag space; valid `EPOLL_CLOEXEC` is recorded through the existing `FD_CLOEXEC` fd-table flag.
+- The created descriptor is represented as a synthetic `anon_inode:[eventpoll]` path entry. It supports the fd-lifetime operations covered by the current proof (`close`, `dup`, `fcntl` flag queries/updates through the fd table) but does not implement full `epoll_ctl`/`epoll_wait` readiness semantics yet.
+- The axlibc/glibc-visible legacy `epoll_create(size)` path now returns `EINVAL` for `size <= 0`, matching Linux's visible invalid-size behavior for callers that actually pass the legacy size to the kernel.
+
+ABI/POSIX surface: syscall numbers, struct layouts, fd-table layout, signal/futex/mmap/user-pointer ABI, and existing pipe/socket/file descriptor semantics are unchanged. The visible syscall impact is limited to generic eventpoll fd creation and errno behavior.
+
+Maintenance boundary: this is not a full epoll implementation. Future `epoll_ctl`/`epoll_wait` support must implement real interest-list/readiness semantics and rerun epoll, poll/select, fd/close/dup/fcntl, socket/pipe readiness, and exec/cloexec regression subsets before promotion accounting. `epoll_create02` remains blocked because musl's old `epoll_create(size)` wrapper maps to valid `epoll_create1(0)`; do not make `epoll_create1(0)` invalid to satisfy that row.
+
+Regression evidence: `epoll_create1_01` and `epoll_create1_02` are parser-clean on RV and LA for musl+glibc (`target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.txt`). Adjacent FD/flag subsets are parser-clean on both arches (`target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.txt`).
+
+Stable-list impact: unchanged at `606 total / 606 unique / 0 duplicate`. Candidate pool after this checkpoint: 30/50 (`epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
