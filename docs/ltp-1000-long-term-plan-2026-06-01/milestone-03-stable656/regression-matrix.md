@@ -326,3 +326,35 @@ Regression evidence:
 ## `kill10` resource-lifetime regression boundary
 
 Current blocker evidence protects against treating case-local timeout cleanup as harmless. Any future `kill10` or process-group signal cleanup patch must rerun an isolated RV singleton first and prove all of the following before broad process/signal shards resume: no musl timeout, no persistent post-cleanup frame leak comparable to `-129185` frames, no allocator panic in the following glibc group, and parser-clean summaries for both libcs. Only after that should LA confirmation and adjacent process/signal regressions run.
+
+
+## Completed regression for mincore lazy-VMA residency and mlock prefault
+
+Changed surfaces: `examples/shell/src/uspace/memory_map.rs` `sys_mincore` and `sys_mlock`, plus `examples/shell/src/uspace/syscall_dispatch.rs` mlock/mlock2 dispatch.
+
+Targeted proof:
+
+- RV `mincore03`: `target/ltp-1000-milestone-03-stable656/rv-mincore03-mincore-mlock-20260602T032124Z.summary.txt`
+- LA `mincore03`: `target/ltp-1000-milestone-03-stable656/la-mincore03-mincore-mlock-20260602T032208Z.summary.txt`
+- Combined candidate report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean10-mincore03-mincore-mlock-20260602T032401Z.promotion-candidates.txt`
+
+Result: `mincore03` is four-way parser-clean and joins the not-yet-promoted candidate pool. The older mixed scout `mincore03` rows remain pre-fix `TBROK` history and are not counted.
+
+Adjacent stable regression subset:
+
+- `mincore01`
+- `mlock01`
+- `mlock03`
+- `mlock04`
+- `munlock01`
+- `mlockall01`
+- `mmap01`
+- `mmap02`
+- `mmap03`
+- `mmap04`
+
+Regression evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.summary.txt`
+- Result: 20/20 wrapper PASS on each arch, with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.

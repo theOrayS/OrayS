@@ -125,10 +125,23 @@ No real anonymous inode, linkable unnamed file, or `linkat(AT_EMPTY_PATH)` mater
 
 Promotion boundary: current `openat03` RV/LA targeted summaries are deterministic and panic-free but contain `TCONF`/wrapper FAIL, so they are non-promotable. Real promotion requires a generic `O_TMPFILE` design plus deep-directory VFS stability evidence and adjacent open/link/unlink/rename regression gates on RV and LA.
 
+
+### `mincore` residency and `mlock` prefault behavior
+
+Files: `examples/shell/src/uspace/memory_map.rs`, `examples/shell/src/uspace/syscall_dispatch.rs`
+
+`mincore(2)` now separates address-range validity from residency. Pages inside an existing VMA are valid even when the lazy page fault path has not populated a PTE yet; those pages report residency byte `0` unless a PTE or shared mapping metadata exists. Pages outside every VMA still return `ENOMEM`. This preserves the Linux-visible distinction between an unmapped range and a mapped but non-resident anonymous range.
+
+`mlock(2)` now validates that the requested range is inside mapped VMAs, rounds to page boundaries, and prefaults the range through the existing `populate_range` path. This makes subsequent `mincore` residency checks observe the locked pages as resident. `munlock`, `mlockall`, and `munlockall` remain permissive no-ops in this checkpoint; `mlock2(flags=0)` follows `mlock`, while nonzero `mlock2` flags retain the previous permissive no-op behavior.
+
+User-visible behavior affected: valid lazy anonymous mappings are no longer misreported as `ENOMEM` by `mincore`, and successful `mlock` materializes pages in mapped ranges. Error numbers for unmapped/overflow/out-of-user-range `mincore`/`mlock` inputs remain `ENOMEM`; syscall numbers, struct layouts, FD tables, signal masks, futex values, file-backed mmap ABI, and user-pointer layouts are unchanged.
+
+Maintenance boundary: this is a minimal residency/prefault implementation, not full Linux memory-lock accounting. Future changes to lazy fault, `mlock`, `mlock2`, or VMA bookkeeping must rerun `mincore03` plus the adjacent mincore/mlock/mmap regression subset on RV and LA.
+
 ## Stable-list impact
 
 - Stable LTP list: unchanged at `606 total / 606 unique / 0 duplicate`.
-- Candidate pool after this checkpoint: 9/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
+- Candidate pool after this checkpoint: 10/50 for stable656 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`).
 
 ## Behavior gaps exposed but not fixed
 

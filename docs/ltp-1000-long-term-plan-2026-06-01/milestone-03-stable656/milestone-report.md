@@ -216,7 +216,7 @@ Combined pool after this repair:
 - `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean9-signal01-poll-wait-20260602T025432Z.promotion-candidates.txt`
 - Candidates: 9 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`)
 - Blocked/incomplete: 1 in this clean proof set (`mmap05` LA `TFAIL`)
-- Stable list remains unchanged at `606/606/0`; the current pool is 9/50, below the +50 stable656 gate.
+- Stable list remained unchanged at `606/606/0`; at that point in the evidence timeline the pool was 9/50. After the later `mincore03` proof below, the current pool is 10/50, still below the +50 stable656 gate.
 
 ### Combined candidate pool
 
@@ -252,16 +252,16 @@ Parser result: 1 PASS / 1 FAIL; RV glibc is clean, but RV musl has `TBROK=1` and
 
 ## Conclusion
 
-Seven new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
+Ten new unique cases are currently four-way clean, but stable656 requires 50 new unique cases from the live stable606 baseline. Therefore:
 
 - `LTP_STABLE_CASES` remains unchanged at `606 total / 606 unique / 0 duplicate`.
 - No milestone promotion commit is created for stable656 yet.
 - The scheduler permission fix, statfs capacity clamp, procfs futex-sleeping state repair, precise timer-list wakeup repair, catchable synchronous SIGSEGV repair, and file-backed mmap SIGBUS repair are kept as generic behavior work with closed targeted and regression evidence.
-- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current seven-case pool.
+- Closed arch-sweep mining adds no further non-stable four-way-clean cases beyond the current ten-case pool.
 
 ## Risks / next steps
 
-1. Accumulate 43 more four-way-clean candidates before editing the stable list for stable656.
+1. Accumulate 40 more four-way-clean candidates before editing the stable list for stable656.
 2. Fix `kill10` cleanup/resource-lifetime blocker before broad process/signal shards; singleton RV evidence now confirms musl timeout, persistent frame leak, and following glibc allocator panic, while the poll/exit cleanup hypothesis was rejected.
 3. Do not count LA musl `readlinkat02`: root cause is now documented as musl's zero-size wrapper rewrite into a one-byte syscall, and a kernel `bufsiz=1` special case would break valid direct Linux truncation semantics.
 4. Treat `nice04` as a libc/kernel errno-boundary investigation: LTP `nice(-10)` expects `EPERM`, while current `setpriority` lowering path returns Linux `EACCES` semantics for `setpriority(2)` and is protected by stable `setpriority02` regression.
@@ -307,3 +307,24 @@ Decision: this is honest blocker evidence only. `openat03` is not in the candida
 ## `kill10` isolated blocker checkpoint
 
 A 2026-06-02 RV singleton rerun reproduced `kill10` as a severe blocker outside broad-shard noise: musl wrapper FAIL 137 after 120s, persistent free-frame delta around `-129185` after cleanup, and immediate glibc allocator panic. A temporary generic `poll`/`ppoll` exit-group cleanup hypothesis was tested and removed because it did not change the parser summary or resource delta. `kill10` remains excluded from promotion and from broad batches until cleanup/lifetime behavior is repaired.
+
+
+## `mincore03` mincore/mlock residency repair
+
+Artifacts:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-mincore03-mincore-mlock-20260602T032124Z.summary.txt`
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-mincore03-mincore-mlock-20260602T032208Z.summary.txt`
+- RV adjacent regression summary: `target/ltp-1000-milestone-03-stable656/rv-mincore03-adjacent-regression-20260602T032259Z.summary.txt`
+- LA adjacent regression summary: `target/ltp-1000-milestone-03-stable656/la-mincore03-adjacent-regression-20260602T032401Z.summary.txt`
+- Combined clean10 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean10-mincore03-mincore-mlock-20260602T032401Z.promotion-candidates.txt`
+
+Targeted result: `mincore03` is RV + LA x musl + glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap after generic lazy-VMA-aware `mincore` residency handling and mapped-range `mlock` prefaulting.
+
+Regression result: `mincore01`, `mlock01`, `mlock03`, `mlock04`, `munlock01`, `mlockall01`, `mmap01`, `mmap02`, `mmap03`, and `mmap04` are parser-clean on RV and LA, 20/20 wrapper PASS on each arch.
+
+Combined pool after this repair:
+
+- Candidates: 10 (`fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore03`, `mmap13`, `munmap01`, `openat02`, `sched_setaffinity01`, `signal01`)
+- Stable list remains unchanged at `606/606/0`; the current pool is 10/50, below the +50 stable656 gate.
+- No `LTP_STABLE_CASES` edit or stable656 milestone promotion commit is made at this checkpoint.

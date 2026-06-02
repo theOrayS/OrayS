@@ -13,6 +13,7 @@ No blacklist changes were made in this checkpoint.
 | `shmat1` | mixed scout had long/hung behavior and was manually terminated | not blacklisted here; evidence is scouting-only |
 | `mmap05` | LA musl+glibc still report `TFAIL=1` / SIGSEGV signal not received after RV became clean | not blacklisted here; recorded as LoongArch fault-signal repair candidate |
 | `munmap01` | previously failed with wrapper code 139; now four-way clean after catchable synchronous `SIGSEGV` repair | not blacklisted here; counted only in the clean candidate pool, not promoted yet |
+| `mincore03` | old mixed scout reported `TBROK`/`ENOMEM`; now four-way clean after generic lazy-VMA `mincore` validity/residency handling plus `mlock` prefault | not blacklisted here; counted only in the clean candidate pool, not promoted yet |
 | `mmap13` | pre-fix `TFAIL` / SIGBUS signal not received | not blacklisted here; repaired by generic file-backed mmap SIGBUS-on-EOF handling and now tracked as a clean candidate |
 | `readlinkat02` | LA musl `TFAIL` from musl zero-size wrapper rewriting to a one-byte syscall | not blacklisted here; ordinary libc/test boundary and not promotion evidence |
 | `clone04` | RV glibc clean but RV musl `TBROK` / killed by SIGSEGV, with LTP hint toward musl `clone.c` wrapper behavior | not blacklisted here; ordinary libc-wrapper boundary and not promotion evidence |
