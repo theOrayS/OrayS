@@ -2018,3 +2018,43 @@ Combined RV+LA: promotion candidates lstat02, lstat02_64; blocked/incomplete row
 ```
 
 Unverified/deferred: no LA was run for the RV-blocked rows because their RV parser output already has visible TFAIL/TBROK/TCONF/ENOSYS blockers and they are not promotion candidates.
+
+## open clean2 validation
+
+RV scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=chmod04,chdir02,getcwd05,open05,open07,open11,open12,open14,open15,open16,close08,read03,write04,write07,write08,readv03 LTP_CASE_TIMEOUT_SECS=60 timeout 35m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.log
+```
+
+LA confirmation command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=open07,open12 LTP_CASE_TIMEOUT_SECS=60 timeout 15m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.log target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.log
+```
+
+Artifacts:
+
+- RV raw/summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.log`, `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.derived.sha256`.
+- RV candidate report: `target/ltp-1000-milestone-03-stable656/rv-fd-vfs-io-scout-20260602T153655+0800.promotion-candidates.txt`.
+- LA raw/summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.log`, `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.summary.json`, `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.derived.sha256`.
+- LA candidate report: `target/ltp-1000-milestone-03-stable656/la-open-clean2-20260602T153756+0800.promotion-candidates.txt`.
+- Combined candidate report/checksum: `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.promotion-candidates.txt`, `target/ltp-1000-milestone-03-stable656/combined-open-clean2-20260602T153844+0800.derived.sha256`.
+
+Parser summaries:
+
+```text
+RV scout: PASS LTP CASE 4, FAIL LTP CASE 28, Internal TFAIL/TBROK/TCONF 10 (TBROK=6, TCONF=4), timeout 0, ENOSYS 2, panic/trap 0.
+RV clean candidates from that scout: open07, open12.
+LA confirmation for clean candidates: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+Combined RV+LA: promotion candidates open07, open12; blocked/incomplete rows 14.
+```
+
+Unverified/deferred: no LA was run for the RV-blocked rows because their RV parser output already has visible blocker/fail evidence and they are not promotion candidates.

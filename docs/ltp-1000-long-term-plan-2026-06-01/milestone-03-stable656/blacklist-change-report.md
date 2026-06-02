@@ -97,3 +97,7 @@ No blacklist was added, removed, or used for promotion accounting in the time/ti
 ## lstat clean2 blacklist status
 
 No blacklist was added, removed, or used for promotion accounting in the lstat clean2 checkpoint. RV-blocked VFS/path rows remain visible parser blockers and are not counted as PASS.
+
+## open clean2 blacklist status
+
+No blacklist was added, removed, or used for promotion accounting in the open clean2 checkpoint. RV-blocked FD/VFS/IO rows remain visible parser blockers and are not counted as PASS.
