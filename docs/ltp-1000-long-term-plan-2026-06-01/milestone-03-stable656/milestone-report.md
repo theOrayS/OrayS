@@ -521,3 +521,31 @@ Current conclusion:
 - Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
 - No stable656 milestone promotion commit is made because the +50 gate is still 22 cases short.
 - Remaining blockers from this step: `mmap08` still fails its EBADF expectation because diagnostic-only evidence shows fd 3 is still a readable temp-file descriptor at `mmap` time; `mlock02` still needs real `RLIMIT_MEMLOCK`/capability behavior.
+
+
+## epoll_create1 clean2 checkpoint
+
+A generic eventpoll creation repair converted `epoll_create1_01` and `epoll_create1_02` into future promotion candidates without editing `LTP_STABLE_CASES`.
+
+Code changes retained in this checkpoint:
+
+1. `examples/shell/src/uspace/syscall_dispatch.rs` now dispatches `__NR_epoll_create1` in the shell userspace syscall bridge.
+2. `examples/shell/src/uspace/fd_table.rs` now creates a synthetic `anon_inode:[eventpoll]` descriptor and validates `EPOLL_CLOEXEC`/unknown flags with `EINVAL`, preserving `FD_CLOEXEC` through the existing fd-table flag path.
+3. `api/arceos_posix_api/src/imp/io_mpx/epoll.rs` now rejects `epoll_create(size <= 0)` with `EINVAL` for the axlibc/glibc-visible legacy path.
+
+Evidence:
+
+- RV targeted proof: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.txt` — 4 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted proof: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.txt` — 4 PASS / 0 FAIL, zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- Incremental clean2 report: `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.txt` — 2 candidates, 0 blocked/incomplete rows.
+- RV adjacent FD/flags regression: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.txt` — 12 PASS / 0 FAIL, parser-clean.
+- LA adjacent FD/flags regression: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.txt` — 12 PASS / 0 FAIL, parser-clean.
+- Combined clean30 audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean30-epoll-create1-20260602T061430Z.md`.
+
+Current conclusion:
+
+- Newly evidenced four-way-clean cases: `epoll_create1_01`, `epoll_create1_02`.
+- Candidate pool: 30/50 (`epoll_create1_01`, `epoll_create1_02`, `fcntl11_64`, `fcntl15`, `fstatfs01`, `fstatfs01_64`, `fsync02`, `futex_wait01`, `futex_wait03`, `futex_wait05`, `mincore02`, `mincore03`, `mincore04`, `mmap13`, `mmap20`, `mprotect02`, `mprotect04`, `munlock02`, `munmap01`, `openat02`, `rename01`, `rename03`, `rename04`, `rename05`, `sched_setaffinity01`, `signal01`, `stat03`, `stat03_64`, `statfs01`, `statvfs01`).
+- Stable list: unchanged at `606 total / 606 unique / 0 duplicate`.
+- No stable656 milestone promotion commit is made because the +50 gate is still 20 cases short.
+- Remaining blocker from this step: `epoll_create02` remains outside the pool because musl maps old `epoll_create(size)` to valid `epoll_create1(0)`, while the promotion gate requires parser-clean musl+glibc proof on both arches.

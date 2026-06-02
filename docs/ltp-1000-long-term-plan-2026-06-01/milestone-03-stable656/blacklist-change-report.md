@@ -84,3 +84,8 @@ Removal condition for `readlink03`: provide a generic LA/musl-compatible zero-si
 No blacklist change was made for the mmap/munlock repair. `mmap20` and `munlock02` are now tracked only as future clean candidates after RV + LA x musl+glibc parser-clean proof. The older RV G009 blocker note is partially superseded only for those two rows; the old failures remain repair history and are not hidden or counted.
 
 `mmap08` and `mlock02` remain visible non-promotable blockers. `mmap08` diagnostic-only logs show fd 3 is still a readable temporary file descriptor at mmap time, so the EBADF expectation is not yet closed by generic fd validation. `mlock02` requires real `RLIMIT_MEMLOCK`/capability semantics. Neither row is blacklisted for credit or counted as PASS.
+
+
+## epoll_create1 clean2 blacklist update
+
+No blacklist change was made for the epoll_create1 repair. `epoll_create1_01` and `epoll_create1_02` are tracked only as future clean candidates after RV + LA x musl+glibc parser-clean proof. `epoll_create02` remains visible blocker evidence: musl's old wrapper maps the invalid legacy-size check onto valid `epoll_create1(0)`, and old-ABI/TCONF history is not hidden or counted. No blacklist/SKIP/status0 credit is taken.

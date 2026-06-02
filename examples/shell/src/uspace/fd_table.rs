@@ -12,14 +12,15 @@ use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
-    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
-    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
+    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
+    ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -44,11 +45,10 @@ use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
 use super::time_abi::rtc_time_from_wall_time;
 use super::user_memory::{
-    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
-    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value,
 };
-use super::UserProcess;
 
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
@@ -202,6 +202,26 @@ pub(super) fn sys_fallocate(
 pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().close_for_process(process, fd as i32) {
         Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_epoll_create1(process: &UserProcess, flags: usize) -> isize {
+    if flags & !(general::EPOLL_CLOEXEC as usize) != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    insert_epoll_fd(
+        process,
+        fd_cloexec_flag(flags & general::EPOLL_CLOEXEC as usize != 0),
+    )
+}
+
+fn insert_epoll_fd(process: &UserProcess, fd_flags: u32) -> isize {
+    match process.fds.lock().insert_with_flags(
+        FdEntry::Path(PathEntry::synthetic_file("anon_inode:[eventpoll]", 0)),
+        fd_flags,
+    ) {
+        Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
     }
 }

@@ -166,7 +166,7 @@ fn push_ready_event(
 pub fn sys_epoll_create(size: c_int) -> c_int {
     debug!("sys_epoll_create <= {}", size);
     syscall_body!(sys_epoll_create, {
-        if size < 0 {
+        if size <= 0 {
             return Err(LinuxError::EINVAL);
         }
         let epoll_instance = EpollInstance::new(0);

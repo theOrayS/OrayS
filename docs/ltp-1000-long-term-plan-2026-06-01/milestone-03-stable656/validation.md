@@ -1807,3 +1807,54 @@ LA: PASS LTP CASE 28, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, 
 ```
 
 Promotion-candidate report result: 2 promotion candidates (`mmap20`, `munlock02`), 0 blocked/incomplete rows for the incremental proof. Combined with the previous clean26 audit, the current not-yet-promoted pool is 28/50; stable list remains unchanged at `606/606/0`.
+
+
+## `epoll_create1_01`/`epoll_create1_02` targeted proof
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="epoll_create1_01 epoll_create1_02" LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="epoll_create1_01 epoll_create1_02" LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 25m ./run-eval.sh la
+python3 scripts/ltp_summary.py <log>
+python3 scripts/ltp_summary.py --json <log>
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.log target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.log
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.log`
+- RV summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.sha256`
+- LA raw log: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.log`
+- LA summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.json`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.sha256`
+- Incremental clean2 report/checksum: `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.txt`, `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.sha256`
+
+Targeted parser summaries:
+
+```text
+RV: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 4, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Adjacent FD/flag regression commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="close01 fcntl01 fcntl05 dup01 pipe2_01 poll01" LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="close01 fcntl01 fcntl05 dup01 pipe2_01 poll01" LTP_DEV=/dev/vda LTP_CASE_TIMEOUT_SECS=90 timeout 30m ./run-eval.sh la
+```
+
+Regression artifacts:
+
+- RV summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.json`, `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.sha256`
+- LA summary/JSON/checksum: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.txt`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.json`, `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.sha256`
+
+Regression parser summaries:
+
+```text
+RV: PASS LTP CASE 12, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+LA: PASS LTP CASE 12, FAIL LTP CASE 0, Internal TFAIL/TBROK/TCONF 0, timeout 0, ENOSYS 0, panic/trap 0.
+```
+
+Decision: `epoll_create1_01` and `epoll_create1_02` are RV + LA x musl + glibc parser-clean and enter the future candidate pool. Combined with the previous clean28 audit, the current not-yet-promoted pool is 30/50; stable list remains unchanged at `606/606/0`.
+
+`epoll_create02` remains blocker evidence only. `rv-epoll-create02-create1-20260602T060510Z.summary.txt` shows the kernel now exposes `epoll_create1(0)`, but musl's `epoll_create(size)` wrapper converts the invalid old-size call into valid `epoll_create1(0)`, so invalid `size` is not visible at the syscall boundary. Do not make `epoll_create1(0)` invalid to satisfy that old-wrapper row.

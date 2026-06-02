@@ -6,16 +6,18 @@ This file records the current candidate pool for the next +50 stable milestone. 
 
 Clean evidence set:
 
-- Previous clean26 parser report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.txt`
-- Current clean2 parser report: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt`
-- Milestone audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean28-mmap20-munlock02-20260602T054508Z.md`
+- Previous clean28 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean28-mmap20-munlock02-20260602T054508Z.md`
+- Current epoll_create1 clean2 parser report: `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.txt`
+- Current clean30 audit table: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean30-epoll-create1-20260602T061430Z.md`
 - Required arches: `rv,la`
 - Required libcs: `musl,glibc`
-- Current four-way-clean not-yet-promoted candidates: 28
-- Remaining before stable656 +50 gate: 22
+- Current four-way-clean not-yet-promoted candidates: 30
+- Remaining before stable656 +50 gate: 20
 
 | Case | Evidence | Decision |
 | --- | --- | --- |
+| `epoll_create1_01` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | keep in candidate pool; not promoted until +50 batch is complete |
+| `epoll_create1_02` | current RV/LA epoll_create1 targeted gates are parser-clean for musl+glibc after generic __NR_epoll_create1 support and FD_CLOEXEC flag handling | keep in candidate pool; not promoted until +50 batch is complete |
 | `fcntl11_64` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `fcntl15` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `fstatfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
@@ -28,8 +30,10 @@ Clean evidence set:
 | `mincore03` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `mincore04` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `mmap13` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `mmap20` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
 | `mprotect02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `mprotect04` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
+| `munlock02` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
 | `munmap01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `openat02` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `rename01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
@@ -42,8 +46,6 @@ Clean evidence set:
 | `stat03_64` | stat/readlink path traversal repair proof is parser-clean on RV and LA for musl+glibc | keep in candidate pool; not promoted until +50 batch is complete |
 | `statfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
 | `statvfs01` | see the parser-clean evidence and historical checkpoint notes below | keep in candidate pool; not promoted until +50 batch is complete |
-| `mmap20` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
-| `munlock02` | current RV/LA mmap20+munlock02 targeted gates are parser-clean for musl+glibc after generic mmap flag/fd validation and munlock mapped-range validation | keep in candidate pool; not promoted until +50 batch is complete |
 
 ## Evidence hygiene notes
 
@@ -77,7 +79,7 @@ Result: the report contains 563 historical four-way-clean candidates overall, bu
 
 ## Stable-list decision
 
-Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 28.
+Do not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES` yet. The live baseline remains `606 total / 606 unique / 0 duplicate`; this milestone target is `656`, so a milestone commit that promotes stable cases requires 50 trustworthy unique candidates, not 30.
 
 ## `openat03` non-candidate note
 
@@ -142,7 +144,7 @@ A documentation/evidence-only FD scout grew the clean pool without editing the s
 - LA clean2 confirmation summary: `target/ltp-1000-milestone-03-stable656/la-fcntl-clean2-confirm-20260602T043619Z.summary.txt` — both RV-clean rows are parser-clean for musl+glibc.
 - Combined clean21 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean21-fcntl-fd-20260602T043619Z.promotion-candidates.txt`.
 
-Newly evidenced four-way-clean cases: `fcntl11_64` and `fcntl15`. Current pool: 21/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+Newly evidenced four-way-clean cases: `fcntl11_64` and `fcntl15`. Pool at that checkpoint: 21/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
 
 Blocked rows from the same RV scout stay outside the pool: `fcntl17` timed out on both libcs; `fcntl24`, `fcntl25`, `fcntl26`, and `fcntl37` retain parser-visible `TCONF`; `fcntl27` and `fcntl31` retain parser-visible `TFAIL`; `fcntl34`, `fcntl38`, and `fcntl39` retain parser-visible `TBROK`. None is blacklisted or counted as PASS.
 
@@ -156,7 +158,7 @@ A VFS/path scout first exposed no immediately promotable clean rows but identifi
 - Regression proof: `rv-rename-inode-retarget-20260602T044708Z.summary.txt` and `la-rename-inode-retarget-20260602T044751Z.summary.txt` both run `rename01,rename05` and are parser-clean for musl+glibc.
 - Combined clean22 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean22-rename01-inode-20260602T044855Z.promotion-candidates.txt`.
 
-Newly evidenced four-way-clean case: `rename01`. Current pool: 22/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
+Newly evidenced four-way-clean case: `rename01`. Pool at that checkpoint: 22/50. Stable list remains `606 total / 606 unique / 0 duplicate`.
 
 Blocked rows from the scout stay outside the pool: `link02`, `link04`, and `link05` retain generic `ENOSYS`/hard-link blockers; `linkat01`, `linkat02`, `renameat01`, `statx04`, `statx05`, `writev03`, `getdents01`, `readlink03`, `stat03`, and `stat03_64` retain visible TCONF/TFAIL/setup or semantic blockers; missing guest testcase binaries (`link01`, `link03`, `rename02`, `renameat02`, `unlink01`, `chmod02`, `readlink02`) are not evidence. None is blacklisted or counted as PASS.
 
@@ -172,7 +174,7 @@ Evidence:
 - Combined clean24 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean24-rename03-04-20260602T050630Z.promotion-candidates.txt`.
 - Checksums: `target/ltp-1000-milestone-03-stable656/rename03-04-clean24-20260602T050630Z.derived.sha256`.
 
-Newly evidenced four-way-clean cases: `rename03` and `rename04`. Current pool: 24/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+Newly evidenced four-way-clean cases: `rename03` and `rename04`. Pool at that checkpoint: 24/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 The earlier VFS-C setup-device/TFAIL notes are superseded only for `rename03` and `rename04`; they remain historical repair context and are not counted as promotion evidence. `mknod07` and `mknodat02` remain outside the pool because they still require a generic ext2/device setup path.
 
@@ -186,7 +188,7 @@ A generic stat/readlink path traversal repair grew the future pool without editi
 - Regression summaries: `rv-stat-readlink-stable-regression-20260602T052501Z.summary.txt` and `la-stat-readlink-stable-regression-20260602T052706Z.summary.txt` — adjacent stable stat/lstat/fstatat/readlink/openat/rename rows are parser-clean on both arches.
 - Combined clean26 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean26-stat03-path-20260602T052251Z.promotion-candidates.txt`.
 
-Newly evidenced four-way-clean cases: `stat03` and `stat03_64`. Current pool: 26/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+Newly evidenced four-way-clean cases: `stat03` and `stat03_64`. Pool at that checkpoint: 26/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 `readlink03` stays outside the pool: RV musl/glibc and LA glibc are clean, but LA musl still has parser-visible `TFAIL=1` on the zero-size-buffer case. This row is neither hidden nor blacklisted, and it is not counted as PASS.
 
@@ -199,6 +201,24 @@ A generic mmap/munlock errno repair grew the future pool without editing the sta
 - Incremental clean2 parser report: `target/ltp-1000-milestone-03-stable656/mmap20-munlock02-clean2-20260602T054508Z.promotion-candidates.txt` — 2 promotion candidates, 0 blocked/incomplete rows.
 - Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean28-mmap20-munlock02-20260602T054508Z.md`.
 
-Newly evidenced four-way-clean cases: `mmap20` and `munlock02`. Current pool: 28/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+Newly evidenced four-way-clean cases: `mmap20` and `munlock02`. Pool at that checkpoint: 28/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
 
 `mmap08` stays outside the pool: diagnostic-only runs show the tested fd is still a readable temporary file descriptor at mmap time, so the expected EBADF path is not yet proven by the generic fd validation. `mlock02` also stays outside the pool because real `RLIMIT_MEMLOCK`/capability semantics are still absent.
+
+
+## epoll_create1 clean2 update
+
+A generic `__NR_epoll_create1` dispatch and `EPOLL_CLOEXEC`/unknown-flag validation grew the future pool without editing the stable list.
+
+Evidence:
+
+- RV targeted summary: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.txt` — `epoll_create1_01` and `epoll_create1_02` are parser-clean for musl+glibc; zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+- LA targeted summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.txt` — same parser-clean result for musl+glibc.
+- Incremental clean2 report: `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.txt`.
+- RV FD/flags regression summary: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.txt` — 12 PASS / 0 FAIL, parser zero internal/fatal markers.
+- LA FD/flags regression summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.txt` — 12 PASS / 0 FAIL, parser zero internal/fatal markers.
+- Combined milestone audit: `docs/ltp-1000-long-term-plan-2026-06-01/milestone-03-stable656/combined-candidate-pool-clean30-epoll-create1-20260602T061430Z.md`.
+
+Newly evidenced four-way-clean cases: `epoll_create1_01` and `epoll_create1_02`. Current pool: 30/50. Stable list remains `606 total / 606 unique / 0 duplicate` because the stable656 +50 gate has not been reached.
+
+`epoll_create02` remains outside the pool: glibc/axlibc `epoll_create(size)` now rejects `size <= 0`, but musl reaches the kernel as valid `epoll_create1(0)` and therefore cannot prove the invalid old-size argument at the syscall boundary. The row stays visible as blocker evidence only.

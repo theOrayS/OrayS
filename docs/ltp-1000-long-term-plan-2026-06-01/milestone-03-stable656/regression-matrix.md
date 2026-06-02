@@ -500,3 +500,23 @@ Adjacent regression subset:
 - Result: 28/28 wrapper PASS on each arch, zero internal markers/fatal signatures.
 
 Repair-history boundary: `rv-mmap-munlock-errno-targeted-20260602T053636Z.summary.txt` is not promotion evidence because `mmap08` and `mlock02` still fail. The `rv-mmap08-debug-*` logs are diagnostic-only fd-lifetime evidence.
+
+
+## epoll_create1 FD/flag regression matrix
+
+Targeted proof:
+
+- RV `epoll_create1_01,epoll_create1_02`: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-final-20260602T061430Z.summary.txt`
+- LA `epoll_create1_01,epoll_create1_02`: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-final-20260602T061430Z.summary.txt`
+- Incremental promotion report: `target/ltp-1000-milestone-03-stable656/epoll-create1-clean2-20260602T061430Z.promotion-candidates.txt`
+
+Result: `epoll_create1_01` and `epoll_create1_02` are RV + LA x musl+glibc parser-clean with zero `TFAIL/TBROK/TCONF`, timeout, ENOSYS, panic/trap.
+
+Adjacent regression subset:
+
+- Cases: `close01`, `fcntl01`, `fcntl05`, `dup01`, `pipe2_01`, `poll01`.
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-epoll-create1-fd-regression-20260602T060838Z.summary.txt`
+- LA summary: `target/ltp-1000-milestone-03-stable656/la-epoll-create1-fd-regression-20260602T061054Z.summary.txt`
+- Result: 12/12 wrapper PASS on each arch, zero internal markers/fatal signatures.
+
+Remaining nearby blockers: `epoll_create02` stays non-promotable because musl's legacy wrapper hides the invalid `size` argument by issuing valid `epoll_create1(0)`. Full `epoll_ctl`/`epoll_wait` semantics are not implemented by this descriptor-creation repair.
