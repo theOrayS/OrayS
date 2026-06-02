@@ -14,12 +14,12 @@ use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
     AF_UNIX_DOMAIN, DEFAULT_SOCKET_BUFFER_SIZE, DEFAULT_TCP_MAXSEG,
     INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IP_RECVERR_OPT, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
-    LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT,
-    MCAST_LEAVE_GROUP_OPT, SO_BROADCAST_OPT, SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT,
-    SO_RCVBUF_OPT, SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT,
-    SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
-    TCP_INFO_OPT, TCP_MAXSEG_OPT, TCP_NODELAY_OPT, fd_cloexec_flag, neg_errno_code,
-    posix_errno_from_ret,
+    LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT,
+    LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT, MCAST_LEAVE_GROUP_OPT, SO_BROADCAST_OPT,
+    SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT, SO_RCVBUF_OPT, SO_RCVTIMEO_OPT,
+    SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT, SO_SNDTIMEO_OPT, SO_TYPE_OPT,
+    SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, TCP_INFO_OPT, TCP_MAXSEG_OPT,
+    TCP_NODELAY_OPT, fd_cloexec_flag, neg_errno_code, posix_errno_from_ret,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
@@ -60,6 +60,8 @@ pub(super) struct LocalSocketEntry {
 
 static NEXT_LOCAL_SOCKET_ID: AtomicUsize = AtomicUsize::new(1);
 const LOCAL_SOCKET_BUFFER_SIZE: usize = 4096;
+const SOCKET_ADDR_STORAGE_MAX: usize = 128;
+const SOCKET_OPTLEN_MAX: usize = TCP_INFO_COMPAT_SIZE;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum LocalSocketBufferStatus {
@@ -423,6 +425,26 @@ pub(super) fn socket_option_supported(level: i32, optname: i32) -> bool {
     }
 }
 
+fn getsockopt_unsupported_errno_code(socket: &SocketEntry, level: i32) -> u32 {
+    if level == posix_ctypes::IPPROTO_UDP as i32
+        && socket.socktype as u32 != posix_ctypes::SOCK_DGRAM
+    {
+        LINUX_EOPNOTSUPP
+    } else if level == SOL_SOCKET_LEVEL
+        || level == IPPROTO_IP_LEVEL
+        || level == posix_ctypes::IPPROTO_TCP as i32
+        || level == posix_ctypes::IPPROTO_UDP as i32
+    {
+        LINUX_ENOPROTOOPT
+    } else {
+        LINUX_EOPNOTSUPP
+    }
+}
+
+fn setsockopt_unsupported_errno_code(_level: i32) -> u32 {
+    LINUX_ENOPROTOOPT
+}
+
 pub(super) fn socket_entry(process: &UserProcess, fd: usize) -> Result<SocketEntry, LinuxError> {
     let table = process.fds.lock();
     match table.entry(fd as i32)? {
@@ -557,6 +579,9 @@ pub(super) fn socket_name_bridge(
     if addr == 0 {
         return neg_errno(LinuxError::EFAULT);
     }
+    if len > SOCKET_ADDR_STORAGE_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
     if let Err(err) = validate_user_write(process, addr, len) {
         return neg_errno(err);
     }
@@ -566,6 +591,39 @@ pub(super) fn socket_name_bridge(
         Ok(_) => write_socket_addr_to_user(process, addr, addrlen, len, &local_addr, local_len),
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn local_socket_name_bridge(
+    process: &UserProcess,
+    addr: usize,
+    addrlen: usize,
+) -> isize {
+    if let Err(err) = validate_user_write(process, addrlen, size_of::<posix_ctypes::socklen_t>()) {
+        return neg_errno(err);
+    }
+    let len = match read_user_value::<posix_ctypes::socklen_t>(process, addrlen) {
+        Ok(len) => len as usize,
+        Err(err) => return neg_errno(err),
+    };
+    if addr == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    if len > SOCKET_ADDR_STORAGE_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_user_write(process, addr, len) {
+        return neg_errno(err);
+    }
+    let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
+    local_addr.sa_family = AF_UNIX_DOMAIN as posix_ctypes::sa_family_t;
+    write_socket_addr_to_user(
+        process,
+        addr,
+        addrlen,
+        len,
+        &local_addr,
+        size_of::<posix_ctypes::sa_family_t>() as posix_ctypes::socklen_t,
+    )
 }
 
 pub(super) fn read_socket_data_from_user(
@@ -584,14 +642,14 @@ pub(super) fn read_socket_addr_from_user(
     ptr: usize,
     len: usize,
 ) -> Result<Vec<u8>, LinuxError> {
-    validate_user_read(process, ptr, len)?;
     if ptr == 0 {
         return Err(LinuxError::EFAULT);
     }
-    if len != size_of::<posix_ctypes::sockaddr>() {
+    if len < size_of::<posix_ctypes::sockaddr>() || len > SOCKET_ADDR_STORAGE_MAX {
         return Err(LinuxError::EINVAL);
     }
-    read_user_bytes(process, ptr, len)
+    validate_user_read(process, ptr, len)?;
+    read_user_bytes(process, ptr, size_of::<posix_ctypes::sockaddr>())
 }
 
 fn sockaddr_bytes(addr: &posix_ctypes::sockaddr) -> [u8; size_of::<posix_ctypes::sockaddr>()] {
@@ -828,7 +886,24 @@ pub(super) fn sys_socketpair_bridge(
     let flags = raw_socktype & flag_mask;
     let base_socktype = raw_socktype & !flag_mask;
 
-    if domain != AF_UNIX_DOMAIN {
+    if domain as u32 == posix_ctypes::AF_INET {
+        if base_socktype as u32 == posix_ctypes::SOCK_STREAM {
+            if protocol != 0 && protocol as u32 != posix_ctypes::IPPROTO_TCP {
+                return neg_errno_code(LINUX_EPROTONOSUPPORT);
+            }
+            return neg_errno_code(LINUX_EOPNOTSUPP);
+        }
+        if base_socktype as u32 == posix_ctypes::SOCK_DGRAM {
+            if protocol != 0 && protocol as u32 != posix_ctypes::IPPROTO_UDP {
+                return neg_errno_code(LINUX_EPROTONOSUPPORT);
+            }
+            return neg_errno_code(LINUX_EOPNOTSUPP);
+        }
+        if base_socktype as u32 == posix_ctypes::SOCK_RAW {
+            return neg_errno_code(LINUX_EPROTONOSUPPORT);
+        }
+        return neg_errno(LinuxError::EINVAL);
+    } else if domain != AF_UNIX_DOMAIN {
         return neg_errno_code(LINUX_EAFNOSUPPORT);
     }
     if protocol != 0 {
@@ -1137,6 +1212,11 @@ pub(super) fn sys_getsockname_bridge(
     addr: usize,
     addrlen: usize,
 ) -> isize {
+    match is_local_socket_fd(process, fd) {
+        Ok(true) => return local_socket_name_bridge(process, addr, addrlen),
+        Ok(false) => {}
+        Err(err) => return neg_errno(err),
+    }
     socket_name_bridge(
         process,
         fd,
@@ -1152,6 +1232,11 @@ pub(super) fn sys_getpeername_bridge(
     addr: usize,
     addrlen: usize,
 ) -> isize {
+    match is_local_socket_fd(process, fd) {
+        Ok(true) => return local_socket_name_bridge(process, addr, addrlen),
+        Ok(false) => {}
+        Err(err) => return neg_errno(err),
+    }
     socket_name_bridge(
         process,
         fd,
@@ -1177,6 +1262,16 @@ pub(super) fn sys_setsockopt_bridge(
     }
     let level_i32 = level as i32;
     let optname_i32 = optname as i32;
+    if optlen > SOCKET_OPTLEN_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if optlen < size_of::<i32>()
+        && (level_i32 == SOL_SOCKET_LEVEL
+            || level_i32 == IPPROTO_IP_LEVEL
+            || level_i32 == posix_ctypes::IPPROTO_TCP as i32)
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
     if level_i32 == IPPROTO_IP_LEVEL
         && matches!(optname_i32, MCAST_JOIN_GROUP_OPT | MCAST_LEAVE_GROUP_OPT)
     {
@@ -1202,7 +1297,7 @@ pub(super) fn sys_setsockopt_bridge(
             }
         }
     } else if !socket_option_supported(level_i32, optname_i32) {
-        neg_errno(LinuxError::EINVAL)
+        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
     } else if level_i32 == SOL_SOCKET_LEVEL
         && matches!(optname_i32, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT)
     {
@@ -1260,6 +1355,9 @@ pub(super) fn sys_getsockopt_bridge(
         let out_len = out_len as posix_ctypes::socklen_t;
         return write_user_value(process, optlen, &out_len);
     }
+    if len > SOCKET_OPTLEN_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
     if level == SOL_SOCKET_LEVEL && matches!(optname, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT) {
         if len < size_of::<general::timeval>() {
             return neg_errno(LinuxError::EINVAL);
@@ -1295,7 +1393,7 @@ pub(super) fn sys_getsockopt_bridge(
             SO_TYPE_OPT => socket.socktype,
             SO_SNDBUF_OPT | SO_RCVBUF_OPT => DEFAULT_SOCKET_BUFFER_SIZE,
             _ if socket_option_supported(level, optname) => 0,
-            _ => return neg_errno(LinuxError::EINVAL),
+            _ => return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level)),
         }
     } else if level == posix_ctypes::IPPROTO_TCP as i32 && socket_option_supported(level, optname) {
         match optname {
@@ -1305,7 +1403,7 @@ pub(super) fn sys_getsockopt_bridge(
     } else if level == IPPROTO_IP_LEVEL && socket_option_supported(level, optname) {
         0
     } else {
-        return neg_errno(LinuxError::EINVAL);
+        return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level));
     };
     let ret = write_user_value(process, optval, &value);
     if ret != 0 {

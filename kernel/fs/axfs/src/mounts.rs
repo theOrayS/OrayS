@@ -50,6 +50,9 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     proc_root.create("sys/kernel/pid_max", VfsNodeType::File)?;
     let file_pid_max = proc_root.clone().lookup("./sys/kernel/pid_max")?;
     file_pid_max.write_at(0, b"4194304\n")?;
+    proc_root.create("sys/kernel/printk", VfsNodeType::File)?;
+    let file_printk = proc_root.clone().lookup("./sys/kernel/printk")?;
+    file_printk.write_at(0, b"4\t4\t1\t7\n")?;
 
     proc_root.create("sys/fs", VfsNodeType::Dir)?;
     proc_root.create("sys/fs/pipe-max-size", VfsNodeType::File)?;

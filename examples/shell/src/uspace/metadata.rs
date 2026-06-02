@@ -10,13 +10,13 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{resolve_dirfd_path, FdEntry};
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
-    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
-    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
-    STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
-    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYSFS_MAGIC, TMPFS_MAGIC,
+    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
+    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
+    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE,
+    STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -33,6 +33,8 @@ const DEV_XVDA_RDEV: u64 = 51_712; // Linux makedev(202, 0).
 const LINUX_PATH_MAX: usize = 4096;
 const XATTR_CREATE: usize = 0x1;
 const XATTR_REPLACE: usize = 0x2;
+const XATTR_NAME_MAX: usize = 255;
+const XATTR_SIZE_MAX: usize = 65_536;
 const NSEC_PER_SEC: i64 = 1_000_000_000;
 
 #[derive(Clone, Copy)]
@@ -1017,7 +1019,7 @@ fn read_xattr_name(process: &UserProcess, name: usize) -> Result<String, LinuxEr
         return Err(LinuxError::EFAULT);
     }
     let name = read_cstr(process, name)?;
-    if name.is_empty() {
+    if name.is_empty() || name.len() > XATTR_NAME_MAX {
         return Err(LinuxError::ERANGE);
     }
     Ok(name)
@@ -1035,6 +1037,9 @@ fn sys_setxattr_for_path(
         Ok(name) => name,
         Err(err) => return neg_errno(err),
     };
+    if size > XATTR_SIZE_MAX {
+        return neg_errno(LinuxError::E2BIG);
+    }
     let value = match read_user_bytes(process, value, size) {
         Ok(value) => value,
         Err(err) => return neg_errno(err),

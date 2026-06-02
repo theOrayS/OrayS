@@ -12,20 +12,29 @@ use super::user_memory::{
 use super::{UserProcess, neg_errno};
 
 pub(super) enum SyslogAction {
+    Read,
     EmptyRead,
     SizeBuffer,
-    ConsoleControl,
+    PrivilegedNoop,
+    ConsoleLevel,
     Invalid,
 }
 
 pub(super) fn syslog_action(log_type: i32) -> SyslogAction {
     match log_type {
+        // SYSLOG_ACTION_READ. The kernel log is modelled as empty, but the
+        // read operation still validates arguments and privileged access.
+        2 => SyslogAction::Read,
         // SYSLOG_ACTION_READ_ALL and READ_CLEAR. Expose an empty kernel log.
         3 | 4 => SyslogAction::EmptyRead,
         // SYSLOG_ACTION_SIZE_BUFFER.
         10 => SyslogAction::SizeBuffer,
-        // Console control operations are accepted as no-ops.
-        6..=8 => SyslogAction::ConsoleControl,
+        // SYSLOG_ACTION_CLOSE, OPEN, CLEAR, CONSOLE_OFF, and CONSOLE_ON do not
+        // need persistent state in this userspace kernel shim, but Linux gates
+        // them behind privileged credentials rather than reporting ENOSYS.
+        0 | 1 | 5..=7 => SyslogAction::PrivilegedNoop,
+        // SYSLOG_ACTION_CONSOLE_LEVEL uses len as the requested 1..=8 level.
+        8 => SyslogAction::ConsoleLevel,
         _ => SyslogAction::Invalid,
     }
 }
@@ -100,7 +109,24 @@ pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize 
 
 pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: usize) -> isize {
     match syslog_action(log_type) {
+        SyslogAction::Read => {
+            if (len as isize) < 0 || buf == 0 {
+                return neg_errno(LinuxError::EINVAL);
+            }
+            if process.uid() != 0 {
+                return neg_errno(LinuxError::EPERM);
+            }
+            if len > 0 {
+                if let Err(err) = validate_user_write(process, buf, len) {
+                    return neg_errno(err);
+                }
+            }
+            0
+        }
         SyslogAction::EmptyRead => {
+            if (len as isize) < 0 {
+                return neg_errno(LinuxError::EINVAL);
+            }
             if let Some(bytes) = syslog_empty_read_bytes(buf, len) {
                 if let Err(err) = validate_user_write(process, buf, len) {
                     return neg_errno(err);
@@ -111,9 +137,41 @@ pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: 
             }
             0
         }
-        SyslogAction::SizeBuffer | SyslogAction::ConsoleControl => 0,
+        SyslogAction::SizeBuffer => 0,
+        SyslogAction::PrivilegedNoop => {
+            if process.uid() != 0 {
+                return neg_errno(LinuxError::EPERM);
+            }
+            0
+        }
+        SyslogAction::ConsoleLevel => {
+            if (len as isize) < 0 || !(1..=8).contains(&len) {
+                return neg_errno(LinuxError::EINVAL);
+            }
+            if process.uid() != 0 {
+                return neg_errno(LinuxError::EPERM);
+            }
+            0
+        }
         SyslogAction::Invalid => neg_errno(LinuxError::EINVAL),
     }
+}
+
+pub(super) fn sys_getcpu(process: &UserProcess, cpu: usize, node: usize) -> isize {
+    let value = 0u32;
+    if cpu != 0 {
+        let ret = write_user_value(process, cpu, &value);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    if node != 0 {
+        let ret = write_user_value(process, node, &value);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    0
 }
 
 pub(super) fn sys_getrusage(process: &UserProcess, who: i32, usage: usize) -> isize {

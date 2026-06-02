@@ -188,7 +188,7 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 pub(super) fn clock_resolution_timespec() -> general::timespec {
     general::timespec {
         tv_sec: 0,
-        tv_nsec: 1,
+        tv_nsec: 20_000_000,
     }
 }
 
@@ -275,7 +275,8 @@ pub(super) fn clock_now_duration(clockid: u32) -> Result<core::time::Duration, L
         | general::CLOCK_BOOTTIME
         | general::CLOCK_PROCESS_CPUTIME_ID
         | general::CLOCK_THREAD_CPUTIME_ID => Ok(axhal::time::monotonic_time()),
-        general::CLOCK_REALTIME_ALARM | general::CLOCK_BOOTTIME_ALARM => Err(LinuxError::EINVAL),
+        general::CLOCK_REALTIME_ALARM => Ok(adjusted_wall_time()),
+        general::CLOCK_BOOTTIME_ALARM => Ok(axhal::time::monotonic_time()),
         _ => Err(LinuxError::EINVAL),
     }
 }

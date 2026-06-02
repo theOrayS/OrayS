@@ -21,6 +21,11 @@ macro_rules! user_trace {
     ($($arg:tt)*) => {};
 }
 
+// Linux validates set_robust_list(2) against the userspace robust_list_head
+// layout.  Both supported LTP ABIs here are 64-bit, so the header is three
+// pointer-sized words: list head pointer, futex offset, and pending-list pointer.
+const ROBUST_LIST_HEAD_LEN: usize = size_of::<usize>() * 3;
+
 pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
     pub(super) clear_child_tid: AtomicUsize,
@@ -105,6 +110,9 @@ pub(super) fn set_current_clear_child_tid(tidptr: usize) {
 }
 
 pub(super) fn set_current_robust_list(head: usize, len: usize) -> Result<(), LinuxError> {
+    if len != ROBUST_LIST_HEAD_LEN {
+        return Err(LinuxError::EINVAL);
+    }
     let Some(ext) = current_task_ext() else {
         return Err(LinuxError::EINVAL);
     };
