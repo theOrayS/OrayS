@@ -58,3 +58,13 @@ The latest G009 mm/mlock/mmap scout found four additional RV-clean rows and the 
 - Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`
 
 These four rows (`mincore02`, `mincore04`, `mprotect02`, `mprotect04`) increase the pool to 14/50. They do not cross the stable656 +50 gate, so `LTP_STABLE_CASES` remains unchanged.
+
+## `statfs01` family no-promotion update
+
+The RV scout for `statfs01`, `fstatfs01`, `fstatfs01_64`, and `statvfs01` did not add candidates:
+
+- Summary: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.summary.txt`
+- Parser result: 0 PASS / 8 FAIL, with `TBROK=8` and zero timeout/ENOSYS/panic/trap.
+- Raw-log diagnosis: LTP setup reports `No free devices found` / `Failed to acquire device`.
+
+These four rows are excluded because the promotion gate requires RV + LA x musl + glibc wrapper PASS and parser-clean summaries. The stable list remains unchanged and the pool remains 14/50.

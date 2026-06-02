@@ -378,3 +378,14 @@ No new source change was retained for this evidence-only checkpoint, so no adjac
 - Combined clean14 report: `target/ltp-1000-milestone-03-stable656/combined-candidate-pool-clean14-g009-mm-mprotect-20260602T034707Z.promotion-candidates.txt`.
 
 Result: `mincore02`, `mincore04`, `mprotect02`, and `mprotect04` join the not-yet-promoted candidate pool. Future fixes for the blocked mlock/mmap/mprotect rows must first make RV parser-clean, then rerun LA confirmation plus adjacent mincore/mlock/munlock/mprotect/mmap regression subsets before any promotion accounting.
+
+## `statfs01` family setup-device regression boundary
+
+No source change was retained for the RV `statfs01,fstatfs01,fstatfs01_64,statvfs01` scout, so no adjacent regression subset is counted here.
+
+Current blocker evidence:
+
+- RV summary: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.summary.txt` — 0 wrapper PASS / 8 wrapper FAIL, `TBROK=8`, zero timeout/ENOSYS/panic/trap.
+- Promotion report: `target/ltp-1000-milestone-03-stable656/rv-statfs01-family-scout-20260602T035624Z.promotion-candidates.txt` — 0 candidates / 4 blocked.
+
+Future generic device/free-block-device support must first make this RV setup parser-clean. Then rerun LA confirmation plus adjacent statfs/fstatfs/statvfs and device/mount setup regressions before any stable promotion accounting.
