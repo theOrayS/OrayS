@@ -1384,3 +1384,27 @@ Artifacts:
 Parser result: RV adjacent subset is `74 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`; LA adjacent subset is also `74 PASS / 0 FAIL / 0 internal markers`.
 
 Conclusion: `fgetxattr02`, `getxattr02`, and `setxattr02` are added to the stable806 candidate pool with four-combo clean evidence after generic special-node xattr and AF_UNIX pathname socket repairs. Candidate pool is now 20/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+
+## Remaining xattr blocker-only RV retest after special-node repair
+
+This follow-up re-ran the remaining xattr rows that were not made clean by the special-node xattr/AF_UNIX pathname socket repair. It is blocker-only evidence and does not change the stable806 candidate pool.
+
+RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fsetxattr02 getxattr03 getxattr04 getxattr05' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt`
+
+Parser result: `0 PASS / 8 FAIL / TCONF=8 / 0 timeout / 0 ENOSYS / 0 panic/trap` across RV musl+glibc. The candidate report has `0` promotion candidates: `fsetxattr02` needs a `brd` driver-backed test device, `getxattr03` reports no supported filesystems after its filesystem filter, `getxattr04` requires `mkfs.xfs`, and `getxattr05` reports missing header/ACL support in the guest. These are environment/feature TCONF blockers, not clean kernel PASS evidence.
+
+Validation conclusion for this follow-up: the stable806 candidate pool remains `20/50` unique cases. No LA follow-up was run because the RV gate is not clean, and no `LTP_STABLE_CASES` update is allowed.
