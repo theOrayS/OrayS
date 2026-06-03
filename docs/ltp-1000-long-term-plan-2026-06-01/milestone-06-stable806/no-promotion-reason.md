@@ -88,3 +88,7 @@ Additional no-promotion note after xattr special-node/AF_UNIX pathname socket re
 
 - Generic special-inode xattr mutation `EPERM` handling, special-device fd opening for synthetic char/block nodes, and AF_UNIX pathname `bind()` filesystem socket-node creation make `fgetxattr02`, `getxattr02`, and `setxattr02` four-combo clean. The adjacent 37-case xattr/mknod/socket subset is clean on RV and LA. This raises the candidate pool to 20 new unique cases, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
 - The earlier RV xattr special-node diagnostic run with `fgetxattr02` `TBROK` and the build-fail retry are retained only as blocker/root-cause evidence and are not counted.
+
+Additional no-promotion note after remaining xattr blocker-only retest:
+
+- The RV retest of `fsetxattr02`, `getxattr03`, `getxattr04`, and `getxattr05` after the special-node repair still produced `0 PASS / 8 FAIL / TCONF=8`, with zero promotion candidates. These rows remain blocked by missing test-device/filesystem/toolchain/header/ACL prerequisites and are not counted. The stable806 candidate pool remains 20/50, and `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.

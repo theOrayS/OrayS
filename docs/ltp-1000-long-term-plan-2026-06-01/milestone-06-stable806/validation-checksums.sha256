@@ -313,3 +313,7 @@ b1c106f0b2eb2131e3dc6477bd82b3325a49d133906dc5fd8fc9f616d8ff5ca0  target/ltp-100
 b887a6ee20a09feccf6d2bfb55b27b8ef2a5717c3c7ffc5cc095c0d5b617a0c3  target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.log
 fb33575a2555cc94a852ea004d42c467e5f4d04373758104bb6f18f78f80fd10  target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt
 ec2e12cbead8b52fcfdf1fdf36ad81b33c2e4e426f0c7cd55a96f586ddf9e86f  target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.json
+e14024d584e2755ebedf2fd66b76eec97c7d3b59142fdb8738b6a8acfce878f6  target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log
+fbd893cbddd66ae0ed4bb76da051075307a4cccd5d87c42d79fcadb9f8757c5d  target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt
+339701fc00930adca32e9b823323be02545c3c6a7584618c5faf8410f284f1a8  target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.json
+f86f212a502799e84d769f58afab2c69276505a8742710fcbbfac076246e71ec  target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt

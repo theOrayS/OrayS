@@ -149,6 +149,7 @@ The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `g
 | `futex_wake02`, `futex_wake04`, `futex_cmp_requeue01`, `futex_cmp_requeue02` | RV futex adjacent scout has `TBROK`/`TCONF` visible markers | Blocker-only; only `futex_wait_bitset01` was RV clean and later LA-clean. Requeue/selective wake semantics are not counted from partial scout output. |
 | `clone02`, `clone04`, `clone05`, `clone08`, `clone09` | RV clone adjacent scout has `TFAIL`/`TBROK`/`ENOSYS` and only glibc-only `clone04` clean | Zero candidates; no LA follow-up because RV musl/glibc was not both clean. |
 | vector IO/sendfile rows | RV FD/vector-IO scout for `writev03`, `preadv03*`, `preadv203*`, `pwritev03*`, `sendfile09*` has `TCONF` for every row | Zero candidates; no pass-with-TCONF promotion. |
+| `fsetxattr02`, `getxattr03`, `getxattr04`, `getxattr05` | RV remaining xattr retest `rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt` has `0 PASS / 8 FAIL / TCONF=8` and candidate report has zero candidates | Blocker-only TCONF evidence: `brd` driver unavailable, no supported filesystem after filters, `mkfs.xfs` missing, and guest header/ACL support missing; no LA follow-up and no promotion count. |
 
 Excluded evidence artifacts:
 
@@ -240,3 +241,10 @@ Additional excluded late-scout artifacts:
 
 - RV sync/fd/io scout summary: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt` — `0 PASS / 20 FAIL`; no `fdatasync`, `fsync`, `sync`, `syncfs`, `sync_file_range`, FIFO `read`/`write`, or `lseek11` row is counted.
 - RV xattr small scout summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`; no row is counted from that scout by itself. `setxattr03`, `fgetxattr02`, `getxattr02`, and `setxattr02` are counted only after their later generic repairs and fresh RV+LA evidence above.
+
+
+Additional remaining xattr blocker-only retest artifacts:
+
+- RV remaining xattr blocker retest log: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log`
+- RV remaining xattr blocker retest summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt`
+- RV remaining xattr blocker retest candidate report: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt`

@@ -597,3 +597,11 @@ setsockopt01
 socketpair01
 # RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt — 74 PASS / 0 FAIL / 0 internal markers.
 # LA summary: target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt — 74 PASS / 0 FAIL / 0 internal markers.
+
+# RV remaining xattr blocker-only retest after special-node repair (2026-06-04)
+fsetxattr02
+getxattr03
+getxattr04
+getxattr05
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt — 0 PASS / 8 FAIL / TCONF=8 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt — 0 promotion candidates; all four cases remain blocker-only and must not be counted.
