@@ -332,3 +332,113 @@ Result: both passed before QEMU targeted gates. Stable list remained `756 total 
 ## Updated validation conclusion after UTS repair
 
 `utsname02` is now a new unique stable806 candidate with RV + LA × musl + glibc parser-clean evidence. The adjacent stable UTS/hostname/uname subset is parser-clean on both architectures. The current candidate pool is therefore `prctl08`, `prctl09`, and `utsname02` (3 new unique cases). `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` because the next milestone commit requires a full +50 unique clean cohort. Socket scout evidence remains blocker-only and contributes zero candidates.
+
+## Readlink/readlinkat near-clean blocker triage
+
+`readlink03` and `readlinkat02` were rechecked because old summary aggregation showed them as three-combo clean rows: RV × musl/glibc and LA × glibc were clean, while LA × musl remained failing.
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='readlink03,readlinkat02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='readlink03,readlinkat02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la \
+  target/ltp-1000-milestone-06-stable806/rv-readlink03-readlinkat02-20260603T191956+0800.log \
+  target/ltp-1000-milestone-06-stable806/la-readlink03-readlinkat02-20260603T192126+0800.log
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-readlink03-readlinkat02-20260603T191956+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-readlink03-readlinkat02-20260603T191956+0800.summary.txt`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-readlink03-readlinkat02-20260603T192126+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-readlink03-readlinkat02-20260603T192126+0800.summary.txt`
+- Combined report: `target/ltp-1000-milestone-06-stable806/la-readlink03-readlinkat02-20260603T192126+0800.combined-promotion-candidates.txt`
+- Temporary debug trace: `target/ltp-1000-milestone-06-stable806/la-readlinkat02-debug-20260603T192649+0800.log`
+
+Parser result:
+
+- RV: `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `2 PASS / 2 FAIL / 2 TFAIL / 0 timeout / 0 ENOSYS / 0 panic/trap`; both failures are LA musl rows.
+- Combined RV+LA candidate report: `0` candidates; `readlink03` and `readlinkat02` are blocked by LA musl `TFAIL`.
+
+Boundary finding:
+
+- The current kernel path already returns `EINVAL` when the kernel actually receives `bufsiz == 0`.
+- Temporary LA debug instrumentation showed the failing musl `readlinkat(3, symlink_file, NULL, 0)` test reached the kernel as `bufsiz=0x1` with a non-null buffer, while the LA glibc row reached the kernel as `bufsiz=0x0` and passed.
+- Treating `bufsiz=1` as `EINVAL` would break real Linux/POSIX `readlink/readlinkat` semantics for legitimate one-byte buffers, so no kernel patch was made and these rows are not promotion candidates.
+
+## RV statx VFS scout
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='statx01,statx04,statx05,statx06,statx07,statx08,statx09,statx10,statx11,statx12' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.promotion-candidates.txt`
+
+Parser result:
+
+- PASS LTP CASE: 2 (`statx01` on both libcs), but both are `pass_with_tconf`.
+- FAIL LTP CASE: 18.
+- Internal signals: `{'TCONF': 32}`.
+- timeout matches: 2 (`statx11` on both libcs).
+- ENOSYS/not implemented matches: 0.
+- panic/trap matches: 0.
+- RV-only promotion candidates: 0.
+
+Conclusion: the statx lane remains blocker/scout material only. `statx01` cannot be promoted because parser-visible `TCONF` disqualifies it, and `statx11` timeout evidence makes the batch unsuitable for promotion.
+
+## RV credential/capability scout
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='gettid02,getuid01_16,getuid03_16,setuid01_16,setuid03_16,setuid04_16,capget01,capget02,capset01,capset02,capset03,capset04' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.promotion-candidates.txt`
+
+Parser result:
+
+- PASS LTP CASE: 1 (`gettid02` on RV musl only).
+- FAIL LTP CASE: 23.
+- Internal signals: `{'TCONF': 22, 'TBROK': 1}`.
+- timeout matches: 0.
+- ENOSYS/not implemented matches: 0.
+- panic/trap matches: 0.
+- RV-only promotion candidates: 0.
+
+Conclusion: 16-bit UID and capability rows are currently visible `TCONF` blockers, not promotion evidence. `gettid02` is only musl-clean; the RV glibc row hit a `TBROK` futex-abort path and must be handled through a futex/glibc robustness lane before any promotion attempt.
+
+## Nice errno boundary
+
+`nice04` remains blocked by a libc-visible errno split in the existing RV proc/synthetic/sched scout:
+
+- RV glibc: `nice(-10) failed with EPERM` and wrapper PASS.
+- RV musl: `nice(-10) should fail with EPERM: EACCES (13)` and wrapper FAIL/TFAIL.
+
+The shared priority implementation currently returns `EACCES` when a non-root caller attempts to lower a nice value through `setpriority`. Other stable setpriority rows rely on that generic boundary, and the kernel cannot safely distinguish musl `nice(-10)` wrapper traffic from a direct `setpriority(2)` call without introducing case/libc-specific behavior. No source change was made; `nice04` stays blocked until a principled libc/ABI-compatible fix is available.
+
+## Updated validation conclusion after blocker triage
+
+The post-UTS blocker triage added zero promotion candidates. `readlink03`, `readlinkat02`, `nice04`, the statx scout, and the credential/capability scout all remain excluded because their evidence contains visible `TFAIL`, `TBROK`, `TCONF`, or timeout markers, or would require a semantically unsafe kernel-only workaround. The milestone-06 candidate pool remains exactly `prctl08`, `prctl09`, and `utsname02` (3 new unique cases), and `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
