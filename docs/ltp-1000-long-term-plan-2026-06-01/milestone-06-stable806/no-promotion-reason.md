@@ -1,6 +1,6 @@
 # milestone-06 current no-promotion reason
 
-This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, and `lseek11` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset repairs, late FD metadata discovery, immutable/append-only xattr mutation repair, special-node xattr/AF_UNIX pathname socket repair, generic `splice(2)` file/pipe/AF_UNIX stream support, and generic `SEEK_DATA`/`SEEK_HOLE` regular-file data/hole range tracking. They are only 26 unique new cases and do not satisfy the next 50-case milestone gate.
+This is an interim stable806 checkpoint. The current baseline remains stable756. The current candidate pool is **35 unique four-combo clean cases**: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, and `bind03`. They are still only 35/50 and do not satisfy the next 50-case milestone gate.
 
 Reasons promotion is still blocked at this checkpoint:
 
@@ -113,3 +113,10 @@ Additional no-promotion note after generic splice(2) repair:
 ## 2026-06-04 lseek11 candidate-only follow-up
 
 - Generic `SEEK_DATA`/`SEEK_HOLE` support plus allocation-granularity data-range tracking makes `lseek11` four-combo clean on RV + LA × musl + glibc. The adjacent stable lseek subset (`lseek01`, `lseek02`, `lseek07`, `llseek01`) remains parser-clean on both architectures. This raises the stable806 candidate pool to `26/50`, still below the next milestone; `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+
+
+## 2026-06-04 socket errno/address candidate follow-up
+
+- Generic socket errno/address-boundary fixes add nine new unique four-combo clean candidates: `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, and `bind03`.
+- The current stable806 candidate pool is therefore `35/50`, still short by 15 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+- The socket/epoll low-risk scout, 16-bit credential scout, VFS/time/proc scout, and LA readlink refresh all remain blocker-only because their parser summaries contain visible `TFAIL/TBROK/TCONF/ENOSYS/timeout` markers or libc-wrapper blockers. They are not counted.

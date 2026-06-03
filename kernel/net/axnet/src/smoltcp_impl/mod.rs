@@ -9,6 +9,7 @@ mod udp_loopback;
 
 use alloc::vec;
 use core::cell::RefCell;
+use core::net::SocketAddr;
 use core::ops::DerefMut;
 
 use axdriver::prelude::*;
@@ -20,7 +21,7 @@ use smoltcp::iface::{Config, Interface, SocketHandle, SocketSet};
 use smoltcp::phy::{Device, DeviceCapabilities, Medium, RxToken, TxToken};
 use smoltcp::socket::{self, AnySocket};
 use smoltcp::time::Instant;
-use smoltcp::wire::{EthernetAddress, HardwareAddress, IpAddress, IpCidr};
+use smoltcp::wire::{EthernetAddress, HardwareAddress, IpAddress, IpCidr, IpEndpoint};
 
 use self::listen_table::ListenTable;
 
@@ -57,6 +58,13 @@ static SOCKET_SET: LazyInit<SocketSetWrapper> = LazyInit::new();
 static ETH0: LazyInit<InterfaceWrapper> = LazyInit::new();
 
 struct SocketSetWrapper<'a>(Mutex<SocketSet<'a>>);
+
+pub fn is_local_addr(local_addr: SocketAddr) -> bool {
+    let local_endpoint = IpEndpoint::from(local_addr);
+    local_endpoint.addr.is_unspecified()
+        || local_addr.ip().is_loopback()
+        || ETH0.iface.lock().has_ip_addr(local_endpoint.addr)
+}
 
 struct DeviceWrapper {
     inner: RefCell<AxNetDevice>, // use `RefCell` is enough since it's wrapped in `Mutex` in `InterfaceWrapper`.

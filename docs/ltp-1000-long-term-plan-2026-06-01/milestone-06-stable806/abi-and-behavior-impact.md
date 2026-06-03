@@ -292,3 +292,28 @@ Maintenance boundary:
 - The data/hole map is in-memory per `UserProcess`, consistent with the existing sparse-size/sparse-data metadata model. It is not a persistent on-disk extent tree and should not be treated as a full filesystem allocator.
 - Future `fallocate`, hole punching, mmap writeback, copy-file-range, or cross-process shared filesystem-state work must update the same generic range metadata instead of adding LTP-specific branches.
 - No case name, LTP path, wrapper output, or evaluator behavior is hardcoded.
+
+
+## 2026-06-04 socket errno/address candidate follow-up
+
+This source patch changes generic socket-visible errno and address behavior; it does not edit evaluator/testsuite code and does not hardcode LTP case names, paths, process names, or output.
+
+User-visible syscall/socket changes:
+
+- `bind(AF_INET, ...)` now rejects non-local IPv4 addresses with `EADDRNOTAVAIL` via the net stack local-address predicate. Unspecified, loopback, and configured interface addresses remain valid.
+- The userspace bridge rejects non-root binds to privileged AF_INET ports (`1..1023`) with `EACCES` before dispatching to the POSIX socket layer.
+- `from_sockaddr` now accepts IPv4 socket-address lengths at least as large as `sockaddr` and maps non-`AF_INET` families to `EAFNOSUPPORT` instead of `EINVAL`.
+- TCP loopback `connect()` treats unspecified remote IP addresses as loopback for the selected address family and reports already-connected state as `AlreadyConnected`/`EISCONN` mapping rather than the older generic duplicate state.
+- TCP `bind()` validates that the requested local address is unspecified, loopback, or assigned to the configured interface before recording the local endpoint.
+- `recv()`/`recvfrom()` now reject `MSG_OOB` with `EINVAL` and report `MSG_ERRQUEUE` as `EAGAIN`. Other receive flags continue through the existing receive path.
+- `send()`/`sendto()` now reject `MSG_OOB` with `EOPNOTSUPP`, report oversize UDP payloads above 65,507 bytes as `EMSGSIZE`, and map stream `ENOTCONN` sends to `EPIPE`.
+- `sendto()` on a TCP stream now ignores the supplied destination address and sends on the connected stream, matching Linux connected-stream semantics; UDP `sendto()` still parses and uses the supplied destination.
+- AF_UNIX pathname `bind()` on a local socket records the bound pathname on the socket entry, creates a filesystem socket node through the generic `mknodat` path, maps existing nodes to `EADDRINUSE`, and returns `EINVAL` for rebinding the same local socket.
+- The `recvfrom` local-socket bridge keeps user pointer validation for datagram-like sockets but does not require a source-address output buffer for stream sockets beyond validating the address-length value.
+
+ABI/maintenance boundaries:
+
+- No struct layout, syscall number, FD table layout, signal, futex, mmap, or user-copy ABI is changed.
+- The AF_UNIX pathname work records bind state and node creation only; it is not a full pathname listener/connection registry. `bind04`, `bind05`, `getsockopt02`, `recvmsg01`, and related AF_UNIX listener/message rows remain blocked until real connect/listen/recvmsg semantics exist.
+- The privileged-port bridge rule is generic but tied to the shell userspace credential model; future UID/capability work must revisit `CAP_NET_BIND_SERVICE` rather than adding case-specific exceptions.
+- Future socket option, socket namespace, socketcall, TCP/UDP readiness, or AF_UNIX connection work must preserve these generic errno boundaries and rerun the socket candidate set before promotion.

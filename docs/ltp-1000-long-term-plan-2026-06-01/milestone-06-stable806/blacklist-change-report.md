@@ -41,3 +41,8 @@ No blacklist was added, removed, or used for `fgetxattr02`, `getxattr02`, `setxa
 ## generic splice(2) repair
 
 No blacklist was added, removed, or used for `splice01`..`splice09`. The counted candidate evidence for `splice01`..`splice05` comes only from RV + LA × musl + glibc targeted parser-clean logs after a generic `splice(2)` implementation. `splice06`, `splice07`, `splice08`, and `splice09` remain blocker-only because their logs still contain visible `TCONF`/`ENOSYS` or version-gate markers. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+
+## 2026-06-04 socket errno/address candidate follow-up
+
+No blacklist was added, removed, or used for the socket errno/address follow-up. The counted socket candidates (`accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`) come only from RV + LA × musl + glibc parser-clean targeted logs after generic source fixes. The LA readlink refresh, RV socket/epoll scout, RV 16-bit credential scout, and RV VFS/time/proc scout are blocker-only and contribute zero promotion candidates. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
