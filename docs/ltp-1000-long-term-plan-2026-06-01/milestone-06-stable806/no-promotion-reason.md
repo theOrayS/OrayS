@@ -72,3 +72,9 @@ Additional no-promotion note after futex_wait_bitset01 follow-up:
 Additional no-promotion note after fstat02/fstat02_64 follow-up:
 
 - The RV FD/path scout plus LA follow-up make `fstat02` and `fstat02_64` four-combo clean without any source change in this follow-up. The same scout leaves `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` blocked by visible parser markers, and the VFS/MM, process/exec/signal, and exec-only scouts add zero candidates. This raises the candidate pool to 16 new unique cases, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+
+
+Additional no-promotion note after sync/fd/io and xattr scouts:
+
+- The RV sync/fd/io scout (`fdatasync03`, `fsync03`, `fsync04`, `sync01`, `syncfs01`, `sync_file_range01`, `sync_file_range02`, `read03`, `write04`, `lseek11`) produced zero candidates: every row has visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers.
+- The RV xattr scout (`fgetxattr02`, `fsetxattr02`, `getxattr02`..`getxattr05`, `setxattr02`, `setxattr03`) also produced zero candidates with visible `TBROK/TCONF/TFAIL` markers. The stable806 candidate pool remains 16/50, and `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.

@@ -193,3 +193,8 @@ No additional source change was made for this follow-up. `fstat02` and `fstat02_
 - The RV VFS/MM scout and LA `mmap05` follow-up are diagnostic only. No mmap, mprotect, msync, page-fault, or signal-delivery behavior changed in this checkpoint.
 - The RV process/exec/signal and exec-only scouts are diagnostic only. No `kill`, `signal`, `execve`, wait, process lifetime, or allocator behavior changed in this checkpoint.
 - No blacklist, SKIP, status0, evaluator, testsuite, stable-list, syscall number, ABI, FD table layout, file status flags, signal, futex, mmap, user-pointer copy, or process lifetime behavior changed in this documentation/evidence update.
+
+
+## sync/fd/io and xattr blocker scout impact
+
+No source change was made for these blocker-only scouts. They do not change `fdatasync`, `fsync`, `sync`, `syncfs`, `sync_file_range`, FIFO `read`/`write`, `lseek`, or xattr syscall semantics. All rows with visible parser markers remain excluded; no syscall numbers, errno boundaries, FD table behavior, struct layouts, user-pointer copy rules, signal/futex/mmap behavior, blacklist, evaluator, testsuite, or stable-list entries changed.

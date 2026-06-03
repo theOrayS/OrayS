@@ -491,3 +491,28 @@ fstat02
 fstat02_64
 # LA summary: target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt — 4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
 # Combined: target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt — four-combo clean candidates.
+
+
+# RV sync/fd/io scout (2026-06-03; blocker-only)
+fdatasync03
+fsync03
+fsync04
+sync01
+syncfs01
+sync_file_range01
+sync_file_range02
+read03
+write04
+lseek11
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt — 0 PASS / 20 FAIL; zero candidates.
+
+# RV xattr small scout (2026-06-03; blocker-only)
+fgetxattr02
+fsetxattr02
+getxattr02
+getxattr03
+getxattr04
+getxattr05
+setxattr02
+setxattr03
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt — 0 PASS / 16 FAIL; zero candidates.
