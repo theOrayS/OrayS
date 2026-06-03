@@ -516,3 +516,34 @@ getxattr05
 setxattr02
 setxattr03
 # RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt — 0 PASS / 16 FAIL; zero candidates.
+
+# RV/LA setxattr03 immutable/append-only xattr mutation targeted repair retest (2026-06-03)
+setxattr03
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# LA summary: target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/combined-setxattr03-fourway-20260603T234153+0800.promotion-candidates.txt — four-combo clean candidate.
+
+# RV/LA xattr adjacent stable regression subset (2026-06-03)
+fgetxattr01
+fgetxattr03
+flistxattr01
+flistxattr02
+flistxattr03
+fremovexattr01
+fremovexattr02
+fsetxattr01
+getxattr01
+lgetxattr01
+lgetxattr02
+listxattr01
+listxattr02
+listxattr03
+llistxattr01
+llistxattr02
+llistxattr03
+lremovexattr01
+removexattr01
+removexattr02
+setxattr01
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.txt — 42 PASS / 0 FAIL / 0 internal markers.
+# LA summary: target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.txt — 42 PASS / 0 FAIL / 0 internal markers.

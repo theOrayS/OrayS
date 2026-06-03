@@ -28,3 +28,7 @@ No blacklist was added, removed, or used for `fstat02`, `fstat02_64`, the RV VFS
 ## sync/fd/io and xattr blocker scouts
 
 No blacklist was added, removed, or used for the RV sync/fd/io or xattr scouts. Both runs are parser-visible blocker evidence only and contribute zero promotion candidates. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+## setxattr03 immutable/append-only xattr repair
+
+No blacklist was added, removed, or used for `setxattr03` or the xattr stable regression subset. The candidate evidence comes only from RV + LA × musl + glibc targeted parser-clean logs after a generic source fix; the earlier xattr scout remains diagnostic blocker evidence for the other rows. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.

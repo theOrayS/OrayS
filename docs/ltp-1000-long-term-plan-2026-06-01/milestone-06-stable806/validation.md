@@ -1203,11 +1203,11 @@ Artifacts:
 - LA candidate report: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.promotion-candidates.txt`
 - Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt`
 
-Parser result: LA is `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. The combined RV+LA report has exactly two four-combo candidates: `fstat02` and `fstat02_64`. Both are absent from the current stable list before this checkpoint, but they are not promoted yet because the candidate pool is only 16/50 for stable806.
+Parser result: LA is `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. The combined RV+LA report has exactly two four-combo candidates: `fstat02` and `fstat02_64`. Both are absent from the current stable list before this checkpoint, but they were not promoted at that point because the candidate pool was only 16/50 before the later `setxattr03` repair.
 
 Validation conclusion for this follow-up:
 
-`fstat02` and `fstat02_64` are added to the stable806 candidate pool with four-combo clean evidence and no source change. `mmap05`, process/kill, exec, O_TMPFILE/openat/open14, close_range, getcwd, and creat rows remain blocker-only. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 16/50 for stable806.
+`fstat02` and `fstat02_64` are added to the stable806 candidate pool with four-combo clean evidence and no source change. `mmap05`, process/kill, exec, O_TMPFILE/openat/open14, close_range, getcwd, and creat rows remain blocker-only. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because this follow-up reached only 16/50 before the later `setxattr03` repair.
 
 
 ## Sync/fd/io and xattr blocker-only scouts
@@ -1250,4 +1250,70 @@ Parser result: `0 PASS / 16 FAIL`, internal markers `{'TBROK': 6, 'TCONF': 8, 'T
 
 Validation conclusion for these scouts:
 
-No sync/fd/io or xattr row is added to the stable806 candidate pool. Rows with visible `TCONF/TFAIL/TBROK/ENOSYS` remain blocker-only; no blacklist/SKIP/status0/full-sweep partial evidence is counted. Candidate pool remains 16/50.
+No sync/fd/io row and no row from the xattr scout itself is added to the stable806 candidate pool. Rows with visible `TCONF/TFAIL/TBROK/ENOSYS` remain blocker-only; no blacklist/SKIP/status0/full-sweep partial evidence is counted. Candidate pool remained 16/50 until the later generic `setxattr03` repair section below.
+
+## setxattr03 immutable/append-only xattr mutation repair
+
+This follow-up converts the previously blocker-only `setxattr03` row into a candidate only after a generic source fix and fresh RV + LA × musl + glibc evidence. The earlier RV xattr scout remains diagnostic and is not counted by itself.
+
+RV setxattr03 command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='setxattr03' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.promotion-candidates.txt`
+
+Parser result: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. RV-only candidate: `setxattr03`.
+
+LA setxattr03 command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='setxattr03' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.log target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/combined-setxattr03-fourway-20260603T234153+0800.promotion-candidates.txt`
+
+Parser result: LA is `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. The combined RV+LA report has exactly one four-combo candidate: `setxattr03`.
+
+Adjacent xattr stable regression command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fgetxattr01 fgetxattr03 flistxattr01 flistxattr02 flistxattr03 fremovexattr01 fremovexattr02 fsetxattr01 getxattr01 lgetxattr01 lgetxattr02 listxattr01 listxattr02 listxattr03 llistxattr01 llistxattr02 llistxattr03 lremovexattr01 removexattr01 removexattr02 setxattr01' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fgetxattr01 fgetxattr03 flistxattr01 flistxattr02 flistxattr03 fremovexattr01 fremovexattr02 fsetxattr01 getxattr01 lgetxattr01 lgetxattr02 listxattr01 listxattr02 listxattr03 llistxattr01 llistxattr02 llistxattr03 lremovexattr01 removexattr01 removexattr02 setxattr01' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.log
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.log
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.log`
+- RV cases: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.cases.txt`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.json`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.log`
+- LA cases: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.cases.txt`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.json`
+
+Parser result: RV xattr stable subset is `42 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`; LA xattr stable subset is also `42 PASS / 0 FAIL / 0 internal markers`.
+
+Validation conclusion for this follow-up:
+
+`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool is now 17/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.

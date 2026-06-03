@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 16/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 17/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `futex_wait_bitset01` | RV + LA × musl + glibc targeted parser-clean from the generic futex bitset command surface; no additional source change after the futex bitset repair | candidate pool |
 | `fstat02` | RV + LA × musl + glibc targeted parser-clean from the FD/path metadata scout and LA follow-up; no source change in this follow-up | candidate pool |
 | `fstat02_64` | RV + LA × musl + glibc targeted parser-clean from the same FD/path metadata evidence; no source change in this follow-up | candidate pool |
+| `setxattr03` | RV + LA × musl + glibc targeted parser-clean after generic immutable/append-only xattr mutation `EPERM` guard | candidate pool |
 
 Evidence artifacts:
 
@@ -100,6 +101,18 @@ Additional fstat02/fstat02_64 evidence artifacts:
 - LA fstat02/fstat02_64 follow-up summary: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt`
 - LA fstat02/fstat02_64 follow-up candidate report: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.promotion-candidates.txt`
 - Combined RV+LA fstat candidate report: `target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt`
+
+Additional setxattr03 immutable/append-only xattr evidence artifacts:
+
+- RV setxattr03 targeted log: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.log`
+- RV setxattr03 summary: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.summary.txt`
+- RV setxattr03 candidate report: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.promotion-candidates.txt`
+- LA setxattr03 targeted log: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.log`
+- LA setxattr03 summary: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.summary.txt`
+- LA setxattr03 candidate report: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.promotion-candidates.txt`
+- Combined RV+LA setxattr03 candidate report: `target/ltp-1000-milestone-06-stable806/combined-setxattr03-fourway-20260603T234153+0800.promotion-candidates.txt`
+- RV xattr stable regression summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.txt`
+- LA xattr stable regression summary: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.txt`
 
 The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` out of the pool because their rows contain visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers.
 
@@ -208,4 +221,4 @@ Additional excluded late-scout artifacts:
 - RV FD/path small scout summary: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt` — blocked rows remain excluded; only `fstat02`/`fstat02_64` are counted after LA confirmation.
 
 - RV sync/fd/io scout summary: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt` — `0 PASS / 20 FAIL`; no `fdatasync`, `fsync`, `sync`, `syncfs`, `sync_file_range`, FIFO `read`/`write`, or `lseek11` row is counted.
-- RV xattr small scout summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`; no xattr row is counted.
+- RV xattr small scout summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`; no row is counted from that scout by itself. `setxattr03` is counted only after the later generic immutable/append-only xattr mutation repair and fresh RV+LA evidence above.

@@ -84,4 +84,10 @@ The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `g
 
 ## sync/fd/io and xattr blocker boundary
 
-The RV sync/fd/io scout and RV xattr scout are blocker-only and add no regression-protected candidates. Future work on filesystem sync support, `sync_file_range`, `SEEK_DATA`/`SEEK_HOLE`, FIFO nonblocking open, device/special-file creation, or xattr immutable/append-only semantics must first remove the visible `TCONF/TFAIL/TBROK/ENOSYS` markers, then rerun the targeted rows on RV + LA × musl + glibc plus adjacent stable sync/xattr subsets before promotion.
+The RV sync/fd/io scout remains blocker-only and adds no regression-protected candidates. The RV xattr scout was blocker-only by itself; only `setxattr03` became a candidate after the later generic immutable/append-only mutation guard and fresh four-combo evidence. Future work on filesystem sync support, `sync_file_range`, `SEEK_DATA`/`SEEK_HOLE`, FIFO nonblocking open, device/special-file creation, or remaining xattr rows must first remove the visible `TCONF/TFAIL/TBROK/ENOSYS` markers, then rerun the targeted rows on RV + LA × musl + glibc plus adjacent stable sync/xattr subsets before promotion.
+
+## setxattr03 immutable/append-only xattr regression boundary
+
+The `setxattr03` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus a 21-case adjacent stable xattr subset on both architectures (`42 PASS / 0 FAIL` for RV and `42 PASS / 0 FAIL` for LA).
+
+Covered stable adjacency includes existing `fgetxattr*`, `flistxattr*`, `fremovexattr*`, `fsetxattr01`, `getxattr01`, `lgetxattr*`, `listxattr*`, `llistxattr*`, `lremovexattr01`, `removexattr*`, and `setxattr01` rows. Future edits in `sys_setxattr_for_path`, `sys_removexattr_for_path`, `set_path_xattr`, `remove_path_xattr`, or `path_inode_flags` should rerun `setxattr03` plus this stable xattr subset before promotion.
