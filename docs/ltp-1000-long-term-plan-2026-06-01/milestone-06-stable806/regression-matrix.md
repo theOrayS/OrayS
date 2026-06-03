@@ -28,3 +28,9 @@ Promotion gate remains unchanged: RV + LA × musl + glibc wrapper PASS, parser-c
 ## Additional VFS regression boundary
 
 The parent-symlink/rmdir repair is protected by a 36-case adjacent stable subset on both architectures (`72 PASS / 0 FAIL` for RV and `72 PASS / 0 FAIL` for LA). This covers existing stable mkdir/mkdirat, rmdir, unlink/unlinkat, symlink/symlinkat, mknod/mknodat, rename, and renameat rows. Future edits in `FdTable::mkdirat`, `FdTable::mknodat`, `FdTable::unlinkat`, `sys_symlinkat`, or process mountpoint checks should rerun this subset before promotion.
+
+## mkdir setgid/final-symlink regression boundary
+
+The `mkdir02`/`mkdir03` repair is protected by targeted RV + LA × musl + glibc evidence for `mkdir02`, `mkdir03`, `mkdirat02`, and `rmdir02` (`16 PASS / 0 FAIL` across the two architecture logs) plus a 35-case adjacent stable subset on both architectures (`70 PASS / 0 FAIL` for RV and `70 PASS / 0 FAIL` for LA).
+
+Covered stable adjacency includes chmod/fchmod/fchmodat, chown/fchown/fchownat, `open10`, `creat08`, `creat09`, mkdir/mkdirat, mknod/mknodat, symlink/symlinkat, and rmdir rows. Future edits in `clear_path_chown_special_bits`, `record_created_path_metadata`, `FdTable::mkdirat`, or `FdTable::mknodat` should rerun this subset before promotion.

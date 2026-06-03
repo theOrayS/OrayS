@@ -605,7 +605,8 @@ impl UserProcess {
             .path_mode(path)
             .unwrap_or(current_mode & FILE_MODE_PERMISSION_MASK);
         let mut updated_mode = mode & !FILE_MODE_SET_UID;
-        if mode & FILE_MODE_GROUP_EXECUTE != 0 {
+        let is_directory = current_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR;
+        if !is_directory && mode & FILE_MODE_GROUP_EXECUTE != 0 {
             updated_mode &= !FILE_MODE_SET_GID;
         }
         self.set_path_mode(path.to_string(), updated_mode);

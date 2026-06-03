@@ -556,3 +556,79 @@ Adjacent parser result:
 - LA adjacent subset: `72 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
 
 Updated validation conclusion after VFS repair: `mkdirat02` and `rmdir02` are new four-combo stable806 candidates. The candidate pool is now `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, and `rmdir02` (5 new unique cases). `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` because the next milestone promotion requires a complete +50 unique cohort.
+
+## mkdir setgid/final-symlink repair and targeted retest
+
+A generic metadata/path repair was added after the VFS scout showed `mkdir02`/`mkdir03` blockers:
+
+- Directory `chown` now preserves `S_ISGID`, allowing setgid directories to keep inheritance semantics after the test setup changes group ownership.
+- `mkdirat` and `mknodat` now treat a final process-visible synthetic symlink as an existing path and return `EEXIST` before creation.
+
+Targeted RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='mkdir02,mkdir03,mkdirat02,rmdir02' LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log
+```
+
+Targeted LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='mkdir02,mkdir03,mkdirat02,rmdir02' LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log
+```
+
+Targeted artifacts:
+
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.promotion-candidates.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.promotion-candidates.txt`
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-fix-20260603T202536+08:00.combined-promotion-candidates.txt`
+
+Targeted parser result:
+
+- RV: `8 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `8 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidates `mkdir02`, `mkdir03`, `mkdirat02`, and `rmdir02`; only `mkdir02` and `mkdir03` are new unique candidates in this checkpoint.
+
+Adjacent stable regression command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='chmod01,chmod05,fchmod01,fchmod05,fchmodat02,chown01,chown02,chown03,chown05,fchown01,fchown02,fchown03,fchown05,fchownat01,open10,creat08,creat09,mkdir04,mkdir05,mkdirat01,mknod01,mknod02,mknod03,mknod04,mknod05,mknod06,mknod08,mknod09,mknodat01,symlink01,symlink02,symlink04,symlinkat01,rmdir01,rmdir03' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 120m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.log
+
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='chmod01,chmod05,fchmod01,fchmod05,fchmodat02,chown01,chown02,chown03,chown05,fchown01,fchown02,fchown03,fchown05,fchownat01,open10,creat08,creat09,mkdir04,mkdir05,mkdirat01,mknod01,mknod02,mknod03,mknod04,mknod05,mknod06,mknod08,mknod09,mknodat01,symlink01,symlink02,symlink04,symlinkat01,rmdir01,rmdir03' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 120m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.log
+```
+
+Adjacent regression artifacts:
+
+- RV cases: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.cases.txt`
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.json`
+- LA cases: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.cases.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.json`
+
+Adjacent parser result:
+
+- RV: `70 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `70 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+
+Validation conclusion for this repair:
+
+`mkdir02` and `mkdir03` are added to the stable806 candidate pool with four-combo clean evidence. `mkdirat02` and `rmdir02` remain clean after the same patch. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 7/50 for stable806.

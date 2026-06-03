@@ -72,3 +72,20 @@ Unchanged boundaries:
 - `unlink` of non-directory final symlinks remains governed by the existing non-following final-component removal semantics.
 - No FD table layout, FD_CLOEXEC, file status flag, signal, futex, mmap, user-pointer ABI, struct layout, or syscall number behavior changed.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir02`, `mkdir03`, `mkdir09`, `mknod07`, `mknodat02`, `symlink03`, and `unlink09` blockers retain visible parser markers and are not counted.
+
+## mkdir setgid and final symlink existence repair impact
+
+This source patch changes real metadata/path behavior; it is not a stable-list promotion.
+
+User-visible syscall/path changes:
+
+- `chown`/`fchown` metadata updates now preserve `S_ISGID` on directories. The existing non-directory behavior still clears `S_ISGID` when group-execute is set, matching the existing special-bit safety rule for regular files and other non-directories.
+- Directory creation under a parent directory with `S_ISGID` now preserves inherited group and setgid metadata through the `chown` setup path exercised by `mkdir02`.
+- `mkdir`/`mkdirat` now treat a process-visible final-component synthetic symlink as an existing path and return `EEXIST` instead of creating a directory at that symlink path.
+- `mknod`/`mknodat` use the same final synthetic-symlink existence check and return `EEXIST` before node creation.
+
+Unchanged boundaries:
+
+- Parent-path symlink resolution semantics from the prior VFS repair remain unchanged; this patch only adds final-component synthetic symlink existence checks before create.
+- No syscall numbers, struct layouts, FD table layout, FD_CLOEXEC behavior, file status flags, signal delivery, futex behavior, mmap behavior, user-pointer copy semantics, blacklist, or evaluator behavior changed.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining non-candidate rows from earlier VFS/FD/select scouts retain visible parser markers and remain excluded.
