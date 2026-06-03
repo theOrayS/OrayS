@@ -1,18 +1,18 @@
 # milestone-06 current no-promotion reason
 
-This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, and `fstat02_64` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset repairs, and late FD metadata discovery. They are only 16 unique new cases and do not satisfy the next 50-case milestone gate.
+This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset repairs, late FD metadata discovery, and immutable/append-only xattr mutation repair. They are only 17 unique new cases and do not satisfy the next 50-case milestone gate.
 
 Reasons promotion is still blocked at this checkpoint:
 
 1. The old archived 4/4 clean-not-stable seed list has already been exhausted by earlier milestones; no remaining old clean seed exists outside current stable756.
 2. The broader proc/synthetic/sched scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside `prctl08`/`prctl09`.
 3. The time/fd/signal scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside this repair lane.
-4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, and `fstat02_64` have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, and futex/clone adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
+4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03` have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, futex/clone, and xattr adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
 5. No blacklist/SKIP/status0/full-sweep partial TPASS evidence is counted.
 
 Next safe slices:
 
-- Keep `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, and `fstat02_64` in the stable806 candidate pool and batch them only with enough additional four-combo clean cases to reach the next 50-case milestone.
+- Keep `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03` in the stable806 candidate pool and batch them only with enough additional four-combo clean cases to reach the next 50-case milestone.
 - Keep `nice04` out of the candidate pool unless a principled libc/ABI-compatible errno boundary is found; do not special-case the LTP wrapper.
 - Avoid POSIX timer rows (`timer_create` family) as easy promotions unless the project accepts a real timer-object implementation.
 - Prefer small FD/fcntl/pipe/io or narrowly scoped mmap/futex probes next; avoid readlink LA-musl, statx attribute/env-heavy rows, 16-bit UID/capability rows, and broad socket batches until their blockers have real semantic fixes.
@@ -71,10 +71,14 @@ Additional no-promotion note after futex_wait_bitset01 follow-up:
 
 Additional no-promotion note after fstat02/fstat02_64 follow-up:
 
-- The RV FD/path scout plus LA follow-up make `fstat02` and `fstat02_64` four-combo clean without any source change in this follow-up. The same scout leaves `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` blocked by visible parser markers, and the VFS/MM, process/exec/signal, and exec-only scouts add zero candidates. This raises the candidate pool to 16 new unique cases, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+- The RV FD/path scout plus LA follow-up make `fstat02` and `fstat02_64` four-combo clean without any source change in this follow-up. The same scout leaves `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` blocked by visible parser markers, and the VFS/MM, process/exec/signal, and exec-only scouts add zero candidates. This raised the candidate pool to 16 new unique cases before the later `setxattr03` repair, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remained unchanged at `756 total / 756 unique / 0 duplicate`.
 
 
 Additional no-promotion note after sync/fd/io and xattr scouts:
 
 - The RV sync/fd/io scout (`fdatasync03`, `fsync03`, `fsync04`, `sync01`, `syncfs01`, `sync_file_range01`, `sync_file_range02`, `read03`, `write04`, `lseek11`) produced zero candidates: every row has visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers.
-- The RV xattr scout (`fgetxattr02`, `fsetxattr02`, `getxattr02`..`getxattr05`, `setxattr02`, `setxattr03`) also produced zero candidates with visible `TBROK/TCONF/TFAIL` markers. The stable806 candidate pool remains 16/50, and `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+- The RV xattr scout (`fgetxattr02`, `fsetxattr02`, `getxattr02`..`getxattr05`, `setxattr02`, `setxattr03`) also produced zero candidates with visible `TBROK/TCONF/TFAIL` markers. The stable806 candidate pool remained 16/50 immediately after those scouts; `setxattr03` is counted only after the later generic repair and fresh RV+LA evidence. `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+
+Additional no-promotion note after setxattr03 repair:
+
+- The generic immutable/append-only xattr mutation guard makes `setxattr03` four-combo clean and preserves a 21-case xattr stable subset on RV and LA. The earlier RV xattr scout remains blocker-only for all other rows with visible `TBROK/TCONF/TFAIL` markers. This raises the candidate pool to 17 new unique cases, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.

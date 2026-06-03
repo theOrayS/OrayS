@@ -197,4 +197,21 @@ No additional source change was made for this follow-up. `fstat02` and `fstat02_
 
 ## sync/fd/io and xattr blocker scout impact
 
-No source change was made for these blocker-only scouts. They do not change `fdatasync`, `fsync`, `sync`, `syncfs`, `sync_file_range`, FIFO `read`/`write`, `lseek`, or xattr syscall semantics. All rows with visible parser markers remain excluded; no syscall numbers, errno boundaries, FD table behavior, struct layouts, user-pointer copy rules, signal/futex/mmap behavior, blacklist, evaluator, testsuite, or stable-list entries changed.
+The earlier sync/fd/io and xattr scouts were blocker-only at the time they were run. The later `setxattr03` patch above changes only generic xattr mutation errno behavior; it does not change `fdatasync`, `fsync`, `sync`, `syncfs`, `sync_file_range`, FIFO `read`/`write`, or `lseek` semantics. All rows with visible parser markers remain excluded; no syscall numbers, errno boundaries, FD table behavior, struct layouts, user-pointer copy rules, signal/futex/mmap behavior, blacklist, evaluator, testsuite, or stable-list entries changed.
+
+## setxattr03 immutable/append-only xattr mutation repair impact
+
+This source patch changes generic xattr mutation errno behavior; it is not a stable-list promotion and does not edit `LTP_STABLE_CASES`.
+
+User-visible syscall/errno changes:
+
+- `setxattr`, `lsetxattr`, and `fsetxattr` now return `EPERM` when the target path has `FS_IMMUTABLE_FL` or `FS_APPEND_FL` recorded through the existing generic `FS_IOC_SETFLAGS` path metadata.
+- `removexattr`, `lremovexattr`, and `fremovexattr` use the same mutation guard and return `EPERM` on immutable or append-only targets before removing stored xattr metadata.
+- Existing xattr name validation, size limits, user-pointer copy-in ordering, `XATTR_CREATE`/`XATTR_REPLACE` handling, `ENODATA`, `EEXIST`, `ERANGE`, `E2BIG`, and `EFAULT` boundaries are preserved before the mutation guard where already ordered that way.
+
+Resource/lifetime and maintenance boundaries:
+
+- The guard reuses process-local in-memory `path_inode_flags` metadata introduced for `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS`; it is not persistent ext4 inode state and does not add a new xattr namespace backend.
+- Xattr read/list operations are unchanged; only mutation operations are gated.
+- No syscall numbers, struct layouts, FD table layout, `FD_CLOEXEC`, file status flags (`O_APPEND`, `O_NONBLOCK`, etc.), signal delivery, futex behavior, mmap behavior, blacklist handling, evaluator logic, or testsuite behavior changed.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. It applies generic Linux immutable/append-only mutation semantics shared with the existing unlink inode-flag boundary.

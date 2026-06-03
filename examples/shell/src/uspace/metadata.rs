@@ -1131,6 +1131,18 @@ fn read_xattr_name(process: &UserProcess, name: usize) -> Result<String, LinuxEr
     Ok(name)
 }
 
+fn check_inode_flags_allow_xattr_mutation(
+    process: &UserProcess,
+    path: &str,
+) -> Result<(), LinuxError> {
+    let flags = process.path_inode_flags(path);
+    if flags & (general::FS_IMMUTABLE_FL | general::FS_APPEND_FL) != 0 {
+        Err(LinuxError::EPERM)
+    } else {
+        Ok(())
+    }
+}
+
 fn sys_setxattr_for_path(
     process: &UserProcess,
     path: String,
@@ -1150,6 +1162,9 @@ fn sys_setxattr_for_path(
         Ok(value) => value,
         Err(err) => return neg_errno(err),
     };
+    if let Err(err) = check_inode_flags_allow_xattr_mutation(process, path.as_str()) {
+        return neg_errno(err);
+    }
     process
         .set_path_xattr(path, name, value, flags)
         .map_or_else(neg_errno, |_| 0)
@@ -1197,6 +1212,9 @@ fn sys_removexattr_for_path(process: &UserProcess, path: String, name: usize) ->
         Ok(name) => name,
         Err(err) => return neg_errno(err),
     };
+    if let Err(err) = check_inode_flags_allow_xattr_mutation(process, path.as_str()) {
+        return neg_errno(err);
+    }
     process
         .remove_path_xattr(path.as_str(), name.as_str())
         .map_or_else(neg_errno, |_| 0)

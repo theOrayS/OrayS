@@ -22,7 +22,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Confirmed the same futex bitset/glibc pthread repair lane also makes `gettid02` and `futex_wait_bitset01` four-combo clean; no extra source change was needed for either follow-up.
 - Documented RV futex wake/requeue, clone, and FD/vector-IO scouts as blocker-only evidence; no partial PASS, `TCONF`, or glibc-only row was counted.
 - Documented late RV VFS/MM, process/exec/signal, exec-only, and FD/path scouts. Only `fstat02` and `fstat02_64` reached RV + LA × musl + glibc parser-clean; `mmap05`, close-range/O_TMPFILE/getcwd/creat, kill/process, and exec rows remain blocker-only.
-- Documented RV sync/fd/io and xattr small scouts as blocker-only evidence; they add zero candidates and expose filesystem support, FIFO open, SEEK_DATA/SEEK_HOLE, mknod, xfs/tooling, and immutable-xattr semantic gaps.
+- Documented RV sync/fd/io and xattr small scouts, then repaired the generic immutable/append-only xattr mutation gap so `setxattr03` is now four-combo clean. Remaining sync/fd/io and xattr scout rows stay blocker-only with visible parser markers.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -45,6 +45,7 @@ Current new unique stable806 candidates:
 14. `futex_wait_bitset01`
 15. `fstat02`
 16. `fstat02_64`
+17. `setxattr03`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -118,7 +119,12 @@ Current new unique stable806 candidates:
 - LA fstat02 follow-up: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt` — `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
 - Combined fstat02/fstat02_64 candidate report: `target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt` — four-combo candidates `fstat02` and `fstat02_64`.
 - RV sync/fd/io scout: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt` — `0 PASS / 20 FAIL`, `TCONF=14`, `TFAIL=6`, `TBROK=4`, `ENOSYS=2`; zero candidates.
-- RV xattr small scout: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`, `TBROK=6`, `TCONF=8`, `TFAIL=4`; zero candidates.
+- RV xattr small scout: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`, `TBROK=6`, `TCONF=8`, `TFAIL=4`; zero candidates from the scout by itself.
+- setxattr03 targeted RV after immutable/append-only xattr mutation repair: `target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- setxattr03 targeted LA after immutable/append-only xattr mutation repair: `target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined setxattr03 candidate report: `target/ltp-1000-milestone-06-stable806/combined-setxattr03-fourway-20260603T234153+0800.promotion-candidates.txt` — four-combo candidate `setxattr03`.
+- Adjacent RV xattr stable regression: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.txt` — `42 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA xattr stable regression: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.txt` — `42 PASS / 0 FAIL / 0 internal markers`.
 
 ## Risks and boundaries
 
@@ -127,11 +133,11 @@ Current new unique stable806 candidates:
 - Socket scout rows remain visibly blocked or incomplete and cannot be promoted.
 - `readlink03`/`readlinkat02` remain blocked on LA musl wrapper behavior; rejecting all one-byte buffers in-kernel is not acceptable.
 - `nice04` remains blocked on libc-visible errno differences around priority lowering; do not risk stable `setpriority` rows with a wrapper-specific kernel special case.
-- Statx, 16-bit UID, capability, futex wake/requeue, clone, FD/vector-IO, sync/fd/io, xattr, mmap protection, O_TMPFILE/openat, close_range/capability, getcwd deleted-directory setup, creat checkpoint, process/kill, and exec rows remain blocker-only until real semantics improve; glibc `gettid02` is superseded by the futex/glibc follow-up evidence above.
+- Statx, 16-bit UID, capability, futex wake/requeue, clone, FD/vector-IO, sync/fd/io, remaining xattr rows beyond `setxattr03`, mmap protection, O_TMPFILE/openat, close_range/capability, getcwd deleted-directory setup, creat checkpoint, process/kill, and exec rows remain blocker-only until real semantics improve; glibc `gettid02` is superseded by the futex/glibc follow-up evidence above.
 - The VFS/FD/select scout was split: `mkdir02`, `mkdir03`, `mkdirat02`, `rmdir02`, `fcntl27`, `fcntl27_64`, `symlink03`, and `unlink09` are repaired and candidate-clean, while the remaining select/mknod rows still have TCONF/timeout/TFAIL/TBROK blockers.
 - Timerslack/prctl adjacent stable regression still needs to be included before any eventual stable806 promotion commit.
 - The inode-flag implementation is in-memory process metadata, not persistent filesystem inode state; future broader FS_IOC work must preserve generic Linux errno/flag semantics and avoid LTP-specific branches.
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, and futex bitset semantics, then adds evidence-only FD metadata discovery for `fstat02`/`fstat02_64`. It brings the stable806 candidate pool to 16 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`). The new blocker triage added only those two four-combo clean fstat rows and intentionally avoided unsafe mmap, readlink, nice, O_TMPFILE, close_range, sync/fd/io, xattr, kill/process, and exec workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset, and immutable/append-only xattr mutation semantics, then adds evidence-only FD metadata discovery for `fstat02`/`fstat02_64`. It brings the stable806 candidate pool to 17 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`). The blocker triage intentionally avoids unsafe mmap, readlink, nice, O_TMPFILE, close_range, sync/fd/io, remaining xattr, kill/process, and exec workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
