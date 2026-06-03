@@ -234,3 +234,11 @@ Resource/lifetime and maintenance boundaries:
 - The AF_UNIX pathname bind path creates the filesystem node needed for pathname visibility. It does not implement full AF_UNIX listen/connect, abstract sockets, credential passing, or socket unlink lifetime rules.
 - No syscall numbers, struct layouts, FD table ABI, `FD_CLOEXEC`, file status flags, signal delivery, futex behavior, mmap behavior, blacklist handling, evaluator logic, testsuite behavior, or stable-list entries changed.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. It applies generic Linux/POSIX-visible special-inode and AF_UNIX pathname semantics.
+
+## 2026-06-04 late actual-bin blocker reprobes impact
+
+No source, stable-list, blacklist, evaluator, testsuite, syscall number, struct layout, FD table, file status flag, signal, futex, mmap, user-pointer copy, process lifetime, or errno behavior changed in these late blocker-only reprobes. They are evidence-only diagnostic runs.
+
+- FD/VFS/IO rows remain excluded because the RV evidence has wrapper failures, missing current guest-bin rows (`status=-1`), O_TMPFILE `TCONF`, and FIFO `TBROK` markers.
+- fcntl rows remain excluded because the RV evidence still exposes feature/errno blockers for leases on tmpfs, `F_GETOWN_EX`, OFD locks, capabilities, and dnotify; no LTP-specific workaround was introduced.
+- process/time/signal rows remain excluded because wrapper-PASS rows contain internal markers and the remaining rows expose real signal/process/config/timeouts. No signal delivery, `kill`/`tgkill`, process group/session, scheduler, priority, rusage, sysinfo, or prctl behavior changed.

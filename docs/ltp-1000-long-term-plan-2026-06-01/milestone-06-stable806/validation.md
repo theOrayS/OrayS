@@ -1408,3 +1408,63 @@ Artifacts:
 Parser result: `0 PASS / 8 FAIL / TCONF=8 / 0 timeout / 0 ENOSYS / 0 panic/trap` across RV musl+glibc. The candidate report has `0` promotion candidates: `fsetxattr02` needs a `brd` driver-backed test device, `getxattr03` reports no supported filesystems after its filesystem filter, `getxattr04` requires `mkfs.xfs`, and `getxattr05` reports missing header/ACL support in the guest. These are environment/feature TCONF blockers, not clean kernel PASS evidence.
 
 Validation conclusion for this follow-up: the stable806 candidate pool remains `20/50` unique cases. No LA follow-up was run because the RV gate is not clean, and no `LTP_STABLE_CASES` update is allowed.
+
+## 2026-06-04 late actual-bin blocker reprobes
+
+These commands were diagnostic RV scouts only. They were not followed by LA because each parser-generated promotion report had zero RV candidates.
+
+FD/VFS/IO command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='chmod04 chdir02 getcwd05 open05 open14 open15 open16 close08 read03 write04 write07 write08 readv03' LTP_CASE_TIMEOUT_SECS=60 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.promotion-candidates.txt`
+
+Parser result: `0 PASS / 26 FAIL / TCONF=4 / TBROK=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`. Candidate report: `0` promotion candidates; 13 blocked/incomplete cases.
+
+fcntl actual-bin command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fcntl24 fcntl24_64 fcntl25 fcntl25_64 fcntl26 fcntl26_64 fcntl31 fcntl31_64 fcntl32 fcntl32_64 fcntl33 fcntl33_64 fcntl34 fcntl34_64 fcntl36 fcntl36_64 fcntl37 fcntl37_64 fcntl38 fcntl38_64 fcntl39 fcntl39_64' LTP_CASE_TIMEOUT_SECS=60 timeout 50m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.promotion-candidates.txt`
+
+Parser result: `0 PASS / 44 FAIL / TCONF=48 / TFAIL=4 / TBROK=8 / 0 timeout / 0 ENOSYS / 0 panic/trap`. Candidate report: `0` promotion candidates; 22 blocked/incomplete cases.
+
+process/time/signal command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='setsid01 getpgid01 setpgid03 getrusage02 getrusage04 sysinfo03 adjtimex02 signal06 rt_sigaction03 sigpending02 sigwait01 sigwaitinfo01 kill05 kill13 tgkill01 tgkill02 tgkill03 prctl02 prctl03 prctl04 prctl07 prctl10 sched_rr_get_interval03 setpriority01' LTP_CASE_TIMEOUT_SECS=60 timeout 60m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.promotion-candidates.txt`
+
+Parser result: `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap`. Candidate report: `0` promotion candidates; 24 blocked/incomplete cases. The wrapper-PASS rows (`setsid01`, `getrusage02`, `adjtimex02`, `sched_rr_get_interval03`, `setpriority01`) all contain internal `TFAIL` or `TCONF` markers and are explicitly not counted.
+
+Validation conclusion for these reprobes: stable806 remains at `20/50` candidate-pool cases. No `LTP_STABLE_CASES` update, no LA follow-up, and no promotion commit are allowed from this evidence.

@@ -605,3 +605,74 @@ getxattr04
 getxattr05
 # RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt — 0 PASS / 8 FAIL / TCONF=8 / 0 timeout / 0 ENOSYS / 0 panic/trap.
 # Candidate report: target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt — 0 promotion candidates; all four cases remain blocker-only and must not be counted.
+
+# 2026-06-04 late actual-bin blocker reprobes: RV FD/VFS/IO blocker-only reprobe
+chmod04
+chdir02
+getcwd05
+open05
+open14
+open15
+open16
+close08
+read03
+write04
+write07
+write08
+readv03
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.summary.txt — 0 PASS / 26 FAIL / TCONF=4 / TBROK=4 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.promotion-candidates.txt — 0 promotion candidates; blocker-only.
+
+# 2026-06-04 late actual-bin blocker reprobes: RV fcntl actual-bin blocker-only reprobe
+fcntl24
+fcntl24_64
+fcntl25
+fcntl25_64
+fcntl26
+fcntl26_64
+fcntl31
+fcntl31_64
+fcntl32
+fcntl32_64
+fcntl33
+fcntl33_64
+fcntl34
+fcntl34_64
+fcntl36
+fcntl36_64
+fcntl37
+fcntl37_64
+fcntl38
+fcntl38_64
+fcntl39
+fcntl39_64
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.txt — 0 PASS / 44 FAIL / TCONF=48 / TFAIL=4 / TBROK=8 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.promotion-candidates.txt — 0 promotion candidates; blocker-only.
+
+# 2026-06-04 late actual-bin blocker reprobes: RV process/time/signal blocker-only reprobe
+setsid01
+getpgid01
+setpgid03
+getrusage02
+getrusage04
+sysinfo03
+adjtimex02
+signal06
+rt_sigaction03
+sigpending02
+sigwait01
+sigwaitinfo01
+kill05
+kill13
+tgkill01
+tgkill02
+tgkill03
+prctl02
+prctl03
+prctl04
+prctl07
+prctl10
+sched_rr_get_interval03
+setpriority01
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt — 10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.promotion-candidates.txt — 0 promotion candidates; wrapper PASS rows with internal markers are not counted.
