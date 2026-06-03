@@ -188,7 +188,7 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 pub(super) fn clock_resolution_timespec() -> general::timespec {
     general::timespec {
         tv_sec: 0,
-        tv_nsec: 20_000_000,
+        tv_nsec: 50_000_000,
     }
 }
 

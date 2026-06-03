@@ -1,6 +1,7 @@
 use core::cmp;
 use core::mem::{offset_of, size_of};
 use core::ptr;
+use core::time::Duration;
 
 use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
@@ -23,26 +24,35 @@ use super::linux_abi::{
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dirent_type,
-    fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs,
-    path_inode, stdio_stat, synthetic_block_stat_for_path, synthetic_char_stat_for_path,
+    DEV_ZERO_RDEV, apply_recorded_path_metadata, canonical_permission_path, dev_null_stat,
+    dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat,
+    file_type_mode, generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
+    synthetic_char_stat_for_path,
 };
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
 };
-use super::select_fdset::SelectMode;
+use super::select_fdset::{SelectMode, yield_poll_wait};
+use super::signal_abi::{
+    current_pending_signal_matches, current_unblocked_signal_pending,
+    install_temporary_signal_mask, take_current_pending_signal_matching,
+};
 use super::synthetic_fs::{
     dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
     proc_comm_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
     proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
     proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    synthetic_file_is_writable_open, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry,
+    synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
+    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
+    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
-use super::time_abi::{clock_gettime_timespec, rtc_time_from_wall_time};
+use super::time_abi::{
+    clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
+};
 use super::user_memory::{
     MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
     user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
@@ -61,6 +71,7 @@ const LINUX_PATH_MAX: usize = 4096;
 // real backing limit at the POSIX boundary instead of accepting longer names
 // that would later panic during directory enumeration.
 const LINUX_NAME_MAX: usize = 63;
+const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
 
 pub(super) enum FdEntry {
@@ -68,6 +79,7 @@ pub(super) enum FdEntry {
     Stdout,
     Stderr,
     DevNull,
+    DevZero,
     BlockDevice(BlockDeviceEntry),
     Rtc,
     File(FileEntry),
@@ -79,6 +91,10 @@ pub(super) enum FdEntry {
     Pipe(PipeEndpoint),
     Socket(SocketEntry),
     LocalSocket(LocalSocketEntry),
+    EventFd(EventFdEntry),
+    Epoll(EpollEntry),
+    TimerFd(TimerFdEntry),
+    SignalFd(SignalFdEntry),
 }
 
 #[derive(Clone)]
@@ -131,6 +147,55 @@ pub(super) struct ProcPagemapEntry {
     pub(super) present_ranges: Arc<Vec<(u64, u64)>>,
     pub(super) offset: u64,
     pub(super) size: u64,
+}
+
+#[derive(Clone)]
+pub(super) struct EventFdEntry {
+    counter: Arc<Mutex<u64>>,
+    status_flags: u32,
+    semaphore: bool,
+}
+
+#[derive(Clone)]
+pub(super) struct TimerFdEntry {
+    clock_id: u32,
+    status_flags: u32,
+    state: Arc<Mutex<TimerFdState>>,
+}
+
+#[derive(Clone, Copy)]
+struct TimerFdState {
+    deadline: Option<Duration>,
+    interval: Duration,
+    expirations: u64,
+}
+
+#[derive(Clone)]
+pub(super) struct SignalFdEntry {
+    mask: Arc<Mutex<u64>>,
+    status_flags: u32,
+}
+
+#[derive(Clone)]
+pub(super) struct EpollEntry {
+    registrations: Arc<Mutex<BTreeMap<i32, EpollRegistration>>>,
+}
+
+#[derive(Clone, Copy)]
+struct EpollRegistration {
+    event: general::epoll_event,
+    last_ready: u32,
+    disabled: bool,
+}
+
+impl EpollRegistration {
+    const fn new(event: general::epoll_event) -> Self {
+        Self {
+            event,
+            last_ready: 0,
+            disabled: false,
+        }
+    }
 }
 
 pub(super) fn sys_openat(
@@ -218,12 +283,650 @@ pub(super) fn sys_epoll_create1(process: &UserProcess, flags: usize) -> isize {
 }
 
 fn insert_epoll_fd(process: &UserProcess, fd_flags: u32) -> isize {
+    match process
+        .fds
+        .lock()
+        .insert_with_flags(FdEntry::Epoll(EpollEntry::new()), fd_flags)
+    {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_eventfd2(process: &UserProcess, initval: usize, flags: usize) -> isize {
+    let flags = flags as u32;
+    let supported = general::EFD_CLOEXEC | general::EFD_NONBLOCK | general::EFD_SEMAPHORE;
+    if flags & !supported != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let fd_flags = fd_cloexec_flag(flags & general::EFD_CLOEXEC != 0);
+    let status_flags = if flags & general::EFD_NONBLOCK != 0 {
+        general::O_NONBLOCK
+    } else {
+        0
+    };
     match process.fds.lock().insert_with_flags(
-        FdEntry::Path(PathEntry::synthetic_file("anon_inode:[eventpoll]", 0)),
+        FdEntry::EventFd(EventFdEntry::new(
+            initval as u64,
+            status_flags,
+            flags & general::EFD_SEMAPHORE != 0,
+        )),
         fd_flags,
     ) {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_timerfd_create(process: &UserProcess, clock_id: usize, flags: usize) -> isize {
+    let clock_id = clock_id as u32;
+    if !TimerFdEntry::clock_supported(clock_id) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let flags = flags as u32;
+    let supported = general::TFD_CLOEXEC | general::TFD_NONBLOCK;
+    if flags & !supported != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let fd_flags = fd_cloexec_flag(flags & general::TFD_CLOEXEC != 0);
+    let status_flags = if flags & general::TFD_NONBLOCK != 0 {
+        general::O_NONBLOCK
+    } else {
+        0
+    };
+    match process.fds.lock().insert_with_flags(
+        FdEntry::TimerFd(TimerFdEntry::new(clock_id, status_flags)),
+        fd_flags,
+    ) {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_timerfd_settime(
+    process: &UserProcess,
+    fd: usize,
+    flags: usize,
+    new_value: usize,
+    old_value: usize,
+) -> isize {
+    let flags = flags as u32;
+    let supported = general::TFD_TIMER_ABSTIME | general::TFD_TIMER_CANCEL_ON_SET;
+    if flags & !supported != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let timer = {
+        let table = process.fds.lock();
+        match table.entry(fd as i32) {
+            Ok(FdEntry::TimerFd(timer)) => timer.clone(),
+            Ok(_) => return neg_errno(LinuxError::EINVAL),
+            Err(err) => return neg_errno(err),
+        }
+    };
+    let new_spec = match read_user_value::<general::itimerspec>(process, new_value) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    let old_spec = match timer.settime(flags, new_spec) {
+        Ok(old_spec) => old_spec,
+        Err(err) => return neg_errno(err),
+    };
+    if old_value != 0 {
+        let ret = write_user_value(process, old_value, &old_spec);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    0
+}
+
+pub(super) fn sys_timerfd_gettime(process: &UserProcess, fd: usize, curr_value: usize) -> isize {
+    let timer = {
+        let table = process.fds.lock();
+        match table.entry(fd as i32) {
+            Ok(FdEntry::TimerFd(timer)) => timer.clone(),
+            Ok(_) => return neg_errno(LinuxError::EINVAL),
+            Err(err) => return neg_errno(err),
+        }
+    };
+    let spec = match timer.gettime() {
+        Ok(spec) => spec,
+        Err(err) => return neg_errno(err),
+    };
+    write_user_value(process, curr_value, &spec)
+}
+
+pub(super) fn sys_signalfd4(
+    process: &UserProcess,
+    fd: usize,
+    mask: usize,
+    sigsetsize: usize,
+    flags: usize,
+) -> isize {
+    let flags = flags as u32;
+    let supported = general::O_CLOEXEC | general::O_NONBLOCK;
+    if flags & !supported != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if sigsetsize != 0 && sigsetsize < super::linux_abi::KERNEL_SIGSET_BYTES {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let mask_bytes = match read_user_bytes(process, mask, super::linux_abi::KERNEL_SIGSET_BYTES) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    let mut raw = [0u8; super::linux_abi::KERNEL_SIGSET_BYTES];
+    raw.copy_from_slice(&mask_bytes);
+    let signal_mask = u64::from_ne_bytes(raw);
+    let fd = fd as i32;
+    if fd == -1 {
+        let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
+        let status_flags = flags & general::O_NONBLOCK;
+        return match process.fds.lock().insert_with_flags(
+            FdEntry::SignalFd(SignalFdEntry::new(signal_mask, status_flags)),
+            fd_flags,
+        ) {
+            Ok(newfd) => newfd as isize,
+            Err(err) => neg_errno(err),
+        };
+    }
+    let mut table = process.fds.lock();
+    match table.entry_mut(fd) {
+        Ok(FdEntry::SignalFd(signal_fd)) => {
+            signal_fd.set_mask(signal_mask);
+            fd as isize
+        }
+        Ok(_) => neg_errno(LinuxError::EINVAL),
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_epoll_ctl(
+    process: &UserProcess,
+    epfd: usize,
+    op: usize,
+    fd: usize,
+    event: usize,
+) -> isize {
+    let event_value = match op as u32 {
+        general::EPOLL_CTL_ADD | general::EPOLL_CTL_MOD => {
+            if event == 0 {
+                return neg_errno(LinuxError::EFAULT);
+            }
+            match read_user_value::<general::epoll_event>(process, event) {
+                Ok(event) => Some(event),
+                Err(err) => return neg_errno(err),
+            }
+        }
+        general::EPOLL_CTL_DEL => None,
+        _ => return neg_errno(LinuxError::EINVAL),
+    };
+    let mut table = process.fds.lock();
+    match table.epoll_ctl(epfd as i32, op as u32, fd as i32, event_value) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_epoll_pwait(
+    process: &UserProcess,
+    epfd: usize,
+    events: usize,
+    maxevents: usize,
+    timeout_ms: isize,
+    sigmask: usize,
+    sigsetsize: usize,
+) -> isize {
+    let timeout = if timeout_ms == 0 {
+        EpollWaitTimeout::Immediate
+    } else if timeout_ms < 0 {
+        EpollWaitTimeout::Infinite
+    } else {
+        EpollWaitTimeout::Until(
+            axhal::time::wall_time() + core::time::Duration::from_millis(timeout_ms as u64),
+        )
+    };
+    sys_epoll_wait_with_timeout(
+        process, epfd, events, maxevents, timeout, sigmask, sigsetsize,
+    )
+}
+
+pub(super) fn sys_epoll_pwait2(
+    process: &UserProcess,
+    epfd: usize,
+    events: usize,
+    maxevents: usize,
+    timeout: usize,
+    sigmask: usize,
+    sigsetsize: usize,
+) -> isize {
+    let timeout = if timeout == 0 {
+        EpollWaitTimeout::Infinite
+    } else {
+        let ts = match read_user_value::<general::timespec>(process, timeout) {
+            Ok(ts) => ts,
+            Err(err) => return neg_errno(err),
+        };
+        if ts.tv_sec < 0 || !(0..1_000_000_000).contains(&ts.tv_nsec) {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if ts.tv_sec == 0 && ts.tv_nsec == 0 {
+            EpollWaitTimeout::Immediate
+        } else {
+            EpollWaitTimeout::Until(
+                axhal::time::wall_time()
+                    + core::time::Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32),
+            )
+        }
+    };
+    sys_epoll_wait_with_timeout(
+        process, epfd, events, maxevents, timeout, sigmask, sigsetsize,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum EpollWaitTimeout {
+    Immediate,
+    Until(core::time::Duration),
+    Infinite,
+}
+
+fn sys_epoll_wait_with_timeout(
+    process: &UserProcess,
+    epfd: usize,
+    events: usize,
+    maxevents: usize,
+    timeout: EpollWaitTimeout,
+    sigmask: usize,
+    sigsetsize: usize,
+) -> isize {
+    if maxevents == 0 || maxevents > FD_TABLE_LIMIT {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if events == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    if matches!(timeout, EpollWaitTimeout::Immediate) && sigmask == 0 {
+        let table = process.fds.lock();
+        match table.epoll_try_fast_no_ready(epfd as i32) {
+            Ok(Some(true)) => return 0,
+            Ok(Some(false) | None) => {}
+            Err(err) => return neg_errno(err),
+        }
+    }
+    let _signal_mask_guard = match install_temporary_signal_mask(process, sigmask, sigsetsize) {
+        Ok(guard) => guard,
+        Err(err) => return neg_errno(err),
+    };
+    let mut ready = Vec::new();
+    if matches!(timeout, EpollWaitTimeout::Immediate) {
+        {
+            let table = process.fds.lock();
+            match table.epoll_collect_ready(epfd as i32, maxevents, &mut ready) {
+                Ok(()) => {}
+                Err(err) => return neg_errno(err),
+            }
+        }
+        return copy_epoll_events_to_user(process, events, &ready);
+    }
+    loop {
+        if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+            return neg_errno(LinuxError::EINTR);
+        }
+        ready.clear();
+        {
+            let table = process.fds.lock();
+            match table.epoll_collect_ready(epfd as i32, maxevents, &mut ready) {
+                Ok(()) => {}
+                Err(err) => return neg_errno(err),
+            }
+        }
+        if !ready.is_empty() {
+            return copy_epoll_events_to_user(process, events, &ready);
+        }
+        if matches!(timeout, EpollWaitTimeout::Until(ddl) if axhal::time::wall_time() >= ddl) {
+            return 0;
+        }
+        yield_poll_wait();
+    }
+}
+
+fn copy_epoll_events_to_user(
+    process: &UserProcess,
+    events: usize,
+    ready: &[general::epoll_event],
+) -> isize {
+    if ready.is_empty() {
+        return 0;
+    }
+    for (idx, event) in ready.iter().enumerate() {
+        let Some(dst) = events.checked_add(idx * size_of::<general::epoll_event>()) else {
+            return neg_errno(LinuxError::EFAULT);
+        };
+        let ret = write_user_value(process, dst, event);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    ready.len() as isize
+}
+
+impl EventFdEntry {
+    const COUNTER_MAX: u64 = u64::MAX - 1;
+
+    fn new(initval: u64, status_flags: u32, semaphore: bool) -> Self {
+        Self {
+            counter: Arc::new(Mutex::new(initval)),
+            status_flags: status_flags & general::O_NONBLOCK,
+            semaphore,
+        }
+    }
+
+    fn status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    fn set_status_flags(&mut self, flags: u32) {
+        self.status_flags = flags & general::O_NONBLOCK;
+    }
+
+    fn nonblocking(&self) -> bool {
+        self.status_flags & general::O_NONBLOCK != 0
+    }
+
+    fn poll_readable(&self) -> bool {
+        *self.counter.lock() > 0
+    }
+
+    fn poll_writable(&self) -> bool {
+        *self.counter.lock() < Self::COUNTER_MAX
+    }
+
+    fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        if dst.len() < size_of::<u64>() {
+            return Err(LinuxError::EINVAL);
+        }
+        loop {
+            {
+                let mut counter = self.counter.lock();
+                if *counter > 0 {
+                    let value = if self.semaphore { 1 } else { *counter };
+                    if self.semaphore {
+                        *counter -= 1;
+                    } else {
+                        *counter = 0;
+                    }
+                    dst[..size_of::<u64>()].copy_from_slice(&value.to_ne_bytes());
+                    return Ok(size_of::<u64>());
+                }
+            }
+            if self.nonblocking() {
+                return Err(LinuxError::EAGAIN);
+            }
+            if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+                return Err(LinuxError::EINTR);
+            }
+            axtask::yield_now();
+        }
+    }
+
+    fn write(&self, process: &UserProcess, src: &[u8]) -> Result<usize, LinuxError> {
+        if src.len() < size_of::<u64>() {
+            return Err(LinuxError::EINVAL);
+        }
+        let value = u64::from_ne_bytes(src[..size_of::<u64>()].try_into().unwrap());
+        if value == u64::MAX {
+            return Err(LinuxError::EINVAL);
+        }
+        loop {
+            {
+                let mut counter = self.counter.lock();
+                if value <= Self::COUNTER_MAX.saturating_sub(*counter) {
+                    *counter += value;
+                    return Ok(size_of::<u64>());
+                }
+            }
+            if self.nonblocking() {
+                return Err(LinuxError::EAGAIN);
+            }
+            if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+                return Err(LinuxError::EINTR);
+            }
+            axtask::yield_now();
+        }
+    }
+}
+
+impl TimerFdEntry {
+    fn new(clock_id: u32, status_flags: u32) -> Self {
+        Self {
+            clock_id,
+            status_flags: status_flags & general::O_NONBLOCK,
+            state: Arc::new(Mutex::new(TimerFdState {
+                deadline: None,
+                interval: Duration::ZERO,
+                expirations: 0,
+            })),
+        }
+    }
+
+    fn clock_supported(clock_id: u32) -> bool {
+        matches!(
+            clock_id,
+            general::CLOCK_REALTIME
+                | general::CLOCK_MONOTONIC
+                | general::CLOCK_BOOTTIME
+                | general::CLOCK_REALTIME_ALARM
+                | general::CLOCK_BOOTTIME_ALARM
+        )
+    }
+
+    fn status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    fn set_status_flags(&mut self, flags: u32) {
+        self.status_flags = flags & general::O_NONBLOCK;
+    }
+
+    fn nonblocking(&self) -> bool {
+        self.status_flags & general::O_NONBLOCK != 0
+    }
+
+    fn settime(
+        &self,
+        flags: u32,
+        new_spec: general::itimerspec,
+    ) -> Result<general::itimerspec, LinuxError> {
+        let new_interval = timespec_to_duration(new_spec.it_interval)?;
+        let new_value = timespec_to_duration(new_spec.it_value)?;
+        let mut state = self.state.lock();
+        self.refresh_locked(&mut state)?;
+        let old_spec = self.spec_from_state(&state)?;
+        state.interval = new_interval;
+        state.expirations = 0;
+        state.deadline = if new_value == Duration::ZERO {
+            None
+        } else if flags & general::TFD_TIMER_ABSTIME != 0 {
+            Some(new_value)
+        } else {
+            Some(saturating_duration_add(
+                clock_now_duration(self.clock_id)?,
+                new_value,
+            ))
+        };
+        Ok(old_spec)
+    }
+
+    fn gettime(&self) -> Result<general::itimerspec, LinuxError> {
+        let mut state = self.state.lock();
+        self.refresh_locked(&mut state)?;
+        self.spec_from_state(&state)
+    }
+
+    fn poll_readable(&self) -> bool {
+        let mut state = self.state.lock();
+        self.refresh_locked(&mut state)
+            .is_ok_and(|()| state.expirations > 0)
+    }
+
+    fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        if dst.len() < size_of::<u64>() {
+            return Err(LinuxError::EINVAL);
+        }
+        loop {
+            {
+                let mut state = self.state.lock();
+                self.refresh_locked(&mut state)?;
+                if state.expirations > 0 {
+                    let value = state.expirations;
+                    state.expirations = 0;
+                    dst[..size_of::<u64>()].copy_from_slice(&value.to_ne_bytes());
+                    return Ok(size_of::<u64>());
+                }
+            }
+            if self.nonblocking() {
+                return Err(LinuxError::EAGAIN);
+            }
+            if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+                return Err(LinuxError::EINTR);
+            }
+            yield_poll_wait();
+        }
+    }
+
+    fn refresh_locked(&self, state: &mut TimerFdState) -> Result<(), LinuxError> {
+        let Some(deadline) = state.deadline else {
+            return Ok(());
+        };
+        let now = clock_now_duration(self.clock_id)?;
+        if now < deadline {
+            return Ok(());
+        }
+        if state.interval == Duration::ZERO {
+            state.expirations = state.expirations.saturating_add(1);
+            state.deadline = None;
+            return Ok(());
+        }
+        let elapsed = now.saturating_sub(deadline);
+        let period_ns = duration_to_nanos_saturating(state.interval).max(1);
+        let periods = elapsed.as_nanos() / period_ns + 1;
+        let periods = periods.min(u64::MAX as u128) as u64;
+        state.expirations = state.expirations.saturating_add(periods);
+        state.deadline = Some(saturating_duration_add(
+            deadline,
+            duration_mul_saturating(state.interval, periods),
+        ));
+        Ok(())
+    }
+
+    fn spec_from_state(&self, state: &TimerFdState) -> Result<general::itimerspec, LinuxError> {
+        let remaining = match state.deadline {
+            Some(deadline) => {
+                let now = clock_now_duration(self.clock_id)?;
+                deadline.saturating_sub(now)
+            }
+            None => Duration::ZERO,
+        };
+        Ok(general::itimerspec {
+            it_interval: duration_to_timespec(state.interval),
+            it_value: duration_to_timespec(remaining),
+        })
+    }
+}
+
+impl SignalFdEntry {
+    fn new(mask: u64, status_flags: u32) -> Self {
+        Self {
+            mask: Arc::new(Mutex::new(mask)),
+            status_flags: status_flags & general::O_NONBLOCK,
+        }
+    }
+
+    fn status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    fn set_status_flags(&mut self, flags: u32) {
+        self.status_flags = flags & general::O_NONBLOCK;
+    }
+
+    fn nonblocking(&self) -> bool {
+        self.status_flags & general::O_NONBLOCK != 0
+    }
+
+    fn set_mask(&mut self, mask: u64) {
+        *self.mask.lock() = mask;
+    }
+
+    fn mask(&self) -> u64 {
+        *self.mask.lock()
+    }
+
+    fn poll_readable(&self) -> bool {
+        current_pending_signal_matches(self.mask())
+    }
+
+    fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        const SIGNALFD_SIGINFO_SIZE: usize = 128;
+        if dst.len() < SIGNALFD_SIGINFO_SIZE {
+            return Err(LinuxError::EINVAL);
+        }
+        loop {
+            let mask = self.mask();
+            if let Some((sig, sender_pid)) = take_current_pending_signal_matching(mask) {
+                let mut info = [0u8; SIGNALFD_SIGINFO_SIZE];
+                info[0..4].copy_from_slice(&(sig as u32).to_ne_bytes());
+                info[8..12].copy_from_slice(&0i32.to_ne_bytes());
+                info[12..16].copy_from_slice(&(sender_pid.max(0) as u32).to_ne_bytes());
+                dst[..SIGNALFD_SIGINFO_SIZE].copy_from_slice(&info);
+                return Ok(SIGNALFD_SIGINFO_SIZE);
+            }
+            if self.nonblocking() {
+                return Err(LinuxError::EAGAIN);
+            }
+            if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+                return Err(LinuxError::EINTR);
+            }
+            yield_poll_wait();
+        }
+    }
+}
+
+fn duration_to_timespec(duration: Duration) -> general::timespec {
+    general::timespec {
+        tv_sec: duration.as_secs().min(i64::MAX as u64) as _,
+        tv_nsec: duration.subsec_nanos() as _,
+    }
+}
+
+fn duration_to_nanos_saturating(duration: Duration) -> u128 {
+    duration.as_secs().min((u128::MAX / 1_000_000_000) as u64) as u128 * 1_000_000_000
+        + duration.subsec_nanos() as u128
+}
+
+fn duration_mul_saturating(duration: Duration, count: u64) -> Duration {
+    let nanos = duration_to_nanos_saturating(duration).saturating_mul(count as u128);
+    duration_from_nanos_saturating(nanos)
+}
+
+fn saturating_duration_add(lhs: Duration, rhs: Duration) -> Duration {
+    duration_from_nanos_saturating(
+        duration_to_nanos_saturating(lhs).saturating_add(duration_to_nanos_saturating(rhs)),
+    )
+}
+
+fn duration_from_nanos_saturating(nanos: u128) -> Duration {
+    let secs = (nanos / 1_000_000_000).min(u64::MAX as u128) as u64;
+    let nsec = (nanos % 1_000_000_000) as u32;
+    Duration::new(secs, nsec)
+}
+
+impl EpollEntry {
+    fn new() -> Self {
+        Self {
+            registrations: Arc::new(Mutex::new(BTreeMap::new())),
+        }
     }
 }
 
@@ -880,7 +1583,7 @@ pub(super) fn sys_flock(process: &UserProcess, fd: usize, operation: usize) -> i
 
 pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().entry(fd as i32) {
-        Ok(FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc) => {
+        Ok(FdEntry::DevNull | FdEntry::DevZero | FdEntry::BlockDevice(_) | FdEntry::Rtc) => {
             neg_errno(LinuxError::EINVAL)
         }
         Ok(_) => 0,
@@ -896,7 +1599,17 @@ pub(super) fn sys_renameat2(
     newpath: usize,
     flags: usize,
 ) -> isize {
-    if flags != 0 {
+    if flags > u32::MAX as usize {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let flags = flags as u32;
+    let supported_flags =
+        general::RENAME_NOREPLACE | general::RENAME_EXCHANGE | general::RENAME_WHITEOUT;
+    if flags & !supported_flags != 0
+        || flags & general::RENAME_EXCHANGE != 0
+            && flags & (general::RENAME_NOREPLACE | general::RENAME_WHITEOUT) != 0
+        || flags & general::RENAME_WHITEOUT != 0
+    {
         return neg_errno(LinuxError::EINVAL);
     }
     let old_path = match read_cstr(process, oldpath) {
@@ -907,6 +1620,13 @@ pub(super) fn sys_renameat2(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
+    if old_path.is_empty() || new_path.is_empty() {
+        return neg_errno(LinuxError::ENOENT);
+    }
+    if path_exceeds_linux_limits(old_path.as_str()) || path_exceeds_linux_limits(new_path.as_str())
+    {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
     let (old_abs_path, new_abs_path) = {
         let table = process.fds.lock();
         let old_abs = match resolve_dirfd_path(process, &table, olddirfd as i32, old_path.as_str())
@@ -919,14 +1639,147 @@ pub(super) fn sys_renameat2(
             Ok(path) => path,
             Err(err) => return neg_errno(err),
         };
+        let old_abs = match process.resolve_parent_symlinks(old_abs.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
+        let new_abs = match process.resolve_parent_symlinks(new_abs.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
         (old_abs, new_abs)
     };
-    match axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()) {
-        Ok(()) => {
-            process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
-            0
+    renameat2_paths(process, old_abs_path, new_abs_path, flags)
+        .map_or_else(|err| neg_errno(err), |_| 0)
+}
+
+fn renameat2_paths(
+    process: &UserProcess,
+    old_abs_path: String,
+    new_abs_path: String,
+    flags: u32,
+) -> Result<(), LinuxError> {
+    let old_st = rename_target_stat(process, old_abs_path.as_str())?;
+    if old_abs_path == new_abs_path {
+        return Ok(());
+    }
+    let new_st = match rename_target_stat(process, new_abs_path.as_str()) {
+        Ok(st) => Some(st),
+        Err(LinuxError::ENOENT) => None,
+        Err(err) => return Err(err),
+    };
+
+    if flags & general::RENAME_NOREPLACE != 0 && new_st.is_some() {
+        return Err(LinuxError::EEXIST);
+    }
+    if new_st
+        .as_ref()
+        .is_some_and(|st| old_st.st_dev == st.st_dev && old_st.st_ino == st.st_ino)
+    {
+        return Ok(());
+    }
+    if flags & general::RENAME_EXCHANGE != 0 {
+        let new_st = new_st.ok_or(LinuxError::ENOENT)?;
+        return rename_exchange(
+            process,
+            old_abs_path.as_str(),
+            new_abs_path.as_str(),
+            &old_st,
+            &new_st,
+        );
+    }
+
+    let old_parent_st = check_parent_write_search_permission(process, old_abs_path.as_str())?;
+    let new_parent_st = check_parent_write_search_permission(process, new_abs_path.as_str())?;
+    check_sticky_parent_permission(process, &old_parent_st, &old_st)?;
+    if let Some(st) = new_st.as_ref() {
+        check_sticky_parent_permission(process, &new_parent_st, st)?;
+    }
+    if process.paths_cross_mount(old_abs_path.as_str(), new_abs_path.as_str()) {
+        return Err(LinuxError::EXDEV);
+    }
+
+    if let Some(backing_path) = process.path_hardlink_backing(old_abs_path.as_str()) {
+        if backing_path != old_abs_path {
+            if new_st.is_some() {
+                return Err(LinuxError::EEXIST);
+            }
+            process.remove_path_hardlink(old_abs_path.as_str());
+            process.remove_path_inode(old_abs_path.as_str());
+            process.set_path_hardlink(backing_path.as_str(), new_abs_path, old_st.st_ino as u64);
+            return Ok(());
         }
-        Err(err) => neg_errno(LinuxError::from(err)),
+    }
+
+    axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()).map_err(LinuxError::from)?;
+    process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
+    Ok(())
+}
+
+fn rename_exchange(
+    process: &UserProcess,
+    old_abs_path: &str,
+    new_abs_path: &str,
+    old_st: &general::stat,
+    new_st: &general::stat,
+) -> Result<(), LinuxError> {
+    let old_parent_st = check_parent_write_search_permission(process, old_abs_path)?;
+    let new_parent_st = check_parent_write_search_permission(process, new_abs_path)?;
+    check_sticky_parent_permission(process, &old_parent_st, old_st)?;
+    check_sticky_parent_permission(process, &new_parent_st, new_st)?;
+    if process.paths_cross_mount(old_abs_path, new_abs_path) {
+        return Err(LinuxError::EXDEV);
+    }
+    let tmp_path = rename_exchange_tmp_path(process, old_abs_path)?;
+    axfs::api::rename(old_abs_path, tmp_path.as_str()).map_err(LinuxError::from)?;
+    if let Err(err) = axfs::api::rename(new_abs_path, old_abs_path).map_err(LinuxError::from) {
+        let _ = axfs::api::rename(tmp_path.as_str(), old_abs_path);
+        return Err(err);
+    }
+    if let Err(err) = axfs::api::rename(tmp_path.as_str(), new_abs_path).map_err(LinuxError::from) {
+        let _ = axfs::api::rename(old_abs_path, new_abs_path);
+        let _ = axfs::api::rename(tmp_path.as_str(), old_abs_path);
+        return Err(err);
+    }
+    process.move_path_metadata(old_abs_path, tmp_path.clone());
+    process.move_path_metadata(new_abs_path, old_abs_path.to_string());
+    process.move_path_metadata(tmp_path.as_str(), new_abs_path.to_string());
+    Ok(())
+}
+
+fn rename_exchange_tmp_path(
+    process: &UserProcess,
+    old_abs_path: &str,
+) -> Result<String, LinuxError> {
+    let parent = parent_path(old_abs_path);
+    for attempt in 0..64 {
+        let candidate = if parent == "/" {
+            format!("/.arceos-rename-exchange-{}-{}", process.pid(), attempt)
+        } else {
+            format!(
+                "{}/.arceos-rename-exchange-{}-{}",
+                parent,
+                process.pid(),
+                attempt
+            )
+        };
+        if path_exceeds_linux_limits(candidate.as_str()) {
+            return Err(LinuxError::ENAMETOOLONG);
+        }
+        if rename_target_stat(process, candidate.as_str()).is_err()
+            && process.path_hardlink_backing(candidate.as_str()).is_none()
+        {
+            return Ok(candidate);
+        }
+    }
+    Err(LinuxError::EEXIST)
+}
+
+fn rename_target_stat(process: &UserProcess, path: &str) -> Result<general::stat, LinuxError> {
+    if let Some(st) = process.path_symlink_stat(path) {
+        Ok(apply_recorded_path_metadata(process, path, st))
+    } else {
+        stat_absolute_path(process, path)
     }
 }
 
@@ -1045,6 +1898,39 @@ pub(super) fn sys_unlinkat(
     }
 }
 
+pub(super) fn sys_linkat(
+    process: &UserProcess,
+    olddirfd: usize,
+    oldpath: usize,
+    newdirfd: usize,
+    newpath: usize,
+    flags: usize,
+) -> isize {
+    let supported_flags = general::AT_SYMLINK_FOLLOW;
+    if flags as u32 & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let old_path = match read_cstr(process, oldpath) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let new_path = match read_cstr(process, newpath) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    match process.fds.lock().linkat(
+        process,
+        olddirfd as i32,
+        old_path.as_str(),
+        newdirfd as i32,
+        new_path.as_str(),
+        flags as u32,
+    ) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
 pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
     let new_cwd = {
         let mut table = process.fds.lock();
@@ -1149,7 +2035,7 @@ impl FdTable {
         matches!(
             self.entry(fd),
             Ok(FdEntry::File(FileEntry { path, .. })) if path == "/dev/zero"
-        )
+        ) || matches!(self.entry(fd), Ok(FdEntry::DevZero))
     }
 
     pub(super) fn pipe_available_read(&self, fd: i32) -> Result<usize, LinuxError> {
@@ -1175,6 +2061,7 @@ impl FdTable {
                 FdEntry::Stdin => false,
                 FdEntry::Stdout | FdEntry::Stderr => false,
                 FdEntry::DevNull
+                | FdEntry::DevZero
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
@@ -1183,7 +2070,11 @@ impl FdTable {
                 | FdEntry::MemoryFile(_)
                 | FdEntry::ProcPagemap(_) => true,
                 FdEntry::Path(_) => false,
-                FdEntry::Pipe(pipe) => pipe.poll().readable,
+                FdEntry::EventFd(eventfd) => eventfd.poll_readable(),
+                FdEntry::TimerFd(timerfd) => timerfd.poll_readable(),
+                FdEntry::SignalFd(signalfd) => signalfd.poll_readable(),
+                FdEntry::Epoll(_) => false,
+                FdEntry::Pipe(pipe) => pipe.poll_readable(),
                 FdEntry::Socket(socket) => socket.poll(mode),
                 FdEntry::LocalSocket(socket) => socket.poll(mode),
             },
@@ -1192,6 +2083,7 @@ impl FdTable {
                 FdEntry::Stdout
                 | FdEntry::Stderr
                 | FdEntry::DevNull
+                | FdEntry::DevZero
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc => true,
                 FdEntry::File(_) => true,
@@ -1199,13 +2091,209 @@ impl FdTable {
                 | FdEntry::ProcFdDir(_)
                 | FdEntry::Path(_)
                 | FdEntry::MemoryFile(_)
-                | FdEntry::ProcPagemap(_) => false,
-                FdEntry::Pipe(pipe) => pipe.poll().writable,
+                | FdEntry::ProcPagemap(_)
+                | FdEntry::TimerFd(_)
+                | FdEntry::SignalFd(_)
+                | FdEntry::Epoll(_) => false,
+                FdEntry::EventFd(eventfd) => eventfd.poll_writable(),
+                FdEntry::Pipe(pipe) => pipe.poll_writable(),
                 FdEntry::Socket(socket) => socket.poll(mode),
                 FdEntry::LocalSocket(socket) => socket.poll(mode),
             },
             SelectMode::Except => false,
         }
+    }
+
+    pub(super) fn epoll_ctl(
+        &mut self,
+        epfd: i32,
+        op: u32,
+        fd: i32,
+        event: Option<general::epoll_event>,
+    ) -> Result<(), LinuxError> {
+        if epfd == fd {
+            return Err(LinuxError::EINVAL);
+        }
+        let epoll = match self.entry(epfd)? {
+            FdEntry::Epoll(epoll) => epoll.clone(),
+            _ => return Err(LinuxError::EINVAL),
+        };
+        match op {
+            general::EPOLL_CTL_ADD | general::EPOLL_CTL_MOD => {
+                let Some(event) = event else {
+                    return Err(LinuxError::EFAULT);
+                };
+                self.validate_epoll_target(epfd, fd)?;
+                let mut registrations = epoll.registrations.lock();
+                match op {
+                    general::EPOLL_CTL_ADD => {
+                        if registrations.contains_key(&fd) {
+                            return Err(LinuxError::EEXIST);
+                        }
+                        registrations.insert(fd, EpollRegistration::new(event));
+                    }
+                    general::EPOLL_CTL_MOD => {
+                        if !registrations.contains_key(&fd) {
+                            return Err(LinuxError::ENOENT);
+                        }
+                        registrations.insert(fd, EpollRegistration::new(event));
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            general::EPOLL_CTL_DEL => {
+                let mut registrations = epoll.registrations.lock();
+                if registrations.remove(&fd).is_none() {
+                    return Err(LinuxError::ENOENT);
+                }
+            }
+            _ => return Err(LinuxError::EINVAL),
+        }
+        Ok(())
+    }
+
+    fn validate_epoll_target(&self, epfd: i32, fd: i32) -> Result<(), LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(_)
+            | FdEntry::Socket(_)
+            | FdEntry::LocalSocket(_)
+            | FdEntry::EventFd(_)
+            | FdEntry::TimerFd(_)
+            | FdEntry::SignalFd(_) => Ok(()),
+            FdEntry::Epoll(_) => {
+                if self.epoll_reaches(fd, epfd, &mut Vec::new()) {
+                    return Err(LinuxError::ELOOP);
+                }
+                if self.epoll_nesting_depth(fd, &mut Vec::new()) >= LINUX_EPOLL_MAX_NEST_DEPTH {
+                    return Err(LinuxError::EINVAL);
+                }
+                Ok(())
+            }
+            _ => Err(LinuxError::EPERM),
+        }
+    }
+
+    fn epoll_reaches(&self, start_epfd: i32, target_epfd: i32, visited: &mut Vec<i32>) -> bool {
+        if start_epfd == target_epfd {
+            return true;
+        }
+        if visited.contains(&start_epfd) {
+            return false;
+        }
+        visited.push(start_epfd);
+        let registrations = match self.entry(start_epfd) {
+            Ok(FdEntry::Epoll(epoll)) => epoll.registrations.lock().clone(),
+            _ => {
+                visited.pop();
+                return false;
+            }
+        };
+        for fd in registrations.keys() {
+            if self.epoll_reaches(*fd, target_epfd, visited) {
+                return true;
+            }
+        }
+        visited.pop();
+        false
+    }
+
+    fn epoll_nesting_depth(&self, epfd: i32, visited: &mut Vec<i32>) -> usize {
+        if visited.contains(&epfd) {
+            return LINUX_EPOLL_MAX_NEST_DEPTH;
+        }
+        visited.push(epfd);
+        let registrations = match self.entry(epfd) {
+            Ok(FdEntry::Epoll(epoll)) => epoll.registrations.lock().clone(),
+            _ => {
+                visited.pop();
+                return 0;
+            }
+        };
+        let mut max_child_depth = 0usize;
+        for fd in registrations.keys() {
+            max_child_depth = cmp::max(max_child_depth, self.epoll_nesting_depth(*fd, visited));
+        }
+        visited.pop();
+        max_child_depth.saturating_add(1)
+    }
+
+    pub(super) fn epoll_collect_ready(
+        &self,
+        epfd: i32,
+        maxevents: usize,
+        out: &mut Vec<general::epoll_event>,
+    ) -> Result<(), LinuxError> {
+        let registrations = match self.entry(epfd)? {
+            FdEntry::Epoll(epoll) => epoll.registrations.clone(),
+            _ => return Err(LinuxError::EINVAL),
+        };
+        let mut registrations = registrations.lock();
+        for (&fd, registration) in registrations.iter_mut() {
+            if registration.disabled {
+                continue;
+            }
+            let ready_events = self.epoll_ready_events(fd, registration.event.events);
+            let edge_triggered = registration.event.events & general::EPOLLET != 0;
+            let became_ready = ready_events & !registration.last_ready != 0;
+            let should_emit = ready_events != 0 && (!edge_triggered || became_ready);
+            let has_capacity = out.len() < maxevents;
+            if should_emit && has_capacity {
+                out.push(general::epoll_event {
+                    events: ready_events,
+                    data: registration.event.data,
+                });
+                if registration.event.events & general::EPOLLONESHOT != 0 {
+                    registration.disabled = true;
+                }
+            }
+            if !should_emit || has_capacity {
+                registration.last_ready = ready_events;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn epoll_try_fast_no_ready(&self, epfd: i32) -> Result<Option<bool>, LinuxError> {
+        let registrations = match self.entry(epfd)? {
+            FdEntry::Epoll(epoll) => epoll.registrations.clone(),
+            _ => return Err(LinuxError::EINVAL),
+        };
+        let mut registrations = registrations.lock();
+        for (&fd, registration) in registrations.iter_mut() {
+            if registration.disabled {
+                continue;
+            }
+            if registration.event.events & (general::EPOLLET | general::EPOLLONESHOT) != 0 {
+                return Ok(None);
+            }
+            let ready_events = self.epoll_ready_events(fd, registration.event.events);
+            if ready_events != 0 {
+                return Ok(Some(false));
+            }
+            registration.last_ready = 0;
+        }
+        Ok(Some(true))
+    }
+
+    fn epoll_ready_events(&self, fd: i32, requested: u32) -> u32 {
+        let mut ready_events = 0u32;
+        if requested & general::EPOLLIN != 0 && self.poll(fd, SelectMode::Read) {
+            ready_events |= general::EPOLLIN;
+        }
+        if requested & general::EPOLLOUT != 0 && self.poll(fd, SelectMode::Write) {
+            ready_events |= general::EPOLLOUT;
+        }
+        if requested & general::EPOLLRDHUP != 0 && self.poll_rdhup(fd) {
+            ready_events |= general::EPOLLRDHUP;
+        }
+        if self.entry(fd).is_err() {
+            ready_events |= general::EPOLLNVAL;
+        }
+        ready_events
+    }
+
+    fn poll_rdhup(&self, fd: i32) -> bool {
+        matches!(self.entry(fd), Ok(FdEntry::Socket(socket)) if socket.poll_rdhup())
     }
 
     pub(super) fn read(
@@ -1217,6 +2305,10 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::Stdin => Ok(0),
             FdEntry::DevNull => Ok(0),
+            FdEntry::DevZero => {
+                dst.fill(0);
+                Ok(dst.len())
+            }
             FdEntry::BlockDevice(_) => {
                 dst.fill(0);
                 Ok(dst.len())
@@ -1234,6 +2326,9 @@ impl FdTable {
             FdEntry::Pipe(pipe) => pipe.read(dst),
             FdEntry::Socket(socket) => socket.read(dst),
             FdEntry::LocalSocket(socket) => socket.read(dst),
+            FdEntry::EventFd(eventfd) => eventfd.read(process, dst),
+            FdEntry::TimerFd(timerfd) => timerfd.read(process, dst),
+            FdEntry::SignalFd(signalfd) => signalfd.read(process, dst),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -1251,6 +2346,7 @@ impl FdTable {
                 Ok(src.len())
             }
             FdEntry::DevNull => Ok(src.len()),
+            FdEntry::DevZero => Ok(src.len()),
             FdEntry::BlockDevice(_) => Ok(src.len()),
             FdEntry::Rtc => Ok(src.len()),
             FdEntry::File(file) => {
@@ -1262,6 +2358,8 @@ impl FdTable {
             FdEntry::Pipe(pipe) => pipe.write(src),
             FdEntry::Socket(socket) => socket.write(src),
             FdEntry::LocalSocket(socket) => socket.write(src),
+            FdEntry::EventFd(eventfd) => eventfd.write(process, src),
+            FdEntry::TimerFd(_) | FdEntry::SignalFd(_) => Err(LinuxError::EINVAL),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -1532,7 +2630,7 @@ impl FdTable {
             let name_start = start + offset_of!(general::linux_dirent64, d_name);
             out[name_start..name_start + name.len()].copy_from_slice(name);
         }
-        if count == 0 && !dir.synthetic_dirents_emitted {
+        if !dir.synthetic_dirents_emitted && out.len() < max_len {
             for name in process.path_symlink_names_in_dir(dir.path.as_str()) {
                 if seen_names.iter().any(|seen| seen == &name) {
                     continue;
@@ -1700,6 +2798,7 @@ impl FdTable {
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
+            FdEntry::DevZero => Ok(()),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -1921,6 +3020,72 @@ impl FdTable {
         Ok(())
     }
 
+    pub(super) fn linkat(
+        &mut self,
+        process: &UserProcess,
+        olddirfd: i32,
+        oldpath: &str,
+        newdirfd: i32,
+        newpath: &str,
+        flags: u32,
+    ) -> Result<(), LinuxError> {
+        if flags & !general::AT_SYMLINK_FOLLOW != 0 {
+            return Err(LinuxError::EINVAL);
+        }
+        if oldpath.is_empty() || newpath.is_empty() {
+            return Err(LinuxError::ENOENT);
+        }
+        if path_exceeds_linux_limits(oldpath) || path_exceeds_linux_limits(newpath) {
+            return Err(LinuxError::ENAMETOOLONG);
+        }
+
+        let old_abs = resolve_dirfd_path(process, self, olddirfd, oldpath)?;
+        let old_abs = if flags & general::AT_SYMLINK_FOLLOW != 0 {
+            process
+                .resolve_path_symlink(old_abs.as_str())?
+                .unwrap_or(old_abs)
+        } else {
+            process.resolve_parent_symlinks(old_abs.as_str())?
+        };
+        let new_abs = resolve_dirfd_path(process, self, newdirfd, newpath)?;
+        let new_abs = process.resolve_parent_symlinks(new_abs.as_str())?;
+
+        if process.path_hardlink_exists(new_abs.as_str())
+            || process.path_symlink(new_abs.as_str()).is_some()
+            || stat_absolute_path(process, new_abs.as_str()).is_ok()
+        {
+            return Err(LinuxError::EEXIST);
+        }
+
+        // This layer does not hard-link synthetic per-process filesystems.
+        // Linux reports EXDEV for a procfs source linked into a regular dir.
+        if old_abs.starts_with("/proc/") || old_abs == "/proc" {
+            return Err(LinuxError::EXDEV);
+        }
+
+        let backing_path = process
+            .path_hardlink_backing(old_abs.as_str())
+            .unwrap_or_else(|| old_abs.clone());
+        let st = stat_absolute_path(process, backing_path.as_str())?;
+        if st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
+            return Err(LinuxError::EPERM);
+        }
+        if st.st_mode & ST_MODE_TYPE_MASK != ST_MODE_FILE {
+            return Err(LinuxError::EPERM);
+        }
+        if process.paths_cross_mount(backing_path.as_str(), new_abs.as_str()) {
+            return Err(LinuxError::EXDEV);
+        }
+        if process.path_on_readonly_mount(backing_path.as_str())
+            || process.path_on_readonly_mount(new_abs.as_str())
+        {
+            return Err(LinuxError::EROFS);
+        }
+        check_parent_write_search_permission(process, new_abs.as_str())?;
+        process.set_path_hardlink(backing_path.as_str(), new_abs, st.st_ino as u64);
+        Ok(())
+    }
+
     pub(super) fn unlinkat(
         &mut self,
         process: &UserProcess,
@@ -1941,6 +3106,22 @@ impl FdTable {
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
+        if let Some(backing_path) = process.path_hardlink_backing(abs_path.as_str()) {
+            if backing_path != abs_path {
+                if remove_dir {
+                    return Err(LinuxError::ENOTDIR);
+                }
+                let st = stat_absolute_path(process, backing_path.as_str())?;
+                check_sticky_parent_permission(process, &parent_st, &st)?;
+                process.remove_path_hardlink(abs_path.as_str());
+                process.remove_path_inode(abs_path.as_str());
+                process.remove_path_special_mode(abs_path.as_str());
+                process.remove_path_rdev(abs_path.as_str());
+                process.remove_path_times(abs_path.as_str());
+                process.clear_path_sparse_file(abs_path.as_str());
+                return Ok(());
+            }
+        }
         let target_st = if let Some(st) = process.path_symlink_stat(abs_path.as_str()) {
             Some(apply_recorded_path_metadata(process, abs_path.as_str(), st))
         } else {
@@ -1967,6 +3148,7 @@ impl FdTable {
             directory_remove_file(abs_path.as_str())
         };
         if removed.is_ok() {
+            process.remove_path_hardlink(abs_path.as_str());
             process.remove_path_inode(abs_path.as_str());
             process.remove_path_special_mode(abs_path.as_str());
             process.remove_path_rdev(abs_path.as_str());
@@ -1981,6 +3163,7 @@ impl FdTable {
             FdEntry::Stdin => Ok(stdio_stat(true)),
             FdEntry::Stdout | FdEntry::Stderr => Ok(stdio_stat(false)),
             FdEntry::DevNull => Ok(dev_null_stat()),
+            FdEntry::DevZero => Ok(dev_zero_stat()),
             FdEntry::BlockDevice(dev) => Ok(PathEntry::synthetic_block(dev.path.as_str()).stat()),
             FdEntry::Rtc => Ok(stdio_stat(false)),
             FdEntry::File(file) => Ok(file_attr_to_stat(
@@ -1995,6 +3178,12 @@ impl FdTable {
             FdEntry::Pipe(pipe) => Ok(pipe.stat()),
             FdEntry::Socket(socket) => Ok(socket.stat()),
             FdEntry::LocalSocket(socket) => Ok(socket.stat()),
+            FdEntry::EventFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[eventfd]", 0).stat()),
+            FdEntry::Epoll(_) => Ok(PathEntry::synthetic_file("anon_inode:[eventpoll]", 0).stat()),
+            FdEntry::TimerFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[timerfd]", 0).stat()),
+            FdEntry::SignalFd(_) => {
+                Ok(PathEntry::synthetic_file("anon_inode:[signalfd]", 0).stat())
+            }
         }
     }
 
@@ -2045,7 +3234,7 @@ impl FdTable {
             }
         }
         match open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0) {
-            Ok(FdEntry::DevNull) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
+            Ok(FdEntry::DevNull) | Ok(FdEntry::DevZero) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
             Ok(FdEntry::BlockDevice(dev)) => {
                 Ok(PathEntry::synthetic_block(dev.path.as_str()).stat())
             }
@@ -2243,18 +3432,14 @@ impl FdTable {
             general::F_GETFL => match self.entry(fd)? {
                 FdEntry::File(file) => Ok(file.status_flags as i32),
                 FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
+                FdEntry::EventFd(eventfd) => Ok(eventfd.status_flags() as i32),
+                FdEntry::TimerFd(timerfd) => Ok(timerfd.status_flags() as i32),
+                FdEntry::SignalFd(signalfd) => Ok(signalfd.status_flags() as i32),
                 _ => Ok(0),
             },
             F_GETPIPE_SZ => Ok(self.pipe_capacity(fd)? as i32),
             F_SETPIPE_SZ => match self.entry(fd)? {
-                FdEntry::Pipe(pipe) => {
-                    let capacity = pipe.capacity();
-                    if arg <= capacity {
-                        Ok(capacity as i32)
-                    } else {
-                        Err(LinuxError::EPERM)
-                    }
-                }
+                FdEntry::Pipe(pipe) => Ok(pipe.set_capacity(arg as usize)? as i32),
                 _ => Err(LinuxError::EBADF),
             },
             general::F_SETFL => match self.entry_mut(fd)? {
@@ -2265,6 +3450,18 @@ impl FdTable {
                 }
                 FdEntry::Pipe(pipe) => {
                     pipe.set_status_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::EventFd(eventfd) => {
+                    eventfd.set_status_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::TimerFd(timerfd) => {
+                    timerfd.set_status_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::SignalFd(signalfd) => {
+                    signalfd.set_status_flags(arg as u32);
                     Ok(0)
                 }
                 _ => Ok(0),
@@ -2899,6 +4096,7 @@ impl FdEntry {
             Self::Stdout => Ok(Self::Stdout),
             Self::Stderr => Ok(Self::Stderr),
             Self::DevNull => Ok(Self::DevNull),
+            Self::DevZero => Ok(Self::DevZero),
             Self::BlockDevice(dev) => Ok(Self::BlockDevice(dev.clone())),
             Self::Rtc => Ok(Self::Rtc),
             Self::File(file) => Ok(Self::File(file.clone())),
@@ -2910,6 +4108,10 @@ impl FdEntry {
             Self::Pipe(pipe) => Ok(Self::Pipe(pipe.clone())),
             Self::Socket(socket) => socket.duplicate().map(Self::Socket),
             Self::LocalSocket(socket) => Ok(Self::LocalSocket(socket.duplicate())),
+            Self::EventFd(eventfd) => Ok(Self::EventFd(eventfd.clone())),
+            Self::Epoll(epoll) => Ok(Self::Epoll(epoll.clone())),
+            Self::TimerFd(timerfd) => Ok(Self::TimerFd(timerfd.clone())),
+            Self::SignalFd(signalfd) => Ok(Self::SignalFd(signalfd.clone())),
         }
     }
 }
@@ -3136,9 +4338,24 @@ fn read_regular_file_at(
             read_len,
             physical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
         );
-        file.file
-            .read_at(offset, &mut dst[..physical_len])
-            .map_err(LinuxError::from)?;
+        let mut physical_read = 0usize;
+        while physical_read < physical_len {
+            let chunk = file
+                .file
+                .read_at(
+                    offset.saturating_add(physical_read as u64),
+                    &mut dst[physical_read..physical_len],
+                )
+                .map_err(LinuxError::from)?;
+            if chunk == 0 {
+                break;
+            }
+            physical_read += chunk;
+        }
+        if physical_read < physical_len {
+            process.copy_path_sparse_data(file.path.as_str(), offset, &mut dst[..physical_read]);
+            return Ok(physical_read);
+        }
     }
     process.copy_path_sparse_data(file.path.as_str(), offset, &mut dst[..read_len]);
     Ok(read_len)
@@ -3274,16 +4491,23 @@ fn parent_path(path: &str) -> &str {
 }
 
 fn stat_absolute_path(process: &UserProcess, path: &str) -> Result<general::stat, LinuxError> {
-    let attr = axfs::api::metadata(path).map_err(LinuxError::from)?;
+    let stat_path = process
+        .path_hardlink_backing(path)
+        .unwrap_or_else(|| path.to_string());
+    let attr = axfs::api::metadata(stat_path.as_str()).map_err(LinuxError::from)?;
     let mut st: general::stat = unsafe { core::mem::zeroed() };
     st.st_dev = 1;
-    st.st_ino = path_inode(Some(path));
+    st.st_ino = path_inode(Some(stat_path.as_str()));
     st.st_mode = file_type_mode(attr.file_type()) | attr.permissions().bits() as u32;
     st.st_nlink = 1;
     st.st_size = attr.size() as _;
     st.st_blksize = 512;
     st.st_blocks = attr.blocks() as _;
-    Ok(apply_recorded_path_metadata(process, path, st))
+    Ok(apply_recorded_path_metadata(
+        process,
+        stat_path.as_str(),
+        st,
+    ))
 }
 
 fn parent_dirs_searchable_absolute(
@@ -3347,6 +4571,17 @@ fn record_created_path_metadata(
     let mut mode = process.apply_umask(requested_mode);
     if is_directory && parent_setgid {
         mode |= FILE_MODE_SET_GID;
+    } else if !is_directory
+        && parent_setgid
+        && process.fs_uid() != 0
+        && !process.has_group(parent_st.st_gid as u32)
+    {
+        // Linux clears S_ISGID for newly-created non-directories in an SGID
+        // directory when the creator is unprivileged and not a member of the
+        // inherited group. Root/CAP_FSETID-style creators keep requested
+        // setgid, which preserves the open10/creat08 root_setgid case while
+        // still clearing it for creat09's unprivileged mismatch.
+        mode &= !FILE_MODE_SET_GID;
     }
     let gid = if parent_setgid {
         parent_st.st_gid as u32
@@ -3579,6 +4814,34 @@ fn open_candidates(
                 synthetic_userdb_fd_entry(synthetic_path, data)
             });
         }
+        if let Some((synthetic_path, data)) = synthetic_kernel_config_content(path.as_str()) {
+            if axfs::api::metadata(synthetic_path).is_err() {
+                if prefer_dir {
+                    return Err(LinuxError::ENOTDIR);
+                }
+                if !path_only && synthetic_file_is_writable_open(flags) {
+                    return Err(LinuxError::EPERM);
+                }
+                return Ok(if path_only {
+                    synthetic_kernel_config_path_entry(synthetic_path, data)
+                } else {
+                    synthetic_kernel_config_fd_entry(synthetic_path, data)
+                });
+            }
+        }
+        if let Some((synthetic_path, data)) = synthetic_proc_sys_content(path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(if path_only {
+                synthetic_proc_sys_path_entry(synthetic_path, data)
+            } else {
+                synthetic_proc_sys_fd_entry(synthetic_path, data)
+            });
+        }
         if path == "/dev/null" {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -3587,6 +4850,16 @@ fn open_candidates(
                 FdEntry::Path(PathEntry::synthetic_char("/dev/null"))
             } else {
                 FdEntry::DevNull
+            });
+        }
+        if path == "/dev/zero" {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_char("/dev/zero"))
+            } else {
+                FdEntry::DevZero
             });
         }
         if is_synthetic_block_device_path(path.as_str()) {
@@ -3627,6 +4900,11 @@ fn open_candidates(
                     mode,
                 )));
             }
+            if special_type == ST_MODE_CHR
+                && process.path_rdev(path.as_str()) == Some(DEV_ZERO_RDEV)
+            {
+                return Ok(FdEntry::DevZero);
+            }
             return Err(LinuxError::ENXIO);
         }
         if process.path_special_mode(path.as_str()) == Some(ST_MODE_FIFO) {
@@ -3648,14 +4926,44 @@ fn open_candidates(
                 return Ok(FdEntry::Path(PathEntry::fifo(path.as_str(), mode)));
             }
             let status_flags = flags & (general::O_NONBLOCK | general::O_DIRECT);
-            let (read_end, write_end) = PipeEndpoint::new_pair(status_flags);
             return Ok(match flags & general::O_ACCMODE {
-                general::O_WRONLY => FdEntry::Pipe(write_end),
+                general::O_WRONLY => {
+                    let (_, write_end) = PipeEndpoint::new_pair(status_flags);
+                    FdEntry::Pipe(write_end)
+                }
                 // Opening a FIFO with O_RDWR is Linux-specific but common in
                 // tests to avoid blocking; any pipe endpoint is non-seekable,
                 // preserving the required ESPIPE semantics.
-                _ => FdEntry::Pipe(read_end),
+                general::O_RDWR => FdEntry::Pipe(PipeEndpoint::new_fifo_readwrite(status_flags)),
+                _ => {
+                    let (read_end, _) = PipeEndpoint::new_pair(status_flags);
+                    FdEntry::Pipe(read_end)
+                }
             });
+        }
+        if let Some(backing_path) = process.path_hardlink_backing(path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
+                return Err(LinuxError::EEXIST);
+            }
+            check_open_permission(process, backing_path.as_str(), flags)?;
+            let file = File::open(backing_path.as_str(), file_opts).map_err(LinuxError::from)?;
+            if path_only {
+                let attr = file.get_attr().map_err(LinuxError::from)?;
+                return Ok(FdEntry::Path(PathEntry::from_attr(path.as_str(), &attr)));
+            }
+            if flags & general::O_TRUNC != 0 {
+                process.truncate_path_sparse_file(backing_path.clone(), 0);
+            }
+            return Ok(FdEntry::File(FileEntry {
+                file,
+                path: backing_path,
+                status_flags: fcntl_status_flags(flags),
+                offset: Arc::new(Mutex::new(0)),
+                lease_type: Arc::new(Mutex::new(general::F_UNLCK)),
+            }));
         }
         if prefer_dir {
             match open_dir_entry(path.as_str()) {
@@ -3679,6 +4987,9 @@ fn open_candidates(
         }
         if !path_only && !prefer_dir && flags & general::O_ACCMODE == general::O_RDONLY {
             if let Ok(FdEntry::Directory(dir)) = open_dir_entry(path.as_str()) {
+                if flags & general::O_CREAT != 0 {
+                    return Err(LinuxError::EISDIR);
+                }
                 check_open_permission(process, path.as_str(), flags)?;
                 return Ok(FdEntry::Directory(dir));
             }

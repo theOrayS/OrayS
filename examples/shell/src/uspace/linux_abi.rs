@@ -16,6 +16,7 @@ pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
 pub(super) const AUX_CLOCK_TICKS: usize = 100;
 
 pub(super) const SIGCHLD_NUM: isize = 17;
+pub(super) const SIGCONT_NUM: i32 = 18;
 pub(super) const SIGINT_NUM: i32 = 2;
 pub(super) const SIGQUIT_NUM: i32 = 3;
 pub(super) const SIGILL_NUM: i32 = 4;
