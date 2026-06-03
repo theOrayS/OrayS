@@ -188,6 +188,8 @@ const PR_SET_PDEATHSIG: usize = 1;
 const PR_GET_PDEATHSIG: usize = 2;
 const PR_SET_NAME: usize = 15;
 const PR_GET_NAME: usize = 16;
+const PR_SET_TIMERSLACK: usize = 29;
+const PR_GET_TIMERSLACK: usize = 30;
 
 pub(super) fn sys_sethostname(process: &UserProcess, name: usize, len: usize) -> isize {
     if len > HOST_NAME_MAX {
@@ -264,6 +266,16 @@ pub(super) fn sys_prctl(
             bytes[..copy_len].copy_from_slice(&name.as_bytes()[..copy_len]);
             write_user_bytes(process, arg2, &bytes).map_or_else(|err| neg_errno(err), |_| 0)
         }
+        PR_SET_TIMERSLACK => {
+            let slack = if arg2 == 0 {
+                process.default_timer_slack_ns()
+            } else {
+                arg2 as u64
+            };
+            process.set_timer_slack_ns(slack);
+            0
+        }
+        PR_GET_TIMERSLACK => cmp::min(process.timer_slack_ns(), isize::MAX as u64) as isize,
         _ => neg_errno(LinuxError::EINVAL),
     }
 }

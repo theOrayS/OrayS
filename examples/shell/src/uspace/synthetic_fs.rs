@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use super::UserProcess;
-use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry};
+use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry, ProcTimerSlackEntry};
 use super::linux_abi::{
     DEFAULT_GROUP_CONTENT, DEFAULT_PASSWD_CONTENT, ETC_GROUP_PATH, ETC_PASSWD_PATH,
     PROC_SELF_MAPS_PATH, USER_ASPACE_BASE, USER_STACK_SIZE, USER_STACK_TOP,
@@ -21,6 +21,7 @@ use super::task_registry::{
 };
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
+const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
 
 fn proc_maps_perms(prot: u32, shared: bool) -> String {
     let mut perms = String::new();
@@ -178,6 +179,49 @@ pub(super) fn proc_pagemap_path_entry(process: &UserProcess, path: &str) -> Opti
     Some(FdEntry::Path(PathEntry::synthetic_file(
         path.as_str(),
         max_page.saturating_mul(core::mem::size_of::<u64>()),
+    )))
+}
+
+fn proc_timerslack_target(process: &UserProcess, path: &str) -> Option<(String, i32, u64)> {
+    let normalized = normalize_path("/", path)?;
+    let pid = if normalized == PROC_SELF_TIMERSLACK_PATH {
+        process.pid()
+    } else {
+        let rest = normalized.strip_prefix("/proc/")?;
+        let pid_text = rest.strip_suffix("/timerslack_ns")?;
+        pid_text.parse::<i32>().ok()?
+    };
+    let timer_slack_ns = if pid == process.pid() {
+        process.timer_slack_ns()
+    } else {
+        user_thread_entry_by_process_pid(pid)?
+            .process
+            .timer_slack_ns()
+    };
+    Some((normalized, pid, timer_slack_ns))
+}
+
+pub(super) fn proc_timerslack_fd_entry(
+    process: &UserProcess,
+    path: &str,
+    status_flags: u32,
+) -> Option<FdEntry> {
+    let (path, pid, _) = proc_timerslack_target(process, path)?;
+    Some(FdEntry::ProcTimerSlack(ProcTimerSlackEntry {
+        path,
+        target_pid: pid,
+        offset: 0,
+        status_flags,
+    }))
+}
+
+pub(super) fn proc_timerslack_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, _, timer_slack_ns) = proc_timerslack_target(process, path)?;
+    let size = format!("{timer_slack_ns}\n").len();
+    Some(FdEntry::Path(PathEntry::synthetic_file_with_mode(
+        path.as_str(),
+        size,
+        0o644,
     )))
 }
 

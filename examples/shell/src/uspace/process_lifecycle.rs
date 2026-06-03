@@ -36,7 +36,7 @@ use super::task_registry::{
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
 };
-use super::{ChildTask, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
+use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -267,6 +267,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         credential_generation: AtomicUsize::new(0),
         personality: AtomicUsize::new(0),
         parent_death_signal: AtomicI32::new(0),
+        default_timer_slack_ns: AtomicU64::new(DEFAULT_TIMER_SLACK_NS),
+        timer_slack_ns: AtomicU64::new(DEFAULT_TIMER_SLACK_NS),
         real_timer_generation: AtomicU64::new(0),
         real_timer_deadline_us: AtomicU64::new(0),
         real_timer_interval_us: AtomicU64::new(0),
@@ -400,6 +402,18 @@ impl UserProcess {
 
     pub(super) fn set_prctl_name(&self, name: String) {
         *self.prctl_name.lock() = name;
+    }
+
+    pub(super) fn timer_slack_ns(&self) -> u64 {
+        self.timer_slack_ns.load(Ordering::Acquire)
+    }
+
+    pub(super) fn default_timer_slack_ns(&self) -> u64 {
+        self.default_timer_slack_ns.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_timer_slack_ns(&self, value: u64) {
+        self.timer_slack_ns.store(value, Ordering::Release);
     }
 
     pub(super) fn set_cwd(&self, cwd: String) {
@@ -798,6 +812,8 @@ impl UserProcess {
             credential_generation: AtomicUsize::new(self.credential_generation()),
             personality: AtomicUsize::new(self.personality()),
             parent_death_signal: AtomicI32::new(self.parent_death_signal.load(Ordering::Acquire)),
+            default_timer_slack_ns: AtomicU64::new(self.timer_slack_ns()),
+            timer_slack_ns: AtomicU64::new(self.timer_slack_ns()),
             real_timer_generation: AtomicU64::new(0),
             real_timer_deadline_us: AtomicU64::new(0),
             real_timer_interval_us: AtomicU64::new(0),

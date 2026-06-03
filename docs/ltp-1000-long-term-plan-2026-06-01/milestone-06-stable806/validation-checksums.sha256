@@ -6,3 +6,15 @@ c17842b35901f4f75e126cea1f8cede2a81884924f73c61ef7886bc29402f47b  target/ltp-100
 b766772e0da151e981418ddf3a679014054e11e1d88bf06bae98911fcc7ac9cd  target/ltp-1000-milestone-06-stable806/rv-time-fd-signal-scout-20260603T180127+0800.summary.txt
 c293ab9dff3c72b5b1fa001554cab04ffcd8432fda6521ce04e9741a769c10c6  target/ltp-1000-milestone-06-stable806/rv-time-fd-signal-scout-20260603T180127+0800.summary.json
 ab61279e414a962ef0e8f9a83b00293650488f17d06f6349ca7443a2a1d2b097  target/ltp-1000-milestone-06-stable806/rv-time-fd-signal-scout-20260603T180127+0800.promotion-candidates.txt
+e08051e34b4bbf6bde2441ce4688156bdff033446bd6c5fac48497ed56312c90  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-20260603T182915+0800.log
+ffdeb65ded65cc06955328e9dd971594ee195213a5ef55568f7d784aad18b9f1  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-20260603T182915+0800.summary.txt
+928d07e83b6d6bd77080e772a6ea0418bfe72ef8e9031f0dd9e1f301060001ef  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-20260603T182915+0800.summary.json
+e47ec5998d672a2f49596a4d042d7f2f66bed404f069ed25a5c7c4c811c05c06  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-20260603T182915+0800.promotion-candidates.txt
+766105a6d6e6d9bd684d456efba14dae80619ecf8ef4f28a11aaca15b0ba46b8  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-default-inherit-20260603T183244+0800.log
+2bf3097f0ec4e4dc7a430bcd67ba82bd47eb1b1e3d58d3555fe1a2e0b0228d22  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-default-inherit-20260603T183244+0800.summary.txt
+afcbb97e83c32021069e4f050561590c010d8cdf7595062dcbdaa68ce39fbcd5  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-default-inherit-20260603T183244+0800.summary.json
+7573268dd652a36ebdf4b3e93172d3f2ce22002c720fd687f63f56f0ec98a9e8  target/ltp-1000-milestone-06-stable806/rv-prctl08-09-after-timerslack-default-inherit-20260603T183244+0800.promotion-candidates.txt
+dcf0c2af7a8c96dad188becce5baf4b6489b051b9cd138585e1b633d619c5cd7  target/ltp-1000-milestone-06-stable806/la-prctl08-09-after-timerslack-default-inherit-20260603T183438+0800.log
+f251af5bfbd6173354a1779bb10ab20caa3cbddaccb3d1e392fda732da994001  target/ltp-1000-milestone-06-stable806/la-prctl08-09-after-timerslack-default-inherit-20260603T183438+0800.summary.txt
+272ae4d0742a88d74bfec3fa46f9ce45d5625e836405d63f1367a7f15c296efa  target/ltp-1000-milestone-06-stable806/la-prctl08-09-after-timerslack-default-inherit-20260603T183438+0800.summary.json
+576b05dc6d19b12a8ccb5321bb2101fa5ab4e2db3c56b8e42f2f88e3c8f8bf23  target/ltp-1000-milestone-06-stable806/la-prctl08-09-after-timerslack-default-inherit-20260603T183438+0800.promotion-candidates.txt

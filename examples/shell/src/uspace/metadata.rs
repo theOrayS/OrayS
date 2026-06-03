@@ -671,6 +671,7 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::Path(path) => Some(path.path.as_str()),
         FdEntry::MemoryFile(file) => Some(file.path.as_str()),
         FdEntry::ProcPagemap(file) => Some(file.path.as_str()),
+        FdEntry::ProcTimerSlack(file) => Some(file.path.as_str()),
         _ => None,
     }
 }

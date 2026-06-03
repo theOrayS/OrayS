@@ -43,10 +43,11 @@ use super::synthetic_fs::{
     proc_comm_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
     proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
     proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    synthetic_file_is_writable_open, synthetic_kernel_config_content,
-    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
-    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
-    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
+    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
+    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
+    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
+    synthetic_proc_sys_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
+    synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
@@ -88,6 +89,7 @@ pub(super) enum FdEntry {
     Path(PathEntry),
     MemoryFile(MemoryFileEntry),
     ProcPagemap(ProcPagemapEntry),
+    ProcTimerSlack(ProcTimerSlackEntry),
     Pipe(PipeEndpoint),
     Socket(SocketEntry),
     LocalSocket(LocalSocketEntry),
@@ -147,6 +149,14 @@ pub(super) struct ProcPagemapEntry {
     pub(super) present_ranges: Arc<Vec<(u64, u64)>>,
     pub(super) offset: u64,
     pub(super) size: u64,
+}
+
+#[derive(Clone)]
+pub(super) struct ProcTimerSlackEntry {
+    pub(super) path: String,
+    pub(super) target_pid: i32,
+    pub(super) offset: usize,
+    pub(super) status_flags: u32,
 }
 
 #[derive(Clone)]
@@ -2068,7 +2078,8 @@ impl FdTable {
                 | FdEntry::Directory(_)
                 | FdEntry::ProcFdDir(_)
                 | FdEntry::MemoryFile(_)
-                | FdEntry::ProcPagemap(_) => true,
+                | FdEntry::ProcPagemap(_)
+                | FdEntry::ProcTimerSlack(_) => true,
                 FdEntry::Path(_) => false,
                 FdEntry::EventFd(eventfd) => eventfd.poll_readable(),
                 FdEntry::TimerFd(timerfd) => timerfd.poll_readable(),
@@ -2092,6 +2103,7 @@ impl FdTable {
                 | FdEntry::Path(_)
                 | FdEntry::MemoryFile(_)
                 | FdEntry::ProcPagemap(_)
+                | FdEntry::ProcTimerSlack(_)
                 | FdEntry::TimerFd(_)
                 | FdEntry::SignalFd(_)
                 | FdEntry::Epoll(_) => false,
@@ -2322,6 +2334,12 @@ impl FdTable {
             }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
             FdEntry::ProcPagemap(file) => Ok(file.read(dst)),
+            FdEntry::ProcTimerSlack(file) => {
+                if !file_is_readable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                file.read(process, dst)
+            }
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
             FdEntry::Pipe(pipe) => pipe.read(dst),
             FdEntry::Socket(socket) => socket.read(dst),
@@ -2359,6 +2377,12 @@ impl FdTable {
             FdEntry::Socket(socket) => socket.write(src),
             FdEntry::LocalSocket(socket) => socket.write(src),
             FdEntry::EventFd(eventfd) => eventfd.write(process, src),
+            FdEntry::ProcTimerSlack(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                file.write(process, src)
+            }
             FdEntry::TimerFd(_) | FdEntry::SignalFd(_) => Err(LinuxError::EINVAL),
             _ => Err(LinuxError::EBADF),
         }
@@ -2463,9 +2487,10 @@ impl FdTable {
             FdEntry::DevNull => Ok(()),
             FdEntry::BlockDevice(_) => Ok(()),
             FdEntry::Rtc => Ok(()),
-            FdEntry::Path(_) | FdEntry::MemoryFile(_) | FdEntry::ProcPagemap(_) => {
-                Err(LinuxError::EBADF)
-            }
+            FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
             _ => Err(LinuxError::EINVAL),
         }
     }
@@ -2497,6 +2522,7 @@ impl FdTable {
             FdEntry::Path(_) => Err(LinuxError::EBADF),
             FdEntry::MemoryFile(file) => file.seek(pos),
             FdEntry::ProcPagemap(file) => file.seek(pos),
+            FdEntry::ProcTimerSlack(file) => file.seek(pos),
             FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
             FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
             _ => Err(LinuxError::ESPIPE),
@@ -3175,6 +3201,7 @@ impl FdTable {
             FdEntry::Path(path) => Ok(path.stat()),
             FdEntry::MemoryFile(file) => Ok(file.stat()),
             FdEntry::ProcPagemap(file) => Ok(file.stat()),
+            FdEntry::ProcTimerSlack(file) => Ok(file.stat()),
             FdEntry::Pipe(pipe) => Ok(pipe.stat()),
             FdEntry::Socket(socket) => Ok(socket.stat()),
             FdEntry::LocalSocket(socket) => Ok(socket.stat()),
@@ -3266,6 +3293,11 @@ impl FdTable {
                 process,
                 file.path.as_str(),
                 file.stat(),
+            )),
+            Ok(FdEntry::ProcTimerSlack(file)) => Ok(apply_recorded_path_metadata(
+                process,
+                file.path.as_str(),
+                file.stat_for_process(process),
             )),
             Ok(_) => Err(LinuxError::EINVAL),
             Err(err) => Err(err),
@@ -3435,6 +3467,7 @@ impl FdTable {
                 FdEntry::EventFd(eventfd) => Ok(eventfd.status_flags() as i32),
                 FdEntry::TimerFd(timerfd) => Ok(timerfd.status_flags() as i32),
                 FdEntry::SignalFd(signalfd) => Ok(signalfd.status_flags() as i32),
+                FdEntry::ProcTimerSlack(file) => Ok(file.status_flags as i32),
                 _ => Ok(0),
             },
             F_GETPIPE_SZ => Ok(self.pipe_capacity(fd)? as i32),
@@ -3608,6 +3641,15 @@ impl PathEntry {
         }
     }
 
+    pub(super) fn synthetic_file_with_mode(path: &str, size: usize, mode: u32) -> Self {
+        Self {
+            path: path.into(),
+            mode: ST_MODE_FILE | (mode & 0o7777),
+            size: size as u64,
+            blocks: (size as u64).div_ceil(512),
+        }
+    }
+
     pub(super) fn synthetic_char(path: &str) -> Self {
         Self {
             path: path.into(),
@@ -3679,6 +3721,92 @@ impl MemoryFileEntry {
             SeekFrom::Start(offset) => offset as i64,
             SeekFrom::Current(offset) => self.offset as i64 + offset,
             SeekFrom::End(offset) => self.data.len() as i64 + offset,
+        };
+        if next < 0 {
+            return Err(LinuxError::EINVAL);
+        }
+        self.offset = next as usize;
+        Ok(self.offset as u64)
+    }
+}
+
+impl ProcTimerSlackEntry {
+    fn target_timer_slack_ns(&self, process: &UserProcess) -> Result<u64, LinuxError> {
+        if self.target_pid == process.pid() {
+            return Ok(process.timer_slack_ns());
+        }
+        user_thread_entry_by_process_pid(self.target_pid)
+            .map(|entry| entry.process.timer_slack_ns())
+            .ok_or(LinuxError::ESRCH)
+    }
+
+    fn target_default_timer_slack_ns(&self, process: &UserProcess) -> Result<u64, LinuxError> {
+        if self.target_pid == process.pid() {
+            return Ok(process.default_timer_slack_ns());
+        }
+        user_thread_entry_by_process_pid(self.target_pid)
+            .map(|entry| entry.process.default_timer_slack_ns())
+            .ok_or(LinuxError::ESRCH)
+    }
+
+    fn set_target_timer_slack_ns(
+        &self,
+        process: &UserProcess,
+        value: u64,
+    ) -> Result<(), LinuxError> {
+        if self.target_pid == process.pid() {
+            process.set_timer_slack_ns(value);
+            return Ok(());
+        }
+        let entry = user_thread_entry_by_process_pid(self.target_pid).ok_or(LinuxError::ESRCH)?;
+        entry.process.set_timer_slack_ns(value);
+        Ok(())
+    }
+
+    pub(super) fn read(
+        &mut self,
+        process: &UserProcess,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
+        let data = format!("{}\n", self.target_timer_slack_ns(process)?).into_bytes();
+        let start = self.offset.min(data.len());
+        let end = cmp::min(start + dst.len(), data.len());
+        let len = end.saturating_sub(start);
+        dst[..len].copy_from_slice(&data[start..end]);
+        self.offset = end;
+        Ok(len)
+    }
+
+    pub(super) fn write(&mut self, process: &UserProcess, src: &[u8]) -> Result<usize, LinuxError> {
+        let text = core::str::from_utf8(src).map_err(|_| LinuxError::EINVAL)?;
+        let value = text.trim().parse::<u64>().map_err(|_| LinuxError::EINVAL)?;
+        let value = if value == 0 {
+            self.target_default_timer_slack_ns(process)?
+        } else {
+            value
+        };
+        self.set_target_timer_slack_ns(process, value)?;
+        self.offset = 0;
+        Ok(src.len())
+    }
+
+    pub(super) fn stat(&self) -> general::stat {
+        PathEntry::synthetic_file_with_mode(self.path.as_str(), 0, 0o644).stat()
+    }
+
+    pub(super) fn stat_for_process(&self, process: &UserProcess) -> general::stat {
+        let size = self
+            .target_timer_slack_ns(process)
+            .map(|value| format!("{value}\n").len())
+            .unwrap_or(0);
+        PathEntry::synthetic_file_with_mode(self.path.as_str(), size, 0o644).stat()
+    }
+
+    pub(super) fn seek(&mut self, pos: SeekFrom) -> Result<u64, LinuxError> {
+        let next = match pos {
+            SeekFrom::Start(offset) => offset as i64,
+            SeekFrom::Current(offset) => self.offset as i64 + offset,
+            SeekFrom::End(_) => return Err(LinuxError::EINVAL),
         };
         if next < 0 {
             return Err(LinuxError::EINVAL);
@@ -4105,6 +4233,7 @@ impl FdEntry {
             Self::Path(path) => Ok(Self::Path(path.clone())),
             Self::MemoryFile(file) => Ok(Self::MemoryFile(file.clone())),
             Self::ProcPagemap(file) => Ok(Self::ProcPagemap(file.clone())),
+            Self::ProcTimerSlack(file) => Ok(Self::ProcTimerSlack(file.clone())),
             Self::Pipe(pipe) => Ok(Self::Pipe(pipe.clone())),
             Self::Socket(socket) => socket.duplicate().map(Self::Socket),
             Self::LocalSocket(socket) => Ok(Self::LocalSocket(socket.duplicate())),
@@ -4759,6 +4888,16 @@ fn open_candidates(
             }
             if !path_only && synthetic_file_is_writable_open(flags) {
                 return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
+            proc_timerslack_path_entry(process, path.as_str())
+        } else {
+            proc_timerslack_fd_entry(process, path.as_str(), fcntl_status_flags(flags))
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
             }
             return Ok(entry);
         }
