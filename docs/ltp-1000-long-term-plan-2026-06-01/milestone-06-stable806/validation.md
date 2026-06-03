@@ -647,7 +647,7 @@ python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv targ
 
 Isolation scout result:
 
-- RV: `1 PASS / 5 FAIL / TBROK=5 / TFAIL=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`; zero promotion candidates. `fcntl27` was selected for a real access-mode fix; `symlink03` required a later tmpdir/parent-permission repair, and glibc `mkdir09` remains excluded.
+- RV: `1 PASS / 5 FAIL / TBROK=5 / TFAIL=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`; zero promotion candidates. `fcntl27` was selected for a real access-mode fix; `symlink03` required a later tmpdir/parent-permission repair, and glibc `mkdir09` remained excluded until the futex bitset repair below.
 
 Targeted RV command:
 
@@ -925,3 +925,79 @@ Adjacent parser result:
 Validation conclusion for this repair:
 
 `unlink09` is added to the stable806 candidate pool with four-combo clean evidence and a 23-case unlink/path-permission adjacent stable subset on both architectures. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 11/50 for stable806.
+
+## mkdir09 futex bitset repair and targeted retest
+
+A current RV retest before this patch reproduced the old blocker: `mkdir09` passed under musl but glibc aborted with `The futex facility returned an unexpected error code.` and an LTP `TBROK`. Upstream LTP 20240524 `mkdir09` creates several pthread workers that repeatedly run `mkdir`/`rmdir` under tmpfs; the failure therefore exposed a generic glibc pthread/futex command gap rather than a mkdir-specific VFS assertion.
+
+The repair adds generic support for `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET` in `sys_futex`, including `EINVAL` for a zero bitset and absolute timeout conversion for wait-bitset calls. The current implementation intentionally reuses the existing futex wait queue and allows harmless over-wake for nonzero bitsets; callers still recheck the futex word.
+
+Pre-fix diagnostic artifacts:
+
+- RV pre-fix raw log: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-current-retest-20260603T222025+0800.log`
+- RV pre-fix summary: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-current-retest-20260603T222025+0800.summary.txt` — `1 PASS / 1 FAIL / TBROK=1`, not promotion evidence.
+
+RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='mkdir09' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.log
+```
+
+LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='mkdir09' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.log target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.log
+```
+
+Targeted artifacts:
+
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.promotion-candidates.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-mkdir09-futex-bitset-fix-promotion-candidates.txt`
+
+Targeted parser result:
+
+- RV summary: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA summary: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidate `mkdir09`.
+
+Adjacent regression command:
+
+```bash
+LTP_CASES='futex_wait01,futex_wait02,futex_wait03,futex_wait04,futex_wait05,futex_wake01,futex_wake03,clone01,clone03,clone06,clone07'
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="$LTP_CASES" LTP_CASE_TIMEOUT_SECS=60 timeout 60m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="$LTP_CASES" LTP_CASE_TIMEOUT_SECS=60 timeout 60m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.log target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.log
+```
+
+Adjacent artifacts:
+
+- Cases list: `target/ltp-1000-milestone-06-stable806/futex-bitset-adjacent-regression-20260603T223054+0800.cases`
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.summary.json`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.json`
+- Combined adjacent candidate report: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.combined-promotion-candidates.txt`
+
+Adjacent parser result:
+
+- RV adjacent summary: `22 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA adjacent summary: `22 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined adjacent report: all 11 adjacent cases are four-combo clean.
+
+`mkdir09` is added to the stable806 candidate pool with four-combo clean evidence and an 11-case futex/clone adjacent stable subset on both architectures. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 12/50 for stable806.

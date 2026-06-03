@@ -7,3 +7,5 @@ The timerslack repair was validated with targeted inline `LTP_CASES='prctl08,prc
 Additional note: the `symlink03` repair also made no blacklist changes. The failed scratch-permission and tmp-mode-only logs are recorded as diagnostic/blocker evidence only; only the later RV/LA parser-clean parent-permission repair is counted as candidate-pool evidence.
 
 Additional note: the `unlink09` FS_IOC inode-flag repair made no blacklist changes. The earlier `ENOTTY`/`TBROK` log is retained as diagnostic evidence only; only the later RV/LA parser-clean targeted and adjacent-regression summaries are counted as candidate-pool evidence.
+
+Additional note: the `mkdir09` futex bitset repair made no blacklist changes. The earlier glibc futex abort log is retained as diagnostic evidence only; only the later RV/LA parser-clean targeted and futex/clone adjacent-regression summaries are counted as candidate-pool evidence.
