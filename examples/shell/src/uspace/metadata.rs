@@ -845,6 +845,10 @@ pub(super) fn sys_symlinkat(
             Err(err) => return neg_errno(err),
         }
     };
+    let resolved_path = match process.resolve_parent_symlinks(resolved_path.as_str()) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
     if process.path_symlink(resolved_path.as_str()).is_some()
         || axfs::api::metadata(resolved_path.as_str()).is_ok()
     {

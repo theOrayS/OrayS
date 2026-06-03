@@ -13,6 +13,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Documented a partial RV socket-core scout as blocker-only evidence.
 - Documented blocker triage for `readlink03`/`readlinkat02`, `nice04`, RV statx rows, and RV credential/capability rows; no source workaround was made for semantically unsafe cases.
 - Documented RV VFS/FD/select scout as blocker-only evidence with zero candidates.
+- Repaired generic VFS parent-symlink resolution and `rmdir` errno boundaries, making `mkdirat02` and `rmdir02` four-combo clean candidates.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -22,6 +23,8 @@ Current new unique stable806 candidates:
 1. `prctl08`
 2. `prctl09`
 3. `utsname02`
+4. `mkdirat02`
+5. `rmdir02`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -37,6 +40,12 @@ Current new unique stable806 candidates:
 - RV credential/capability scout: `1 PASS / 23 FAIL / 22 TCONF / 1 TBROK`; 0 candidates.
 - RV VFS/FD/select scout: `9 PASS / 45 FAIL / 112 TCONF / 26 TFAIL / 7 TBROK / 4 timeout`; 0 candidates.
 
+- VFS parent-symlink/rmdir targeted RV: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.summary.txt` — `5 PASS / 13 FAIL`, with new clean RV candidates `mkdirat02` and `rmdir02`; remaining rows still have visible `TFAIL/TBROK/TCONF` and are excluded.
+- VFS parent-symlink/rmdir targeted LA: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.summary.txt` — `4 PASS / 0 FAIL / 0 internal markers` for `mkdirat02` and `rmdir02`.
+- Combined VFS candidate report: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.combined-promotion-candidates.txt` — four-combo candidates `mkdirat02`, `rmdir02`.
+- Adjacent RV VFS regression: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.summary.txt` — `72 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA VFS regression: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.summary.txt` — `72 PASS / 0 FAIL / 0 internal markers`.
+
 ## Risks and boundaries
 
 - `CLONE_NEWUTS` and `unshare(CLONE_NEWUTS)` are still not implemented; `utsname03` remains blocked and is not counted.
@@ -45,9 +54,9 @@ Current new unique stable806 candidates:
 - `readlink03`/`readlinkat02` remain blocked on LA musl wrapper behavior; rejecting all one-byte buffers in-kernel is not acceptable.
 - `nice04` remains blocked on libc-visible errno differences around priority lowering; do not risk stable `setpriority` rows with a wrapper-specific kernel special case.
 - Statx, 16-bit UID, capability, and glibc `gettid02` rows remain blocker-only until real semantics or futex/glibc robustness improve.
-- The VFS/FD/select scout is blocker-only: select rows have TCONF, fcntl locking rows time out, and path/errno rows have visible TFAIL/TBROK.
+- The VFS/FD/select scout was split: `mkdirat02`/`rmdir02` are repaired and candidate-clean, while the remaining select/fcntl/mknod/symlink/unlink rows still have TCONF/timeout/TFAIL/TBROK blockers.
 - Timerslack/prctl adjacent stable regression still needs to be included before any eventual stable806 promotion commit.
 
 ## Conclusion
 
-This checkpoint improves UTS semantics and adds 1 new unique candidate (`utsname02`), bringing the stable806 candidate pool to 3 unique cases. The later blocker triage and VFS/FD/select scout added zero candidates and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS and VFS path/errno semantics and adds 3 new unique candidates (`utsname02`, `mkdirat02`, `rmdir02`), bringing the stable806 candidate pool to 5 unique cases. The later blocker triage added zero candidates outside the repaired VFS pair and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.

@@ -52,3 +52,23 @@ Explicit non-changes:
 - `statx`, 16-bit UID syscall compatibility, Linux capabilities, and futex behavior are unchanged by this checkpoint.
 
 The RV VFS/FD/select scout was documentation-only. It made no syscall/errno/flag/FD/signal/futex/mmap/user-pointer changes; `select*` TCONF rows, `fcntl17*` timeouts, and VFS path errno blockers remain unchanged.
+
+
+## VFS parent-symlink/rmdir errno repair impact
+
+This source patch changes real VFS path and errno behavior; it is not a stable-list promotion.
+
+User-visible syscall/path changes:
+
+- `mkdirat` now resolves symlink components in the parent path before creating the final directory entry. The final new component is still created, not followed.
+- `mknodat` now resolves symlink components in the parent path before creating the final node. This is a generic parent-path fix even though `mknodat02` remains blocked by environment/feature `TCONF` rows.
+- `symlinkat` now resolves symlink components in the parent path of `linkpath`; the final symlink name is still not followed, preserving symlink creation semantics.
+- `unlinkat(..., AT_REMOVEDIR)` / `rmdir` now resolve symlink components in the parent path before attempting directory removal.
+- `rmdir(".")` and equivalent final `.` removal through `unlinkat(..., AT_REMOVEDIR)` now return `EINVAL` instead of falling through to lower-level directory removal behavior.
+- Removing a path that is a process-visible mountpoint now returns `EBUSY` before attempting `directory_remove_dir`, matching the protected mountpoint boundary used by `rmdir02`.
+
+Unchanged boundaries:
+
+- `unlink` of non-directory final symlinks remains governed by the existing non-following final-component removal semantics.
+- No FD table layout, FD_CLOEXEC, file status flag, signal, futex, mmap, user-pointer ABI, struct layout, or syscall number behavior changed.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir02`, `mkdir03`, `mkdir09`, `mknod07`, `mknodat02`, `symlink03`, and `unlink09` blockers retain visible parser markers and are not counted.

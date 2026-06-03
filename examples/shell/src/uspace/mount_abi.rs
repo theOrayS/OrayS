@@ -91,7 +91,7 @@ impl UserProcess {
         );
     }
 
-    fn has_mount_point(&self, target: &str) -> bool {
+    pub(super) fn has_mount_point(&self, target: &str) -> bool {
         self.mount_points.lock().contains_key(target)
     }
 

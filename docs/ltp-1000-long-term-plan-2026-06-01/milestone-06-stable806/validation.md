@@ -331,7 +331,7 @@ Result: both passed before QEMU targeted gates. Stable list remained `756 total 
 
 ## Updated validation conclusion after UTS repair
 
-`utsname02` is now a new unique stable806 candidate with RV + LA × musl + glibc parser-clean evidence. The adjacent stable UTS/hostname/uname subset is parser-clean on both architectures. The current candidate pool is therefore `prctl08`, `prctl09`, and `utsname02` (3 new unique cases). `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` because the next milestone commit requires a full +50 unique clean cohort. Socket scout evidence remains blocker-only and contributes zero candidates.
+`utsname02` is now a new unique stable806 candidate with RV + LA × musl + glibc parser-clean evidence. The adjacent stable UTS/hostname/uname subset is parser-clean on both architectures. At that point, before the later VFS repair, the candidate pool was `prctl08`, `prctl09`, and `utsname02` (3 new unique cases). `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` because the next milestone commit requires a full +50 unique clean cohort. Socket scout evidence remains blocker-only and contributes zero candidates.
 
 ## Readlink/readlinkat near-clean blocker triage
 
@@ -441,7 +441,7 @@ The shared priority implementation currently returns `EACCES` when a non-root ca
 
 ## Updated validation conclusion after blocker triage
 
-The post-UTS blocker triage added zero promotion candidates. `readlink03`, `readlinkat02`, `nice04`, the statx scout, and the credential/capability scout all remain excluded because their evidence contains visible `TFAIL`, `TBROK`, `TCONF`, or timeout markers, or would require a semantically unsafe kernel-only workaround. The milestone-06 candidate pool remains exactly `prctl08`, `prctl09`, and `utsname02` (3 new unique cases), and `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+The post-UTS blocker triage added zero promotion candidates. `readlink03`, `readlinkat02`, `nice04`, the statx scout, and the credential/capability scout all remain excluded because their evidence contains visible `TFAIL`, `TBROK`, `TCONF`, or timeout markers, or would require a semantically unsafe kernel-only workaround. At that pre-VFS-repair point, the milestone-06 candidate pool remained `prctl08`, `prctl09`, and `utsname02` (3 new unique cases), and `LTP_STABLE_CASES` remained `756 total / 756 unique / 0 duplicate`.
 
 ## RV VFS/FD/select scout
 
@@ -483,3 +483,76 @@ Notable boundaries:
 - `mkdir02`, `mkdir03`, `mkdirat02`, and `rmdir02` expose real path/errno `TFAIL` blockers; `unlink09` and `symlink03` expose `TBROK` blockers.
 
 Conclusion: this scout adds zero stable806 candidates and updates the next-lane map toward small, isolated VFS errno fixes or fcntl-lock lifetime fixes rather than broad-batch promotion.
+
+
+## VFS parent-symlink/rmdir errno repair and targeted retest
+
+The RV VFS/FD/select scout exposed real `mkdirat02`/`rmdir02` path and errno blockers. The source repair was generic: creation/removal syscalls now resolve symlink parents before operating, `unlinkat(..., AT_REMOVEDIR)` rejects a final `.` component with `EINVAL`, and rmdir of a process mountpoint returns `EBUSY`. No LTP case/path/process/output hardcoding was added.
+
+Commands:
+
+```bash
+cargo fmt -- --check
+cargo check -p arceos-shell
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='unlink09,symlink03,mkdir02,mkdir03,mkdir09,mkdirat02,rmdir02,mknod07,mknodat02' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv \
+  target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='mkdirat02,rmdir02' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la \
+  target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.log \
+  target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.log
+```
+
+Artifacts:
+
+- RV case list: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.cases.txt`
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-fix-20260603T200303+0800.promotion-candidates.txt`
+- LA case list: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.cases.txt`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-fix-candidates-20260603T200510+0800.combined-promotion-candidates.txt`
+
+Parser result:
+
+- RV targeted run: `5 PASS / 13 FAIL`, internal `{'TBROK': 7, 'TFAIL': 6, 'TCONF': 8}`, `0 timeout`, `0 ENOSYS`, `0 panic/trap`. `mkdirat02` and `rmdir02` are RV-clean; the other rows remain visibly blocked and excluded.
+- LA targeted run for the two RV-clean candidates: `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: `2` four-combo candidates, `mkdirat02` and `rmdir02`.
+
+Adjacent stable regression subset:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='mkdir04,mkdir05,mkdirat01,rmdir01,rmdir03,unlink05,unlink07,unlink08,unlinkat01,symlink01,symlink02,symlink04,symlinkat01,mknod01,mknod02,mknod03,mknod04,mknod05,mknod06,mknod08,mknod09,mknodat01,rename01,rename03,rename04,rename05,rename06,rename07,rename08,rename09,rename10,rename12,rename13,rename14,renameat201,renameat202' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='mkdir04,mkdir05,mkdirat01,rmdir01,rmdir03,unlink05,unlink07,unlink08,unlinkat01,symlink01,symlink02,symlink04,symlinkat01,mknod01,mknod02,mknod03,mknod04,mknod05,mknod06,mknod08,mknod09,mknodat01,rename01,rename03,rename04,rename05,rename06,rename07,rename08,rename09,rename10,rename12,rename13,rename14,renameat201,renameat202' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV adjacent case list: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.cases.txt`
+- RV adjacent raw log: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.log`
+- RV adjacent summary: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.summary.txt`
+- RV adjacent JSON: `target/ltp-1000-milestone-06-stable806/rv-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.summary.json`
+- LA adjacent case list: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.cases.txt`
+- LA adjacent raw log: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.log`
+- LA adjacent summary: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.summary.txt`
+- LA adjacent JSON: `target/ltp-1000-milestone-06-stable806/la-vfs-parent-symlink-rmdir-adjacent-regression-20260603T200657+0800.summary.json`
+
+Adjacent parser result:
+
+- RV adjacent subset: `72 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA adjacent subset: `72 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+
+Updated validation conclusion after VFS repair: `mkdirat02` and `rmdir02` are new four-combo stable806 candidates. The candidate pool is now `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, and `rmdir02` (5 new unique cases). `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` because the next milestone promotion requires a complete +50 unique cohort.
