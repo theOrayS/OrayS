@@ -384,3 +384,37 @@ gettid02
 # RV: target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
 # LA: target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
 # Combined: target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt — four-combo clean candidate.
+
+
+# RV futex adjacent scout after futex bitset repair (2026-06-03; blocker-only except futex_wait_bitset01)
+futex_wait_bitset01
+futex_wake02
+futex_wake04
+futex_cmp_requeue01
+futex_cmp_requeue02
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.summary.txt — 2 PASS / 8 FAIL; wake/requeue rows have visible TBROK/TCONF and are not candidates.
+
+# LA futex_wait_bitset01 follow-up (2026-06-03)
+futex_wait_bitset01
+# LA summary: target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/rv-la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt — four-combo clean candidate.
+
+# RV clone adjacent scout (2026-06-03; blocker-only)
+clone02
+clone04
+clone05
+clone08
+clone09
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-clone-adjacent-scout-20260603T225857+0800.summary.txt — 1 PASS / 9 FAIL with TFAIL/TBROK/ENOSYS; zero candidates.
+
+# RV FD/vector-IO scout (2026-06-03; blocker-only)
+writev03
+preadv03
+preadv03_64
+preadv203
+preadv203_64
+pwritev03
+pwritev03_64
+sendfile09
+sendfile09_64
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-vector-io-scout-20260603T225958+0800.summary.txt — 0 PASS / 18 FAIL with TCONF=18; zero candidates.

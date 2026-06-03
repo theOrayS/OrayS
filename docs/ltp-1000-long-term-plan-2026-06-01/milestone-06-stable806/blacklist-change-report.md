@@ -13,3 +13,8 @@ Additional note: the `mkdir09` futex bitset repair made no blacklist changes. Th
 ## gettid02 futex/glibc follow-up
 
 No blacklist was added, removed, or used for `gettid02`. The candidate evidence comes only from RV + LA × musl + glibc targeted parser-clean logs and the existing futex/clone adjacent regression boundary. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+
+## futex_wait_bitset01 and blocker scouts
+
+No blacklist was added, removed, or used for `futex_wait_bitset01`, the RV futex wake/requeue scout, the RV clone scout, or the RV FD/vector-IO scout. The only new candidate evidence comes from RV + LA × musl + glibc parser-clean `futex_wait_bitset01`; wake/requeue, clone, and vector-IO rows with visible parser markers remain blocker-only. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.

@@ -1046,3 +1046,52 @@ Regression boundary:
 No new code was added for this follow-up. The underlying code change is the generic futex bitset support already protected by the RV/LA futex/clone adjacent regression above (`22 PASS / 0 FAIL` on each architecture). `gettid02` itself confirms that thread IDs remain distinct across pthread-created threads on RV and LA, musl and glibc.
 
 `gettid02` is added to the stable806 candidate pool with four-combo clean evidence. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 13/50 for stable806.
+
+
+## futex_wait_bitset01 follow-up and blocker scouts
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='futex_wait_bitset01 futex_wake02 futex_wake04 futex_cmp_requeue01 futex_cmp_requeue02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.log
+
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='futex_wait_bitset01' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.log target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.log
+
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='clone02 clone04 clone05 clone08 clone09' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-clone-adjacent-scout-20260603T225857+0800.log
+
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='writev03 preadv03 preadv03_64 preadv203 preadv203_64 pwritev03 pwritev03_64 sendfile09 sendfile09_64' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-fd-vector-io-scout-20260603T225958+0800.log
+```
+
+Artifacts:
+
+- RV futex scout log: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.log`
+- RV futex scout summary: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.summary.txt`
+- RV futex scout JSON: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.summary.json`
+- RV futex scout candidate report: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.promotion-candidates.txt`
+- LA futex_wait_bitset01 log: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.log`
+- LA futex_wait_bitset01 summary: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.summary.txt`
+- LA futex_wait_bitset01 JSON: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.summary.json`
+- LA futex_wait_bitset01 candidate report: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt`
+- Combined futex_wait_bitset01 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt`
+- RV clone scout summary: `target/ltp-1000-milestone-06-stable806/rv-clone-adjacent-scout-20260603T225857+0800.summary.txt`
+- RV FD/vector-IO scout summary: `target/ltp-1000-milestone-06-stable806/rv-fd-vector-io-scout-20260603T225958+0800.summary.txt`
+
+Parser result:
+
+- RV futex scout: `2 PASS / 8 FAIL / TBROK=2 / TCONF=6 / 0 timeout / 0 ENOSYS / 0 panic/trap`; `futex_wait_bitset01` is the only RV musl+glibc clean row.
+- LA futex_wait_bitset01 follow-up: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidate `futex_wait_bitset01`; it is not already present in `LTP_STABLE_CASES`.
+- RV clone scout: `1 PASS / 9 FAIL / TFAIL=4 / TBROK=7 / ENOSYS=8`; zero candidates because RV musl+glibc is not clean for any row.
+- RV FD/vector-IO scout: `0 PASS / 18 FAIL / TCONF=18`; zero candidates and no pass-with-TCONF promotion.
+
+Regression boundary:
+
+No new source change was made for `futex_wait_bitset01`; it exercises the generic `FUTEX_WAIT_BITSET` behavior added for the earlier futex bitset repair. The existing RV/LA futex/clone adjacent subset remains the code-regression boundary, and the new targeted RV+LA evidence covers `futex_wait_bitset01` itself. Wake/requeue, clone, and vector-IO rows remain blocker-only until their visible parser markers are removed by real semantic fixes.
+
+`futex_wait_bitset01` is added to the stable806 candidate pool with four-combo clean evidence. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 14/50 for stable806.

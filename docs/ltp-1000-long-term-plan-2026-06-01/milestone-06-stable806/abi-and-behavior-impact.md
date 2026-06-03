@@ -172,3 +172,13 @@ No additional source change was made for this follow-up. The user-visible behavi
 - The old glibc `gettid02` `TBROK` was removed by the same generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` surface used by glibc pthread joins; no `gettid02`-specific branch was introduced.
 - No syscall numbers, struct layouts, errno boundaries, file descriptor semantics, signal behavior, mmap behavior, or user-pointer copy rules changed in this follow-up.
 - The caveats from the futex bitset repair remain: nonzero bitsets reuse the existing futex queue and may over-wake; futex callers recheck the futex word, so this is acceptable for the current candidate evidence but not a full PI/requeue/futex_waitv implementation.
+
+
+## futex_wait_bitset01 follow-up and blocker scout impact
+
+No additional source change was made for this follow-up. `futex_wait_bitset01` relies on the already-committed generic futex bitset support documented above.
+
+- `FUTEX_WAIT_BITSET` user-visible semantics, timeout handling, `bitset == 0` `EINVAL`, and nonzero-bitset wait behavior are unchanged from the futex bitset repair.
+- The RV futex scout confirms wake/requeue rows still have visible parser blockers; no partial wake/requeue result is counted and no new syscall behavior was introduced for them in this follow-up.
+- The RV clone and FD/vector-IO scouts were read-only evidence runs. They did not change `clone`, `readv`/`writev`, `preadv`/`pwritev`, `sendfile`, FD flags, signal, mmap, struct layout, user-pointer copy, or errno behavior.
+- No blacklist, SKIP, status0, evaluator, testsuite, stable-list, syscall number, ABI, FD table, signal, mmap, or process lifetime behavior changed in this documentation/evidence update.

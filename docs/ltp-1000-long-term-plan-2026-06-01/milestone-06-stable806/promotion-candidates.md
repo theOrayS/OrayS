@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 13/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 14/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -17,6 +17,7 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `unlink09` | RV + LA × musl + glibc targeted parser-clean after generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` inode-flag support and immutable/append-only unlink `EPERM` checks | candidate pool |
 | `mkdir09` | RV + LA × musl + glibc targeted parser-clean after generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support fixed glibc pthread joins | candidate pool |
 | `gettid02` | RV + LA × musl + glibc targeted parser-clean after the same futex bitset/glibc pthread repair lane removed the old glibc `TBROK` blocker | candidate pool |
+| `futex_wait_bitset01` | RV + LA × musl + glibc targeted parser-clean from the generic futex bitset command surface; no additional source change after the futex bitset repair | candidate pool |
 
 Evidence artifacts:
 
@@ -99,6 +100,9 @@ Additional fcntl27 read-lease evidence artifacts:
 | `*_16`, `capget*`, `capset*` | RV scout has 16-bit UID/capability `TCONF` rows | Zero RV-only candidates; needs unsupported-ABI/capability lane work before reconsideration. |
 | `unlink09`..`select04` VFS/FD/select scout | RV scout has `9 PASS / 45 FAIL`, `TBROK/TCONF/TFAIL`, and four `fcntl17*` timeouts | Zero RV-only candidates from the broad scout; later targeted repairs make `fcntl27`, same-source `fcntl27_64`, `symlink03`, and `unlink09` valid candidates. The broad scout itself and remaining `select*` pass-with-TCONF rows plus timeout/TFAIL/TBROK rows are not promotion evidence. |
 | `mkdir09` isolation scout | RV isolation scout after the mkdir repair still had a glibc `mkdir09` futex abort | Superseded by the later futex bitset repair below; the isolation scout remains diagnostic blocker evidence only and is not counted by itself. Earlier `symlink03` blocker rows are superseded by the later parent-permission repair and clean RV/LA evidence above. |
+| `futex_wake02`, `futex_wake04`, `futex_cmp_requeue01`, `futex_cmp_requeue02` | RV futex adjacent scout has `TBROK`/`TCONF` visible markers | Blocker-only; only `futex_wait_bitset01` was RV clean and later LA-clean. Requeue/selective wake semantics are not counted from partial scout output. |
+| `clone02`, `clone04`, `clone05`, `clone08`, `clone09` | RV clone adjacent scout has `TFAIL`/`TBROK`/`ENOSYS` and only glibc-only `clone04` clean | Zero candidates; no LA follow-up because RV musl/glibc was not both clean. |
+| vector IO/sendfile rows | RV FD/vector-IO scout for `writev03`, `preadv03*`, `preadv203*`, `pwritev03*`, `sendfile09*` has `TCONF` for every row | Zero candidates; no pass-with-TCONF promotion. |
 
 Excluded evidence artifacts:
 
@@ -119,6 +123,9 @@ Additional symlink03 parent-permission evidence artifacts:
 
 - RV symlink03 scratch-permission diagnostic summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-ltp-scratch-perms-fix-20260603T211855+0800.summary.txt` (blocker-only)
 - RV symlink03 tmp-mode-only diagnostic summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-initial-tmp-mode-fix-20260603T212433+0800.summary.txt` (blocker-only)
+- RV futex adjacent scout summary: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.summary.txt` (blocker-only for wake/requeue rows; `futex_wait_bitset01` separately promoted to candidate pool after LA follow-up)
+- RV clone adjacent scout summary: `target/ltp-1000-milestone-06-stable806/rv-clone-adjacent-scout-20260603T225857+0800.summary.txt` (blocker-only)
+- RV FD/vector-IO scout summary: `target/ltp-1000-milestone-06-stable806/rv-fd-vector-io-scout-20260603T225958+0800.summary.txt` (blocker-only)
 - RV symlink03 targeted log: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.log`
 - RV symlink03 summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.summary.txt`
 - RV symlink03 candidate report: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.promotion-candidates.txt`
@@ -166,3 +173,13 @@ Additional gettid02 futex/glibc follow-up evidence artifacts:
 - LA gettid02 summary: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt`
 - LA gettid02 candidate report: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt`
 - Combined gettid02 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt`
+
+Additional futex_wait_bitset01 follow-up evidence artifacts:
+
+- RV futex adjacent scout log: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.log`
+- RV futex adjacent scout summary: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.summary.txt`
+- RV futex adjacent scout candidate report: `target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.promotion-candidates.txt`
+- LA futex_wait_bitset01 follow-up log: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.log`
+- LA futex_wait_bitset01 follow-up summary: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.summary.txt`
+- LA futex_wait_bitset01 follow-up candidate report: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt`
+- Combined futex_wait_bitset01 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt`
