@@ -1,51 +1,60 @@
-# milestone-06 promotion candidates so far
+# milestone-06 stable806 promotion candidates
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 42/50 unique cases.
+These 50 unique cases are promoted into `LTP_STABLE_CASES` for milestone-06 stable806. The final current-code RV + LA × musl + glibc gate is parser-clean; earlier candidate-pool sections below are retained as chronology. Current candidate pool: 50/50 unique cases, stable list `806 total / 806 unique / 0 duplicate`.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
-| `prctl08` | RV + LA × musl + glibc targeted parser-clean after timerslack repair | candidate pool |
-| `prctl09` | RV + LA × musl + glibc targeted parser-clean after timerslack repair | candidate pool |
-| `utsname02` | RV + LA × musl + glibc targeted parser-clean after shared default UTS hostname repair | candidate pool |
-| `mkdirat02` | RV + LA × musl + glibc targeted parser-clean after parent-symlink resolution repair | candidate pool |
-| `rmdir02` | RV + LA × musl + glibc targeted parser-clean after `rmdir(".")`/mountpoint errno repair | candidate pool |
-| `mkdir02` | RV + LA × musl + glibc targeted parser-clean after preserving directory `S_ISGID` across `chown` | candidate pool |
-| `mkdir03` | RV + LA × musl + glibc targeted parser-clean after treating a final synthetic symlink as existing for `mkdir`/`mkdirat` | candidate pool |
-| `fcntl27` | RV + LA × musl + glibc targeted parser-clean after returning `EAGAIN` for read leases on write-open descriptors | candidate pool |
-| `fcntl27_64` | RV + LA × musl + glibc targeted parser-clean from the same generic `F_SETLEASE` read-lease access rule | candidate pool |
-| `symlink03` | RV + LA × musl + glibc targeted parser-clean after Linux-like tmpdir metadata seed plus generic symlink parent write/search/type permission checks | candidate pool |
-| `unlink09` | RV + LA × musl + glibc targeted parser-clean after generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` inode-flag support and immutable/append-only unlink `EPERM` checks | candidate pool |
-| `mkdir09` | RV + LA × musl + glibc targeted parser-clean after generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support fixed glibc pthread joins | candidate pool |
-| `gettid02` | RV + LA × musl + glibc targeted parser-clean after the same futex bitset/glibc pthread repair lane removed the old glibc `TBROK` blocker | candidate pool |
-| `futex_wait_bitset01` | RV + LA × musl + glibc targeted parser-clean from the generic futex bitset command surface; no additional source change after the futex bitset repair | candidate pool |
-| `fstat02` | RV + LA × musl + glibc targeted parser-clean from the FD/path metadata scout and LA follow-up; no source change in this follow-up | candidate pool |
-| `fstat02_64` | RV + LA × musl + glibc targeted parser-clean from the same FD/path metadata evidence; no source change in this follow-up | candidate pool |
-| `setxattr03` | RV + LA × musl + glibc targeted parser-clean after generic immutable/append-only xattr mutation `EPERM` guard | candidate pool |
-| `fgetxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special-node xattr/read and AF_UNIX pathname bind repair | candidate pool |
-| `getxattr02` | RV + LA × musl + glibc targeted parser-clean after special inode xattr mutation rejects `user.*` writes with `EPERM` while get/list stays metadata-only | candidate pool |
-| `setxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special inode xattr mutation `EPERM` boundary | candidate pool |
-| `splice01` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` file/pipe transfer support | candidate pool |
-| `splice02` | RV + LA × musl + glibc targeted parser-clean after generic blocking pipe-to-file `splice(2)` behavior | candidate pool |
-| `splice03` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` invalid-fd/offset errno handling | candidate pool |
-| `splice04` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-pipe `splice(2)` transfer support | candidate pool |
-| `splice05` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-AF_UNIX-stream and AF_UNIX-stream-to-pipe `splice(2)` support | candidate pool |
-| `lseek11` | RV + LA × musl + glibc targeted parser-clean after generic `SEEK_DATA`/`SEEK_HOLE` regular-file data/hole range tracking | candidate pool |
-| `accept02` | RV + LA × musl + glibc parser-clean after generic socket errno/address-boundary fixes | candidate pool |
-| `bind01` | RV + LA × musl + glibc parser-clean after generic AF_INET address/length errno handling | candidate pool |
-| `bind02` | RV + LA × musl + glibc parser-clean after privileged-port `EACCES` handling | candidate pool |
-| `connect01` | RV + LA × musl + glibc parser-clean after generic connect errno/address-boundary fixes | candidate pool |
-| `recv01` | RV + LA × musl + glibc parser-clean after generic receive flag errno handling | candidate pool |
-| `recvfrom01` | RV + LA × musl + glibc parser-clean after generic receive-from flag and sockaddr errno handling | candidate pool |
-| `send01` | RV + LA × musl + glibc parser-clean after generic send flag/size/error handling | candidate pool |
-| `sendto01` | RV + LA × musl + glibc parser-clean after connected TCP `sendto()` destination handling | candidate pool |
-| `bind03` | RV + LA × musl + glibc parser-clean after generic AF_UNIX pathname bind node/existing-bind behavior | candidate pool |
-| `getsockopt02` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname listener/accept plus `SO_PEERCRED` support | candidate pool |
-| `recvmsg01` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname stream listener plus minimal `sendmsg`/`recvmsg` bridge | candidate pool |
-| `posix_fadvise02` | RV + LA × musl + glibc parser-clean after generic `fadvise64` invalid-fd errno support | candidate pool |
-| `posix_fadvise02_64` | RV + LA × musl + glibc parser-clean after the same generic `fadvise64` invalid-fd errno support | candidate pool |
-| `posix_fadvise04` | RV + LA × musl + glibc parser-clean after generic `fadvise64` nonseekable-fd `ESPIPE` handling | candidate pool |
-| `posix_fadvise04_64` | RV + LA × musl + glibc parser-clean after the same generic `fadvise64` nonseekable-fd `ESPIPE` handling | candidate pool |
-| `fallocate03` | RV + LA × musl + glibc parser-clean after generic `FALLOC_FL_KEEP_SIZE` no-size-growth handling | candidate pool |
+| `prctl08` | RV + LA × musl + glibc targeted parser-clean after timerslack repair | promoted stable806 |
+| `prctl09` | RV + LA × musl + glibc targeted parser-clean after timerslack repair | promoted stable806 |
+| `utsname02` | RV + LA × musl + glibc targeted parser-clean after shared default UTS hostname repair | promoted stable806 |
+| `mkdirat02` | RV + LA × musl + glibc targeted parser-clean after parent-symlink resolution repair | promoted stable806 |
+| `rmdir02` | RV + LA × musl + glibc targeted parser-clean after `rmdir(".")`/mountpoint errno repair | promoted stable806 |
+| `mkdir02` | RV + LA × musl + glibc targeted parser-clean after preserving directory `S_ISGID` across `chown` | promoted stable806 |
+| `mkdir03` | RV + LA × musl + glibc targeted parser-clean after treating a final synthetic symlink as existing for `mkdir`/`mkdirat` | promoted stable806 |
+| `fcntl27` | RV + LA × musl + glibc targeted parser-clean after returning `EAGAIN` for read leases on write-open descriptors | promoted stable806 |
+| `fcntl27_64` | RV + LA × musl + glibc targeted parser-clean from the same generic `F_SETLEASE` read-lease access rule | promoted stable806 |
+| `symlink03` | RV + LA × musl + glibc targeted parser-clean after Linux-like tmpdir metadata seed plus generic symlink parent write/search/type permission checks | promoted stable806 |
+| `unlink09` | RV + LA × musl + glibc targeted parser-clean after generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` inode-flag support and immutable/append-only unlink `EPERM` checks | promoted stable806 |
+| `mkdir09` | RV + LA × musl + glibc targeted parser-clean after generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support fixed glibc pthread joins | promoted stable806 |
+| `gettid02` | RV + LA × musl + glibc targeted parser-clean after the same futex bitset/glibc pthread repair lane removed the old glibc `TBROK` blocker | promoted stable806 |
+| `futex_wait_bitset01` | RV + LA × musl + glibc targeted parser-clean from the generic futex bitset command surface; no additional source change after the futex bitset repair | promoted stable806 |
+| `fstat02` | RV + LA × musl + glibc targeted parser-clean from the FD/path metadata scout and LA follow-up; no source change in this follow-up | promoted stable806 |
+| `fstat02_64` | RV + LA × musl + glibc targeted parser-clean from the same FD/path metadata evidence; no source change in this follow-up | promoted stable806 |
+| `setxattr03` | RV + LA × musl + glibc targeted parser-clean after generic immutable/append-only xattr mutation `EPERM` guard | promoted stable806 |
+| `fgetxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special-node xattr/read and AF_UNIX pathname bind repair | promoted stable806 |
+| `getxattr02` | RV + LA × musl + glibc targeted parser-clean after special inode xattr mutation rejects `user.*` writes with `EPERM` while get/list stays metadata-only | promoted stable806 |
+| `setxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special inode xattr mutation `EPERM` boundary | promoted stable806 |
+| `splice01` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` file/pipe transfer support | promoted stable806 |
+| `splice02` | RV + LA × musl + glibc targeted parser-clean after generic blocking pipe-to-file `splice(2)` behavior | promoted stable806 |
+| `splice03` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` invalid-fd/offset errno handling | promoted stable806 |
+| `splice04` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-pipe `splice(2)` transfer support | promoted stable806 |
+| `splice05` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-AF_UNIX-stream and AF_UNIX-stream-to-pipe `splice(2)` support | promoted stable806 |
+| `lseek11` | RV + LA × musl + glibc targeted parser-clean after generic `SEEK_DATA`/`SEEK_HOLE` regular-file data/hole range tracking | promoted stable806 |
+| `accept02` | RV + LA × musl + glibc parser-clean after generic socket errno/address-boundary fixes | promoted stable806 |
+| `bind01` | RV + LA × musl + glibc parser-clean after generic AF_INET address/length errno handling | promoted stable806 |
+| `bind02` | RV + LA × musl + glibc parser-clean after privileged-port `EACCES` handling | promoted stable806 |
+| `connect01` | RV + LA × musl + glibc parser-clean after generic connect errno/address-boundary fixes | promoted stable806 |
+| `recv01` | RV + LA × musl + glibc parser-clean after generic receive flag errno handling | promoted stable806 |
+| `recvfrom01` | RV + LA × musl + glibc parser-clean after generic receive-from flag and sockaddr errno handling | promoted stable806 |
+| `send01` | RV + LA × musl + glibc parser-clean after generic send flag/size/error handling | promoted stable806 |
+| `sendto01` | RV + LA × musl + glibc parser-clean after connected TCP `sendto()` destination handling | promoted stable806 |
+| `bind03` | RV + LA × musl + glibc parser-clean after generic AF_UNIX pathname bind node/existing-bind behavior | promoted stable806 |
+| `getsockopt02` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname listener/accept plus `SO_PEERCRED` support | promoted stable806 |
+| `recvmsg01` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname stream listener plus minimal `sendmsg`/`recvmsg` bridge | promoted stable806 |
+| `posix_fadvise02` | RV + LA × musl + glibc parser-clean after generic `fadvise64` invalid-fd errno support | promoted stable806 |
+| `posix_fadvise02_64` | RV + LA × musl + glibc parser-clean after the same generic `fadvise64` invalid-fd errno support | promoted stable806 |
+| `posix_fadvise04` | RV + LA × musl + glibc parser-clean after generic `fadvise64` nonseekable-fd `ESPIPE` handling | promoted stable806 |
+| `posix_fadvise04_64` | RV + LA × musl + glibc parser-clean after the same generic `fadvise64` nonseekable-fd `ESPIPE` handling | promoted stable806 |
+| `fallocate03` | RV + LA × musl + glibc parser-clean after generic `FALLOC_FL_KEEP_SIZE` no-size-growth handling | promoted stable806 |
+
+| `shmget02` | RV + LA × musl + glibc parser-clean after dynamic `/proc/sys/kernel/shmmax` enforcement and SysV SHM size/permission fixes | promoted stable806 |
+| `shmget03` | RV + LA × musl + glibc parser-clean after generic SysV SHM create/lookup/error-boundary fixes | promoted stable806 |
+| `shmget04` | RV + LA × musl + glibc parser-clean after generic SysV SHM segment-limit and size-boundary handling | promoted stable806 |
+| `shmat02` | RV + LA × musl + glibc parser-clean after generic `shmat` permission/flag/attach behavior | promoted stable806 |
+| `shmat03` | RV + LA × musl + glibc parser-clean after generic `SHM_RND`/address-validation behavior | promoted stable806 |
+| `shmdt01` | RV + LA × musl + glibc parser-clean after generic per-process attachment tracking and detach cleanup | promoted stable806 |
+| `shmctl03` | RV + LA × musl + glibc parser-clean after generic `IPC_STAT`/`IPC_RMID` metadata and permission handling | promoted stable806 |
+| `shmctl04` | RV + LA × musl + glibc parser-clean after `SHM_INFO`/`SHM_STAT_ANY` and dynamic `/proc/sysvipc/shm` consistency | promoted stable806 |
 
 Evidence artifacts:
 
@@ -401,6 +410,15 @@ This follow-up supersedes the earlier blocker-only scout rows for `getsockopt02`
 | --- | --- | --- |
 | AF_UNIX `SO_PEERCRED` and `recvmsg` | `target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt` | `getsockopt02`, `recvmsg01` |
 
+| `shmget02` | RV + LA × musl + glibc parser-clean after dynamic `/proc/sys/kernel/shmmax` enforcement and SysV SHM size/permission fixes | promoted stable806 |
+| `shmget03` | RV + LA × musl + glibc parser-clean after generic SysV SHM create/lookup/error-boundary fixes | promoted stable806 |
+| `shmget04` | RV + LA × musl + glibc parser-clean after generic SysV SHM segment-limit and size-boundary handling | promoted stable806 |
+| `shmat02` | RV + LA × musl + glibc parser-clean after generic `shmat` permission/flag/attach behavior | promoted stable806 |
+| `shmat03` | RV + LA × musl + glibc parser-clean after generic `SHM_RND`/address-validation behavior | promoted stable806 |
+| `shmdt01` | RV + LA × musl + glibc parser-clean after generic per-process attachment tracking and detach cleanup | promoted stable806 |
+| `shmctl03` | RV + LA × musl + glibc parser-clean after generic `IPC_STAT`/`IPC_RMID` metadata and permission handling | promoted stable806 |
+| `shmctl04` | RV + LA × musl + glibc parser-clean after `SHM_INFO`/`SHM_STAT_ANY` and dynamic `/proc/sysvipc/shm` consistency | promoted stable806 |
+
 Evidence artifacts:
 
 - RV targeted raw log: `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800.log`
@@ -436,3 +454,23 @@ Evidence:
 - SysV shm scout retained as blocker-only evidence: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt` — `0 PASS / 26 FAIL`, internal markers `TCONF=3`, `TBROK=2`, `TFAIL=9`; no LA follow-up and no promotion candidates.
 
 The current candidate pool is **42/50**, still short by 8 unique cases. Stable count remains `756 total / 756 unique / 0 duplicate`; no stable-list update or milestone806 promotion commit is allowed yet.
+
+## Final 50-case promotion evidence
+
+Full current-code cohort:
+
+```text
+prctl08 prctl09 utsname02 mkdirat02 rmdir02 mkdir02 mkdir03 fcntl27 fcntl27_64 symlink03 unlink09 mkdir09 gettid02 futex_wait_bitset01 fstat02 fstat02_64 setxattr03 fgetxattr02 getxattr02 setxattr02 splice01 splice02 splice03 splice04 splice05 lseek11 accept02 bind01 bind02 connect01 recv01 recvfrom01 send01 sendto01 bind03 getsockopt02 recvmsg01 posix_fadvise02 posix_fadvise02_64 posix_fadvise04 posix_fadvise04_64 fallocate03 shmget02 shmget03 shmget04 shmat02 shmat03 shmdt01 shmctl03 shmctl04
+```
+
+Final artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.summary.json`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.summary.json`
+- Combined report: `target/ltp-1000-milestone-06-stable806/stable806-candidate50-final-gate-rv-la-fourway.promotion-candidates.txt`
+
+Parser result: RV `100 PASS / 0 FAIL / 0 internal markers`; LA `100 PASS / 0 FAIL / 0 internal markers`; combined report `Promotion candidates: 50`, `Blocked/incomplete cases: 0`.

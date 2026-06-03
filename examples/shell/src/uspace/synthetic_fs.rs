@@ -15,6 +15,7 @@ use super::linux_abi::{
 };
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
+use super::sysv_shm;
 use super::task_context::task_ext;
 use super::task_registry::{
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
@@ -547,6 +548,32 @@ pub(super) fn synthetic_kernel_config_path_entry(
     data: &'static [u8],
 ) -> FdEntry {
     FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
+}
+
+const PROC_SYSVIPC_SHM_PATH: &str = "/proc/sysvipc/shm";
+
+pub(super) fn proc_sysvipc_shm_fd_entry(path: &str) -> Option<FdEntry> {
+    let normalized = normalize_path("/", path)?;
+    if normalized != PROC_SYSVIPC_SHM_PATH {
+        return None;
+    }
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path: normalized,
+        data: Arc::new(sysv_shm::proc_sysvipc_shm_content()),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_sysvipc_shm_path_entry(path: &str) -> Option<FdEntry> {
+    let normalized = normalize_path("/", path)?;
+    if normalized != PROC_SYSVIPC_SHM_PATH {
+        return None;
+    }
+    let size = sysv_shm::proc_sysvipc_shm_content().len();
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        normalized.as_str(),
+        size,
+    )))
 }
 
 const PROC_SYS_KERNEL_CORE_PATTERN_PATH: &str = "/proc/sys/kernel/core_pattern";

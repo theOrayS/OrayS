@@ -1,10 +1,10 @@
-# milestone-06 stable806 interim report
+# milestone-06 stable806 promotion report
 
-Date: 2026-06-03.
+Date: 2026-06-04.
 
 ## Target
 
-Move the live baseline from stable756 toward the next stable806 milestone without fake pass behavior. This is an interim candidate-pool checkpoint, not a stable-list promotion.
+Move the live baseline from stable756 to stable806 without fake pass behavior. This is the milestone-06 stable-list promotion record.
 
 ## Changes in this checkpoint
 
@@ -26,11 +26,12 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Repaired generic special-inode xattr mutation errno, special-device fd opening for synthetic char/block nodes, and AF_UNIX pathname `bind()` filesystem socket-node creation; `fgetxattr02`, `getxattr02`, and `setxattr02` are now four-combo clean candidates with xattr/mknod/socket adjacent regression evidence.
 - Added generic `splice(2)` dispatch and conservative pipe/file/AF_UNIX stream transfer semantics; `splice01`..`splice05` are now four-combo clean candidates. `splice06` remains blocked by writable proc-sysfile semantics, and `splice07` is wrapper-PASS only with `TCONF/ENOSYS` from unsupported optional fd fixtures, so neither is counted.
 - Added generic `fadvise64` dispatch/errno handling and `FALLOC_FL_KEEP_SIZE` support, making `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03` four-combo clean candidates.
-- Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
+- Added generic SysV SHM metadata/control coverage (`IPC_INFO`, `SHM_INFO`, `SHM_STAT(_ANY)`, `SHM_RND`/`SHM_REMAP`, attach-count teardown/fork retention, dynamic `/proc/sysvipc/shm`, and `/proc/sys/kernel/shmmax`/`shmall` defaults), making eight new SysV SHM rows four-combo clean while preserving adjacent `shmat04`/`shmdt02`.
+- Updated `examples/shell/src/cmd.rs::LTP_STABLE_CASES` from `756 total / 756 unique / 0 duplicate` to `806 total / 806 unique / 0 duplicate`.
 
 ## Candidate-pool status
 
-Current new unique stable806 candidates: **42/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; this is still an interim candidate-pool checkpoint, not a stable-list promotion.
+Current new unique stable806 candidates: **50/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` is now `806 total / 806 unique / 0 duplicate`; milestone-06 is promoted to stable806.
 
 1. `prctl08`
 2. `prctl09`
@@ -74,6 +75,14 @@ Current new unique stable806 candidates: **42/50**. `examples/shell/src/cmd.rs::
 40. `posix_fadvise04`
 41. `posix_fadvise04_64`
 42. `fallocate03`
+43. `shmget02`
+44. `shmget03`
+45. `shmget04`
+46. `shmat02`
+47. `shmat03`
+48. `shmdt01`
+49. `shmctl03`
+50. `shmctl04`
 
 `utsname01` and the eventfd/poll/pselect follow-up rows are clean in targeted runs but are already stable, so they are adjacent regression evidence only. Earlier in this file some historical subsections mention smaller pool sizes (20/25/26); those statements are preserved as checkpoint chronology and are superseded by this current 42/50 pool.
 
@@ -312,3 +321,14 @@ Evidence:
 - SysV shm scout remains blocker-only: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt` — `0 PASS / 26 FAIL`; no LA follow-up.
 
 Current milestone-06 state: candidate pool **42/50**, short by 8; stable list unchanged at `756 total / 756 unique / 0 duplicate`.
+
+## Final stable806 promotion gate (2026-06-04)
+
+Current-code final gate ran the full 50-case cohort on RV and LA, each with musl and glibc wrappers. Parser result is clean on both architectures:
+
+- RV final gate: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.summary.txt` — `100 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA final gate: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.summary.txt` — `100 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined report: `target/ltp-1000-milestone-06-stable806/stable806-candidate50-final-gate-rv-la-fourway.promotion-candidates.txt` — `Promotion candidates: 50`, `Blocked/incomplete cases: 0`.
+- Stable list check after edit: `806 total / 806 unique / 0 duplicate`.
+
+The final SysV SHM slice contributes the last eight new unique cases: `shmget02`, `shmget03`, `shmget04`, `shmat02`, `shmat03`, `shmdt01`, `shmctl03`, and `shmctl04`. `shmat04` and `shmdt02` were included in the SysV final8+adjacent gate as already-stable regression coverage, not as new candidates.

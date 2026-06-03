@@ -865,3 +865,74 @@ fstat02_64
 # RV adjacent summary: target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt — 20 PASS / 0 FAIL / 0 internal markers.
 # LA adjacent summary: target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt — 20 PASS / 0 FAIL / 0 internal markers.
 # Current pool after this follow-up: 42/50; stable list remains 756 total / 756 unique / 0 duplicate.
+
+# RV/LA SysV SHM final8 + adjacent gate, 2026-06-04
+shmget02
+shmget03
+shmget04
+shmat02
+shmat03
+shmdt01
+shmctl03
+shmctl04
+# adjacent already-stable rows
+shmat04
+shmdt02
+
+# RV/LA stable806 final 50-case promotion gate, 2026-06-04
+prctl08
+prctl09
+utsname02
+mkdirat02
+rmdir02
+mkdir02
+mkdir03
+fcntl27
+fcntl27_64
+symlink03
+unlink09
+mkdir09
+gettid02
+futex_wait_bitset01
+fstat02
+fstat02_64
+setxattr03
+fgetxattr02
+getxattr02
+setxattr02
+splice01
+splice02
+splice03
+splice04
+splice05
+lseek11
+accept02
+bind01
+bind02
+connect01
+recv01
+recvfrom01
+send01
+sendto01
+bind03
+getsockopt02
+recvmsg01
+posix_fadvise02
+posix_fadvise02_64
+posix_fadvise04
+posix_fadvise04_64
+fallocate03
+shmget02
+shmget03
+shmget04
+shmat02
+shmat03
+shmdt01
+shmctl03
+shmctl04
+
+# SysV SHM excluded/blocker-only rows, 2026-06-04
+shmat01
+shmctl01
+shmctl02
+shmctl05
