@@ -846,3 +846,82 @@ Adjacent parser result:
 Validation conclusion for this repair:
 
 `symlink03` is added to the stable806 candidate pool with four-combo clean evidence and a 20-case symlink/access/readlink/link/unlink/rmdir/mkdir adjacent stable subset on both architectures. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 10/50 for stable806.
+
+## unlink09 FS_IOC inode-flags repair and targeted retest
+
+After the `symlink03` parent-permission repair, `unlink09` still failed during the immutable/append-only setup path because `ioctl(FS_IOC_GETFLAGS)` returned `ENOTTY` on regular file descriptors. The repair adds a generic in-memory per-path inode flag store and handles `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` for path-backed file descriptors. `unlink`/`unlinkat` now reject deletion of paths with `FS_IMMUTABLE_FL` or `FS_APPEND_FL` with `EPERM`, while the existing read-only mount path still returns `EROFS`.
+
+Failed diagnostic evidence, not promotion evidence:
+
+- RV pre-fix log: `target/ltp-1000-milestone-06-stable806/rv-unlink09-after-symlink03-perms-20260603T215126+0800.log`
+- RV pre-fix summary: `target/ltp-1000-milestone-06-stable806/rv-unlink09-after-symlink03-perms-20260603T215126+0800.summary.txt` — `0 PASS / 2 FAIL / TBROK=2`, rooted in `FS_IOC_GETFLAGS` returning `ENOTTY`.
+
+Targeted RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='unlink09' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.log
+```
+
+Targeted LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='unlink09' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.log target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.log
+```
+
+Targeted artifacts:
+
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.promotion-candidates.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.combined-promotion-candidates.txt`
+
+Targeted parser result:
+
+- RV: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidate `unlink09`.
+
+Adjacent stable regression command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='access01,access02,access03,access04,faccessat01,faccessat02,chmod01,chmod03,chmod05,symlink01,symlink02,symlink04,symlinkat01,readlink01,readlinkat01,link02,linkat01,unlink05,unlink07,unlinkat01,rmdir01,mkdir04,unlink09' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.log
+
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='access01,access02,access03,access04,faccessat01,faccessat02,chmod01,chmod03,chmod05,symlink01,symlink02,symlink04,symlinkat01,readlink01,readlinkat01,link02,linkat01,unlink05,unlink07,unlinkat01,rmdir01,mkdir04,unlink09' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.log target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.log
+```
+
+Adjacent regression artifacts:
+
+- Cases list: `target/ltp-1000-milestone-06-stable806/unlink09-adjacent-regression-20260603T220147+0800.cases`
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.json`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.json`
+- Combined adjacent candidate report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.combined-promotion-candidates.txt`
+
+Adjacent parser result:
+
+- RV: `46 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `46 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+
+Validation conclusion for this repair:
+
+`unlink09` is added to the stable806 candidate pool with four-combo clean evidence and a 23-case unlink/path-permission adjacent stable subset on both architectures. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 11/50 for stable806.

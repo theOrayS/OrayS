@@ -184,6 +184,14 @@ impl UserProcess {
         }
         drop(owners);
 
+        let mut inode_flags = self.path_inode_flags.lock();
+        if let Some(flags) = inode_flags.remove(old_path) {
+            inode_flags.insert(new_path.clone(), flags);
+        } else {
+            inode_flags.remove(new_path.as_str());
+        }
+        drop(inode_flags);
+
         let mut symlinks = self.path_symlinks.lock();
         if let Some(target) = symlinks.remove(old_path) {
             symlinks.insert(new_path.clone(), target);
@@ -262,6 +270,22 @@ impl UserProcess {
 
     pub(super) fn path_owner(&self, path: &str) -> Option<(u32, u32)> {
         self.path_owners.lock().get(path).copied()
+    }
+
+    pub(super) fn set_path_inode_flags(&self, path: String, flags: u32) {
+        if flags == 0 {
+            self.path_inode_flags.lock().remove(path.as_str());
+        } else {
+            self.path_inode_flags.lock().insert(path, flags);
+        }
+    }
+
+    pub(super) fn remove_path_inode_flags(&self, path: &str) {
+        self.path_inode_flags.lock().remove(path);
+    }
+
+    pub(super) fn path_inode_flags(&self, path: &str) -> u32 {
+        self.path_inode_flags.lock().get(path).copied().unwrap_or(0)
     }
 
     pub(super) fn set_path_symlink(&self, path: String, target: String) {

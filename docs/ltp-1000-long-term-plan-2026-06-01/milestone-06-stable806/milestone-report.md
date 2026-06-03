@@ -17,6 +17,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Repaired directory `chown`/setgid preservation and final-component symlink existence checks for `mkdirat`/`mknodat`, making `mkdir02` and `mkdir03` four-combo clean candidates.
 - Repaired `F_SETLEASE` read-lease access semantics so write-open file descriptors fail with `EAGAIN`, making `fcntl27` and same-source `fcntl27_64` four-combo clean candidates while preserving existing read-only lease rows.
 - Seeded Linux-like `01777` metadata for `/tmp` and `/tmp/ltp-work`, then made `symlinkat` use the generic parent write/search/type permission gate before recording synthetic symlinks; this makes `symlink03` four-combo clean without hardcoding the case or path.
+- Added generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` handling plus immutable/append-only unlink `EPERM` checks; this makes `unlink09` four-combo clean without hardcoding the case or output.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -33,6 +34,7 @@ Current new unique stable806 candidates:
 8. `fcntl27`
 9. `fcntl27_64`
 10. `symlink03`
+11. `unlink09`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -76,6 +78,14 @@ Current new unique stable806 candidates:
 - Adjacent RV symlink/path-permission regression: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.summary.txt` — `40 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA symlink/path-permission regression: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.summary.txt` — `40 PASS / 0 FAIL / 0 internal markers`.
 
+
+- unlink09 pre-fix diagnostic: `target/ltp-1000-milestone-06-stable806/rv-unlink09-after-symlink03-perms-20260603T215126+0800.summary.txt` — `0 PASS / 2 FAIL / TBROK=2`, not promotion evidence.
+- unlink09 targeted RV after FS_IOC inode-flag repair: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- unlink09 targeted LA after FS_IOC inode-flag repair: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.summary.txt` — same clean `2 PASS / 0 FAIL / 0 internal markers` result.
+- Combined unlink09 candidate report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.combined-promotion-candidates.txt` — four-combo candidate `unlink09`.
+- Adjacent RV unlink/path-permission regression: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt` — `46 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA unlink/path-permission regression: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt` — `46 PASS / 0 FAIL / 0 internal markers`.
+
 ## Risks and boundaries
 
 - `CLONE_NEWUTS` and `unshare(CLONE_NEWUTS)` are still not implemented; `utsname03` remains blocked and is not counted.
@@ -84,9 +94,10 @@ Current new unique stable806 candidates:
 - `readlink03`/`readlinkat02` remain blocked on LA musl wrapper behavior; rejecting all one-byte buffers in-kernel is not acceptable.
 - `nice04` remains blocked on libc-visible errno differences around priority lowering; do not risk stable `setpriority` rows with a wrapper-specific kernel special case.
 - Statx, 16-bit UID, capability, and glibc `gettid02` rows remain blocker-only until real semantics or futex/glibc robustness improve.
-- The VFS/FD/select scout was split: `mkdir02`, `mkdir03`, `mkdirat02`, `rmdir02`, `fcntl27`, `fcntl27_64`, and `symlink03` are repaired and candidate-clean, while the remaining select/mknod/unlink rows still have TCONF/timeout/TFAIL/TBROK blockers.
+- The VFS/FD/select scout was split: `mkdir02`, `mkdir03`, `mkdirat02`, `rmdir02`, `fcntl27`, `fcntl27_64`, `symlink03`, and `unlink09` are repaired and candidate-clean, while the remaining select/mknod rows still have TCONF/timeout/TFAIL/TBROK blockers.
 - Timerslack/prctl adjacent stable regression still needs to be included before any eventual stable806 promotion commit.
+- The inode-flag implementation is in-memory process metadata, not persistent filesystem inode state; future broader FS_IOC work must preserve generic Linux errno/flag semantics and avoid LTP-specific branches.
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, and symlink parent-permission semantics and adds 8 new unique candidates (`utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`), bringing the stable806 candidate pool to 10 unique cases. The blocker triage added zero candidates outside the explicitly repaired rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, and FS_IOC inode-flag/unlink errno semantics and adds 9 new unique candidates (`utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`), bringing the stable806 candidate pool to 11 unique cases. The blocker triage added zero candidates outside the explicitly repaired rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.

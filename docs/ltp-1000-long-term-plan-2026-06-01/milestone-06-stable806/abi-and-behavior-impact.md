@@ -71,7 +71,7 @@ Unchanged boundaries:
 
 - `unlink` of non-directory final symlinks remains governed by the existing non-following final-component removal semantics.
 - No FD table layout, FD_CLOEXEC, file status flag, signal, futex, mmap, user-pointer ABI, struct layout, or syscall number behavior changed.
-- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir09`, `mknod07`, `mknodat02`, and `unlink09` blockers retain visible parser markers and are not counted until separately repaired.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir09`, `mknod07`, and `mknodat02` blockers retain visible parser markers and are not counted until separately repaired; `unlink09` moved to the later FS_IOC inode-flag repair lane.
 
 ## mkdir setgid and final symlink existence repair impact
 
@@ -125,3 +125,22 @@ Unchanged boundaries:
 - Final symlink creation semantics remain non-following for the new link name; the change checks only the parent path before creation.
 - No syscall numbers, struct layouts, FD table layout, `FD_CLOEXEC`, file status flags, signal delivery, futex behavior, mmap behavior, user-pointer copy semantics, blacklist, or evaluator behavior changed.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. `/tmp` and `/tmp/ltp-work` are generic harness scratch roots and receive standard Linux tmpdir permissions rather than test-result-specific behavior.
+
+## unlink09 FS_IOC inode-flag repair impact
+
+This source patch changes generic file `ioctl` and unlink errno behavior; it is not a stable-list promotion and does not edit `LTP_STABLE_CASES`.
+
+User-visible syscall/errno/flag changes:
+
+- `ioctl(fd, FS_IOC_GETFLAGS, u32*)` now succeeds for path-backed file descriptors and copies out the current in-memory inode flags, defaulting to `0` for paths without stored flags.
+- `ioctl(fd, FS_IOC_SETFLAGS, u32*)` now copies in a `u32` flag word for path-backed file descriptors and records it in per-process path metadata; setting flags to `0` clears the stored metadata.
+- `FS_IOC_SETFLAGS` on a path that resolves under the existing read-only mount model returns `EROFS`.
+- `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` on a non-path-backed descriptor return `ENOTTY`; invalid descriptors still return the table error such as `EBADF`.
+- `unlink`/`unlinkat` now return `EPERM` for paths carrying `FS_IMMUTABLE_FL` or `FS_APPEND_FL`, before removing regular-file or hardlink metadata.
+- Successful unlink/symlink/hardlink-alias removal clears any stored inode flags for that path, and `rename` moves the stored flags with the path metadata.
+
+Resource/lifetime and maintenance boundaries:
+
+- Inode flags are process-local in-memory metadata cloned across `fork()`, matching the existing synthetic path metadata model; they are not persisted to the backing filesystem image and are not a full ext4 inode implementation.
+- The patch does not change syscall numbers, struct layouts, FD table layout, `FD_CLOEXEC`, file status flags (`O_APPEND`, `O_NONBLOCK`, etc.), signal delivery, futex behavior, mmap behavior, or user-pointer copy semantics beyond the explicit `ioctl` copy-in/copy-out for the `u32` flags word.
+- The implementation uses generic Linux inode flag constants and VFS unlink errno behavior; it does not hardcode LTP case names, paths, process names, or expected output.

@@ -97,6 +97,7 @@ struct UserProcess {
     path_symlinks: Mutex<BTreeMap<String, String>>,
     path_hardlinks: Mutex<BTreeMap<String, String>>,
     path_hardlink_counts: Mutex<BTreeMap<String, u64>>,
+    path_inode_flags: Mutex<BTreeMap<String, u32>>,
     path_xattrs: Mutex<BTreeMap<String, BTreeMap<String, Vec<u8>>>>,
     path_times: Mutex<BTreeMap<String, PathTimes>>,
     path_sparse_sizes: Mutex<BTreeMap<String, u64>>,

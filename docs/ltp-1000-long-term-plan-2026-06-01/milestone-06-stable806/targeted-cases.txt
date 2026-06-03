@@ -330,3 +330,31 @@ linkat01
 unlinkat01
 rmdir01
 mkdir04
+
+# RV/LA unlink09 FS_IOC inode-flags targeted repair retest, 2026-06-03
+unlink09
+
+# RV/LA unlink09 FS_IOC inode-flags adjacent stable regression subset, 2026-06-03
+access01
+access02
+access03
+access04
+faccessat01
+faccessat02
+chmod01
+chmod03
+chmod05
+symlink01
+symlink02
+symlink04
+symlinkat01
+readlink01
+readlinkat01
+link02
+linkat01
+unlink05
+unlink07
+unlinkat01
+rmdir01
+mkdir04
+unlink09
