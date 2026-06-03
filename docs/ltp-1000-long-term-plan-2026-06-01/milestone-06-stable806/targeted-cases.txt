@@ -762,10 +762,8 @@ connect02
 send02
 sendto02
 sendto03
-recvmsg01
 recvmsg02
 recvmsg03
-getsockopt02
 setsockopt02
 setsockopt03
 setsockopt04
@@ -779,3 +777,30 @@ epoll_create01
 epoll_create02
 eventfd06
 # Plus 29 current 16-bit credential rows and the VFS/time/proc low-risk scout rows recorded in validation.md; all have visible parser blockers and zero promotion candidates.
+
+# 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
+# Targeted candidate gate plus adjacent socket regression; case unit.
+getsockopt02
+recvmsg01
+socket01
+socket02
+socketpair01
+socketpair02
+accept01
+getsockopt01
+setsockopt01
+accept02
+bind01
+bind02
+bind03
+connect01
+recv01
+recvfrom01
+send01
+sendto01
+# RV targeted summary: target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.txt — 4 PASS / 0 FAIL / 0 internal markers.
+# LA targeted summary: target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.txt — 4 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt — four-combo candidates getsockopt02/recvmsg01.
+# RV adjacent socket regression: target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt — 36 PASS / 0 FAIL / 0 internal markers.
+# LA adjacent socket regression: target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt — 36 PASS / 0 FAIL / 0 internal markers.
+# Current pool after this follow-up: 37/50; stable list remains 756 total / 756 unique / 0 duplicate.

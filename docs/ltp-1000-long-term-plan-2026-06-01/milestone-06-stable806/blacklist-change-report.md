@@ -46,3 +46,7 @@ No blacklist was added, removed, or used for `splice01`..`splice09`. The counted
 ## 2026-06-04 socket errno/address candidate follow-up
 
 No blacklist was added, removed, or used for the socket errno/address follow-up. The counted socket candidates (`accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`) come only from RV + LA × musl + glibc parser-clean targeted logs after generic source fixes. The LA readlink refresh, RV socket/epoll scout, RV 16-bit credential scout, and RV VFS/time/proc scout are blocker-only and contribute zero promotion candidates. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
+
+No blacklist was added, removed, or used for `getsockopt02`, `recvmsg01`, or the adjacent socket regression subset. The counted evidence comes only from fresh RV + LA × musl + glibc parser-clean targeted logs and adjacent regression after generic AF_UNIX pathname listener/accept, `SO_PEERCRED`, and minimal `sendmsg`/`recvmsg` bridge support. Earlier socket/epoll scout rows for these cases are superseded by this targeted evidence; all remaining rows with visible `TFAIL/TBROK/TCONF/ENOSYS/timeout` markers remain blocker-only. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.

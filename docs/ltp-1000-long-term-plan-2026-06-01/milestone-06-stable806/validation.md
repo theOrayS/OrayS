@@ -1665,4 +1665,30 @@ Current stable count check remains:
 756 756 0
 ```
 
-Current candidate-pool count is **35/50**; no stable-list update or milestone806 promotion commit is allowed yet.
+At the socket errno/address checkpoint candidate-pool count was **35/50**; the later AF_UNIX follow-up below raises the current pool to **37/50**. No stable-list update or milestone806 promotion commit is allowed yet.
+
+## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
+
+Command shape used for the targeted gate and adjacent regression:
+
+```bash
+LTP_CASES='getsockopt02 recvmsg01' timeout 900 ./run-eval.sh rv
+LTP_CASES='getsockopt02 recvmsg01' timeout 900 ./run-eval.sh la
+python3 scripts/ltp_summary.py <raw-log>
+python3 scripts/ltp_summary.py --json <raw-log> > <summary-json>
+python3 scripts/ltp_summary.py --promotion-candidates   target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800.log   target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800.log
+LTP_CASES='socket01 socket02 socketpair01 socketpair02 accept01 getsockopt01 setsockopt01 accept02 bind01 bind02 bind03 connect01 recv01 recvfrom01 send01 sendto01 getsockopt02 recvmsg01' timeout 1200 ./run-eval.sh <rv|la>
+```
+
+Artifacts and parser results:
+
+| Gate | Raw log | Summary | JSON | Parser result |
+| --- | --- | --- | --- | --- |
+| RV targeted `getsockopt02 recvmsg01` | `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800.log` | `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.txt` | `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.json` | `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` |
+| LA targeted `getsockopt02 recvmsg01` | `target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800.log` | `target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.txt` | `target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.json` | `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` |
+| RV adjacent socket regression | `target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800.log` | `target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt` | `target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.json` | `36 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` |
+| LA adjacent socket regression | `target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800.log` | `target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt` | `target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.json` | `36 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` |
+
+Combined candidate report: `target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt` — `Promotion candidates: 2`; candidates `getsockopt02`, `recvmsg01`; blocked/incomplete `0`.
+
+The current candidate pool is **37/50**, still short by 13 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable-list update or milestone806 promotion commit is allowed yet.

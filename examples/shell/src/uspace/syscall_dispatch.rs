@@ -11,8 +11,8 @@ use super::fd_pipe::sys_pipe2;
 use super::fd_socket::{
     sys_accept_bridge, sys_bind_bridge, sys_connect_bridge, sys_getpeername_bridge,
     sys_getsockname_bridge, sys_getsockopt_bridge, sys_listen_bridge, sys_recvfrom_bridge,
-    sys_sendto_bridge, sys_setsockopt_bridge, sys_shutdown_bridge, sys_socket_bridge,
-    sys_socketpair_bridge,
+    sys_recvmsg_bridge, sys_sendmsg_bridge, sys_sendto_bridge, sys_setsockopt_bridge,
+    sys_shutdown_bridge, sys_socket_bridge, sys_socketpair_bridge,
 };
 use super::fd_table::{
     sys_chdir, sys_close, sys_copy_file_range, sys_dup, sys_dup3, sys_epoll_create1, sys_epoll_ctl,
@@ -301,6 +301,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
             tf.arg5(),
         ),
+        general::__NR_sendmsg => sys_sendmsg_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_recvfrom => sys_recvfrom_bridge(
             &process,
             tf.arg0(),
@@ -310,6 +311,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
             tf.arg5(),
         ),
+        general::__NR_recvmsg => sys_recvmsg_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_shutdown => sys_shutdown_bridge(&process, tf.arg0(), tf.arg1()),
         general::__NR_getsockname => {
             sys_getsockname_bridge(&process, tf.arg0(), tf.arg1(), tf.arg2())

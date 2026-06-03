@@ -29,7 +29,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 
 ## Candidate-pool status
 
-Current new unique stable806 candidates: **35/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; this is still an interim candidate-pool checkpoint, not a stable-list promotion.
+Current new unique stable806 candidates: **37/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; this is still an interim candidate-pool checkpoint, not a stable-list promotion.
 
 1. `prctl08`
 2. `prctl09`
@@ -67,7 +67,7 @@ Current new unique stable806 candidates: **35/50**. `examples/shell/src/cmd.rs::
 34. `sendto01`
 35. `bind03`
 
-`utsname01` and the eventfd/poll/pselect follow-up rows are clean in targeted runs but are already stable, so they are adjacent regression evidence only. Earlier in this file some historical subsections mention smaller pool sizes (20/25/26); those statements are preserved as checkpoint chronology and are superseded by this current 35/50 pool.
+`utsname01` and the eventfd/poll/pselect follow-up rows are clean in targeted runs but are already stable, so they are adjacent regression evidence only. Earlier in this file some historical subsections mention smaller pool sizes (20/25/26); those statements are preserved as checkpoint chronology and are superseded by this current 37/50 pool.
 
 ## Evidence
 
@@ -260,4 +260,23 @@ Negative follow-up evidence kept out of promotion:
 - RV 16-bit credential scout: `target/ltp-1000-milestone-06-stable806/rv-cred16-scout-20260604T025923+0800.summary.txt` — `0 PASS / 58 FAIL`, all blocker-only `TCONF`; zero candidates.
 - RV VFS/time/proc low-risk scout: `target/ltp-1000-milestone-06-stable806/rv-vfs-time-proc-lowrisk-scout-20260604T030139+0800.summary.txt` — `6 PASS / 46 FAIL`, `TFAIL=24`, `TBROK=10`, `TCONF=45`, `timeout=2`, `ENOSYS=2`; zero clean candidates.
 
-The candidate pool is now **35/50**. Stable806 remains blocked until at least 15 additional unique four-combo clean cases are found and the full milestone gate is rerun.
+At that socket errno/address checkpoint the candidate pool was **35/50**. The later AF_UNIX `SO_PEERCRED`/`recvmsg` follow-up below raises it to **37/50**; stable806 remains blocked until at least 13 additional unique four-combo clean cases are found and the full milestone gate is rerun.
+
+## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
+
+This follow-up converts `getsockopt02` and `recvmsg01` from earlier socket blocker/scout rows into current candidate-pool evidence. It does not edit `LTP_STABLE_CASES`; it only records parser-clean evidence for the next stable806 cohort.
+
+New four-combo candidates from this follow-up:
+
+- `getsockopt02` — AF_UNIX pathname stream `listen`/`accept` plus `SO_PEERCRED` peer-credential copy-out.
+- `recvmsg01` — AF_UNIX pathname stream connection setup plus minimal `sendmsg`/`recvmsg` bridge sufficient for the generic return/errno checks in this LTP row.
+
+Evidence:
+
+- RV targeted summary: `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.txt` — `4 PASS / 0 FAIL / 0 internal markers`.
+- LA targeted summary: `target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.txt` — `4 PASS / 0 FAIL / 0 internal markers`.
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt` — two four-combo candidates; blocked/incomplete `0`.
+- RV adjacent socket regression: `target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt` — `36 PASS / 0 FAIL / 0 internal markers`.
+- LA adjacent socket regression: `target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt` — `36 PASS / 0 FAIL / 0 internal markers`.
+
+The candidate pool is now **37/50**. Stable806 remains blocked until at least 13 additional unique four-combo clean cases are found and the full milestone gate is rerun. Stable count remains `756 total / 756 unique / 0 duplicate`.

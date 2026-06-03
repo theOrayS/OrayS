@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 26/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 37/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -30,6 +30,17 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `splice04` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-pipe `splice(2)` transfer support | candidate pool |
 | `splice05` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-AF_UNIX-stream and AF_UNIX-stream-to-pipe `splice(2)` support | candidate pool |
 | `lseek11` | RV + LA × musl + glibc targeted parser-clean after generic `SEEK_DATA`/`SEEK_HOLE` regular-file data/hole range tracking | candidate pool |
+| `accept02` | RV + LA × musl + glibc parser-clean after generic socket errno/address-boundary fixes | candidate pool |
+| `bind01` | RV + LA × musl + glibc parser-clean after generic AF_INET address/length errno handling | candidate pool |
+| `bind02` | RV + LA × musl + glibc parser-clean after privileged-port `EACCES` handling | candidate pool |
+| `connect01` | RV + LA × musl + glibc parser-clean after generic connect errno/address-boundary fixes | candidate pool |
+| `recv01` | RV + LA × musl + glibc parser-clean after generic receive flag errno handling | candidate pool |
+| `recvfrom01` | RV + LA × musl + glibc parser-clean after generic receive-from flag and sockaddr errno handling | candidate pool |
+| `send01` | RV + LA × musl + glibc parser-clean after generic send flag/size/error handling | candidate pool |
+| `sendto01` | RV + LA × musl + glibc parser-clean after connected TCP `sendto()` destination handling | candidate pool |
+| `bind03` | RV + LA × musl + glibc parser-clean after generic AF_UNIX pathname bind node/existing-bind behavior | candidate pool |
+| `getsockopt02` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname listener/accept plus `SO_PEERCRED` support | candidate pool |
+| `recvmsg01` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname stream listener plus minimal `sendmsg`/`recvmsg` bridge | candidate pool |
 
 Evidence artifacts:
 
@@ -324,7 +335,7 @@ The candidate pool is now 26/50 unique cases. `examples/shell/src/cmd.rs::LTP_ST
 
 ## 2026-06-04 socket errno/address candidate follow-up
 
-The socket follow-up adds nine new unique four-combo candidates and supersedes the prior 26/50 pool count with a current **35/50** pool. These rows are counted only from fresh RV + LA × musl + glibc parser-clean evidence; blocked socketcall, namespace, pass-with-`TCONF`, and already-stable rows remain excluded.
+The socket errno/address follow-up added nine new unique four-combo candidates and superseded the prior 26/50 pool count with a then-current **35/50** pool; the later AF_UNIX `SO_PEERCRED`/`recvmsg` follow-up below supersedes this again with a current **37/50** pool. These rows are counted only from fresh RV + LA × musl + glibc parser-clean evidence; blocked socketcall, namespace, pass-with-`TCONF`, and already-stable rows remain excluded.
 
 | Candidate set | Combined report | New unique candidates |
 | --- | --- | --- |
@@ -335,7 +346,7 @@ The socket follow-up adds nine new unique four-combo candidates and supersedes t
 | TCP `sendto` connected-stream destination handling | `target/ltp-1000-milestone-06-stable806/la-sendto01-tcp-ignore-dest-20260604T024159+0800.combined-promotion-candidates.txt` | `sendto01` |
 | AF_UNIX pathname bind | `target/ltp-1000-milestone-06-stable806/la-bind03-unix-bound-path-20260604T024448+0800.combined-promotion-candidates.txt` | `bind03` |
 
-Current 35-case pool:
+Current 37-case pool:
 
 - `prctl08`
 - `prctl09`
@@ -372,5 +383,29 @@ Current 35-case pool:
 - `send01`
 - `sendto01`
 - `bind03`
+- `getsockopt02`
+- `recvmsg01`
 
-Excluded new scout rows: `readlink03`, `readlinkat02`, `bind04`, `bind05`, `bind06`, `connect02`, `send02`, `sendto02`, `sendto03`, `recvmsg01`, `recvmsg02`, `recvmsg03`, `getsockopt02`, `setsockopt02`..`setsockopt10`, `epoll_create01`, `epoll_create02`, `eventfd06`, all 16-bit credential rows, and the VFS/time/proc scout rows. Their evidence contains visible `TFAIL/TBROK/TCONF/ENOSYS/timeout` markers or missing semantic prerequisites, so they contribute zero promotion candidates.
+Excluded new scout rows: `readlink03`, `readlinkat02`, `bind04`, `bind05`, `bind06`, `connect02`, `send02`, `sendto02`, `sendto03`, `recvmsg02`, `recvmsg03`, `setsockopt02`..`setsockopt10`, `epoll_create01`, `epoll_create02`, `eventfd06`, all 16-bit credential rows, and the VFS/time/proc scout rows. Their evidence contains visible `TFAIL/TBROK/TCONF/ENOSYS/timeout` markers or missing semantic prerequisites, so they contribute zero promotion candidates.
+
+## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
+
+This follow-up supersedes the earlier blocker-only scout rows for `getsockopt02` and `recvmsg01`. They now count only from fresh targeted RV + LA × musl + glibc parser-clean evidence after generic AF_UNIX pathname listener/accept, peer-credential tracking, and minimal `sendmsg`/`recvmsg` bridge support. The earlier broad socket/epoll scout remains blocker-only for the other rows.
+
+| Candidate set | Combined report | New unique candidates |
+| --- | --- | --- |
+| AF_UNIX `SO_PEERCRED` and `recvmsg` | `target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt` | `getsockopt02`, `recvmsg01` |
+
+Evidence artifacts:
+
+- RV targeted raw log: `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800.log`
+- RV targeted summary: `target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.txt` — `4 PASS / 0 FAIL / 0 internal markers` for `getsockopt02` and `recvmsg01` across musl + glibc.
+- LA targeted raw log: `target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800.log`
+- LA targeted summary: `target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.txt` — `4 PASS / 0 FAIL / 0 internal markers` for the same two cases.
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt` — promotion candidates `2`, blocked/incomplete `0`.
+- RV adjacent socket regression summary: `target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt` — `36 PASS / 0 FAIL / 0 internal markers` for 18 socket rows across musl + glibc.
+- LA adjacent socket regression summary: `target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt` — `36 PASS / 0 FAIL / 0 internal markers` for the same 18 rows.
+
+Current 37-case pool: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`, `getsockopt02`, `recvmsg01`.
+
+The candidate pool is now **37/50**, still short by 13 unique four-combo clean cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the full +50 gate.

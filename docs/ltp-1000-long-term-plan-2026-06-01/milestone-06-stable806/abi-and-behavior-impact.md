@@ -317,3 +317,20 @@ ABI/maintenance boundaries:
 - The AF_UNIX pathname work records bind state and node creation only; it is not a full pathname listener/connection registry. `bind04`, `bind05`, `getsockopt02`, `recvmsg01`, and related AF_UNIX listener/message rows remain blocked until real connect/listen/recvmsg semantics exist.
 - The privileged-port bridge rule is generic but tied to the shell userspace credential model; future UID/capability work must revisit `CAP_NET_BIND_SERVICE` rather than adding case-specific exceptions.
 - Future socket option, socket namespace, socketcall, TCP/UDP readiness, or AF_UNIX connection work must preserve these generic errno boundaries and rerun the socket candidate set before promotion.
+
+## 2026-06-04 AF_UNIX pathname listener / SO_PEERCRED / sendmsg-recvmsg impact
+
+This source patch is generic userspace-kernel bridge behavior for AF_UNIX and message syscalls; it is not a stable-list promotion and does not edit evaluator/testsuite code.
+
+User-visible syscall/errno/ABI changes:
+
+- Pathname `AF_UNIX` stream sockets now support the `bind()` → `listen()` → `connect()` → `accept()` lifecycle through an in-memory listener registry keyed by the resolved pathname. Existing duplicate-bind `EADDRINUSE`, same-socket rebind `EINVAL`, and missing-listener `ECONNREFUSED`/path lookup errno behavior are preserved through generic checks.
+- Accepted local stream sockets carry peer credentials captured at connect/listen time. `getsockopt(fd, SOL_SOCKET, SO_PEERCRED, ...)` copies out a Linux-layout `{pid, uid, gid}` credential struct for local sockets, enabling `getsockopt02` without hardcoding the LTP case.
+- `sendmsg(2)` and `recvmsg(2)` now dispatch through the userspace bridge. The implemented bridge validates/copies the Linux `msghdr`/iovec surface used by current tests, transfers payload data through the existing local-socket or inet send/recv paths, reports invalid iovec counts with `EMSGSIZE`, and preserves existing invalid flag behavior through the lower send/recv path.
+- `SO_ERROR`, `SO_TYPE`, `SO_SNDBUF`, and `SO_RCVBUF` local-socket `getsockopt` queries remain available; unsupported local-socket options return `ENOPROTOOPT`.
+
+Resource/lifetime and maintenance boundaries:
+
+- The AF_UNIX listener table is process-global in-memory state. Listener removal is tied to the last local socket entry owning the bound path; pending accepted endpoints are held in a bounded Rust `Vec` protected by a mutex. No on-disk socket inode format, syscall number, FD table layout, or Rust ABI struct layout exported to userspace changed beyond the Linux-compatible copy-out bytes described above.
+- This is intentionally not full Linux AF_UNIX support. Abstract namespace sockets, datagram/SEQPACKET semantics, full `socketcall`, real ancillary control-message delivery (`SCM_RIGHTS`/`SCM_CREDENTIALS`), multi-iov receive scatter beyond the minimal bridge, and complete `getsockname`/`getpeername` pathname payload semantics remain future work and must not be claimed as supported by this checkpoint.
+- No signal, futex, mmap, rlimit, process teardown, blacklist, stable-list, remote-evaluator, testsuite, or hardcoded LTP case/path/process/output behavior changed.

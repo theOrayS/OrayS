@@ -149,3 +149,11 @@ Required before promotion:
 
 - Rerun the nine socket candidates on RV + LA × musl + glibc together with adjacent already-stable socket rows (`socket01`, `socket02`, `socketpair01`/`02`, representative `getsockname`/`getsockopt`/`setsockopt` stable rows if present) when assembling stable806.
 - Do not promote `bind04`, `bind05`, `getsockopt02`, `recvmsg01`, `send02`, `sendto02`, `sendto03`, `epoll_create01/02`, `eventfd06`, socketcall rows, or 16-bit credential rows until their visible parser blockers are removed by real semantics.
+
+## AF_UNIX SO_PEERCRED/sendmsg regression boundary
+
+`getsockopt02` and `recvmsg01` are protected by fresh RV + LA × musl + glibc targeted evidence (`8 PASS / 0 FAIL / 0 internal markers` across the two architecture logs) plus an 18-case adjacent socket subset on both architectures (`36 PASS / 0 FAIL / 0 internal markers` for RV and `36 PASS / 0 FAIL / 0 internal markers` for LA).
+
+Covered stable adjacency includes `socket01`, `socket02`, `socketpair01`, `socketpair02`, `accept01`, `getsockopt01`, `setsockopt01`, and the current socket candidate rows `accept02`, `bind01`, `bind02`, `bind03`, `connect01`, `recv01`, `recvfrom01`, `send01`, and `sendto01`. Future edits in AF_UNIX local socket listener lifecycle, local-socket peer credential handling, `sendmsg`/`recvmsg` bridge code, socket fd type dispatch, or local socket `getsockopt` should rerun `getsockopt02`, `recvmsg01`, and this adjacent socket subset on RV + LA × musl + glibc before counting these cases in a stable milestone.
+
+The boundary does not cover abstract namespace, datagram/SEQPACKET, full ancillary `SCM_RIGHTS`, or socketcall rows; those remain blocker/future-work lanes and must not be promoted from this evidence.
