@@ -104,3 +104,5 @@ Unchanged boundaries:
 
 - FD allocation, `FD_CLOEXEC`, `F_GETFL`/`F_SETFL`, record locks (`F_GETLK`, `F_SETLK`, `F_SETLKW`), pipe capacity commands, signals, futexes, mmap, struct layout, and user-pointer copy semantics are unchanged.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. It applies a generic access-mode rule before recording a read lease.
+
+Follow-up `fcntl27_64` validation made no additional source changes. It demonstrates that the same visible errno rule also covers the 64-bit LTP variant; syscall numbers, struct layouts, FD flags, signal/futex/mmap behavior, and user-pointer copying remain unchanged beyond the generic `F_SETLEASE` access-mode rule above.

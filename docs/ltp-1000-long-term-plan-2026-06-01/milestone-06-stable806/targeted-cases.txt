@@ -302,3 +302,5 @@ fcntl30_64
 fcntl35
 fcntl35_64
 fcntl27
+# RV/LA fcntl27_64 read-lease targeted repair retest, 2026-06-03
+fcntl27_64
