@@ -370,7 +370,7 @@ fn sys_poll_until(
     }
 }
 
-fn yield_poll_wait() {
+pub(super) fn yield_poll_wait() {
     if let Some(ext) = current_task_ext() {
         ext.poll_wait.store(true, Ordering::Release);
         axtask::yield_now();

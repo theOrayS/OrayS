@@ -93,6 +93,8 @@ struct UserProcess {
     path_rdevs: Mutex<BTreeMap<String, u64>>,
     path_owners: Mutex<BTreeMap<String, (u32, u32)>>,
     path_symlinks: Mutex<BTreeMap<String, String>>,
+    path_hardlinks: Mutex<BTreeMap<String, String>>,
+    path_hardlink_counts: Mutex<BTreeMap<String, u64>>,
     path_xattrs: Mutex<BTreeMap<String, BTreeMap<String, Vec<u8>>>>,
     path_times: Mutex<BTreeMap<String, PathTimes>>,
     path_sparse_sizes: Mutex<BTreeMap<String, u64>>,
@@ -133,6 +135,8 @@ struct UserProcess {
     exit_group_code: AtomicI32,
     exit_code: AtomicI32,
     term_signal: AtomicI32,
+    wait_stopped_signal: AtomicI32,
+    wait_continued_signal: AtomicI32,
     exit_wait: WaitQueue,
     teardown: ProcessTeardown,
 }

@@ -80,6 +80,7 @@ pub(super) fn load_program_image(
     let prepared = prepare_program(cwd, program_path, argv, 0)?;
     let elf = ElfFile::new(&prepared.image).map_err(|err| format!("invalid ELF: {err}"))?;
     let main = analyze_elf(&elf, USER_PIE_LOAD_BASE)?;
+    let exec_root = effective_exec_root(prepared.exec_root.as_str(), main.interpreter.as_deref());
 
     aspace.clear();
 
@@ -89,7 +90,7 @@ pub(super) fn load_program_image(
     let mut interp_base = 0usize;
 
     if let Some(raw_interp) = main.interpreter.as_deref() {
-        let interp_path = resolve_runtime_support_file(prepared.exec_root.as_str(), raw_interp)?;
+        let interp_path = resolve_runtime_support_file(exec_root.as_str(), raw_interp)?;
         #[cfg(not(any(target_arch = "loongarch64", target_arch = "riscv64")))]
         let interp_image = std::fs::read(interp_path.as_str())
             .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
@@ -97,13 +98,9 @@ pub(super) fn load_program_image(
         let mut interp_image = std::fs::read(interp_path.as_str())
             .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
         #[cfg(target_arch = "loongarch64")]
-        patch_loongarch_musl_syscall_stubs(
-            prepared.exec_root.as_str(),
-            raw_interp,
-            &mut interp_image,
-        )?;
+        patch_loongarch_musl_syscall_stubs(exec_root.as_str(), raw_interp, &mut interp_image)?;
         #[cfg(target_arch = "riscv64")]
-        patch_riscv_musl_syscall_stubs(prepared.exec_root.as_str(), raw_interp, &mut interp_image)?;
+        patch_riscv_musl_syscall_stubs(exec_root.as_str(), raw_interp, &mut interp_image)?;
         let interp_elf =
             ElfFile::new(&interp_image).map_err(|err| format!("invalid interpreter ELF: {err}"))?;
         let interp = analyze_elf(
@@ -150,7 +147,7 @@ pub(super) fn load_program_image(
     let env_refs = if let Some(env) = env_override {
         env.iter().map(String::as_str).collect::<Vec<_>>()
     } else {
-        default_env = default_exec_env(prepared.exec_root.as_str(), cwd);
+        default_env = default_exec_env(exec_root.as_str(), cwd);
         default_env.iter().map(String::as_str).collect::<Vec<_>>()
     };
     let stack_ptr = build_initial_stack(
@@ -183,9 +180,26 @@ pub(super) fn load_program_image(
                 PAGE_SIZE_4K,
             ),
         },
-        exec_root: prepared.exec_root,
+        exec_root,
         exec_path: prepared.path,
     })
+}
+
+fn effective_exec_root(path_root: &str, interpreter: Option<&str>) -> String {
+    if path_root != "/" {
+        return path_root.into();
+    }
+    let Some(interpreter) = interpreter else {
+        return path_root.into();
+    };
+    let name = interpreter.rsplit('/').next().unwrap_or(interpreter);
+    if name.starts_with("ld-musl-") {
+        "/musl".into()
+    } else if name.starts_with("ld-linux-") {
+        "/glibc".into()
+    } else {
+        path_root.into()
+    }
 }
 
 fn prepare_program(

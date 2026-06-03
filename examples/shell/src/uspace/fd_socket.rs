@@ -48,6 +48,7 @@ pub(super) struct SocketEntry {
     pub(super) posix_fd: i32,
     pub(super) socktype: i32,
     pub(super) options: Arc<Mutex<SocketOptions>>,
+    read_shutdown: Arc<Mutex<bool>>,
 }
 
 pub(super) struct LocalSocketEntry {
@@ -93,6 +94,7 @@ impl SocketEntry {
             posix_fd,
             socktype,
             options: Arc::new(Mutex::new(SocketOptions::default())),
+            read_shutdown: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -102,6 +104,7 @@ impl SocketEntry {
             posix_fd,
             socktype: self.socktype,
             options: self.options.clone(),
+            read_shutdown: self.read_shutdown.clone(),
         })
     }
 
@@ -130,6 +133,16 @@ impl SocketEntry {
             },
             Err(_) => matches!(mode, SelectMode::Except),
         }
+    }
+
+    pub(super) fn mark_shutdown(&self, how: i32) {
+        if matches!(how, 0 | 2) {
+            *self.read_shutdown.lock() = true;
+        }
+    }
+
+    pub(super) fn poll_rdhup(&self) -> bool {
+        *self.read_shutdown.lock()
     }
 
     pub(super) fn stat(&self) -> general::stat {
@@ -1201,7 +1214,10 @@ pub(super) fn sys_recvfrom_bridge(
 pub(super) fn sys_shutdown_bridge(process: &UserProcess, fd: usize, how: usize) -> isize {
     let socket = socket_entry_or_return!(process, fd);
     match posix_ret_i32(arceos_posix_api::sys_shutdown(socket.posix_fd, how as i32)) {
-        Ok(_) => 0,
+        Ok(_) => {
+            socket.mark_shutdown(how as i32);
+            0
+        }
         Err(err) => neg_errno(err),
     }
 }

@@ -460,6 +460,76 @@ pub(super) fn synthetic_userdb_path_entry(path: &'static str, data: &'static [u8
     FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
 }
 
+const KERNEL_CONFIG_BOOT_PATH: &str = "/boot/config-6.0.0";
+const KERNEL_CONFIG_MODULE_PATH: &str = "/lib/modules/6.0.0/config";
+const KERNEL_CONFIG_MODULE_BUILD_PATH: &str = "/lib/modules/6.0.0/build/.config";
+const KERNEL_CONFIG_LIB_PATH: &str = "/lib/kernel/config-6.0.0";
+
+const SYNTHETIC_KERNEL_CONFIG_CONTENT: &[u8] = b"\
+# ArceOS synthetic kernel config for LTP feature probes.
+# Keep these entries aligned with implemented kernel/user ABI support.
+CONFIG_EVENTFD=y
+";
+
+pub(super) fn synthetic_kernel_config_content(path: &str) -> Option<(&'static str, &'static [u8])> {
+    match normalize_path("/", path).as_deref() {
+        Some(KERNEL_CONFIG_BOOT_PATH) => {
+            Some((KERNEL_CONFIG_BOOT_PATH, SYNTHETIC_KERNEL_CONFIG_CONTENT))
+        }
+        Some(KERNEL_CONFIG_MODULE_PATH) => {
+            Some((KERNEL_CONFIG_MODULE_PATH, SYNTHETIC_KERNEL_CONFIG_CONTENT))
+        }
+        Some(KERNEL_CONFIG_MODULE_BUILD_PATH) => Some((
+            KERNEL_CONFIG_MODULE_BUILD_PATH,
+            SYNTHETIC_KERNEL_CONFIG_CONTENT,
+        )),
+        Some(KERNEL_CONFIG_LIB_PATH) => {
+            Some((KERNEL_CONFIG_LIB_PATH, SYNTHETIC_KERNEL_CONFIG_CONTENT))
+        }
+        _ => None,
+    }
+}
+
+pub(super) fn synthetic_kernel_config_fd_entry(path: &'static str, data: &'static [u8]) -> FdEntry {
+    FdEntry::MemoryFile(MemoryFileEntry {
+        path: path.into(),
+        data: Arc::new(data.to_vec()),
+        offset: 0,
+    })
+}
+
+pub(super) fn synthetic_kernel_config_path_entry(
+    path: &'static str,
+    data: &'static [u8],
+) -> FdEntry {
+    FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
+}
+
+const PROC_SYS_KERNEL_CORE_PATTERN_PATH: &str = "/proc/sys/kernel/core_pattern";
+const PROC_SYS_KERNEL_CORE_PATTERN_CONTENT: &[u8] = b"core\n";
+
+pub(super) fn synthetic_proc_sys_content(path: &str) -> Option<(&'static str, &'static [u8])> {
+    match normalize_path("/", path).as_deref() {
+        Some(PROC_SYS_KERNEL_CORE_PATTERN_PATH) => Some((
+            PROC_SYS_KERNEL_CORE_PATTERN_PATH,
+            PROC_SYS_KERNEL_CORE_PATTERN_CONTENT,
+        )),
+        _ => None,
+    }
+}
+
+pub(super) fn synthetic_proc_sys_fd_entry(path: &'static str, data: &'static [u8]) -> FdEntry {
+    FdEntry::MemoryFile(MemoryFileEntry {
+        path: path.into(),
+        data: Arc::new(data.to_vec()),
+        offset: 0,
+    })
+}
+
+pub(super) fn synthetic_proc_sys_path_entry(path: &'static str, data: &'static [u8]) -> FdEntry {
+    FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
+}
+
 pub(super) fn dev_shm_host_path(path: &str) -> Option<String> {
     let normalized = normalize_path("/", path)?;
     let rel = normalized.strip_prefix("/dev/shm/")?;

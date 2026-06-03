@@ -246,6 +246,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         path_rdevs: Mutex::new(BTreeMap::new()),
         path_owners: Mutex::new(BTreeMap::new()),
         path_symlinks: Mutex::new(BTreeMap::new()),
+        path_hardlinks: Mutex::new(BTreeMap::new()),
+        path_hardlink_counts: Mutex::new(BTreeMap::new()),
         path_xattrs: Mutex::new(BTreeMap::new()),
         path_times: Mutex::new(BTreeMap::new()),
         path_sparse_sizes: Mutex::new(BTreeMap::new()),
@@ -286,6 +288,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
         exit_code: AtomicI32::new(0),
         term_signal: AtomicI32::new(0),
+        wait_stopped_signal: AtomicI32::new(0),
+        wait_continued_signal: AtomicI32::new(0),
         exit_wait: WaitQueue::new(),
         teardown: ProcessTeardown::new(),
     });
@@ -308,6 +312,11 @@ fn exec_program(
         let mut aspace = process.aspace.lock();
         load_program_image(&mut aspace, cwd, path, &argv_refs, Some(env))?
     };
+    // execve replaces user mappings while reusing the same page-table root for
+    // the task.  Task switches only flush when the root changes, so stale user
+    // TLB entries can otherwise survive an exec and make the new image read
+    // pages from the previous program at overlapping virtual addresses.
+    axhal::asm::flush_tlb(None);
     *process.brk.lock() = image.brk;
     process.shared_mmap_ranges.lock().clear();
     process.mmap_sigbus_ranges.lock().clear();
@@ -768,6 +777,8 @@ impl UserProcess {
             path_rdevs: Mutex::new(self.path_rdevs.lock().clone()),
             path_owners: Mutex::new(self.path_owners.lock().clone()),
             path_symlinks: Mutex::new(self.path_symlinks.lock().clone()),
+            path_hardlinks: Mutex::new(self.path_hardlinks.lock().clone()),
+            path_hardlink_counts: Mutex::new(self.path_hardlink_counts.lock().clone()),
             path_xattrs: Mutex::new(self.path_xattrs.lock().clone()),
             path_times: Mutex::new(self.path_times.lock().clone()),
             path_sparse_sizes: Mutex::new(self.path_sparse_sizes.lock().clone()),
@@ -810,6 +821,8 @@ impl UserProcess {
             exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
             exit_code: AtomicI32::new(0),
             term_signal: AtomicI32::new(0),
+            wait_stopped_signal: AtomicI32::new(0),
+            wait_continued_signal: AtomicI32::new(0),
             exit_wait: WaitQueue::new(),
             teardown: ProcessTeardown::new(),
         }))
@@ -819,6 +832,144 @@ impl UserProcess {
         let pid = task.id().as_u64() as i32;
         self.children.lock().push(ChildTask { pid, task, process });
         pid
+    }
+
+    pub(super) fn record_wait_stopped(&self, sig: i32) {
+        self.wait_continued_signal.store(0, Ordering::Release);
+        self.wait_stopped_signal.store(sig, Ordering::Release);
+        notify_parent_child_exit(self.ppid);
+    }
+
+    pub(super) fn record_wait_continued(&self, sig: i32) {
+        self.wait_stopped_signal.store(0, Ordering::Release);
+        self.wait_continued_signal.store(sig, Ordering::Release);
+        notify_parent_child_exit(self.ppid);
+    }
+
+    fn wait_child_signal_event(
+        &self,
+        pid: i32,
+        nohang: bool,
+        want_stopped: bool,
+        want_continued: bool,
+        consume: bool,
+    ) -> Result<Option<(i32, i32, i32)>, LinuxError> {
+        fn wait_pid_matches(child: &ChildTask, pid: i32, current_pgid: i32) -> bool {
+            match pid {
+                -1 => true,
+                0 => child.process.pgid() == current_pgid,
+                p if p > 0 => child.pid == p,
+                p => p
+                    .checked_neg()
+                    .is_some_and(|target_pgid| child.process.pgid() == target_pgid),
+            }
+        }
+
+        fn child_event(
+            child: &ChildTask,
+            want_stopped: bool,
+            want_continued: bool,
+        ) -> Option<(i32, i32)> {
+            if want_stopped {
+                let sig = child.process.wait_stopped_signal.load(Ordering::Acquire);
+                if sig != 0 {
+                    return Some((sig, general::CLD_STOPPED as i32));
+                }
+            }
+            if want_continued {
+                let sig = child.process.wait_continued_signal.load(Ordering::Acquire);
+                if sig != 0 {
+                    return Some((sig, general::CLD_CONTINUED as i32));
+                }
+            }
+            None
+        }
+
+        if pid < -1 && pid.checked_neg().is_none() {
+            return Err(LinuxError::ESRCH);
+        }
+        let current_pgid = self.pgid();
+
+        loop {
+            let maybe_event = {
+                let children = self.children.lock();
+                if children.is_empty() {
+                    return Err(LinuxError::ECHILD);
+                }
+                if !children
+                    .iter()
+                    .any(|child| wait_pid_matches(child, pid, current_pgid))
+                {
+                    return Err(LinuxError::ECHILD);
+                }
+                children
+                    .iter()
+                    .find(|child| {
+                        wait_pid_matches(child, pid, current_pgid)
+                            && child_event(child, want_stopped, want_continued).is_some()
+                    })
+                    .and_then(|child| {
+                        child_event(child, want_stopped, want_continued)
+                            .map(|(sig, code)| (child.pid, sig, code))
+                    })
+            };
+
+            if let Some((child_pid, sig, code)) = maybe_event {
+                if consume {
+                    let children = self.children.lock();
+                    if let Some(child) = children.iter().find(|child| child.pid == child_pid) {
+                        if code == general::CLD_STOPPED as i32 {
+                            child
+                                .process
+                                .wait_stopped_signal
+                                .store(0, Ordering::Release);
+                        } else {
+                            child
+                                .process
+                                .wait_continued_signal
+                                .store(0, Ordering::Release);
+                        }
+                    }
+                }
+                return Ok(Some((child_pid, sig, code)));
+            }
+
+            if nohang {
+                axtask::yield_now();
+                return Ok(None);
+            }
+            if self.pending_exit_group().is_some() || self.eval_watchdog_expired() {
+                return Err(LinuxError::EINTR);
+            }
+            let wait_condition = || {
+                let children = self.children.lock();
+                children.is_empty()
+                    || !children
+                        .iter()
+                        .any(|child| wait_pid_matches(child, pid, current_pgid))
+                    || children.iter().any(|child| {
+                        wait_pid_matches(child, pid, current_pgid)
+                            && child_event(child, want_stopped, want_continued).is_some()
+                    })
+                    || self.pending_exit_group().is_some()
+                    || self.eval_watchdog_expired()
+            };
+            if let Some(timeout) = self.eval_watchdog_remaining() {
+                self.child_wait_blocked.store(true, Ordering::Release);
+                if self
+                    .child_exit_wait
+                    .wait_timeout_until(timeout, wait_condition)
+                {
+                    self.child_wait_blocked.store(false, Ordering::Release);
+                    return Err(LinuxError::EINTR);
+                }
+                self.child_wait_blocked.store(false, Ordering::Release);
+            } else {
+                self.child_wait_blocked.store(true, Ordering::Release);
+                self.child_exit_wait.wait_until(wait_condition);
+                self.child_wait_blocked.store(false, Ordering::Release);
+            }
+        }
     }
 
     pub(super) fn wait_child(
@@ -1291,6 +1442,17 @@ fn waitid_siginfo(child_pid: i32, status: i32) -> [u8; 128] {
     info
 }
 
+fn waitid_signal_siginfo(child_pid: i32, sig: i32, code: i32) -> [u8; 128] {
+    let mut info = [0u8; 128];
+    info[0..4].copy_from_slice(&(general::SIGCHLD as i32).to_ne_bytes());
+    info[4..8].copy_from_slice(&0i32.to_ne_bytes());
+    info[8..12].copy_from_slice(&code.to_ne_bytes());
+    info[16..20].copy_from_slice(&child_pid.to_ne_bytes());
+    info[20..24].copy_from_slice(&0u32.to_ne_bytes());
+    info[24..28].copy_from_slice(&sig.to_ne_bytes());
+    info
+}
+
 fn signal_wait_status(sig: i32) -> i32 {
     let core_dumped = matches!(sig, 3 | 4 | 5 | 6 | 7 | 8 | 11 | 24 | 25 | 31);
     (sig & 0x7f) | if core_dumped { 0x80 } else { 0 }
@@ -1304,11 +1466,17 @@ pub(super) fn sys_waitid(
     options: usize,
     _rusage: usize,
 ) -> isize {
-    const SUPPORTED_WAITID_OPTIONS: u32 =
-        general::WNOHANG | general::WEXITED | general::__WNOTHREAD | general::__WALL;
+    const SUPPORTED_WAITID_OPTIONS: u32 = general::WNOHANG
+        | general::WEXITED
+        | general::WSTOPPED
+        | general::WCONTINUED
+        | general::WNOWAIT
+        | general::__WNOTHREAD
+        | general::__WALL;
 
     let options = options as u32;
-    if options & !SUPPORTED_WAITID_OPTIONS != 0 || options & general::WEXITED == 0 {
+    let waitable = general::WEXITED | general::WSTOPPED | general::WCONTINUED;
+    if options & !SUPPORTED_WAITID_OPTIONS != 0 || options & waitable == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
 
@@ -1317,6 +1485,32 @@ pub(super) fn sys_waitid(
         Err(err) => return neg_errno(err),
     };
     let nohang = options & general::WNOHANG != 0;
+    let want_stopped = options & general::WSTOPPED != 0;
+    let want_continued = options & general::WCONTINUED != 0;
+    if want_stopped || want_continued {
+        let wait_result = match process.wait_child_signal_event(
+            pid_filter,
+            nohang,
+            want_stopped,
+            want_continued,
+            options & general::WNOWAIT == 0,
+        ) {
+            Ok(result) => result,
+            Err(err) => return neg_errno(err),
+        };
+        let info = if let Some((child_pid, sig, code)) = wait_result {
+            waitid_signal_siginfo(child_pid, sig, code)
+        } else {
+            [0u8; 128]
+        };
+        if infop != 0 {
+            if let Err(err) = write_user_bytes(process, infop, &info) {
+                return neg_errno(err);
+            }
+        }
+        return 0;
+    }
+
     let wait_result = match process.wait_child(pid_filter, nohang) {
         Ok(result) => result,
         Err(err) => return neg_errno(err),

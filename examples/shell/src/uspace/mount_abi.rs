@@ -53,6 +53,27 @@ impl UserProcess {
         best.is_some_and(|(_, readonly)| readonly)
     }
 
+    pub(super) fn paths_cross_mount(&self, lhs: &str, rhs: &str) -> bool {
+        fn best_mount_target<'a>(
+            mount_points: &'a std::collections::BTreeMap<String, MountPoint>,
+            path: &str,
+        ) -> Option<&'a str> {
+            let mut best: Option<&str> = None;
+            for target in mount_points.keys() {
+                if mount_path_rest(path, target.as_str()).is_none() {
+                    continue;
+                }
+                if best.is_none_or(|best_target| target.len() > best_target.len()) {
+                    best = Some(target.as_str());
+                }
+            }
+            best
+        }
+
+        let mount_points = self.mount_points.lock();
+        best_mount_target(&mount_points, lhs) != best_mount_target(&mount_points, rhs)
+    }
+
     fn add_mount_point(&self, target: String, source_root: String, readonly: bool, remount: bool) {
         let mut mount_points = self.mount_points.lock();
         if remount {

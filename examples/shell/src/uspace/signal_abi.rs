@@ -15,7 +15,7 @@ use super::UserProcess;
 use super::futex;
 use super::linux_abi::{
     KERNEL_SIGSET_BYTES, SIG_BLOCK_HOW, SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM,
-    SIGCANCEL_NUM, SIGCHLD_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
+    SIGCANCEL_NUM, SIGCONT_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM,
     SIGQUIT_NUM, SIGSEGV_NUM, SIGSTOP_NUM, SIGTERM_NUM, neg_errno,
 };
 #[cfg(target_arch = "loongarch64")]
@@ -169,6 +169,26 @@ pub(super) fn current_unblocked_signal_pending() -> bool {
     })
 }
 
+pub(super) fn current_pending_signal_matches(mask: u64) -> bool {
+    current_task_ext().is_some_and(|ext| {
+        let sig = ext.pending_signal.load(Ordering::Acquire);
+        sig != 0 && signal_mask_bit(sig) & mask != 0
+    })
+}
+
+pub(super) fn take_current_pending_signal_matching(mask: u64) -> Option<(i32, i32)> {
+    let ext = current_task_ext()?;
+    let sig = ext.pending_signal.load(Ordering::Acquire);
+    if sig == 0 || signal_mask_bit(sig) & mask == 0 {
+        return None;
+    }
+    let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
+    ext.pending_signal
+        .compare_exchange(sig, 0, Ordering::AcqRel, Ordering::Acquire)
+        .ok()
+        .map(|_| (sig, sender_pid))
+}
+
 pub(super) fn install_temporary_signal_mask(
     process: &UserProcess,
     set: usize,
@@ -211,6 +231,13 @@ pub(super) fn deliver_user_signal(
         .unwrap_or(0);
     if handler == 0 && default_signal_terminates(sig) && !signal_is_blocked(ext, sig) {
         ext.process.request_signal_exit_group(sig);
+    }
+    if handler == 0 && !signal_is_blocked(ext, sig) {
+        if sig == SIGSTOP_NUM {
+            ext.process.record_wait_stopped(sig);
+        } else if sig == SIGCONT_NUM {
+            ext.process.record_wait_continued(sig);
+        }
     }
     ext.pending_signal_sender
         .store(sender_pid, Ordering::Release);
@@ -814,22 +841,79 @@ pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: u
 
 pub(super) fn sys_rt_sigtimedwait(
     process: &UserProcess,
-    _set: usize,
+    set: usize,
     info: usize,
     timeout: usize,
-    _sigsetsize: usize,
+    sigsetsize: usize,
 ) -> isize {
-    if timeout != 0 {
-        if let Err(err) = read_user_value::<general::timespec>(process, timeout) {
-            return neg_errno(err);
-        }
+    if set == 0 || sigsetsize < KERNEL_SIGSET_BYTES {
+        return neg_errno(LinuxError::EINVAL);
     }
-    if info != 0 {
-        if let Err(err) = clear_user_bytes(process, info, 128) {
-            return neg_errno(err);
+    let src = match read_user_bytes(process, set, KERNEL_SIGSET_BYTES) {
+        Ok(src) => src,
+        Err(err) => return neg_errno(err),
+    };
+    let mut set_bytes = [0u8; KERNEL_SIGSET_BYTES];
+    set_bytes.copy_from_slice(&src);
+    let wait_mask = u64::from_ne_bytes(set_bytes) & !unmaskable_signal_bits();
+
+    let deadline_us = if timeout != 0 {
+        let timeout = match read_user_value::<general::timespec>(process, timeout) {
+            Ok(timeout) => timeout,
+            Err(err) => return neg_errno(err),
+        };
+        if timeout.tv_sec < 0 || timeout.tv_nsec < 0 || timeout.tv_nsec >= 1_000_000_000 {
+            return neg_errno(LinuxError::EINVAL);
         }
+        let timeout_us = (timeout.tv_sec as u64)
+            .saturating_mul(1_000_000)
+            .saturating_add(((timeout.tv_nsec as u64).saturating_add(999)) / 1_000);
+        Some(
+            (axhal::time::monotonic_time()
+                .as_micros()
+                .min(u64::MAX as u128) as u64)
+                .saturating_add(timeout_us),
+        )
+    } else {
+        None
+    };
+
+    let Some(ext) = current_task_ext() else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    loop {
+        if let Some((sig, sender_pid)) = take_current_pending_signal_matching(wait_mask) {
+            if info != 0 {
+                let mut siginfo = [0u8; 128];
+                siginfo[0..4].copy_from_slice(&sig.to_ne_bytes());
+                siginfo[4..8].copy_from_slice(&0i32.to_ne_bytes());
+                siginfo[8..12].copy_from_slice(&0i32.to_ne_bytes());
+                siginfo[16..20].copy_from_slice(&sender_pid.to_ne_bytes());
+                if let Err(err) = write_user_bytes(process, info, &siginfo) {
+                    return neg_errno(err);
+                }
+            }
+            return sig as isize;
+        }
+
+        if let Some(deadline_us) = deadline_us {
+            let now_us = axhal::time::monotonic_time()
+                .as_micros()
+                .min(u64::MAX as u128) as u64;
+            if now_us >= deadline_us {
+                return neg_errno(LinuxError::EAGAIN);
+            }
+        }
+
+        if let Some(code) = ext.process.pending_exit_group() {
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
+        }
+        let _ = ext.process.consume_expired_real_timer();
+        if current_unblocked_signal_pending() && !current_pending_signal_matches(wait_mask) {
+            return neg_errno(LinuxError::EINTR);
+        }
+        axtask::yield_now();
     }
-    SIGCHLD_NUM
 }
 
 pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {

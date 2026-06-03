@@ -27,6 +27,7 @@ use super::user_memory::{
 use super::{PathTimes, UserProcess};
 
 const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
+pub(super) const DEV_ZERO_RDEV: u64 = 261; // Linux makedev(1, 5).
 const DEV_VDA_RDEV: u64 = 65_024; // Linux makedev(254, 0), virtio block.
 const DEV_SDA_RDEV: u64 = 2_048; // Linux makedev(8, 0).
 const DEV_XVDA_RDEV: u64 = 51_712; // Linux makedev(202, 0).
@@ -275,6 +276,67 @@ impl UserProcess {
         self.path_symlinks.lock().get(path).cloned()
     }
 
+    pub(super) fn path_hardlink_backing(&self, path: &str) -> Option<String> {
+        self.path_hardlinks.lock().get(path).cloned()
+    }
+
+    pub(super) fn path_hardlink_exists(&self, path: &str) -> bool {
+        self.path_hardlinks.lock().contains_key(path)
+    }
+
+    pub(super) fn path_hardlink_count(&self, path: &str) -> Option<u64> {
+        let canonical = self
+            .path_hardlinks
+            .lock()
+            .get(path)
+            .cloned()
+            .unwrap_or_else(|| path.to_string());
+        self.path_hardlink_counts
+            .lock()
+            .get(canonical.as_str())
+            .copied()
+            .filter(|count| *count > 1)
+    }
+
+    pub(super) fn set_path_hardlink(&self, existing_path: &str, new_path: String, ino: u64) {
+        let canonical = self
+            .path_hardlink_backing(existing_path)
+            .unwrap_or_else(|| existing_path.to_string());
+        let count = {
+            let mut links = self.path_hardlinks.lock();
+            links.entry(canonical.clone()).or_insert(canonical.clone());
+            links.insert(new_path.clone(), canonical.clone());
+            links
+                .values()
+                .filter(|target| *target == &canonical)
+                .count() as u64
+        };
+        self.path_hardlink_counts
+            .lock()
+            .insert(canonical.clone(), count);
+        self.set_path_inode(canonical, ino);
+        self.set_path_inode(new_path, ino);
+    }
+
+    pub(super) fn remove_path_hardlink(&self, path: &str) -> Option<(String, u64)> {
+        let (canonical, remaining) = {
+            let mut links = self.path_hardlinks.lock();
+            let canonical = links.remove(path)?;
+            let remaining = links
+                .values()
+                .filter(|target| *target == &canonical)
+                .count() as u64;
+            (canonical, remaining)
+        };
+        let mut counts = self.path_hardlink_counts.lock();
+        if remaining > 1 {
+            counts.insert(canonical.clone(), remaining);
+        } else {
+            counts.remove(canonical.as_str());
+        }
+        Some((canonical, remaining))
+    }
+
     pub(super) fn path_symlink_names_in_dir(&self, dir: &str) -> Vec<String> {
         let prefix = if dir == "/" {
             String::from("/")
@@ -439,15 +501,19 @@ impl UserProcess {
     }
 
     pub(super) fn move_path_sparse_file(&self, old_path: &str, new_path: String) {
-        if let Some(size) = self.path_sparse_sizes.lock().remove(old_path) {
-            self.path_sparse_sizes.lock().insert(new_path.clone(), size);
-        } else {
-            self.path_sparse_sizes.lock().remove(new_path.as_str());
+        {
+            let mut sizes = self.path_sparse_sizes.lock();
+            if let Some(size) = sizes.remove(old_path) {
+                sizes.insert(new_path.clone(), size);
+            } else {
+                sizes.remove(new_path.as_str());
+            }
         }
-        if let Some(data) = self.path_sparse_data.lock().remove(old_path) {
-            self.path_sparse_data.lock().insert(new_path, data);
+        let mut all_data = self.path_sparse_data.lock();
+        if let Some(data) = all_data.remove(old_path) {
+            all_data.insert(new_path, data);
         } else {
-            self.path_sparse_data.lock().remove(new_path.as_str());
+            all_data.remove(new_path.as_str());
         }
     }
 
@@ -579,6 +645,9 @@ pub(super) fn apply_recorded_path_metadata(
     }
     if let Some(ino) = process.path_inode_override(path) {
         st.st_ino = ino;
+    }
+    if let Some(nlink) = process.path_hardlink_count(path) {
+        st.st_nlink = nlink as _;
     }
     if let Some(size) = process.path_sparse_size(path) {
         st.st_size = size.min(i64::MAX as u64) as _;
@@ -1461,6 +1530,7 @@ pub(super) fn stdio_stat(readable: bool) -> general::stat {
 pub(super) fn synthetic_char_stat_for_path(path: &str, mode: u32) -> general::stat {
     let rdev = match path {
         "/dev/null" => DEV_NULL_RDEV,
+        "/dev/zero" => DEV_ZERO_RDEV,
         _ => 0,
     };
     synthetic_char_stat(path_inode(Some(path)), mode, rdev)
@@ -1478,6 +1548,10 @@ pub(super) fn synthetic_block_stat_for_path(path: &str, mode: u32) -> general::s
 
 pub(super) fn dev_null_stat() -> general::stat {
     synthetic_char_stat_for_path("/dev/null", ST_MODE_CHR | 0o220)
+}
+
+pub(super) fn dev_zero_stat() -> general::stat {
+    synthetic_char_stat_for_path("/dev/zero", ST_MODE_CHR | 0o666)
 }
 
 pub(super) fn path_inode(path: Option<&str>) -> u64 {
