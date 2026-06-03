@@ -442,3 +442,44 @@ The shared priority implementation currently returns `EACCES` when a non-root ca
 ## Updated validation conclusion after blocker triage
 
 The post-UTS blocker triage added zero promotion candidates. `readlink03`, `readlinkat02`, `nice04`, the statx scout, and the credential/capability scout all remain excluded because their evidence contains visible `TFAIL`, `TBROK`, `TCONF`, or timeout markers, or would require a semantically unsafe kernel-only workaround. The milestone-06 candidate pool remains exactly `prctl08`, `prctl09`, and `utsname02` (3 new unique cases), and `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+
+## RV VFS/FD/select scout
+
+After the readlink/statx/credential triage produced no safe candidates, the leader ran a small four-image-present, non-stable VFS/FD/select RV scout. This was a scout-only run; visible parser blockers disqualify every row from promotion.
+
+Command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='unlink09,rename11,renameat01,symlink03,mknod07,mknodat02,mkdir02,mkdir03,mkdir09,mkdirat02,rmdir02,openat03,openat04,fcntl17,fcntl17_64,fcntl24,fcntl24_64,fcntl25,fcntl25_64,fcntl26,fcntl26_64,fcntl27,fcntl27_64,select01,select02,select03,select04' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.promotion-candidates.txt`
+- Case list: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.cases.txt`
+
+Parser result:
+
+- PASS LTP CASE: 9.
+- FAIL LTP CASE: 45.
+- Internal signals: `{'TBROK': 7, 'TCONF': 112, 'TFAIL': 26}`.
+- timeout matches: 4 (`fcntl17`, `fcntl17_64` on both libcs).
+- ENOSYS/not implemented matches: 0.
+- panic/trap matches: 0.
+- RV-only promotion candidates: 0.
+
+Notable boundaries:
+
+- `select01`..`select04` have wrapper PASS but visible `TCONF` markers for unsupported select syscall variants, so they are `pass_with_tconf` and not promotable.
+- `fcntl17`/`fcntl17_64` timed out on both libcs and should be isolated before any fcntl locking work.
+- `fcntl24`..`fcntl26_64`, `mknod07`, `mknodat02`, `openat03`, `openat04`, `rename11`, and `renameat01` are mostly environment/unsupported-feature `TCONF` rows.
+- `mkdir02`, `mkdir03`, `mkdirat02`, and `rmdir02` expose real path/errno `TFAIL` blockers; `unlink09` and `symlink03` expose `TBROK` blockers.
+
+Conclusion: this scout adds zero stable806 candidates and updates the next-lane map toward small, isolated VFS errno fixes or fcntl-lock lifetime fixes rather than broad-batch promotion.

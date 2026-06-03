@@ -57,3 +57,8 @@ bfc2077d0134a353e7466d8e194283630d9d5b7bd2a511eea8de4e69fb40e8bf  target/ltp-100
 e00b9ab93d796328c9cf9adc44d2cc8af7847ba473c54a39017025bc9f165350  target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.summary.txt
 017842ccc2297c406139f0ec36d10fbfb006001e4ff1e89e7882ee8fe549a68c  target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.summary.json
 cc145f78adfe387d687f97719b9d9f817f1f928693926e0e4e3a8025e6c4d0b7  target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.promotion-candidates.txt
+18aeb57619d2858424ddbbc11e98d46d8814f00f98f8aba02987c0d4a1151640  target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.cases.txt
+805135a7dfb211eb9f11055345b84afc96ca9962f93084a5b6cd68a8ef375a77  target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.log
+b25f34e5a626f778247481ac51ab2bd5c9a721e8c0cb90695e0e17433fc65914  target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.summary.txt
+83f31c8ca11f4a327936a8db37e7dbf51ffccb0b3753f7abd878c5c2724fc82e  target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.summary.json
+66837bda4e6e94f9f1043039f156872e5b3f16b032c0bb75d63d6dd6771c9099  target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.promotion-candidates.txt

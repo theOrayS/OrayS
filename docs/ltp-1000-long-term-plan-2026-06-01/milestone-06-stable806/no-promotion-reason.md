@@ -30,3 +30,4 @@ Additional blocker/scout notes from the post-UTS triage:
 - `nice04` is blocked by the musl-visible `EACCES` result from the generic `setpriority` path, while glibc maps the `nice(-10)` wrapper expectation to `EPERM`. A kernel-only special case would risk breaking stable setpriority semantics.
 - The RV statx scout produced `TCONF` on `statx01`, visible FAILs on the rest, and timeouts for `statx11`; it contributes zero candidates.
 - The RV credential/capability scout produced 16-bit UID/capability `TCONF` rows plus a glibc `gettid02` futex `TBROK`; it contributes zero candidates.
+- The RV VFS/FD/select scout `rv-vfs-fd-select-scout-20260603T194925+0800` produced `9 PASS / 45 FAIL` with visible `TBROK/TCONF/TFAIL` markers and four `fcntl17*` timeouts; it contributes zero candidates. `select01`..`select04` are pass-with-TCONF rows, not stable evidence.
