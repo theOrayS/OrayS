@@ -334,3 +334,22 @@ Resource/lifetime and maintenance boundaries:
 - The AF_UNIX listener table is process-global in-memory state. Listener removal is tied to the last local socket entry owning the bound path; pending accepted endpoints are held in a bounded Rust `Vec` protected by a mutex. No on-disk socket inode format, syscall number, FD table layout, or Rust ABI struct layout exported to userspace changed beyond the Linux-compatible copy-out bytes described above.
 - This is intentionally not full Linux AF_UNIX support. Abstract namespace sockets, datagram/SEQPACKET semantics, full `socketcall`, real ancillary control-message delivery (`SCM_RIGHTS`/`SCM_CREDENTIALS`), multi-iov receive scatter beyond the minimal bridge, and complete `getsockname`/`getpeername` pathname payload semantics remain future work and must not be claimed as supported by this checkpoint.
 - No signal, futex, mmap, rlimit, process teardown, blacklist, stable-list, remote-evaluator, testsuite, or hardcoded LTP case/path/process/output behavior changed.
+
+## 2026-06-04 fadvise64 and FALLOC_FL_KEEP_SIZE impact
+
+This source patch adds generic syscall behavior in the shell userspace bridge. It does not edit evaluator/testsuite code, blacklist files, or `LTP_STABLE_CASES`, and it does not hardcode LTP case names, paths, process names, or output.
+
+User-visible syscall/errno behavior:
+
+- `fadvise64` now dispatches from the syscall table instead of falling through to `ENOSYS`.
+- Valid file-like descriptors accept advisory hints `POSIX_FADV_NORMAL` through `POSIX_FADV_NOREUSE` as a no-op; this models advisory semantics without changing data or metadata.
+- Invalid descriptors return `EBADF`; negative offset or length returns `EINVAL`; invalid advice values return `EINVAL`.
+- Pipes, inet sockets, and local sockets return `ESPIPE` for `fadvise64`, matching nonseekable-fd expectations.
+- `fallocate` still supports mode `0` through the existing truncate/grow path. It now also accepts `FALLOC_FL_KEEP_SIZE` for writable regular files, validates the target range and `RLIMIT_FSIZE`, and preserves the logical file size.
+- Unsupported `fallocate` modes such as punch-hole/collapse/zero-range remain `EOPNOTSUPP`; this is why `fallocate01`/`fallocate04` pass-with-`TCONF` rows and full-filesystem rows are not counted.
+
+ABI/resource/lifetime boundaries:
+
+- No syscall numbers, struct layouts, FD table layout, user-pointer ABI, signal, futex, mmap, process lifetime, or stable-list behavior changed.
+- The KEEP_SIZE implementation is not a full filesystem preallocation allocator. It validates a writable regular-file descriptor and keeps logical size unchanged; future sparse metadata or block-allocation work must extend the generic sparse/data-range model rather than adding case-specific branches.
+- `fadvise64` is intentionally advisory/no-op for regular file-like descriptors; future page-cache/readahead/writeback work may attach behavior behind this interface but must preserve the generic errno boundary validated here.

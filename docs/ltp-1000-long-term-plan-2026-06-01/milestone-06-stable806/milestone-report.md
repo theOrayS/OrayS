@@ -25,11 +25,12 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Documented RV sync/fd/io and xattr small scouts, then repaired the generic immutable/append-only xattr mutation gap so `setxattr03` is now four-combo clean. Remaining sync/fd/io and xattr scout rows stay blocker-only with visible parser markers.
 - Repaired generic special-inode xattr mutation errno, special-device fd opening for synthetic char/block nodes, and AF_UNIX pathname `bind()` filesystem socket-node creation; `fgetxattr02`, `getxattr02`, and `setxattr02` are now four-combo clean candidates with xattr/mknod/socket adjacent regression evidence.
 - Added generic `splice(2)` dispatch and conservative pipe/file/AF_UNIX stream transfer semantics; `splice01`..`splice05` are now four-combo clean candidates. `splice06` remains blocked by writable proc-sysfile semantics, and `splice07` is wrapper-PASS only with `TCONF/ENOSYS` from unsupported optional fd fixtures, so neither is counted.
+- Added generic `fadvise64` dispatch/errno handling and `FALLOC_FL_KEEP_SIZE` support, making `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03` four-combo clean candidates.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
 
-Current new unique stable806 candidates: **37/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; this is still an interim candidate-pool checkpoint, not a stable-list promotion.
+Current new unique stable806 candidates: **42/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; this is still an interim candidate-pool checkpoint, not a stable-list promotion.
 
 1. `prctl08`
 2. `prctl09`
@@ -66,8 +67,15 @@ Current new unique stable806 candidates: **37/50**. `examples/shell/src/cmd.rs::
 33. `send01`
 34. `sendto01`
 35. `bind03`
+36. `getsockopt02`
+37. `recvmsg01`
+38. `posix_fadvise02`
+39. `posix_fadvise02_64`
+40. `posix_fadvise04`
+41. `posix_fadvise04_64`
+42. `fallocate03`
 
-`utsname01` and the eventfd/poll/pselect follow-up rows are clean in targeted runs but are already stable, so they are adjacent regression evidence only. Earlier in this file some historical subsections mention smaller pool sizes (20/25/26); those statements are preserved as checkpoint chronology and are superseded by this current 37/50 pool.
+`utsname01` and the eventfd/poll/pselect follow-up rows are clean in targeted runs but are already stable, so they are adjacent regression evidence only. Earlier in this file some historical subsections mention smaller pool sizes (20/25/26); those statements are preserved as checkpoint chronology and are superseded by this current 42/50 pool.
 
 ## Evidence
 
@@ -260,7 +268,7 @@ Negative follow-up evidence kept out of promotion:
 - RV 16-bit credential scout: `target/ltp-1000-milestone-06-stable806/rv-cred16-scout-20260604T025923+0800.summary.txt` — `0 PASS / 58 FAIL`, all blocker-only `TCONF`; zero candidates.
 - RV VFS/time/proc low-risk scout: `target/ltp-1000-milestone-06-stable806/rv-vfs-time-proc-lowrisk-scout-20260604T030139+0800.summary.txt` — `6 PASS / 46 FAIL`, `TFAIL=24`, `TBROK=10`, `TCONF=45`, `timeout=2`, `ENOSYS=2`; zero clean candidates.
 
-At that socket errno/address checkpoint the candidate pool was **35/50**. The later AF_UNIX `SO_PEERCRED`/`recvmsg` follow-up below raises it to **37/50**; stable806 remains blocked until at least 13 additional unique four-combo clean cases are found and the full milestone gate is rerun.
+At that socket errno/address checkpoint the candidate pool was **35/50**. The later AF_UNIX `SO_PEERCRED`/`recvmsg` follow-up raised it to **37/50**, and the later fadvise64/fallocate follow-up raises the current pool to **42/50**; stable806 remains blocked until at least 8 additional unique four-combo clean cases are found and the full milestone gate is rerun.
 
 ## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
 
@@ -279,4 +287,28 @@ Evidence:
 - RV adjacent socket regression: `target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt` — `36 PASS / 0 FAIL / 0 internal markers`.
 - LA adjacent socket regression: `target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt` — `36 PASS / 0 FAIL / 0 internal markers`.
 
-The candidate pool is now **37/50**. Stable806 remains blocked until at least 13 additional unique four-combo clean cases are found and the full milestone gate is rerun. Stable count remains `756 total / 756 unique / 0 duplicate`.
+The candidate pool was **37/50** at the AF_UNIX checkpoint. The later fadvise64/fallocate follow-up raises the current pool to **42/50**; stable806 remains blocked until at least 8 additional unique four-combo clean cases are found and the full milestone gate is rerun. Stable count remains `756 total / 756 unique / 0 duplicate`.
+
+## 2026-06-04 fadvise64/fallocate KEEP_SIZE candidate follow-up
+
+This follow-up adds generic `fadvise64` dispatch/errno behavior and `FALLOC_FL_KEEP_SIZE` handling, then records five new candidate-pool cases. It does not update `LTP_STABLE_CASES` and does not create a stable806 milestone commit because the +50 cohort is still incomplete.
+
+New four-combo candidates:
+
+- `posix_fadvise02`
+- `posix_fadvise02_64`
+- `posix_fadvise04`
+- `posix_fadvise04_64`
+- `fallocate03`
+
+Evidence:
+
+- Pre-fix fadvise/fallocate RV scout: `target/ltp-1000-milestone-06-stable806/rv-fadvise-fallocate-scout-20260604T042346+08:00.summary.txt` — zero candidates because all wrapper PASS rows had visible `TCONF` and the other rows had `TFAIL/TBROK/ENOSYS` blockers.
+- RV targeted gate: `target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.summary.txt` — `10 PASS / 0 FAIL / 0 internal markers`.
+- LA targeted gate: `target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.summary.txt` — `10 PASS / 0 FAIL / 0 internal markers`.
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/fadvise02-04-fallocate03-rv-la-fourway.promotion-candidates.txt` — five candidates; blocked/incomplete `0`.
+- Adjacent RV FD/storage regression: `target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA FD/storage regression: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- SysV shm scout remains blocker-only: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt` — `0 PASS / 26 FAIL`; no LA follow-up.
+
+Current milestone-06 state: candidate pool **42/50**, short by 8; stable list unchanged at `756 total / 756 unique / 0 duplicate`.

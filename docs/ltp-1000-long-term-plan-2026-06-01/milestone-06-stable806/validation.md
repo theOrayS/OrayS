@@ -1665,7 +1665,7 @@ Current stable count check remains:
 756 756 0
 ```
 
-At the socket errno/address checkpoint candidate-pool count was **35/50**; the later AF_UNIX follow-up below raises the current pool to **37/50**. No stable-list update or milestone806 promotion commit is allowed yet.
+At the socket errno/address checkpoint candidate-pool count was **35/50**; the later AF_UNIX follow-up raised it to **37/50**, and the fadvise64/fallocate follow-up below raises the current pool to **42/50**. No stable-list update or milestone806 promotion commit is allowed yet.
 
 ## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
 
@@ -1691,4 +1691,57 @@ Artifacts and parser results:
 
 Combined candidate report: `target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt` — `Promotion candidates: 2`; candidates `getsockopt02`, `recvmsg01`; blocked/incomplete `0`.
 
-The current candidate pool is **37/50**, still short by 13 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable-list update or milestone806 promotion commit is allowed yet.
+The candidate pool was **37/50** at the AF_UNIX checkpoint; the fadvise64/fallocate follow-up below raises the current pool to **42/50**, still short by 8 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable-list update or milestone806 promotion commit is allowed yet.
+
+## 2026-06-04 fadvise64/fallocate KEEP_SIZE validation
+
+Source/format/build checks:
+
+```bash
+cargo fmt --all
+git diff --check
+timeout 900 make A=examples/shell ARCH=riscv64
+```
+
+Targeted gate commands used this shape:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='posix_fadvise02 posix_fadvise02_64 posix_fadvise04 posix_fadvise04_64 fallocate03' LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='posix_fadvise02 posix_fadvise02_64 posix_fadvise04 posix_fadvise04_64 fallocate03' LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh la
+python3 scripts/ltp_summary.py <raw-log>
+python3 scripts/ltp_summary.py --json <raw-log> > <summary-json>
+python3 scripts/ltp_summary.py --promotion-candidates \
+  target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.log \
+  target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.log
+```
+
+Artifacts and parser results:
+
+| Gate | Raw log | Summary | JSON / report | Parser result |
+| --- | --- | --- | --- | --- |
+| RV targeted `posix_fadvise02* posix_fadvise04* fallocate03` | `target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.log` | `target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.summary.txt` | `target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.summary.json` | `10 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` |
+| LA targeted `posix_fadvise02* posix_fadvise04* fallocate03` | `target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.log` | `target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.summary.txt` | `target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.summary.json` | `10 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` |
+| Combined RV+LA candidate report | same RV/LA raw logs | n/a | `target/ltp-1000-milestone-06-stable806/fadvise02-04-fallocate03-rv-la-fourway.promotion-candidates.txt` | five candidates, blocked/incomplete `0` |
+
+Adjacent regression commands used this shape:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fcntl27 fcntl27_64 lseek11 splice01 splice02 splice03 splice04 splice05 fstat02 fstat02_64' LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fcntl27 fcntl27_64 lseek11 splice01 splice02 splice03 splice04 splice05 fstat02 fstat02_64' LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh la
+```
+
+Adjacent regression artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.json`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.json`
+
+Blocker-only scout evidence retained out of promotion:
+
+- SysV shm RV scout: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt` — `0 PASS / 26 FAIL`, internal markers `TCONF=3`, `TBROK=2`, `TFAIL=9`; no timeout/ENOSYS/panic/trap, but semantic/resource blockers mean no LA follow-up and no promotion count.
+- Pre-fix fadvise/fallocate RV scout: `target/ltp-1000-milestone-06-stable806/rv-fadvise-fallocate-scout-20260604T042346+08:00.summary.txt` — `4 PASS / 24 FAIL`, all pass rows had `TCONF`, internal markers `TBROK=10`, `TFAIL=58`, `TCONF=12`, `ENOSYS=52`; zero candidates.
+
+Checksums for raw logs, parser summaries, JSON, case lists, and candidate reports are recorded in `validation-checksums.sha256`. Raw logs/checksum files remain under `target/` and are not staged. Stable list check remains `756 total / 756 unique / 0 duplicate`; this follow-up raises only the candidate pool to `42/50`.

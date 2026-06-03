@@ -803,4 +803,65 @@ sendto01
 # Combined candidate report: target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt — four-combo candidates getsockopt02/recvmsg01.
 # RV adjacent socket regression: target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt — 36 PASS / 0 FAIL / 0 internal markers.
 # LA adjacent socket regression: target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt — 36 PASS / 0 FAIL / 0 internal markers.
-# Current pool after this follow-up: 37/50; stable list remains 756 total / 756 unique / 0 duplicate.
+# Current pool after this AF_UNIX follow-up: 37/50; later fadvise/fallocate follow-up raises it to 42/50. Stable list remains 756 total / 756 unique / 0 duplicate.
+
+# 2026-06-04 fadvise64/fallocate KEEP_SIZE follow-up
+# Candidate gate, adjacent regression, and blocker-only scout; case unit.
+
+# SysV shm blocker-only RV scout: zero candidates, no LA follow-up.
+shmget02
+shmget03
+shmget04
+shmget05
+shmget06
+shmat01
+shmat02
+shmat03
+shmat1
+shmdt01
+shmctl01
+shmctl02
+shmctl03
+# Summary: target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt — 0 PASS / 26 FAIL / TCONF=3 / TBROK=2 / TFAIL=9.
+
+# fadvise/fallocate broad RV scout; only the later targeted five are counted.
+posix_fadvise01
+posix_fadvise01_64
+posix_fadvise02
+posix_fadvise02_64
+posix_fadvise03
+posix_fadvise03_64
+posix_fadvise04
+posix_fadvise04_64
+fallocate01
+fallocate02
+fallocate03
+fallocate04
+fallocate05
+fallocate06
+# Scout summary: target/ltp-1000-milestone-06-stable806/rv-fadvise-fallocate-scout-20260604T042346+08:00.summary.txt — 4 PASS / 24 FAIL, all pass rows had internal TCONF; zero candidates.
+
+# Four-combo clean targeted candidate gate after generic fadvise64 and KEEP_SIZE fallocate repair.
+posix_fadvise02
+posix_fadvise02_64
+posix_fadvise04
+posix_fadvise04_64
+fallocate03
+# RV targeted summary: target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.summary.txt — 10 PASS / 0 FAIL / 0 internal markers.
+# LA targeted summary: target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.summary.txt — 10 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/fadvise02-04-fallocate03-rv-la-fourway.promotion-candidates.txt — candidates posix_fadvise02, posix_fadvise02_64, posix_fadvise04, posix_fadvise04_64, fallocate03.
+
+# Adjacent FD/storage regression after fadvise/fallocate repair.
+fcntl27
+fcntl27_64
+lseek11
+splice01
+splice02
+splice03
+splice04
+splice05
+fstat02
+fstat02_64
+# RV adjacent summary: target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt — 20 PASS / 0 FAIL / 0 internal markers.
+# LA adjacent summary: target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt — 20 PASS / 0 FAIL / 0 internal markers.
+# Current pool after this follow-up: 42/50; stable list remains 756 total / 756 unique / 0 duplicate.

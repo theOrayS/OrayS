@@ -16,12 +16,12 @@ use super::fd_socket::{
 };
 use super::fd_table::{
     sys_chdir, sys_close, sys_copy_file_range, sys_dup, sys_dup3, sys_epoll_create1, sys_epoll_ctl,
-    sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2, sys_fallocate, sys_fchdir, sys_fcntl,
-    sys_flock, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat,
-    sys_lseek, sys_mkdirat, sys_mknodat, sys_openat, sys_pread64, sys_preadv, sys_preadv2,
-    sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readahead, sys_readv, sys_renameat2,
-    sys_sendfile, sys_signalfd4, sys_splice, sys_timerfd_create, sys_timerfd_gettime,
-    sys_timerfd_settime, sys_unlinkat, sys_write, sys_writev,
+    sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2, sys_fadvise64, sys_fallocate, sys_fchdir,
+    sys_fcntl, sys_flock, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64, sys_ioctl,
+    sys_linkat, sys_lseek, sys_mkdirat, sys_mknodat, sys_openat, sys_pread64, sys_preadv,
+    sys_preadv2, sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readahead, sys_readv,
+    sys_renameat2, sys_sendfile, sys_signalfd4, sys_splice, sys_timerfd_create,
+    sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat, sys_write, sys_writev,
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
@@ -186,6 +186,9 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_pipe2 => sys_pipe2(&process, tf.arg0(), tf.arg1()),
         general::__NR_fallocate => {
             sys_fallocate(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
+        general::__NR_fadvise64 => {
+            sys_fadvise64(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
         general::__NR_truncate => sys_truncate(&process, tf.arg0(), tf.arg1()),
         general::__NR_ftruncate => sys_ftruncate(&process, tf.arg0(), tf.arg1()),
