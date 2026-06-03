@@ -24,10 +24,10 @@ use super::linux_abi::{
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    DEV_ZERO_RDEV, apply_recorded_path_metadata, canonical_permission_path, dev_null_stat,
-    dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat,
-    file_type_mode, generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
-    synthetic_char_stat_for_path,
+    DEV_NULL_RDEV, DEV_ZERO_RDEV, apply_recorded_path_metadata, canonical_permission_path,
+    dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path,
+    file_attr_to_stat, file_type_mode, generic_statfs, path_inode, stdio_stat,
+    synthetic_block_stat_for_path, synthetic_char_stat_for_path,
 };
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
@@ -3042,7 +3042,9 @@ impl FdTable {
             ST_MODE_FIFO => ST_MODE_FIFO,
             ST_MODE_CHR | ST_MODE_BLK if process.fs_uid() == 0 => node_type,
             ST_MODE_CHR | ST_MODE_BLK => return Err(LinuxError::EPERM),
-            ST_MODE_DIR | ST_MODE_LNK | ST_MODE_SOCKET | ST_MODE_TYPE_MASK => {
+            ST_MODE_SOCKET if process.fs_uid() == 0 => node_type,
+            ST_MODE_SOCKET => return Err(LinuxError::EPERM),
+            ST_MODE_DIR | ST_MODE_LNK | ST_MODE_TYPE_MASK => {
                 return Err(LinuxError::EINVAL);
             }
             _ => return Err(LinuxError::EINVAL),
@@ -3065,9 +3067,13 @@ impl FdTable {
                 process.set_path_special_mode(abs_path.clone(), ST_MODE_FIFO);
                 process.remove_path_rdev(abs_path.as_str());
             }
-            ST_MODE_CHR | ST_MODE_BLK => {
+            ST_MODE_CHR | ST_MODE_BLK | ST_MODE_SOCKET => {
                 process.set_path_special_mode(abs_path.clone(), node_type);
-                process.set_path_rdev(abs_path, dev);
+                if matches!(node_type, ST_MODE_CHR | ST_MODE_BLK) {
+                    process.set_path_rdev(abs_path, dev);
+                } else {
+                    process.remove_path_rdev(abs_path.as_str());
+                }
             }
             _ => {
                 process.remove_path_special_mode(abs_path.as_str());
@@ -5102,10 +5108,15 @@ fn open_candidates(
                     mode,
                 )));
             }
-            if special_type == ST_MODE_CHR
-                && process.path_rdev(path.as_str()) == Some(DEV_ZERO_RDEV)
-            {
-                return Ok(FdEntry::DevZero);
+            match (special_type, process.path_rdev(path.as_str())) {
+                (ST_MODE_CHR, Some(DEV_NULL_RDEV)) => return Ok(FdEntry::DevNull),
+                (ST_MODE_CHR, Some(DEV_ZERO_RDEV)) => return Ok(FdEntry::DevZero),
+                (ST_MODE_BLK, _) => {
+                    return Ok(FdEntry::BlockDevice(BlockDeviceEntry {
+                        path: path.clone(),
+                    }));
+                }
+                _ => {}
             }
             return Err(LinuxError::ENXIO);
         }

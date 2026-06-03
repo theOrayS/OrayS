@@ -1316,4 +1316,71 @@ Parser result: RV xattr stable subset is `42 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF
 
 Validation conclusion for this follow-up:
 
-`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool is now 17/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool was 17/50 at that point. The later xattr special-node follow-up below raises the current pool to 20/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+
+
+## xattr special-node / AF_UNIX pathname socket repair
+
+This follow-up supersedes the earlier RV xattr special-node diagnostic run for `fgetxattr02`, `getxattr02`, and `setxattr02`. The first RV diagnostic after special-inode xattr errno repair still had `fgetxattr02` `TBROK` on AF_UNIX pathname `bind()`/`ENOTSOCK`, and the first bind-fix retry failed at build time due a missing import. Neither diagnostic run is promotion evidence.
+
+RV targeted command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fgetxattr02 getxattr02 setxattr02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.promotion-candidates.txt`
+
+Parser result: `6 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. RV-only candidates: `fgetxattr02`, `getxattr02`, `setxattr02`.
+
+LA targeted command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fgetxattr02 getxattr02 setxattr02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.log target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.log > target/ltp-1000-milestone-06-stable806/combined-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/combined-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt`
+
+Parser result: LA is `6 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. The combined RV+LA report has exactly three four-combo candidates: `fgetxattr02`, `getxattr02`, and `setxattr02`.
+
+Adjacent xattr/mknod/socket regression command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='getxattr01 listxattr01 fgetxattr01 fgetxattr03 flistxattr01 flistxattr02 flistxattr03 fremovexattr01 fremovexattr02 fsetxattr01 lgetxattr01 lgetxattr02 listxattr02 listxattr03 llistxattr01 llistxattr02 llistxattr03 lremovexattr01 removexattr01 removexattr02 setxattr01 mknod06 mknod02 mknod05 mknod08 mknodat01 mknod03 mknod04 mknod09 mknod01 socket02 socketpair02 socket01 getsockname01 getsockopt01 setsockopt01 socketpair01' LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='getxattr01 listxattr01 fgetxattr01 fgetxattr03 flistxattr01 flistxattr02 flistxattr03 fremovexattr01 fremovexattr02 fsetxattr01 lgetxattr01 lgetxattr02 listxattr02 listxattr03 llistxattr01 llistxattr02 llistxattr03 lremovexattr01 removexattr01 removexattr02 setxattr01 mknod06 mknod02 mknod05 mknod08 mknodat01 mknod03 mknod04 mknod09 mknod01 socket02 socketpair02 socket01 getsockname01 getsockopt01 setsockopt01 socketpair01' LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.log
+python3 scripts/ltp_summary.py 'target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.log'
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.log`
+- RV cases: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.cases.txt`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.json`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.log`
+- LA cases: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.cases.txt`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.json`
+
+Parser result: RV adjacent subset is `74 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`; LA adjacent subset is also `74 PASS / 0 FAIL / 0 internal markers`.
+
+Conclusion: `fgetxattr02`, `getxattr02`, and `setxattr02` are added to the stable806 candidate pool with four-combo clean evidence after generic special-node xattr and AF_UNIX pathname socket repairs. Candidate pool is now 20/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.

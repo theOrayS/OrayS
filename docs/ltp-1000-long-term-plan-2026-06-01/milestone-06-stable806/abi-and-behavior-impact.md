@@ -215,3 +215,22 @@ Resource/lifetime and maintenance boundaries:
 - Xattr read/list operations are unchanged; only mutation operations are gated.
 - No syscall numbers, struct layouts, FD table layout, `FD_CLOEXEC`, file status flags (`O_APPEND`, `O_NONBLOCK`, etc.), signal delivery, futex behavior, mmap behavior, blacklist handling, evaluator logic, or testsuite behavior changed.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. It applies generic Linux immutable/append-only mutation semantics shared with the existing unlink inode-flag boundary.
+
+
+## xattr special-node / AF_UNIX pathname socket repair impact
+
+This source patch changes generic special-file and local-socket filesystem behavior; it is not a stable-list promotion and does not edit `LTP_STABLE_CASES`.
+
+User-visible syscall/errno changes:
+
+- `mknod(2)`/`mknodat(2)` now accept pathname socket nodes (`S_IFSOCK`) for the root/CAP-like synthetic filesystem user (`fs_uid == 0`) and reject unprivileged socket-node creation with `EPERM`. Directory/link/unknown type handling remains unchanged.
+- Synthetic special-node metadata now records socket nodes as `S_IFSOCK` and continues recording character/block nodes with their device number. Opening mknod-created `/dev/null`-like char nodes and block-special nodes now resolves through existing `DevNull`, `DevZero`, or block-device fd entries; unknown special devices still return `ENXIO`.
+- `setxattr`, `lsetxattr`, `fsetxattr`, `removexattr`, `lremovexattr`, and `fremovexattr` now return `EPERM` for FIFO, character-device, block-device, and socket special inodes instead of allowing `user.*` mutation metadata on those special files. Get/list xattr behavior remains metadata-only and can still report `ENODATA`/empty lists as appropriate.
+- `bind(2)` on pathname AF_UNIX sockets now creates a filesystem socket node through the generic `mknodat` path. Abstract AF_UNIX socket addresses remain unsupported and return `EOPNOTSUPP`; no fake local listener registry was introduced.
+
+Resource/lifetime and maintenance boundaries:
+
+- Special-file and socket-node metadata are still process-local synthetic path metadata, consistent with existing VFS metadata in this shell model; they are not persisted as real ext4 device/socket inodes.
+- The AF_UNIX pathname bind path creates the filesystem node needed for pathname visibility. It does not implement full AF_UNIX listen/connect, abstract sockets, credential passing, or socket unlink lifetime rules.
+- No syscall numbers, struct layouts, FD table ABI, `FD_CLOEXEC`, file status flags, signal delivery, futex behavior, mmap behavior, blacklist handling, evaluator logic, testsuite behavior, or stable-list entries changed.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. It applies generic Linux/POSIX-visible special-inode and AF_UNIX pathname semantics.

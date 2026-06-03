@@ -32,3 +32,8 @@ No blacklist was added, removed, or used for the RV sync/fd/io or xattr scouts. 
 ## setxattr03 immutable/append-only xattr repair
 
 No blacklist was added, removed, or used for `setxattr03` or the xattr stable regression subset. The candidate evidence comes only from RV + LA × musl + glibc targeted parser-clean logs after a generic source fix; the earlier xattr scout remains diagnostic blocker evidence for the other rows. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+
+## xattr special-node / AF_UNIX pathname socket repair
+
+No blacklist was added, removed, or used for `fgetxattr02`, `getxattr02`, `setxattr02`, or the xattr/mknod/socket adjacent regression subset. The candidate evidence comes only from RV + LA × musl + glibc targeted parser-clean logs after generic source fixes and clean adjacent regression. The earlier RV special-node diagnostic and build-fail retry are blocker evidence only. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.

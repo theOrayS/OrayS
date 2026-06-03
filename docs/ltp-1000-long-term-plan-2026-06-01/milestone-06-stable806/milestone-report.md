@@ -23,6 +23,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Documented RV futex wake/requeue, clone, and FD/vector-IO scouts as blocker-only evidence; no partial PASS, `TCONF`, or glibc-only row was counted.
 - Documented late RV VFS/MM, process/exec/signal, exec-only, and FD/path scouts. Only `fstat02` and `fstat02_64` reached RV + LA × musl + glibc parser-clean; `mmap05`, close-range/O_TMPFILE/getcwd/creat, kill/process, and exec rows remain blocker-only.
 - Documented RV sync/fd/io and xattr small scouts, then repaired the generic immutable/append-only xattr mutation gap so `setxattr03` is now four-combo clean. Remaining sync/fd/io and xattr scout rows stay blocker-only with visible parser markers.
+- Repaired generic special-inode xattr mutation errno, special-device fd opening for synthetic char/block nodes, and AF_UNIX pathname `bind()` filesystem socket-node creation; `fgetxattr02`, `getxattr02`, and `setxattr02` are now four-combo clean candidates with xattr/mknod/socket adjacent regression evidence.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -46,6 +47,9 @@ Current new unique stable806 candidates:
 15. `fstat02`
 16. `fstat02_64`
 17. `setxattr03`
+18. `fgetxattr02`
+19. `getxattr02`
+20. `setxattr02`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -140,4 +144,17 @@ Current new unique stable806 candidates:
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset, and immutable/append-only xattr mutation semantics, then adds evidence-only FD metadata discovery for `fstat02`/`fstat02_64`. It brings the stable806 candidate pool to 17 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`). The blocker triage intentionally avoids unsafe mmap, readlink, nice, O_TMPFILE, close_range, sync/fd/io, remaining xattr, kill/process, and exec workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset, immutable/append-only xattr mutation semantics, and special-inode xattr/AF_UNIX pathname socket handling, then adds evidence-only FD metadata discovery for `fstat02`/`fstat02_64`. It brings the stable806 candidate pool to 20 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`). The blocker triage intentionally avoids unsafe mmap, readlink, nice, O_TMPFILE, close_range, sync/fd/io, remaining xattr, kill/process, and exec workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+
+
+## 2026-06-04 xattr special-node / AF_UNIX pathname socket follow-up
+
+This follow-up converts three previously blocker-only xattr rows into candidate-pool evidence after generic semantics work, not by counting the earlier RV scout.
+
+- Targeted RV: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.summary.txt` — `6 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` for `fgetxattr02`, `getxattr02`, `setxattr02` across musl + glibc.
+- Targeted LA: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.summary.txt` — same clean `6 PASS / 0 FAIL / 0 internal markers` result.
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/combined-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt` — four-combo candidates `fgetxattr02`, `getxattr02`, and `setxattr02`; blocked/incomplete cases `0`.
+- Adjacent RV xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
+
+The candidate pool is now 20/50 unique cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.

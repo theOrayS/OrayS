@@ -91,3 +91,10 @@ The RV sync/fd/io scout remains blocker-only and adds no regression-protected ca
 The `setxattr03` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus a 21-case adjacent stable xattr subset on both architectures (`42 PASS / 0 FAIL` for RV and `42 PASS / 0 FAIL` for LA).
 
 Covered stable adjacency includes existing `fgetxattr*`, `flistxattr*`, `fremovexattr*`, `fsetxattr01`, `getxattr01`, `lgetxattr*`, `listxattr*`, `llistxattr*`, `lremovexattr01`, `removexattr*`, and `setxattr01` rows. Future edits in `sys_setxattr_for_path`, `sys_removexattr_for_path`, `set_path_xattr`, `remove_path_xattr`, or `path_inode_flags` should rerun `setxattr03` plus this stable xattr subset before promotion.
+
+
+## xattr special-node / AF_UNIX pathname socket regression boundary
+
+The `fgetxattr02`/`getxattr02`/`setxattr02` repair is protected by targeted RV + LA × musl + glibc evidence (`12 PASS / 0 FAIL` across the two targeted architecture logs) plus a 37-case adjacent xattr/mknod/socket stable subset on both architectures (`74 PASS / 0 FAIL` for RV and `74 PASS / 0 FAIL` for LA).
+
+Covered stable adjacency includes existing `fgetxattr*`, `flistxattr*`, `fremovexattr*`, `fsetxattr01`, `getxattr01`, `lgetxattr*`, `listxattr*`, `llistxattr*`, `lremovexattr01`, `removexattr*`, `setxattr01`, representative `mknod*`/`mknodat01`, and socket creation/option/socketpair rows. Future edits in special inode metadata, `FdTable::mknodat`, `FdTable::openat`, xattr mutation guards, or AF_UNIX pathname `bind()` should rerun these three targeted cases plus this adjacent subset before promotion.
