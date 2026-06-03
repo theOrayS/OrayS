@@ -1,5 +1,5 @@
 use core::cell::UnsafeCell;
-use core::net::SocketAddr;
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use core::time::Duration;
 
@@ -173,7 +173,7 @@ impl TcpSocket {
     ///
     /// The local port is generated automatically.
     pub fn connect(&self, remote_addr: SocketAddr) -> AxResult {
-        if remote_addr.ip().is_loopback() {
+        if remote_addr.ip().is_loopback() || remote_addr.ip().is_unspecified() {
             return self.connect_loopback(remote_addr);
         }
 
@@ -211,7 +211,12 @@ impl TcpSocket {
             }
             Ok(())
         })
-        .unwrap_or_else(|_| ax_err!(AlreadyExists, "socket connect() failed: already connected"))?; // EISCONN
+        .unwrap_or_else(|_| {
+            ax_err!(
+                AlreadyConnected,
+                "socket connect() failed: already connected"
+            )
+        })?; // EISCONN
 
         // Here our state must be `CONNECTING`, and only one thread can run here.
         if self.is_nonblocking() {
@@ -242,6 +247,10 @@ impl TcpSocket {
             if local_addr.port() == 0 {
                 local_addr.set_port(get_ephemeral_port()?);
             }
+            let local_endpoint = IpEndpoint::from(local_addr);
+            if !super::is_local_addr(local_addr) {
+                return ax_err!(InvalidInput, "socket bind() failed: address not available");
+            }
             // SAFETY: no other threads can read or write `self.local_addr` as we
             // have changed the state to `BUSY`.
             unsafe {
@@ -249,7 +258,7 @@ impl TcpSocket {
                 if old != UNSPECIFIED_ENDPOINT {
                     return ax_err!(InvalidInput, "socket bind() failed: already bound");
                 }
-                self.local_addr.get().write(IpEndpoint::from(local_addr));
+                self.local_addr.get().write(local_endpoint);
             }
             Ok(())
         })
@@ -521,7 +530,16 @@ impl TcpSocket {
     fn connect_loopback(&self, remote_addr: SocketAddr) -> AxResult {
         self.update_state(STATE_CLOSED, STATE_CONNECTED, || {
             let bound_endpoint = self.bound_endpoint()?;
-            let peer_endpoint = IpEndpoint::from(remote_addr);
+            let peer_addr = if remote_addr.ip().is_unspecified() {
+                let loopback = match remote_addr {
+                    SocketAddr::V4(_) => IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    SocketAddr::V6(_) => IpAddr::V6(Ipv6Addr::LOCALHOST),
+                };
+                SocketAddr::new(loopback, remote_addr.port())
+            } else {
+                remote_addr
+            };
+            let peer_endpoint = IpEndpoint::from(peer_addr);
             let local_endpoint = IpEndpoint::new(
                 bound_endpoint.addr.unwrap_or(peer_endpoint.addr),
                 bound_endpoint.port,
@@ -537,7 +555,12 @@ impl TcpSocket {
             }
             Ok(())
         })
-        .unwrap_or_else(|_| ax_err!(AlreadyExists, "socket connect() failed: already connected"))?;
+        .unwrap_or_else(|_| {
+            ax_err!(
+                AlreadyConnected,
+                "socket connect() failed: already connected"
+            )
+        })?;
         Ok(())
     }
 

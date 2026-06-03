@@ -731,3 +731,51 @@ llseek01
 # Combined candidate report: target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.promotion-candidates.txt — one four-combo candidate lseek11.
 # RV adjacent stable lseek regression: target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.txt — 8 PASS / 0 FAIL / 0 internal markers.
 # LA adjacent stable lseek regression: target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt — 8 PASS / 0 FAIL / 0 internal markers.
+
+
+# 2026-06-04 socket errno/address candidate follow-up
+# Candidate gates and blocker-only follow-up; case unit.
+accept02
+bind01
+bind02
+connect01
+recv01
+recvfrom01
+send01
+sendto01
+bind03
+# RV socket basic scout: target/ltp-1000-milestone-06-stable806/rv-socket-basic-scout-20260604T015858+0800.summary.txt — accept02 RV-clean; other rows blocker-only.
+# LA accept02 follow-up: target/ltp-1000-milestone-06-stable806/la-accept02-followup-20260604T020823+0800.summary.txt — 2 PASS / 0 FAIL / 0 internal markers.
+# RV/LA bind/connect gate: bind01, bind02, connect01 — rv-bind-privileged-port-fix-20260604T022349+0800.summary.txt and la-bind-privileged-port-fix-20260604T022457+0800.summary.txt are both parser-clean.
+# RV/LA recv gate: recv01, recvfrom01 — rv-recv-flags-fix-20260604T022734+0800.summary.txt and la-recv-flags-fix-20260604T022833+0800.summary.txt are both parser-clean.
+# RV/LA send gate: send01 — rv-send01-flags-size-fix-20260604T023249+0800.summary.txt and la-send01-flags-size-fix-20260604T023335+0800.summary.txt are both parser-clean.
+# RV/LA sendto gate: sendto01 — rv-sendto01-tcp-ignore-dest-20260604T024113+0800.summary.txt and la-sendto01-tcp-ignore-dest-20260604T024159+0800.summary.txt are both parser-clean.
+# RV/LA AF_UNIX pathname bind gate: bind03 — rv-bind03-unix-bound-path-20260604T024400+0800.summary.txt and la-bind03-unix-bound-path-20260604T024448+0800.summary.txt are both parser-clean.
+
+# Blocker-only scouts after socket candidate gate.
+readlink03
+readlinkat02
+bind04
+bind05
+bind06
+connect02
+send02
+sendto02
+sendto03
+recvmsg01
+recvmsg02
+recvmsg03
+getsockopt02
+setsockopt02
+setsockopt03
+setsockopt04
+setsockopt05
+setsockopt06
+setsockopt07
+setsockopt08
+setsockopt09
+setsockopt10
+epoll_create01
+epoll_create02
+eventfd06
+# Plus 29 current 16-bit credential rows and the VFS/time/proc low-risk scout rows recorded in validation.md; all have visible parser blockers and zero promotion candidates.

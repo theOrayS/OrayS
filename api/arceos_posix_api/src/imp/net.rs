@@ -17,6 +17,9 @@ use crate::utils::char_ptr_to_str;
 const SHUT_RD: c_int = 0;
 const SHUT_WR: c_int = 1;
 const SHUT_RDWR: c_int = 2;
+const MSG_OOB: c_int = 0x1;
+const MSG_ERRQUEUE: c_int = 0x2000;
+const UDP_MAX_PAYLOAD_LEN: usize = 65_507;
 
 unsafe fn readable_socket_buffer<'a>(
     buf: *const c_void,
@@ -48,6 +51,30 @@ unsafe fn writable_socket_buffer<'a>(
     Ok(unsafe { core::slice::from_raw_parts_mut(ptr, len) })
 }
 
+fn check_recv_flags(flag: c_int) -> LinuxResult {
+    if flag & MSG_OOB != 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    if flag & MSG_ERRQUEUE != 0 {
+        return Err(LinuxError::EAGAIN);
+    }
+    Ok(())
+}
+
+fn check_send_flags(flag: c_int) -> LinuxResult {
+    if flag & MSG_OOB != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    Ok(())
+}
+
+fn map_stream_send_error(res: LinuxResult<usize>) -> LinuxResult<usize> {
+    match res {
+        Err(LinuxError::ENOTCONN) => Err(LinuxError::EPIPE),
+        other => other,
+    }
+}
+
 pub enum Socket {
     Udp(Mutex<UdpSocket>),
     Tcp(Mutex<TcpSocket>),
@@ -67,8 +94,16 @@ impl Socket {
 
     fn send(&self, buf: &[u8]) -> LinuxResult<usize> {
         match self {
-            Socket::Udp(udpsocket) => Ok(udpsocket.lock().send(buf)?),
-            Socket::Tcp(tcpsocket) => Ok(tcpsocket.lock().send(buf)?),
+            Socket::Udp(udpsocket) => {
+                if buf.len() > UDP_MAX_PAYLOAD_LEN {
+                    return Err(LinuxError::EMSGSIZE);
+                }
+                Ok(udpsocket.lock().send(buf)?)
+            }
+            Socket::Tcp(tcpsocket) => {
+                let res: LinuxResult<usize> = tcpsocket.lock().send(buf).map_err(Into::into);
+                map_stream_send_error(res)
+            }
         }
     }
 
@@ -117,8 +152,16 @@ impl Socket {
     fn sendto(&self, buf: &[u8], addr: SocketAddr) -> LinuxResult<usize> {
         match self {
             // diff: must bind before sendto
-            Socket::Udp(udpsocket) => Ok(udpsocket.lock().send_to(buf, addr)?),
-            Socket::Tcp(_) => Err(LinuxError::EISCONN),
+            Socket::Udp(udpsocket) => {
+                if buf.len() > UDP_MAX_PAYLOAD_LEN {
+                    return Err(LinuxError::EMSGSIZE);
+                }
+                Ok(udpsocket.lock().send_to(buf, addr)?)
+            }
+            Socket::Tcp(tcpsocket) => {
+                let res: LinuxResult<usize> = tcpsocket.lock().send(buf).map_err(Into::into);
+                map_stream_send_error(res)
+            }
         }
     }
 
@@ -353,13 +396,13 @@ fn from_sockaddr(
     if addr.is_null() {
         return Err(LinuxError::EFAULT);
     }
-    if addrlen != size_of::<ctypes::sockaddr>() as ctypes::socklen_t {
+    if addrlen < size_of::<ctypes::sockaddr>() as ctypes::socklen_t {
         return Err(LinuxError::EINVAL);
     }
 
     let mid = unsafe { core::ptr::read_unaligned(addr as *const ctypes::sockaddr_in) };
     if mid.sin_family != ctypes::AF_INET as u16 {
-        return Err(LinuxError::EINVAL);
+        return Err(LinuxError::EAFNOSUPPORT);
     }
 
     let res = SocketAddr::V4(mid.into());
@@ -402,6 +445,9 @@ pub fn sys_bind(
     );
     syscall_body!(sys_bind, {
         let addr = from_sockaddr(socket_addr, addrlen)?;
+        if !axnet::is_local_addr(addr) {
+            return Err(LinuxError::EADDRNOTAVAIL);
+        }
         Socket::from_fd(socket_fd)?.bind(addr)?;
         Ok(0)
     })
@@ -448,9 +494,14 @@ pub unsafe fn sys_sendto(
         socket_fd, buf_ptr as usize, len, flag, socket_addr as usize, addrlen
     );
     syscall_body!(sys_sendto, {
+        check_send_flags(flag)?;
+        let socket = Socket::from_fd(socket_fd)?;
         let buf = unsafe { readable_socket_buffer(buf_ptr, len)? };
+        if matches!(socket.as_ref(), Socket::Tcp(_)) {
+            return socket.send(buf);
+        }
         let addr = from_sockaddr(socket_addr, addrlen)?;
-        Socket::from_fd(socket_fd)?.sendto(buf, addr)
+        socket.sendto(buf, addr)
     })
 }
 
@@ -473,6 +524,7 @@ pub unsafe fn sys_send(
         socket_fd, buf_ptr as usize, len, flag
     );
     syscall_body!(sys_send, {
+        check_send_flags(flag)?;
         let buf = unsafe { readable_socket_buffer(buf_ptr, len)? };
         Socket::from_fd(socket_fd)?.send(buf)
     })
@@ -500,6 +552,7 @@ pub unsafe fn sys_recvfrom(
         socket_fd, buf_ptr as usize, len, flag, socket_addr as usize, addrlen as usize
     );
     syscall_body!(sys_recvfrom, {
+        check_recv_flags(flag)?;
         if socket_addr.is_null() || addrlen.is_null() {
             return Err(LinuxError::EFAULT);
         }
@@ -533,6 +586,7 @@ pub unsafe fn sys_recv(
         socket_fd, buf_ptr as usize, len, flag
     );
     syscall_body!(sys_recv, {
+        check_recv_flags(flag)?;
         let buf = unsafe { writable_socket_buffer(buf_ptr, len)? };
         Socket::from_fd(socket_fd)?.recv(buf)
     })

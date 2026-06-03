@@ -29,7 +29,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 
 ## Candidate-pool status
 
-Current new unique stable806 candidates:
+Current new unique stable806 candidates: **35/50**. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; this is still an interim candidate-pool checkpoint, not a stable-list promotion.
 
 1. `prctl08`
 2. `prctl09`
@@ -56,8 +56,18 @@ Current new unique stable806 candidates:
 23. `splice03`
 24. `splice04`
 25. `splice05`
+26. `lseek11`
+27. `accept02`
+28. `bind01`
+29. `bind02`
+30. `connect01`
+31. `recv01`
+32. `recvfrom01`
+33. `send01`
+34. `sendto01`
+35. `bind03`
 
-`utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
+`utsname01` and the eventfd/poll/pselect follow-up rows are clean in targeted runs but are already stable, so they are adjacent regression evidence only. Earlier in this file some historical subsections mention smaller pool sizes (20/25/26); those statements are preserved as checkpoint chronology and are superseded by this current 35/50 pool.
 
 ## Evidence
 
@@ -208,3 +218,46 @@ This follow-up adds a generic regular-file data/hole map so `lseek(fd, off, SEEK
 - Adjacent LA stable lseek subset: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt` — `8 PASS / 0 FAIL / 0 internal markers`.
 
 The candidate pool is now 26/50 unique cases (`lseek11` added after `splice01`..`splice05`). The stable list remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made until the full +50 cohort is available.
+
+
+## 2026-06-04 socket errno/address candidate follow-up
+
+This follow-up converts nine socket rows into candidate-pool evidence after generic socket errno/address-boundary fixes. It does not edit `LTP_STABLE_CASES` and does not count blocked socket namespace/socketcall or pass-with-`TCONF` rows.
+
+New four-combo candidates from this follow-up:
+
+- `accept02` (LA follow-up after RV was already parser-clean).
+- `bind01`, `bind02`, `connect01` (generic AF_INET local-address and privileged-port errno boundaries).
+- `recv01`, `recvfrom01` (generic receive flag errno handling).
+- `send01`, `sendto01` (generic send flag, UDP size, TCP stream destination/error behavior).
+- `bind03` (generic AF_UNIX pathname bind node/existing-bind behavior).
+
+Evidence:
+
+- RV socket basic scout: `target/ltp-1000-milestone-06-stable806/rv-socket-basic-scout-20260604T015858+0800.summary.txt` — `accept02` parser-clean on RV; other socket rows still blocker-only in that scout.
+- LA `accept02` follow-up: `target/ltp-1000-milestone-06-stable806/la-accept02-followup-20260604T020823+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- Combined `accept02` report: `target/ltp-1000-milestone-06-stable806/la-accept02-followup-20260604T020823+0800.combined-promotion-candidates.txt` — four-combo candidate `accept02`.
+- RV `bind01`/`bind02`/`connect01`: `target/ltp-1000-milestone-06-stable806/rv-bind-privileged-port-fix-20260604T022349+0800.summary.txt` — `6 PASS / 0 FAIL / 0 internal markers`.
+- LA `bind01`/`bind02`/`connect01`: `target/ltp-1000-milestone-06-stable806/la-bind-privileged-port-fix-20260604T022457+0800.summary.txt` — `6 PASS / 0 FAIL / 0 internal markers`.
+- Combined report: `target/ltp-1000-milestone-06-stable806/la-bind-privileged-port-fix-20260604T022457+0800.combined-promotion-candidates.txt` — four-combo candidates `bind01`, `bind02`, `connect01`.
+- RV `recv01`/`recvfrom01`: `target/ltp-1000-milestone-06-stable806/rv-recv-flags-fix-20260604T022734+0800.summary.txt` — `4 PASS / 0 FAIL / 0 internal markers`.
+- LA `recv01`/`recvfrom01`: `target/ltp-1000-milestone-06-stable806/la-recv-flags-fix-20260604T022833+0800.summary.txt` — `4 PASS / 0 FAIL / 0 internal markers`.
+- Combined report: `target/ltp-1000-milestone-06-stable806/la-recv-flags-fix-20260604T022833+0800.combined-promotion-candidates.txt` — four-combo candidates `recv01`, `recvfrom01`.
+- RV `send01`: `target/ltp-1000-milestone-06-stable806/rv-send01-flags-size-fix-20260604T023249+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- LA `send01`: `target/ltp-1000-milestone-06-stable806/la-send01-flags-size-fix-20260604T023335+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- Combined report: `target/ltp-1000-milestone-06-stable806/la-send01-flags-size-fix-20260604T023335+0800.combined-promotion-candidates.txt` — four-combo candidate `send01`.
+- RV `sendto01`: `target/ltp-1000-milestone-06-stable806/rv-sendto01-tcp-ignore-dest-20260604T024113+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- LA `sendto01`: `target/ltp-1000-milestone-06-stable806/la-sendto01-tcp-ignore-dest-20260604T024159+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- Combined report: `target/ltp-1000-milestone-06-stable806/la-sendto01-tcp-ignore-dest-20260604T024159+0800.combined-promotion-candidates.txt` — four-combo candidate `sendto01`.
+- RV `bind03`: `target/ltp-1000-milestone-06-stable806/rv-bind03-unix-bound-path-20260604T024400+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- LA `bind03`: `target/ltp-1000-milestone-06-stable806/la-bind03-unix-bound-path-20260604T024448+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers`.
+- Combined report: `target/ltp-1000-milestone-06-stable806/la-bind03-unix-bound-path-20260604T024448+0800.combined-promotion-candidates.txt` — four-combo candidate `bind03`.
+
+Negative follow-up evidence kept out of promotion:
+
+- LA readlink refresh: `target/ltp-1000-milestone-06-stable806/la-readlink03-readlinkat02-refresh-20260604T025514+0800.summary.txt` — glibc clean but musl `TFAIL=2`; zero candidates.
+- RV socket/epoll low-risk scout: `target/ltp-1000-milestone-06-stable806/rv-socket-epoll-lowrisk-scout-20260604T025727+0800.summary.txt` — `5 PASS / 41 FAIL`, `TCONF=34`, `TBROK=12`, `TFAIL=6`; zero clean candidates. `epoll_create01`, `epoll_create02`, and `setsockopt03` are pass-with-internal markers only.
+- RV 16-bit credential scout: `target/ltp-1000-milestone-06-stable806/rv-cred16-scout-20260604T025923+0800.summary.txt` — `0 PASS / 58 FAIL`, all blocker-only `TCONF`; zero candidates.
+- RV VFS/time/proc low-risk scout: `target/ltp-1000-milestone-06-stable806/rv-vfs-time-proc-lowrisk-scout-20260604T030139+0800.summary.txt` — `6 PASS / 46 FAIL`, `TFAIL=24`, `TBROK=10`, `TCONF=45`, `timeout=2`, `ENOSYS=2`; zero clean candidates.
+
+The candidate pool is now **35/50**. Stable806 remains blocked until at least 15 additional unique four-combo clean cases are found and the full milestone gate is rerun.

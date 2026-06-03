@@ -56,6 +56,7 @@ pub(super) struct LocalSocketEntry {
     id: usize,
     socktype: i32,
     nonblocking: bool,
+    bound_path: Arc<Mutex<Option<String>>>,
     pair: Option<LocalSocketPairEndpoint>,
     options: Arc<Mutex<SocketOptions>>,
 }
@@ -259,6 +260,7 @@ impl LocalSocketEntry {
             id: NEXT_LOCAL_SOCKET_ID.fetch_add(1, Ordering::Relaxed),
             socktype,
             nonblocking: flags & posix_ctypes::SOCK_NONBLOCK as i32 != 0,
+            bound_path: Arc::new(Mutex::new(None)),
             pair: None,
             options: Arc::new(Mutex::new(SocketOptions::default())),
         }
@@ -274,6 +276,7 @@ impl LocalSocketEntry {
                 id: first_id,
                 socktype,
                 nonblocking,
+                bound_path: Arc::new(Mutex::new(None)),
                 pair: Some(LocalSocketPairEndpoint {
                     side: 0,
                     state: state.clone(),
@@ -284,6 +287,7 @@ impl LocalSocketEntry {
                 id: first_id + 1,
                 socktype,
                 nonblocking,
+                bound_path: Arc::new(Mutex::new(None)),
                 pair: Some(LocalSocketPairEndpoint { side: 1, state }),
                 options,
             },
@@ -295,6 +299,7 @@ impl LocalSocketEntry {
             id: self.id,
             socktype: self.socktype,
             nonblocking: self.nonblocking,
+            bound_path: self.bound_path.clone(),
             pair: self.pair.clone(),
             options: self.options.clone(),
         }
@@ -938,18 +943,62 @@ pub(super) fn sys_bind_bridge(
     addrlen: usize,
 ) -> isize {
     match is_local_socket_fd(process, fd) {
-        Ok(true) => return sys_bind_local_socket(process, addr, addrlen),
+        Ok(true) => return sys_bind_local_socket(process, fd, addr, addrlen),
         Ok(false) => {}
         Err(err) => return neg_errno(err),
     }
-    socket_addr_call(process, fd, addr, addrlen, arceos_posix_api::sys_bind)
+    let socket = match socket_entry(process, fd) {
+        Ok(socket) => socket,
+        Err(err) => return neg_errno(err),
+    };
+    let addr_bytes = match read_socket_addr_from_user(process, addr, addrlen) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    if process.uid() != 0 && inet_privileged_port(&addr_bytes).is_some() {
+        return neg_errno(LinuxError::EACCES);
+    }
+    match posix_ret_i32(arceos_posix_api::sys_bind(
+        socket.posix_fd,
+        addr_bytes.as_ptr() as *const posix_ctypes::sockaddr,
+        addrlen as posix_ctypes::socklen_t,
+    )) {
+        Ok(_) => 0,
+        Err(err) => neg_errno(err),
+    }
 }
 
-fn sys_bind_local_socket(process: &UserProcess, addr: usize, addrlen: usize) -> isize {
+fn inet_privileged_port(addr_bytes: &[u8]) -> Option<u16> {
+    let addr = unsafe {
+        core::ptr::read_unaligned(addr_bytes.as_ptr() as *const posix_ctypes::sockaddr_in)
+    };
+    if addr.sin_family != posix_ctypes::AF_INET as posix_ctypes::sa_family_t {
+        return None;
+    }
+    let port = u16::from_be(addr.sin_port);
+    (1..1024).contains(&port).then_some(port)
+}
+
+fn sys_bind_local_socket(process: &UserProcess, fd: usize, addr: usize, addrlen: usize) -> isize {
     let path = match read_unix_path_socket_addr(process, addr, addrlen) {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
+
+    let bound_path = {
+        let mut table = process.fds.lock();
+        match table.entry_mut(fd as i32) {
+            Ok(FdEntry::LocalSocket(socket)) => {
+                if socket.bound_path.lock().is_some() {
+                    return neg_errno(LinuxError::EINVAL);
+                }
+                socket.bound_path.clone()
+            }
+            Ok(_) => return neg_errno(LinuxError::ENOTSOCK),
+            Err(err) => return neg_errno(err),
+        }
+    };
+
     match process.fds.lock().mknodat(
         process,
         general::AT_FDCWD,
@@ -957,7 +1006,11 @@ fn sys_bind_local_socket(process: &UserProcess, addr: usize, addrlen: usize) -> 
         ST_MODE_SOCKET | 0o777,
         0,
     ) {
-        Ok(()) => 0,
+        Ok(()) => {
+            *bound_path.lock() = Some(path);
+            0
+        }
+        Err(LinuxError::EEXIST) => neg_errno(LinuxError::EADDRINUSE),
         Err(err) => neg_errno(err),
     }
 }
@@ -1261,8 +1314,13 @@ pub(super) fn sys_recvfrom_bridge(
             Ok(len) => len as usize,
             Err(err) => return neg_errno(err),
         };
-        if let Err(err) = validate_user_write(process, addr, addr_len_value) {
-            return neg_errno(err);
+        if addr_len_value > SOCKET_ADDR_STORAGE_MAX {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if socket.socktype as u32 != posix_ctypes::SOCK_STREAM {
+            if let Err(err) = validate_user_write(process, addr, addr_len_value) {
+                return neg_errno(err);
+            }
         }
         recv_socket_data_to_user_with_addr(
             process,

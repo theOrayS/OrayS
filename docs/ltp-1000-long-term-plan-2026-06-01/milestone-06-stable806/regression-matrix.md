@@ -131,3 +131,21 @@ Future edits to `sys_splice`, pipe semantics, AF_UNIX local sockets, regular-fil
 `lseek11` is protected by fresh RV + LA × musl + glibc targeted evidence (`4 PASS / 0 FAIL / 0 internal markers` across the two architecture logs) plus an adjacent stable lseek subset on both architectures (`16 PASS / 0 FAIL / 0 internal markers` across RV and LA for `lseek01`, `lseek02`, `lseek07`, and `llseek01`).
 
 The regression boundary covers `FdTable::lseek`, regular-file logical size computation, sparse-file read/write/truncate metadata, open-`O_TRUNC` handling, unlink/rename sparse metadata movement, and `stat`/`st_blksize` consistency. Future edits in these areas should rerun `lseek11` plus the adjacent stable lseek subset on RV + LA × musl + glibc before counting the case in a stable milestone.
+
+
+## 2026-06-04 socket errno/address candidate follow-up regression boundary
+
+The socket candidate follow-up is protected by fresh RV + LA × musl + glibc parser-clean evidence for `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, and `bind03`.
+
+Covered behavior surface:
+
+- AF_INET bind address validation (`EADDRNOTAVAIL`) and privileged-port `EACCES` in the userspace bridge.
+- IPv4 `sockaddr` length/family errno handling.
+- TCP unspecified-address loopback connect and connected-stream `sendto()` semantics.
+- send/recv flag errno behavior (`MSG_OOB`, `MSG_ERRQUEUE`) and UDP payload size `EMSGSIZE`.
+- AF_UNIX pathname bind node creation, duplicate-node `EADDRINUSE`, and same-socket rebind `EINVAL`.
+
+Required before promotion:
+
+- Rerun the nine socket candidates on RV + LA × musl + glibc together with adjacent already-stable socket rows (`socket01`, `socket02`, `socketpair01`/`02`, representative `getsockname`/`getsockopt`/`setsockopt` stable rows if present) when assembling stable806.
+- Do not promote `bind04`, `bind05`, `getsockopt02`, `recvmsg01`, `send02`, `sendto02`, `sendto03`, `epoll_create01/02`, `eventfd06`, socketcall rows, or 16-bit credential rows until their visible parser blockers are removed by real semantics.
