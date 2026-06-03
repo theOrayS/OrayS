@@ -2986,7 +2986,9 @@ impl FdTable {
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         let abs_path = process.resolve_parent_symlinks(abs_path.as_str())?;
-        if axfs::api::metadata(abs_path.as_str()).is_ok() {
+        if process.path_symlink(abs_path.as_str()).is_some()
+            || axfs::api::metadata(abs_path.as_str()).is_ok()
+        {
             return Err(LinuxError::EEXIST);
         }
         let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
@@ -3022,7 +3024,9 @@ impl FdTable {
         };
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         let abs_path = process.resolve_parent_symlinks(abs_path.as_str())?;
-        if axfs::api::metadata(abs_path.as_str()).is_ok() {
+        if process.path_symlink(abs_path.as_str()).is_some()
+            || axfs::api::metadata(abs_path.as_str()).is_ok()
+        {
             return Err(LinuxError::EEXIST);
         }
         let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
