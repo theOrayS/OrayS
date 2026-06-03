@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 20/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 25/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -24,6 +24,11 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `fgetxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special-node xattr/read and AF_UNIX pathname bind repair | candidate pool |
 | `getxattr02` | RV + LA × musl + glibc targeted parser-clean after special inode xattr mutation rejects `user.*` writes with `EPERM` while get/list stays metadata-only | candidate pool |
 | `setxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special inode xattr mutation `EPERM` boundary | candidate pool |
+| `splice01` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` file/pipe transfer support | candidate pool |
+| `splice02` | RV + LA × musl + glibc targeted parser-clean after generic blocking pipe-to-file `splice(2)` behavior | candidate pool |
+| `splice03` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` invalid-fd/offset errno handling | candidate pool |
+| `splice04` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-pipe `splice(2)` transfer support | candidate pool |
+| `splice05` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-AF_UNIX-stream and AF_UNIX-stream-to-pipe `splice(2)` support | candidate pool |
 
 Evidence artifacts:
 
@@ -134,6 +139,17 @@ Note: the earlier `rv-xattr-special-node-fix-20260604T000115+0800` run is diagno
 
 The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` out of the pool because their rows contain visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers.
 
+
+Additional splice(2) evidence artifacts:
+
+- RV splice01-05 targeted log: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log`
+- RV splice01-05 summary: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.txt`
+- RV splice01-05 candidate report: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.promotion-candidates.txt`
+- LA splice01-05 targeted log: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.log`
+- LA splice01-05 summary: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.txt`
+- Combined RV+LA splice candidate report: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt`
+- RV splice07 invalid-fd errno cleanup summary: `target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.txt` (wrapper PASS with internal `TCONF/ENOSYS`; blocker-only)
+
 ## Explicitly excluded after blocker triage
 
 | Case/lane | Evidence | Exclusion reason |
@@ -150,6 +166,9 @@ The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `g
 | `clone02`, `clone04`, `clone05`, `clone08`, `clone09` | RV clone adjacent scout has `TFAIL`/`TBROK`/`ENOSYS` and only glibc-only `clone04` clean | Zero candidates; no LA follow-up because RV musl/glibc was not both clean. |
 | vector IO/sendfile rows | RV FD/vector-IO scout for `writev03`, `preadv03*`, `preadv203*`, `pwritev03*`, `sendfile09*` has `TCONF` for every row | Zero candidates; no pass-with-TCONF promotion. |
 | `fsetxattr02`, `getxattr03`, `getxattr04`, `getxattr05` | RV remaining xattr retest `rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt` has `0 PASS / 8 FAIL / TCONF=8` and candidate report has zero candidates | Blocker-only TCONF evidence: `brd` driver unavailable, no supported filesystem after filters, `mkfs.xfs` missing, and guest header/ACL support missing; no LA follow-up and no promotion count. |
+| `splice06` | RV current-code retest still reports `TCONF=1` per libc because `/proc/sys/kernel/domainname`/proc-sys write semantics are not implemented | Blocker-only; no LA follow-up and no promotion count. |
+| `splice07` | RV wrapper passes after invalid-fd errno cleanup, but each libc row has `TCONF=168` and `ENOSYS=168` from unsupported optional fd fixtures (`pidfd`, fanotify, inotify, userfaultfd, perf, io_uring, bpf, fsopen/fspick/open_tree, memfd, memfd_secret) | Pass-with-internal-markers; not promotion evidence. |
+| `splice08`, `splice09` | Initial RV splice scout reports upstream minimum-kernel-version `TCONF` for 6.7+ behavior | Blocker-only version-gated evidence; no fake kernel-version workaround. |
 
 Excluded evidence artifacts:
 
@@ -251,7 +270,7 @@ Additional remaining xattr blocker-only retest artifacts:
 
 ## 2026-06-04 late actual-bin blocker reprobes
 
-These RV-only reprobes used case names confirmed against the current guest image where possible and are blocker-only evidence. They do not change the stable806 candidate pool (`20/50`) and do not justify an LA follow-up because the RV gate has zero parser-clean candidates.
+These RV-only reprobes used case names confirmed against the current guest image where possible and are blocker-only evidence. They did not change the stable806 candidate pool (`20/50` at that point) and did not justify an LA follow-up because the RV gate had zero parser-clean candidates.
 
 | Scout | Cases | Parser result | Candidate result | Promotion decision |
 | --- | ---: | --- | --- | --- |

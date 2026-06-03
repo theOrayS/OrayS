@@ -118,3 +118,9 @@ The scout adds adjacent RV regression evidence for existing eventfd/poll/pselect
 | eventfd/poll/pselect stable adjacency | Existing stable rows are RV parser-clean in the mixed scout | Useful as RV adjacency only; any new promotion still needs fresh RV + LA × musl + glibc clean evidence for new unique rows. |
 | epoll_create01/02 | pass-with-TCONF and musl TFAIL remain visible | Implement real raw `epoll_create`/invalid-size semantics or document unsupported scope before reconsidering; no wrapper-specific workaround. |
 | eventfd06 | `libaio` unavailable `TCONF` | Requires real AIO/libaio test support or upstream environment change; TCONF is not promotion evidence. |
+
+## splice01..splice05 generic splice(2) regression boundary
+
+`splice01`, `splice02`, `splice03`, `splice04`, and `splice05` are protected by fresh RV + LA × musl + glibc targeted evidence (`20 PASS / 0 FAIL / 0 internal markers` across the two architecture logs). The regression boundary covers `sys_splice`, `FdTable::read`, `FdTable::write`, regular-file current-offset advancement, pipe read/write availability, AF_UNIX `LocalSocketEntry` read/write behavior, optional user offset copy-in/copy-out, and invalid-fd errno ordering.
+
+Future edits to `sys_splice`, pipe semantics, AF_UNIX local sockets, regular-file offset/write paths, `O_APPEND` handling, or syscall dispatch should rerun `splice01`..`splice05` on RV + LA × musl + glibc before counting these cases in a stable milestone. `splice06`/`splice07`/`splice08`/`splice09` remain blocker-only and must not be promoted until their visible `TCONF/ENOSYS` or version-gate markers are removed by real semantics.

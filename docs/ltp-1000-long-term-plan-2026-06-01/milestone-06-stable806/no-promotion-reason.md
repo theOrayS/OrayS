@@ -1,18 +1,18 @@
 # milestone-06 current no-promotion reason
 
-This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset repairs, late FD metadata discovery, immutable/append-only xattr mutation repair, and special-node xattr/AF_UNIX pathname socket repair. They are only 20 unique new cases and do not satisfy the next 50-case milestone gate.
+This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, and `splice05` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset repairs, late FD metadata discovery, immutable/append-only xattr mutation repair, special-node xattr/AF_UNIX pathname socket repair, and generic `splice(2)` file/pipe/AF_UNIX stream support. They are only 25 unique new cases and do not satisfy the next 50-case milestone gate.
 
 Reasons promotion is still blocked at this checkpoint:
 
 1. The old archived 4/4 clean-not-stable seed list has already been exhausted by earlier milestones; no remaining old clean seed exists outside current stable756.
 2. The broader proc/synthetic/sched scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside `prctl08`/`prctl09`.
 3. The time/fd/signal scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside this repair lane.
-4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03`, plus `fgetxattr02`, `getxattr02`, and `setxattr02`, have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, futex/clone, xattr, and xattr/mknod/socket adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
+4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03`, plus `fgetxattr02`, `getxattr02`, `setxattr02`, and `splice01`..`splice05`, have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, futex/clone, xattr, and xattr/mknod/socket adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
 5. No blacklist/SKIP/status0/full-sweep partial TPASS evidence is counted.
 
 Next safe slices:
 
-- Keep `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, and `setxattr02` in the stable806 candidate pool and batch them only with enough additional four-combo clean cases to reach the next 50-case milestone.
+- Keep `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, and `splice05` in the stable806 candidate pool and batch them only with enough additional four-combo clean cases to reach the next 50-case milestone.
 - Keep `nice04` out of the candidate pool unless a principled libc/ABI-compatible errno boundary is found; do not special-case the LTP wrapper.
 - Avoid POSIX timer rows (`timer_create` family) as easy promotions unless the project accepts a real timer-object implementation.
 - Prefer small FD/fcntl/pipe/io or narrowly scoped mmap/futex probes next; avoid readlink LA-musl, statx attribute/env-heavy rows, 16-bit UID/capability rows, and broad socket batches until their blockers have real semantic fixes.
@@ -81,7 +81,7 @@ Additional no-promotion note after sync/fd/io and xattr scouts:
 
 Additional no-promotion note after setxattr03 repair:
 
-- The generic immutable/append-only xattr mutation guard makes `setxattr03` four-combo clean and preserves a 21-case xattr stable subset on RV and LA. The earlier RV xattr scout remains blocker-only for all other rows with visible `TBROK/TCONF/TFAIL` markers. This raised the candidate pool to 17 new unique cases at that point, still below the +50 stable806 promotion gate; the later xattr special-node follow-up raises the current pool to 20/50. `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+- The generic immutable/append-only xattr mutation guard makes `setxattr03` four-combo clean and preserves a 21-case xattr stable subset on RV and LA. The earlier RV xattr scout remains blocker-only for all other rows with visible `TBROK/TCONF/TFAIL` markers. This raised the candidate pool to 17 new unique cases at that point, still below the +50 stable806 promotion gate; the later xattr special-node follow-up raised it to 20/50 and the generic `splice(2)` follow-up raises the current pool to 25/50. `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
 
 
 Additional no-promotion note after xattr special-node/AF_UNIX pathname socket repair:
@@ -91,15 +91,20 @@ Additional no-promotion note after xattr special-node/AF_UNIX pathname socket re
 
 Additional no-promotion note after remaining xattr blocker-only retest:
 
-- The RV retest of `fsetxattr02`, `getxattr03`, `getxattr04`, and `getxattr05` after the special-node repair still produced `0 PASS / 8 FAIL / TCONF=8`, with zero promotion candidates. These rows remain blocked by missing test-device/filesystem/toolchain/header/ACL prerequisites and are not counted. The stable806 candidate pool remains 20/50, and `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+- The RV retest of `fsetxattr02`, `getxattr03`, `getxattr04`, and `getxattr05` after the special-node repair still produced `0 PASS / 8 FAIL / TCONF=8`, with zero promotion candidates. These rows remain blocked by missing test-device/filesystem/toolchain/header/ACL prerequisites and are not counted. The stable806 candidate pool remained 20/50 at that point, and `LTP_STABLE_CASES` remained unchanged at `756 total / 756 unique / 0 duplicate`.
 
 Additional no-promotion note after late actual-bin blocker reprobes:
 
 - The RV FD/VFS/IO reprobe (`chmod04`, `chdir02`, `getcwd05`, `open05`, `open14`, `open15`, `open16`, `close08`, `read03`, `write04`, `write07`, `write08`, `readv03`) produced `0 PASS / 26 FAIL` and zero promotion candidates. Several legacy case names are absent from the current guest bin (`status=-1`), while `open14`, FIFO read/write rows, and other rows show visible blockers. No LA follow-up was run.
 - The RV fcntl actual-bin reprobe (`fcntl24*`, `fcntl25*`, `fcntl26*`, `fcntl31*`, `fcntl32*`, `fcntl33*`, `fcntl34*`, `fcntl36*`, `fcntl37*`, `fcntl38*`, `fcntl39*`) produced `0 PASS / 44 FAIL` with visible `TCONF/TFAIL/TBROK` markers and zero candidates. Tmpfs lease restrictions, `F_GETOWN_EX`, OFD lock commands, capability, and dnotify prerequisites remain real blockers.
 - The RV process/time/signal reprobe produced `10 PASS / 38 FAIL` but the pass rows contain internal `TFAIL` or `TCONF`, and the failing rows include `TBROK` plus four timeouts. The candidate report has zero candidates, so no wrapper PASS row from this run is counted.
-- Stable806 candidate pool remains `20/50`; `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+- Stable806 candidate pool remained `20/50` at that point; `LTP_STABLE_CASES` remained `756 total / 756 unique / 0 duplicate`.
 
 Additional no-promotion note after epoll/eventfd/poll/pselect RV scout:
 
-- The RV scout reports 17 RV candidates, but they are all already in `LTP_STABLE_CASES` and are counted only as adjacent regression evidence. The three new/unstable rows are blocked: `epoll_create01` is pass-with-TCONF, `epoll_create02` has RV musl `TFAIL` plus raw-syscall `TCONF`, and `eventfd06` is `TCONF` due to missing `libaio`. There are therefore `0` new unique stable806 candidates, no LA follow-up, and the candidate pool remains `20/50`.
+- The RV scout reports 17 RV candidates, but they are all already in `LTP_STABLE_CASES` and are counted only as adjacent regression evidence. The three new/unstable rows are blocked: `epoll_create01` is pass-with-TCONF, `epoll_create02` has RV musl `TFAIL` plus raw-syscall `TCONF`, and `eventfd06` is `TCONF` due to missing `libaio`. There were therefore `0` new unique stable806 candidates, no LA follow-up, and the candidate pool remained `20/50` at that point.
+
+
+Additional no-promotion note after generic splice(2) repair:
+
+- Generic `splice(2)` dispatch plus conservative file/pipe/AF_UNIX stream transfer semantics make `splice01`, `splice02`, `splice03`, `splice04`, and `splice05` four-combo clean on RV + LA × musl + glibc. `splice06` remains blocked on writable proc-sysfile semantics, and `splice07` remains pass-with-`TCONF/ENOSYS` because optional fd-fixture syscalls are unsupported. `splice08`/`splice09` are version-gated `TCONF` rows from the initial scout. The stable806 candidate pool is now `25/50`, still below the next milestone; `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.

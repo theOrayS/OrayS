@@ -250,3 +250,25 @@ No source, stable-list, blacklist, evaluator, testsuite, syscall number, struct 
 - Existing eventfd/poll/pselect stable rows remained parser-clean on RV and provide adjacent regression evidence for readiness/timer paths.
 - `epoll_create01`/`epoll_create02` remain excluded because the raw `__NR_epoll_create` variant is unsupported/`TCONF`, and `epoll_create02` additionally fails on musl for invalid-size errno behavior.
 - `eventfd06` remains excluded because its AIO dependency is unavailable in the guest; no `libaio`/AIO compatibility shim or fake PASS was introduced.
+
+## 2026-06-04 generic splice(2) ABI/behavior impact
+
+Source changes in this follow-up add `__NR_splice` dispatch in `examples/shell/src/uspace/syscall_dispatch.rs` and a generic `sys_splice` implementation in `examples/shell/src/uspace/fd_table.rs`.
+
+User-visible behavior changes:
+
+- `splice(2)` no longer falls through to `ENOSYS` for supported file-descriptor combinations.
+- Supported endpoints are regular files, pipes, and connected AF_UNIX local stream sockets; at least one endpoint must be a pipe.
+- Regular-file offsets use the same optional `loff_t *` copy-in/copy-out boundary as `copy_file_range(2)`: null pointers use and advance the current file offset; non-null offsets are validated, reject negative values with `EINVAL`, and are written back only after successful copied bytes.
+- Pipe offsets return `ESPIPE`; unsupported combinations return conservative `EINVAL` or `EBADF` rather than attempting partial device/socket behavior.
+- `O_APPEND` regular-file outputs are rejected with `EINVAL` for `splice(2)` instead of silently appending through `write_file_at` semantics.
+- `SPLICE_F_MOVE`, `SPLICE_F_NONBLOCK`, `SPLICE_F_MORE`, and `SPLICE_F_GIFT` are accepted; unsupported flag bits return `EINVAL`. `MOVE`/`MORE`/`GIFT` are semantic no-ops in this copy-based implementation. `SPLICE_F_NONBLOCK` is honored for empty/full pipe readiness where this fd model can detect it.
+- Inet `SocketEntry` is deliberately not treated as a supported splice stream yet; AF_UNIX `LocalSocketEntry` is supported because the existing local-socket read/write semantics are used by the clean `splice05` evidence. This avoids exposing disconnected inet-socket `ENOTCONN` as an invalid-fd matrix regression.
+
+No syscall number, struct layout, stable-list, blacklist, evaluator, testsuite, signal, futex, mmap, or process-lifetime behavior changed. The implementation does not hardcode LTP case names, paths, process names, or output; it is a generic fd-table syscall surface.
+
+Known boundaries:
+
+- `splice06` still needs real writable `/proc/sys/fs/pipe-max-size` and `/proc/sys/kernel/domainname`-style proc-sysfile semantics before it can be considered.
+- `splice07` is wrapper-PASS only with internal `TCONF/ENOSYS` from optional fd fixtures; those fixture syscalls remain out of scope for this splice repair.
+- `splice08`/`splice09` remain upstream-version-gated `TCONF` rows and are not counted.

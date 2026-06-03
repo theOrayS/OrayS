@@ -37,3 +37,7 @@ No blacklist was added, removed, or used for `setxattr03` or the xattr stable re
 ## xattr special-node / AF_UNIX pathname socket repair
 
 No blacklist was added, removed, or used for `fgetxattr02`, `getxattr02`, `setxattr02`, or the xattr/mknod/socket adjacent regression subset. The candidate evidence comes only from RV + LA × musl + glibc targeted parser-clean logs after generic source fixes and clean adjacent regression. The earlier RV special-node diagnostic and build-fail retry are blocker evidence only. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+## generic splice(2) repair
+
+No blacklist was added, removed, or used for `splice01`..`splice09`. The counted candidate evidence for `splice01`..`splice05` comes only from RV + LA × musl + glibc targeted parser-clean logs after a generic `splice(2)` implementation. `splice06`, `splice07`, `splice08`, and `splice09` remain blocker-only because their logs still contain visible `TCONF`/`ENOSYS` or version-gate markers. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.

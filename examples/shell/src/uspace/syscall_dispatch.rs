@@ -20,8 +20,8 @@ use super::fd_table::{
     sys_flock, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat,
     sys_lseek, sys_mkdirat, sys_mknodat, sys_openat, sys_pread64, sys_preadv, sys_preadv2,
     sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readahead, sys_readv, sys_renameat2,
-    sys_sendfile, sys_signalfd4, sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime,
-    sys_unlinkat, sys_write, sys_writev,
+    sys_sendfile, sys_signalfd4, sys_splice, sys_timerfd_create, sys_timerfd_gettime,
+    sys_timerfd_settime, sys_unlinkat, sys_write, sys_writev,
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
@@ -137,6 +137,15 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_sendfile => {
             sys_sendfile(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
+        general::__NR_splice => sys_splice(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+            tf.arg5(),
+        ),
         general::__NR_readahead => sys_readahead(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_copy_file_range => sys_copy_file_range(
             &process,

@@ -333,3 +333,17 @@ edab940527d7ad965577d6938a96ea539ab1b1f80c3cd23caa93d531403d8a68  target/ltp-100
 0cc6fa9a0faf2a03e1bf51eb34a2463147c8a1e2efd3cc72b79baefd838face7  target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt
 3589ea087dffb6888d0fec91ebde8d409c803921f1597403894d61a3011bc5d6  target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.json
 66ec7b325e919ba612a631a10a42043f92167401a701d9558809663fcb42d751  target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt
+b6c33e59731edd06a70c7cc4c860f07cf82be1d897a07dc8fa734b93fddc3174  target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log
+48f60fd67485d38ac9923eda29d24ae21a5c2ea9d7f8147edff27a92a660baf8  target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.txt
+29d138817d35309c89af005947464152663f504f469d714d579f9f78a985702c  target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.json
+93220bee0ac0a34ecdcaa20c8ea36a7b8c84a1e36a3b10b2c32a896802846435  target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.promotion-candidates.txt
+ed163d69a09ddc0ffcbdf126a42d5745a93449fa7a39354788e948b7ac795c04  target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.status
+912bfad5dbbdbfbab1a9de17013d4248e28a5b36892de48ff051b2c04b2ef636  target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.log
+c3a82bbdbc71279e43fbdfbcedfc372861f978caed5ded17e8607b4e25cb86b7  target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.txt
+8ec7a81e5f63e7665b515899ae257e141e9f97a024db50e236a5bc7bbd80a510  target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.json
+d4d083f3e89a1d588b8cc08e251003cd7075ce5d7205221ff960d81b318e6ed9  target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt
+ed163d69a09ddc0ffcbdf126a42d5745a93449fa7a39354788e948b7ac795c04  target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.status
+19e1257bb9109777954f5185add5e851193b43a0fd7fdc255afbeeaad40409f3  target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.log
+6a8a32972afcd0ccafe77cdbd6428718ced5dbf52fd958537aacf1eef993699b  target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.txt
+703fa0022b23b3ddf0b85f81fc0410192e80566aa71fc8c40a1084b3515b30df  target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.json
+ed163d69a09ddc0ffcbdf126a42d5745a93449fa7a39354788e948b7ac795c04  target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.status

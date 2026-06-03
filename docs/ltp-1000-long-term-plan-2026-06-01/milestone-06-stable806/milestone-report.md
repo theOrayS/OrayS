@@ -24,6 +24,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Documented late RV VFS/MM, process/exec/signal, exec-only, and FD/path scouts. Only `fstat02` and `fstat02_64` reached RV + LA × musl + glibc parser-clean; `mmap05`, close-range/O_TMPFILE/getcwd/creat, kill/process, and exec rows remain blocker-only.
 - Documented RV sync/fd/io and xattr small scouts, then repaired the generic immutable/append-only xattr mutation gap so `setxattr03` is now four-combo clean. Remaining sync/fd/io and xattr scout rows stay blocker-only with visible parser markers.
 - Repaired generic special-inode xattr mutation errno, special-device fd opening for synthetic char/block nodes, and AF_UNIX pathname `bind()` filesystem socket-node creation; `fgetxattr02`, `getxattr02`, and `setxattr02` are now four-combo clean candidates with xattr/mknod/socket adjacent regression evidence.
+- Added generic `splice(2)` dispatch and conservative pipe/file/AF_UNIX stream transfer semantics; `splice01`..`splice05` are now four-combo clean candidates. `splice06` remains blocked by writable proc-sysfile semantics, and `splice07` is wrapper-PASS only with `TCONF/ENOSYS` from unsupported optional fd fixtures, so neither is counted.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -50,6 +51,11 @@ Current new unique stable806 candidates:
 18. `fgetxattr02`
 19. `getxattr02`
 20. `setxattr02`
+21. `splice01`
+22. `splice02`
+23. `splice03`
+24. `splice04`
+25. `splice05`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -144,7 +150,7 @@ Current new unique stable806 candidates:
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset, immutable/append-only xattr mutation semantics, and special-inode xattr/AF_UNIX pathname socket handling, then adds evidence-only FD metadata discovery for `fstat02`/`fstat02_64`. It brings the stable806 candidate pool to 20 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`). The blocker triage intentionally avoids unsafe mmap, readlink, nice, O_TMPFILE, close_range, sync/fd/io, remaining xattr, kill/process, and exec workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, futex bitset, immutable/append-only xattr mutation semantics, and special-inode xattr/AF_UNIX pathname socket handling, then adds evidence-only FD metadata discovery for `fstat02`/`fstat02_64`. It brings the stable806 candidate pool to 25 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`). The blocker triage intentionally avoids unsafe mmap, readlink, nice, O_TMPFILE, close_range, sync/fd/io, remaining xattr, kill/process, and exec workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
 
 
 ## 2026-06-04 xattr special-node / AF_UNIX pathname socket follow-up
@@ -157,7 +163,7 @@ This follow-up converts three previously blocker-only xattr rows into candidate-
 - Adjacent RV xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
 
-The candidate pool is now 20/50 unique cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
+The candidate pool was 20/50 unique cases at that point; the later generic `splice(2)` follow-up raises the current pool to 25/50. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
 
 ## 2026-06-04 late actual-bin blocker reprobes
 
@@ -167,7 +173,7 @@ After the remaining xattr blocker retest, three more RV-only scouts were run to 
 - RV fcntl actual-bin reprobe: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.txt` — `0 PASS / 44 FAIL / TCONF=48 / TFAIL=4 / TBROK=8 / 0 timeout / 0 ENOSYS / 0 panic/trap`; candidate report has `0` candidates.
 - RV process/time/signal reprobe: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt` — `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap`; candidate report has `0` candidates.
 
-Conclusion: these scouts are blocker-only. No LA follow-up was run, no `LTP_STABLE_CASES` update is allowed, and stable806 remains `20/50` candidate-pool cases at baseline `756 total / 756 unique / 0 duplicate`.
+Conclusion: these scouts are blocker-only. No LA follow-up was run, no `LTP_STABLE_CASES` update is allowed, and stable806 remained `20/50` candidate-pool cases at that point, baseline `756 total / 756 unique / 0 duplicate`.
 
 ## 2026-06-04 epoll/eventfd/poll/pselect RV scout
 
@@ -176,4 +182,16 @@ A small RV scout checked current guest-bin epoll/eventfd/poll/pselect rows after
 - RV summary: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt` — `37 PASS / 3 FAIL / TCONF=6 / TFAIL=2 / 0 timeout / 0 ENOSYS / 0 panic/trap`.
 - RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt` — 17 RV candidates are all existing stable rows; the three new rows (`epoll_create01`, `epoll_create02`, `eventfd06`) are blocked.
 
-Conclusion: no LA follow-up and no stable-list change. stable806 remains `20/50` candidate-pool cases, baseline `756 total / 756 unique / 0 duplicate`.
+Conclusion: no LA follow-up and no stable-list change. stable806 remained `20/50` candidate-pool cases at that point, baseline `756 total / 756 unique / 0 duplicate`.
+
+
+## 2026-06-04 generic splice(2) follow-up
+
+This follow-up converts the first five current guest-bin `splice*` rows into candidate-pool evidence after a generic syscall implementation, not by counting the earlier `ENOSYS` scout.
+
+- Targeted RV current-code gate: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.txt` — `10 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` for `splice01`..`splice05` across musl + glibc.
+- Targeted LA current-code gate: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.txt` — same clean `10 PASS / 0 FAIL / 0 internal markers` result.
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt` — five four-combo candidates: `splice01`, `splice02`, `splice03`, `splice04`, `splice05`; blocked/incomplete cases `0`.
+- `splice07` RV retest after conservative invalid-fd errno cleanup: `target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.txt` — wrapper `PASS` on RV but `TCONF=336` and `ENOSYS=336` across optional fd-fixture setup. It is explicitly not promotion evidence.
+
+The candidate pool is now 25/50 unique cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.

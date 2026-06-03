@@ -1316,7 +1316,7 @@ Parser result: RV xattr stable subset is `42 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF
 
 Validation conclusion for this follow-up:
 
-`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool was 17/50 at that point. The later xattr special-node follow-up below raises the current pool to 20/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool was 17/50 at that point. The later xattr special-node follow-up below raised the pool to 20/50, and the later generic `splice(2)` follow-up raises the current pool to 25/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
 
 
 ## xattr special-node / AF_UNIX pathname socket repair
@@ -1383,7 +1383,7 @@ Artifacts:
 
 Parser result: RV adjacent subset is `74 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`; LA adjacent subset is also `74 PASS / 0 FAIL / 0 internal markers`.
 
-Conclusion: `fgetxattr02`, `getxattr02`, and `setxattr02` are added to the stable806 candidate pool with four-combo clean evidence after generic special-node xattr and AF_UNIX pathname socket repairs. Candidate pool is now 20/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+Conclusion: `fgetxattr02`, `getxattr02`, and `setxattr02` were added to the stable806 candidate pool with four-combo clean evidence after generic special-node xattr and AF_UNIX pathname socket repairs. Candidate pool was 20/50 at that point; the later generic `splice(2)` follow-up raises the current pool to 25/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
 
 ## Remaining xattr blocker-only RV retest after special-node repair
 
@@ -1407,7 +1407,7 @@ Artifacts:
 
 Parser result: `0 PASS / 8 FAIL / TCONF=8 / 0 timeout / 0 ENOSYS / 0 panic/trap` across RV musl+glibc. The candidate report has `0` promotion candidates: `fsetxattr02` needs a `brd` driver-backed test device, `getxattr03` reports no supported filesystems after its filesystem filter, `getxattr04` requires `mkfs.xfs`, and `getxattr05` reports missing header/ACL support in the guest. These are environment/feature TCONF blockers, not clean kernel PASS evidence.
 
-Validation conclusion for this follow-up: the stable806 candidate pool remains `20/50` unique cases. No LA follow-up was run because the RV gate is not clean, and no `LTP_STABLE_CASES` update is allowed.
+Validation conclusion for this follow-up: the stable806 candidate pool remained `20/50` unique cases at that point. No LA follow-up was run because the RV gate was not clean, and no `LTP_STABLE_CASES` update was allowed.
 
 ## 2026-06-04 late actual-bin blocker reprobes
 
@@ -1467,7 +1467,7 @@ Artifacts:
 
 Parser result: `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap`. Candidate report: `0` promotion candidates; 24 blocked/incomplete cases. The wrapper-PASS rows (`setsid01`, `getrusage02`, `adjtimex02`, `sched_rr_get_interval03`, `setpriority01`) all contain internal `TFAIL` or `TCONF` markers and are explicitly not counted.
 
-Validation conclusion for these reprobes: stable806 remains at `20/50` candidate-pool cases. No `LTP_STABLE_CASES` update, no LA follow-up, and no promotion commit are allowed from this evidence.
+Validation conclusion for these reprobes: stable806 remained at `20/50` candidate-pool cases at that point. No `LTP_STABLE_CASES` update, no LA follow-up, and no promotion commit are allowed from this evidence.
 
 ## 2026-06-04 epoll/eventfd/poll/pselect RV scout
 
@@ -1488,3 +1488,70 @@ Artifacts:
 - RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt`
 
 Parser result: `37 PASS / 3 FAIL / TCONF=6 / TFAIL=2 / 0 TBROK / 0 timeout / 0 ENOSYS / 0 panic/trap`. The candidate report lists 17 RV candidates, but those rows are all already stable (`eventfd01`..`eventfd05`, `eventfd2_01`..`eventfd2_03`, `poll01`, `poll02`, `ppoll01`, and `pselect01`/`pselect02`/`pselect03` 32/64 variants). New unique rows are `0`: `epoll_create01` is pass-with-TCONF, `epoll_create02` has musl `TFAIL`, and `eventfd06` is `TCONF` due to unavailable `libaio`. No LA follow-up was run.
+
+## 2026-06-04 generic splice(2) repair and gate
+
+Initial RV scout (blocker map; not promotion evidence):
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='splice01 splice02 splice03 splice04 splice05 splice06 splice07 splice08 splice09' LTP_CASE_TIMEOUT_SECS=60 timeout 50m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-splice-scout-20260604T004741+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-splice-scout-20260604T004741+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-06-stable806/rv-splice-scout-20260604T004741+0800.log
+```
+
+Initial parser result: `0 PASS / 18 FAIL`, `TBROK=2`, `TFAIL=342`, `TCONF=342`, `timeout=2`, `ENOSYS=680`, `panic/trap=0`; candidate report had `0` candidates. This was used only to identify the missing generic syscall surface and proc/version/fixture blockers.
+
+Build/format gates after the generic `splice(2)` implementation:
+
+```bash
+cargo fmt --check
+git diff --check
+make A=examples/shell ARCH=riscv64
+```
+
+Result: all passed. The make build refreshed local `kernel-rv`/`kernel-la` generated outputs for validation only; they are not staged.
+
+Current-code RV targeted gate:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='splice01 splice02 splice03 splice04 splice05' LTP_CASE_TIMEOUT_SECS=60 timeout 40m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.promotion-candidates.txt`
+
+Parser result: `10 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` across RV musl + glibc.
+
+Current-code LA targeted gate:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='splice01 splice02 splice03 splice04 splice05' LTP_CASE_TIMEOUT_SECS=60 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.log target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.json`
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt`
+
+Parser result: `10 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` across LA musl + glibc. Combined report has exactly five four-combo candidates: `splice01`, `splice02`, `splice03`, `splice04`, `splice05`; blocked/incomplete `0`.
+
+Blocked splice rows retained explicitly:
+
+- `splice06`: current RV retest still fails with `TCONF=1` per libc because the proc-sys domainname/pipe-max-size write surface is not implemented. No LA follow-up; not counted.
+- `splice07`: after invalid-fd errno cleanup, RV wrapper status is PASS, but both libc rows have `TCONF=168` and `ENOSYS=168` from unsupported optional fd-fixture setup. This is pass-with-internal-markers and not counted.
+- `splice08`/`splice09`: initial scout reports upstream 6.7+ version-gated `TCONF`; not counted.
+
+Conclusion: `splice01`..`splice05` are added to the stable806 candidate pool with four-combo clean evidence. Candidate pool is now `25/50`. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the full +50 gate is not available.
