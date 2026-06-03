@@ -1,18 +1,18 @@
 # milestone-06 current no-promotion reason
 
-This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, and `gettid02` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, and futex bitset repairs. They are only 13 unique new cases and do not satisfy the next 50-case milestone gate.
+This is an interim stable806 checkpoint. The current baseline remains stable756: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, and `futex_wait_bitset01` are now four-combo clean candidates after real timerslack, shared-UTS, VFS path/errno, directory setgid, final-symlink existence, fcntl read-lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, and futex bitset repairs. They are only 14 unique new cases and do not satisfy the next 50-case milestone gate.
 
 Reasons promotion is still blocked at this checkpoint:
 
 1. The old archived 4/4 clean-not-stable seed list has already been exhausted by earlier milestones; no remaining old clean seed exists outside current stable756.
 2. The broader proc/synthetic/sched scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside `prctl08`/`prctl09`.
 3. The time/fd/signal scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside this repair lane.
-4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, and `gettid02` have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, and futex/clone adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
+4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, and `futex_wait_bitset01` have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, and futex/clone adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
 5. No blacklist/SKIP/status0/full-sweep partial TPASS evidence is counted.
 
 Next safe slices:
 
-- Keep `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, and `gettid02` in the stable806 candidate pool and batch them only with enough additional four-combo clean cases to reach the next 50-case milestone.
+- Keep `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, and `futex_wait_bitset01` in the stable806 candidate pool and batch them only with enough additional four-combo clean cases to reach the next 50-case milestone.
 - Keep `nice04` out of the candidate pool unless a principled libc/ABI-compatible errno boundary is found; do not special-case the LTP wrapper.
 - Avoid POSIX timer rows (`timer_create` family) as easy promotions unless the project accepts a real timer-object implementation.
 - Prefer small FD/fcntl/pipe/io or narrowly scoped mmap/futex probes next; avoid readlink LA-musl, statx attribute/env-heavy rows, 16-bit UID/capability rows, and broad socket batches until their blockers have real semantic fixes.
@@ -62,3 +62,8 @@ Additional no-promotion note after mkdir09 futex bitset repair:
 Additional no-promotion note after gettid02 futex/glibc follow-up:
 
 - The same generic futex bitset/glibc pthread repair lane makes `gettid02` four-combo clean on RV and LA. No additional source change was made for this follow-up, and the earlier futex/clone adjacent subset remains the regression boundary for the underlying code change. This raises the candidate pool to 13 new unique cases, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+
+
+Additional no-promotion note after futex_wait_bitset01 follow-up:
+
+- The existing generic futex bitset implementation also makes `futex_wait_bitset01` four-combo clean on RV and LA. The same RV scout shows `futex_wake02`, `futex_wake04`, `futex_cmp_requeue01`, and `futex_cmp_requeue02` still have visible `TBROK`/`TCONF` blockers, and the clone plus FD/vector-IO follow-up scouts add zero candidates because their RV evidence contains visible `TFAIL`/`TBROK`/`TCONF`/`ENOSYS`. This raises the candidate pool to 14 new unique cases, still below the +50 stable806 promotion gate, so `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.

@@ -57,7 +57,7 @@ Covered stable adjacency includes `access*`, `faccessat*`, representative `chmod
 
 ## mkdir09 futex bitset regression boundary
 
-The `mkdir09` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus an 11-case futex/clone adjacent stable subset on both architectures (`22 PASS / 0 FAIL` for RV and `22 PASS / 0 FAIL` for LA).
+The `mkdir09` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs), the later `futex_wait_bitset01` four-combo follow-up evidence, plus an 11-case futex/clone adjacent stable subset on both architectures (`22 PASS / 0 FAIL` for RV and `22 PASS / 0 FAIL` for LA).
 
 Covered stable adjacency includes `futex_wait01` through `futex_wait05`, `futex_wake01`, `futex_wake03`, and representative `clone01`, `clone03`, `clone06`, and `clone07` process/thread boundaries. Future edits in `sys_futex`, futex timeout conversion, futex keying/wake behavior, or process teardown wakeups should rerun this subset before promotion.
 
@@ -66,3 +66,10 @@ Covered stable adjacency includes `futex_wait01` through `futex_wait05`, `futex_
 `gettid02` is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs). No source change was added after the futex bitset patch, so the code-regression boundary remains the futex/clone adjacent subset already run for the `mkdir09` repair (`22 PASS / 0 FAIL` on RV and `22 PASS / 0 FAIL` on LA).
 
 Future changes to `sys_futex`, thread teardown, pthread join compatibility, or `gettid`/TID allocation must rerun `gettid02` plus the futex/clone adjacent subset before counting this candidate toward a stable milestone.
+
+
+## futex_wait_bitset01 follow-up regression boundary
+
+`futex_wait_bitset01` is protected by RV + LA × musl + glibc targeted evidence (`4 PASS / 0 FAIL` across the RV futex scout row and the LA follow-up log). No additional source changed after the generic futex bitset patch, so the code-regression boundary remains `sys_futex`, futex timeout conversion, futex keying/wake behavior, and process/thread teardown wakeups.
+
+The same RV scout keeps `futex_wake02`, `futex_wake04`, `futex_cmp_requeue01`, and `futex_cmp_requeue02` out of the candidate pool because their evidence has visible `TBROK`/`TCONF` markers. The RV clone and FD/vector-IO scouts are also blocker-only. Future work on selective wake, requeue, clone flags, or vector I/O must rerun their targeted rows plus the stable futex/clone or FD adjacent subset before promotion.
