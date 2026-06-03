@@ -158,3 +158,13 @@ This follow-up converts three previously blocker-only xattr rows into candidate-
 - Adjacent LA xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
 
 The candidate pool is now 20/50 unique cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
+
+## 2026-06-04 late actual-bin blocker reprobes
+
+After the remaining xattr blocker retest, three more RV-only scouts were run to avoid relying on stale case names and to map the next blocker surface. They produced no promotion candidates and did not change code or the stable list.
+
+- RV FD/VFS/IO reprobe: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.summary.txt` — `0 PASS / 26 FAIL / TCONF=4 / TBROK=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`; candidate report has `0` candidates.
+- RV fcntl actual-bin reprobe: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.txt` — `0 PASS / 44 FAIL / TCONF=48 / TFAIL=4 / TBROK=8 / 0 timeout / 0 ENOSYS / 0 panic/trap`; candidate report has `0` candidates.
+- RV process/time/signal reprobe: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt` — `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap`; candidate report has `0` candidates.
+
+Conclusion: these scouts are blocker-only. No LA follow-up was run, no `LTP_STABLE_CASES` update is allowed, and stable806 remains `20/50` candidate-pool cases at baseline `756 total / 756 unique / 0 duplicate`.

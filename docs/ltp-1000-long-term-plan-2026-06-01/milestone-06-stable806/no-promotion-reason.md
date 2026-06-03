@@ -92,3 +92,10 @@ Additional no-promotion note after xattr special-node/AF_UNIX pathname socket re
 Additional no-promotion note after remaining xattr blocker-only retest:
 
 - The RV retest of `fsetxattr02`, `getxattr03`, `getxattr04`, and `getxattr05` after the special-node repair still produced `0 PASS / 8 FAIL / TCONF=8`, with zero promotion candidates. These rows remain blocked by missing test-device/filesystem/toolchain/header/ACL prerequisites and are not counted. The stable806 candidate pool remains 20/50, and `LTP_STABLE_CASES` remains unchanged at `756 total / 756 unique / 0 duplicate`.
+
+Additional no-promotion note after late actual-bin blocker reprobes:
+
+- The RV FD/VFS/IO reprobe (`chmod04`, `chdir02`, `getcwd05`, `open05`, `open14`, `open15`, `open16`, `close08`, `read03`, `write04`, `write07`, `write08`, `readv03`) produced `0 PASS / 26 FAIL` and zero promotion candidates. Several legacy case names are absent from the current guest bin (`status=-1`), while `open14`, FIFO read/write rows, and other rows show visible blockers. No LA follow-up was run.
+- The RV fcntl actual-bin reprobe (`fcntl24*`, `fcntl25*`, `fcntl26*`, `fcntl31*`, `fcntl32*`, `fcntl33*`, `fcntl34*`, `fcntl36*`, `fcntl37*`, `fcntl38*`, `fcntl39*`) produced `0 PASS / 44 FAIL` with visible `TCONF/TFAIL/TBROK` markers and zero candidates. Tmpfs lease restrictions, `F_GETOWN_EX`, OFD lock commands, capability, and dnotify prerequisites remain real blockers.
+- The RV process/time/signal reprobe produced `10 PASS / 38 FAIL` but the pass rows contain internal `TFAIL` or `TCONF`, and the failing rows include `TBROK` plus four timeouts. The candidate report has zero candidates, so no wrapper PASS row from this run is counted.
+- Stable806 candidate pool remains `20/50`; `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.

@@ -248,3 +248,25 @@ Additional remaining xattr blocker-only retest artifacts:
 - RV remaining xattr blocker retest log: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.log`
 - RV remaining xattr blocker retest summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt`
 - RV remaining xattr blocker retest candidate report: `target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt`
+
+## 2026-06-04 late actual-bin blocker reprobes
+
+These RV-only reprobes used case names confirmed against the current guest image where possible and are blocker-only evidence. They do not change the stable806 candidate pool (`20/50`) and do not justify an LA follow-up because the RV gate has zero parser-clean candidates.
+
+| Scout | Cases | Parser result | Candidate result | Promotion decision |
+| --- | ---: | --- | --- | --- |
+| FD/VFS/IO reprobe | 13 | `0 PASS / 26 FAIL / TCONF=4 / TBROK=4 / 0 timeout / 0 ENOSYS / 0 panic/trap` | `0` RV candidates; 13 blocked/incomplete | Excluded. Several legacy names are absent from the current guest bin (`status=-1`), `open14` is O_TMPFILE `TCONF`, and FIFO read/write rows are `TBROK`. |
+| fcntl actual-bin reprobe | 22 | `0 PASS / 44 FAIL / TCONF=48 / TFAIL=4 / TBROK=8 / 0 timeout / 0 ENOSYS / 0 panic/trap` | `0` RV candidates; 22 blocked/incomplete | Excluded. Lease/dnotify/cap/OFD-lock rows still expose real feature or errno blockers. |
+| process/time/signal reprobe | 24 | `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap` | `0` RV candidates; 24 blocked/incomplete | Excluded. Wrapper PASS rows contain internal `TCONF` or `TFAIL`, and several signal/tgkill/getrusage rows fail or timeout. |
+
+Additional late blocker-only artifacts:
+
+- RV FD/VFS/IO reprobe log: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.log`
+- RV FD/VFS/IO reprobe summary: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.summary.txt`
+- RV FD/VFS/IO candidate report: `target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.promotion-candidates.txt`
+- RV fcntl actual-bin reprobe log: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.log`
+- RV fcntl actual-bin reprobe summary: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.txt`
+- RV fcntl actual-bin candidate report: `target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.promotion-candidates.txt`
+- RV process/time/signal reprobe log: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.log`
+- RV process/time/signal reprobe summary: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt`
+- RV process/time/signal candidate report: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.promotion-candidates.txt`

@@ -98,3 +98,13 @@ Covered stable adjacency includes existing `fgetxattr*`, `flistxattr*`, `fremove
 The `fgetxattr02`/`getxattr02`/`setxattr02` repair is protected by targeted RV + LA × musl + glibc evidence (`12 PASS / 0 FAIL` across the two targeted architecture logs) plus a 37-case adjacent xattr/mknod/socket stable subset on both architectures (`74 PASS / 0 FAIL` for RV and `74 PASS / 0 FAIL` for LA).
 
 Covered stable adjacency includes existing `fgetxattr*`, `flistxattr*`, `fremovexattr*`, `fsetxattr01`, `getxattr01`, `lgetxattr*`, `listxattr*`, `llistxattr*`, `lremovexattr01`, `removexattr*`, `setxattr01`, representative `mknod*`/`mknodat01`, and socket creation/option/socketpair rows. Future edits in special inode metadata, `FdTable::mknodat`, `FdTable::openat`, xattr mutation guards, or AF_UNIX pathname `bind()` should rerun these three targeted cases plus this adjacent subset before promotion.
+
+## 2026-06-04 late actual-bin blocker reprobes regression boundary
+
+These reprobes add no new candidate-regression boundary because they were blocker-only. Future work should treat them as focused blocker maps:
+
+| Area | Current blocker evidence | Required before reconsidering promotion |
+| --- | --- | --- |
+| FD/VFS/IO late reprobe | `0 PASS / 26 FAIL`, missing-current-bin/status `-1` rows, O_TMPFILE `TCONF`, FIFO `TBROK` | Use current guest-bin names only; fix generic semantics, then rerun RV + LA × musl + glibc before counting. |
+| fcntl uncovered rows | `0 PASS / 44 FAIL`, `TCONF/TFAIL/TBROK` in lease/OFD/dnotify/cap rows | Implement real feature/errno behavior or document unsupported scope; rerun targeted fcntl rows plus existing stable fcntl subset. |
+| process/time/signal late reprobe | `10 PASS / 38 FAIL`, pass-with-internal-marker rows, 4 timeouts | Fix signal/process/session/rusage/prctl semantics and timeout roots first; wrapper PASS with internal markers remains disallowed. |
