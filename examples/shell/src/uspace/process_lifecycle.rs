@@ -46,6 +46,19 @@ macro_rules! user_trace {
     ($($arg:tt)*) => {};
 }
 
+fn initial_path_modes() -> BTreeMap<String, u32> {
+    let mut modes = BTreeMap::new();
+    // The ramfs mount at /tmp should behave like a normal Linux temporary
+    // directory for user programs that switch credentials and then create
+    // scratch subdirectories.  The LTP runner's TMPDIR is a shared scratch root
+    // created by the kernel-side harness before each case; seed it with the
+    // same world-writable sticky mode so forked/setuid test children inherit a
+    // writable view instead of the backing ramfs default directory mode.
+    modes.insert(String::from("/tmp"), 0o1777);
+    modes.insert(String::from("/tmp/ltp-work"), 0o1777);
+    modes
+}
+
 pub(super) struct ProcessTeardown {
     done: AtomicBool,
 }
@@ -240,7 +253,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         sched_state: Mutex::new(default_sched_state()),
         nice: AtomicI32::new(0),
         signal_actions: Mutex::new(BTreeMap::new()),
-        path_modes: Mutex::new(BTreeMap::new()),
+        path_modes: Mutex::new(initial_path_modes()),
         path_inodes: Mutex::new(BTreeMap::new()),
         path_special_modes: Mutex::new(BTreeMap::new()),
         path_rdevs: Mutex::new(BTreeMap::new()),

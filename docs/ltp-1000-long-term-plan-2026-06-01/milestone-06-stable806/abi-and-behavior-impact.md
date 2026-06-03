@@ -71,7 +71,7 @@ Unchanged boundaries:
 
 - `unlink` of non-directory final symlinks remains governed by the existing non-following final-component removal semantics.
 - No FD table layout, FD_CLOEXEC, file status flag, signal, futex, mmap, user-pointer ABI, struct layout, or syscall number behavior changed.
-- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir02`, `mkdir03`, `mkdir09`, `mknod07`, `mknodat02`, `symlink03`, and `unlink09` blockers retain visible parser markers and are not counted.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir09`, `mknod07`, `mknodat02`, and `unlink09` blockers retain visible parser markers and are not counted until separately repaired.
 
 ## mkdir setgid and final symlink existence repair impact
 
@@ -106,3 +106,22 @@ Unchanged boundaries:
 - The patch does not hardcode LTP case names, paths, process names, or expected output. It applies a generic access-mode rule before recording a read lease.
 
 Follow-up `fcntl27_64` validation made no additional source changes. It demonstrates that the same visible errno rule also covers the 64-bit LTP variant; syscall numbers, struct layouts, FD flags, signal/futex/mmap behavior, and user-pointer copying remain unchanged beyond the generic `F_SETLEASE` access-mode rule above.
+
+
+
+## symlink03 tmpdir and parent permission repair impact
+
+This source patch changes real path metadata and `symlinkat` errno behavior; it is not a stable-list promotion and does not edit `LTP_STABLE_CASES`.
+
+User-visible syscall/path changes:
+
+- Newly loaded user programs seed per-process path mode metadata for `/tmp` and `/tmp/ltp-work` as `01777` so setuid/forked test children can create scratch subdirectories under the shared temporary root like a normal Linux tmpdir.
+- `symlinkat` now checks the resolved parent path with the generic parent write/search/type permission helper before recording a synthetic symlink.
+- Symlink creation under a parent directory lacking write/search permission now returns the generic permission error (`EACCES`) instead of silently creating the link.
+- Symlink creation through a non-directory parent component now returns `ENOTDIR` through the same helper before synthetic link insertion.
+
+Unchanged boundaries:
+
+- Final symlink creation semantics remain non-following for the new link name; the change checks only the parent path before creation.
+- No syscall numbers, struct layouts, FD table layout, `FD_CLOEXEC`, file status flags, signal delivery, futex behavior, mmap behavior, user-pointer copy semantics, blacklist, or evaluator behavior changed.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. `/tmp` and `/tmp/ltp-work` are generic harness scratch roots and receive standard Linux tmpdir permissions rather than test-result-specific behavior.

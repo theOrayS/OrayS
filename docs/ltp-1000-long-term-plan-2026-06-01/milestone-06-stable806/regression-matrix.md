@@ -7,7 +7,7 @@ This checkpoint changed timerslack/prctl/proc behavior and default UTS hostname 
 | timerslack / prctl | `prctl08`, `prctl09` RV + LA × musl + glibc parser-clean | Adjacent stable `prctl01`, `prctl05` and representative `PR_SET_NAME/PR_GET_NAME` rows if available |
 | proc synthetic file plumbing | `/proc/self/timerslack_ns`, `/proc/<pid>/timerslack_ns` read/write/stat covered by `prctl08` | Existing `/proc` stable rows such as `proc01`, `uname01`, `uname02`, `newuname01`, `utsname01`, `utsname04` |
 | UTS hostname sharing | `utsname02` RV + LA × musl + glibc parser-clean; adjacent `gethostname01,sethostname01,sethostname02,sethostname03,uname01,uname02,uname04,newuname01,utsname01,utsname04` clean on RV+LA | Keep `CLONE_NEWUTS`/`unshare(CLONE_NEWUTS)` rows blocked until a real UTS namespace implementation exists; do not count `utsname03` |
-| VFS parent symlink / rmdir errno | `mkdirat02`, `rmdir02` RV + LA × musl + glibc parser-clean; adjacent stable `mkdir/rmdir/unlink/symlink/mknod/rename` subset clean on RV+LA | Keep remaining `mkdir02`, `mkdir03`, `mkdir09`, `mknod07`, `mknodat02`, `symlink03`, `unlink09` rows blocked until their visible `TFAIL/TBROK/TCONF` causes are fixed. |
+| VFS parent symlink / rmdir errno | `mkdirat02`, `rmdir02` RV + LA × musl + glibc parser-clean; adjacent stable `mkdir/rmdir/unlink/symlink/mknod/rename` subset clean on RV+LA | Keep remaining `mkdir09`, `mknod07`, `mknodat02`, and `unlink09` rows blocked until their visible `TFAIL/TBROK/TCONF` causes are fixed. |
 | priority/nice/rlimit | Not changed | `getpriority01`, `getpriority02`, `setpriority02`, `setrlimit01`, `setrlimit03`, `setrlimit05` if future priority fixes are batched |
 | time/signal wait | Not changed | `clock_gettime04`, `nanosleep01`, `getitimer01`, `getitimer02`, `setitimer02`, `sigsuspend01`, `sigaction02`, `rt_sigprocmask01`, `sigprocmask01` if future time/signal fixes are batched |
 | epoll/eventfd/timerfd | Not changed | milestone-05 promoted epoll/eventfd/timerfd/signalfd cases plus `poll01`, `pipe01`, `pipe06`, `pipe2_01`, `pipe2_02` if future fd fixes are batched |
@@ -40,3 +40,11 @@ Covered stable adjacency includes chmod/fchmod/fchmodat, chown/fchown/fchownat, 
 The `fcntl27`/`fcntl27_64` repair is protected by targeted RV + LA × musl + glibc evidence for `fcntl27` and `fcntl27_64` (`8 PASS / 0 FAIL` across the two targeted candidate pairs) plus all current stable `fcntl*` rows and `fcntl27` on both architectures (`98 PASS / 0 FAIL` for RV and `98 PASS / 0 FAIL` for LA). `fcntl27_64` required no extra source change beyond the same generic lease access rule.
 
 Covered stable adjacency includes `F_DUPFD`, `F_GETFD`/`F_SETFD`, `F_GETFL`/`F_SETFL`, record locking (`F_GETLK`, `F_SETLK`, `F_SETLKW`), lease read-only success (`fcntl23`, `fcntl23_64`), and OFD/lock stress rows. Future edits in `FdTable::fcntl`, `fcntl_getlease`, or `fcntl_setlease` should rerun this subset before promotion.
+
+
+
+## symlink03 tmpdir/parent-permission regression boundary
+
+The `symlink03` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus a 20-case adjacent stable symlink/access/readlink/link/unlink/rmdir/mkdir subset on both architectures (`40 PASS / 0 FAIL` for RV and `40 PASS / 0 FAIL` for LA).
+
+Covered stable adjacency includes `access*`, `faccessat*`, representative `chmod*`, `symlink*`, `symlinkat01`, `readlink*`, `link*`, `unlinkat01`, `rmdir01`, and `mkdir04`. Future edits in `initial_path_modes`, `check_parent_write_search_permission`, `sys_symlinkat`, or path-mode/chmod permission handling should rerun this subset before promotion.
