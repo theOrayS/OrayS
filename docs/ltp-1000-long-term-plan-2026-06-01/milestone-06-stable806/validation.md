@@ -197,3 +197,138 @@ Result:
 ## Validation conclusion
 
 The original two RV scouting batches remain blocker maps. After the generic timerslack repair, `prctl08` and `prctl09` are parser-clean on RV + LA × musl + glibc and are recorded as promotion candidates for a later stable806 batch. They are not added to `LTP_STABLE_CASES` in this commit because milestone-06 still lacks the next 50-case clean cohort and adjacent stable-regression gate. No blacklist/SKIP/status0/full-sweep partial row is counted toward stable806.
+
+## RV socket broad scout (partial/blocker evidence only)
+
+A broad socket-core scout was attempted after the timerslack repair to identify the next lane. The run is explicitly **not promotion evidence** because glibc `accept02` reached `The futex facility returned an unexpected error code.` and the QEMU process was terminated by the leader to avoid an unbounded hang.
+
+Command shape:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='accept02,accept03,accept4_01,bind01,bind02,bind03,bind04,bind05,bind06,connect01,connect02,getsockopt02,setsockopt02,setsockopt03,setsockopt04,setsockopt05,setsockopt06,recv01,recvfrom01,recvmsg01,send01,send02,sendto01,sendto02,sendto03,sockioctl01' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+```
+
+Artifacts:
+
+- Partial raw log: `target/ltp-1000-milestone-06-stable806/rv-socket-core-scout-20260603T184807+0800.log`
+- Partial summary: `target/ltp-1000-milestone-06-stable806/rv-socket-core-scout-20260603T184807+0800.partial-summary.txt`
+- Partial JSON: `target/ltp-1000-milestone-06-stable806/rv-socket-core-scout-20260603T184807+0800.partial-summary.json`
+- Partial candidate report: `target/ltp-1000-milestone-06-stable806/rv-socket-core-scout-20260603T184807+0800.partial-promotion-candidates.txt`
+
+Parser result from the partial log:
+
+- PASS LTP CASE: 4
+- FAIL LTP CASE: 22
+- Internal signals: `{'TCONF': 23, 'TFAIL': 12, 'TBROK': 17}`
+- timeout matches: 0
+- ENOSYS/not implemented matches: 12
+- panic/trap matches: 0
+- Promotion candidates: 0
+
+Conclusion: socket rows remain blocker/scouting material only; no partial TPASS, blacklist, or unknown glibc state is counted.
+
+## UTS shared-hostname repair and targeted retest
+
+The upstream LTP `utsname02` container test checks that two plain forked processes share the same UTS hostname: child 1 calls `sethostname("LTP_HOSTNAME")`, then child 2 must observe that hostname through `gethostname()`. The local model previously copied `hostname: Mutex<String>` during `fork()`, so sibling processes saw stale per-process hostnames.
+
+The repair changes `UserProcess::hostname` to `Arc<Mutex<String>>` and makes `fork()` share the same Arc for plain processes. This models the default shared UTS namespace without implementing `CLONE_NEWUTS`.
+
+RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='utsname01,utsname02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.log
+```
+
+RV artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.promotion-candidates.txt`
+
+RV parser result:
+
+- PASS LTP CASE: 4
+- FAIL LTP CASE: 0
+- Internal signals: `{}`
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+- RV-only promotion candidates: 2 (`utsname01`, `utsname02`); `utsname01` is already stable and is regression coverage, so only `utsname02` is a new unique candidate.
+
+LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='utsname01,utsname02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.log
+```
+
+LA artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.summary.json`
+- LA-only candidate report: `target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.promotion-candidates.txt`
+
+LA parser result:
+
+- PASS LTP CASE: 4
+- FAIL LTP CASE: 0
+- Internal signals: `{}`
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+- LA-only promotion candidates: 2 (`utsname01`, `utsname02`); only `utsname02` is new unique evidence.
+
+Combined four-combo candidate report:
+
+```bash
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la \
+  target/ltp-1000-milestone-06-stable806/rv-utsname-shared-hostname-20260603T190100+0800.log \
+  target/ltp-1000-milestone-06-stable806/la-utsname-shared-hostname-20260603T190234+0800.log
+```
+
+Artifact: `target/ltp-1000-milestone-06-stable806/rv-la-utsname-shared-hostname-20260603T190408+0800.promotion-candidates.txt`
+
+Result: 2 four-combo clean rows (`utsname01`, `utsname02`), where `utsname02` is the new unique stable806 candidate.
+
+## UTS adjacent stable regression subset
+
+The UTS/hostname repair affects visible `sethostname`, `gethostname`, and `uname` nodename behavior. The leader therefore ran the adjacent stable subset on RV and LA before committing the patch:
+
+```bash
+CASES='gethostname01,sethostname01,sethostname02,sethostname03,uname01,uname02,uname04,newuname01,utsname01,utsname04'
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="$CASES" LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="$CASES" LTP_CASE_TIMEOUT_SECS=45 timeout 60m ./run-eval.sh la
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-utsname-adjacent-regression-20260603T190435+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-utsname-adjacent-regression-20260603T190435+0800.summary.txt`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-utsname-adjacent-regression-20260603T190701+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-utsname-adjacent-regression-20260603T190701+0800.summary.txt`
+
+Parser result:
+
+- RV: `20 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `20 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+
+## UTS local verification
+
+```bash
+cargo fmt -- --check
+cargo check -p arceos-shell
+```
+
+Result: both passed before QEMU targeted gates. Stable list remained `756 total / 756 unique / 0 duplicate`; no stable list edit was made.
+
+
+## Updated validation conclusion after UTS repair
+
+`utsname02` is now a new unique stable806 candidate with RV + LA × musl + glibc parser-clean evidence. The adjacent stable UTS/hostname/uname subset is parser-clean on both architectures. The current candidate pool is therefore `prctl08`, `prctl09`, and `utsname02` (3 new unique cases). `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` because the next milestone commit requires a full +50 unique clean cohort. Socket scout evidence remains blocker-only and contributes zero candidates.

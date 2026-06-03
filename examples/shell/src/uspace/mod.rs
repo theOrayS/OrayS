@@ -81,7 +81,7 @@ struct UserProcess {
     cwd: Mutex<String>,
     exec_root: Mutex<String>,
     exec_path: Mutex<String>,
-    hostname: Mutex<String>,
+    hostname: Arc<Mutex<String>>,
     prctl_name: Mutex<String>,
     children: Mutex<Vec<ChildTask>>,
     child_exit_wait: WaitQueue,
