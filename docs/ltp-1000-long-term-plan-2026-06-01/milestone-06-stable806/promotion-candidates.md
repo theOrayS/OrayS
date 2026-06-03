@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 11/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `fcntl27` | RV + LA × musl + glibc targeted parser-clean after returning `EAGAIN` for read leases on write-open descriptors | candidate pool |
 | `fcntl27_64` | RV + LA × musl + glibc targeted parser-clean from the same generic `F_SETLEASE` read-lease access rule | candidate pool |
 | `symlink03` | RV + LA × musl + glibc targeted parser-clean after Linux-like tmpdir metadata seed plus generic symlink parent write/search/type permission checks | candidate pool |
+| `unlink09` | RV + LA × musl + glibc targeted parser-clean after generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` inode-flag support and immutable/append-only unlink `EPERM` checks | candidate pool |
 
 Evidence artifacts:
 
@@ -93,7 +94,7 @@ Additional fcntl27 read-lease evidence artifacts:
 | `nice04` | RV glibc clean; RV musl `TFAIL` with `EACCES` instead of `EPERM` | Shared `setpriority` semantics would be endangered by a kernel-only wrapper special case. |
 | `statx01,statx04..statx12` | RV scout has `TCONF`, wrapper FAILs, and `statx11` timeouts | Zero RV-only candidates; not safe promotion evidence. |
 | `gettid02`, `*_16`, `capget*`, `capset*` | RV scout has one musl-only pass, glibc `gettid02` `TBROK`, and 16-bit UID/capability `TCONF` rows | Zero RV-only candidates; needs futex/glibc or unsupported-ABI lane work before reconsideration. |
-| `unlink09`..`select04` VFS/FD/select scout | RV scout has `9 PASS / 45 FAIL`, `TBROK/TCONF/TFAIL`, and four `fcntl17*` timeouts | Zero RV-only candidates from the broad scout; later targeted repair makes `fcntl27` and same-source `fcntl27_64` valid candidates. `select*` pass-with-TCONF rows and timeout/TFAIL/TBROK rows are not promotion evidence. |
+| `unlink09`..`select04` VFS/FD/select scout | RV scout has `9 PASS / 45 FAIL`, `TBROK/TCONF/TFAIL`, and four `fcntl17*` timeouts | Zero RV-only candidates from the broad scout; later targeted repairs make `fcntl27`, same-source `fcntl27_64`, `symlink03`, and `unlink09` valid candidates. The broad scout itself and remaining `select*` pass-with-TCONF rows plus timeout/TFAIL/TBROK rows are not promotion evidence. |
 | `mkdir09` isolation scout | RV isolation scout after the mkdir repair still has a glibc `mkdir09` futex abort | Blocker-only; not counted as a stable806 candidate. Earlier `symlink03` blocker rows are superseded by the later parent-permission repair and clean RV/LA evidence above. |
 
 Excluded evidence artifacts:
@@ -124,3 +125,17 @@ Additional symlink03 parent-permission evidence artifacts:
 - Combined RV+LA symlink03 candidate report: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.combined-promotion-candidates.txt`
 - RV symlink/path-permission adjacent regression summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.summary.txt`
 - LA symlink/path-permission adjacent regression summary: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.summary.txt`
+
+Additional unlink09 FS_IOC inode-flag evidence artifacts:
+
+- RV unlink09 pre-fix diagnostic summary: `target/ltp-1000-milestone-06-stable806/rv-unlink09-after-symlink03-perms-20260603T215126+0800.summary.txt` — `0 PASS / 2 FAIL / TBROK=2`, not promotion evidence.
+- RV unlink09 targeted log: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.log`
+- RV unlink09 summary: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.summary.txt`
+- RV unlink09 candidate report: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-flags-fix-20260603T215832+0800.promotion-candidates.txt`
+- LA unlink09 targeted log: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.log`
+- LA unlink09 summary: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.summary.txt`
+- LA unlink09 candidate report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.promotion-candidates.txt`
+- Combined unlink09 candidate report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-flags-fix-20260603T220000+0800.combined-promotion-candidates.txt`
+- RV unlink09 adjacent regression summary: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt`
+- LA unlink09 adjacent regression summary: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt`
+- Combined adjacent report: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.combined-promotion-candidates.txt`

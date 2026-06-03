@@ -1997,6 +1997,31 @@ pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize
             return write_default_winsize(process, arg);
         }
     }
+    if req as u32 == ioctl::FS_IOC_GETFLAGS || req as u32 == ioctl::FS_IOC_SETFLAGS {
+        let path = {
+            let table = process.fds.lock();
+            match table.entry(fd as i32) {
+                Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
+                Err(err) => return neg_errno(err),
+            }
+        };
+        let Some(path) = path else {
+            return neg_errno(LinuxError::ENOTTY);
+        };
+        if req as u32 == ioctl::FS_IOC_GETFLAGS {
+            let flags = process.path_inode_flags(path.as_str());
+            return write_user_value(process, arg, &flags);
+        }
+        if process.path_on_readonly_mount(path.as_str()) {
+            return neg_errno(LinuxError::EROFS);
+        }
+        let flags: u32 = match read_user_value(process, arg) {
+            Ok(flags) => flags,
+            Err(err) => return neg_errno(err),
+        };
+        process.set_path_inode_flags(path, flags);
+        return 0;
+    }
     neg_errno(LinuxError::ENOTTY)
 }
 
@@ -3148,9 +3173,11 @@ impl FdTable {
                     return Err(LinuxError::ENOTDIR);
                 }
                 let st = stat_absolute_path(process, backing_path.as_str())?;
+                check_inode_flags_allow_unlink(process, backing_path.as_str())?;
                 check_sticky_parent_permission(process, &parent_st, &st)?;
                 process.remove_path_hardlink(abs_path.as_str());
                 process.remove_path_inode(abs_path.as_str());
+                process.remove_path_inode_flags(abs_path.as_str());
                 process.remove_path_special_mode(abs_path.as_str());
                 process.remove_path_rdev(abs_path.as_str());
                 process.remove_path_times(abs_path.as_str());
@@ -3168,6 +3195,7 @@ impl FdTable {
             }
         };
         if let Some(st) = target_st.as_ref() {
+            check_inode_flags_allow_unlink(process, abs_path.as_str())?;
             check_sticky_parent_permission(process, &parent_st, st)?;
         }
         if process.path_symlink(abs_path.as_str()).is_some() {
@@ -3175,6 +3203,7 @@ impl FdTable {
                 return Err(LinuxError::ENOTDIR);
             }
             process.remove_path_symlink(abs_path.as_str());
+            process.remove_path_inode_flags(abs_path.as_str());
             process.remove_path_times(abs_path.as_str());
             return Ok(());
         }
@@ -3189,6 +3218,7 @@ impl FdTable {
         if removed.is_ok() {
             process.remove_path_hardlink(abs_path.as_str());
             process.remove_path_inode(abs_path.as_str());
+            process.remove_path_inode_flags(abs_path.as_str());
             process.remove_path_special_mode(abs_path.as_str());
             process.remove_path_rdev(abs_path.as_str());
             process.remove_path_times(abs_path.as_str());
@@ -4758,6 +4788,15 @@ fn check_sticky_parent_permission(
         Ok(())
     } else {
         Err(LinuxError::EPERM)
+    }
+}
+
+fn check_inode_flags_allow_unlink(process: &UserProcess, path: &str) -> Result<(), LinuxError> {
+    let flags = process.path_inode_flags(path);
+    if flags & (general::FS_IMMUTABLE_FL | general::FS_APPEND_FL) != 0 {
+        Err(LinuxError::EPERM)
+    } else {
+        Ok(())
     }
 }
 
