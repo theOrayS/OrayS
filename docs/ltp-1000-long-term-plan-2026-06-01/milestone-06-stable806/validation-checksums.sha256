@@ -208,3 +208,12 @@ e8980bff6c42577da358680fe9d4b7831071d8d1a83db989fe5a052ace7dadb0  target/ltp-100
 66ed027fb628a97e8392c84334f3414d082231c43d77f373f446a143e93f39e9  target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.promotion-candidates.txt
 35062ddcbe4a545c6257681f96deefaaf66450824aa6d05aa6035f4aa52c738c  target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.json
 a6831be1b922323ad3e95991f913e4533aa075bf3022ca3cc637036d2731c0e5  target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.txt
+fe795a1dd484acfb65610ffafe632b0644cbcf069283a98eb79d923a4e5ab911  target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.log
+d947599bb2a61df440c92f271e6a16173377e432ca3368139b4ae803e783a5d2  target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.txt
+d50eea17d719094fc7fcfdbf4dddfd0849aa92d9dca42ee994399822bbd49ffc  target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.json
+eee6388aad940a573b3b2872eedf0400767dedb1666f8f5fb80c5a8679f9f0f9  target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.promotion-candidates.txt
+2c8229a990d306b662ea372c9de670d8e3038e8744fb40fd2576d764c26b2b9c  target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.log
+0a1b7af23ac1ba3c4aeab1f169f565bc9c84c6ee5ccf5549fe916cfc0fe44eba  target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt
+4a4d1e6cd410484d4cd74dc61b724eefc25c6d3c34b299e4efb63f6029499b81  target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.json
+45c6d478c6f317d44816733f65cf1c400dc988974b555716ad99f659c5bd1682  target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt
+75c716ca9eced51ba3ed2ff0ef1b978a5bcc61957753ffc793ee31806fefd724  target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt

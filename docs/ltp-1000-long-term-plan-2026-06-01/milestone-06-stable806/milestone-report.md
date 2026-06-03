@@ -19,6 +19,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Seeded Linux-like `01777` metadata for `/tmp` and `/tmp/ltp-work`, then made `symlinkat` use the generic parent write/search/type permission gate before recording synthetic symlinks; this makes `symlink03` four-combo clean without hardcoding the case or path.
 - Added generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` handling plus immutable/append-only unlink `EPERM` checks; this makes `unlink09` four-combo clean without hardcoding the case or output.
 - Added generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support; this makes glibc `mkdir09` four-combo clean without hardcoding the case or output.
+- Confirmed the same futex bitset/glibc pthread repair lane also makes `gettid02` four-combo clean; no extra source change was needed.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -37,6 +38,7 @@ Current new unique stable806 candidates:
 10. `symlink03`
 11. `unlink09`
 12. `mkdir09`
+13. `gettid02`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -94,6 +96,9 @@ Current new unique stable806 candidates:
 - Combined mkdir09 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-mkdir09-futex-bitset-fix-promotion-candidates.txt` — four-combo candidate `mkdir09`.
 - Adjacent RV futex/clone regression: `target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.summary.txt` — `22 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA futex/clone regression: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.txt` — `22 PASS / 0 FAIL / 0 internal markers`.
+- gettid02 targeted RV after futex bitset repair: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- gettid02 targeted LA after futex bitset repair: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt` — same clean `2 PASS / 0 FAIL / 0 internal markers` result.
+- Combined gettid02 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt` — four-combo candidate `gettid02`.
 
 ## Risks and boundaries
 
@@ -102,11 +107,11 @@ Current new unique stable806 candidates:
 - Socket scout rows remain visibly blocked or incomplete and cannot be promoted.
 - `readlink03`/`readlinkat02` remain blocked on LA musl wrapper behavior; rejecting all one-byte buffers in-kernel is not acceptable.
 - `nice04` remains blocked on libc-visible errno differences around priority lowering; do not risk stable `setpriority` rows with a wrapper-specific kernel special case.
-- Statx, 16-bit UID, capability, and glibc `gettid02` rows remain blocker-only until real semantics or futex/glibc robustness improve.
+- Statx, 16-bit UID, and capability rows remain blocker-only until real semantics improve; glibc `gettid02` is superseded by the futex/glibc follow-up evidence above.
 - The VFS/FD/select scout was split: `mkdir02`, `mkdir03`, `mkdirat02`, `rmdir02`, `fcntl27`, `fcntl27_64`, `symlink03`, and `unlink09` are repaired and candidate-clean, while the remaining select/mknod rows still have TCONF/timeout/TFAIL/TBROK blockers.
 - Timerslack/prctl adjacent stable regression still needs to be included before any eventual stable806 promotion commit.
 - The inode-flag implementation is in-memory process metadata, not persistent filesystem inode state; future broader FS_IOC work must preserve generic Linux errno/flag semantics and avoid LTP-specific branches.
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, and futex bitset semantics. It brings the stable806 candidate pool to 12 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`). The blocker triage added zero candidates outside the explicitly repaired rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, and futex bitset semantics. It brings the stable806 candidate pool to 13 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`). The blocker triage added zero candidates outside the explicitly repaired rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.

@@ -9,3 +9,7 @@ Additional note: the `symlink03` repair also made no blacklist changes. The fail
 Additional note: the `unlink09` FS_IOC inode-flag repair made no blacklist changes. The earlier `ENOTTY`/`TBROK` log is retained as diagnostic evidence only; only the later RV/LA parser-clean targeted and adjacent-regression summaries are counted as candidate-pool evidence.
 
 Additional note: the `mkdir09` futex bitset repair made no blacklist changes. The earlier glibc futex abort log is retained as diagnostic evidence only; only the later RV/LA parser-clean targeted and futex/clone adjacent-regression summaries are counted as candidate-pool evidence.
+
+## gettid02 futex/glibc follow-up
+
+No blacklist was added, removed, or used for `gettid02`. The candidate evidence comes only from RV + LA × musl + glibc targeted parser-clean logs and the existing futex/clone adjacent regression boundary. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.

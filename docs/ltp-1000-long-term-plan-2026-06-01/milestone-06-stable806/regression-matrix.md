@@ -21,7 +21,7 @@ Promotion gate remains unchanged: RV + LA × musl + glibc wrapper PASS, parser-c
 | readlink/readlinkat | RV clean, LA glibc clean, LA musl `TFAIL` for zero-size wrapper case | Do not reject valid `bufsiz=1` kernel calls; revisit only if libc/test ABI boundary has a real semantic fix. |
 | nice/setpriority | RV glibc `nice04` clean, RV musl `nice04` `TFAIL`; shared `setpriority` code unchanged | Protect existing stable `setpriority` semantics before any errno-boundary change. |
 | statx | RV statx scout has `TCONF`, wrapper FAILs, and `statx11` timeouts | Needs a real statx attribute/env semantics lane; no `pass_with_tconf` promotion. |
-| credentials/capabilities | RV 16-bit UID/cap rows `TCONF`; glibc `gettid02` `TBROK` futex abort | Needs unsupported-ABI policy or real capability/futex work; no partial musl-only promotion. |
+| credentials/capabilities | RV 16-bit UID/cap rows `TCONF`; earlier glibc `gettid02` `TBROK` futex abort | 16-bit/cap rows still need unsupported-ABI policy or real capability work; `gettid02` is superseded by the later futex/glibc follow-up evidence below. |
 | VFS/FD/select scout | RV scout has select pass-with-TCONF rows, fcntl17/fcntl17_64 timeouts, VFS path errno TFAIL/TBROK, and zero candidates | Split into isolated fixes; no broad VFS/FD/select promotion from this evidence. |
 
 
@@ -60,3 +60,9 @@ Covered stable adjacency includes `access*`, `faccessat*`, representative `chmod
 The `mkdir09` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus an 11-case futex/clone adjacent stable subset on both architectures (`22 PASS / 0 FAIL` for RV and `22 PASS / 0 FAIL` for LA).
 
 Covered stable adjacency includes `futex_wait01` through `futex_wait05`, `futex_wake01`, `futex_wake03`, and representative `clone01`, `clone03`, `clone06`, and `clone07` process/thread boundaries. Future edits in `sys_futex`, futex timeout conversion, futex keying/wake behavior, or process teardown wakeups should rerun this subset before promotion.
+
+## gettid02 futex/glibc follow-up regression boundary
+
+`gettid02` is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs). No source change was added after the futex bitset patch, so the code-regression boundary remains the futex/clone adjacent subset already run for the `mkdir09` repair (`22 PASS / 0 FAIL` on RV and `22 PASS / 0 FAIL` on LA).
+
+Future changes to `sys_futex`, thread teardown, pthread join compatibility, or `gettid`/TID allocation must rerun `gettid02` plus the futex/clone adjacent subset before counting this candidate toward a stable milestone.

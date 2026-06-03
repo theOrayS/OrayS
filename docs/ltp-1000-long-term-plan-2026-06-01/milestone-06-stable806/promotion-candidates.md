@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 12/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 13/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -16,6 +16,7 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `symlink03` | RV + LA × musl + glibc targeted parser-clean after Linux-like tmpdir metadata seed plus generic symlink parent write/search/type permission checks | candidate pool |
 | `unlink09` | RV + LA × musl + glibc targeted parser-clean after generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` inode-flag support and immutable/append-only unlink `EPERM` checks | candidate pool |
 | `mkdir09` | RV + LA × musl + glibc targeted parser-clean after generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support fixed glibc pthread joins | candidate pool |
+| `gettid02` | RV + LA × musl + glibc targeted parser-clean after the same futex bitset/glibc pthread repair lane removed the old glibc `TBROK` blocker | candidate pool |
 
 Evidence artifacts:
 
@@ -94,7 +95,8 @@ Additional fcntl27 read-lease evidence artifacts:
 | `readlinkat02` | RV clean; LA glibc clean; LA musl `TFAIL` | Same LA musl wrapper boundary as `readlink03`; combined report has 0 candidates. |
 | `nice04` | RV glibc clean; RV musl `TFAIL` with `EACCES` instead of `EPERM` | Shared `setpriority` semantics would be endangered by a kernel-only wrapper special case. |
 | `statx01,statx04..statx12` | RV scout has `TCONF`, wrapper FAILs, and `statx11` timeouts | Zero RV-only candidates; not safe promotion evidence. |
-| `gettid02`, `*_16`, `capget*`, `capset*` | RV scout has one musl-only pass, glibc `gettid02` `TBROK`, and 16-bit UID/capability `TCONF` rows | Zero RV-only candidates; needs futex/glibc or unsupported-ABI lane work before reconsideration. |
+| `gettid02` pre-futex-bitset scout | RV scout had one musl-only pass and glibc `gettid02` `TBROK` | Superseded by the later RV+LA targeted evidence below after generic futex bitset support; the earlier scout remains blocker-only. |
+| `*_16`, `capget*`, `capset*` | RV scout has 16-bit UID/capability `TCONF` rows | Zero RV-only candidates; needs unsupported-ABI/capability lane work before reconsideration. |
 | `unlink09`..`select04` VFS/FD/select scout | RV scout has `9 PASS / 45 FAIL`, `TBROK/TCONF/TFAIL`, and four `fcntl17*` timeouts | Zero RV-only candidates from the broad scout; later targeted repairs make `fcntl27`, same-source `fcntl27_64`, `symlink03`, and `unlink09` valid candidates. The broad scout itself and remaining `select*` pass-with-TCONF rows plus timeout/TFAIL/TBROK rows are not promotion evidence. |
 | `mkdir09` isolation scout | RV isolation scout after the mkdir repair still had a glibc `mkdir09` futex abort | Superseded by the later futex bitset repair below; the isolation scout remains diagnostic blocker evidence only and is not counted by itself. Earlier `symlink03` blocker rows are superseded by the later parent-permission repair and clean RV/LA evidence above. |
 
@@ -154,3 +156,13 @@ Additional mkdir09 futex bitset evidence artifacts:
 - RV futex/clone adjacent regression summary: `target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.summary.txt`
 - LA futex/clone adjacent regression summary: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.txt`
 - Combined futex/clone adjacent report: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.combined-promotion-candidates.txt`
+
+Additional gettid02 futex/glibc follow-up evidence artifacts:
+
+- RV gettid02 targeted log: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.log`
+- RV gettid02 summary: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.txt`
+- RV gettid02 candidate report: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.promotion-candidates.txt`
+- LA gettid02 targeted log: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.log`
+- LA gettid02 summary: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt`
+- LA gettid02 candidate report: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt`
+- Combined gettid02 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt`

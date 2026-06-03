@@ -163,3 +163,12 @@ Resource/lifetime and maintenance boundaries:
 - Nonzero bitset wake may over-wake waiters that would not match a Linux per-waiter bitset. This is acceptable for the current model because futex callers must recheck the futex word and tolerate spurious wakeups; future selective-bitset work can refine this without changing the public candidate evidence.
 - No syscall numbers, struct layouts, FD behavior, file status flags, signal delivery, mmap behavior, blacklist handling, evaluator logic, or user-pointer ABI changed beyond the existing `timespec` copy-in for futex timeout handling.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. It fixes a generic glibc pthread/futex compatibility command surface exposed by `mkdir09`.
+
+## gettid02 futex/glibc follow-up impact
+
+No additional source change was made for this follow-up. The user-visible behavior relied on the already-committed generic futex bitset support plus existing `gettid`/thread ID semantics.
+
+- `gettid(2)` behavior is unchanged by this documentation/evidence update: pthread-created tasks continue to receive task-specific TIDs distinct from the parent thread.
+- The old glibc `gettid02` `TBROK` was removed by the same generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` surface used by glibc pthread joins; no `gettid02`-specific branch was introduced.
+- No syscall numbers, struct layouts, errno boundaries, file descriptor semantics, signal behavior, mmap behavior, or user-pointer copy rules changed in this follow-up.
+- The caveats from the futex bitset repair remain: nonzero bitsets reuse the existing futex queue and may over-wake; futex callers recheck the futex word, so this is acceptable for the current candidate evidence but not a full PI/requeue/futex_waitv implementation.
