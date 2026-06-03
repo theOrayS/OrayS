@@ -10,7 +10,7 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{FdEntry, resolve_dirfd_path};
+use super::fd_table::{FdEntry, check_parent_write_search_permission, resolve_dirfd_path};
 use super::linux_abi::{
     ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
     FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
@@ -854,6 +854,9 @@ pub(super) fn sys_symlinkat(
         || axfs::api::metadata(resolved_path.as_str()).is_ok()
     {
         return neg_errno(LinuxError::EEXIST);
+    }
+    if let Err(err) = check_parent_write_search_permission(process, resolved_path.as_str()) {
+        return neg_errno(err);
     }
     process.set_path_symlink(resolved_path, target);
     0

@@ -4688,7 +4688,7 @@ fn parent_dirs_searchable_absolute(
     Ok(true)
 }
 
-fn check_parent_write_search_permission(
+pub(super) fn check_parent_write_search_permission(
     process: &UserProcess,
     path: &str,
 ) -> Result<general::stat, LinuxError> {

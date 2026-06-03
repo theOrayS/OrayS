@@ -635,7 +635,7 @@ Validation conclusion for this repair:
 
 ## fcntl27 read-lease access repair and targeted retest
 
-A generic `fcntl(F_SETLEASE)` access-mode repair was added after the RV VFS/FD isolation scout confirmed `fcntl27` failed because `F_SETLEASE,F_RDLCK` on write-open descriptors incorrectly succeeded. The same isolation scout keeps `symlink03` and glibc `mkdir09` as blocker-only rows.
+A generic `fcntl(F_SETLEASE)` access-mode repair was added after the RV VFS/FD isolation scout confirmed `fcntl27` failed because `F_SETLEASE,F_RDLCK` on write-open descriptors incorrectly succeeded. The same isolation scout also exposed `symlink03` and glibc `mkdir09` as blocker rows; later `symlink03` evidence in this file supersedes only the `symlink03` blocker, while `mkdir09` remains excluded.
 
 Isolation scout command:
 
@@ -647,7 +647,7 @@ python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv targ
 
 Isolation scout result:
 
-- RV: `1 PASS / 5 FAIL / TBROK=5 / TFAIL=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`; zero promotion candidates. `fcntl27` was selected for a real access-mode fix; `symlink03` and glibc `mkdir09` remain excluded.
+- RV: `1 PASS / 5 FAIL / TBROK=5 / TFAIL=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`; zero promotion candidates. `fcntl27` was selected for a real access-mode fix; `symlink03` required a later tmpdir/parent-permission repair, and glibc `mkdir09` remains excluded.
 
 Targeted RV command:
 
@@ -762,3 +762,87 @@ Parser result:
 Validation conclusion for this follow-up:
 
 `fcntl27_64` is added to the stable806 candidate pool with four-combo clean evidence. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 9/50 for stable806.
+
+
+
+## symlink03 tmpdir and parent permission targeted repair
+
+The earlier VFS/FD isolation scout showed `symlink03` failing before promotion eligibility. The first real fix seeded per-process path metadata for `/tmp` and `/tmp/ltp-work` as Linux-like world-writable sticky directories (`01777`), which removed the setuid child `mkdtemp()` `TBROK` but exposed a second generic errno bug: `symlink()` could create entries under parents that should fail with `EACCES` or `ENOTDIR`. The final repair made `sys_symlinkat` call the existing generic parent write/search/type permission gate before recording the synthetic symlink.
+
+Failed diagnostic artifacts, not promotion evidence:
+
+- RV scratch-permission diagnostic log: `target/ltp-1000-milestone-06-stable806/rv-symlink03-ltp-scratch-perms-fix-20260603T211855+0800.log`
+- RV scratch-permission diagnostic summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-ltp-scratch-perms-fix-20260603T211855+0800.summary.txt` — `0 PASS / 2 FAIL / TBROK=4`.
+- RV tmp-mode-only diagnostic log: `target/ltp-1000-milestone-06-stable806/rv-symlink03-initial-tmp-mode-fix-20260603T212433+0800.log`
+- RV tmp-mode-only diagnostic summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-initial-tmp-mode-fix-20260603T212433+0800.summary.txt` — `0 PASS / 2 FAIL / TFAIL=4`.
+
+Targeted RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='symlink03' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.log
+```
+
+Targeted LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='symlink03' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.log target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.log
+```
+
+Targeted artifacts:
+
+- RV cases: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.cases.txt`
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-fix-20260603T212914+0800.promotion-candidates.txt`
+- LA cases: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.cases.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.promotion-candidates.txt`
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-fix-20260603T212914+0800.combined-promotion-candidates.txt`
+
+Targeted parser result:
+
+- RV: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidate `symlink03`.
+
+Adjacent stable regression command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='access01,access02,access03,access04,faccessat01,faccessat02,chmod01,chmod03,chmod05,symlink01,symlink02,symlink04,symlinkat01,readlink01,readlinkat01,link02,linkat01,unlinkat01,rmdir01,mkdir04' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.log
+
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='access01,access02,access03,access04,faccessat01,faccessat02,chmod01,chmod03,chmod05,symlink01,symlink02,symlink04,symlinkat01,readlink01,readlinkat01,link02,linkat01,unlinkat01,rmdir01,mkdir04' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 90m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.log
+```
+
+Adjacent regression artifacts:
+
+- RV cases: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.cases.txt`
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-symlink03-parent-permission-adjacent-regression-20260603T213226+0800.summary.json`
+- LA cases: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.cases.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-symlink03-parent-permission-adjacent-regression-20260603T213538+0800.summary.json`
+
+Adjacent parser result:
+
+- RV: `40 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `40 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+
+Validation conclusion for this repair:
+
+`symlink03` is added to the stable806 candidate pool with four-combo clean evidence and a 20-case symlink/access/readlink/link/unlink/rmdir/mkdir adjacent stable subset on both architectures. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 10/50 for stable806.
