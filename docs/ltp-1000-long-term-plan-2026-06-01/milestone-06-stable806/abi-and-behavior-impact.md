@@ -40,3 +40,13 @@ Boundary intentionally not changed:
 
 - `CLONE_NEWUTS`/`unshare(CLONE_NEWUTS)` are still not implemented; `utsname03` remains a namespace-engineering blocker and is not promoted.
 - The shared hostname object is only a default UTS namespace model; it does not introduce a full namespace registry or per-namespace lifetime teardown beyond the existing process `Arc` lifetime.
+
+## Post-UTS blocker triage impact
+
+The readlink/nice/statx/credential-capability triage in this documentation checkpoint made no source changes and therefore introduces no new syscall, errno, flag, FD, signal, futex, mmap, struct-layout, or user-pointer ABI behavior.
+
+Explicit non-changes:
+
+- `readlinkat` still returns `EINVAL` when the kernel receives `bufsiz == 0`; it does not reject legitimate `bufsiz == 1` calls just to satisfy an LA musl wrapper-specific LTP row.
+- `setpriority`/`nice` priority-lowering behavior is unchanged; no wrapper- or libc-specific errno mapping was added.
+- `statx`, 16-bit UID syscall compatibility, Linux capabilities, and futex behavior are unchanged by this checkpoint.

@@ -12,3 +12,12 @@ This checkpoint changed timerslack/prctl/proc behavior and default UTS hostname 
 | epoll/eventfd/timerfd | Not changed | milestone-05 promoted epoll/eventfd/timerfd/signalfd cases plus `poll01`, `pipe01`, `pipe06`, `pipe2_01`, `pipe2_02` if future fd fixes are batched |
 
 Promotion gate remains unchanged: RV + LA × musl + glibc wrapper PASS, parser-clean, with no new `TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap` beyond explicitly disclosed inherited caveats.
+
+## Additional blocker matrix from post-UTS triage
+
+| Lane | Current evidence | Promotion boundary |
+| --- | --- | --- |
+| readlink/readlinkat | RV clean, LA glibc clean, LA musl `TFAIL` for zero-size wrapper case | Do not reject valid `bufsiz=1` kernel calls; revisit only if libc/test ABI boundary has a real semantic fix. |
+| nice/setpriority | RV glibc `nice04` clean, RV musl `nice04` `TFAIL`; shared `setpriority` code unchanged | Protect existing stable `setpriority` semantics before any errno-boundary change. |
+| statx | RV statx scout has `TCONF`, wrapper FAILs, and `statx11` timeouts | Needs a real statx attribute/env semantics lane; no `pass_with_tconf` promotion. |
+| credentials/capabilities | RV 16-bit UID/cap rows `TCONF`; glibc `gettid02` `TBROK` futex abort | Needs unsupported-ABI policy or real capability/futex work; no partial musl-only promotion. |

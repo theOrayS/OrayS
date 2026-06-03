@@ -87,3 +87,33 @@ uname04
 newuname01
 utsname01
 utsname04
+
+# RV/LA readlink near-clean blocker triage, 2026-06-03 (blocked on LA musl; not promotion evidence)
+readlink03
+readlinkat02
+
+# RV statx VFS scout, 2026-06-03 (blocker-only; not promotion evidence)
+statx01
+statx04
+statx05
+statx06
+statx07
+statx08
+statx09
+statx10
+statx11
+statx12
+
+# RV credential/capability scout, 2026-06-03 (blocker-only; not promotion evidence)
+gettid02
+getuid01_16
+getuid03_16
+setuid01_16
+setuid03_16
+setuid04_16
+capget01
+capget02
+capset01
+capset02
+capset03
+capset04
