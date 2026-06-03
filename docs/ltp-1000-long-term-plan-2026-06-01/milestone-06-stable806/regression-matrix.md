@@ -21,3 +21,4 @@ Promotion gate remains unchanged: RV + LA × musl + glibc wrapper PASS, parser-c
 | nice/setpriority | RV glibc `nice04` clean, RV musl `nice04` `TFAIL`; shared `setpriority` code unchanged | Protect existing stable `setpriority` semantics before any errno-boundary change. |
 | statx | RV statx scout has `TCONF`, wrapper FAILs, and `statx11` timeouts | Needs a real statx attribute/env semantics lane; no `pass_with_tconf` promotion. |
 | credentials/capabilities | RV 16-bit UID/cap rows `TCONF`; glibc `gettid02` `TBROK` futex abort | Needs unsupported-ABI policy or real capability/futex work; no partial musl-only promotion. |
+| VFS/FD/select scout | RV scout has select pass-with-TCONF rows, fcntl17/fcntl17_64 timeouts, VFS path errno TFAIL/TBROK, and zero candidates | Split into isolated fixes; no broad VFS/FD/select promotion from this evidence. |

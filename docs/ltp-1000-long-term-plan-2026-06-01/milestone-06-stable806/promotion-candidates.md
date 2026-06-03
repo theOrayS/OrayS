@@ -39,6 +39,7 @@ Note: `utsname01` is four-combo clean in the targeted UTS run but is already pre
 | `nice04` | RV glibc clean; RV musl `TFAIL` with `EACCES` instead of `EPERM` | Shared `setpriority` semantics would be endangered by a kernel-only wrapper special case. |
 | `statx01,statx04..statx12` | RV scout has `TCONF`, wrapper FAILs, and `statx11` timeouts | Zero RV-only candidates; not safe promotion evidence. |
 | `gettid02`, `*_16`, `capget*`, `capset*` | RV scout has one musl-only pass, glibc `gettid02` `TBROK`, and 16-bit UID/capability `TCONF` rows | Zero RV-only candidates; needs futex/glibc or unsupported-ABI lane work before reconsideration. |
+| `unlink09`..`select04` VFS/FD/select scout | RV scout has `9 PASS / 45 FAIL`, `TBROK/TCONF/TFAIL`, and four `fcntl17*` timeouts | Zero RV-only candidates; `select*` pass-with-TCONF rows and timeout/TFAIL/TBROK rows are not promotion evidence. |
 
 Excluded evidence artifacts:
 
@@ -47,3 +48,8 @@ Excluded evidence artifacts:
 - Combined readlink report: `target/ltp-1000-milestone-06-stable806/la-readlink03-readlinkat02-20260603T192126+0800.combined-promotion-candidates.txt`
 - RV statx summary: `target/ltp-1000-milestone-06-stable806/rv-statx-vfs-scout-20260603T193211+0800.summary.txt`
 - RV credential/capability summary: `target/ltp-1000-milestone-06-stable806/rv-cred-cap-scout-20260603T193548+0800.summary.txt`
+
+Additional excluded VFS/FD/select artifact:
+
+- RV VFS/FD/select summary: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.summary.txt`
+- RV VFS/FD/select candidate report: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-select-scout-20260603T194925+0800.promotion-candidates.txt`

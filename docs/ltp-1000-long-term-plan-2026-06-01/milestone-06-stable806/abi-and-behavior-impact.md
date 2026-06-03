@@ -50,3 +50,5 @@ Explicit non-changes:
 - `readlinkat` still returns `EINVAL` when the kernel receives `bufsiz == 0`; it does not reject legitimate `bufsiz == 1` calls just to satisfy an LA musl wrapper-specific LTP row.
 - `setpriority`/`nice` priority-lowering behavior is unchanged; no wrapper- or libc-specific errno mapping was added.
 - `statx`, 16-bit UID syscall compatibility, Linux capabilities, and futex behavior are unchanged by this checkpoint.
+
+The RV VFS/FD/select scout was documentation-only. It made no syscall/errno/flag/FD/signal/futex/mmap/user-pointer changes; `select*` TCONF rows, `fcntl17*` timeouts, and VFS path errno blockers remain unchanged.
