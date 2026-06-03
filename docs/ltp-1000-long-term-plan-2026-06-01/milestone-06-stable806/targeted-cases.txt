@@ -1,0 +1,41 @@
+# milestone-06 stable806 targeted/scouted cases (case unit)
+
+# RV proc/synthetic/sched scout, 2026-06-03
+utsname02
+utsname03
+sysinfo03
+getrusage02
+getrusage03
+getrusage04
+prctl02
+prctl03
+prctl04
+prctl06
+prctl07
+prctl08
+prctl09
+prctl10
+setrlimit06
+setpriority01
+nice04
+
+# RV time/fd/signal scout, 2026-06-03
+epoll_create01
+epoll_create02
+eventfd06
+timerfd04
+timer_delete01
+timer_delete02
+timer_getoverrun01
+timer_gettime01
+timer_settime01
+timer_settime02
+timer_settime03
+clock_gettime01
+clock_gettime03
+clock_nanosleep01
+clock_nanosleep03
+setitimer01
+sigtimedwait01
+sigwait01
+sigwaitinfo01
