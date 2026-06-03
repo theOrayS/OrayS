@@ -43,3 +43,47 @@ sigwaitinfo01
 # RV/LA timerslack targeted retest, 2026-06-03 (retested cases from proc/synthetic/sched scout)
 prctl08
 prctl09
+
+# RV socket core broad scout, 2026-06-03 (partial/blocker-only; not promotion evidence)
+accept02
+accept03
+accept4_01
+bind01
+bind02
+bind03
+bind04
+bind05
+bind06
+connect01
+connect02
+getsockopt02
+setsockopt02
+setsockopt03
+setsockopt04
+setsockopt05
+setsockopt06
+recv01
+recvfrom01
+recvmsg01
+send01
+send02
+sendto01
+sendto02
+sendto03
+sockioctl01
+
+# RV/LA UTS shared-hostname targeted retest, 2026-06-03
+utsname01
+utsname02
+
+# RV/LA UTS adjacent stable regression subset, 2026-06-03
+gethostname01
+sethostname01
+sethostname02
+sethostname03
+uname01
+uname02
+uname04
+newuname01
+utsname01
+utsname04
