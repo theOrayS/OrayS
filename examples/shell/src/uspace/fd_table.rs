@@ -2985,6 +2985,7 @@ impl FdTable {
             return Err(LinuxError::ENAMETOOLONG);
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        let abs_path = process.resolve_parent_symlinks(abs_path.as_str())?;
         if axfs::api::metadata(abs_path.as_str()).is_ok() {
             return Err(LinuxError::EEXIST);
         }
@@ -3020,6 +3021,7 @@ impl FdTable {
             _ => return Err(LinuxError::EINVAL),
         };
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        let abs_path = process.resolve_parent_symlinks(abs_path.as_str())?;
         if axfs::api::metadata(abs_path.as_str()).is_ok() {
             return Err(LinuxError::EEXIST);
         }
@@ -3130,7 +3132,11 @@ impl FdTable {
         if path_exceeds_linux_limits(path) {
             return Err(LinuxError::ENAMETOOLONG);
         }
+        if remove_dir && last_path_component(path) == Some(".") {
+            return Err(LinuxError::EINVAL);
+        }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
+        let abs_path = process.resolve_parent_symlinks(abs_path.as_str())?;
         let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
         if let Some(backing_path) = process.path_hardlink_backing(abs_path.as_str()) {
             if backing_path != abs_path {
@@ -3169,6 +3175,9 @@ impl FdTable {
             return Ok(());
         }
         let removed = if remove_dir {
+            if process.has_mount_point(abs_path.as_str()) {
+                return Err(LinuxError::EBUSY);
+            }
             directory_remove_dir(abs_path.as_str())
         } else {
             directory_remove_file(abs_path.as_str())
@@ -4617,6 +4626,10 @@ fn parent_path(path: &str) -> &str {
         Some((parent, _)) if !parent.is_empty() => parent,
         _ => "/",
     }
+}
+
+fn last_path_component(path: &str) -> Option<&str> {
+    path.rsplit('/').find(|component| !component.is_empty())
 }
 
 fn stat_absolute_path(process: &UserProcess, path: &str) -> Result<general::stat, LinuxError> {
