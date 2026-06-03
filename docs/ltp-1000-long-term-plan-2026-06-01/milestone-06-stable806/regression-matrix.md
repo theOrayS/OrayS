@@ -37,6 +37,6 @@ Covered stable adjacency includes chmod/fchmod/fchmodat, chown/fchown/fchownat, 
 
 ## fcntl read-lease regression boundary
 
-The `fcntl27` repair is protected by targeted RV + LA × musl + glibc evidence for `fcntl27` (`4 PASS / 0 FAIL`) plus all current stable `fcntl*` rows and the new candidate on both architectures (`98 PASS / 0 FAIL` for RV and `98 PASS / 0 FAIL` for LA).
+The `fcntl27`/`fcntl27_64` repair is protected by targeted RV + LA × musl + glibc evidence for `fcntl27` and `fcntl27_64` (`8 PASS / 0 FAIL` across the two targeted candidate pairs) plus all current stable `fcntl*` rows and `fcntl27` on both architectures (`98 PASS / 0 FAIL` for RV and `98 PASS / 0 FAIL` for LA). `fcntl27_64` required no extra source change beyond the same generic lease access rule.
 
 Covered stable adjacency includes `F_DUPFD`, `F_GETFD`/`F_SETFD`, `F_GETFL`/`F_SETFL`, record locking (`F_GETLK`, `F_SETLK`, `F_SETLKW`), lease read-only success (`fcntl23`, `fcntl23_64`), and OFD/lock stress rows. Future edits in `FdTable::fcntl`, `fcntl_getlease`, or `fcntl_setlease` should rerun this subset before promotion.
