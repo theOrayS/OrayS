@@ -632,3 +632,88 @@ Adjacent parser result:
 Validation conclusion for this repair:
 
 `mkdir02` and `mkdir03` are added to the stable806 candidate pool with four-combo clean evidence. `mkdirat02` and `rmdir02` remain clean after the same patch. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 7/50 for stable806.
+
+## fcntl27 read-lease access repair and targeted retest
+
+A generic `fcntl(F_SETLEASE)` access-mode repair was added after the RV VFS/FD isolation scout confirmed `fcntl27` failed because `F_SETLEASE,F_RDLCK` on write-open descriptors incorrectly succeeded. The same isolation scout keeps `symlink03` and glibc `mkdir09` as blocker-only rows.
+
+Isolation scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='symlink03,mkdir09,fcntl27' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-vfs-fd-isolation-scout-20260603T211800+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-vfs-fd-isolation-scout-20260603T211800+0800.log
+```
+
+Isolation scout result:
+
+- RV: `1 PASS / 5 FAIL / TBROK=5 / TFAIL=4 / 0 timeout / 0 ENOSYS / 0 panic/trap`; zero promotion candidates. `fcntl27` was selected for a real access-mode fix; `symlink03` and glibc `mkdir09` remain excluded.
+
+Targeted RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fcntl27' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.log
+```
+
+Targeted LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fcntl27' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.log target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.log
+```
+
+Targeted artifacts:
+
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.promotion-candidates.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.promotion-candidates.txt`
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.combined-promotion-candidates.txt`
+
+Targeted parser result:
+
+- RV: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidate `fcntl27`.
+
+Adjacent stable regression command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='fcntl01,fcntl02,fcntl03,fcntl04,fcntl08,fcntl09,fcntl10,fcntl16,fcntl29,fcntl01_64,fcntl02_64,fcntl03_64,fcntl04_64,fcntl08_64,fcntl09_64,fcntl10_64,fcntl16_64,fcntl29_64,fcntl23,fcntl23_64,fcntl05,fcntl05_64,fcntl12,fcntl12_64,fcntl13,fcntl13_64,fcntl07,fcntl07_64,fcntl18,fcntl18_64,fcntl11,fcntl14,fcntl19,fcntl22,fcntl19_64,fcntl20,fcntl20_64,fcntl21,fcntl21_64,fcntl22_64,fcntl30,fcntl11_64,fcntl15,fcntl14_64,fcntl15_64,fcntl30_64,fcntl35,fcntl35_64,fcntl27' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 150m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.log
+
+OSCOMP_TEST_GROUPS=ltp \
+LTP_CASES='fcntl01,fcntl02,fcntl03,fcntl04,fcntl08,fcntl09,fcntl10,fcntl16,fcntl29,fcntl01_64,fcntl02_64,fcntl03_64,fcntl04_64,fcntl08_64,fcntl09_64,fcntl10_64,fcntl16_64,fcntl29_64,fcntl23,fcntl23_64,fcntl05,fcntl05_64,fcntl12,fcntl12_64,fcntl13,fcntl13_64,fcntl07,fcntl07_64,fcntl18,fcntl18_64,fcntl11,fcntl14,fcntl19,fcntl22,fcntl19_64,fcntl20,fcntl20_64,fcntl21,fcntl21_64,fcntl22_64,fcntl30,fcntl11_64,fcntl15,fcntl14_64,fcntl15_64,fcntl30_64,fcntl35,fcntl35_64,fcntl27' \
+LTP_CASE_TIMEOUT_SECS=45 timeout 150m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.log
+```
+
+Adjacent regression artifacts:
+
+- RV cases: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.cases.txt`
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.summary.json`
+- LA cases: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.cases.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.summary.json`
+
+Adjacent parser result:
+
+- RV: `98 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `98 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+
+Validation conclusion for this repair:
+
+`fcntl27` is added to the stable806 candidate pool with four-combo clean evidence and full current-stable fcntl adjacency. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 8/50 for stable806.

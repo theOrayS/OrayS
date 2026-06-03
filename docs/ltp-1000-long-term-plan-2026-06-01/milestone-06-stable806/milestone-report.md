@@ -15,6 +15,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Documented RV VFS/FD/select scout as blocker-only evidence with zero candidates.
 - Repaired generic VFS parent-symlink resolution and `rmdir` errno boundaries, making `mkdirat02` and `rmdir02` four-combo clean candidates.
 - Repaired directory `chown`/setgid preservation and final-component symlink existence checks for `mkdirat`/`mknodat`, making `mkdir02` and `mkdir03` four-combo clean candidates.
+- Repaired `F_SETLEASE` read-lease access semantics so write-open file descriptors fail with `EAGAIN`, making `fcntl27` a four-combo clean candidate while preserving existing read-only lease rows.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -28,6 +29,7 @@ Current new unique stable806 candidates:
 5. `rmdir02`
 6. `mkdir02`
 7. `mkdir03`
+8. `fcntl27`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -55,6 +57,13 @@ Current new unique stable806 candidates:
 - Adjacent RV metadata/VFS regression: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.txt` — `70 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA metadata/VFS regression: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.txt` — `70 PASS / 0 FAIL / 0 internal markers`.
 
+- RV VFS/FD isolation scout: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-isolation-scout-20260603T211800+0800.summary.txt` — `1 PASS / 5 FAIL`, confirming `symlink03` and glibc `mkdir09` remain blocker rows while `fcntl27` is a repairable lease-access row.
+- fcntl27 targeted RV: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- fcntl27 targeted LA: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.txt` — same clean `2 PASS / 0 FAIL / 0 internal markers` result.
+- Combined fcntl27 candidate report: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.combined-promotion-candidates.txt` — four-combo candidate `fcntl27`.
+- Adjacent RV fcntl regression: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.summary.txt` — `98 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA fcntl regression: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-adjacent-regression-20260603T212200+0800.summary.txt` — `98 PASS / 0 FAIL / 0 internal markers`.
+
 ## Risks and boundaries
 
 - `CLONE_NEWUTS` and `unshare(CLONE_NEWUTS)` are still not implemented; `utsname03` remains blocked and is not counted.
@@ -63,9 +72,9 @@ Current new unique stable806 candidates:
 - `readlink03`/`readlinkat02` remain blocked on LA musl wrapper behavior; rejecting all one-byte buffers in-kernel is not acceptable.
 - `nice04` remains blocked on libc-visible errno differences around priority lowering; do not risk stable `setpriority` rows with a wrapper-specific kernel special case.
 - Statx, 16-bit UID, capability, and glibc `gettid02` rows remain blocker-only until real semantics or futex/glibc robustness improve.
-- The VFS/FD/select scout was split: `mkdir02`, `mkdir03`, `mkdirat02`, and `rmdir02` are repaired and candidate-clean, while the remaining select/fcntl/mknod/symlink/unlink rows still have TCONF/timeout/TFAIL/TBROK blockers.
+- The VFS/FD/select scout was split: `mkdir02`, `mkdir03`, `mkdirat02`, `rmdir02`, and `fcntl27` are repaired and candidate-clean, while the remaining select/mknod/symlink/unlink rows still have TCONF/timeout/TFAIL/TBROK blockers.
 - Timerslack/prctl adjacent stable regression still needs to be included before any eventual stable806 promotion commit.
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, and metadata inheritance semantics and adds 5 new unique candidates (`utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`), bringing the stable806 candidate pool to 7 unique cases. The blocker triage added zero candidates outside the repaired VFS/metadata rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, and metadata inheritance semantics and adds 6 new unique candidates (`utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`), bringing the stable806 candidate pool to 8 unique cases. The blocker triage added zero candidates outside the repaired VFS/metadata rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.

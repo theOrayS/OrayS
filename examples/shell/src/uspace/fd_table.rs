@@ -3596,7 +3596,14 @@ impl FdTable {
     fn fcntl_setlease(&mut self, fd: i32, lease_type: u32) -> Result<i32, LinuxError> {
         match self.entry(fd)? {
             FdEntry::File(file) => match lease_type {
-                general::F_RDLCK | general::F_WRLCK | general::F_UNLCK => {
+                general::F_RDLCK => {
+                    if file.status_flags & general::O_ACCMODE != general::O_RDONLY {
+                        return Err(LinuxError::EAGAIN);
+                    }
+                    *file.lease_type.lock() = lease_type;
+                    Ok(())
+                }
+                general::F_WRLCK | general::F_UNLCK => {
                     *file.lease_type.lock() = lease_type;
                     Ok(())
                 }

@@ -89,3 +89,18 @@ Unchanged boundaries:
 - Parent-path symlink resolution semantics from the prior VFS repair remain unchanged; this patch only adds final-component synthetic symlink existence checks before create.
 - No syscall numbers, struct layouts, FD table layout, FD_CLOEXEC behavior, file status flags, signal delivery, futex behavior, mmap behavior, user-pointer copy semantics, blacklist, or evaluator behavior changed.
 - The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining non-candidate rows from earlier VFS/FD/select scouts retain visible parser markers and remain excluded.
+
+## fcntl read-lease access repair impact
+
+This source patch changes real `fcntl(F_SETLEASE)` errno behavior; it is not a stable-list promotion.
+
+User-visible syscall/errno changes:
+
+- `fcntl(fd, F_SETLEASE, F_RDLCK)` now returns `EAGAIN` when the file descriptor was opened with write access (`O_WRONLY` or `O_RDWR`).
+- Read leases on read-only regular-file descriptors remain accepted, preserving existing stable `fcntl23`/`fcntl23_64` behavior.
+- `F_WRLCK` and `F_UNLCK` handling is otherwise unchanged; full lease break/delivery semantics are still not modeled.
+
+Unchanged boundaries:
+
+- FD allocation, `FD_CLOEXEC`, `F_GETFL`/`F_SETFL`, record locks (`F_GETLK`, `F_SETLK`, `F_SETLKW`), pipe capacity commands, signals, futexes, mmap, struct layout, and user-pointer copy semantics are unchanged.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. It applies a generic access-mode rule before recording a read lease.
