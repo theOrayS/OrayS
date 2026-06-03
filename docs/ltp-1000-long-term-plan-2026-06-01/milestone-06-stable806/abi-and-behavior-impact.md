@@ -353,3 +353,31 @@ ABI/resource/lifetime boundaries:
 - No syscall numbers, struct layouts, FD table layout, user-pointer ABI, signal, futex, mmap, process lifetime, or stable-list behavior changed.
 - The KEEP_SIZE implementation is not a full filesystem preallocation allocator. It validates a writable regular-file descriptor and keeps logical size unchanged; future sparse metadata or block-allocation work must extend the generic sparse/data-range model rather than adding case-specific branches.
 - `fadvise64` is intentionally advisory/no-op for regular file-like descriptors; future page-cache/readahead/writeback work may attach behavior behind this interface but must preserve the generic errno boundary validated here.
+
+
+## SysV SHM metadata/control and proc consistency impact
+
+This final stable806 patch changes real SysV shared-memory semantics; it is not a case-name or wrapper-output special case.
+
+User-visible syscall/proc changes:
+
+- `shmget` now enforces `IPC_CREAT|IPC_EXCL`, requested-size compatibility for existing keys, `SHM_HUGETLB` rejection, dynamic `/proc/sys/kernel/shmmax` size limits capped by the kernel default, and a conservative segment-count limit.
+- `/proc/sys/kernel/shmmax`, `/proc/sys/kernel/shmall`, and `/proc/sys/kernel/shmmni` are present with default values `131072`, `32`, and `128`. `shmget02` can lower `shmmax` through the existing file path and observe `EINVAL` for oversized requests without reducing the default capacity needed by adjacent stable `shmat04`.
+- `shmat` now validates known flags, supports `SHM_RND`, `SHM_REMAP`, and `SHM_EXEC`, rejects invalid low/remap targets, preserves existing mappings unless `SHM_REMAP` is requested, and records per-process attachments.
+- `shmdt`, process teardown, and fork now update SysV SHM attach counts and removed-segment lifetime: `IPC_RMID` removes the ID immediately but keeps backing pages alive while inherited or live attachments remain.
+- `shmctl` now supports `IPC_INFO`, `SHM_INFO`, `SHM_STAT`, `SHM_STAT_ANY`, `IPC_STAT`, `IPC_RMID`, `IPC_SET` validation, and `SHM_LOCK`/`SHM_UNLOCK` permission failure boundaries.
+- `/proc/sysvipc/shm` is now a dynamic read snapshot generated from the active SysV SHM table, including `rss`/`swap` columns, so `SHM_INFO` and proc parsing report consistent segment/page counts.
+- LoongArch `SHM_RND` uses a 64 KiB low-boundary alignment while RISC-V uses the 4 KiB page boundary. `shmat01` is still excluded because the currently available LA musl/glibc wrapper expectations diverge; no libc- or case-specific kernel workaround was added.
+
+ABI/errno/layout boundaries:
+
+- SysV IPC user structs retain the asm-generic 64-bit layouts documented by compile-time size checks (`ipc_perm`: 48 bytes, `shmid64_ds`: 112 bytes, `shminfo64`: 72 bytes, `shm_info`: 48 bytes).
+- Permission checks are generic owner/group/other mode checks; root remains allowed for access/control paths where Linux semantics permit it.
+- No syscall numbers, FD table layout, signal ABI, futex ABI, mmap struct layout, or user-pointer copy-in/copy-out ABI changed outside the SysV SHM/proc surfaces listed above.
+- `SHM_LOCK`/`SHM_UNLOCK` remain unsupported privileged operations and return `EPERM`; they are not counted as promotion behavior.
+
+Resource/lifetime risks and mitigations:
+
+- Shared backing pages are freed only when an active or removed segment has no attachments. This protects fork/teardown and `IPC_RMID` lifetime but still relies on per-process attachment maps being maintained by `shmat`, `shmdt`, fork, and teardown.
+- The dynamic proc snapshot is point-in-time and read-only; write opens return `EPERM`, matching the synthetic proc-file boundary used by this compatibility layer.
+- The implementation is intentionally conservative: no huge pages, no swap accounting, no namespace isolation, and no hidden blacklist/SKIP/status0 evidence.

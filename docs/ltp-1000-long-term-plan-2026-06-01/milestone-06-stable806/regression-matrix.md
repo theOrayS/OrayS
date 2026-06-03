@@ -172,3 +172,20 @@ Adjacent regression protected in the same checkpoint:
 - LA summary: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
 
 Future edits to `sys_fadvise64`, `FdTable::fadvise64`, `sys_fallocate`, `fallocate_keep_size`, `truncate`, regular-file writable-descriptor checks, sparse size/data-range metadata, read/write/lseek behavior, or syscall dispatch for these numbers must rerun the targeted five-case gate plus the adjacent FD/storage regression subset before any stable806 promotion.
+
+
+## Final stable806 regression boundary
+
+The final promotion boundary is the current-code 50-case RV/LA gate:
+
+- RV: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.summary.txt` — `100 PASS / 0 FAIL / 0 internal markers`.
+- LA: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.summary.txt` — `100 PASS / 0 FAIL / 0 internal markers`.
+- Combined: `target/ltp-1000-milestone-06-stable806/stable806-candidate50-final-gate-rv-la-fourway.promotion-candidates.txt` — `50` candidates, `0` blocked/incomplete.
+
+The SysV SHM repair is additionally protected by a targeted final8+adjacent subset on both architectures:
+
+| Area | New candidates | Adjacent stable rows | Evidence |
+| --- | --- | --- | --- |
+| SysV SHM create/attach/detach/control/proc | `shmget02`, `shmget03`, `shmget04`, `shmat02`, `shmat03`, `shmdt01`, `shmctl03`, `shmctl04` | `shmat04`, `shmdt02` | RV and LA `20 PASS / 0 FAIL / 0 internal markers` in `*-sysv-shm-final8-plus-adjacent-after-procfix-*` summaries |
+
+Future edits in `examples/shell/src/uspace/sysv_shm.rs`, SysV SHM process teardown/fork retention, `/proc/sysvipc/shm`, or `/proc/sys/kernel/shmmax`/`shmall` must rerun at least the SysV final8+adjacent subset plus the 50-case stable806 cohort before further promotion.

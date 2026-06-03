@@ -44,6 +44,13 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
 
     proc_root.create("sys", VfsNodeType::Dir)?;
     proc_root.create("sys/kernel", VfsNodeType::Dir)?;
+    proc_root.create("sysvipc", VfsNodeType::Dir)?;
+    proc_root.create("sysvipc/shm", VfsNodeType::File)?;
+    let file_sysvipc_shm = proc_root.clone().lookup("./sysvipc/shm")?;
+    file_sysvipc_shm.write_at(
+        0,
+        b"       key      shmid perms                  size  cpid  lpid nattch   uid   gid  cuid  cgid      atime      dtime      ctime       rss      swap\n",
+    )?;
     proc_root.create("sys/kernel/tainted", VfsNodeType::File)?;
     let file_tainted = proc_root.clone().lookup("./sys/kernel/tainted")?;
     file_tainted.write_at(0, b"0\n")?;
@@ -53,6 +60,15 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     proc_root.create("sys/kernel/printk", VfsNodeType::File)?;
     let file_printk = proc_root.clone().lookup("./sys/kernel/printk")?;
     file_printk.write_at(0, b"4\t4\t1\t7\n")?;
+    proc_root.create("sys/kernel/shmmax", VfsNodeType::File)?;
+    let file_shmmax = proc_root.clone().lookup("./sys/kernel/shmmax")?;
+    file_shmmax.write_at(0, b"131072\n")?;
+    proc_root.create("sys/kernel/shmall", VfsNodeType::File)?;
+    let file_shmall = proc_root.clone().lookup("./sys/kernel/shmall")?;
+    file_shmall.write_at(0, b"32\n")?;
+    proc_root.create("sys/kernel/shmmni", VfsNodeType::File)?;
+    let file_shmmni = proc_root.clone().lookup("./sys/kernel/shmmni")?;
+    file_shmmni.write_at(0, b"128\n")?;
 
     proc_root.create("sys/fs", VfsNodeType::Dir)?;
     proc_root.create("sys/fs/pipe-max-size", VfsNodeType::File)?;

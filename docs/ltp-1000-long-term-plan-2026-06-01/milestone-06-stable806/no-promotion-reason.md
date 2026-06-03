@@ -1,4 +1,6 @@
-# milestone-06 current no-promotion reason
+This file is retained as historical chronology for pre-final checkpoints. It is superseded by the 2026-06-04 stable806 promotion: `LTP_STABLE_CASES` is now `806 total / 806 unique / 0 duplicate`, and the final 50-case RV/LA × musl/glibc gate is parser-clean.
+
+# milestone-06 no-promotion reason (superseded)
 
 This is an interim stable806 checkpoint. The current baseline remains stable756. The current candidate pool is **42 unique four-combo clean cases**: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`, `getsockopt02`, `recvmsg01`, `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03`. They are still only 42/50 and do not satisfy the next 50-case milestone gate.
 

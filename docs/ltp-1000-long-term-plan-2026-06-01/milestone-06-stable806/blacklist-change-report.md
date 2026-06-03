@@ -50,3 +50,10 @@ No blacklist was added, removed, or used for the socket errno/address follow-up.
 ## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
 
 No blacklist was added, removed, or used for `getsockopt02`, `recvmsg01`, or the adjacent socket regression subset. The counted evidence comes only from fresh RV + LA × musl + glibc parser-clean targeted logs and adjacent regression after generic AF_UNIX pathname listener/accept, `SO_PEERCRED`, and minimal `sendmsg`/`recvmsg` bridge support. Earlier socket/epoll scout rows for these cases are superseded by this targeted evidence; all remaining rows with visible `TFAIL/TBROK/TCONF/ENOSYS/timeout` markers remain blocker-only. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+
+## 2026-06-04 SysV SHM and final stable806 gate
+
+No blacklist was added, removed, or used for the SysV SHM final8+adjacent gate or the full 50-case stable806 promotion gate. Counted evidence comes only from RV + LA × musl + glibc parser-clean targeted logs and the final 50-case combined report.
+
+Excluded SysV rows (`shmat01`, `shmctl01`, `shmctl02`, `shmctl05`) remain blocker-only because their current evidence contains visible semantic, libc-wrapper, timeout, or environment blockers. They are not blacklist entries and are not counted. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted toward stable806.

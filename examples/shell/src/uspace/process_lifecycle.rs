@@ -21,6 +21,7 @@ use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::{current_cwd, is_busybox_applet_name};
 use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_registered};
+use super::sysv_shm;
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
@@ -482,6 +483,7 @@ impl UserProcess {
     }
 
     pub(super) fn teardown(&self) {
+        sysv_shm::release_process_attachments(self);
         self.teardown
             .run(self.pid(), &self.aspace, &self.fds, &self.children);
     }
@@ -782,6 +784,9 @@ impl UserProcess {
             }
         }
 
+        let shm_attachments = self.shm_attachments.lock().clone();
+        sysv_shm::retain_attachments(&shm_attachments);
+
         Ok(Arc::new(UserProcess {
             aspace: Mutex::new(aspace),
             brk: Mutex::new(*self.brk.lock()),
@@ -816,7 +821,7 @@ impl UserProcess {
             path_data_ranges: Mutex::new(self.path_data_ranges.lock().clone()),
             umask: AtomicU32::new(self.umask.load(Ordering::Acquire)),
             mount_points: self.mount_points.clone(),
-            shm_attachments: Mutex::new(self.shm_attachments.lock().clone()),
+            shm_attachments: Mutex::new(shm_attachments),
             real_uid: AtomicU32::new(self.real_uid()),
             uid: AtomicU32::new(self.uid()),
             saved_uid: AtomicU32::new(self.saved_uid()),

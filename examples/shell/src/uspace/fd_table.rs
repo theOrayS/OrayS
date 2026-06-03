@@ -44,11 +44,11 @@ use super::synthetic_fs::{
     proc_comm_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
     proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
     proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
-    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
-    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
-    synthetic_proc_sys_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry,
+    proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry, proc_timerslack_fd_entry,
+    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
+    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
+    synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::task_registry::user_thread_entry_by_process_pid;
@@ -5536,6 +5536,19 @@ fn open_candidates(
             proc_comm_path_entry(process, path.as_str())
         } else {
             proc_comm_fd_entry(process, path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
+            proc_sysvipc_shm_path_entry(path.as_str())
+        } else {
+            proc_sysvipc_shm_fd_entry(path.as_str())
         } {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);

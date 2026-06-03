@@ -1,7 +1,7 @@
 # milestone-06 stable806 validation notes
 
-Date: 2026-06-03. This is an early stable806 scouting checkpoint, not a promotion gate.
-`LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable-list edit was made.
+Date: 2026-06-04. This document now records the stable806 promotion gate.
+`LTP_STABLE_CASES` is `806 total / 806 unique / 0 duplicate` after promotion; older scouting sections below are historical chronology.
 
 ## Current baseline check
 
@@ -15,7 +15,7 @@ end = text.index('];', start)
 cases = re.findall(r'"([^"]+)"', text[start:end])
 print(len(cases), len(set(cases)), len(cases) - len(set(cases)))
 PY
-# 756 756 0
+# 806 806 0
 ```
 
 ## Four-image testcase universe refresh
@@ -1745,3 +1745,63 @@ Blocker-only scout evidence retained out of promotion:
 - Pre-fix fadvise/fallocate RV scout: `target/ltp-1000-milestone-06-stable806/rv-fadvise-fallocate-scout-20260604T042346+08:00.summary.txt` — `4 PASS / 24 FAIL`, all pass rows had `TCONF`, internal markers `TBROK=10`, `TFAIL=58`, `TCONF=12`, `ENOSYS=52`; zero candidates.
 
 Checksums for raw logs, parser summaries, JSON, case lists, and candidate reports are recorded in `validation-checksums.sha256`. Raw logs/checksum files remain under `target/` and are not staged. Stable list check remains `756 total / 756 unique / 0 duplicate`; this follow-up raises only the candidate pool to `42/50`.
+
+
+## 2026-06-04 stable806 final 50-case promotion gate
+
+Final cohort:
+
+```text
+prctl08 prctl09 utsname02 mkdirat02 rmdir02 mkdir02 mkdir03 fcntl27 fcntl27_64 symlink03 unlink09 mkdir09 gettid02 futex_wait_bitset01 fstat02 fstat02_64 setxattr03 fgetxattr02 getxattr02 setxattr02 splice01 splice02 splice03 splice04 splice05 lseek11 accept02 bind01 bind02 connect01 recv01 recvfrom01 send01 sendto01 bind03 getsockopt02 recvmsg01 posix_fadvise02 posix_fadvise02_64 posix_fadvise04 posix_fadvise04_64 fallocate03 shmget02 shmget03 shmget04 shmat02 shmat03 shmdt01 shmctl03 shmctl04
+```
+
+Commands:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="$CASES" LTP_CASE_TIMEOUT_SECS=60 timeout 120m ./run-eval.sh rv
+OSCOMP_TEST_GROUPS=ltp LTP_CASES="$CASES" LTP_CASE_TIMEOUT_SECS=60 timeout 120m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.log
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc \
+  target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.log \
+  target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.log
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.summary.json`
+- RV checksum: `target/ltp-1000-milestone-06-stable806/rv-stable806-candidate50-final-gate-20260604T062225+0800.sha256`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.summary.json`
+- LA checksum: `target/ltp-1000-milestone-06-stable806/la-stable806-candidate50-final-gate-20260604T062526+0800.sha256`
+- Combined promotion report: `target/ltp-1000-milestone-06-stable806/stable806-candidate50-final-gate-rv-la-fourway.promotion-candidates.txt`
+
+Parser result:
+
+- RV: `100 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA: `100 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined: `Promotion candidates: 50`, `Blocked/incomplete cases: 0`.
+
+Stable list check after edit:
+
+```text
+806 806 0
+```
+
+## 2026-06-04 SysV SHM final8 + adjacent gate
+
+The final SysV SHM lane added the last eight new unique candidates: `shmget02`, `shmget03`, `shmget04`, `shmat02`, `shmat03`, `shmdt01`, `shmctl03`, and `shmctl04`. `shmat04` and `shmdt02` were included as adjacent stable regression rows.
+
+Artifacts:
+
+- RV final8+adjacent raw log: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-final8-plus-adjacent-after-procfix-20260604T061917+0800.log`
+- RV final8+adjacent summary: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-final8-plus-adjacent-after-procfix-20260604T061917+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- LA final8+adjacent raw log: `target/ltp-1000-milestone-06-stable806/la-sysv-shm-final8-plus-adjacent-after-procfix-20260604T062021+0800.log`
+- LA final8+adjacent summary: `target/ltp-1000-milestone-06-stable806/la-sysv-shm-final8-plus-adjacent-after-procfix-20260604T062021+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- SysV combined report: `target/ltp-1000-milestone-06-stable806/sysv-shm-final8-plus-adjacent-after-procfix-fourway.promotion-candidates.txt` — 10 four-combo clean rows, of which 8 are new unique and 2 are adjacent stable rows.
+- `shmctl04` focused fix gate: RV `target/ltp-1000-milestone-06-stable806/rv-shmctl04-proc-sysvipc-fix-20260604T061743+0800.summary.txt`, LA `target/ltp-1000-milestone-06-stable806/la-shmctl04-proc-sysvipc-fix-20260604T061823+0800.summary.txt`, both `2 PASS / 0 FAIL / 0 internal markers`.
+
+Blocker-only SysV notes retained: `shmat01` remains excluded because LA musl/glibc `SHMLBA` expectations diverge for the same LTP wrapper shape; `shmctl01`/`shmctl02`/`shmctl05` still have visible blockers or environment prerequisites in earlier scouts.
