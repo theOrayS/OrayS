@@ -73,3 +73,10 @@ Future changes to `sys_futex`, thread teardown, pthread join compatibility, or `
 `futex_wait_bitset01` is protected by RV + LA × musl + glibc targeted evidence (`4 PASS / 0 FAIL` across the RV futex scout row and the LA follow-up log). No additional source changed after the generic futex bitset patch, so the code-regression boundary remains `sys_futex`, futex timeout conversion, futex keying/wake behavior, and process/thread teardown wakeups.
 
 The same RV scout keeps `futex_wake02`, `futex_wake04`, `futex_cmp_requeue01`, and `futex_cmp_requeue02` out of the candidate pool because their evidence has visible `TBROK`/`TCONF` markers. The RV clone and FD/vector-IO scouts are also blocker-only. Future work on selective wake, requeue, clone flags, or vector I/O must rerun their targeted rows plus the stable futex/clone or FD adjacent subset before promotion.
+
+
+## fstat02/fstat02_64 evidence-only regression boundary
+
+`fstat02` and `fstat02_64` are protected by RV + LA × musl + glibc targeted evidence (`8 PASS / 0 FAIL` across the RV FD/path scout rows and the LA follow-up log). No source changed in this follow-up, so the code-regression boundary remains the existing `fstat(2)` metadata path, path-backed file descriptor lookup, and stat struct copy-out semantics.
+
+The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` out of the candidate pool because their evidence has visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers. The RV VFS/MM, LA `mmap05`, process/exec/signal, and exec-only scouts are also blocker-only. Future edits in `stat`/`fstat` metadata, FD lookup, or user-pointer stat copy-out should rerun `fstat02`, `fstat02_64`, and a representative adjacent stable stat/fstat subset before promotion.
