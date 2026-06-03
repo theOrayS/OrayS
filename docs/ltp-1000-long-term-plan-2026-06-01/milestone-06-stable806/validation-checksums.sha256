@@ -438,3 +438,16 @@ e67b000707c10bca618dcac304d826d1b757e60d09bc9cf2d190e310b204b4d8  target/ltp-100
 144e049aae4f5fbbb7a2a02c35449a86db1eee382b2b7a1a6c27a19b632fa8fe  target/ltp-1000-milestone-06-stable806/rv-vfs-time-proc-lowrisk-scout-20260604T030139+0800.log
 e36abeb2adb2e84196e1ef2dc7f63c1287ef4717c6b4c5660a22dff88ee5bbcb  target/ltp-1000-milestone-06-stable806/rv-vfs-time-proc-lowrisk-scout-20260604T030139+0800.promotion-candidates.txt
 6a7c418e21d3fc360415da0137be16dab0f8d5db6e7505c253932807b656fcb1  target/ltp-1000-milestone-06-stable806/rv-vfs-time-proc-lowrisk-scout-20260604T030139+0800.summary.txt
+a55f7ccd3e4deb32bfcf3ee21ca9d784cfea923979d1f998901f7cf09fbc592b  target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800.log
+dd3f11ac24afef93bc1afe78f0f1f42cec79a1f7f623ef23da43b263caeb7ea9  target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.txt
+2d0a4e0287e3a17c35a20d239aa83c0e5b8124bf3df7fa47a5aca4a45b11b5f0  target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.json
+bfff96a4cc512db4c544958a9d0f58d8f822c3f17890a36b242d033c86b6bbfd  target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800.log
+a0e9fe3a3ec106835e3263db6cc95ebddd1b8608d7f08afa62388fa8bf79ced8  target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.txt
+1562da07af94c6871f405a678c27cd98e546226f0d7245c41ecf4413f9d3ba82  target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.json
+020f5fe41095eddd05f21389702b33f8f85639b556b4bb0b78d1d0476e3d7786  target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt
+674213ca86868e98fdf550eee40f807df3ae0b99a7b3b4c58ae5d6044cb10573  target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800.log
+75731d653797438518abf683558f855e1b103dc7c36d1d5e721446b87247551e  target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt
+a14fd19b1d17aef59be161939ab61f34587feb8b4024733783f2ad5a4903772c  target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.json
+e9f644d867787d9bd199d9fca7a8a8d0313cdb5591d900f3333ab99f00aa1f6a  target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800.log
+efe9f44ea092cfdaa429fe4ddcc2cef89a269b43ff780eac3bcbc6a74718626a  target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt
+9f351f5af691644851e318435b84391e80625b3fdff152a66a4d11e82204dc7e  target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.json

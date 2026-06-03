@@ -121,6 +121,7 @@ pub(super) const SO_KEEPALIVE_OPT: i32 = 9;
 pub(super) const SO_REUSEPORT_OPT: i32 = 15;
 pub(super) const SO_RCVTIMEO_OPT: i32 = 20;
 pub(super) const SO_SNDTIMEO_OPT: i32 = 21;
+pub(super) const SO_PEERCRED_OPT: i32 = 17;
 pub(super) const IPPROTO_IP_LEVEL: i32 = 0;
 pub(super) const IP_RECVERR_OPT: i32 = 11;
 pub(super) const MCAST_JOIN_GROUP_OPT: i32 = 42;
