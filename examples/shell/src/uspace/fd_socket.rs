@@ -7,6 +7,7 @@ use arceos_posix_api::ctypes as posix_ctypes;
 use axerrno::LinuxError;
 use axsync::Mutex;
 use linux_raw_sys::general;
+use std::string::String;
 use std::sync::Arc;
 use std::vec::Vec;
 
@@ -936,7 +937,72 @@ pub(super) fn sys_bind_bridge(
     addr: usize,
     addrlen: usize,
 ) -> isize {
+    match is_local_socket_fd(process, fd) {
+        Ok(true) => return sys_bind_local_socket(process, addr, addrlen),
+        Ok(false) => {}
+        Err(err) => return neg_errno(err),
+    }
     socket_addr_call(process, fd, addr, addrlen, arceos_posix_api::sys_bind)
+}
+
+fn sys_bind_local_socket(process: &UserProcess, addr: usize, addrlen: usize) -> isize {
+    let path = match read_unix_path_socket_addr(process, addr, addrlen) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    match process.fds.lock().mknodat(
+        process,
+        general::AT_FDCWD,
+        path.as_str(),
+        ST_MODE_SOCKET | 0o777,
+        0,
+    ) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+fn read_unix_path_socket_addr(
+    process: &UserProcess,
+    addr: usize,
+    addrlen: usize,
+) -> Result<String, LinuxError> {
+    if addr == 0 {
+        return Err(LinuxError::EFAULT);
+    }
+    let family_len = size_of::<posix_ctypes::sa_family_t>();
+    if addrlen < family_len {
+        return Err(LinuxError::EINVAL);
+    }
+    validate_user_read(process, addr, addrlen)?;
+    let bytes = read_user_bytes(process, addr, addrlen.min(MAX_USER_IO_CHUNK))?;
+    let family = posix_ctypes::sa_family_t::from_ne_bytes(
+        bytes[..family_len]
+            .try_into()
+            .unwrap_or([0; size_of::<posix_ctypes::sa_family_t>()]),
+    );
+    if family as i32 != AF_UNIX_DOMAIN {
+        return Err(LinuxError::EINVAL);
+    }
+    let path_bytes = &bytes[family_len..];
+    let Some(&first) = path_bytes.first() else {
+        return Err(LinuxError::EINVAL);
+    };
+    if first == 0 {
+        // Abstract AF_UNIX sockets need a listener registry.  Pathname
+        // sockets, which materialize as filesystem socket nodes, are handled
+        // here; abstract names remain unsupported rather than being faked.
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    let path_len = path_bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(path_bytes.len());
+    let path = core::str::from_utf8(&path_bytes[..path_len]).map_err(|_| LinuxError::EINVAL)?;
+    if path.is_empty() {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok(path.into())
 }
 
 pub(super) fn sys_listen_bridge(process: &UserProcess, fd: usize, backlog: usize) -> isize {

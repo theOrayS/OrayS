@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 17/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 20/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -21,6 +21,9 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `fstat02` | RV + LA × musl + glibc targeted parser-clean from the FD/path metadata scout and LA follow-up; no source change in this follow-up | candidate pool |
 | `fstat02_64` | RV + LA × musl + glibc targeted parser-clean from the same FD/path metadata evidence; no source change in this follow-up | candidate pool |
 | `setxattr03` | RV + LA × musl + glibc targeted parser-clean after generic immutable/append-only xattr mutation `EPERM` guard | candidate pool |
+| `fgetxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special-node xattr/read and AF_UNIX pathname bind repair | candidate pool |
+| `getxattr02` | RV + LA × musl + glibc targeted parser-clean after special inode xattr mutation rejects `user.*` writes with `EPERM` while get/list stays metadata-only | candidate pool |
+| `setxattr02` | RV + LA × musl + glibc targeted parser-clean after generic special inode xattr mutation `EPERM` boundary | candidate pool |
 
 Evidence artifacts:
 
@@ -113,6 +116,21 @@ Additional setxattr03 immutable/append-only xattr evidence artifacts:
 - Combined RV+LA setxattr03 candidate report: `target/ltp-1000-milestone-06-stable806/combined-setxattr03-fourway-20260603T234153+0800.promotion-candidates.txt`
 - RV xattr stable regression summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.txt`
 - LA xattr stable regression summary: `target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.txt`
+
+
+Additional fgetxattr02/getxattr02/setxattr02 special-node xattr evidence artifacts:
+
+- RV targeted log: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.log`
+- RV targeted summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.summary.txt`
+- RV targeted candidate report: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.promotion-candidates.txt`
+- LA targeted log: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.log`
+- LA targeted summary: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.summary.txt`
+- LA targeted candidate report: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/combined-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt`
+- RV adjacent xattr/mknod/socket regression summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt`
+- LA adjacent xattr/mknod/socket regression summary: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt`
+
+Note: the earlier `rv-xattr-special-node-fix-20260604T000115+0800` run is diagnostic only because `fgetxattr02` still hit an AF_UNIX `bind()`/`ENOTSOCK` `TBROK`, and the `rv-xattr-special-node-bind-fix-20260604T000402+0800` run is build-fail diagnostic only. They are not counted as promotion evidence.
 
 The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` out of the pool because their rows contain visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers.
 
@@ -221,4 +239,4 @@ Additional excluded late-scout artifacts:
 - RV FD/path small scout summary: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt` — blocked rows remain excluded; only `fstat02`/`fstat02_64` are counted after LA confirmation.
 
 - RV sync/fd/io scout summary: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt` — `0 PASS / 20 FAIL`; no `fdatasync`, `fsync`, `sync`, `syncfs`, `sync_file_range`, FIFO `read`/`write`, or `lseek11` row is counted.
-- RV xattr small scout summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`; no row is counted from that scout by itself. `setxattr03` is counted only after the later generic immutable/append-only xattr mutation repair and fresh RV+LA evidence above.
+- RV xattr small scout summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt` — `0 PASS / 16 FAIL`; no row is counted from that scout by itself. `setxattr03`, `fgetxattr02`, `getxattr02`, and `setxattr02` are counted only after their later generic repairs and fresh RV+LA evidence above.

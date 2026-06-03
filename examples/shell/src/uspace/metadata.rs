@@ -26,7 +26,7 @@ use super::user_memory::{
 };
 use super::{PathTimes, UserProcess};
 
-const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
+pub(super) const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 pub(super) const DEV_ZERO_RDEV: u64 = 261; // Linux makedev(1, 5).
 const DEV_VDA_RDEV: u64 = 65_024; // Linux makedev(254, 0), virtio block.
 const DEV_SDA_RDEV: u64 = 2_048; // Linux makedev(8, 0).
@@ -1135,6 +1135,12 @@ fn check_inode_flags_allow_xattr_mutation(
     process: &UserProcess,
     path: &str,
 ) -> Result<(), LinuxError> {
+    if matches!(
+        process.path_special_mode(path),
+        Some(ST_MODE_FIFO | ST_MODE_CHR | ST_MODE_BLK | ST_MODE_SOCKET)
+    ) {
+        return Err(LinuxError::EPERM);
+    }
     let flags = process.path_inode_flags(path);
     if flags & (general::FS_IMMUTABLE_FL | general::FS_APPEND_FL) != 0 {
         Err(LinuxError::EPERM)
