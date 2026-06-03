@@ -39,3 +39,7 @@ setitimer01
 sigtimedwait01
 sigwait01
 sigwaitinfo01
+
+# RV/LA timerslack targeted retest, 2026-06-03 (retested cases from proc/synthetic/sched scout)
+prctl08
+prctl09

@@ -56,6 +56,8 @@ use select_fdset::SelectMode;
 
 struct AxNamespaceImpl;
 
+const DEFAULT_TIMER_SLACK_NS: u64 = 50_000;
+
 #[derive(Clone)]
 struct MountPoint {
     source_root: String,
@@ -114,6 +116,8 @@ struct UserProcess {
     credential_generation: AtomicUsize,
     personality: AtomicUsize,
     parent_death_signal: AtomicI32,
+    default_timer_slack_ns: AtomicU64,
+    timer_slack_ns: AtomicU64,
     real_timer_generation: AtomicU64,
     real_timer_deadline_us: AtomicU64,
     real_timer_interval_us: AtomicU64,
