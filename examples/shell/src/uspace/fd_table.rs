@@ -74,6 +74,9 @@ const LINUX_PATH_MAX: usize = 4096;
 // that would later panic during directory enumeration.
 const LINUX_NAME_MAX: usize = 63;
 const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
+const FALLOC_FL_KEEP_SIZE: usize = 0x01;
+const POSIX_FADV_MIN: i32 = 0;
+const POSIX_FADV_MAX: i32 = 5;
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
 
 pub(super) enum FdEntry {
@@ -260,7 +263,7 @@ pub(super) fn sys_fallocate(
     if offset < 0 || len <= 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    if mode != 0 {
+    if mode != 0 && mode != FALLOC_FL_KEEP_SIZE {
         return neg_errno(LinuxError::EOPNOTSUPP);
     }
     let Some(end) = (offset as u64).checked_add(len as u64) else {
@@ -270,7 +273,34 @@ pub(super) fn sys_fallocate(
     if end > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
     }
-    match process.fds.lock().truncate(process, fd as i32, end) {
+    let result = if mode == FALLOC_FL_KEEP_SIZE {
+        process.fds.lock().fallocate_keep_size(process, fd as i32)
+    } else {
+        process.fds.lock().truncate(process, fd as i32, end)
+    };
+    match result {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_fadvise64(
+    process: &UserProcess,
+    fd: usize,
+    offset: usize,
+    len: usize,
+    advice: usize,
+) -> isize {
+    let offset = offset as isize;
+    let len = len as isize;
+    if offset < 0 || len < 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let advice = advice as i32;
+    if !(POSIX_FADV_MIN..=POSIX_FADV_MAX).contains(&advice) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    match process.fds.lock().fadvise64(fd as i32) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -2889,6 +2919,40 @@ impl FdTable {
             | FdEntry::ProcPagemap(_)
             | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
             _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn fallocate_keep_size(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+    ) -> Result<(), LinuxError> {
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EINVAL);
+                }
+                let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+                process.ensure_path_data_ranges(file.path.clone(), physical_size);
+                Ok(())
+            }
+            FdEntry::DevNull => Ok(()),
+            FdEntry::BlockDevice(_) => Ok(()),
+            FdEntry::Rtc => Ok(()),
+            FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn fadvise64(&self, fd: i32) -> Result<(), LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Ok(()),
         }
     }
 

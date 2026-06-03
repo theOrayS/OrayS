@@ -1,13 +1,13 @@
 # milestone-06 current no-promotion reason
 
-This is an interim stable806 checkpoint. The current baseline remains stable756. The current candidate pool is **37 unique four-combo clean cases**: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, and `bind03`, plus `getsockopt02` and `recvmsg01`. They are still only 37/50 and do not satisfy the next 50-case milestone gate.
+This is an interim stable806 checkpoint. The current baseline remains stable756. The current candidate pool is **42 unique four-combo clean cases**: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`, `getsockopt02`, `recvmsg01`, `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03`. They are still only 42/50 and do not satisfy the next 50-case milestone gate.
 
 Reasons promotion is still blocked at this checkpoint:
 
 1. The old archived 4/4 clean-not-stable seed list has already been exhausted by earlier milestones; no remaining old clean seed exists outside current stable756.
 2. The broader proc/synthetic/sched scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside `prctl08`/`prctl09`.
 3. The time/fd/signal scout still has visible `TFAIL`, `TBROK`, `TCONF`, `ENOSYS`, and timeout rows outside this repair lane.
-4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03`, plus `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`..`splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`, `getsockopt02`, and `recvmsg01`, have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, futex/clone, xattr, xattr/mknod/socket, and lseek adjacent subsets are clean; however the candidate pool is still far below the required next +50 unique stable milestone.
+4. The clean timerslack pair, UTS shared-hostname row, VFS/mkdir `mkdir02`/`mkdir03`/`mkdirat02`/`rmdir02` rows, `fcntl27`/`fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, and `setxattr03`, plus `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`..`splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`, `getsockopt02`, `recvmsg01`, `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03`, have RV + LA × musl + glibc evidence, and the UTS, VFS/metadata, fcntl, symlink, unlink, futex/clone, xattr, xattr/mknod/socket, lseek, AF_UNIX, and FD/storage adjacent subsets are clean; however the candidate pool is still below the required next +50 unique stable milestone.
 5. No blacklist/SKIP/status0/full-sweep partial TPASS evidence is counted.
 
 Next safe slices:
@@ -118,11 +118,18 @@ Additional no-promotion note after generic splice(2) repair:
 ## 2026-06-04 socket errno/address candidate follow-up
 
 - Generic socket errno/address-boundary fixes add nine new unique four-combo clean candidates: `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, and `bind03`.
-- The stable806 candidate pool was `35/50` at that checkpoint; the later AF_UNIX follow-up below raises it to `37/50`, still short by 13 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+- The stable806 candidate pool was `35/50` at that checkpoint; the later AF_UNIX follow-up raised it to `37/50`, and the fadvise64/fallocate follow-up raises the current pool to `42/50`, still short by 8 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
 - The socket/epoll low-risk scout, 16-bit credential scout, VFS/time/proc scout, and LA readlink refresh all remain blocker-only because their parser summaries contain visible `TFAIL/TBROK/TCONF/ENOSYS/timeout` markers or libc-wrapper blockers. They are not counted.
 
 ## 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
 
 - Generic AF_UNIX pathname stream listener/accept, peer-credential tracking, and minimal `sendmsg`/`recvmsg` bridge support add two new unique four-combo clean candidates: `getsockopt02` and `recvmsg01`.
-- The current stable806 candidate pool is `37/50`, still short by 13 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+- The stable806 candidate pool was `37/50` at the AF_UNIX checkpoint; the fadvise64/fallocate follow-up raises the current pool to `42/50`, still short by 8 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
 - Earlier blocker-only scout rows for these two cases are superseded only by the fresh targeted RV + LA × musl + glibc parser-clean logs. Other socketcall, abstract namespace, datagram/SEQPACKET, and pass-with-`TCONF` rows remain excluded.
+
+## 2026-06-04 fadvise64/fallocate KEEP_SIZE candidate-only follow-up
+
+- Generic `fadvise64` dispatch/errno handling and `FALLOC_FL_KEEP_SIZE` support add five new unique four-combo clean candidates: `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03`.
+- The current stable806 candidate pool is `42/50`, still short by 8 unique cases. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; there is no stable-list update and no stable806 milestone commit yet.
+- SysV shm scout rows remain blocker-only (`0 PASS / 26 FAIL`, visible `TCONF/TBROK/TFAIL`) and are excluded.
+- `posix_fadvise01`, `posix_fadvise01_64`, `posix_fadvise03`, `posix_fadvise03_64`, `fallocate01`, `fallocate02`, `fallocate04`, `fallocate05`, and `fallocate06` remain excluded because their current evidence contains `TCONF`, `TFAIL`, `TBROK`, `ENOSYS`, full-filesystem, missing `/bin/cat`, or test-device blockers. Wrapper PASS rows with internal markers are not promotion evidence.

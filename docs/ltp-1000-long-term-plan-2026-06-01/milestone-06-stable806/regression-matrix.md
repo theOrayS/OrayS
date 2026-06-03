@@ -157,3 +157,18 @@ Required before promotion:
 Covered stable adjacency includes `socket01`, `socket02`, `socketpair01`, `socketpair02`, `accept01`, `getsockopt01`, `setsockopt01`, and the current socket candidate rows `accept02`, `bind01`, `bind02`, `bind03`, `connect01`, `recv01`, `recvfrom01`, `send01`, and `sendto01`. Future edits in AF_UNIX local socket listener lifecycle, local-socket peer credential handling, `sendmsg`/`recvmsg` bridge code, socket fd type dispatch, or local socket `getsockopt` should rerun `getsockopt02`, `recvmsg01`, and this adjacent socket subset on RV + LA × musl + glibc before counting these cases in a stable milestone.
 
 The boundary does not cover abstract namespace, datagram/SEQPACKET, full ancillary `SCM_RIGHTS`, or socketcall rows; those remain blocker/future-work lanes and must not be promoted from this evidence.
+
+## 2026-06-04 fadvise64/fallocate KEEP_SIZE regression boundary
+
+Protected candidate gate:
+
+- `posix_fadvise02`, `posix_fadvise02_64`, `posix_fadvise04`, `posix_fadvise04_64`, and `fallocate03` are parser-clean on RV + LA × musl + glibc after the generic `fadvise64` dispatch and `FALLOC_FL_KEEP_SIZE` repair.
+- Combined candidate evidence: `target/ltp-1000-milestone-06-stable806/fadvise02-04-fallocate03-rv-la-fourway.promotion-candidates.txt` — five candidates, blocked/incomplete `0`.
+
+Adjacent regression protected in the same checkpoint:
+
+- Case subset: `fcntl27`, `fcntl27_64`, `lseek11`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `fstat02`, `fstat02_64`.
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+
+Future edits to `sys_fadvise64`, `FdTable::fadvise64`, `sys_fallocate`, `fallocate_keep_size`, `truncate`, regular-file writable-descriptor checks, sparse size/data-range metadata, read/write/lseek behavior, or syscall dispatch for these numbers must rerun the targeted five-case gate plus the adjacent FD/storage regression subset before any stable806 promotion.

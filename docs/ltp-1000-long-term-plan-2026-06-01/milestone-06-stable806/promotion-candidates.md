@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 37/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 42/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -41,6 +41,11 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `bind03` | RV + LA × musl + glibc parser-clean after generic AF_UNIX pathname bind node/existing-bind behavior | candidate pool |
 | `getsockopt02` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname listener/accept plus `SO_PEERCRED` support | candidate pool |
 | `recvmsg01` | RV + LA × musl + glibc parser-clean after AF_UNIX pathname stream listener plus minimal `sendmsg`/`recvmsg` bridge | candidate pool |
+| `posix_fadvise02` | RV + LA × musl + glibc parser-clean after generic `fadvise64` invalid-fd errno support | candidate pool |
+| `posix_fadvise02_64` | RV + LA × musl + glibc parser-clean after the same generic `fadvise64` invalid-fd errno support | candidate pool |
+| `posix_fadvise04` | RV + LA × musl + glibc parser-clean after generic `fadvise64` nonseekable-fd `ESPIPE` handling | candidate pool |
+| `posix_fadvise04_64` | RV + LA × musl + glibc parser-clean after the same generic `fadvise64` nonseekable-fd `ESPIPE` handling | candidate pool |
+| `fallocate03` | RV + LA × musl + glibc parser-clean after generic `FALLOC_FL_KEEP_SIZE` no-size-growth handling | candidate pool |
 
 Evidence artifacts:
 
@@ -335,7 +340,7 @@ The candidate pool is now 26/50 unique cases. `examples/shell/src/cmd.rs::LTP_ST
 
 ## 2026-06-04 socket errno/address candidate follow-up
 
-The socket errno/address follow-up added nine new unique four-combo candidates and superseded the prior 26/50 pool count with a then-current **35/50** pool; the later AF_UNIX `SO_PEERCRED`/`recvmsg` follow-up below supersedes this again with a current **37/50** pool. These rows are counted only from fresh RV + LA × musl + glibc parser-clean evidence; blocked socketcall, namespace, pass-with-`TCONF`, and already-stable rows remain excluded.
+The socket errno/address follow-up added nine new unique four-combo candidates and superseded the prior 26/50 pool count with a then-current **35/50** pool; the later AF_UNIX `SO_PEERCRED`/`recvmsg` follow-up superseded this again with a **37/50** pool, and the later fadvise64/fallocate KEEP_SIZE follow-up raises the current pool to **42/50**. These rows are counted only from fresh RV + LA × musl + glibc parser-clean evidence; blocked socketcall, namespace, pass-with-`TCONF`, and already-stable rows remain excluded.
 
 | Candidate set | Combined report | New unique candidates |
 | --- | --- | --- |
@@ -408,4 +413,26 @@ Evidence artifacts:
 
 Current 37-case pool: `prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`, `gettid02`, `futex_wait_bitset01`, `fstat02`, `fstat02_64`, `setxattr03`, `fgetxattr02`, `getxattr02`, `setxattr02`, `splice01`, `splice02`, `splice03`, `splice04`, `splice05`, `lseek11`, `accept02`, `bind01`, `bind02`, `connect01`, `recv01`, `recvfrom01`, `send01`, `sendto01`, `bind03`, `getsockopt02`, `recvmsg01`.
 
-The candidate pool is now **37/50**, still short by 13 unique four-combo clean cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the full +50 gate.
+The candidate pool was **37/50** at the AF_UNIX checkpoint; the later fadvise64/fallocate KEEP_SIZE follow-up raises the current pool to **42/50**, still short by 8 unique four-combo clean cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the full +50 gate.
+
+## 2026-06-04 fadvise64/fallocate KEEP_SIZE follow-up
+
+This follow-up adds five candidate-pool cases after generic syscall behavior changes. It does not edit `LTP_STABLE_CASES` and does not count pass-with-`TCONF` or blocker-only rows from the broader scout.
+
+New four-combo candidates from this follow-up:
+
+- `posix_fadvise02` and `posix_fadvise02_64` — invalid file descriptor now returns `EBADF` through the generic `fadvise64` path instead of `ENOSYS`.
+- `posix_fadvise04` and `posix_fadvise04_64` — pipe/socket/local-socket descriptors now return `ESPIPE` for advisory file-offset calls.
+- `fallocate03` — `FALLOC_FL_KEEP_SIZE` is accepted for writable regular files while preserving logical file size.
+
+Evidence:
+
+- Pre-fix RV scout: `target/ltp-1000-milestone-06-stable806/rv-fadvise-fallocate-scout-20260604T042346+08:00.summary.txt` — `4 PASS / 24 FAIL`, but all pass rows were pass-with-`TCONF`; internal markers `TBROK=10`, `TFAIL=58`, `TCONF=12`, `ENOSYS=52`; zero promotion candidates.
+- RV targeted summary: `target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.summary.txt` — `10 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA targeted summary: `target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.summary.txt` — `10 PASS / 0 FAIL / 0 internal markers`.
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/fadvise02-04-fallocate03-rv-la-fourway.promotion-candidates.txt` — five four-combo candidates; blocked/incomplete `0`.
+- RV adjacent FD/storage regression: `target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- LA adjacent FD/storage regression: `target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt` — `20 PASS / 0 FAIL / 0 internal markers`.
+- SysV shm scout retained as blocker-only evidence: `target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt` — `0 PASS / 26 FAIL`, internal markers `TCONF=3`, `TBROK=2`, `TFAIL=9`; no LA follow-up and no promotion candidates.
+
+The current candidate pool is **42/50**, still short by 8 unique cases. Stable count remains `756 total / 756 unique / 0 duplicate`; no stable-list update or milestone806 promotion commit is allowed yet.
