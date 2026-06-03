@@ -428,7 +428,7 @@ Parser result:
 - panic/trap matches: 0.
 - RV-only promotion candidates: 0.
 
-Conclusion: 16-bit UID and capability rows are currently visible `TCONF` blockers, not promotion evidence. `gettid02` is only musl-clean; the RV glibc row hit a `TBROK` futex-abort path and must be handled through a futex/glibc robustness lane before any promotion attempt.
+Conclusion at this scout point: 16-bit UID and capability rows are currently visible `TCONF` blockers, not promotion evidence. `gettid02` was only musl-clean in this earlier RV-only scout because the RV glibc row hit a `TBROK` futex-abort path; that `gettid02` blocker is superseded by the later futex/glibc follow-up evidence below.
 
 ## Nice errno boundary
 
@@ -441,7 +441,7 @@ The shared priority implementation currently returns `EACCES` when a non-root ca
 
 ## Updated validation conclusion after blocker triage
 
-The post-UTS blocker triage added zero promotion candidates. `readlink03`, `readlinkat02`, `nice04`, the statx scout, and the credential/capability scout all remain excluded because their evidence contains visible `TFAIL`, `TBROK`, `TCONF`, or timeout markers, or would require a semantically unsafe kernel-only workaround. At that pre-VFS-repair point, the milestone-06 candidate pool remained `prctl08`, `prctl09`, and `utsname02` (3 new unique cases), and `LTP_STABLE_CASES` remained `756 total / 756 unique / 0 duplicate`.
+The post-UTS blocker triage added zero promotion candidates at that point. `readlink03`, `readlinkat02`, `nice04`, the statx scout, and the credential/capability scout all remained excluded because their evidence contained visible `TFAIL`, `TBROK`, `TCONF`, or timeout markers, or would require a semantically unsafe kernel-only workaround. The `gettid02` row from that scout is superseded by the later futex/glibc follow-up evidence below. At that pre-VFS-repair point, the milestone-06 candidate pool remained `prctl08`, `prctl09`, and `utsname02` (3 new unique cases), and `LTP_STABLE_CASES` remained `756 total / 756 unique / 0 duplicate`.
 
 ## RV VFS/FD/select scout
 
@@ -1001,3 +1001,48 @@ Adjacent parser result:
 - Combined adjacent report: all 11 adjacent cases are four-combo clean.
 
 `mkdir09` is added to the stable806 candidate pool with four-combo clean evidence and an 11-case futex/clone adjacent stable subset on both architectures. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 12/50 for stable806.
+
+## gettid02 futex/glibc follow-up targeted retest
+
+The earlier credential/capability scout had only RV musl-clean `gettid02` evidence and a glibc `TBROK` caused by the same pthread/futex command gap later fixed for `mkdir09`. After the generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support was committed, `gettid02` was rerun directly on both architectures. No additional source change was made for this follow-up.
+
+RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='gettid02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.log
+```
+
+LA command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='gettid02' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.log target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.log
+```
+
+Artifacts:
+
+- RV log: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.promotion-candidates.txt`
+- LA log: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt`
+
+Parser result:
+
+- RV summary: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- LA summary: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- Combined RV+LA report: four-combo candidate `gettid02`; `gettid02` is not already present in `LTP_STABLE_CASES`.
+
+Regression boundary:
+
+No new code was added for this follow-up. The underlying code change is the generic futex bitset support already protected by the RV/LA futex/clone adjacent regression above (`22 PASS / 0 FAIL` on each architecture). `gettid02` itself confirms that thread IDs remain distinct across pthread-created threads on RV and LA, musl and glibc.
+
+`gettid02` is added to the stable806 candidate pool with four-combo clean evidence. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 13/50 for stable806.
