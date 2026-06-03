@@ -358,3 +358,23 @@ unlinkat01
 rmdir01
 mkdir04
 unlink09
+
+
+# RV mkdir09 current blocker retest before futex bitset repair, 2026-06-03
+mkdir09
+
+# RV/LA mkdir09 futex bitset targeted repair retest, 2026-06-03
+mkdir09
+
+# RV/LA futex bitset adjacent stable regression subset, 2026-06-03
+futex_wait01
+futex_wait02
+futex_wait03
+futex_wait04
+futex_wait05
+futex_wake01
+futex_wake03
+clone01
+clone03
+clone06
+clone07

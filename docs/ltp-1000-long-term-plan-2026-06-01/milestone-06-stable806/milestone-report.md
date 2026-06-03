@@ -18,6 +18,7 @@ Move the live baseline from stable756 toward the next stable806 milestone withou
 - Repaired `F_SETLEASE` read-lease access semantics so write-open file descriptors fail with `EAGAIN`, making `fcntl27` and same-source `fcntl27_64` four-combo clean candidates while preserving existing read-only lease rows.
 - Seeded Linux-like `01777` metadata for `/tmp` and `/tmp/ltp-work`, then made `symlinkat` use the generic parent write/search/type permission gate before recording synthetic symlinks; this makes `symlink03` four-combo clean without hardcoding the case or path.
 - Added generic `FS_IOC_GETFLAGS`/`FS_IOC_SETFLAGS` handling plus immutable/append-only unlink `EPERM` checks; this makes `unlink09` four-combo clean without hardcoding the case or output.
+- Added generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support; this makes glibc `mkdir09` four-combo clean without hardcoding the case or output.
 - Did not edit `examples/shell/src/cmd.rs::LTP_STABLE_CASES`.
 
 ## Candidate-pool status
@@ -35,6 +36,7 @@ Current new unique stable806 candidates:
 9. `fcntl27_64`
 10. `symlink03`
 11. `unlink09`
+12. `mkdir09`
 
 `utsname01` is clean in the UTS targeted run but is already stable, so it is only adjacent regression evidence.
 
@@ -62,7 +64,7 @@ Current new unique stable806 candidates:
 - Adjacent RV metadata/VFS regression: `target/ltp-1000-milestone-06-stable806/rv-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.txt` — `70 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA metadata/VFS regression: `target/ltp-1000-milestone-06-stable806/la-mkdir-setgid-symlink-exist-adjacent-regression-20260603T202536+08:00.summary.txt` — `70 PASS / 0 FAIL / 0 internal markers`.
 
-- RV VFS/FD isolation scout: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-isolation-scout-20260603T211800+0800.summary.txt` — `1 PASS / 5 FAIL`, initially confirming `symlink03` and glibc `mkdir09` as blocker rows while `fcntl27` was a repairable lease-access row. The later `symlink03` repair below supersedes the `symlink03` blocker evidence; `mkdir09` remains excluded.
+- RV VFS/FD isolation scout: `target/ltp-1000-milestone-06-stable806/rv-vfs-fd-isolation-scout-20260603T211800+0800.summary.txt` — `1 PASS / 5 FAIL`, initially confirming `symlink03` and glibc `mkdir09` as blocker rows while `fcntl27` was a repairable lease-access row. The later `symlink03` repair below supersedes the `symlink03` blocker evidence; `mkdir09` is superseded by the later futex bitset repair evidence below.
 - fcntl27 targeted RV: `target/ltp-1000-milestone-06-stable806/rv-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
 - fcntl27 targeted LA: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.summary.txt` — same clean `2 PASS / 0 FAIL / 0 internal markers` result.
 - Combined fcntl27 candidate report: `target/ltp-1000-milestone-06-stable806/la-fcntl27-read-lease-access-fix-20260603T212200+0800.combined-promotion-candidates.txt` — four-combo candidate `fcntl27`.
@@ -86,6 +88,13 @@ Current new unique stable806 candidates:
 - Adjacent RV unlink/path-permission regression: `target/ltp-1000-milestone-06-stable806/rv-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt` — `46 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA unlink/path-permission regression: `target/ltp-1000-milestone-06-stable806/la-unlink09-fs-ioc-adjacent-regression-20260603T220147+0800.summary.txt` — `46 PASS / 0 FAIL / 0 internal markers`.
 
+- mkdir09 pre-fix diagnostic: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-current-retest-20260603T222025+0800.summary.txt` — `1 PASS / 1 FAIL / TBROK=1`, not promotion evidence.
+- mkdir09 targeted RV after futex bitset repair: `target/ltp-1000-milestone-06-stable806/rv-mkdir09-futex-bitset-fix-20260603T222513+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- mkdir09 targeted LA after futex bitset repair: `target/ltp-1000-milestone-06-stable806/la-mkdir09-futex-bitset-fix-20260603T222640+0800.summary.txt` — same clean `2 PASS / 0 FAIL / 0 internal markers` result.
+- Combined mkdir09 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-mkdir09-futex-bitset-fix-promotion-candidates.txt` — four-combo candidate `mkdir09`.
+- Adjacent RV futex/clone regression: `target/ltp-1000-milestone-06-stable806/rv-futex-bitset-adjacent-regression-20260603T222822+0800.summary.txt` — `22 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA futex/clone regression: `target/ltp-1000-milestone-06-stable806/la-futex-bitset-adjacent-regression-20260603T223054+0800.summary.txt` — `22 PASS / 0 FAIL / 0 internal markers`.
+
 ## Risks and boundaries
 
 - `CLONE_NEWUTS` and `unshare(CLONE_NEWUTS)` are still not implemented; `utsname03` remains blocked and is not counted.
@@ -100,4 +109,4 @@ Current new unique stable806 candidates:
 
 ## Conclusion
 
-This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, and FS_IOC inode-flag/unlink errno semantics and adds 9 new unique candidates (`utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`), bringing the stable806 candidate pool to 11 unique cases. The blocker triage added zero candidates outside the explicitly repaired rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.
+This checkpoint improves UTS, VFS path/errno, metadata inheritance, fcntl lease, symlink parent-permission, FS_IOC inode-flag/unlink errno, and futex bitset semantics. It brings the stable806 candidate pool to 12 unique cases (`prctl08`, `prctl09`, `utsname02`, `mkdirat02`, `rmdir02`, `mkdir02`, `mkdir03`, `fcntl27`, `fcntl27_64`, `symlink03`, `unlink09`, `mkdir09`). The blocker triage added zero candidates outside the explicitly repaired rows and intentionally avoided unsafe readlink/nice workarounds. Baseline remains `756 total / 756 unique / 0 duplicate`; no stable-list milestone promotion commit is created until the next +50 unique clean cohort is available.

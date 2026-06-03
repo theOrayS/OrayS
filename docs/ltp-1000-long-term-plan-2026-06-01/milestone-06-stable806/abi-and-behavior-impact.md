@@ -71,7 +71,7 @@ Unchanged boundaries:
 
 - `unlink` of non-directory final symlinks remains governed by the existing non-following final-component removal semantics.
 - No FD table layout, FD_CLOEXEC, file status flag, signal, futex, mmap, user-pointer ABI, struct layout, or syscall number behavior changed.
-- The patch does not hardcode LTP case names, paths, process names, or expected output. Remaining `mkdir09`, `mknod07`, and `mknodat02` blockers retain visible parser markers and are not counted until separately repaired; `unlink09` moved to the later FS_IOC inode-flag repair lane.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. `mkdir09` moved to the later futex bitset repair lane; remaining `mknod07` and `mknodat02` blockers retain visible parser markers and are not counted until separately repaired. `unlink09` moved to the later FS_IOC inode-flag repair lane.
 
 ## mkdir setgid and final symlink existence repair impact
 
@@ -144,3 +144,22 @@ Resource/lifetime and maintenance boundaries:
 - Inode flags are process-local in-memory metadata cloned across `fork()`, matching the existing synthetic path metadata model; they are not persisted to the backing filesystem image and are not a full ext4 inode implementation.
 - The patch does not change syscall numbers, struct layouts, FD table layout, `FD_CLOEXEC`, file status flags (`O_APPEND`, `O_NONBLOCK`, etc.), signal delivery, futex behavior, mmap behavior, or user-pointer copy semantics beyond the explicit `ioctl` copy-in/copy-out for the `u32` flags word.
 - The implementation uses generic Linux inode flag constants and VFS unlink errno behavior; it does not hardcode LTP case names, paths, process names, or expected output.
+
+## mkdir09 futex bitset repair impact
+
+This source patch changes generic `futex(2)` command coverage; it is not a stable-list promotion and does not edit `LTP_STABLE_CASES`.
+
+User-visible syscall/errno changes:
+
+- `futex(uaddr, FUTEX_WAIT_BITSET[_PRIVATE][|FUTEX_CLOCK_REALTIME], val, timeout, NULL, bitset)` now uses the existing futex wait queue when `bitset != 0` instead of returning `ENOSYS`.
+- `FUTEX_WAIT_BITSET` with `bitset == 0` returns `EINVAL`, matching the Linux invalid-bitset boundary.
+- `FUTEX_WAIT_BITSET` timeout pointers are treated as absolute deadlines: monotonic by default and realtime when `FUTEX_CLOCK_REALTIME` is present. Expired absolute deadlines return `ETIMEDOUT` through the existing wait timeout path.
+- `futex(uaddr, FUTEX_WAKE_BITSET[_PRIVATE], nr, NULL, NULL, bitset)` now wakes through the existing futex queue when `bitset != 0`; `bitset == 0` returns `EINVAL`.
+- Existing `FUTEX_WAIT` relative-timeout and `FUTEX_WAKE` behavior remains supported and shares the same value-check, `EAGAIN`, `EFAULT`, `EINTR`, and `ETIMEDOUT` boundaries.
+
+Resource/lifetime and maintenance boundaries:
+
+- The implementation intentionally reuses the current per-physical-frame futex queue. It does not introduce a per-waiter bitset registry, PI futexes, requeue operations, robust-list handling, or `futex_waitv`.
+- Nonzero bitset wake may over-wake waiters that would not match a Linux per-waiter bitset. This is acceptable for the current model because futex callers must recheck the futex word and tolerate spurious wakeups; future selective-bitset work can refine this without changing the public candidate evidence.
+- No syscall numbers, struct layouts, FD behavior, file status flags, signal delivery, mmap behavior, blacklist handling, evaluator logic, or user-pointer ABI changed beyond the existing `timespec` copy-in for futex timeout handling.
+- The patch does not hardcode LTP case names, paths, process names, or expected output. It fixes a generic glibc pthread/futex compatibility command surface exposed by `mkdir09`.

@@ -7,7 +7,7 @@ This checkpoint changed timerslack/prctl/proc behavior and default UTS hostname 
 | timerslack / prctl | `prctl08`, `prctl09` RV + LA × musl + glibc parser-clean | Adjacent stable `prctl01`, `prctl05` and representative `PR_SET_NAME/PR_GET_NAME` rows if available |
 | proc synthetic file plumbing | `/proc/self/timerslack_ns`, `/proc/<pid>/timerslack_ns` read/write/stat covered by `prctl08` | Existing `/proc` stable rows such as `proc01`, `uname01`, `uname02`, `newuname01`, `utsname01`, `utsname04` |
 | UTS hostname sharing | `utsname02` RV + LA × musl + glibc parser-clean; adjacent `gethostname01,sethostname01,sethostname02,sethostname03,uname01,uname02,uname04,newuname01,utsname01,utsname04` clean on RV+LA | Keep `CLONE_NEWUTS`/`unshare(CLONE_NEWUTS)` rows blocked until a real UTS namespace implementation exists; do not count `utsname03` |
-| VFS parent symlink / rmdir errno | `mkdirat02`, `rmdir02` RV + LA × musl + glibc parser-clean; adjacent stable `mkdir/rmdir/unlink/symlink/mknod/rename` subset clean on RV+LA | Keep remaining `mkdir09`, `mknod07`, and `mknodat02` rows blocked until their visible `TFAIL/TBROK/TCONF` causes are fixed; `unlink09` moved to the FS_IOC inode-flag candidate lane below. |
+| VFS parent symlink / rmdir errno | `mkdirat02`, `rmdir02` RV + LA × musl + glibc parser-clean; adjacent stable `mkdir/rmdir/unlink/symlink/mknod/rename` subset clean on RV+LA | `mkdir09` moved to the futex bitset candidate lane below; keep remaining `mknod07` and `mknodat02` rows blocked until their visible `TFAIL/TBROK/TCONF` causes are fixed. `unlink09` moved to the FS_IOC inode-flag candidate lane below. |
 | priority/nice/rlimit | Not changed | `getpriority01`, `getpriority02`, `setpriority02`, `setrlimit01`, `setrlimit03`, `setrlimit05` if future priority fixes are batched |
 | time/signal wait | Not changed | `clock_gettime04`, `nanosleep01`, `getitimer01`, `getitimer02`, `setitimer02`, `sigsuspend01`, `sigaction02`, `rt_sigprocmask01`, `sigprocmask01` if future time/signal fixes are batched |
 | epoll/eventfd/timerfd | Not changed | milestone-05 promoted epoll/eventfd/timerfd/signalfd cases plus `poll01`, `pipe01`, `pipe06`, `pipe2_01`, `pipe2_02` if future fd fixes are batched |
@@ -54,3 +54,9 @@ Covered stable adjacency includes `access*`, `faccessat*`, representative `chmod
 The `unlink09` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus a 23-case adjacent stable unlink/access/symlink/readlink/link/rmdir/mkdir subset on both architectures (`46 PASS / 0 FAIL` for RV and `46 PASS / 0 FAIL` for LA).
 
 Covered stable adjacency includes `access*`, `faccessat*`, representative `chmod*`, `symlink*`, `symlinkat01`, `readlink*`, `link*`, `unlink05`, `unlink07`, `unlinkat01`, `rmdir01`, and `mkdir04`, with `unlink09` included as the newly clean candidate row. Future edits in `sys_ioctl`, `path_inode_flags` metadata, `move_path_metadata`, or `FdTable::unlinkat` should rerun this subset before promotion.
+
+## mkdir09 futex bitset regression boundary
+
+The `mkdir09` repair is protected by targeted RV + LA × musl + glibc evidence (`4 PASS / 0 FAIL` across the two targeted architecture logs) plus an 11-case futex/clone adjacent stable subset on both architectures (`22 PASS / 0 FAIL` for RV and `22 PASS / 0 FAIL` for LA).
+
+Covered stable adjacency includes `futex_wait01` through `futex_wait05`, `futex_wake01`, `futex_wake03`, and representative `clone01`, `clone03`, `clone06`, and `clone07` process/thread boundaries. Future edits in `sys_futex`, futex timeout conversion, futex keying/wake behavior, or process teardown wakeups should rerun this subset before promotion.

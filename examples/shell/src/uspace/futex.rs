@@ -15,6 +15,7 @@ use super::UserProcess;
 use super::linux_abi::{USER_MMAP_BASE, neg_errno};
 use super::signal_abi::current_sigcancel_pending;
 use super::task_context::current_task_ext;
+use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::read_user_value;
 
 macro_rules! user_trace {
@@ -79,6 +80,104 @@ fn wake_addr_checked(
     Ok(woken)
 }
 
+fn read_futex_timeout(
+    process: &UserProcess,
+    timeout: usize,
+    absolute: bool,
+    realtime: bool,
+) -> Result<Option<core::time::Duration>, LinuxError> {
+    if timeout == 0 {
+        return Ok(None);
+    }
+
+    let ts = read_user_value::<general::timespec>(process, timeout)?;
+    let mut dur = timespec_to_duration(ts)?;
+    if absolute {
+        let clockid = if realtime {
+            general::CLOCK_REALTIME
+        } else {
+            general::CLOCK_MONOTONIC
+        };
+        dur = dur
+            .checked_sub(clock_now_duration(clockid)?)
+            .unwrap_or_else(|| core::time::Duration::from_secs(0));
+    }
+    Ok(Some(dur))
+}
+
+fn wait_addr(
+    process: &UserProcess,
+    uaddr: usize,
+    val: usize,
+    timeout: usize,
+    absolute_timeout: bool,
+    realtime_timeout: bool,
+) -> isize {
+    let current = match read_user_value::<u32>(process, uaddr) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    if current != val as u32 {
+        return neg_errno(LinuxError::EAGAIN);
+    }
+    let key = match futex_key(process, uaddr) {
+        Ok(key) => key,
+        Err(err) => return neg_errno(err),
+    };
+    let timeout = match read_futex_timeout(process, timeout, absolute_timeout, realtime_timeout) {
+        Ok(timeout) => timeout,
+        Err(err) => return neg_errno(err),
+    };
+    let state = state(key);
+    let seq = state.seq.load(Ordering::Acquire);
+    if let Some(ext) = current_task_ext() {
+        ext.futex_wait.store(uaddr, Ordering::Release);
+    }
+    let wait_cond = || {
+        state.seq.load(Ordering::Acquire) != seq
+            || read_user_value::<u32>(process, uaddr).map_or(true, |value| value != val as u32)
+            || current_sigcancel_pending()
+            || process.pending_exit_group().is_some()
+            || process.eval_watchdog_expired()
+    };
+    if let Some(dur) = timeout {
+        let dur = process
+            .eval_watchdog_remaining()
+            .map_or(dur, |remaining| remaining.min(dur));
+        if state.queue.wait_timeout_until(dur, wait_cond) {
+            if let Some(ext) = current_task_ext() {
+                ext.futex_wait.store(0, Ordering::Release);
+            }
+            if process.eval_watchdog_expired() || process.pending_exit_group().is_some() {
+                return neg_errno(LinuxError::EINTR);
+            }
+            return neg_errno(LinuxError::ETIMEDOUT);
+        }
+        if let Some(ext) = current_task_ext() {
+            ext.futex_wait.store(0, Ordering::Release);
+        }
+        if current_sigcancel_pending() {
+            return neg_errno(LinuxError::EINTR);
+        }
+        return 0;
+    }
+    if let Some(dur) = process.eval_watchdog_remaining() {
+        let _ = state.queue.wait_timeout_until(dur, wait_cond);
+    } else {
+        state.queue.wait_until(wait_cond);
+    }
+    if let Some(ext) = current_task_ext() {
+        ext.futex_wait.store(0, Ordering::Release);
+    }
+    if current_sigcancel_pending()
+        || process.pending_exit_group().is_some()
+        || process.eval_watchdog_expired()
+    {
+        return neg_errno(LinuxError::EINTR);
+    }
+    0
+}
+
 pub(super) fn wake_addr(process: &UserProcess, uaddr: usize, count: usize) -> usize {
     // Best-effort kernel-internal wake path for teardown/cancellation cleanup:
     // if the user address has already been unmapped, there is no futex queue to
@@ -122,80 +221,33 @@ pub(super) fn sys_futex(
         );
     }
     match cmd {
-        general::FUTEX_WAIT => {
-            let current = match read_user_value::<u32>(process, uaddr) {
-                Ok(value) => value,
-                Err(err) => return neg_errno(err),
-            };
-            if current != val as u32 {
-                return neg_errno(LinuxError::EAGAIN);
+        general::FUTEX_WAIT => wait_addr(process, uaddr, val, timeout, false, false),
+        general::FUTEX_WAIT_BITSET => {
+            if _val3 == 0 {
+                return neg_errno(LinuxError::EINVAL);
             }
-            let key = match futex_key(process, uaddr) {
-                Ok(key) => key,
-                Err(err) => return neg_errno(err),
-            };
-            let state = state(key);
-            let seq = state.seq.load(Ordering::Acquire);
-            if let Some(ext) = current_task_ext() {
-                ext.futex_wait.store(uaddr, Ordering::Release);
-            }
-            let wait_cond = || {
-                state.seq.load(Ordering::Acquire) != seq
-                    || read_user_value::<u32>(process, uaddr)
-                        .map_or(true, |value| value != val as u32)
-                    || current_sigcancel_pending()
-                    || process.pending_exit_group().is_some()
-                    || process.eval_watchdog_expired()
-            };
-            if timeout != 0 {
-                let ts = match read_user_value::<general::timespec>(process, timeout) {
-                    Ok(value) => value,
-                    Err(err) => return neg_errno(err),
-                };
-                let dur = core::time::Duration::new(
-                    ts.tv_sec.max(0) as u64,
-                    ts.tv_nsec.clamp(0, 999_999_999) as u32,
-                );
-                let dur = process
-                    .eval_watchdog_remaining()
-                    .map_or(dur, |remaining| remaining.min(dur));
-                if state.queue.wait_timeout_until(dur, wait_cond) {
-                    if let Some(ext) = current_task_ext() {
-                        ext.futex_wait.store(0, Ordering::Release);
-                    }
-                    if process.eval_watchdog_expired() || process.pending_exit_group().is_some() {
-                        return neg_errno(LinuxError::EINTR);
-                    }
-                    return neg_errno(LinuxError::ETIMEDOUT);
-                }
-                if let Some(ext) = current_task_ext() {
-                    ext.futex_wait.store(0, Ordering::Release);
-                }
-                if current_sigcancel_pending() {
-                    return neg_errno(LinuxError::EINTR);
-                }
-                return 0;
-            }
-            if let Some(dur) = process.eval_watchdog_remaining() {
-                let _ = state.queue.wait_timeout_until(dur, wait_cond);
-            } else {
-                state.queue.wait_until(wait_cond);
-            }
-            if let Some(ext) = current_task_ext() {
-                ext.futex_wait.store(0, Ordering::Release);
-            }
-            if current_sigcancel_pending()
-                || process.pending_exit_group().is_some()
-                || process.eval_watchdog_expired()
-            {
-                return neg_errno(LinuxError::EINTR);
-            }
-            0
+            wait_addr(
+                process,
+                uaddr,
+                val,
+                timeout,
+                true,
+                op & general::FUTEX_CLOCK_REALTIME != 0,
+            )
         }
         general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val) {
             Ok(woken) => woken as isize,
             Err(err) => neg_errno(err),
         },
+        general::FUTEX_WAKE_BITSET => {
+            if _val3 == 0 {
+                return neg_errno(LinuxError::EINVAL);
+            }
+            match wake_addr_checked(process, uaddr, val) {
+                Ok(woken) => woken as isize,
+                Err(err) => neg_errno(err),
+            }
+        }
         _ => neg_errno(LinuxError::ENOSYS),
     }
 }
