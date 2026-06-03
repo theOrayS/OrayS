@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 14/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 16/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -18,6 +18,8 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `mkdir09` | RV + LA × musl + glibc targeted parser-clean after generic `FUTEX_WAIT_BITSET`/`FUTEX_WAKE_BITSET` support fixed glibc pthread joins | candidate pool |
 | `gettid02` | RV + LA × musl + glibc targeted parser-clean after the same futex bitset/glibc pthread repair lane removed the old glibc `TBROK` blocker | candidate pool |
 | `futex_wait_bitset01` | RV + LA × musl + glibc targeted parser-clean from the generic futex bitset command surface; no additional source change after the futex bitset repair | candidate pool |
+| `fstat02` | RV + LA × musl + glibc targeted parser-clean from the FD/path metadata scout and LA follow-up; no source change in this follow-up | candidate pool |
+| `fstat02_64` | RV + LA × musl + glibc targeted parser-clean from the same FD/path metadata evidence; no source change in this follow-up | candidate pool |
 
 Evidence artifacts:
 
@@ -87,6 +89,19 @@ Additional fcntl27 read-lease evidence artifacts:
 - LA fcntl27_64 summary: `target/ltp-1000-milestone-06-stable806/la-fcntl27-64-read-lease-access-scout-20260603T210950+0800.summary.txt`
 - LA fcntl27_64 candidate report: `target/ltp-1000-milestone-06-stable806/la-fcntl27-64-read-lease-access-scout-20260603T210950+0800.promotion-candidates.txt`
 - Combined RV+LA fcntl27_64 candidate report: `target/ltp-1000-milestone-06-stable806/la-fcntl27-64-read-lease-access-scout-20260603T210950+0800.combined-promotion-candidates.txt`
+
+
+Additional fstat02/fstat02_64 evidence artifacts:
+
+- RV FD/path small scout log: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.log`
+- RV FD/path small scout summary: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt`
+- RV FD/path small scout candidate report: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.promotion-candidates.txt`
+- LA fstat02/fstat02_64 follow-up log: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.log`
+- LA fstat02/fstat02_64 follow-up summary: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt`
+- LA fstat02/fstat02_64 follow-up candidate report: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.promotion-candidates.txt`
+- Combined RV+LA fstat candidate report: `target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt`
+
+The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` out of the pool because their rows contain visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers.
 
 ## Explicitly excluded after blocker triage
 
@@ -183,3 +198,11 @@ Additional futex_wait_bitset01 follow-up evidence artifacts:
 - LA futex_wait_bitset01 follow-up summary: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.summary.txt`
 - LA futex_wait_bitset01 follow-up candidate report: `target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt`
 - Combined futex_wait_bitset01 candidate report: `target/ltp-1000-milestone-06-stable806/rv-la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt`
+
+Additional excluded late-scout artifacts:
+
+- RV VFS/MM small scout summary: `target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.summary.txt` — `mmap05` is only RV-clean; LA follow-up below fails, so no candidate is counted.
+- LA mmap05 follow-up summary: `target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.summary.txt` — `0 PASS / 2 FAIL / TFAIL=2`; `mmap05` remains blocked on LA SIGSEGV/protection semantics.
+- RV process/exec/signal scout summary: `target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.summary.txt` — allocator panic marker during the `kill10` batch; zero candidates.
+- RV exec-only scout summary: `target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.summary.txt` — visible `TBROK/TFAIL`; zero candidates.
+- RV FD/path small scout summary: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt` — blocked rows remain excluded; only `fstat02`/`fstat02_64` are counted after LA confirmation.

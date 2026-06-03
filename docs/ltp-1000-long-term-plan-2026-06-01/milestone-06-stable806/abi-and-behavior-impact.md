@@ -182,3 +182,14 @@ No additional source change was made for this follow-up. `futex_wait_bitset01` r
 - The RV futex scout confirms wake/requeue rows still have visible parser blockers; no partial wake/requeue result is counted and no new syscall behavior was introduced for them in this follow-up.
 - The RV clone and FD/vector-IO scouts were read-only evidence runs. They did not change `clone`, `readv`/`writev`, `preadv`/`pwritev`, `sendfile`, FD flags, signal, mmap, struct layout, user-pointer copy, or errno behavior.
 - No blacklist, SKIP, status0, evaluator, testsuite, stable-list, syscall number, ABI, FD table, signal, mmap, or process lifetime behavior changed in this documentation/evidence update.
+
+
+## fstat02/fstat02_64 follow-up and late scout impact
+
+No additional source change was made for this follow-up. `fstat02` and `fstat02_64` exercise the existing `fstat(2)` metadata path and are evidence-only additions to the stable806 candidate pool.
+
+- `fstat(2)` behavior observed by LTP is unchanged by this documentation/evidence update: UID, GID, size, mode, and link-count metadata for the test file are already consistent on RV + LA × musl + glibc.
+- The RV FD/path scout also records blockers for `close_range*`, `getcwd03`/`getcwd04`, O_TMPFILE-based `openat03`/`openat04`/`open14`, and `creat07`; no syscall behavior was changed to mask their `TCONF/TFAIL/TBROK/ENOSYS` evidence.
+- The RV VFS/MM scout and LA `mmap05` follow-up are diagnostic only. No mmap, mprotect, msync, page-fault, or signal-delivery behavior changed in this checkpoint.
+- The RV process/exec/signal and exec-only scouts are diagnostic only. No `kill`, `signal`, `execve`, wait, process lifetime, or allocator behavior changed in this checkpoint.
+- No blacklist, SKIP, status0, evaluator, testsuite, stable-list, syscall number, ABI, FD table layout, file status flags, signal, futex, mmap, user-pointer copy, or process lifetime behavior changed in this documentation/evidence update.

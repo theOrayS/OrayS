@@ -1095,3 +1095,116 @@ Regression boundary:
 No new source change was made for `futex_wait_bitset01`; it exercises the generic `FUTEX_WAIT_BITSET` behavior added for the earlier futex bitset repair. The existing RV/LA futex/clone adjacent subset remains the code-regression boundary, and the new targeted RV+LA evidence covers `futex_wait_bitset01` itself. Wake/requeue, clone, and vector-IO rows remain blocker-only until their visible parser markers are removed by real semantic fixes.
 
 `futex_wait_bitset01` is added to the stable806 candidate pool with four-combo clean evidence. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 14/50 for stable806.
+
+
+## Late VFS/MM, process/exec, and FD/path scouts
+
+These runs extend the milestone-06 evidence ledger after the futex bitset follow-up. They are mostly blocker maps; only `fstat02` and `fstat02_64` are added to the candidate pool after both RV and LA are parser-clean.
+
+RV VFS/MM small scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='rename11 renameat01 linkat02 getdents01 getdents02 utimensat01 utimes01 mprotect01 mprotect03 msync01 msync02 msync03 msync04 mmap05 mmap08' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.promotion-candidates.txt`
+
+Parser result: `4 PASS / 26 FAIL`, internal markers `{'TCONF': 22, 'TFAIL': 21}`, `0` timeout, `2` ENOSYS, `0` panic/trap. `mmap05` was the only RV musl+glibc clean row, so it required LA follow-up before any promotion use.
+
+LA mmap05 follow-up command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='mmap05' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.promotion-candidates.txt`
+
+Parser result: `0 PASS / 2 FAIL`, internal markers `{'TFAIL': 2}`, `0` timeout, `0` ENOSYS, `0` panic/trap. `mmap05` is therefore excluded from the candidate pool.
+
+RV process/exec/signal scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='getpgid01 setpgid03 setsid01 kill05 kill10 kill13 signal06 sigpending02 sigrelse01 nanosleep02 execve01 execve02 execve03 execve04 execve05' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.promotion-candidates.txt`
+
+Parser result: `1 PASS / 3 FAIL` before the run hit an allocator panic marker during the process/kill batch; internal markers `{'TFAIL': 4, 'TBROK': 3}`, `0` timeout, `0` ENOSYS, `1` panic/trap. This evidence is blocker-only and contributes zero candidates. `kill10` must be isolated before any broad process batch is rerun.
+
+RV exec-only scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='execl01 execle01 execlp01 execv01 execvp01 execve01 execve02 execve03 execve04 execve05' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.promotion-candidates.txt`
+
+Parser result: `2 PASS / 18 FAIL`, internal markers `{'TBROK': 16, 'TFAIL': 8}`, `0` timeout, `0` ENOSYS, `0` panic/trap. `execve04` wrapper PASS still has an internal `TFAIL`, so no exec row is countable.
+
+RV FD/path small scout command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fstat02 fstat02_64 getcwd03 getcwd04 close_range01 close_range02 openat03 openat04 open14 creat07' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.promotion-candidates.txt`
+
+Parser result: `4 PASS / 16 FAIL`, internal markers `{'TBROK': 5, 'TCONF': 15, 'TFAIL': 9}`, `0` timeout, `8` ENOSYS, `0` panic/trap. RV-only clean candidates: `fstat02`, `fstat02_64`. The remaining rows are excluded because they contain visible parser markers.
+
+LA fstat02/fstat02_64 follow-up command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fstat02 fstat02_64' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.log target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.json`
+- LA candidate report: `target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.promotion-candidates.txt`
+- Combined RV+LA candidate report: `target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt`
+
+Parser result: LA is `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`. The combined RV+LA report has exactly two four-combo candidates: `fstat02` and `fstat02_64`. Both are absent from the current stable list before this checkpoint, but they are not promoted yet because the candidate pool is only 16/50 for stable806.
+
+Validation conclusion for this follow-up:
+
+`fstat02` and `fstat02_64` are added to the stable806 candidate pool with four-combo clean evidence and no source change. `mmap05`, process/kill, exec, O_TMPFILE/openat/open14, close_range, getcwd, and creat rows remain blocker-only. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 16/50 for stable806.

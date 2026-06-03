@@ -418,3 +418,76 @@ pwritev03_64
 sendfile09
 sendfile09_64
 # RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-vector-io-scout-20260603T225958+0800.summary.txt — 0 PASS / 18 FAIL with TCONF=18; zero candidates.
+
+
+# RV VFS/MM small scout (2026-06-03; blocker-only except RV-only mmap05, later LA-blocked)
+rename11
+renameat01
+linkat02
+getdents01
+getdents02
+utimensat01
+utimes01
+mprotect01
+mprotect03
+msync01
+msync02
+msync03
+msync04
+mmap05
+mmap08
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.summary.txt — 4 PASS / 26 FAIL; only mmap05 was RV-clean.
+
+# LA mmap05 follow-up (2026-06-03; blocker-only)
+mmap05
+# LA summary: target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.summary.txt — 0 PASS / 2 FAIL / TFAIL=2; no candidate.
+
+# RV process/exec/signal scout (2026-06-03; blocker-only, allocator panic marker)
+getpgid01
+setpgid03
+setsid01
+kill05
+kill10
+kill13
+signal06
+sigpending02
+sigrelse01
+nanosleep02
+execve01
+execve02
+execve03
+execve04
+execve05
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.summary.txt — 1 PASS / 3 FAIL before panic marker; zero candidates.
+
+# RV exec-only scout (2026-06-03; blocker-only)
+execl01
+execle01
+execlp01
+execv01
+execvp01
+execve01
+execve02
+execve03
+execve04
+execve05
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.summary.txt — 2 PASS / 18 FAIL with visible TBROK/TFAIL; zero candidates.
+
+# RV FD/path small scout (2026-06-03; fstat02/fstat02_64 RV-clean, others blocker-only)
+fstat02
+fstat02_64
+getcwd03
+getcwd04
+close_range01
+close_range02
+openat03
+openat04
+open14
+creat07
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt — 4 PASS / 16 FAIL; RV candidates fstat02/fstat02_64.
+
+# LA fstat02/fstat02_64 follow-up (2026-06-03)
+fstat02
+fstat02_64
+# LA summary: target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt — 4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt — four-combo clean candidates.
