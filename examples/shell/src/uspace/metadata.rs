@@ -519,9 +519,72 @@ impl UserProcess {
         self.path_sparse_sizes.lock().get(path).copied()
     }
 
+    fn sparse_data_block_size() -> u64 {
+        512
+    }
+
+    fn data_range_block_floor(offset: u64) -> u64 {
+        let block_size = Self::sparse_data_block_size();
+        offset / block_size * block_size
+    }
+
+    fn data_range_block_ceil(offset: u64) -> u64 {
+        let block_size = Self::sparse_data_block_size();
+        offset.saturating_add(block_size - 1) / block_size * block_size
+    }
+
+    pub(super) fn ensure_path_data_ranges(&self, path: String, physical_size: u64) {
+        let mut all_ranges = self.path_data_ranges.lock();
+        if all_ranges.contains_key(path.as_str()) {
+            return;
+        }
+        let ranges = if physical_size == 0 {
+            Vec::new()
+        } else {
+            vec![(0, Self::data_range_block_ceil(physical_size))]
+        };
+        all_ranges.insert(path, ranges);
+    }
+
+    pub(super) fn mark_path_data_range(&self, path: String, offset: u64, len: u64) {
+        if len == 0 {
+            return;
+        }
+        let start = Self::data_range_block_floor(offset);
+        let end = Self::data_range_block_ceil(offset.saturating_add(len));
+        if start >= end {
+            return;
+        }
+        let mut all_ranges = self.path_data_ranges.lock();
+        let ranges = all_ranges.entry(path).or_default();
+        let mut merged = Vec::new();
+        let mut pending_start = start;
+        let mut pending_end = end;
+        for (range_start, range_end) in ranges.drain(..) {
+            if range_end < pending_start {
+                merged.push((range_start, range_end));
+            } else if range_start > pending_end {
+                merged.push((pending_start, pending_end));
+                pending_start = range_start;
+                pending_end = range_end;
+            } else {
+                pending_start = pending_start.min(range_start);
+                pending_end = pending_end.max(range_end);
+            }
+        }
+        merged.push((pending_start, pending_end));
+        merged.sort_by_key(|(range_start, _)| *range_start);
+        *ranges = merged;
+    }
+
+    pub(super) fn path_data_ranges(&self, path: &str) -> Option<Vec<(u64, u64)>> {
+        self.path_data_ranges.lock().get(path).cloned()
+    }
+
     pub(super) fn clear_path_sparse_file(&self, path: &str) {
         self.path_sparse_sizes.lock().remove(path);
         self.path_sparse_data.lock().remove(path);
+        self.path_data_ranges.lock().remove(path);
     }
 
     pub(super) fn move_path_sparse_file(&self, old_path: &str, new_path: String) {
@@ -535,9 +598,17 @@ impl UserProcess {
         }
         let mut all_data = self.path_sparse_data.lock();
         if let Some(data) = all_data.remove(old_path) {
-            all_data.insert(new_path, data);
+            all_data.insert(new_path.clone(), data);
         } else {
             all_data.remove(new_path.as_str());
+        }
+        drop(all_data);
+
+        let mut all_ranges = self.path_data_ranges.lock();
+        if let Some(ranges) = all_ranges.remove(old_path) {
+            all_ranges.insert(new_path, ranges);
+        } else {
+            all_ranges.remove(new_path.as_str());
         }
     }
 
@@ -568,6 +639,25 @@ impl UserProcess {
         if remove_empty {
             all_data.remove(path.as_str());
         }
+
+        let mut all_ranges = self.path_data_ranges.lock();
+        if size == 0 {
+            all_ranges.remove(path.as_str());
+        } else {
+            let retained = all_ranges
+                .remove(path.as_str())
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|(start, end)| {
+                    if start >= size {
+                        None
+                    } else {
+                        Some((start, end.min(size)))
+                    }
+                })
+                .collect();
+            all_ranges.insert(path, retained);
+        }
     }
 
     pub(super) fn write_path_sparse_data(&self, path: String, offset: u64, data: &[u8]) {
@@ -577,6 +667,7 @@ impl UserProcess {
         if data.is_empty() {
             return;
         }
+        self.mark_path_data_range(path.clone(), offset, data.len() as u64);
 
         let mut all_data = self.path_sparse_data.lock();
         let extents = all_data.entry(path).or_default();
@@ -834,6 +925,7 @@ pub(super) fn sys_truncate(process: &UserProcess, pathname: usize, length: usize
         Ok(attr) => attr.size(),
         Err(err) => return neg_errno(LinuxError::from(err)),
     };
+    process.ensure_path_data_ranges(target_path.clone(), physical_size);
     if length <= physical_size || length < MAX_IN_MEMORY_FILE_SIZE {
         if let Err(err) = file.truncate(length) {
             return neg_errno(LinuxError::from(err));

@@ -1,6 +1,6 @@
 # milestone-06 promotion candidates so far
 
-These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 25/50 unique cases.
+These cases are candidate-pool evidence only. They are not yet promoted into `LTP_STABLE_CASES` because milestone-06 still needs the full next 50-case cohort plus adjacent stable regression evidence. Current candidate pool: 26/50 unique cases.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -29,6 +29,7 @@ These cases are candidate-pool evidence only. They are not yet promoted into `LT
 | `splice03` | RV + LA × musl + glibc targeted parser-clean after generic `splice(2)` invalid-fd/offset errno handling | candidate pool |
 | `splice04` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-pipe `splice(2)` transfer support | candidate pool |
 | `splice05` | RV + LA × musl + glibc targeted parser-clean after generic pipe-to-AF_UNIX-stream and AF_UNIX-stream-to-pipe `splice(2)` support | candidate pool |
+| `lseek11` | RV + LA × musl + glibc targeted parser-clean after generic `SEEK_DATA`/`SEEK_HOLE` regular-file data/hole range tracking | candidate pool |
 
 Evidence artifacts:
 
@@ -306,3 +307,16 @@ Artifacts:
 - RV epoll/eventfd/poll/pselect scout log: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.log`
 - RV epoll/eventfd/poll/pselect scout summary: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt`
 - RV epoll/eventfd/poll/pselect candidate report: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt`
+
+
+## 2026-06-04 lseek11 SEEK_DATA/SEEK_HOLE follow-up
+
+This follow-up converts `lseek11` from the earlier sync/fd/io blocker scout into candidate-pool evidence after a generic `SEEK_DATA`/`SEEK_HOLE` implementation. The earlier scout remains blocker-only and is not counted.
+
+- Targeted RV current-code gate: `target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` for `lseek11` across musl + glibc.
+- Targeted LA current-code gate: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.summary.txt` — same clean `2 PASS / 0 FAIL / 0 internal markers` result.
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.promotion-candidates.txt` — one four-combo candidate: `lseek11`; blocked/incomplete cases `0`.
+- Adjacent RV lseek stable regression: `target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.txt` — `8 PASS / 0 FAIL / 0 internal markers` for `lseek01`, `lseek02`, `lseek07`, and `llseek01` across musl + glibc.
+- Adjacent LA lseek stable regression: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt` — `8 PASS / 0 FAIL / 0 internal markers` for the same stable subset.
+
+The candidate pool is now 26/50 unique cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.

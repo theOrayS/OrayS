@@ -717,3 +717,17 @@ splice09
 # Current-code LA gate: target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.txt — splice01..splice05: 10 PASS / 0 FAIL / 0 internal markers.
 # Combined candidate report: target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt — five four-combo candidates splice01..splice05.
 # RV splice07 cleanup retest: target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.txt — wrapper PASS but TCONF=336/ENOSYS=336, blocker-only.
+
+
+# 2026-06-04 generic SEEK_DATA/SEEK_HOLE lane
+# Targeted candidate gate plus adjacent stable lseek regression.
+lseek11
+lseek01
+lseek02
+lseek07
+llseek01
+# RV lseek11 gate: target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.summary.txt — 2 PASS / 0 FAIL / 0 internal markers.
+# LA lseek11 gate: target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.summary.txt — 2 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.promotion-candidates.txt — one four-combo candidate lseek11.
+# RV adjacent stable lseek regression: target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.txt — 8 PASS / 0 FAIL / 0 internal markers.
+# LA adjacent stable lseek regression: target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt — 8 PASS / 0 FAIL / 0 internal markers.

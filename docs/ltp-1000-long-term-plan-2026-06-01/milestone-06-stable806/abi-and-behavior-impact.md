@@ -272,3 +272,23 @@ Known boundaries:
 - `splice06` still needs real writable `/proc/sys/fs/pipe-max-size` and `/proc/sys/kernel/domainname`-style proc-sysfile semantics before it can be considered.
 - `splice07` is wrapper-PASS only with internal `TCONF/ENOSYS` from optional fd fixtures; those fixture syscalls remain out of scope for this splice repair.
 - `splice08`/`splice09` remain upstream-version-gated `TCONF` rows and are not counted.
+
+
+## lseek11 SEEK_DATA/SEEK_HOLE ABI and behavior impact
+
+The change adds generic regular-file support for Linux `lseek(2)` whence values `SEEK_DATA` (`3`) and `SEEK_HOLE` (`4`) in the shell userspace syscall layer.
+
+User-visible behavior:
+
+- Regular files now return the next data range or hole for `SEEK_DATA`/`SEEK_HOLE` and update the open file offset on success.
+- Negative offsets still return `EINVAL`; offsets at or beyond logical EOF return `ENXIO` for data/hole queries.
+- Directories keep `EISDIR`, path-only descriptors keep `EBADF`, pipes/sockets keep `ESPIPE`, and unsupported nonregular descriptors return `EINVAL` for these whence values.
+- Sparse-file logical size remains governed by the existing `path_sparse_sizes` metadata; read paths still synthesize zero-filled holes and overlay written sparse data.
+- Writes mark allocation-style data ranges at a 512-byte granularity matching the exposed `st_blksize` boundary used by the current stat path. This models Linux filesystems where a zero-filled allocated block can be considered data for `SEEK_DATA`, while unwritten sparse gaps remain holes.
+- Truncate/open-`O_TRUNC`/unlink/rename metadata paths now preserve, clip, move, or clear data-range metadata alongside existing sparse-size/sparse-data metadata.
+
+Maintenance boundary:
+
+- The data/hole map is in-memory per `UserProcess`, consistent with the existing sparse-size/sparse-data metadata model. It is not a persistent on-disk extent tree and should not be treated as a full filesystem allocator.
+- Future `fallocate`, hole punching, mmap writeback, copy-file-range, or cross-process shared filesystem-state work must update the same generic range metadata instead of adding LTP-specific branches.
+- No case name, LTP path, wrapper output, or evaluator behavior is hardcoded.

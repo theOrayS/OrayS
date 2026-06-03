@@ -102,6 +102,7 @@ struct UserProcess {
     path_times: Mutex<BTreeMap<String, PathTimes>>,
     path_sparse_sizes: Mutex<BTreeMap<String, u64>>,
     path_sparse_data: Mutex<BTreeMap<String, Vec<(u64, Vec<u8>)>>>,
+    path_data_ranges: Mutex<BTreeMap<String, Vec<(u64, u64)>>>,
     umask: AtomicU32,
     mount_points: Arc<Mutex<BTreeMap<String, MountPoint>>>,
     shm_attachments: Mutex<BTreeMap<usize, (i32, usize)>>,

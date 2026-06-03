@@ -124,3 +124,10 @@ The scout adds adjacent RV regression evidence for existing eventfd/poll/pselect
 `splice01`, `splice02`, `splice03`, `splice04`, and `splice05` are protected by fresh RV + LA × musl + glibc targeted evidence (`20 PASS / 0 FAIL / 0 internal markers` across the two architecture logs). The regression boundary covers `sys_splice`, `FdTable::read`, `FdTable::write`, regular-file current-offset advancement, pipe read/write availability, AF_UNIX `LocalSocketEntry` read/write behavior, optional user offset copy-in/copy-out, and invalid-fd errno ordering.
 
 Future edits to `sys_splice`, pipe semantics, AF_UNIX local sockets, regular-file offset/write paths, `O_APPEND` handling, or syscall dispatch should rerun `splice01`..`splice05` on RV + LA × musl + glibc before counting these cases in a stable milestone. `splice06`/`splice07`/`splice08`/`splice09` remain blocker-only and must not be promoted until their visible `TCONF/ENOSYS` or version-gate markers are removed by real semantics.
+
+
+## lseek11 SEEK_DATA/SEEK_HOLE regression boundary
+
+`lseek11` is protected by fresh RV + LA × musl + glibc targeted evidence (`4 PASS / 0 FAIL / 0 internal markers` across the two architecture logs) plus an adjacent stable lseek subset on both architectures (`16 PASS / 0 FAIL / 0 internal markers` across RV and LA for `lseek01`, `lseek02`, `lseek07`, and `llseek01`).
+
+The regression boundary covers `FdTable::lseek`, regular-file logical size computation, sparse-file read/write/truncate metadata, open-`O_TRUNC` handling, unlink/rename sparse metadata movement, and `stat`/`st_blksize` consistency. Future edits in these areas should rerun `lseek11` plus the adjacent stable lseek subset on RV + LA × musl + glibc before counting the case in a stable milestone.

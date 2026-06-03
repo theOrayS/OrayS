@@ -19,8 +19,9 @@ use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, 
 use super::linux_abi::{
     ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
     FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RTC_RD_TIME, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK,
-    ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR,
+    ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag,
+    neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -2873,6 +2874,7 @@ impl FdTable {
                     return Err(LinuxError::EINVAL);
                 }
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+                process.ensure_path_data_ranges(file.path.clone(), physical_size);
                 if size <= physical_size || size < MAX_IN_MEMORY_FILE_SIZE {
                     file.file.truncate(size).map_err(LinuxError::from)?;
                 }
@@ -2897,6 +2899,24 @@ impl FdTable {
         offset: i64,
         whence: u32,
     ) -> Result<u64, LinuxError> {
+        if matches!(whence, SEEK_DATA_WHENCE | SEEK_HOLE_WHENCE) {
+            if offset < 0 {
+                return Err(LinuxError::EINVAL);
+            }
+            return match self.entry_mut(fd)? {
+                FdEntry::File(file) => file_entry_seek_data_or_hole(
+                    process,
+                    file,
+                    offset as u64,
+                    whence == SEEK_DATA_WHENCE,
+                ),
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+                FdEntry::Path(_) => Err(LinuxError::EBADF),
+                FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
+                FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
+                _ => Err(LinuxError::EINVAL),
+            };
+        }
         let pos = match whence {
             general::SEEK_SET => {
                 if offset < 0 {
@@ -4949,6 +4969,8 @@ fn write_regular_file_at(
         return Ok(0);
     }
     let logical_before = file_logical_size(process, file)?;
+    let physical_before = file.file.get_attr().map_err(LinuxError::from)?.size();
+    process.ensure_path_data_ranges(file.path.clone(), physical_before);
     let mut written = 0usize;
     if write_offset < MAX_IN_MEMORY_FILE_SIZE {
         let physical_len = cmp::min(
@@ -4963,6 +4985,7 @@ fn write_regular_file_at(
                 .write_at(write_offset, &src[..physical_len])
                 .map_err(LinuxError::from)?;
             written += count;
+            process.mark_path_data_range(file.path.clone(), write_offset, count as u64);
             if count < physical_len {
                 let logical_after = logical_before.max(write_offset.saturating_add(written as u64));
                 process.set_path_sparse_size(file.path.clone(), logical_after);
@@ -5024,6 +5047,85 @@ fn file_entry_seek(
     }
     .ok_or(LinuxError::EINVAL)?;
     *offset = next;
+    Ok(next)
+}
+
+fn regular_file_data_ranges(
+    process: &UserProcess,
+    file: &FileEntry,
+    size: u64,
+) -> Result<Vec<(u64, u64)>, LinuxError> {
+    let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+    let mut ranges = process
+        .path_data_ranges(file.path.as_str())
+        .unwrap_or_else(|| {
+            if physical_size == 0 {
+                Vec::new()
+            } else {
+                vec![(0, physical_size.min(size))]
+            }
+        });
+    ranges.sort_by_key(|(start, _)| *start);
+
+    let mut normalized = Vec::new();
+    for (start, end) in ranges {
+        let start = start.min(size);
+        let end = end.min(size);
+        if start >= end {
+            continue;
+        }
+        if let Some((_, prev_end)) = normalized.last_mut() {
+            if start <= *prev_end {
+                *prev_end = (*prev_end).max(end);
+                continue;
+            }
+        }
+        normalized.push((start, end));
+    }
+    Ok(normalized)
+}
+
+fn file_entry_seek_data_or_hole(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    start: u64,
+    want_data: bool,
+) -> Result<u64, LinuxError> {
+    let size = file_logical_size(process, file)?;
+    if start >= size {
+        return Err(LinuxError::ENXIO);
+    }
+    let ranges = regular_file_data_ranges(process, file, size)?;
+    let next = if want_data {
+        ranges
+            .iter()
+            .find_map(|(range_start, range_end)| {
+                if *range_end <= start {
+                    None
+                } else if *range_start <= start {
+                    Some(start)
+                } else {
+                    Some(*range_start)
+                }
+            })
+            .ok_or(LinuxError::ENXIO)?
+    } else {
+        let mut cursor = start;
+        for (range_start, range_end) in ranges {
+            if range_end <= cursor {
+                continue;
+            }
+            if cursor < range_start {
+                break;
+            }
+            cursor = range_end;
+            if cursor >= size {
+                break;
+            }
+        }
+        cursor.min(size)
+    };
+    *file.offset.lock() = next;
     Ok(next)
 }
 
