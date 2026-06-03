@@ -1346,6 +1346,369 @@ pub(super) fn sys_sendfile(
     copied as isize
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SpliceEndpointKind {
+    RegularFile,
+    Pipe,
+    Stream,
+}
+
+pub(super) fn sys_splice(
+    process: &UserProcess,
+    fd_in: usize,
+    off_in_ptr: usize,
+    fd_out: usize,
+    off_out_ptr: usize,
+    len: usize,
+    flags: usize,
+) -> isize {
+    let supported_flags = (general::SPLICE_F_MOVE
+        | general::SPLICE_F_NONBLOCK
+        | general::SPLICE_F_MORE
+        | general::SPLICE_F_GIFT) as usize;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
+
+    let mut off_in = match read_copy_file_range_offset(process, off_in_ptr) {
+        Ok(offset) => offset,
+        Err(err) => return neg_errno(err),
+    };
+    let mut off_out = match read_copy_file_range_offset(process, off_out_ptr) {
+        Ok(offset) => offset,
+        Err(err) => return neg_errno(err),
+    };
+    let fd_in = fd_in as i32;
+    let fd_out = fd_out as i32;
+    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+
+    let (in_kind, out_kind) = {
+        let mut table = process.fds.lock();
+        let in_kind = match splice_input_kind(&table, fd_in, off_in.is_some()) {
+            Ok(kind) => kind,
+            Err(err) => return neg_errno(err),
+        };
+        let out_kind = match splice_output_kind(&table, fd_out, off_out.is_some()) {
+            Ok(kind) => kind,
+            Err(err) => return neg_errno(err),
+        };
+        if in_kind != SpliceEndpointKind::Pipe && out_kind != SpliceEndpointKind::Pipe {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if in_kind == SpliceEndpointKind::Pipe
+            && out_kind == SpliceEndpointKind::Pipe
+            && fd_in == fd_out
+        {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if let Err(err) = validate_splice_output(
+            &mut table,
+            process,
+            fd_out,
+            out_kind,
+            off_out,
+            file_size_limit,
+        ) {
+            return neg_errno(err);
+        }
+        if let Err(err) = validate_splice_input(&mut table, process, fd_in, in_kind, off_in) {
+            return neg_errno(err);
+        }
+        (in_kind, out_kind)
+    };
+
+    let mut copied = 0usize;
+    while copied < len {
+        let mut chunk_len = (len - copied).min(MAX_USER_IO_CHUNK);
+        if in_kind == SpliceEndpointKind::Pipe {
+            let available = match process.fds.lock().pipe_available_read(fd_in) {
+                Ok(available) => available,
+                Err(err) => {
+                    return if copied > 0 {
+                        copied as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            if available == 0 && nonblocking {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(LinuxError::EAGAIN)
+                };
+            }
+            if available > 0 {
+                chunk_len = chunk_len.min(available);
+            }
+        }
+        if out_kind == SpliceEndpointKind::Pipe {
+            let available = match process.fds.lock().splice_pipe_available_write(fd_out) {
+                Ok(available) => available,
+                Err(err) => {
+                    return if copied > 0 {
+                        copied as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            if available == 0 && nonblocking {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(LinuxError::EAGAIN)
+                };
+            }
+            if available > 0 {
+                chunk_len = chunk_len.min(available);
+            }
+        }
+
+        let mut buf = match user_io_buffer(chunk_len) {
+            Ok(buf) => buf,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+        let read = {
+            let mut table = process.fds.lock();
+            splice_read_input(&mut table, process, fd_in, in_kind, off_in, &mut buf)
+        };
+        let read = match read {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+
+        let written = {
+            let mut table = process.fds.lock();
+            splice_write_output(
+                &mut table,
+                process,
+                fd_out,
+                out_kind,
+                off_out,
+                &buf[..read],
+                file_size_limit,
+            )
+        };
+        let written = match written {
+            Ok(written) => written,
+            Err(err) => {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+
+        if in_kind == SpliceEndpointKind::RegularFile {
+            if let Some(pos) = off_in.as_mut() {
+                *pos = pos.saturating_add(written as u64);
+            } else if let Err(err) = process.fds.lock().advance_file_offset_fd(fd_in, written) {
+                return if copied > 0 {
+                    copied as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        }
+        if out_kind == SpliceEndpointKind::RegularFile {
+            if let Some(pos) = off_out.as_mut() {
+                *pos = pos.saturating_add(written as u64);
+            }
+        }
+        copied += written;
+        if written == 0 || written < read {
+            break;
+        }
+    }
+
+    if let Some(pos) = off_in {
+        let out: i64 = match pos.try_into() {
+            Ok(value) => value,
+            Err(_) => return neg_errno(LinuxError::EOVERFLOW),
+        };
+        let ret = write_user_value(process, off_in_ptr, &out);
+        if ret < 0 {
+            return if copied > 0 { copied as isize } else { ret };
+        }
+    }
+    if let Some(pos) = off_out {
+        let out: i64 = match pos.try_into() {
+            Ok(value) => value,
+            Err(_) => return neg_errno(LinuxError::EOVERFLOW),
+        };
+        let ret = write_user_value(process, off_out_ptr, &out);
+        if ret < 0 {
+            return if copied > 0 { copied as isize } else { ret };
+        }
+    }
+
+    copied as isize
+}
+
+fn splice_input_kind(
+    table: &FdTable,
+    fd: i32,
+    has_offset: bool,
+) -> Result<SpliceEndpointKind, LinuxError> {
+    match table.entry(fd)? {
+        FdEntry::File(file) => {
+            if !file_is_readable(file.status_flags) {
+                return Err(LinuxError::EBADF);
+            }
+            Ok(SpliceEndpointKind::RegularFile)
+        }
+        FdEntry::Pipe(_) => {
+            if has_offset {
+                Err(LinuxError::ESPIPE)
+            } else {
+                Ok(SpliceEndpointKind::Pipe)
+            }
+        }
+        FdEntry::LocalSocket(_) => {
+            if has_offset {
+                Err(LinuxError::ESPIPE)
+            } else {
+                Ok(SpliceEndpointKind::Stream)
+            }
+        }
+        FdEntry::Socket(_) => Err(LinuxError::EINVAL),
+        FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EINVAL),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn splice_output_kind(
+    table: &FdTable,
+    fd: i32,
+    has_offset: bool,
+) -> Result<SpliceEndpointKind, LinuxError> {
+    match table.entry(fd)? {
+        FdEntry::File(file) => {
+            if !file_is_writable(file.status_flags) {
+                return Err(LinuxError::EBADF);
+            }
+            if file.status_flags & general::O_APPEND != 0 {
+                return Err(LinuxError::EINVAL);
+            }
+            Ok(SpliceEndpointKind::RegularFile)
+        }
+        FdEntry::Pipe(_) => {
+            if has_offset {
+                Err(LinuxError::ESPIPE)
+            } else {
+                Ok(SpliceEndpointKind::Pipe)
+            }
+        }
+        FdEntry::LocalSocket(_) => {
+            if has_offset {
+                Err(LinuxError::ESPIPE)
+            } else {
+                Ok(SpliceEndpointKind::Stream)
+            }
+        }
+        FdEntry::Socket(_) => Err(LinuxError::EINVAL),
+        FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EINVAL),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn validate_splice_input(
+    table: &mut FdTable,
+    process: &UserProcess,
+    fd: i32,
+    kind: SpliceEndpointKind,
+    offset: Option<u64>,
+) -> Result<(), LinuxError> {
+    match kind {
+        SpliceEndpointKind::RegularFile => match offset {
+            Some(pos) => table
+                .read_file_at_into_fd(process, fd, pos, &mut [])
+                .map(|_| ()),
+            None => table
+                .read_file_at_current_offset_into_fd(process, fd, &mut [])
+                .map(|_| ()),
+        },
+        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => {
+            table.read(process, fd, &mut []).map(|_| ())
+        }
+    }
+}
+
+fn validate_splice_output(
+    table: &mut FdTable,
+    process: &UserProcess,
+    fd: i32,
+    kind: SpliceEndpointKind,
+    offset: Option<u64>,
+    file_size_limit: u64,
+) -> Result<(), LinuxError> {
+    match kind {
+        SpliceEndpointKind::RegularFile => match offset {
+            Some(pos) => table.write_file_at(process, fd, pos, &[], Some(file_size_limit)),
+            None => table.write(process, fd, &[], Some(file_size_limit)),
+        }
+        .map(|_| ()),
+        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => table
+            .write(process, fd, &[], Some(file_size_limit))
+            .map(|_| ()),
+    }
+}
+
+fn splice_read_input(
+    table: &mut FdTable,
+    process: &UserProcess,
+    fd: i32,
+    kind: SpliceEndpointKind,
+    offset: Option<u64>,
+    dst: &mut [u8],
+) -> Result<usize, LinuxError> {
+    match kind {
+        SpliceEndpointKind::RegularFile => match offset {
+            Some(pos) => table.read_file_at_into_fd(process, fd, pos, dst),
+            None => table
+                .read_file_at_current_offset_into_fd(process, fd, dst)
+                .map(|(_, read)| read),
+        },
+        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => table.read(process, fd, dst),
+    }
+}
+
+fn splice_write_output(
+    table: &mut FdTable,
+    process: &UserProcess,
+    fd: i32,
+    kind: SpliceEndpointKind,
+    offset: Option<u64>,
+    src: &[u8],
+    file_size_limit: u64,
+) -> Result<usize, LinuxError> {
+    match kind {
+        SpliceEndpointKind::RegularFile => match offset {
+            Some(pos) => table.write_file_at(process, fd, pos, src, Some(file_size_limit)),
+            None => table.write(process, fd, src, Some(file_size_limit)),
+        },
+        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => {
+            table.write(process, fd, src, Some(file_size_limit))
+        }
+    }
+}
+
 pub(super) fn sys_readahead(
     process: &UserProcess,
     fd: usize,
@@ -2077,6 +2440,13 @@ impl FdTable {
         match self.entry(fd)? {
             FdEntry::Pipe(pipe) => Ok(pipe.available_read()),
             _ => Err(LinuxError::ENOTTY),
+        }
+    }
+
+    fn splice_pipe_available_write(&self, fd: i32) -> Result<usize, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) => Ok(pipe.capacity().saturating_sub(pipe.available_read())),
+            _ => Err(LinuxError::EBADF),
         }
     }
 
