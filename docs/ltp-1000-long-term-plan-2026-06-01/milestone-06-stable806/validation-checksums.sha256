@@ -269,3 +269,13 @@ bec4a72904e6417b7732bc1af55c554f3923b60cd409baa313127338f6262b84  target/ltp-100
 8b11f445327201649fa435e8e1005ce00aaf5411923b571745ea1cb812a2c2b3  target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.json
 8fb9d70eed0a86c024ac48c171e1086c91917e937b9c5ce2e49c96cd4fb5ec4a  target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.promotion-candidates.txt
 7b879ec9767d8bb124cfbcfa9b3970f57e73b9de3acd7430a4417bb64f12f104  target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt
+155343d854fbe9d748a9122c7e97fc1ea53161b68a3a1c00fe8ce8447f27dd38  target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.cases.txt
+a8a00203deb4e0f778feb016db66ac50e8ea0643ad4330340d1d40099a232d85  target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.log
+22642149bacc9fb05211abe0c30117b9d587a940b02f812df5cc1542a82225f1  target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt
+95d6fcea0617c3d459f47e9f069edc1ee1aa184c3f8ce42208828fae1fd8e2e1  target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.json
+6d1670d5bafb971bec6cc3e616733310e685226f531caf96222159a0135cd37a  target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.promotion-candidates.txt
+7b145eed9b8c2427c8a8cfb4537881e411af10b5590e6ccb07f7f0e2ff9b6415  target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.cases.txt
+b198cbe5fd37e2b63ff9d1e83dc0864746ff1dbb25cb43cb5b7fd6fe5b3cfe74  target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.log
+5ab97e87394aeff1ec13fd58ac8c42702237fcf2acb9fb6f2dc9cd6bd6255de9  target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt
+f6125571fa43a257b5707d0d6a1f504d686b4dca777095da6d1994700e4279c5  target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.json
+0d3c8c2b47b637df8b67959942464c74768f26f1a9d06612636e6541d5afb109  target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.promotion-candidates.txt

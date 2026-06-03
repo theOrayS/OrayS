@@ -80,3 +80,8 @@ The same RV scout keeps `futex_wake02`, `futex_wake04`, `futex_cmp_requeue01`, a
 `fstat02` and `fstat02_64` are protected by RV + LA × musl + glibc targeted evidence (`8 PASS / 0 FAIL` across the RV FD/path scout rows and the LA follow-up log). No source changed in this follow-up, so the code-regression boundary remains the existing `fstat(2)` metadata path, path-backed file descriptor lookup, and stat struct copy-out semantics.
 
 The same RV FD/path scout keeps `close_range01`, `close_range02`, `getcwd03`, `getcwd04`, `openat03`, `openat04`, `open14`, and `creat07` out of the candidate pool because their evidence has visible `TCONF`, `TFAIL`, `TBROK`, or `ENOSYS` markers. The RV VFS/MM, LA `mmap05`, process/exec/signal, and exec-only scouts are also blocker-only. Future edits in `stat`/`fstat` metadata, FD lookup, or user-pointer stat copy-out should rerun `fstat02`, `fstat02_64`, and a representative adjacent stable stat/fstat subset before promotion.
+
+
+## sync/fd/io and xattr blocker boundary
+
+The RV sync/fd/io scout and RV xattr scout are blocker-only and add no regression-protected candidates. Future work on filesystem sync support, `sync_file_range`, `SEEK_DATA`/`SEEK_HOLE`, FIFO nonblocking open, device/special-file creation, or xattr immutable/append-only semantics must first remove the visible `TCONF/TFAIL/TBROK/ENOSYS` markers, then rerun the targeted rows on RV + LA × musl + glibc plus adjacent stable sync/xattr subsets before promotion.

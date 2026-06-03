@@ -1208,3 +1208,46 @@ Parser result: LA is `4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOS
 Validation conclusion for this follow-up:
 
 `fstat02` and `fstat02_64` are added to the stable806 candidate pool with four-combo clean evidence and no source change. `mmap05`, process/kill, exec, O_TMPFILE/openat/open14, close_range, getcwd, and creat rows remain blocker-only. The stable list remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the candidate pool is only 16/50 for stable806.
+
+
+## Sync/fd/io and xattr blocker-only scouts
+
+These RV-only scouts were run after the fstat follow-up to search for low-risk candidates. Both produced zero promotion candidates and are recorded only as blocker maps.
+
+RV sync/fd/io command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fdatasync03 fsync03 fsync04 sync01 syncfs01 sync_file_range01 sync_file_range02 read03 write04 lseek11' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.promotion-candidates.txt`
+
+Parser result: `0 PASS / 20 FAIL`, internal markers `{'TCONF': 14, 'TFAIL': 6, 'TBROK': 4}`, `0` timeout, `2` ENOSYS, `0` panic/trap. Promotion candidates: none.
+
+RV xattr command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='fgetxattr02 fsetxattr02 getxattr02 getxattr03 getxattr04 getxattr05 setxattr02 setxattr03' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.json`
+- RV-only candidate report: `target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.promotion-candidates.txt`
+
+Parser result: `0 PASS / 16 FAIL`, internal markers `{'TBROK': 6, 'TCONF': 8, 'TFAIL': 4}`, `0` timeout, `0` ENOSYS, `0` panic/trap. Promotion candidates: none.
+
+Validation conclusion for these scouts:
+
+No sync/fd/io or xattr row is added to the stable806 candidate pool. Rows with visible `TCONF/TFAIL/TBROK/ENOSYS` remain blocker-only; no blacklist/SKIP/status0/full-sweep partial evidence is counted. Candidate pool remains 16/50.

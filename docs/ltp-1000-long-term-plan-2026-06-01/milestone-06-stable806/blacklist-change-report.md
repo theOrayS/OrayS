@@ -23,3 +23,8 @@ No blacklist was added, removed, or used for `futex_wait_bitset01`, the RV futex
 ## fstat02/fstat02_64 and late blocker scouts
 
 No blacklist was added, removed, or used for `fstat02`, `fstat02_64`, the RV VFS/MM scout, the LA `mmap05` follow-up, the RV process/exec/signal scout, the RV exec-only scout, or the RV FD/path small scout. The only new candidate evidence comes from RV + LA × musl + glibc parser-clean `fstat02` and `fstat02_64`; all rows with visible `TCONF`, `TFAIL`, `TBROK`, `ENOSYS`, panic, timeout, or partial state remain blocker-only. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
+
+
+## sync/fd/io and xattr blocker scouts
+
+No blacklist was added, removed, or used for the RV sync/fd/io or xattr scouts. Both runs are parser-visible blocker evidence only and contribute zero promotion candidates. No blacklist/SKIP/status0/full-sweep local TPASS evidence is counted.
