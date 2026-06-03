@@ -676,3 +676,27 @@ sched_rr_get_interval03
 setpriority01
 # RV summary: target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt — 10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap.
 # Candidate report: target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.promotion-candidates.txt — 0 promotion candidates; wrapper PASS rows with internal markers are not counted.
+
+# 2026-06-04 epoll/eventfd/poll/pselect RV scout: RV mixed new-row + adjacent stable regression scout
+epoll_create01
+epoll_create02
+eventfd01
+eventfd02
+eventfd03
+eventfd04
+eventfd05
+eventfd06
+eventfd2_01
+eventfd2_02
+eventfd2_03
+poll01
+poll02
+ppoll01
+pselect01
+pselect01_64
+pselect02
+pselect02_64
+pselect03
+pselect03_64
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt — 37 PASS / 3 FAIL / TCONF=6 / TFAIL=2 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt — 17 RV candidates are all already stable; 0 new unique candidates. epoll_create01/02 and eventfd06 remain blocked.

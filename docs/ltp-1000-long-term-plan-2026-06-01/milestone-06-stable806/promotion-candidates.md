@@ -270,3 +270,20 @@ Additional late blocker-only artifacts:
 - RV process/time/signal reprobe log: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.log`
 - RV process/time/signal reprobe summary: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt`
 - RV process/time/signal candidate report: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.promotion-candidates.txt`
+
+## 2026-06-04 epoll/eventfd/poll/pselect RV scout
+
+This RV scout intentionally mixed three new/unstable rows with existing stable eventfd/poll/pselect rows as adjacent regression evidence. The parser reports 17 RV candidates, but all 17 are already present in `LTP_STABLE_CASES`; they are not new unique candidate-pool entries. The only not-yet-stable rows in this scout are blocked.
+
+| Case group | Result | Promotion decision |
+| --- | --- | --- |
+| Existing stable eventfd/poll/pselect rows | `34` clean arch/libc rows; promotion report lists 17 RV candidates | Adjacent regression evidence only; already in stable list, no new unique count. |
+| `epoll_create01` | RV musl+glibc wrapper PASS but both have `TCONF=1` from unsupported raw `__NR_epoll_create` variant | Excluded as pass-with-TCONF. |
+| `epoll_create02` | RV glibc pass-with-TCONF; RV musl `TFAIL=2` plus `TCONF=1` | Excluded. |
+| `eventfd06` | RV musl+glibc `TCONF=1` because `libaio` is unavailable | Excluded. |
+
+Artifacts:
+
+- RV epoll/eventfd/poll/pselect scout log: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.log`
+- RV epoll/eventfd/poll/pselect scout summary: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt`
+- RV epoll/eventfd/poll/pselect candidate report: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt`

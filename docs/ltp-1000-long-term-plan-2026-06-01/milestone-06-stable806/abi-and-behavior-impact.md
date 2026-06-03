@@ -242,3 +242,11 @@ No source, stable-list, blacklist, evaluator, testsuite, syscall number, struct 
 - FD/VFS/IO rows remain excluded because the RV evidence has wrapper failures, missing current guest-bin rows (`status=-1`), O_TMPFILE `TCONF`, and FIFO `TBROK` markers.
 - fcntl rows remain excluded because the RV evidence still exposes feature/errno blockers for leases on tmpfs, `F_GETOWN_EX`, OFD locks, capabilities, and dnotify; no LTP-specific workaround was introduced.
 - process/time/signal rows remain excluded because wrapper-PASS rows contain internal markers and the remaining rows expose real signal/process/config/timeouts. No signal delivery, `kill`/`tgkill`, process group/session, scheduler, priority, rusage, sysinfo, or prctl behavior changed.
+
+## 2026-06-04 epoll/eventfd/poll/pselect RV scout impact
+
+No source, stable-list, blacklist, evaluator, testsuite, syscall number, struct layout, FD table, file status flag, signal, futex, mmap, user-pointer copy, process lifetime, or errno behavior changed in this RV scout. It is evidence-only.
+
+- Existing eventfd/poll/pselect stable rows remained parser-clean on RV and provide adjacent regression evidence for readiness/timer paths.
+- `epoll_create01`/`epoll_create02` remain excluded because the raw `__NR_epoll_create` variant is unsupported/`TCONF`, and `epoll_create02` additionally fails on musl for invalid-size errno behavior.
+- `eventfd06` remains excluded because its AIO dependency is unavailable in the guest; no `libaio`/AIO compatibility shim or fake PASS was introduced.

@@ -99,3 +99,7 @@ Additional no-promotion note after late actual-bin blocker reprobes:
 - The RV fcntl actual-bin reprobe (`fcntl24*`, `fcntl25*`, `fcntl26*`, `fcntl31*`, `fcntl32*`, `fcntl33*`, `fcntl34*`, `fcntl36*`, `fcntl37*`, `fcntl38*`, `fcntl39*`) produced `0 PASS / 44 FAIL` with visible `TCONF/TFAIL/TBROK` markers and zero candidates. Tmpfs lease restrictions, `F_GETOWN_EX`, OFD lock commands, capability, and dnotify prerequisites remain real blockers.
 - The RV process/time/signal reprobe produced `10 PASS / 38 FAIL` but the pass rows contain internal `TFAIL` or `TCONF`, and the failing rows include `TBROK` plus four timeouts. The candidate report has zero candidates, so no wrapper PASS row from this run is counted.
 - Stable806 candidate pool remains `20/50`; `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`.
+
+Additional no-promotion note after epoll/eventfd/poll/pselect RV scout:
+
+- The RV scout reports 17 RV candidates, but they are all already in `LTP_STABLE_CASES` and are counted only as adjacent regression evidence. The three new/unstable rows are blocked: `epoll_create01` is pass-with-TCONF, `epoll_create02` has RV musl `TFAIL` plus raw-syscall `TCONF`, and `eventfd06` is `TCONF` due to missing `libaio`. There are therefore `0` new unique stable806 candidates, no LA follow-up, and the candidate pool remains `20/50`.

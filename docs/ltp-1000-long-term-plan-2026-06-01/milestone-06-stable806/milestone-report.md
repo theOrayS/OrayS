@@ -168,3 +168,12 @@ After the remaining xattr blocker retest, three more RV-only scouts were run to 
 - RV process/time/signal reprobe: `target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt` — `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap`; candidate report has `0` candidates.
 
 Conclusion: these scouts are blocker-only. No LA follow-up was run, no `LTP_STABLE_CASES` update is allowed, and stable806 remains `20/50` candidate-pool cases at baseline `756 total / 756 unique / 0 duplicate`.
+
+## 2026-06-04 epoll/eventfd/poll/pselect RV scout
+
+A small RV scout checked current guest-bin epoll/eventfd/poll/pselect rows after the stale Team cleanup. It produced useful adjacent regression evidence but no new unique stable806 candidates.
+
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt` — `37 PASS / 3 FAIL / TCONF=6 / TFAIL=2 / 0 timeout / 0 ENOSYS / 0 panic/trap`.
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt` — 17 RV candidates are all existing stable rows; the three new rows (`epoll_create01`, `epoll_create02`, `eventfd06`) are blocked.
+
+Conclusion: no LA follow-up and no stable-list change. stable806 remains `20/50` candidate-pool cases, baseline `756 total / 756 unique / 0 duplicate`.
