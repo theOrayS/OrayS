@@ -163,7 +163,7 @@ This follow-up converts three previously blocker-only xattr rows into candidate-
 - Adjacent RV xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
 - Adjacent LA xattr/mknod/socket regression: `target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt` — `74 PASS / 0 FAIL / 0 internal markers`.
 
-The candidate pool was 20/50 unique cases at that point; the later generic `splice(2)` follow-up raises the current pool to 25/50. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
+The candidate pool was 20/50 unique cases at that point; the later generic `splice(2)` follow-up raised the pool to 25/50, and the later `lseek11` follow-up raises the current pool to 26/50. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
 
 ## 2026-06-04 late actual-bin blocker reprobes
 
@@ -194,4 +194,17 @@ This follow-up converts the first five current guest-bin `splice*` rows into can
 - Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt` — five four-combo candidates: `splice01`, `splice02`, `splice03`, `splice04`, `splice05`; blocked/incomplete cases `0`.
 - `splice07` RV retest after conservative invalid-fd errno cleanup: `target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.txt` — wrapper `PASS` on RV but `TCONF=336` and `ENOSYS=336` across optional fd-fixture setup. It is explicitly not promotion evidence.
 
-The candidate pool is now 25/50 unique cases. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
+The candidate pool was 25/50 unique cases at the splice checkpoint; the later `lseek11` follow-up raises the current pool to 26/50. `examples/shell/src/cmd.rs::LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made before the next +50 gate.
+
+
+## 2026-06-04 lseek11 SEEK_DATA/SEEK_HOLE follow-up
+
+This follow-up adds a generic regular-file data/hole map so `lseek(fd, off, SEEK_DATA)` and `lseek(fd, off, SEEK_HOLE)` distinguish written data ranges from sparse holes instead of returning `EINVAL`/`ENOSYS` or treating every zero-filled gap as data.
+
+- Targeted RV: `target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.summary.txt` — `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` for `lseek11` across musl + glibc.
+- Targeted LA: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.summary.txt` — `2 PASS / 0 FAIL / 0 internal markers` for the same case/libc matrix.
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.promotion-candidates.txt` — four-combo candidate `lseek11`; blocked/incomplete cases `0`.
+- Adjacent RV stable lseek subset: `target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.txt` — `8 PASS / 0 FAIL / 0 internal markers`.
+- Adjacent LA stable lseek subset: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt` — `8 PASS / 0 FAIL / 0 internal markers`.
+
+The candidate pool is now 26/50 unique cases (`lseek11` added after `splice01`..`splice05`). The stable list remains `756 total / 756 unique / 0 duplicate`; no stable806 promotion commit is made until the full +50 cohort is available.

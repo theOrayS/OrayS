@@ -14,6 +14,8 @@ pub(super) const USER_PIE_LOAD_BASE: usize = USER_ASPACE_BASE;
 pub(super) const MAX_SCRIPT_INTERPRETER_DEPTH: usize = 4;
 pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
 pub(super) const AUX_CLOCK_TICKS: usize = 100;
+pub(super) const SEEK_DATA_WHENCE: u32 = 3;
+pub(super) const SEEK_HOLE_WHENCE: u32 = 4;
 
 pub(super) const SIGCHLD_NUM: isize = 17;
 pub(super) const SIGCONT_NUM: i32 = 18;

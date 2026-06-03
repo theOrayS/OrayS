@@ -1316,7 +1316,7 @@ Parser result: RV xattr stable subset is `42 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF
 
 Validation conclusion for this follow-up:
 
-`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool was 17/50 at that point. The later xattr special-node follow-up below raised the pool to 20/50, and the later generic `splice(2)` follow-up raises the current pool to 25/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+`setxattr03` is added to the stable806 candidate pool with four-combo clean evidence after a generic xattr mutation guard. The stable xattr subset remains clean on both architectures. The broader xattr scout rows other than `setxattr03` remain excluded unless their visible parser blockers are fixed with real semantics. Candidate pool was 17/50 at that point. The later xattr special-node follow-up below raised the pool to 20/50, and the later generic `splice(2)` follow-up raised the pool to 25/50; the later `lseek11` follow-up raises the current pool to 26/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
 
 
 ## xattr special-node / AF_UNIX pathname socket repair
@@ -1383,7 +1383,7 @@ Artifacts:
 
 Parser result: RV adjacent subset is `74 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap`; LA adjacent subset is also `74 PASS / 0 FAIL / 0 internal markers`.
 
-Conclusion: `fgetxattr02`, `getxattr02`, and `setxattr02` were added to the stable806 candidate pool with four-combo clean evidence after generic special-node xattr and AF_UNIX pathname socket repairs. Candidate pool was 20/50 at that point; the later generic `splice(2)` follow-up raises the current pool to 25/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
+Conclusion: `fgetxattr02`, `getxattr02`, and `setxattr02` were added to the stable806 candidate pool with four-combo clean evidence after generic special-node xattr and AF_UNIX pathname socket repairs. Candidate pool was 20/50 at that point; the later generic `splice(2)` follow-up raised the pool to 25/50; the later `lseek11` follow-up raises the current pool to 26/50. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate` until the full +50 milestone gate is available.
 
 ## Remaining xattr blocker-only RV retest after special-node repair
 
@@ -1554,4 +1554,77 @@ Blocked splice rows retained explicitly:
 - `splice07`: after invalid-fd errno cleanup, RV wrapper status is PASS, but both libc rows have `TCONF=168` and `ENOSYS=168` from unsupported optional fd-fixture setup. This is pass-with-internal-markers and not counted.
 - `splice08`/`splice09`: initial scout reports upstream 6.7+ version-gated `TCONF`; not counted.
 
-Conclusion: `splice01`..`splice05` are added to the stable806 candidate pool with four-combo clean evidence. Candidate pool is now `25/50`. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the full +50 gate is not available.
+Conclusion: `splice01`..`splice05` are added to the stable806 candidate pool with four-combo clean evidence. Candidate pool was `25/50` at the splice checkpoint; the later `lseek11` follow-up raises the current pool to `26/50`. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the full +50 gate is not available.
+
+
+## 2026-06-04 lseek11 SEEK_DATA/SEEK_HOLE repair and gate
+
+Build/format smoke for this patch:
+
+```bash
+cargo fmt --all --check
+```
+
+Result: passed. The broader host `cargo check -p arceos-shell --features uspace,auto-run-tests,axhal/irq` was not used as promotion evidence because it fails under the host x86_64 target on pre-existing target-architecture gates (`AUX_PLATFORM`, TrapFrame register layout, and related riscv64/loongarch64-only code paths). The authoritative validation for this change is the RV/LA evaluator matrix below.
+
+Current-code RV targeted gate:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='lseek11' LTP_CASE_TIMEOUT_SECS=45 timeout 30m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.summary.json`
+- Checksum: `target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.sha256`
+
+Parser result: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` across RV musl + glibc. `lseek11.c` reports block size `512` and all 15 internal `SEEK_DATA`/`SEEK_HOLE` subtests pass per libc.
+
+Current-code LA targeted gate:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='lseek11' LTP_CASE_TIMEOUT_SECS=45 timeout 30m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.log target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.summary.json`
+- Combined candidate report: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.promotion-candidates.txt`
+- Checksum: `target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.sha256`
+
+Parser result: `2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap` across LA musl + glibc. Combined report has exactly one four-combo candidate: `lseek11`; blocked/incomplete `0`.
+
+Adjacent stable lseek regression gate:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='lseek01 lseek02 lseek07 llseek01' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.log
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='lseek01 lseek02 lseek07 llseek01' LTP_CASE_TIMEOUT_SECS=45 timeout 45m ./run-eval.sh la
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.log target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.log
+```
+
+Artifacts:
+
+- RV raw log: `target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.log`
+- RV summary: `target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.txt`
+- RV JSON: `target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.json`
+- RV checksum: `target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.sha256`
+- LA raw log: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.log`
+- LA summary: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt`
+- LA JSON: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.json`
+- LA combined candidate/regression report: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.promotion-candidates.txt`
+- LA checksum: `target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.sha256`
+
+Parser result: RV `8 PASS / 0 FAIL / 0 internal markers`; LA `8 PASS / 0 FAIL / 0 internal markers` for `lseek01`, `lseek02`, `lseek07`, and `llseek01` across musl + glibc.
+
+Conclusion: `lseek11` is added to the stable806 candidate pool with four-combo clean evidence and adjacent stable lseek regression. Candidate pool is now `26/50`. `LTP_STABLE_CASES` remains `756 total / 756 unique / 0 duplicate`; no promotion commit is made because the full +50 gate is not available.
