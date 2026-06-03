@@ -1468,3 +1468,23 @@ Artifacts:
 Parser result: `10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap`. Candidate report: `0` promotion candidates; 24 blocked/incomplete cases. The wrapper-PASS rows (`setsid01`, `getrusage02`, `adjtimex02`, `sched_rr_get_interval03`, `setpriority01`) all contain internal `TFAIL` or `TCONF` markers and are explicitly not counted.
 
 Validation conclusion for these reprobes: stable806 remains at `20/50` candidate-pool cases. No `LTP_STABLE_CASES` update, no LA follow-up, and no promotion commit are allowed from this evidence.
+
+## 2026-06-04 epoll/eventfd/poll/pselect RV scout
+
+RV command:
+
+```bash
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='epoll_create01 epoll_create02 eventfd01 eventfd02 eventfd03 eventfd04 eventfd05 eventfd06 eventfd2_01 eventfd2_02 eventfd2_03 poll01 poll02 ppoll01 pselect01 pselect01_64 pselect02 pselect02_64 pselect03 pselect03_64' LTP_CASE_TIMEOUT_SECS=45 timeout 50m ./run-eval.sh rv
+python3 scripts/ltp_summary.py target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.log
+python3 scripts/ltp_summary.py --json target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.log
+python3 scripts/ltp_summary.py --promotion-candidates --promotion-arches rv --promotion-libcs musl,glibc target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.log
+```
+
+Artifacts:
+
+- Raw log: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.log`
+- Summary: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt`
+- JSON: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.json`
+- RV candidate report: `target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt`
+
+Parser result: `37 PASS / 3 FAIL / TCONF=6 / TFAIL=2 / 0 TBROK / 0 timeout / 0 ENOSYS / 0 panic/trap`. The candidate report lists 17 RV candidates, but those rows are all already stable (`eventfd01`..`eventfd05`, `eventfd2_01`..`eventfd2_03`, `poll01`, `poll02`, `ppoll01`, and `pselect01`/`pselect02`/`pselect03` 32/64 variants). New unique rows are `0`: `epoll_create01` is pass-with-TCONF, `epoll_create02` has musl `TFAIL`, and `eventfd06` is `TCONF` due to unavailable `libaio`. No LA follow-up was run.

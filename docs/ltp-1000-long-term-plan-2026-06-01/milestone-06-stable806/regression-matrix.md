@@ -108,3 +108,13 @@ These reprobes add no new candidate-regression boundary because they were blocke
 | FD/VFS/IO late reprobe | `0 PASS / 26 FAIL`, missing-current-bin/status `-1` rows, O_TMPFILE `TCONF`, FIFO `TBROK` | Use current guest-bin names only; fix generic semantics, then rerun RV + LA × musl + glibc before counting. |
 | fcntl uncovered rows | `0 PASS / 44 FAIL`, `TCONF/TFAIL/TBROK` in lease/OFD/dnotify/cap rows | Implement real feature/errno behavior or document unsupported scope; rerun targeted fcntl rows plus existing stable fcntl subset. |
 | process/time/signal late reprobe | `10 PASS / 38 FAIL`, pass-with-internal-marker rows, 4 timeouts | Fix signal/process/session/rusage/prctl semantics and timeout roots first; wrapper PASS with internal markers remains disallowed. |
+
+## 2026-06-04 epoll/eventfd/poll/pselect RV scout regression boundary
+
+The scout adds adjacent RV regression evidence for existing eventfd/poll/pselect stable rows, but no new candidate-regression boundary.
+
+| Area | Current evidence | Promotion boundary |
+| --- | --- | --- |
+| eventfd/poll/pselect stable adjacency | Existing stable rows are RV parser-clean in the mixed scout | Useful as RV adjacency only; any new promotion still needs fresh RV + LA × musl + glibc clean evidence for new unique rows. |
+| epoll_create01/02 | pass-with-TCONF and musl TFAIL remain visible | Implement real raw `epoll_create`/invalid-size semantics or document unsupported scope before reconsidering; no wrapper-specific workaround. |
+| eventfd06 | `libaio` unavailable `TCONF` | Requires real AIO/libaio test support or upstream environment change; TCONF is not promotion evidence. |
