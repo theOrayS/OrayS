@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 use super::linux_abi::SIGALRM_NUM;
 use super::process_lifecycle::terminate_current_thread_for_exit_group;
-use super::signal_abi::{deliver_user_signal, validate_signal_target};
+use super::signal_abi::{
+    current_unblocked_signal_pending, deliver_user_signal, validate_signal_target,
+};
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
@@ -931,6 +933,28 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
     }
 }
 
+fn sleep_duration_interruptible(duration: core::time::Duration) -> Option<core::time::Duration> {
+    if duration.as_nanos() == 0 {
+        return None;
+    }
+    let deadline = axhal::time::wall_time() + duration;
+    loop {
+        let now = axhal::time::wall_time();
+        if now >= deadline {
+            return None;
+        }
+        if let Some(ext) = current_task_ext()
+            && let Some(code) = ext.process.pending_exit_group()
+        {
+            terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
+        }
+        if current_unblocked_signal_pending() {
+            return Some(deadline.saturating_sub(now));
+        }
+        axtask::yield_now();
+    }
+}
+
 pub(super) fn sys_clock_gettime(process: &UserProcess, clk_id: usize, tp: usize) -> isize {
     let ts = match clock_gettime_timespec(clk_id as u32) {
         Ok(ts) => ts,
@@ -1028,10 +1052,17 @@ pub(super) fn sys_nanosleep(process: &UserProcess, req: usize, rem: usize) -> is
         Ok(duration) => duration,
         Err(err) => return neg_errno(err),
     };
-    sleep_duration(duration);
+    if let Some(remaining) = sleep_duration_interruptible(duration) {
+        if rem != 0 {
+            let ret = write_user_value(process, rem, &timespec_from_duration(remaining));
+            if ret != 0 {
+                return ret;
+            }
+        }
+        return neg_errno(LinuxError::EINTR);
+    }
     if rem != 0 {
-        let zero = zero_timespec();
-        let ret = write_user_value(process, rem, &zero);
+        let ret = write_user_value(process, rem, &zero_timespec());
         if ret != 0 {
             return ret;
         }
@@ -1059,7 +1090,9 @@ pub(super) fn sys_clock_nanosleep(
             Err(err) => return neg_errno(err),
         };
         if let Some(delta) = duration.checked_sub(now) {
-            sleep_duration(delta);
+            if sleep_duration_interruptible(delta).is_some() {
+                return neg_errno(LinuxError::EINTR);
+            }
         }
         return 0;
     }
