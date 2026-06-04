@@ -16,7 +16,7 @@ use super::fd_socket::{
     sys_shutdown_bridge, sys_socket_bridge, sys_socketpair_bridge,
 };
 use super::fd_table::{
-    sys_chdir, sys_close, sys_close_range, sys_copy_file_range, sys_dup, sys_dup3,
+    sys_chdir, sys_chroot, sys_close, sys_close_range, sys_copy_file_range, sys_dup, sys_dup3,
     sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
     sys_fadvise64, sys_fallocate, sys_fchdir, sys_fcntl, sys_flock, sys_fsync, sys_ftruncate,
     sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat, sys_lseek, sys_memfd_create, sys_mkdirat,
@@ -167,6 +167,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_sysinfo => sys_sysinfo(&process, tf.arg0()),
         general::__NR_getcwd => sys_getcwd(&process, tf.arg0(), tf.arg1()),
         general::__NR_chdir => sys_chdir(&process, tf.arg0()),
+        general::__NR_chroot => sys_chroot(&process, tf.arg0()),
         general::__NR_openat => sys_openat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_mkdirat => sys_mkdirat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_mknodat => sys_mknodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
