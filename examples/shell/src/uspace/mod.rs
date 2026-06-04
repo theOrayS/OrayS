@@ -77,6 +77,8 @@ struct UserProcess {
     shared_mmap_ranges: Mutex<Vec<(usize, usize, MappingFlags)>>,
     mmap_sigbus_ranges: Mutex<Vec<(usize, usize)>>,
     mmap_ranges: Mutex<Vec<UserMmapRegion>>,
+    mlock_future: AtomicBool,
+    mlockall_accounted_kb: AtomicUsize,
     fds: Mutex<FdTable>,
     cwd: Mutex<String>,
     exec_root: Mutex<String>,
@@ -180,6 +182,7 @@ struct UserMmapRegion {
     size: usize,
     prot: u32,
     shared: bool,
+    anonymous: bool,
     locked: bool,
     may_write: bool,
     file_backing: Option<UserMmapFileBacking>,
@@ -202,10 +205,17 @@ impl UserMmapRegion {
             size: end.saturating_sub(start),
             prot,
             shared: self.shared,
+            anonymous: self.anonymous,
             locked: self.locked,
             may_write: self.may_write,
             file_backing,
         }
+    }
+
+    fn subregion_with_lock(&self, start: usize, end: usize, locked: bool) -> Self {
+        let mut region = self.subregion(start, end, self.prot);
+        region.locked = locked;
+        region
     }
 }
 
