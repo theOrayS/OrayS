@@ -19,6 +19,14 @@ static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 const NSEC_PER_SEC: i128 = 1_000_000_000;
 pub(super) const USER_HZ: c_long = 100;
 
+fn has_effective_capability(process: &UserProcess, cap: u32) -> bool {
+    cap <= general::CAP_LAST_CAP && process.cap_effective() & (1u64 << cap) != 0
+}
+
+fn can_set_system_time(process: &UserProcess) -> bool {
+    has_effective_capability(process, general::CAP_SYS_TIME)
+}
+
 impl UserProcess {
     pub(super) fn real_timer_armed(&self) -> bool {
         self.real_timer_deadline_us.load(Ordering::Acquire) != 0
@@ -941,6 +949,9 @@ pub(super) fn sys_clock_settime(process: &UserProcess, clk_id: usize, tp: usize)
     };
     if ts.tv_sec < 0 || !(0..1_000_000_000).contains(&ts.tv_nsec) {
         return neg_errno(LinuxError::EINVAL);
+    }
+    if !can_set_system_time(process) {
+        return neg_errno(LinuxError::EPERM);
     }
     set_realtime_offset_from_timespec(ts);
     0
