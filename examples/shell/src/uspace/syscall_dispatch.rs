@@ -28,8 +28,8 @@ use super::fd_table::{
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
 use super::memory_map::{
-    sys_brk, sys_madvise, sys_mincore, sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_msync,
-    sys_munlock, sys_munlockall, sys_munmap,
+    sys_brk, sys_madvise, sys_mincore, sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap,
+    sys_msync, sys_munlock, sys_munlockall, sys_munmap,
 };
 use super::memory_policy::{sys_get_mempolicy, sys_mbind, sys_set_mempolicy};
 use super::metadata::{
@@ -483,6 +483,14 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_mincore => sys_mincore(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_mprotect => sys_mprotect(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_msync => sys_msync(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_mremap => sys_mremap(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
         general::__NR_munmap => sys_munmap(&process, tf, tf.arg0(), tf.arg1()),
         general::__NR_mbind => sys_mbind(
             &process,

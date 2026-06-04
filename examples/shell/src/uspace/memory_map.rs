@@ -367,6 +367,309 @@ pub(super) fn sys_mmap(
     target as isize
 }
 
+pub(super) fn sys_mremap(
+    process: &UserProcess,
+    old_addr: usize,
+    old_size: usize,
+    new_size: usize,
+    flags: usize,
+    new_addr: usize,
+) -> isize {
+    const SUPPORTED_FLAGS: u32 = general::MREMAP_MAYMOVE | general::MREMAP_FIXED;
+
+    let flags = flags as u32;
+    if old_addr & (PAGE_SIZE_4K - 1) != 0 || flags & !SUPPORTED_FLAGS != 0 || new_size == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if flags & general::MREMAP_FIXED != 0 {
+        if flags & general::MREMAP_MAYMOVE == 0 || new_addr & (PAGE_SIZE_4K - 1) != 0 {
+            return neg_errno(LinuxError::EINVAL);
+        }
+    }
+
+    let Some(old_size) = align_up_checked(old_size, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    let Some(new_size) = align_up_checked(new_size, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if old_size == 0 || new_size == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let Some(old_end) = old_addr.checked_add(old_size) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if !mremap_mapped_range(process, old_addr, old_end) {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let Some(source) = mremap_source_region(process, old_addr, old_end) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+
+    if flags & general::MREMAP_FIXED != 0 {
+        let Some(target_end) = new_addr.checked_add(new_size) else {
+            return neg_errno(LinuxError::ENOMEM);
+        };
+        if new_addr < USER_MMAP_BASE
+            || target_end > mmap_limit_end()
+            || ranges_overlap(old_addr, old_end, new_addr, target_end)
+        {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        return mremap_move(process, source, old_addr, old_size, new_addr, new_size)
+            .map_or_else(neg_errno, |addr| addr as isize);
+    }
+
+    if new_size <= old_size {
+        return mremap_shrink_in_place(process, source, old_addr, old_size, new_size);
+    }
+
+    if let Some(result) = mremap_try_expand_in_place(process, &source, old_addr, old_size, new_size)
+    {
+        return result.map_or_else(neg_errno, |addr| addr as isize);
+    }
+
+    if flags & general::MREMAP_MAYMOVE == 0 {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+
+    let target = match mremap_find_free_area(process, new_size) {
+        Some(target) => target,
+        None => return neg_errno(LinuxError::ENOMEM),
+    };
+
+    mremap_move(process, source, old_addr, old_size, target, new_size)
+        .map_or_else(neg_errno, |addr| addr as isize)
+}
+
+fn mmap_limit_end() -> usize {
+    USER_STACK_TOP - USER_STACK_SIZE
+}
+
+fn ranges_overlap(
+    left_start: usize,
+    left_end: usize,
+    right_start: usize,
+    right_end: usize,
+) -> bool {
+    left_start < right_end && right_start < left_end
+}
+
+fn mremap_source_region(
+    process: &UserProcess,
+    start: usize,
+    end: usize,
+) -> Option<super::UserMmapRegion> {
+    process
+        .mmap_regions()
+        .into_iter()
+        .find(|region| region.start <= start && region.end() >= end)
+}
+
+fn mremap_mapped_range(process: &UserProcess, start: usize, end: usize) -> bool {
+    let size = end - start;
+    let aspace = process.aspace.lock();
+    aspace.contains_range(VirtAddr::from(start), size)
+        && aspace.can_access_range(VirtAddr::from(start), size, MappingFlags::empty())
+}
+
+fn mremap_shrink_in_place(
+    process: &UserProcess,
+    source: super::UserMmapRegion,
+    old_addr: usize,
+    old_size: usize,
+    new_size: usize,
+) -> isize {
+    if new_size < old_size {
+        let tail_start = old_addr + new_size;
+        let tail_size = old_size - new_size;
+        process.forget_mmap_region(tail_start, old_addr + old_size);
+        process.forget_mmap_range(tail_start, old_addr + old_size);
+        let unmap_result = process
+            .aspace
+            .lock()
+            .unmap(VirtAddr::from(tail_start), tail_size);
+        if let Err(err) = unmap_result {
+            return neg_errno(LinuxError::from(err));
+        }
+    }
+    let mut region = source.subregion(old_addr, old_addr + new_size, source.prot);
+    region.start = old_addr;
+    region.size = new_size;
+    process.record_mmap_region(
+        region.start,
+        region.size,
+        region.prot,
+        region.shared,
+        region.anonymous,
+        region.locked,
+        region.may_write,
+        region.file_backing,
+    );
+    old_addr as isize
+}
+
+fn mremap_try_expand_in_place(
+    process: &UserProcess,
+    source: &super::UserMmapRegion,
+    old_addr: usize,
+    old_size: usize,
+    new_size: usize,
+) -> Option<Result<usize, LinuxError>> {
+    let old_end = old_addr.checked_add(old_size)?;
+    let new_end = old_addr.checked_add(new_size)?;
+    if new_end > mmap_limit_end() {
+        return Some(Err(LinuxError::ENOMEM));
+    }
+    let extension = new_size.checked_sub(old_size)?;
+    if extension == 0 {
+        return Some(Ok(old_addr));
+    }
+    let map_flags = mmap_prot_to_flags(source.prot);
+    let populate = source.file_backing.is_some() || source.shared || source.locked;
+    let mut aspace = process.aspace.lock();
+    if aspace
+        .map_alloc(VirtAddr::from(old_end), extension, map_flags, populate)
+        .is_err()
+    {
+        return None;
+    }
+    drop(aspace);
+
+    let mut region = source.subregion(old_addr, old_addr + old_size, source.prot);
+    region.start = old_addr;
+    region.size = new_size;
+    if let Some(backing) = region.file_backing.as_mut() {
+        backing.valid_len = backing.valid_len.max(new_size);
+    }
+    process.record_mmap_region(
+        region.start,
+        region.size,
+        region.prot,
+        region.shared,
+        region.anonymous,
+        region.locked,
+        region.may_write,
+        region.file_backing,
+    );
+    if source.shared && map_flags.contains(MappingFlags::WRITE) {
+        process.record_shared_mmap(old_end, extension, map_flags);
+    }
+    Some(Ok(old_addr))
+}
+
+fn mremap_find_free_area(process: &UserProcess, size: usize) -> Option<usize> {
+    let limit_size = mmap_limit_end().checked_sub(USER_MMAP_BASE)?;
+    let limit = VirtAddrRange::from_start_size(VirtAddr::from(USER_MMAP_BASE), limit_size);
+    let mut brk = process.brk.lock();
+    let hint = align_up_checked(brk.next_mmap, PAGE_SIZE_4K)?;
+    let start = {
+        let aspace = process.aspace.lock();
+        aspace
+            .find_free_area(VirtAddr::from(hint), size, limit)
+            .or_else(|| aspace.find_free_area(VirtAddr::from(USER_MMAP_BASE), size, limit))
+    }?;
+    let start = start.as_usize();
+    brk.next_mmap = start
+        .checked_add(size)
+        .and_then(|end| end.checked_add(PAGE_SIZE_4K))
+        .filter(|next| *next < mmap_limit_end())
+        .unwrap_or(USER_MMAP_BASE);
+    Some(start)
+}
+
+fn mremap_move(
+    process: &UserProcess,
+    source: super::UserMmapRegion,
+    old_addr: usize,
+    old_size: usize,
+    target: usize,
+    new_size: usize,
+) -> Result<usize, LinuxError> {
+    let target_end = target.checked_add(new_size).ok_or(LinuxError::ENOMEM)?;
+    if target < USER_MMAP_BASE || target_end > mmap_limit_end() {
+        return Err(LinuxError::ENOMEM);
+    }
+    let copy_size = old_size.min(new_size);
+    let map_flags = mmap_prot_to_flags(source.prot);
+    let populate = source.file_backing.is_some() || source.shared || source.locked;
+
+    process.forget_mmap_region(target, target_end);
+    process.forget_mmap_range(target, target_end);
+    {
+        let mut aspace = process.aspace.lock();
+        let _ = aspace.unmap(VirtAddr::from(target), new_size);
+        aspace
+            .map_alloc(VirtAddr::from(target), new_size, map_flags, populate)
+            .map_err(LinuxError::from)?;
+    }
+
+    if let Err(err) = mremap_copy_user_range(process, old_addr, target, copy_size) {
+        let _ = process
+            .aspace
+            .lock()
+            .unmap(VirtAddr::from(target), new_size);
+        return Err(err);
+    }
+
+    process.forget_mmap_region(old_addr, old_addr + old_size);
+    process.forget_mmap_range(old_addr, old_addr + old_size);
+    process
+        .aspace
+        .lock()
+        .unmap(VirtAddr::from(old_addr), old_size)
+        .map_err(LinuxError::from)?;
+
+    let mut region = source.subregion(old_addr, old_addr + old_size, source.prot);
+    region.start = target;
+    region.size = new_size;
+    if let Some(backing) = region.file_backing.as_mut() {
+        backing.valid_len = backing.valid_len.max(new_size);
+    }
+    process.record_mmap_region(
+        region.start,
+        region.size,
+        region.prot,
+        region.shared,
+        region.anonymous,
+        region.locked,
+        region.may_write,
+        region.file_backing,
+    );
+    if source.shared && map_flags.contains(MappingFlags::WRITE) {
+        process.record_shared_mmap(target, new_size, map_flags);
+    }
+    Ok(target)
+}
+
+fn mremap_copy_user_range(
+    process: &UserProcess,
+    src: usize,
+    dst: usize,
+    len: usize,
+) -> Result<(), LinuxError> {
+    let chunk = MAX_USER_IO_CHUNK.min(PAGE_SIZE_4K * 16);
+    let mut buf = Vec::new();
+    buf.try_reserve_exact(chunk)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    buf.resize(chunk, 0);
+    let mut copied = 0usize;
+    while copied < len {
+        let chunk_len = (len - copied).min(buf.len());
+        let src_addr = src.checked_add(copied).ok_or(LinuxError::ENOMEM)?;
+        let dst_addr = dst.checked_add(copied).ok_or(LinuxError::ENOMEM)?;
+        let mut aspace = process.aspace.lock();
+        aspace
+            .read(VirtAddr::from(src_addr), &mut buf[..chunk_len])
+            .map_err(LinuxError::from)?;
+        aspace
+            .write(VirtAddr::from(dst_addr), &buf[..chunk_len])
+            .map_err(LinuxError::from)?;
+        copied += chunk_len;
+    }
+    Ok(())
+}
+
 pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len: usize) -> isize {
     if len == 0 {
         return neg_errno(LinuxError::EINVAL);
@@ -413,6 +716,7 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
             return 0;
         }
     }
+    let _ = msync_file_backed_ranges(process, start, end);
     process.forget_mmap_region(start, end);
     process.forget_mmap_range(start, end);
     let unmap_result = process
