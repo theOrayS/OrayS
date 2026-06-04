@@ -19,9 +19,10 @@ use super::linux_abi::{
     LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT,
     LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT, MCAST_LEAVE_GROUP_OPT, SO_BROADCAST_OPT,
     SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT, SO_PEERCRED_OPT, SO_RCVBUF_OPT,
-    SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT, SO_SNDTIMEO_OPT,
-    SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, TCP_INFO_OPT,
-    TCP_MAXSEG_OPT, TCP_NODELAY_OPT, fd_cloexec_flag, neg_errno_code, posix_errno_from_ret,
+    SO_RCVBUFFORCE_OPT, SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT,
+    SO_SNDBUFFORCE_OPT, SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET,
+    TCP_INFO_COMPAT_SIZE, TCP_INFO_OPT, TCP_MAXSEG_OPT, TCP_NODELAY_OPT, fd_cloexec_flag,
+    neg_errno_code, posix_errno_from_ret,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
@@ -1905,7 +1906,13 @@ pub(super) fn sys_setsockopt_bridge(
             }
         }
     } else if !socket_option_supported(level_i32, optname_i32) {
-        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
+        if level_i32 == SOL_SOCKET_LEVEL
+            && matches!(optname_i32, SO_SNDBUFFORCE_OPT | SO_RCVBUFFORCE_OPT)
+        {
+            0
+        } else {
+            neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
+        }
     } else if level_i32 == SOL_SOCKET_LEVEL
         && matches!(optname_i32, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT)
     {
