@@ -408,6 +408,8 @@ fn patch_loongarch_musl_syscall_stubs(
         offsets.push((offset, syscall_nr));
     }
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
+    let gethostname_offset = find_dynsym_file_offset(&elf, "gethostname")?;
+    let syscall_ret_offset = find_symbol_file_offset(&elf, "__syscall_ret")?;
     drop(elf);
 
     for (offset, syscall_nr) in offsets {
@@ -415,6 +417,11 @@ fn patch_loongarch_musl_syscall_stubs(
     }
     if let Some(offset) = brk_offset {
         patch_loongarch_musl_brk_stub(image, offset)?;
+    }
+    if let (Some(gethostname_offset), Some(syscall_ret_offset)) =
+        (gethostname_offset, syscall_ret_offset)
+    {
+        patch_loongarch_musl_gethostname_wrapper(image, gethostname_offset, syscall_ret_offset)?;
     }
     patch_loongarch_musl_readlink_wrappers(image)?;
     Ok(())
@@ -435,6 +442,8 @@ fn patch_riscv_musl_syscall_stubs(
     let getpriority_offset = find_dynsym_file_offset(&elf, "getpriority")?;
     let setpriority_offset = find_dynsym_file_offset(&elf, "setpriority")?;
     let errno_location_offset = find_dynsym_file_offset(&elf, "__errno_location")?;
+    let gethostname_offset = find_dynsym_file_offset(&elf, "gethostname")?;
+    let syscall_ret_offset = find_symbol_file_offset(&elf, "__syscall_ret")?;
     drop(elf);
     if let Some(offset) = brk_offset {
         patch_riscv_musl_brk_stub(image, offset)?;
@@ -458,6 +467,11 @@ fn patch_riscv_musl_syscall_stubs(
             errno_location_offset,
         )?;
     }
+    if let (Some(gethostname_offset), Some(syscall_ret_offset)) =
+        (gethostname_offset, syscall_ret_offset)
+    {
+        patch_riscv_musl_gethostname_wrapper(image, gethostname_offset, syscall_ret_offset)?;
+    }
     Ok(())
 }
 
@@ -467,6 +481,26 @@ fn find_dynsym_file_offset(elf: &ElfFile<'_>, name: &str) -> Result<Option<usize
         return Ok(None);
     };
     let SectionData::DynSymbolTable64(entries) = dynsym.get_data(elf).map_err(str_err)? else {
+        return Ok(None);
+    };
+    for entry in entries {
+        if entry.get_name(elf).unwrap_or("") == name {
+            let value = entry.value() as usize;
+            return vaddr_to_file_offset(elf, value).map(Some);
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn find_symbol_file_offset(elf: &ElfFile<'_>, name: &str) -> Result<Option<usize>, String> {
+    if let Some(offset) = find_dynsym_file_offset(elf, name)? {
+        return Ok(Some(offset));
+    }
+    let Some(symtab) = elf.find_section_by_name(".symtab") else {
+        return Ok(None);
+    };
+    let SectionData::SymbolTable64(entries) = symtab.get_data(elf).map_err(str_err)? else {
         return Ok(None);
     };
     for entry in entries {
@@ -523,6 +557,55 @@ fn patch_riscv_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), Stri
         image[offset..end].copy_from_slice(&patch);
     }
     Ok(())
+}
+
+#[cfg(target_arch = "riscv64")]
+fn patch_riscv_musl_gethostname_wrapper(
+    image: &mut [u8],
+    offset: usize,
+    syscall_ret_offset: usize,
+) -> Result<(), String> {
+    const KNOWN_PREFIX: [u32; 4] = [
+        0xe501_0113, // addi sp, sp, -432
+        0x1921_3823, // sd s2, 400(sp)
+        0x0081_0913, // addi s2, sp, 8
+        0x1891_3c23, // sd s1, 408(sp)
+    ];
+    if !riscv_words_match(image, offset, &KNOWN_PREFIX)? {
+        return Ok(());
+    }
+
+    let patch_offset = offset + 0x7c;
+    let success_offset = offset + 0x5c;
+    let patch = [
+        0xfdc0_0513u32,                                   // li a0, -ENAMETOOLONG
+        riscv_jal(patch_offset + 4, syscall_ret_offset)?, // __syscall_ret(a0)
+        riscv_j(patch_offset + 8, success_offset)?,       // common epilogue
+    ];
+    for (idx, word) in patch.iter().enumerate() {
+        let word_offset = patch_offset + idx * size_of::<u32>();
+        let end = word_offset
+            .checked_add(size_of::<u32>())
+            .ok_or_else(|| "riscv musl gethostname patch range overflow".to_string())?;
+        let bytes = image
+            .get_mut(word_offset..end)
+            .ok_or_else(|| "riscv musl gethostname patch exceeds image".to_string())?;
+        bytes.copy_from_slice(&word.to_le_bytes());
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "riscv64")]
+fn riscv_words_match(image: &[u8], offset: usize, words: &[u32]) -> Result<bool, String> {
+    for (idx, expected) in words.iter().enumerate() {
+        let word_offset = offset
+            .checked_add(idx * size_of::<u32>())
+            .ok_or_else(|| "RISC-V prefix offset overflow".to_string())?;
+        if read_u32_le(image, word_offset)? != *expected {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 #[cfg(target_arch = "riscv64")]
@@ -595,6 +678,19 @@ fn patch_riscv_musl_nice_wrapper(
 
 #[cfg(target_arch = "riscv64")]
 fn riscv_jal(from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    riscv_jal_with_rd(1, from_offset, to_offset)
+}
+
+#[cfg(target_arch = "riscv64")]
+fn riscv_j(from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    riscv_jal_with_rd(0, from_offset, to_offset)
+}
+
+#[cfg(target_arch = "riscv64")]
+fn riscv_jal_with_rd(rd: u32, from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    if rd > 31 {
+        return Err(format!("RISC-V jal register out of range: {rd}"));
+    }
     let delta = (to_offset as i64)
         .checked_sub(from_offset as i64)
         .ok_or_else(|| "RISC-V jal delta overflow".to_string())?;
@@ -609,7 +705,7 @@ fn riscv_jal(from_offset: usize, to_offset: usize) -> Result<u32, String> {
         | (imm & 0x000f_f000)
         | ((imm & 0x0000_0800) << 9)
         | ((imm & 0x0000_07fe) << 20)
-        | (1 << 7)
+        | (rd << 7)
         | 0x6f)
 }
 
@@ -683,6 +779,40 @@ fn patch_loongarch_musl_syscall_wrapper(
         .concat();
         image[offset..end].copy_from_slice(&patch);
     }
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_gethostname_wrapper(
+    image: &mut [u8],
+    offset: usize,
+    syscall_ret_offset: usize,
+) -> Result<(), String> {
+    const KNOWN_PREFIX: [u32; 4] = [
+        0x02f9_4063, // addi.d sp, sp, -432
+        0x29c6_4079, // st.d s2, sp, 400
+        0x02c0_2079, // addi.d s2, sp, 8
+        0x29c6_6078, // st.d s1, sp, 408
+    ];
+    if !loongarch_words_match(image, offset, &KNOWN_PREFIX)? {
+        return Ok(());
+    }
+
+    let patch_offset = offset + 0x80;
+    let success_offset = offset + 0x60;
+    let patch = [
+        loongarch_addi_w(4, -36)?.to_le_bytes(), // a0 = -ENAMETOOLONG
+        loongarch_bl(patch_offset + 4, syscall_ret_offset)?.to_le_bytes(),
+        loongarch_b(patch_offset + 8, success_offset)?.to_le_bytes(),
+    ]
+    .concat();
+    let end = patch_offset
+        .checked_add(patch.len())
+        .ok_or_else(|| "loongarch musl gethostname patch range overflow".to_string())?;
+    let bytes = image
+        .get_mut(patch_offset..end)
+        .ok_or_else(|| "loongarch musl gethostname patch exceeds image".to_string())?;
+    bytes.copy_from_slice(&patch);
     Ok(())
 }
 
@@ -795,7 +925,7 @@ fn loongarch_words_match(image: &[u8], offset: usize, words: &[u32]) -> Result<b
     Ok(true)
 }
 
-#[cfg(target_arch = "loongarch64")]
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 fn read_u32_le(image: &[u8], offset: usize) -> Result<u32, String> {
     let end = offset
         .checked_add(size_of::<u32>())
@@ -804,6 +934,11 @@ fn read_u32_le(image: &[u8], offset: usize) -> Result<u32, String> {
         .get(offset..end)
         .ok_or_else(|| "LoongArch instruction read exceeds image".to_string())?;
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_bl(from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    loongarch_branch(0x15, from_offset, to_offset)
 }
 
 #[cfg(target_arch = "loongarch64")]
@@ -829,7 +964,16 @@ fn loongarch_branch_target_offset(branch_offset: usize, instruction: u32) -> Res
 
 #[cfg(target_arch = "loongarch64")]
 fn loongarch_b(from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    loongarch_branch(0x14, from_offset, to_offset)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_branch(opcode: u32, from_offset: usize, to_offset: usize) -> Result<u32, String> {
     const B_OPCODE: u32 = 0x14;
+    const BL_OPCODE: u32 = 0x15;
+    if opcode != B_OPCODE && opcode != BL_OPCODE {
+        return Err(format!("unsupported LoongArch branch opcode: {opcode:#x}"));
+    }
     let delta = (to_offset as i64)
         .checked_sub(from_offset as i64)
         .ok_or_else(|| "LoongArch branch delta overflow".to_string())?;
@@ -841,7 +985,7 @@ fn loongarch_b(from_offset: usize, to_offset: usize) -> Result<u32, String> {
         return Err(format!("LoongArch branch delta out of range: {delta}"));
     }
     let raw = (words as u32) & 0x03ff_ffff;
-    Ok((B_OPCODE << 26) | ((raw & 0xffff) << 10) | ((raw >> 16) & 0x3ff))
+    Ok((opcode << 26) | ((raw & 0xffff) << 10) | ((raw >> 16) & 0x3ff))
 }
 
 #[cfg(target_arch = "loongarch64")]
