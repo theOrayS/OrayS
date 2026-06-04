@@ -99,6 +99,9 @@ fn user_range_accessible(process: &UserProcess, ptr: usize, len: usize, write: b
     if !user_range_fits(ptr, len) {
         return false;
     }
+    if user_range_crosses_uncommitted_brk(process, ptr, len) {
+        return false;
+    }
     let flags = if write {
         MappingFlags::READ | MappingFlags::WRITE
     } else {
@@ -106,6 +109,17 @@ fn user_range_accessible(process: &UserProcess, ptr: usize, len: usize, write: b
     };
     let aspace = process.aspace.lock();
     aspace.can_access_range(VirtAddr::from(ptr), len, flags)
+}
+
+fn user_range_crosses_uncommitted_brk(process: &UserProcess, ptr: usize, len: usize) -> bool {
+    if len == 0 {
+        return false;
+    }
+    let Some(end) = ptr.checked_add(len) else {
+        return true;
+    };
+    let brk = process.brk.lock();
+    ptr < brk.limit && end > brk.end
 }
 
 pub(super) fn user_bytes<'a>(
