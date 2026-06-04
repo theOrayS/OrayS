@@ -2235,7 +2235,13 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
         let mut table = process.fds.lock();
         match table.resolve_path(process, general::AT_FDCWD, path.as_str()) {
             Ok(path) => {
-                let stat = match table.stat_path(process, general::AT_FDCWD, path.as_str()) {
+                let resolved_path = match process.resolve_path_symlink(path.as_str()) {
+                    Ok(Some(target)) => target,
+                    Ok(None) => path,
+                    Err(err) => return neg_errno(err),
+                };
+                let stat = match table.stat_path(process, general::AT_FDCWD, resolved_path.as_str())
+                {
                     Ok(stat) => stat,
                     Err(err) => return neg_errno(err),
                 };
@@ -2245,7 +2251,7 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
                 let uid = process.fs_uid();
                 let gid = process.fs_gid();
                 let parents_searchable =
-                    match table.parent_dirs_searchable(process, path.as_str(), uid, gid) {
+                    match table.parent_dirs_searchable(process, resolved_path.as_str(), uid, gid) {
                         Ok(searchable) => searchable,
                         Err(err) => return neg_errno(err),
                     };
@@ -2254,7 +2260,7 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
                 {
                     return neg_errno(LinuxError::EACCES);
                 }
-                path
+                resolved_path
             }
             Err(err) => return neg_errno(err),
         }
