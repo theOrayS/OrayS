@@ -81,6 +81,7 @@ struct UserProcess {
     mlockall_accounted_kb: AtomicUsize,
     fds: Mutex<FdTable>,
     cwd: Mutex<String>,
+    fs_root: Mutex<String>,
     exec_root: Mutex<String>,
     exec_path: Mutex<String>,
     hostname: Arc<Mutex<String>>,

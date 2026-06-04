@@ -20,7 +20,7 @@ use super::futex;
 use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
-use super::runtime_paths::{current_cwd, is_busybox_applet_name};
+use super::runtime_paths::{current_cwd, is_busybox_applet_name, normalize_path};
 use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_registered};
 use super::sysv_shm;
 #[cfg(target_arch = "riscv64")]
@@ -247,6 +247,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         mlockall_accounted_kb: AtomicUsize::new(0),
         fds: Mutex::new(FdTable::new()),
         cwd: Mutex::new(cwd.into()),
+        fs_root: Mutex::new(String::from("/")),
         exec_root: Mutex::new(image.exec_root.clone()),
         exec_path: Mutex::new(image.exec_path.clone()),
         hostname: Arc::new(Mutex::new(String::from("arceos"))),
@@ -410,6 +411,23 @@ impl UserProcess {
         self.cwd.lock().clone()
     }
 
+    pub(super) fn fs_root(&self) -> String {
+        self.fs_root.lock().clone()
+    }
+
+    pub(super) fn resolve_fs_absolute_path(&self, path: &str) -> Result<String, LinuxError> {
+        let normalized = normalize_path("/", path).ok_or(LinuxError::EINVAL)?;
+        let root = self.fs_root();
+        if root == "/" {
+            return Ok(normalized);
+        }
+        if normalized == "/" {
+            return Ok(root);
+        }
+        let tail = normalized.trim_start_matches('/');
+        normalize_path(root.as_str(), tail).ok_or(LinuxError::EINVAL)
+    }
+
     pub(super) fn exec_root(&self) -> String {
         self.exec_root.lock().clone()
     }
@@ -456,6 +474,10 @@ impl UserProcess {
 
     pub(super) fn set_cwd(&self, cwd: String) {
         *self.cwd.lock() = cwd;
+    }
+
+    pub(super) fn set_fs_root(&self, fs_root: String) {
+        *self.fs_root.lock() = fs_root;
     }
 
     fn set_exec_root(&self, exec_root: String) {
@@ -885,6 +907,7 @@ impl UserProcess {
             mlockall_accounted_kb: AtomicUsize::new(0),
             fds: Mutex::new(self.fds.lock().fork_copy()?),
             cwd: Mutex::new(self.cwd()),
+            fs_root: Mutex::new(self.fs_root()),
             exec_root: Mutex::new(self.exec_root()),
             exec_path: Mutex::new(self.exec_path()),
             hostname: self.hostname.clone(),

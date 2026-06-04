@@ -2282,14 +2282,10 @@ pub(super) fn sys_statfs(process: &UserProcess, pathname: usize, statfsbuf: usiz
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let cwd = process.cwd();
-    let Some(abs_path) = normalize_path(cwd.as_str(), path.as_str()) else {
-        return neg_errno(LinuxError::EINVAL);
-    };
     let st = match process
         .fds
         .lock()
-        .statfs_path(process, general::AT_FDCWD, abs_path.as_str())
+        .statfs_path(process, general::AT_FDCWD, path.as_str())
     {
         Ok(st) => st,
         Err(err) => return neg_errno(err),

@@ -2307,6 +2307,9 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
+    if path_exceeds_linux_limits(path.as_str()) {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
     let visible_path = {
         let mut table = process.fds.lock();
         match table.resolve_path(process, general::AT_FDCWD, path.as_str()) {
@@ -2316,8 +2319,7 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
                     Ok(None) => path,
                     Err(err) => return neg_errno(err),
                 };
-                let stat = match table.stat_path(process, general::AT_FDCWD, resolved_path.as_str())
-                {
+                let stat = match stat_absolute_path(process, resolved_path.as_str()) {
                     Ok(stat) => stat,
                     Err(err) => return neg_errno(err),
                 };
@@ -2326,11 +2328,15 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
                 }
                 let uid = process.fs_uid();
                 let gid = process.fs_gid();
-                let parents_searchable =
-                    match table.parent_dirs_searchable(process, resolved_path.as_str(), uid, gid) {
-                        Ok(searchable) => searchable,
-                        Err(err) => return neg_errno(err),
-                    };
+                let parents_searchable = match parent_dirs_searchable_absolute(
+                    process,
+                    resolved_path.as_str(),
+                    uid,
+                    gid,
+                ) {
+                    Ok(searchable) => searchable,
+                    Err(err) => return neg_errno(err),
+                };
                 if uid != 0
                     && (!parents_searchable || !access_allowed(&stat, ACCESS_X_OK, uid, gid))
                 {
@@ -2346,6 +2352,62 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
         return neg_errno(err);
     }
     process.set_cwd(visible_path);
+    0
+}
+
+fn can_chroot(process: &UserProcess) -> bool {
+    process.uid() == 0
+        && general::CAP_SYS_CHROOT <= general::CAP_LAST_CAP
+        && process.cap_effective() & (1u64 << general::CAP_SYS_CHROOT) != 0
+}
+
+pub(super) fn sys_chroot(process: &UserProcess, pathname: usize) -> isize {
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    if path_exceeds_linux_limits(path.as_str()) {
+        return neg_errno(LinuxError::ENAMETOOLONG);
+    }
+
+    let new_root = {
+        let table = process.fds.lock();
+        let resolved_path = match table.resolve_path(process, general::AT_FDCWD, path.as_str()) {
+            Ok(path) => match process.resolve_path_symlink(path.as_str()) {
+                Ok(Some(target)) => target,
+                Ok(None) => path,
+                Err(err) => return neg_errno(err),
+            },
+            Err(err) => return neg_errno(err),
+        };
+        if path_exceeds_linux_limits(resolved_path.as_str()) {
+            return neg_errno(LinuxError::ENAMETOOLONG);
+        }
+        let stat = match stat_absolute_path(process, resolved_path.as_str()) {
+            Ok(stat) => stat,
+            Err(err) => return neg_errno(err),
+        };
+        if stat.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
+            return neg_errno(LinuxError::ENOTDIR);
+        }
+        let uid = process.fs_uid();
+        let gid = process.fs_gid();
+        let parents_searchable =
+            match parent_dirs_searchable_absolute(process, resolved_path.as_str(), uid, gid) {
+                Ok(searchable) => searchable,
+                Err(err) => return neg_errno(err),
+            };
+        if uid != 0 && (!parents_searchable || !access_allowed(&stat, ACCESS_X_OK, uid, gid)) {
+            return neg_errno(LinuxError::EACCES);
+        }
+        resolved_path
+    };
+
+    if !can_chroot(process) {
+        return neg_errno(LinuxError::EPERM);
+    }
+
+    process.set_fs_root(new_root);
     0
 }
 
@@ -4292,7 +4354,7 @@ impl FdTable {
             return Err(LinuxError::ENOENT);
         }
         let normalized = if path.starts_with('/') {
-            normalize_path("/", path).ok_or(LinuxError::EINVAL)?
+            process.resolve_fs_absolute_path(path)?
         } else if dirfd == general::AT_FDCWD {
             let cwd = process.cwd();
             normalize_path(cwd.as_str(), path).ok_or(LinuxError::EINVAL)?
@@ -5543,11 +5605,15 @@ fn open_fd_entry(
 
     if absolute || dirfd == general::AT_FDCWD {
         let mut candidates = if absolute {
-            if let Some(path) = dev_shm_host_path(path) {
-                ensure_dev_shm_dir()?;
-                return open_candidates(process, table, &[path], &opts, flags, mode);
+            if process.fs_root() == "/" {
+                if let Some(path) = dev_shm_host_path(path) {
+                    ensure_dev_shm_dir()?;
+                    return open_candidates(process, table, &[path], &opts, flags, mode);
+                }
+                runtime_absolute_path_candidates(exec_root.as_str(), path)
+            } else {
+                vec![process.resolve_fs_absolute_path(path)?]
             }
-            runtime_absolute_path_candidates(exec_root.as_str(), path)
         } else {
             let cwd = process.cwd();
             let primary = normalize_path(cwd.as_str(), path).ok_or(LinuxError::EINVAL)?;
@@ -6743,8 +6809,8 @@ pub(super) fn resolve_dirfd_path(
         return Err(LinuxError::ENAMETOOLONG);
     }
     if path.starts_with('/') {
-        return normalize_path("/", path)
-            .ok_or(LinuxError::EINVAL)
+        return process
+            .resolve_fs_absolute_path(path)
             .and_then(|path| translate_checked_path(process, path));
     }
     if dirfd == general::AT_FDCWD {
