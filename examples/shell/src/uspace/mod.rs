@@ -41,7 +41,7 @@ mod task_registry;
 mod time_abi;
 mod user_memory;
 
-use fd_table::FdTable;
+use fd_table::{FdTable, FileEntry};
 use linux_abi::*;
 use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
@@ -82,12 +82,14 @@ struct UserProcess {
     exec_root: Mutex<String>,
     exec_path: Mutex<String>,
     hostname: Arc<Mutex<String>>,
+    domainname: Arc<Mutex<String>>,
     prctl_name: Mutex<String>,
     children: Mutex<Vec<ChildTask>>,
     child_exit_wait: WaitQueue,
     rlimits: Mutex<BTreeMap<u32, UserRlimit>>,
     sched_state: Mutex<UserSchedState>,
     nice: AtomicI32,
+    ioprio: AtomicU32,
     signal_actions: Mutex<BTreeMap<usize, general::kernel_sigaction>>,
     path_modes: Mutex<BTreeMap<String, u32>>,
     path_inodes: Mutex<BTreeMap<String, u64>>,
@@ -116,10 +118,16 @@ struct UserProcess {
     fs_gid: AtomicU32,
     groups: Mutex<Vec<u32>>,
     credential_generation: AtomicUsize,
+    cap_effective: AtomicU64,
+    cap_permitted: AtomicU64,
+    cap_inheritable: AtomicU64,
+    cap_bounding: AtomicU64,
     personality: AtomicUsize,
     parent_death_signal: AtomicI32,
     default_timer_slack_ns: AtomicU64,
     timer_slack_ns: AtomicU64,
+    posix_timers: Mutex<BTreeMap<i32, time_abi::UserPosixTimer>>,
+    next_posix_timer_id: AtomicI32,
     real_timer_generation: AtomicU64,
     real_timer_deadline_us: AtomicU64,
     real_timer_interval_us: AtomicU64,
@@ -155,18 +163,49 @@ struct BrkState {
     next_mmap: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
+struct UserMmapFileBacking {
+    file: FileEntry,
+    offset: u64,
+    /// Number of bytes in this mapping that correspond to real file data.
+    ///
+    /// Linux keeps the zero-filled tail of the final partial page accessible for
+    /// MAP_SHARED, but dirty bytes past EOF must not be written back to the file.
+    valid_len: usize,
+}
+
+#[derive(Clone)]
 struct UserMmapRegion {
     start: usize,
     size: usize,
     prot: u32,
     shared: bool,
     locked: bool,
+    may_write: bool,
+    file_backing: Option<UserMmapFileBacking>,
 }
 
 impl UserMmapRegion {
     fn end(&self) -> usize {
         self.start.saturating_add(self.size)
+    }
+
+    fn subregion(&self, start: usize, end: usize, prot: u32) -> Self {
+        let mut file_backing = self.file_backing.clone();
+        if let Some(backing) = file_backing.as_mut() {
+            let delta = start.saturating_sub(self.start);
+            backing.offset = backing.offset.saturating_add(delta as u64);
+            backing.valid_len = backing.valid_len.saturating_sub(delta).min(end - start);
+        }
+        Self {
+            start,
+            size: end.saturating_sub(start),
+            prot,
+            shared: self.shared,
+            locked: self.locked,
+            may_write: self.may_write,
+            file_backing,
+        }
     }
 }
 

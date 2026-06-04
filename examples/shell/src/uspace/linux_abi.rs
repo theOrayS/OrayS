@@ -98,11 +98,14 @@ pub(super) const SYSV_SHM_UNLOCK: i32 = 12;
 pub(super) const SYSV_SHM_STAT: i32 = 13;
 pub(super) const SYSV_SHM_INFO: i32 = 14;
 pub(super) const SYSV_SHM_STAT_ANY: i32 = 15;
-pub(super) const SYSV_SHM_MAX_SIZE: usize = 128 * 1024;
+pub(super) const SYSV_SHM_LOCKED: u32 = 0o2000;
+pub(super) const SYSV_SHM_MAX_SIZE: usize = 1024 * 1024;
 pub(super) const SYSV_SHM_MAX_SEGMENTS: usize = 128;
 
 pub(super) const O_PATH_FLAG: u32 = 0o10000000;
 pub(super) const O_NOFOLLOW_FLAG: u32 = 0o0400000;
+pub(super) const CLOSE_RANGE_UNSHARE: u32 = 1 << 1;
+pub(super) const CLOSE_RANGE_CLOEXEC: u32 = 1 << 2;
 pub(super) const PROC_SELF_MAPS_PATH: &str = "/proc/self/maps";
 pub(super) const ETC_PASSWD_PATH: &str = "/etc/passwd";
 pub(super) const ETC_GROUP_PATH: &str = "/etc/group";

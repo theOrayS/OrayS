@@ -125,6 +125,16 @@ pub(super) fn signal_is_blocked(ext: &UserTaskExt, sig: i32) -> bool {
     bit != 0 && ext.signal_mask.load(Ordering::Acquire) & bit != 0
 }
 
+fn realtime_signal_queue_blocked_by_rlimit(entry: &UserThreadEntry, sig: i32) -> bool {
+    if sig < 32 {
+        return false;
+    }
+    let Some(ext) = super::task_context::task_ext(&entry.task) else {
+        return false;
+    };
+    signal_is_blocked(ext, sig) && ext.process.get_rlimit(general::RLIMIT_SIGPENDING).current() == 0
+}
+
 pub(super) fn queue_current_synchronous_signal(sig: i32) -> bool {
     let Some(ext) = current_task_ext() else {
         return false;
@@ -294,15 +304,38 @@ fn deliver_user_signal_result(entry: &UserThreadEntry, sig: i32, sender_pid: i32
     }
 }
 
-fn deliver_process_group_signal(pgid: i32, sig: i32, sender_pid: i32) -> isize {
+fn signal_permission_allowed(sender: &UserProcess, target: &UserProcess, sig: i32) -> bool {
+    if sender.uid() == 0 {
+        return true;
+    }
+    if sig == SIGCONT_NUM && sender.sid() == target.sid() {
+        return true;
+    }
+    let sender_real = sender.real_uid();
+    let sender_effective = sender.uid();
+    sender_real == target.real_uid()
+        || sender_real == target.saved_uid()
+        || sender_effective == target.real_uid()
+        || sender_effective == target.saved_uid()
+}
+
+fn deliver_process_group_signal(process: &UserProcess, pgid: i32, sig: i32) -> isize {
     let entries = user_thread_entries_by_process_group(pgid);
     if entries.is_empty() {
         return neg_errno(LinuxError::ESRCH);
     }
+    let mut delivered = false;
     for entry in entries {
-        if let Err(err) = deliver_user_signal(&entry, sig, sender_pid) {
+        if !signal_permission_allowed(process, entry.process.as_ref(), sig) {
+            continue;
+        }
+        if let Err(err) = deliver_user_signal(&entry, sig, process.pid()) {
             return neg_errno(err);
         }
+        delivered = true;
+    }
+    if !delivered {
+        return neg_errno(LinuxError::EPERM);
     }
     0
 }
@@ -881,8 +914,10 @@ pub(super) fn sys_rt_sigtimedwait(
     let Some(ext) = current_task_ext() else {
         return neg_errno(LinuxError::EINVAL);
     };
+    ext.signal_wait.store(true, Ordering::Release);
     loop {
         if let Some((sig, sender_pid)) = take_current_pending_signal_matching(wait_mask) {
+            ext.signal_wait.store(false, Ordering::Release);
             if info != 0 {
                 let mut siginfo = [0u8; 128];
                 siginfo[0..4].copy_from_slice(&sig.to_ne_bytes());
@@ -901,15 +936,18 @@ pub(super) fn sys_rt_sigtimedwait(
                 .as_micros()
                 .min(u64::MAX as u128) as u64;
             if now_us >= deadline_us {
+                ext.signal_wait.store(false, Ordering::Release);
                 return neg_errno(LinuxError::EAGAIN);
             }
         }
 
         if let Some(code) = ext.process.pending_exit_group() {
+            ext.signal_wait.store(false, Ordering::Release);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
         }
         let _ = ext.process.consume_expired_real_timer();
         if current_unblocked_signal_pending() && !current_pending_signal_matches(wait_mask) {
+            ext.signal_wait.store(false, Ordering::Release);
             return neg_errno(LinuxError::EINTR);
         }
         axtask::yield_now();
@@ -921,10 +959,10 @@ pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
         return neg_errno(err);
     }
     if pid == 0 {
-        return deliver_process_group_signal(process.pgid(), sig, process.pid());
+        return deliver_process_group_signal(process, process.pgid(), sig);
     }
     if pid < -1 {
-        return deliver_process_group_signal(-pid, sig, process.pid());
+        return deliver_process_group_signal(process, -pid, sig);
     }
     if pid == -1 {
         return neg_errno(LinuxError::EPERM);
@@ -945,6 +983,9 @@ pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
     else {
         return neg_errno(LinuxError::ESRCH);
     };
+    if !signal_permission_allowed(process, entry.process.as_ref(), sig) {
+        return neg_errno(LinuxError::EPERM);
+    }
     deliver_user_signal_result(&entry, sig, process.pid())
 }
 
@@ -979,6 +1020,9 @@ pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -
     if tgid <= 0 || tid <= 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    if let Err(err) = validate_signal_target(sig) {
+        return neg_errno(err);
+    }
     let entry = match user_thread_entry_by_tid(tid) {
         Some(entry) => entry,
         None => return neg_errno(LinuxError::ESRCH),
@@ -992,6 +1036,9 @@ pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -
             current_tid(),
             tgid,
         );
+    }
+    if realtime_signal_queue_blocked_by_rlimit(&entry, sig) {
+        return neg_errno(LinuxError::EAGAIN);
     }
     let ret = deliver_user_signal_result(&entry, sig, process.pid());
     if ret == 0 && tid == current_tid() && process.pending_exit_group().is_some() {

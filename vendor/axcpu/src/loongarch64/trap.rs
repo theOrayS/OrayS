@@ -61,12 +61,14 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
         | Trap::Exception(Exception::PageNonExecutableFault) => {
             handle_page_fault(tf, PageFaultFlags::EXECUTE, from_user);
         }
+        Trap::Exception(Exception::PagePrivilegeIllegal) => {
+            handle_page_fault(tf, PageFaultFlags::READ, from_user)
+        }
         #[cfg(feature = "uspace")]
         Trap::Exception(
             Exception::FetchInstructionAddressError
             | Exception::MemoryAccessAddressError
-            | Exception::AddressNotAligned
-            | Exception::PagePrivilegeIllegal,
+            | Exception::AddressNotAligned,
         ) if from_user => {
             if !handle_user_signal(tf, 11) {
                 panic!(

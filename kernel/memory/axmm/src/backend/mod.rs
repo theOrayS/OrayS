@@ -14,6 +14,25 @@ pub(crate) use self::alloc::retain_shared_frame;
 
 pub(crate) type SharedPages = Arc<SpinNoIrq<BTreeMap<usize, (PhysAddr, MappingFlags)>>>;
 
+#[inline]
+fn pte_flags_for_mapping(flags: MappingFlags) -> MappingFlags {
+    #[cfg(target_arch = "loongarch64")]
+    {
+        const ACCESS: MappingFlags = MappingFlags::READ
+            .union(MappingFlags::WRITE)
+            .union(MappingFlags::EXECUTE);
+        if flags.contains(MappingFlags::USER) && !flags.intersects(ACCESS) {
+            // LoongArch QEMU does not reliably raise a non-readable exception
+            // for user pages encoded only as PLV3 + NR/NX. Keep the leaf
+            // present so lifecycle paths can free/copy the frame, but remove
+            // user accessibility so a PLV3 access traps as SIGSEGV. The owning
+            // memory area still carries the original PROT_NONE flags.
+            return MappingFlags::READ;
+        }
+    }
+    flags
+}
+
 /// A unified enum type for different memory mapping backends.
 ///
 /// Currently, three backends are implemented:
@@ -77,9 +96,10 @@ impl MappingBackend for Backend {
         new_flags: Self::Flags,
         page_table: &mut Self::PageTable,
     ) -> bool {
+        let pte_flags = pte_flags_for_mapping(new_flags);
         page_table
             .cursor()
-            .protect_region(start, size, new_flags)
+            .protect_region(start, size, pte_flags)
             .is_ok()
     }
 }

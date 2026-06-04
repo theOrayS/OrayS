@@ -43,6 +43,9 @@ pub(super) struct UserSchedParam {
 pub(super) struct UserSchedState {
     policy: i32,
     param: UserSchedParam,
+    sched_runtime: u64,
+    sched_deadline: u64,
+    sched_period: u64,
 }
 
 #[repr(C)]
@@ -113,6 +116,9 @@ pub(super) fn default_sched_state() -> UserSchedState {
     UserSchedState {
         policy: 0,
         param: default_sched_param(),
+        sched_runtime: 0,
+        sched_deadline: 0,
+        sched_period: 0,
     }
 }
 
@@ -135,11 +141,66 @@ impl UserProcess {
             core::sync::atomic::Ordering::Release,
         );
     }
+
+    pub(super) fn ioprio(&self) -> u32 {
+        self.ioprio.load(core::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(super) fn set_ioprio(&self, ioprio: u32) {
+        self.ioprio
+            .store(ioprio, core::sync::atomic::Ordering::Release);
+    }
 }
 
 const MIN_NICE: i32 = -20;
 const MAX_NICE: i32 = 19;
 const DEFAULT_NICE: i32 = 0;
+const IOPRIO_WHO_PROCESS: u32 = 1;
+const IOPRIO_WHO_PGRP: u32 = 2;
+const IOPRIO_WHO_USER: u32 = 3;
+const IOPRIO_CLASS_SHIFT: u32 = 13;
+const IOPRIO_PRIO_MASK: u32 = (1 << IOPRIO_CLASS_SHIFT) - 1;
+const IOPRIO_CLASS_NONE: u32 = 0;
+const IOPRIO_CLASS_RT: u32 = 1;
+const IOPRIO_CLASS_BE: u32 = 2;
+const IOPRIO_CLASS_IDLE: u32 = 3;
+const IOPRIO_NR_LEVELS: u32 = 8;
+
+pub(super) fn default_ioprio() -> u32 {
+    encode_ioprio(IOPRIO_CLASS_BE, 4)
+}
+
+fn encode_ioprio(class: u32, data: u32) -> u32 {
+    (class << IOPRIO_CLASS_SHIFT) | data
+}
+
+fn ioprio_class(ioprio: u32) -> u32 {
+    ioprio >> IOPRIO_CLASS_SHIFT
+}
+
+fn ioprio_data(ioprio: u32) -> u32 {
+    ioprio & IOPRIO_PRIO_MASK
+}
+
+fn validate_ioprio(ioprio: u32) -> Result<(), LinuxError> {
+    let class = ioprio_class(ioprio);
+    let data = ioprio_data(ioprio);
+    match class {
+        IOPRIO_CLASS_NONE if data == 0 => Ok(()),
+        IOPRIO_CLASS_RT | IOPRIO_CLASS_BE | IOPRIO_CLASS_IDLE if data < IOPRIO_NR_LEVELS => Ok(()),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn ioprio_rank(ioprio: u32) -> (u32, u32) {
+    let class_rank = match ioprio_class(ioprio) {
+        IOPRIO_CLASS_RT => 0,
+        IOPRIO_CLASS_BE => 1,
+        IOPRIO_CLASS_IDLE => 2,
+        _ => 3,
+    };
+    (class_rank, ioprio_data(ioprio))
+}
 
 fn clamp_nice(nice: i32) -> i32 {
     nice.clamp(MIN_NICE, MAX_NICE)
@@ -201,6 +262,58 @@ fn priority_targets(
     }
 }
 
+fn ioprio_targets(
+    process: &UserProcess,
+    which: u32,
+    who: i32,
+) -> Result<Vec<UserProcessRef>, LinuxError> {
+    let mut targets = Vec::new();
+    match which {
+        IOPRIO_WHO_PROCESS => {
+            let target = if who == 0 { process.pid() } else { who };
+            if target < 0 {
+                return Err(LinuxError::ESRCH);
+            }
+            if target == process.pid() || target == current_tid() {
+                targets.push(UserProcessRef::Borrowed(process));
+            } else if target == 1 {
+                targets.push(UserProcessRef::InitProcess);
+            } else if let Some(entry) = user_thread_entry_by_process_pid(target) {
+                targets.push(UserProcessRef::Owned(entry.process));
+            }
+        }
+        IOPRIO_WHO_PGRP => {
+            let target = if who == 0 { process.pgid() } else { who };
+            if target < 0 {
+                return Err(LinuxError::ESRCH);
+            }
+            for entry in user_thread_entries_by_process_group(target) {
+                targets.push(UserProcessRef::Owned(entry.process));
+            }
+        }
+        IOPRIO_WHO_USER => {
+            if who < 0 {
+                return Err(LinuxError::ESRCH);
+            }
+            let target = if who == 0 { process.uid() } else { who as u32 };
+            if process.uid() == target {
+                targets.push(UserProcessRef::Borrowed(process));
+            }
+            for entry in live_user_process_entries() {
+                if entry.process.pid() != process.pid() && entry.process.uid() == target {
+                    targets.push(UserProcessRef::Owned(entry.process));
+                }
+            }
+        }
+        _ => return Err(LinuxError::EINVAL),
+    }
+    if targets.is_empty() {
+        Err(LinuxError::ESRCH)
+    } else {
+        Ok(targets)
+    }
+}
+
 enum UserProcessRef<'a> {
     Borrowed(&'a UserProcess),
     Owned(std::sync::Arc<UserProcess>),
@@ -228,6 +341,22 @@ impl UserProcessRef<'_> {
         match self {
             UserProcessRef::Borrowed(process) => process.set_nice(nice),
             UserProcessRef::Owned(process) => process.set_nice(nice),
+            UserProcessRef::InitProcess => {}
+        }
+    }
+
+    fn ioprio(&self) -> u32 {
+        match self {
+            UserProcessRef::Borrowed(process) => process.ioprio(),
+            UserProcessRef::Owned(process) => process.ioprio(),
+            UserProcessRef::InitProcess => default_ioprio(),
+        }
+    }
+
+    fn set_ioprio(&self, ioprio: u32) {
+        match self {
+            UserProcessRef::Borrowed(process) => process.set_ioprio(ioprio),
+            UserProcessRef::Owned(process) => process.set_ioprio(ioprio),
             UserProcessRef::InitProcess => {}
         }
     }
@@ -266,6 +395,40 @@ pub(super) fn sys_setpriority(process: &UserProcess, which: u32, who: i32, nice:
     0
 }
 
+pub(super) fn sys_ioprio_get(process: &UserProcess, which: u32, who: i32) -> isize {
+    let targets = match ioprio_targets(process, which, who) {
+        Ok(targets) => targets,
+        Err(err) => return neg_errno(err),
+    };
+    targets
+        .iter()
+        .map(|target| target.ioprio())
+        .min_by_key(|ioprio| ioprio_rank(*ioprio))
+        .unwrap_or_else(default_ioprio) as isize
+}
+
+pub(super) fn sys_ioprio_set(process: &UserProcess, which: u32, who: i32, ioprio: u32) -> isize {
+    if let Err(err) = validate_ioprio(ioprio) {
+        return neg_errno(err);
+    }
+    let targets = match ioprio_targets(process, which, who) {
+        Ok(targets) => targets,
+        Err(err) => return neg_errno(err),
+    };
+    for target in &targets {
+        if process.uid() != 0 && process.uid() != target.uid() {
+            return neg_errno(LinuxError::EPERM);
+        }
+        if process.uid() != 0 && ioprio_class(ioprio) == IOPRIO_CLASS_RT {
+            return neg_errno(LinuxError::EPERM);
+        }
+    }
+    for target in targets {
+        target.set_ioprio(ioprio);
+    }
+    0
+}
+
 pub(super) fn sched_param_accepts_policy(policy: i32, param: UserSchedParam) -> bool {
     match policy as u32 {
         0 if param.sched_priority == 0 => true,
@@ -284,7 +447,10 @@ fn sched_priority_bounds(policy: i32) -> Option<(i32, i32)> {
 }
 
 fn sched_policy_needs_privilege(policy: i32) -> bool {
-    matches!(policy as u32, general::SCHED_FIFO | general::SCHED_RR)
+    matches!(
+        policy as u32,
+        general::SCHED_FIFO | general::SCHED_RR | general::SCHED_DEADLINE
+    )
 }
 
 fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {
@@ -421,7 +587,17 @@ pub(super) fn sys_sched_setscheduler(
     if process.uid() != 0 && sched_policy_needs_privilege(policy) {
         return neg_errno(LinuxError::EPERM);
     }
-    match set_sched_target_state(process, pid, UserSchedState { policy, param }) {
+    match set_sched_target_state(
+        process,
+        pid,
+        UserSchedState {
+            policy,
+            param,
+            sched_runtime: 0,
+            sched_deadline: 0,
+            sched_period: 0,
+        },
+    ) {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -469,9 +645,9 @@ fn sched_attr_from_state(state: UserSchedState) -> UserSchedAttr {
         sched_flags: 0,
         sched_nice: 0,
         sched_priority: state.param.sched_priority as u32,
-        sched_runtime: 0,
-        sched_deadline: 0,
-        sched_period: 0,
+        sched_runtime: state.sched_runtime,
+        sched_deadline: state.sched_deadline,
+        sched_period: state.sched_period,
         sched_util_min: 0,
         sched_util_max: 0,
     }
@@ -482,10 +658,37 @@ fn sched_state_from_attr(attr: UserSchedAttr) -> Result<UserSchedState, LinuxErr
         sched_priority: attr.sched_priority as i32,
     };
     let policy = attr.sched_policy as i32;
-    if attr.sched_flags != 0 || !sched_param_accepts_policy(policy, param) {
+    if attr.sched_flags != 0 {
         return Err(LinuxError::EINVAL);
     }
-    Ok(UserSchedState { policy, param })
+    if policy as u32 == general::SCHED_DEADLINE {
+        if param.sched_priority != 0
+            || attr.sched_runtime == 0
+            || attr.sched_deadline == 0
+            || attr.sched_period == 0
+            || attr.sched_runtime > attr.sched_deadline
+            || attr.sched_deadline > attr.sched_period
+        {
+            return Err(LinuxError::EINVAL);
+        }
+        return Ok(UserSchedState {
+            policy,
+            param,
+            sched_runtime: attr.sched_runtime,
+            sched_deadline: attr.sched_deadline,
+            sched_period: attr.sched_period,
+        });
+    }
+    if !sched_param_accepts_policy(policy, param) {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok(UserSchedState {
+        policy,
+        param,
+        sched_runtime: 0,
+        sched_deadline: 0,
+        sched_period: 0,
+    })
 }
 
 pub(super) fn sys_sched_getattr(
@@ -551,10 +754,18 @@ pub(super) fn sys_sched_setattr(
     let sched_attr =
         unsafe { core::ptr::read_unaligned(attr_bytes.as_ptr() as *const UserSchedAttr) };
     match sched_state_from_attr(sched_attr) {
-        Ok(state) => match set_sched_target_state(process, pid, state) {
-            Ok(()) => 0,
-            Err(err) => neg_errno(err),
-        },
+        Ok(state) => {
+            if let Err(err) = can_set_sched_target(process, pid) {
+                return neg_errno(err);
+            }
+            if process.uid() != 0 && sched_policy_needs_privilege(state.policy) {
+                return neg_errno(LinuxError::EPERM);
+            }
+            match set_sched_target_state(process, pid, state) {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            }
+        }
         Err(err) => neg_errno(err),
     }
 }

@@ -29,9 +29,7 @@ pub(super) struct FutexState {
 
 fn table() -> &'static Mutex<BTreeMap<usize, Arc<FutexState>>> {
     static FUTEXES: LazyInit<Mutex<BTreeMap<usize, Arc<FutexState>>>> = LazyInit::new();
-    if !FUTEXES.is_inited() {
-        FUTEXES.init_once(Mutex::new(BTreeMap::new()));
-    }
+    let _ = FUTEXES.call_once(|| Mutex::new(BTreeMap::new()));
     &FUTEXES
 }
 

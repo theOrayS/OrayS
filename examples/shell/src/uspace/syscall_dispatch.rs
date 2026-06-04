@@ -4,8 +4,9 @@ use axhal::trap::{SYSCALL, register_trap_handler};
 use linux_raw_sys::general;
 
 use super::credentials::{
-    sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid, sys_setfsuid, sys_setgid,
-    sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid, sys_setreuid, sys_setuid,
+    sys_capget, sys_capset, sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid,
+    sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid,
+    sys_setreuid, sys_setuid,
 };
 use super::fd_pipe::sys_pipe2;
 use super::fd_socket::{
@@ -15,13 +16,14 @@ use super::fd_socket::{
     sys_shutdown_bridge, sys_socket_bridge, sys_socketpair_bridge,
 };
 use super::fd_table::{
-    sys_chdir, sys_close, sys_copy_file_range, sys_dup, sys_dup3, sys_epoll_create1, sys_epoll_ctl,
-    sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2, sys_fadvise64, sys_fallocate, sys_fchdir,
-    sys_fcntl, sys_flock, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64, sys_ioctl,
-    sys_linkat, sys_lseek, sys_mkdirat, sys_mknodat, sys_openat, sys_pread64, sys_preadv,
-    sys_preadv2, sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readahead, sys_readv,
-    sys_renameat2, sys_sendfile, sys_signalfd4, sys_splice, sys_timerfd_create,
-    sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat, sys_write, sys_writev,
+    sys_chdir, sys_close, sys_close_range, sys_copy_file_range, sys_dup, sys_dup3,
+    sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
+    sys_fadvise64, sys_fallocate, sys_fchdir, sys_fcntl, sys_flock, sys_fsync, sys_ftruncate,
+    sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat, sys_lseek, sys_mkdirat, sys_mknodat,
+    sys_openat, sys_pread64, sys_preadv, sys_preadv2, sys_pwrite64, sys_pwritev, sys_pwritev2,
+    sys_read, sys_readahead, sys_readv, sys_renameat2, sys_sendfile, sys_signalfd4, sys_splice,
+    sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat, sys_write,
+    sys_writev,
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
@@ -43,10 +45,10 @@ use super::process_lifecycle::{
     terminate_current_thread_for_exit_group,
 };
 use super::resource_sched::{
-    sys_getpriority, sys_prlimit64, sys_sched_get_priority_max, sys_sched_get_priority_min,
-    sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam, sys_sched_getscheduler,
-    sys_sched_rr_get_interval, sys_sched_setaffinity, sys_sched_setattr, sys_sched_setparam,
-    sys_sched_setscheduler, sys_sched_yield, sys_setpriority,
+    sys_getpriority, sys_ioprio_get, sys_ioprio_set, sys_prlimit64, sys_sched_get_priority_max,
+    sys_sched_get_priority_min, sys_sched_getaffinity, sys_sched_getattr, sys_sched_getparam,
+    sys_sched_getscheduler, sys_sched_rr_get_interval, sys_sched_setaffinity, sys_sched_setattr,
+    sys_sched_setparam, sys_sched_setscheduler, sys_sched_yield, sys_setpriority,
 };
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
 use super::resource_sched::{sys_getrlimit, sys_setrlimit};
@@ -62,7 +64,8 @@ use super::signal_abi::{
     sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill, sys_tkill,
 };
 use super::system_info::{
-    sys_getcpu, sys_getrusage, sys_prctl, sys_sethostname, sys_sysinfo, sys_syslog, sys_uname,
+    sys_getcpu, sys_getrusage, sys_prctl, sys_setdomainname, sys_sethostname, sys_sysinfo,
+    sys_syslog, sys_uname,
 };
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
@@ -71,7 +74,9 @@ use super::task_context::{
 };
 use super::time_abi::{
     sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep,
-    sys_clock_settime, sys_getitimer, sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_times,
+    sys_clock_settime, sys_getitimer, sys_gettimeofday, sys_nanosleep, sys_setitimer,
+    sys_timer_create, sys_timer_delete, sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime,
+    sys_times,
 };
 use super::user_memory::sys_getrandom;
 
@@ -261,6 +266,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
         ),
         general::__NR_close => sys_close(&process, tf.arg0()),
+        general::__NR_close_range => sys_close_range(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_fsync | general::__NR_fdatasync => sys_fsync(&process, tf.arg0()),
         general::__NR_newfstatat => {
             sys_newfstatat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
@@ -402,6 +408,13 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_getrandom => sys_getrandom(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_getitimer => sys_getitimer(&process, tf.arg0() as i32, tf.arg1()),
         general::__NR_setitimer => sys_setitimer(&process, tf.arg0() as i32, tf.arg1(), tf.arg2()),
+        general::__NR_timer_create => sys_timer_create(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_timer_settime => {
+            sys_timer_settime(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
+        general::__NR_timer_gettime => sys_timer_gettime(&process, tf.arg0(), tf.arg1()),
+        general::__NR_timer_getoverrun => sys_timer_getoverrun(&process, tf.arg0()),
+        general::__NR_timer_delete => sys_timer_delete(&process, tf.arg0()),
         general::__NR_times => sys_times(&process, tf.arg0()),
         general::__NR_getrusage => sys_getrusage(&process, tf.arg0() as i32, tf.arg1()),
         general::__NR_setpriority => sys_setpriority(
@@ -411,6 +424,13 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg2() as i32,
         ),
         general::__NR_getpriority => sys_getpriority(&process, tf.arg0() as u32, tf.arg1() as i32),
+        general::__NR_ioprio_set => sys_ioprio_set(
+            &process,
+            tf.arg0() as u32,
+            tf.arg1() as i32,
+            tf.arg2() as u32,
+        ),
+        general::__NR_ioprio_get => sys_ioprio_get(&process, tf.arg0() as u32, tf.arg1() as i32),
         general::__NR_uname => sys_uname(&process, tf.arg0()),
         general::__NR_nanosleep => sys_nanosleep(&process, tf.arg0(), tf.arg1()),
         general::__NR_clock_nanosleep => {
@@ -530,6 +550,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
         ),
         general::__NR_sethostname => sys_sethostname(&process, tf.arg0(), tf.arg1()),
+        general::__NR_setdomainname => sys_setdomainname(&process, tf.arg0(), tf.arg1()),
         general::__NR_setpgid => sys_setpgid(&process, tf.arg0(), tf.arg1()),
         general::__NR_getpgid => sys_getpgid(&process, tf.arg0()),
         general::__NR_getsid => sys_getsid(&process, tf.arg0()),
@@ -572,6 +593,8 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         LOONGARCH_LEGACY_SETRLIMIT => sys_setrlimit(&process, tf.arg0() as u32, tf.arg1()),
         general::__NR_getpid => process.pid() as isize,
         general::__NR_getppid => process.ppid() as isize,
+        general::__NR_capget => sys_capget(&process, tf.arg0(), tf.arg1()),
+        general::__NR_capset => sys_capset(&process, tf.arg0(), tf.arg1()),
         #[cfg(not(target_arch = "loongarch64"))]
         general::__NR_clone => sys_clone(
             &process,

@@ -62,10 +62,10 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     file_printk.write_at(0, b"4\t4\t1\t7\n")?;
     proc_root.create("sys/kernel/shmmax", VfsNodeType::File)?;
     let file_shmmax = proc_root.clone().lookup("./sys/kernel/shmmax")?;
-    file_shmmax.write_at(0, b"131072\n")?;
+    file_shmmax.write_at(0, b"1048576\n")?;
     proc_root.create("sys/kernel/shmall", VfsNodeType::File)?;
     let file_shmall = proc_root.clone().lookup("./sys/kernel/shmall")?;
-    file_shmall.write_at(0, b"32\n")?;
+    file_shmall.write_at(0, b"256\n")?;
     proc_root.create("sys/kernel/shmmni", VfsNodeType::File)?;
     let file_shmmni = proc_root.clone().lookup("./sys/kernel/shmmni")?;
     file_shmmni.write_at(0, b"128\n")?;

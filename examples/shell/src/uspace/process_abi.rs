@@ -3,8 +3,10 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 
 use super::linux_abi::{LINUX_PERSONALITY_MASK, LINUX_PERSONALITY_QUERY};
-use super::task_registry::user_thread_entry_by_process_pid;
+use super::task_registry::{live_user_process_entries, user_thread_entry_by_process_pid};
 use super::{UserProcess, neg_errno};
+
+const SYNTHETIC_INIT_PID: i32 = 1;
 
 impl UserProcess {
     pub(super) fn personality(&self) -> usize {
@@ -41,7 +43,11 @@ pub(super) fn sys_setpgid(process: &UserProcess, pid: usize, pgid: usize) -> isi
     if group <= 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    if group != target && group != process.pgid() {
+    let target_sid = target_process
+        .as_ref()
+        .map(|entry| entry.sid())
+        .unwrap_or_else(|| process.sid());
+    if group != target && !process_group_exists_in_session(group, target_sid) {
         return neg_errno(LinuxError::EPERM);
     }
     if let Some(target_process) = target_process {
@@ -51,6 +57,12 @@ pub(super) fn sys_setpgid(process: &UserProcess, pid: usize, pgid: usize) -> isi
     }
 
     0
+}
+
+fn process_group_exists_in_session(pgid: i32, sid: i32) -> bool {
+    live_user_process_entries()
+        .into_iter()
+        .any(|entry| entry.process.pgid() == pgid && entry.process.sid() == sid)
 }
 
 fn visible_process_group_and_session(
@@ -68,6 +80,9 @@ fn visible_process_group_and_session(
         return Ok((process.pgid(), process.sid()));
     }
     let Some(entry) = user_thread_entry_by_process_pid(target) else {
+        if target == SYNTHETIC_INIT_PID {
+            return Ok((SYNTHETIC_INIT_PID, SYNTHETIC_INIT_PID));
+        }
         return Err(LinuxError::ESRCH);
     };
     Ok((entry.process.pgid(), entry.process.sid()))
@@ -89,6 +104,9 @@ pub(super) fn sys_getsid(process: &UserProcess, pid: usize) -> isize {
 
 pub(super) fn sys_setsid(process: &UserProcess) -> isize {
     let sid = process.pid();
+    if process_group_exists_in_session(sid, process.sid()) {
+        return neg_errno(LinuxError::EPERM);
+    }
     process.set_pgid(sid);
     process.set_sid(sid);
     sid as isize

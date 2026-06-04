@@ -17,9 +17,7 @@ pub(super) struct UserThreadEntry {
 
 fn user_thread_table() -> &'static Mutex<BTreeMap<i32, UserThreadEntry>> {
     static USER_THREADS: LazyInit<Mutex<BTreeMap<i32, UserThreadEntry>>> = LazyInit::new();
-    if !USER_THREADS.is_inited() {
-        USER_THREADS.init_once(Mutex::new(BTreeMap::new()));
-    }
+    let _ = USER_THREADS.call_once(|| Mutex::new(BTreeMap::new()));
     &USER_THREADS
 }
 
