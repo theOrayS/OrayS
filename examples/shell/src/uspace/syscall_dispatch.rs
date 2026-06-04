@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{SYSCALL, register_trap_handler};
+use axhal::trap::{register_trap_handler, SYSCALL};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -19,11 +19,11 @@ use super::fd_table::{
     sys_chdir, sys_close, sys_close_range, sys_copy_file_range, sys_dup, sys_dup3,
     sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
     sys_fadvise64, sys_fallocate, sys_fchdir, sys_fcntl, sys_flock, sys_fsync, sys_ftruncate,
-    sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat, sys_lseek, sys_mkdirat, sys_mknodat,
-    sys_openat, sys_pread64, sys_preadv, sys_preadv2, sys_pwrite64, sys_pwritev, sys_pwritev2,
-    sys_read, sys_readahead, sys_readv, sys_renameat2, sys_sendfile, sys_signalfd4, sys_splice,
-    sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat, sys_write,
-    sys_writev,
+    sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat, sys_lseek, sys_memfd_create, sys_mkdirat,
+    sys_mknodat, sys_openat, sys_pread64, sys_preadv, sys_preadv2, sys_pwrite64, sys_pwritev,
+    sys_pwritev2, sys_read, sys_readahead, sys_readv, sys_renameat2, sys_sendfile, sys_signalfd4,
+    sys_splice, sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat,
+    sys_write, sys_writev,
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
@@ -285,6 +285,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_dup => sys_dup(&process, tf.arg0()),
         general::__NR_dup3 => sys_dup3(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_fcntl => sys_fcntl(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_memfd_create => sys_memfd_create(&process, tf.arg0(), tf.arg1()),
         general::__NR_flock => sys_flock(&process, tf.arg0(), tf.arg1()),
         general::__NR_fchdir => sys_fchdir(&process, tf.arg0()),
         general::__NR_readlinkat => {

@@ -15,26 +15,26 @@ use std::vec::Vec;
 
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE,
-    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
-    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE,
-    SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
-    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
+    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR,
+    ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    DEV_NULL_RDEV, DEV_ZERO_RDEV, apply_recorded_path_metadata, canonical_permission_path,
-    dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path,
-    file_attr_to_stat, file_type_mode, generic_statfs, path_inode, stdio_stat,
-    synthetic_block_stat_for_path, synthetic_char_stat_for_path,
+    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
+    dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
+    generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
+    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV,
 };
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
 };
-use super::select_fdset::{SelectMode, yield_poll_wait};
+use super::select_fdset::{yield_poll_wait, SelectMode};
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
@@ -56,9 +56,9 @@ use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value,
+    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
+    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
 use super::{PathTimes, UserProcess};
 
@@ -73,8 +73,10 @@ const LINUX_PATH_MAX: usize = 4096;
 // real backing limit at the POSIX boundary instead of accepting longer names
 // that would later panic during directory enumeration.
 const LINUX_NAME_MAX: usize = 63;
+const MEMFD_NAME_MAX: usize = 249;
 const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
 const FALLOC_FL_KEEP_SIZE: usize = 0x01;
+const FALLOC_FL_PUNCH_HOLE: usize = 0x02;
 const POSIX_FADV_MIN: i32 = 0;
 const POSIX_FADV_MAX: i32 = 5;
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
@@ -92,6 +94,7 @@ pub(super) enum FdEntry {
     ProcFdDir(ProcFdDirEntry),
     Path(PathEntry),
     MemoryFile(MemoryFileEntry),
+    Memfd(MemfdEntry),
     ProcPagemap(ProcPagemapEntry),
     ProcTimerSlack(ProcTimerSlackEntry),
     Pipe(PipeEndpoint),
@@ -145,6 +148,25 @@ pub(super) struct MemoryFileEntry {
     pub(super) path: String,
     pub(super) data: Arc<Vec<u8>>,
     pub(super) offset: usize,
+}
+
+#[derive(Clone)]
+pub(super) struct MemfdEntry {
+    name: String,
+    status_flags: u32,
+    offset: Arc<Mutex<u64>>,
+    state: Arc<Mutex<MemfdState>>,
+}
+
+#[derive(Clone)]
+pub(super) enum MmapFileBacking {
+    File(FileEntry),
+    Memfd(MemfdEntry),
+}
+
+struct MemfdState {
+    data: Vec<u8>,
+    seals: u32,
 }
 
 #[derive(Clone)]
@@ -235,6 +257,31 @@ pub(super) fn sys_openat(
     }
 }
 
+pub(super) fn sys_memfd_create(process: &UserProcess, name: usize, flags: usize) -> isize {
+    let flags = flags as u32;
+    let supported_flags = general::MFD_CLOEXEC | general::MFD_ALLOW_SEALING;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let name = match read_cstr(process, name) {
+        Ok(name) => name,
+        Err(err) => return neg_errno(err),
+    };
+    if name.len() > MEMFD_NAME_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let entry = FdEntry::Memfd(MemfdEntry::new(
+        name,
+        general::O_RDWR,
+        flags & general::MFD_ALLOW_SEALING != 0,
+    ));
+    let fd_flags = fd_cloexec_flag(flags & general::MFD_CLOEXEC != 0);
+    match process.fds.lock().insert_with_flags(entry, fd_flags) {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
 pub(super) fn sys_ftruncate(process: &UserProcess, fd: usize, length: usize) -> isize {
     let length = length as isize;
     if length < 0 {
@@ -263,7 +310,10 @@ pub(super) fn sys_fallocate(
     if offset < 0 || len <= 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    if mode != 0 && mode != FALLOC_FL_KEEP_SIZE {
+    let supported_modes = FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE;
+    if mode & !supported_modes != 0
+        || mode & FALLOC_FL_PUNCH_HOLE != 0 && mode & FALLOC_FL_KEEP_SIZE == 0
+    {
         return neg_errno(LinuxError::EOPNOTSUPP);
     }
     let Some(end) = (offset as u64).checked_add(len as u64) else {
@@ -273,7 +323,12 @@ pub(super) fn sys_fallocate(
     if end > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
     }
-    let result = if mode == FALLOC_FL_KEEP_SIZE {
+    let result = if mode & FALLOC_FL_PUNCH_HOLE != 0 {
+        process
+            .fds
+            .lock()
+            .fallocate_punch_hole(process, fd as i32, offset as u64, len as u64)
+    } else if mode == FALLOC_FL_KEEP_SIZE {
         process.fds.lock().fallocate_keep_size(process, fd as i32)
     } else {
         process.fds.lock().truncate(process, fd as i32, end)
@@ -2672,6 +2727,7 @@ impl FdTable {
                 | FdEntry::Directory(_)
                 | FdEntry::ProcFdDir(_)
                 | FdEntry::MemoryFile(_)
+                | FdEntry::Memfd(_)
                 | FdEntry::ProcPagemap(_)
                 | FdEntry::ProcTimerSlack(_) => true,
                 FdEntry::Path(_) => false,
@@ -2691,7 +2747,7 @@ impl FdTable {
                 | FdEntry::DevZero(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc => true,
-                FdEntry::File(_) => true,
+                FdEntry::File(_) | FdEntry::Memfd(_) => true,
                 FdEntry::Directory(_)
                 | FdEntry::ProcFdDir(_)
                 | FdEntry::Path(_)
@@ -2930,6 +2986,7 @@ impl FdTable {
                 file_entry_read(process, file, dst)
             }
             FdEntry::MemoryFile(file) => Ok(file.read(dst)),
+            FdEntry::Memfd(file) => file.read(dst),
             FdEntry::ProcPagemap(file) => Ok(file.read(dst)),
             FdEntry::ProcTimerSlack(file) => {
                 if !file_is_readable(file.status_flags) {
@@ -2975,6 +3032,7 @@ impl FdTable {
                 }
                 file_entry_write(process, file, src, file_size_limit)
             }
+            FdEntry::Memfd(file) => file.write(src, file_size_limit),
             FdEntry::Pipe(pipe) => pipe.write(src),
             FdEntry::Socket(socket) => socket.write(src),
             FdEntry::LocalSocket(socket) => socket.write(src),
@@ -2998,24 +3056,25 @@ impl FdTable {
         src: &[u8],
         file_size_limit: Option<u64>,
     ) -> Result<usize, LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return match self.entry(fd)? {
-                FdEntry::Directory(_) => Err(LinuxError::EISDIR),
-                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
-                    Err(LinuxError::ESPIPE)
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
                 }
-                _ => Err(LinuxError::EBADF),
-            };
-        };
-        if !file_is_writable(file.status_flags) {
-            return Err(LinuxError::EBADF);
+                let base_offset = if file.status_flags & general::O_APPEND != 0 {
+                    file_logical_size(process, file)?
+                } else {
+                    offset
+                };
+                write_regular_file_at(process, file, base_offset, src, file_size_limit)
+            }
+            FdEntry::Memfd(file) => file.write_at(offset, src, file_size_limit),
+            FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
         }
-        let base_offset = if file.status_flags & general::O_APPEND != 0 {
-            file_logical_size(process, file)?
-        } else {
-            offset
-        };
-        write_regular_file_at(process, file, base_offset, src, file_size_limit)
     }
 
     fn close_slot(&mut self, idx: usize) -> Result<(), LinuxError> {
@@ -3133,6 +3192,7 @@ impl FdTable {
             FdEntry::DevNull => Ok(()),
             FdEntry::BlockDevice(_) => Ok(()),
             FdEntry::Rtc => Ok(()),
+            FdEntry::Memfd(file) => file.truncate(size),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -3158,6 +3218,26 @@ impl FdTable {
             FdEntry::DevNull => Ok(()),
             FdEntry::BlockDevice(_) => Ok(()),
             FdEntry::Rtc => Ok(()),
+            FdEntry::Memfd(file) => file.fallocate_keep_size(),
+            FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn fallocate_punch_hole(
+        &mut self,
+        _process: &UserProcess,
+        fd: i32,
+        offset: u64,
+        len: u64,
+    ) -> Result<(), LinuxError> {
+        match self.entry_mut(fd)? {
+            FdEntry::Memfd(file) => file.punch_hole(offset, len),
+            FdEntry::File(_) => Err(LinuxError::EOPNOTSUPP),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -3219,6 +3299,7 @@ impl FdTable {
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
             FdEntry::Path(_) => Err(LinuxError::EBADF),
             FdEntry::MemoryFile(file) => file.seek(pos),
+            FdEntry::Memfd(file) => file.seek(pos),
             FdEntry::ProcPagemap(file) => file.seek(pos),
             FdEntry::ProcTimerSlack(file) => file.seek(pos),
             FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
@@ -3431,19 +3512,20 @@ impl FdTable {
         offset: u64,
         dst: &mut [u8],
     ) -> Result<usize, LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return match self.entry(fd)? {
-                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
-                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
-                    Err(LinuxError::ESPIPE)
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_readable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
                 }
-                _ => Err(LinuxError::EBADF),
-            };
-        };
-        if !file_is_readable(file.status_flags) {
-            return Err(LinuxError::EBADF);
+                read_regular_file_at(process, file, offset, dst)
+            }
+            FdEntry::Memfd(file) => file.read_at(offset, dst),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
         }
-        read_regular_file_at(process, file, offset, dst)
     }
 
     pub(super) fn read_file_at_current_offset_into_fd(
@@ -3452,20 +3534,21 @@ impl FdTable {
         fd: i32,
         dst: &mut [u8],
     ) -> Result<(u64, usize), LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return match self.entry(fd)? {
-                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
-                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
-                    Err(LinuxError::ESPIPE)
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_readable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
                 }
-                _ => Err(LinuxError::EBADF),
-            };
-        };
-        if !file_is_readable(file.status_flags) {
-            return Err(LinuxError::EBADF);
+                let offset = *file.offset.lock();
+                read_regular_file_at(process, file, offset, dst).map(|read| (offset, read))
+            }
+            FdEntry::Memfd(file) => file.read_at_current_offset(dst),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
         }
-        let offset = *file.offset.lock();
-        read_regular_file_at(process, file, offset, dst).map(|read| (offset, read))
     }
 
     pub(super) fn advance_file_offset_fd(
@@ -3473,18 +3556,23 @@ impl FdTable {
         fd: i32,
         amount: usize,
     ) -> Result<(), LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return match self.entry(fd)? {
-                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
-                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
-                    Err(LinuxError::ESPIPE)
-                }
-                _ => Err(LinuxError::EBADF),
-            };
-        };
-        let mut offset = file.offset.lock();
-        *offset = offset.saturating_add(amount as u64);
-        Ok(())
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                let mut offset = file.offset.lock();
+                *offset = offset.saturating_add(amount as u64);
+                Ok(())
+            }
+            FdEntry::Memfd(file) => {
+                let mut offset = file.offset.lock();
+                *offset = offset.saturating_add(amount as u64);
+                Ok(())
+            }
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
+        }
     }
 
     pub(super) fn mmap_read_file_at_into_fd(
@@ -3494,41 +3582,55 @@ impl FdTable {
         offset: u64,
         dst: &mut [u8],
     ) -> Result<usize, LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return match self.entry(fd)? {
-                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
-                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
-                    Err(LinuxError::ESPIPE)
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_readable(file.status_flags) {
+                    return Err(LinuxError::EACCES);
                 }
-                _ => Err(LinuxError::EBADF),
-            };
-        };
-        if !file_is_readable(file.status_flags) {
-            return Err(LinuxError::EACCES);
+                read_regular_file_at(process, file, offset, dst)
+            }
+            FdEntry::Memfd(file) => file.read_at(offset, dst),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
         }
-        read_regular_file_at(process, file, offset, dst)
     }
 
-    pub(super) fn mmap_file_backing(&mut self, fd: i32) -> Result<FileEntry, LinuxError> {
-        let FdEntry::File(file) = self.entry_mut(fd)? else {
-            return match self.entry(fd)? {
-                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
-                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
-                    Err(LinuxError::ESPIPE)
+    pub(super) fn mmap_file_backing(&mut self, fd: i32) -> Result<MmapFileBacking, LinuxError> {
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_readable(file.status_flags) {
+                    return Err(LinuxError::EACCES);
                 }
-                _ => Err(LinuxError::EBADF),
-            };
-        };
-        if !file_is_readable(file.status_flags) {
-            return Err(LinuxError::EACCES);
+                Ok(MmapFileBacking::File(file.clone()))
+            }
+            FdEntry::Memfd(file) => {
+                if !file.readable() {
+                    return Err(LinuxError::EACCES);
+                }
+                Ok(MmapFileBacking::Memfd(file.clone()))
+            }
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
         }
-        Ok(file.clone())
     }
 
     pub(super) fn mmap_validate_file_fd(&mut self, fd: i32) -> Result<(), LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => {
                 if file_is_readable(file.status_flags) {
+                    Ok(())
+                } else {
+                    Err(LinuxError::EACCES)
+                }
+            }
+            FdEntry::Memfd(file) => {
+                if file.readable() {
                     Ok(())
                 } else {
                     Err(LinuxError::EACCES)
@@ -3546,6 +3648,7 @@ impl FdTable {
     pub(super) fn mmap_fd_allows_shared_write(&self, fd: i32) -> Result<bool, LinuxError> {
         match self.entry(fd)? {
             FdEntry::File(file) => Ok(file_is_writable(file.status_flags)),
+            FdEntry::Memfd(file) => Ok(file.allows_shared_write()),
             FdEntry::DevZero(status_flags) => Ok(file_is_writable(*status_flags)),
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
@@ -3954,6 +4057,7 @@ impl FdTable {
             FdEntry::ProcFdDir(dir) => Ok(proc_fd_dir_stat(dir.path.as_str())),
             FdEntry::Path(path) => Ok(path.stat()),
             FdEntry::MemoryFile(file) => Ok(file.stat()),
+            FdEntry::Memfd(file) => Ok(file.stat()),
             FdEntry::ProcPagemap(file) => Ok(file.stat()),
             FdEntry::ProcTimerSlack(file) => Ok(file.stat()),
             FdEntry::Pipe(pipe) => Ok(pipe.stat()),
@@ -4045,6 +4149,7 @@ impl FdTable {
                 file.path.as_str(),
                 file.stat(),
             )),
+            Ok(FdEntry::Memfd(file)) => Ok(file.stat()),
             Ok(FdEntry::ProcPagemap(file)) => Ok(apply_recorded_path_metadata(
                 process,
                 file.path.as_str(),
@@ -4219,6 +4324,7 @@ impl FdTable {
             general::F_SETFD => self.set_fd_flags(fd, arg as u32),
             general::F_GETFL => match self.entry(fd)? {
                 FdEntry::File(file) => Ok(file.status_flags as i32),
+                FdEntry::Memfd(file) => Ok(file.status_flags as i32),
                 FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
                 FdEntry::EventFd(eventfd) => Ok(eventfd.status_flags() as i32),
                 FdEntry::TimerFd(timerfd) => Ok(timerfd.status_flags() as i32),
@@ -4230,6 +4336,18 @@ impl FdTable {
             F_SETPIPE_SZ => match self.entry(fd)? {
                 FdEntry::Pipe(pipe) => Ok(pipe.set_capacity(arg as usize)? as i32),
                 _ => Err(LinuxError::EBADF),
+            },
+            general::F_GET_SEALS => match self.entry(fd)? {
+                FdEntry::Memfd(file) => Ok(file.seals() as i32),
+                _ => Err(LinuxError::EINVAL),
+            },
+            general::F_ADD_SEALS => match self.entry_mut(fd)? {
+                FdEntry::Memfd(file) => {
+                    let active_shared_writable_mmap =
+                        process.has_shared_writable_mmap_for_memfd(file);
+                    file.add_seals(arg as u32, active_shared_writable_mmap)
+                }
+                _ => Err(LinuxError::EINVAL),
             },
             cmd @ (general::F_SETOWN
             | general::F_GETOWN
@@ -4243,6 +4361,11 @@ impl FdTable {
             },
             general::F_SETFL => match self.entry_mut(fd)? {
                 FdEntry::File(file) => {
+                    file.status_flags =
+                        (file.status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::Memfd(file) => {
                     file.status_flags =
                         (file.status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
                     Ok(0)
@@ -4500,6 +4623,242 @@ impl MemoryFileEntry {
         }
         self.offset = next as usize;
         Ok(self.offset as u64)
+    }
+}
+
+impl MemfdEntry {
+    const SUPPORTED_SEALS: u32 = general::F_SEAL_SEAL
+        | general::F_SEAL_SHRINK
+        | general::F_SEAL_GROW
+        | general::F_SEAL_WRITE;
+
+    fn new(name: String, status_flags: u32, allow_sealing: bool) -> Self {
+        Self {
+            name,
+            status_flags: fcntl_status_flags(status_flags),
+            offset: Arc::new(Mutex::new(0)),
+            state: Arc::new(Mutex::new(MemfdState {
+                data: Vec::new(),
+                seals: if allow_sealing {
+                    0
+                } else {
+                    general::F_SEAL_SEAL
+                },
+            })),
+        }
+    }
+
+    fn path(&self) -> String {
+        format!("memfd:{} (deleted)", self.name)
+    }
+
+    fn reopen(&self, status_flags: u32) -> Self {
+        Self {
+            name: self.name.clone(),
+            status_flags: fcntl_status_flags(status_flags),
+            offset: Arc::new(Mutex::new(0)),
+            state: self.state.clone(),
+        }
+    }
+
+    fn readable(&self) -> bool {
+        file_is_readable(self.status_flags)
+    }
+
+    fn writable(&self) -> bool {
+        file_is_writable(self.status_flags)
+    }
+
+    fn seals(&self) -> u32 {
+        self.state.lock().seals
+    }
+
+    fn sealed(&self, seal: u32) -> bool {
+        self.seals() & seal != 0
+    }
+
+    fn allows_shared_write(&self) -> bool {
+        self.writable() && !self.sealed(general::F_SEAL_WRITE)
+    }
+
+    pub(super) fn same_backing(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.state, &other.state)
+    }
+
+    fn add_seals(
+        &mut self,
+        seals: u32,
+        active_shared_writable_mmap: bool,
+    ) -> Result<i32, LinuxError> {
+        if seals & !Self::SUPPORTED_SEALS != 0 {
+            return Err(LinuxError::EINVAL);
+        }
+        if !self.writable() {
+            return Err(LinuxError::EPERM);
+        }
+        let mut state = self.state.lock();
+        if state.seals & general::F_SEAL_SEAL != 0 {
+            return Err(LinuxError::EPERM);
+        }
+        if seals & general::F_SEAL_WRITE != 0 && active_shared_writable_mmap {
+            return Err(LinuxError::EBUSY);
+        }
+        state.seals |= seals;
+        Ok(0)
+    }
+
+    fn read(&mut self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        if !self.readable() {
+            return Err(LinuxError::EBADF);
+        }
+        let offset = *self.offset.lock();
+        let read = self.read_at(offset, dst)?;
+        *self.offset.lock() = offset.saturating_add(read as u64);
+        Ok(read)
+    }
+
+    fn read_at(&self, offset: u64, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        if !self.readable() {
+            return Err(LinuxError::EBADF);
+        }
+        let state = self.state.lock();
+        let start = offset.min(usize::MAX as u64) as usize;
+        if start >= state.data.len() {
+            return Ok(0);
+        }
+        let len = cmp::min(dst.len(), state.data.len() - start);
+        dst[..len].copy_from_slice(&state.data[start..start + len]);
+        Ok(len)
+    }
+
+    fn read_at_current_offset(&mut self, dst: &mut [u8]) -> Result<(u64, usize), LinuxError> {
+        if !self.readable() {
+            return Err(LinuxError::EBADF);
+        }
+        let offset = *self.offset.lock();
+        self.read_at(offset, dst).map(|read| (offset, read))
+    }
+
+    fn write(&mut self, src: &[u8], file_size_limit: Option<u64>) -> Result<usize, LinuxError> {
+        let offset = if self.status_flags & general::O_APPEND != 0 {
+            self.size()
+        } else {
+            *self.offset.lock()
+        };
+        let written = self.write_at(offset, src, file_size_limit)?;
+        *self.offset.lock() = offset.saturating_add(written as u64);
+        Ok(written)
+    }
+
+    fn write_at(
+        &mut self,
+        offset: u64,
+        src: &[u8],
+        file_size_limit: Option<u64>,
+    ) -> Result<usize, LinuxError> {
+        if !self.writable() {
+            return Err(LinuxError::EBADF);
+        }
+        if self.sealed(general::F_SEAL_WRITE) {
+            return Err(LinuxError::EPERM);
+        }
+        let src = limit_regular_file_write_len(src, file_size_limit, offset)?;
+        if src.is_empty() {
+            return Ok(0);
+        }
+        let end = offset
+            .checked_add(src.len() as u64)
+            .ok_or(LinuxError::EFBIG)?;
+        if end > MAX_IN_MEMORY_FILE_SIZE {
+            return Err(LinuxError::EFBIG);
+        }
+        let mut state = self.state.lock();
+        if end > state.data.len() as u64 && state.seals & general::F_SEAL_GROW != 0 {
+            return Err(LinuxError::EPERM);
+        }
+        let start = offset as usize;
+        let end_usize = end as usize;
+        if end_usize > state.data.len() {
+            state.data.resize(end_usize, 0);
+        }
+        state.data[start..end_usize].copy_from_slice(src);
+        Ok(src.len())
+    }
+
+    fn truncate(&mut self, size: u64) -> Result<(), LinuxError> {
+        if !self.writable() {
+            return Err(LinuxError::EINVAL);
+        }
+        if size > MAX_IN_MEMORY_FILE_SIZE {
+            return Err(LinuxError::EFBIG);
+        }
+        let mut state = self.state.lock();
+        let current = state.data.len() as u64;
+        if size < current && state.seals & general::F_SEAL_SHRINK != 0 {
+            return Err(LinuxError::EPERM);
+        }
+        if size > current && state.seals & general::F_SEAL_GROW != 0 {
+            return Err(LinuxError::EPERM);
+        }
+        state.data.resize(size as usize, 0);
+        Ok(())
+    }
+
+    fn fallocate_keep_size(&self) -> Result<(), LinuxError> {
+        if !self.writable() {
+            return Err(LinuxError::EBADF);
+        }
+        if self.sealed(general::F_SEAL_WRITE) {
+            return Err(LinuxError::EPERM);
+        }
+        Ok(())
+    }
+
+    fn punch_hole(&mut self, offset: u64, len: u64) -> Result<(), LinuxError> {
+        if !self.writable() {
+            return Err(LinuxError::EBADF);
+        }
+        if self.sealed(general::F_SEAL_WRITE) {
+            return Err(LinuxError::EPERM);
+        }
+        let end = offset.checked_add(len).ok_or(LinuxError::EINVAL)?;
+        let mut state = self.state.lock();
+        let start = offset.min(state.data.len() as u64) as usize;
+        let end = end.min(state.data.len() as u64) as usize;
+        if start < end {
+            state.data[start..end].fill(0);
+        }
+        Ok(())
+    }
+
+    fn size(&self) -> u64 {
+        self.state.lock().data.len() as u64
+    }
+
+    fn stat(&self) -> general::stat {
+        PathEntry::synthetic_file(self.path().as_str(), self.size() as usize).stat()
+    }
+
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, LinuxError> {
+        let size = self.size();
+        let mut offset = self.offset.lock();
+        let next = match pos {
+            SeekFrom::Start(pos) => Some(pos),
+            SeekFrom::Current(off) => (*offset).checked_add_signed(off),
+            SeekFrom::End(off) => size.checked_add_signed(off),
+        }
+        .ok_or(LinuxError::EINVAL)?;
+        *offset = next;
+        Ok(next)
+    }
+}
+
+impl MmapFileBacking {
+    pub(super) fn is_memfd_backing(&self, file: &MemfdEntry) -> bool {
+        match self {
+            Self::Memfd(backing) => backing.same_backing(file),
+            Self::File(_) => false,
+        }
     }
 }
 
@@ -5001,6 +5360,7 @@ impl FdEntry {
             Self::ProcFdDir(dir) => Ok(Self::ProcFdDir(dir.clone())),
             Self::Path(path) => Ok(Self::Path(path.clone())),
             Self::MemoryFile(file) => Ok(Self::MemoryFile(file.clone())),
+            Self::Memfd(file) => Ok(Self::Memfd(file.clone())),
             Self::ProcPagemap(file) => Ok(Self::ProcPagemap(file.clone())),
             Self::ProcTimerSlack(file) => Ok(Self::ProcTimerSlack(file.clone())),
             Self::Pipe(pipe) => Ok(Self::Pipe(pipe.clone())),
@@ -5060,7 +5420,7 @@ fn open_fd_entry(
         let mut candidates = if absolute {
             if let Some(path) = dev_shm_host_path(path) {
                 ensure_dev_shm_dir()?;
-                return open_candidates(process, &[path], &opts, flags, mode);
+                return open_candidates(process, table, &[path], &opts, flags, mode);
             }
             runtime_absolute_path_candidates(exec_root.as_str(), path)
         } else {
@@ -5079,7 +5439,7 @@ fn open_fd_entry(
         if candidates.is_empty() {
             return Err(LinuxError::EINVAL);
         }
-        open_candidates(process, &candidates, &opts, flags, mode)
+        open_candidates(process, table, &candidates, &opts, flags, mode)
     } else {
         let FdEntry::Directory(dir) = table.entry(dirfd)? else {
             return Err(LinuxError::ENOTDIR);
@@ -5093,7 +5453,7 @@ fn open_fd_entry(
             append_busybox_applet_alias_candidates(&mut candidates);
         }
         translate_mount_candidates(process, &mut candidates);
-        open_candidates(process, &candidates, &opts, flags, mode)
+        open_candidates(process, table, &candidates, &opts, flags, mode)
     }
 }
 
@@ -5331,29 +5691,39 @@ fn write_regular_file_at(
 
 pub(super) fn write_mmap_file_backing(
     process: &UserProcess,
-    file: &mut FileEntry,
+    file: &mut MmapFileBacking,
     write_offset: u64,
     src: &[u8],
 ) -> Result<usize, LinuxError> {
-    if !file_is_writable(file.status_flags) {
-        return Err(LinuxError::EBADF);
+    match file {
+        MmapFileBacking::File(file) => {
+            if !file_is_writable(file.status_flags) {
+                return Err(LinuxError::EBADF);
+            }
+            // MAP_SHARED writeback is tied to the mapping offset, not to the current
+            // descriptor position. In particular, do not redirect msync writes to EOF
+            // for O_APPEND descriptors.
+            write_regular_file_at(process, file, write_offset, src, None)
+        }
+        MmapFileBacking::Memfd(file) => file.write_at(write_offset, src, None),
     }
-    // MAP_SHARED writeback is tied to the mapping offset, not to the current
-    // descriptor position. In particular, do not redirect msync writes to EOF
-    // for O_APPEND descriptors.
-    write_regular_file_at(process, file, write_offset, src, None)
 }
 
 pub(super) fn read_mmap_file_backing(
     process: &UserProcess,
-    file: &mut FileEntry,
+    file: &mut MmapFileBacking,
     read_offset: u64,
     dst: &mut [u8],
 ) -> Result<usize, LinuxError> {
-    if !file_is_readable(file.status_flags) {
-        return Err(LinuxError::EBADF);
+    match file {
+        MmapFileBacking::File(file) => {
+            if !file_is_readable(file.status_flags) {
+                return Err(LinuxError::EBADF);
+            }
+            read_regular_file_at(process, file, read_offset, dst)
+        }
+        MmapFileBacking::Memfd(file) => file.read_at(read_offset, dst),
     }
-    read_regular_file_at(process, file, read_offset, dst)
 }
 
 fn file_entry_read(
@@ -5696,6 +6066,7 @@ fn tmpfile_requested(flags: u32) -> bool {
 
 fn open_candidates(
     process: &UserProcess,
+    table: &FdTable,
     candidates: &[String],
     opts: &OpenOptions,
     flags: u32,
@@ -5714,7 +6085,7 @@ fn open_candidates(
         if flags & O_NOFOLLOW_FLAG != 0 {
             let resolved_path = process.resolve_parent_symlinks(path.as_str())?;
             if resolved_path != *path {
-                return open_candidates(process, &[resolved_path], opts, flags, mode);
+                return open_candidates(process, table, &[resolved_path], opts, flags, mode);
             }
             if process.path_symlink(path.as_str()).is_some() {
                 if prefer_dir {
@@ -5726,7 +6097,7 @@ fn open_candidates(
                 return Err(LinuxError::ELOOP);
             }
         } else if let Some(resolved_path) = process.resolve_path_symlink(path.as_str())? {
-            return open_candidates(process, &[resolved_path], opts, flags, mode);
+            return open_candidates(process, table, &[resolved_path], opts, flags, mode);
         }
         if wants_tmpfile {
             if flags & general::O_ACCMODE == general::O_RDONLY {
@@ -5737,6 +6108,12 @@ fn open_candidates(
                 Err(err) => record_missing_candidate(&mut last_err, err)?,
             }
             continue;
+        }
+        if let Some(fd) = proc_fd_target_number(process, path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return reopen_proc_fd_entry(table, fd, flags, path_only);
         }
         if let Some(proc_fd_path) = proc_fd_dir_path(process, path.as_str()) {
             if !path_only
@@ -6162,6 +6539,46 @@ fn proc_fd_dir_path(process: &UserProcess, path: &str) -> Option<String> {
     }
     let pid_path = format!("/proc/{}/fd", process.pid());
     (normalized == pid_path).then_some(normalized)
+}
+
+fn proc_fd_target_number(process: &UserProcess, path: &str) -> Option<i32> {
+    let normalized = normalize_path("/", path)?;
+    let rest = normalized
+        .strip_prefix("/proc/self/fd/")
+        .or_else(|| normalized.strip_prefix("/dev/fd/"))
+        .or_else(|| normalized.strip_prefix(format!("/proc/{}/fd/", process.pid()).as_str()))?;
+    if rest.is_empty() || rest.contains('/') {
+        return None;
+    }
+    rest.parse().ok()
+}
+
+fn reopen_proc_fd_entry(
+    table: &FdTable,
+    fd: i32,
+    flags: u32,
+    path_only: bool,
+) -> Result<FdEntry, LinuxError> {
+    match table.entry(fd)? {
+        FdEntry::Memfd(file) => {
+            let mut reopened = file.reopen(fcntl_status_flags(flags));
+            if flags & general::O_TRUNC != 0 {
+                if !reopened.writable() {
+                    return Err(LinuxError::EACCES);
+                }
+                reopened.truncate(0)?;
+            }
+            if path_only {
+                Ok(FdEntry::Path(PathEntry::synthetic_file(
+                    reopened.path().as_str(),
+                    reopened.size() as usize,
+                )))
+            } else {
+                Ok(FdEntry::Memfd(reopened))
+            }
+        }
+        _ => Err(LinuxError::EINVAL),
+    }
 }
 
 fn directory_create_dir(path: &str) -> Result<(), LinuxError> {
