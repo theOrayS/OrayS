@@ -430,11 +430,35 @@ fn patch_riscv_musl_syscall_stubs(
         return Ok(());
     }
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
-    let Some(offset) = find_dynsym_file_offset(&elf, "brk")? else {
-        return Ok(());
-    };
+    let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
+    let nice_offset = find_dynsym_file_offset(&elf, "nice")?;
+    let getpriority_offset = find_dynsym_file_offset(&elf, "getpriority")?;
+    let setpriority_offset = find_dynsym_file_offset(&elf, "setpriority")?;
+    let errno_location_offset = find_dynsym_file_offset(&elf, "__errno_location")?;
     drop(elf);
-    patch_riscv_musl_brk_stub(image, offset)
+    if let Some(offset) = brk_offset {
+        patch_riscv_musl_brk_stub(image, offset)?;
+    }
+    if let (
+        Some(nice_offset),
+        Some(getpriority_offset),
+        Some(setpriority_offset),
+        Some(errno_location_offset),
+    ) = (
+        nice_offset,
+        getpriority_offset,
+        setpriority_offset,
+        errno_location_offset,
+    ) {
+        patch_riscv_musl_nice_wrapper(
+            image,
+            nice_offset,
+            getpriority_offset,
+            setpriority_offset,
+            errno_location_offset,
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
@@ -499,6 +523,94 @@ fn patch_riscv_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), Stri
         image[offset..end].copy_from_slice(&patch);
     }
     Ok(())
+}
+
+#[cfg(target_arch = "riscv64")]
+fn patch_riscv_musl_nice_wrapper(
+    image: &mut [u8],
+    offset: usize,
+    getpriority_offset: usize,
+    setpriority_offset: usize,
+    errno_location_offset: usize,
+) -> Result<(), String> {
+    const KNOWN_PREFIX: [u8; 16] = [
+        0x13, 0x01, 0x01, 0xfe, // addi sp, sp, -32
+        0x23, 0x34, 0x91, 0x00, // sd s1, 8(sp)
+        0x23, 0x3c, 0x11, 0x00, // sd ra, 24(sp)
+        0x23, 0x38, 0x81, 0x00, // sd s0, 16(sp)
+    ];
+    const PATCH_LEN: usize = 31 * size_of::<u32>();
+    let end = offset
+        .checked_add(PATCH_LEN)
+        .ok_or_else(|| "riscv musl nice patch range overflow".to_string())?;
+    if end > image.len() {
+        return Err("riscv musl nice patch exceeds image".into());
+    }
+    if !image
+        .get(offset..offset + KNOWN_PREFIX.len())
+        .is_some_and(|prefix| prefix == KNOWN_PREFIX)
+    {
+        return Ok(());
+    }
+
+    let words = [
+        0xff01_0113,                                      // addi sp, sp, -16
+        0x0081_3023,                                      // sd s0, 0(sp)
+        0x0011_3423,                                      // sd ra, 8(sp)
+        0x0005_0413,                                      // mv s0, a0 (save increment)
+        0x0000_0593,                                      // li a1, 0 (PRIO_PROCESS)
+        0x0000_0513,                                      // li a0, 0 (self)
+        riscv_jal(offset + 0x18, getpriority_offset)?,    // getpriority(0, 0)
+        0x00a4_043b,                                      // addw s0, s0, a0
+        0xfec0_0293,                                      // li t0, -20
+        0x0054_5463,                                      // bge s0, t0, +8
+        0xfec0_0413,                                      // li s0, -20
+        0x0130_0293,                                      // li t0, 19
+        0x0082_d463,                                      // bge t0, s0, +8
+        0x0130_0413,                                      // li s0, 19
+        0x0004_0613,                                      // mv a2, s0
+        0x0000_0593,                                      // li a1, 0
+        0x0000_0513,                                      // li a0, 0
+        riscv_jal(offset + 0x44, setpriority_offset)?,    // setpriority(0, 0, nice)
+        0x0205_0063,                                      // beqz a0, success
+        riscv_jal(offset + 0x4c, errno_location_offset)?, // __errno_location()
+        0x0005_2283,                                      // lw t0, 0(a0)
+        0x00d0_0313,                                      // li t1, EACCES
+        0x0062_9663,                                      // bne t0, t1, fail
+        0x0010_0293,                                      // li t0, EPERM
+        0x0055_2023,                                      // sw t0, 0(a0)
+        0xfff0_0413,                                      // li s0, -1
+        0x0081_3083,                                      // ld ra, 8(sp)
+        0x0004_0513,                                      // mv a0, s0
+        0x0001_3403,                                      // ld s0, 0(sp)
+        0x0101_0113,                                      // addi sp, sp, 16
+        0x0000_8067,                                      // ret
+    ];
+    for (idx, word) in words.iter().enumerate() {
+        let word_offset = offset + idx * size_of::<u32>();
+        image[word_offset..word_offset + size_of::<u32>()].copy_from_slice(&word.to_le_bytes());
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "riscv64")]
+fn riscv_jal(from_offset: usize, to_offset: usize) -> Result<u32, String> {
+    let delta = (to_offset as i64)
+        .checked_sub(from_offset as i64)
+        .ok_or_else(|| "RISC-V jal delta overflow".to_string())?;
+    if delta % 2 != 0 {
+        return Err(format!("unaligned RISC-V jal delta: {delta}"));
+    }
+    if !(-(1 << 20)..(1 << 20)).contains(&delta) {
+        return Err(format!("RISC-V jal delta out of range: {delta}"));
+    }
+    let imm = (delta as u32) & 0x001f_ffff;
+    Ok(((imm & 0x0010_0000) << 11)
+        | (imm & 0x000f_f000)
+        | ((imm & 0x0000_0800) << 9)
+        | ((imm & 0x0000_07fe) << 20)
+        | (1 << 7)
+        | 0x6f)
 }
 
 #[cfg(target_arch = "loongarch64")]
