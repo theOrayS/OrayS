@@ -2405,6 +2405,16 @@ pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
 pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize {
     const BLKGETSIZE64: u32 = 0x8008_1272;
     const FIONREAD: u32 = 0x541b;
+    const SIOCATMARK: u32 = 0x8905;
+    const SIOCGIFCONF: u32 = 0x8912;
+    const SIOCGIFFLAGS: u32 = 0x8913;
+    const SIOCSIFFLAGS: u32 = 0x8914;
+    match req as u32 {
+        SIOCATMARK | SIOCGIFCONF | SIOCGIFFLAGS | SIOCSIFFLAGS => {
+            return socket_ioctl(process, fd, req as u32, arg);
+        }
+        _ => {}
+    }
     if req as u32 == BLKGETSIZE64 && process.fds.lock().is_block_device(fd as i32) {
         let size: u64 = 512 * 1024 * 1024;
         return write_user_value(process, arg, &size);
@@ -2451,6 +2461,130 @@ pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize
         return 0;
     }
     neg_errno(LinuxError::ENOTTY)
+}
+
+enum IoctlSocketKind {
+    Inet(u32),
+    Local,
+    Other,
+}
+
+fn ioctl_socket_kind(process: &UserProcess, fd: usize) -> Result<IoctlSocketKind, LinuxError> {
+    let table = process.fds.lock();
+    match table.entry(fd as i32) {
+        Ok(FdEntry::Socket(socket)) => Ok(IoctlSocketKind::Inet(socket.socktype as u32)),
+        Ok(FdEntry::LocalSocket(_)) => Ok(IoctlSocketKind::Local),
+        Ok(_) => Ok(IoctlSocketKind::Other),
+        Err(err) => Err(err),
+    }
+}
+
+fn socket_ioctl(process: &UserProcess, fd: usize, req: u32, arg: usize) -> isize {
+    const SIOCATMARK: u32 = 0x8905;
+    const SIOCGIFCONF: u32 = 0x8912;
+    const SIOCGIFFLAGS: u32 = 0x8913;
+    const SIOCSIFFLAGS: u32 = 0x8914;
+    let kind = match ioctl_socket_kind(process, fd) {
+        Ok(kind) => kind,
+        Err(err) => return neg_errno(err),
+    };
+    if matches!(kind, IoctlSocketKind::Other) {
+        return neg_errno(LinuxError::ENOTTY);
+    }
+
+    match req {
+        SIOCATMARK => socket_ioctl_atmark(process, kind, arg),
+        SIOCGIFCONF => socket_ioctl_get_ifconf(process, arg),
+        SIOCGIFFLAGS => socket_ioctl_get_ifflags(process, arg),
+        SIOCSIFFLAGS => socket_ioctl_set_ifflags(process, arg),
+        _ => neg_errno(LinuxError::ENOTTY),
+    }
+}
+
+fn socket_ioctl_atmark(process: &UserProcess, kind: IoctlSocketKind, arg: usize) -> isize {
+    const SOCK_DGRAM_KIND: u32 = 2;
+    if arg == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    if matches!(kind, IoctlSocketKind::Inet(socktype) if socktype == SOCK_DGRAM_KIND) {
+        return neg_errno(LinuxError::ENOTTY);
+    }
+    let value: i32 = 0;
+    write_user_value(process, arg, &value)
+}
+
+fn socket_ioctl_get_ifconf(process: &UserProcess, arg: usize) -> isize {
+    const IFCONF_SIZE: usize = 16;
+    const IFCONF_BUF_OFFSET: usize = 8;
+    const IFREQ_SIZE: usize = 40;
+    const IFREQ_NAME_SIZE: usize = 16;
+    if arg == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let ifconf = match read_user_bytes(process, arg, IFCONF_SIZE) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    let requested_len =
+        i32::from_ne_bytes(ifconf[0..size_of::<i32>()].try_into().unwrap()).max(0) as usize;
+    let ifc_buf = usize::from_ne_bytes(
+        ifconf[IFCONF_BUF_OFFSET..IFCONF_BUF_OFFSET + size_of::<usize>()]
+            .try_into()
+            .unwrap(),
+    );
+    if ifc_buf == 0 || requested_len < IFREQ_SIZE {
+        let len: i32 = 0;
+        return write_user_bytes_ret(process, arg, &len.to_ne_bytes());
+    }
+
+    let mut ifreq = [0u8; IFREQ_SIZE];
+    ifreq[..3].copy_from_slice(b"lo\0");
+    let family = 2u16.to_ne_bytes();
+    ifreq[IFREQ_NAME_SIZE..IFREQ_NAME_SIZE + size_of::<u16>()].copy_from_slice(&family);
+    let loopback = u32::from_be_bytes([127, 0, 0, 1]).to_ne_bytes();
+    let addr_offset = IFREQ_NAME_SIZE + 4;
+    ifreq[addr_offset..addr_offset + size_of::<u32>()].copy_from_slice(&loopback);
+
+    let written = requested_len.min(IFREQ_SIZE);
+    if let Err(err) = write_user_bytes(process, ifc_buf, &ifreq[..written]) {
+        return neg_errno(err);
+    }
+    let len = written as i32;
+    write_user_bytes_ret(process, arg, &len.to_ne_bytes())
+}
+
+fn socket_ioctl_get_ifflags(process: &UserProcess, arg: usize) -> isize {
+    const IFREQ_SIZE: usize = 40;
+    const IFREQ_FLAGS_OFFSET: usize = 16;
+    const IFF_UP: i16 = 0x1;
+    const IFF_LOOPBACK: i16 = 0x8;
+    const IFF_RUNNING: i16 = 0x40;
+    if arg == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    if let Err(err) = validate_user_write(process, arg, IFREQ_SIZE) {
+        return neg_errno(err);
+    }
+    let flags = (IFF_UP | IFF_LOOPBACK | IFF_RUNNING).to_ne_bytes();
+    write_user_bytes_ret(process, arg + IFREQ_FLAGS_OFFSET, &flags)
+}
+
+fn socket_ioctl_set_ifflags(process: &UserProcess, arg: usize) -> isize {
+    const IFREQ_SIZE: usize = 40;
+    if arg == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    match validate_user_read(process, arg, IFREQ_SIZE) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+fn write_user_bytes_ret(process: &UserProcess, dst: usize, bytes: &[u8]) -> isize {
+    match write_user_bytes(process, dst, bytes) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
 }
 
 impl FdTable {
