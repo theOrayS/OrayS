@@ -44,8 +44,9 @@ use super::synthetic_fs::{
     proc_comm_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
     proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
     proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry, proc_timerslack_fd_entry,
-    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry,
+    proc_task_dir_path_entry, proc_timerslack_fd_entry, proc_timerslack_path_entry,
+    synthetic_file_is_writable_open, synthetic_kernel_config_content,
     synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
     synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
     synthetic_userdb_content, synthetic_userdb_fd_entry, synthetic_userdb_path_entry,
@@ -92,6 +93,7 @@ pub(super) enum FdEntry {
     File(FileEntry),
     Directory(DirectoryEntry),
     ProcFdDir(ProcFdDirEntry),
+    SyntheticDir(SyntheticDirEntry),
     Path(PathEntry),
     MemoryFile(MemoryFileEntry),
     Memfd(MemfdEntry),
@@ -128,6 +130,21 @@ pub(super) struct DirectoryEntry {
 pub(super) struct ProcFdDirEntry {
     pub(super) path: String,
     next_dirent_cookie: u64,
+}
+
+#[derive(Clone)]
+pub(super) struct SyntheticDirEntry {
+    pub(super) path: String,
+    parent_path: String,
+    dirents: Vec<SyntheticDirent>,
+    next_dirent_cookie: u64,
+}
+
+#[derive(Clone)]
+pub(super) struct SyntheticDirent {
+    name: String,
+    d_type: u8,
+    path: String,
 }
 
 #[derive(Clone)]
@@ -1696,7 +1713,9 @@ fn splice_input_kind(
             }
         }
         FdEntry::Socket(_) => Err(LinuxError::EINVAL),
-        FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EINVAL),
+        FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+            Err(LinuxError::EINVAL)
+        }
         _ => Err(LinuxError::EINVAL),
     }
 }
@@ -1731,7 +1750,9 @@ fn splice_output_kind(
             }
         }
         FdEntry::Socket(_) => Err(LinuxError::EINVAL),
-        FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EINVAL),
+        FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+            Err(LinuxError::EINVAL)
+        }
         _ => Err(LinuxError::EINVAL),
     }
 }
@@ -2726,6 +2747,7 @@ impl FdTable {
                 | FdEntry::File(_)
                 | FdEntry::Directory(_)
                 | FdEntry::ProcFdDir(_)
+                | FdEntry::SyntheticDir(_)
                 | FdEntry::MemoryFile(_)
                 | FdEntry::Memfd(_)
                 | FdEntry::ProcPagemap(_)
@@ -2750,6 +2772,7 @@ impl FdTable {
                 FdEntry::File(_) | FdEntry::Memfd(_) => true,
                 FdEntry::Directory(_)
                 | FdEntry::ProcFdDir(_)
+                | FdEntry::SyntheticDir(_)
                 | FdEntry::Path(_)
                 | FdEntry::MemoryFile(_)
                 | FdEntry::ProcPagemap(_)
@@ -2994,7 +3017,9 @@ impl FdTable {
                 }
                 file.read(process, dst)
             }
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(pipe) => pipe.read(dst),
             FdEntry::Socket(socket) => socket.read(dst),
             FdEntry::LocalSocket(socket) => socket.read(dst),
@@ -3069,7 +3094,9 @@ impl FdTable {
                 write_regular_file_at(process, file, base_offset, src, file_size_limit)
             }
             FdEntry::Memfd(file) => file.write_at(offset, src, file_size_limit),
-            FdEntry::Directory(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3273,7 +3300,9 @@ impl FdTable {
                     offset as u64,
                     whence == SEEK_DATA_WHENCE,
                 ),
-                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                    Err(LinuxError::EISDIR)
+                }
                 FdEntry::Path(_) => Err(LinuxError::EBADF),
                 FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
                 FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
@@ -3296,7 +3325,9 @@ impl FdTable {
             FdEntry::DevNull => Ok(0),
             FdEntry::BlockDevice(_) => Ok(0),
             FdEntry::Rtc => Ok(0),
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Path(_) => Err(LinuxError::EBADF),
             FdEntry::MemoryFile(file) => file.seek(pos),
             FdEntry::Memfd(file) => file.seek(pos),
@@ -3384,6 +3415,12 @@ impl FdTable {
                 unreachable!();
             };
             return get_proc_fd_dirents(dir, &fd_names, max_len);
+        }
+        if matches!(self.entry(fd)?, FdEntry::SyntheticDir(_)) {
+            let FdEntry::SyntheticDir(dir) = self.entry_mut(fd)? else {
+                unreachable!();
+            };
+            return get_synthetic_dirents(dir, max_len);
         }
         let entry = self.entry_mut(fd)?;
         let FdEntry::Directory(dir) = entry else {
@@ -3520,7 +3557,9 @@ impl FdTable {
                 read_regular_file_at(process, file, offset, dst)
             }
             FdEntry::Memfd(file) => file.read_at(offset, dst),
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3543,7 +3582,9 @@ impl FdTable {
                 read_regular_file_at(process, file, offset, dst).map(|read| (offset, read))
             }
             FdEntry::Memfd(file) => file.read_at_current_offset(dst),
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3567,7 +3608,9 @@ impl FdTable {
                 *offset = offset.saturating_add(amount as u64);
                 Ok(())
             }
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3590,7 +3633,9 @@ impl FdTable {
                 read_regular_file_at(process, file, offset, dst)
             }
             FdEntry::Memfd(file) => file.read_at(offset, dst),
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3612,7 +3657,9 @@ impl FdTable {
                 }
                 Ok(MmapFileBacking::Memfd(file.clone()))
             }
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3636,7 +3683,9 @@ impl FdTable {
                     Err(LinuxError::EACCES)
                 }
             }
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3650,7 +3699,9 @@ impl FdTable {
             FdEntry::File(file) => Ok(file_is_writable(file.status_flags)),
             FdEntry::Memfd(file) => Ok(file.allows_shared_write()),
             FdEntry::DevZero(status_flags) => Ok(file_is_writable(*status_flags)),
-            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
+                Err(LinuxError::EISDIR)
+            }
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
@@ -3776,6 +3827,59 @@ fn get_proc_fd_dirents(
                 dirent,
                 general::linux_dirent64 {
                     d_ino: path_inode(Some(entry_path.as_str())) as _,
+                    d_off: next_cookie as _,
+                    d_reclen: reclen as _,
+                    d_type,
+                    d_name: Default::default(),
+                },
+            );
+        }
+        let name_start = start + offset_of!(general::linux_dirent64, d_name);
+        out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
+        dir.next_dirent_cookie = next_cookie;
+        index += 1;
+    }
+    Ok(out)
+}
+
+fn get_synthetic_dirents(
+    dir: &mut SyntheticDirEntry,
+    max_len: usize,
+) -> Result<Vec<u8>, LinuxError> {
+    let min_reclen = align_up(offset_of!(general::linux_dirent64, d_name) + 1, 8);
+    if max_len < min_reclen {
+        return Err(LinuxError::EINVAL);
+    }
+
+    let total_entries = dir.dirents.len().saturating_add(2);
+    let mut out = Vec::new();
+    let mut index = dir.next_dirent_cookie as usize;
+    while index < total_entries {
+        let (name, d_type, entry_path): (&str, u8, &str) = if index == 0 {
+            (".", general::DT_DIR as u8, dir.path.as_str())
+        } else if index == 1 {
+            ("..", general::DT_DIR as u8, dir.parent_path.as_str())
+        } else {
+            let dirent = &dir.dirents[index - 2];
+            (dirent.name.as_str(), dirent.d_type, dirent.path.as_str())
+        };
+        let name_bytes = name.as_bytes();
+        let reclen = align_up(
+            offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
+            8,
+        );
+        if out.len() + reclen > max_len {
+            break;
+        }
+        let start = out.len();
+        out.resize(start + reclen, 0);
+        let next_cookie = index.saturating_add(1) as u64;
+        unsafe {
+            let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
+            ptr::write_unaligned(
+                dirent,
+                general::linux_dirent64 {
+                    d_ino: path_inode(Some(entry_path)) as _,
                     d_off: next_cookie as _,
                     d_reclen: reclen as _,
                     d_type,
@@ -4055,6 +4159,7 @@ impl FdTable {
             )),
             FdEntry::Directory(dir) => Ok(file_attr_to_stat(&dir.attr, Some(dir.path.as_str()))),
             FdEntry::ProcFdDir(dir) => Ok(proc_fd_dir_stat(dir.path.as_str())),
+            FdEntry::SyntheticDir(dir) => Ok(proc_fd_dir_stat(dir.path.as_str())),
             FdEntry::Path(path) => Ok(path.stat()),
             FdEntry::MemoryFile(file) => Ok(file.stat()),
             FdEntry::Memfd(file) => Ok(file.stat()),
@@ -4139,6 +4244,7 @@ impl FdTable {
                 file_attr_to_stat(&dir.attr, Some(dir.path.as_str())),
             )),
             Ok(FdEntry::ProcFdDir(dir)) => Ok(proc_fd_dir_stat(dir.path.as_str())),
+            Ok(FdEntry::SyntheticDir(dir)) => Ok(proc_fd_dir_stat(dir.path.as_str())),
             Ok(FdEntry::Path(path)) => Ok(apply_recorded_path_metadata(
                 process,
                 path.path.as_str(),
@@ -4194,6 +4300,7 @@ impl FdTable {
             let base = match self.entry(dirfd)? {
                 FdEntry::Directory(dir) => dir.path.as_str(),
                 FdEntry::ProcFdDir(dir) => dir.path.as_str(),
+                FdEntry::SyntheticDir(dir) => dir.path.as_str(),
                 FdEntry::Path(path_entry) if path_entry.mode & ST_MODE_TYPE_MASK == ST_MODE_DIR => {
                     path_entry.path.as_str()
                 }
@@ -4589,6 +4696,23 @@ impl PathEntry {
         st.st_blksize = 512;
         st.st_blocks = self.blocks as _;
         st
+    }
+}
+
+impl SyntheticDirEntry {
+    pub(super) fn new(path: String, parent_path: String, dirents: Vec<SyntheticDirent>) -> Self {
+        Self {
+            path,
+            parent_path,
+            dirents,
+            next_dirent_cookie: 0,
+        }
+    }
+}
+
+impl SyntheticDirent {
+    pub(super) fn new(name: String, d_type: u8, path: String) -> Self {
+        Self { name, d_type, path }
     }
 }
 
@@ -5358,6 +5482,7 @@ impl FdEntry {
             Self::File(file) => Ok(Self::File(file.clone())),
             Self::Directory(dir) => Ok(Self::Directory(dir.clone())),
             Self::ProcFdDir(dir) => Ok(Self::ProcFdDir(dir.clone())),
+            Self::SyntheticDir(dir) => Ok(Self::SyntheticDir(dir.clone())),
             Self::Path(path) => Ok(Self::Path(path.clone())),
             Self::MemoryFile(file) => Ok(Self::MemoryFile(file.clone())),
             Self::Memfd(file) => Ok(Self::Memfd(file.clone())),
@@ -6132,6 +6257,21 @@ fn open_candidates(
                     next_dirent_cookie: 0,
                 })
             });
+        }
+        if let Some(entry) = if path_only {
+            proc_task_dir_path_entry(process, path.as_str())
+        } else {
+            proc_task_dir_fd_entry(process, path.as_str())
+        } {
+            if !path_only
+                && (matches!(
+                    flags & general::O_ACCMODE,
+                    general::O_WRONLY | general::O_RDWR
+                ) || flags & (general::O_CREAT | general::O_TRUNC) != 0)
+            {
+                return Err(LinuxError::EISDIR);
+            }
+            return Ok(entry);
         }
         if is_proc_self_maps_path(path.as_str()) {
             if prefer_dir {

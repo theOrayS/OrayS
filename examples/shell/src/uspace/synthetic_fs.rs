@@ -1,14 +1,18 @@
 use core::sync::atomic::Ordering;
 
 use axerrno::LinuxError;
+use axtask::AxTaskRef;
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
-use super::UserProcess;
-use super::fd_table::{FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry, ProcTimerSlackEntry};
+use super::fd_table::{
+    FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry, ProcTimerSlackEntry, SyntheticDirEntry,
+    SyntheticDirent,
+};
+use super::futex::futex_waiter_is_queued;
 use super::linux_abi::{
     DEFAULT_GROUP_CONTENT, DEFAULT_PASSWD_CONTENT, ETC_GROUP_PATH, ETC_PASSWD_PATH,
     PROC_SELF_MAPS_PATH, USER_ASPACE_BASE, USER_STACK_SIZE, USER_STACK_TOP,
@@ -20,6 +24,7 @@ use super::task_context::task_ext;
 use super::task_registry::{
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
 };
+use super::UserProcess;
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
@@ -229,6 +234,30 @@ pub(super) fn proc_timerslack_path_entry(process: &UserProcess, path: &str) -> O
 
 fn proc_stat_target_process(process: &UserProcess, path: &str) -> Option<(i32, UserProcessStat)> {
     let normalized = normalize_path("/", path)?;
+    if let Some(tid_text) = normalized
+        .strip_prefix("/proc/self/task/")
+        .and_then(|rest| rest.strip_suffix("/stat"))
+    {
+        if tid_text.contains('/') {
+            return None;
+        }
+        let tid = tid_text.parse::<i32>().ok()?;
+        return proc_task_thread_stat(process, process.pid(), tid);
+    }
+    if let Some(rest) = normalized.strip_prefix("/proc/") {
+        let (pid_text, after_pid) = rest.split_once('/')?;
+        if let Some(tid_text) = after_pid
+            .strip_prefix("task/")
+            .and_then(|rest| rest.strip_suffix("/stat"))
+        {
+            if tid_text.contains('/') {
+                return None;
+            }
+            let pid = pid_text.parse::<i32>().ok()?;
+            let tid = tid_text.parse::<i32>().ok()?;
+            return proc_task_thread_stat(process, pid, tid);
+        }
+    }
     let pid = if normalized == "/proc/self/stat" {
         process.pid()
     } else {
@@ -249,6 +278,23 @@ fn proc_stat_target_process(process: &UserProcess, path: &str) -> Option<(i32, U
         .map(|entry| (pid, UserProcessStat::from(entry.process.as_ref())))
 }
 
+fn proc_task_thread_stat(
+    process: &UserProcess,
+    pid: i32,
+    tid: i32,
+) -> Option<(i32, UserProcessStat)> {
+    if !live_process_exists(process, pid) {
+        return None;
+    }
+    let entry = user_thread_entry_by_tid(tid)?;
+    (entry.process.pid() == pid).then(|| {
+        (
+            tid,
+            UserProcessStat::from_task(entry.process.as_ref(), &entry.task),
+        )
+    })
+}
+
 struct UserProcessStat {
     ppid: i32,
     pgid: i32,
@@ -260,6 +306,14 @@ struct UserProcessStat {
 
 impl UserProcessStat {
     fn from(process: &UserProcess) -> Self {
+        Self::with_state(process, process_state(process))
+    }
+
+    fn from_task(process: &UserProcess, task: &AxTaskRef) -> Self {
+        Self::with_state(process, task_state(process, task))
+    }
+
+    fn with_state(process: &UserProcess, state: char) -> Self {
         let exec_path = process.exec_path();
         let comm = exec_path
             .rsplit('/')
@@ -269,17 +323,6 @@ impl UserProcessStat {
             .chars()
             .take(15)
             .collect();
-        let state = if process.live_threads.load(Ordering::Acquire) == 0 {
-            'Z'
-        } else if process.is_child_wait_blocked()
-            || process.is_syscall_wait_blocked()
-            || process_has_futex_waiter(process)
-            || process_has_signal_waiter(process)
-        {
-            'S'
-        } else {
-            'R'
-        };
         Self {
             ppid: process.ppid(),
             pgid: process.pgid(),
@@ -302,26 +345,54 @@ impl UserProcessStat {
     }
 }
 
+fn process_state(process: &UserProcess) -> char {
+    if process.live_threads.load(Ordering::Acquire) == 0 {
+        'Z'
+    } else if process.is_child_wait_blocked()
+        || process.is_syscall_wait_blocked()
+        || process_has_futex_waiter(process)
+        || process_has_signal_waiter(process)
+    {
+        'S'
+    } else {
+        'R'
+    }
+}
+
+fn task_state(process: &UserProcess, task: &AxTaskRef) -> char {
+    if process.live_threads.load(Ordering::Acquire) == 0 {
+        'Z'
+    } else if task_has_futex_waiter(process, task) || task_has_signal_waiter(task) {
+        'S'
+    } else {
+        'R'
+    }
+}
+
+fn task_has_futex_waiter(process: &UserProcess, task: &AxTaskRef) -> bool {
+    let Some(ext) = task_ext(task) else {
+        return false;
+    };
+    let uaddr = ext.futex_wait.load(Ordering::Acquire);
+    uaddr != 0 && futex_waiter_is_queued(process, uaddr)
+}
+
+fn task_has_signal_waiter(task: &AxTaskRef) -> bool {
+    task_ext(task)
+        .map(|ext| ext.signal_wait.load(Ordering::Acquire) || ext.poll_wait.load(Ordering::Acquire))
+        .unwrap_or(false)
+}
+
 fn process_has_futex_waiter(process: &UserProcess) -> bool {
     user_thread_entries_by_process_pid(process.pid())
         .into_iter()
-        .any(|entry| {
-            task_ext(&entry.task)
-                .map(|ext| ext.futex_wait.load(Ordering::Acquire) != 0)
-                .unwrap_or(false)
-        })
+        .any(|entry| task_has_futex_waiter(process, &entry.task))
 }
 
 fn process_has_signal_waiter(process: &UserProcess) -> bool {
     user_thread_entries_by_process_pid(process.pid())
         .into_iter()
-        .any(|entry| {
-            task_ext(&entry.task)
-                .map(|ext| {
-                    ext.signal_wait.load(Ordering::Acquire) || ext.poll_wait.load(Ordering::Acquire)
-                })
-                .unwrap_or(false)
-        })
+        .any(|entry| task_has_signal_waiter(&entry.task))
 }
 
 fn proc_pid_stat_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
@@ -425,6 +496,110 @@ pub(super) fn proc_pid_status_path_entry(process: &UserProcess, path: &str) -> O
     )))
 }
 
+fn live_process_exists(process: &UserProcess, pid: i32) -> bool {
+    pid == process.pid() || user_thread_entry_by_process_pid(pid).is_some()
+}
+
+fn thread_belongs_to_process(pid: i32, tid: i32) -> bool {
+    user_thread_entry_by_tid(tid)
+        .map(|entry| entry.process.pid() == pid)
+        .unwrap_or(false)
+}
+
+fn parent_path(path: &str) -> String {
+    match path.rsplit_once('/') {
+        Some(("", _)) | None => "/".into(),
+        Some((parent, _)) => parent.into(),
+    }
+}
+
+fn proc_task_dir_snapshot(
+    process: &UserProcess,
+    path: &str,
+) -> Option<(String, String, Vec<SyntheticDirent>)> {
+    let normalized = normalize_path("/", path)?;
+    if normalized == "/proc/self/task" {
+        return proc_task_list_dir_snapshot(process, normalized, process.pid());
+    }
+    if let Some(tid_text) = normalized.strip_prefix("/proc/self/task/") {
+        if tid_text.contains('/') {
+            return None;
+        }
+        let tid = tid_text.parse::<i32>().ok()?;
+        return proc_task_thread_dir_snapshot(process, normalized, process.pid(), tid);
+    }
+
+    let rest = normalized.strip_prefix("/proc/")?;
+    let (pid_text, after_pid) = rest.split_once('/')?;
+    let pid = pid_text.parse::<i32>().ok()?;
+    if after_pid == "task" {
+        return proc_task_list_dir_snapshot(process, normalized, pid);
+    }
+    let tid_text = after_pid.strip_prefix("task/")?;
+    if tid_text.contains('/') {
+        return None;
+    }
+    let tid = tid_text.parse::<i32>().ok()?;
+    proc_task_thread_dir_snapshot(process, normalized, pid, tid)
+}
+
+fn proc_task_list_dir_snapshot(
+    process: &UserProcess,
+    path: String,
+    pid: i32,
+) -> Option<(String, String, Vec<SyntheticDirent>)> {
+    if !live_process_exists(process, pid) {
+        return None;
+    }
+    let mut tids = user_thread_entries_by_process_pid(pid)
+        .into_iter()
+        .map(|entry| entry.task.id().as_u64() as i32)
+        .collect::<Vec<_>>();
+    tids.sort_unstable();
+    tids.dedup();
+    let entries = tids
+        .into_iter()
+        .map(|tid| {
+            let name = tid.to_string();
+            SyntheticDirent::new(
+                name,
+                general::DT_DIR as u8,
+                format!("{}/{}", path.as_str(), tid),
+            )
+        })
+        .collect();
+    Some((path.clone(), parent_path(path.as_str()), entries))
+}
+
+fn proc_task_thread_dir_snapshot(
+    process: &UserProcess,
+    path: String,
+    pid: i32,
+    tid: i32,
+) -> Option<(String, String, Vec<SyntheticDirent>)> {
+    if !live_process_exists(process, pid) || !thread_belongs_to_process(pid, tid) {
+        return None;
+    }
+    let entries = vec![SyntheticDirent::new(
+        "comm".into(),
+        general::DT_REG as u8,
+        format!("{}/comm", path.as_str()),
+    )];
+    Some((path.clone(), parent_path(path.as_str()), entries))
+}
+
+pub(super) fn proc_task_dir_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, parent, entries) = proc_task_dir_snapshot(process, path)?;
+    Some(FdEntry::SyntheticDir(SyntheticDirEntry::new(
+        path, parent, entries,
+    )))
+}
+
+pub(super) fn proc_task_dir_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, _, _) = proc_task_dir_snapshot(process, path)?;
+    Some(FdEntry::Path(PathEntry::synthetic_dir(path.as_str())))
+}
+
 fn proc_comm_target_process(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
     let normalized = normalize_path("/", path)?;
     let process_comm_content = |target: &UserProcess| {
@@ -436,30 +611,27 @@ fn proc_comm_target_process(process: &UserProcess, path: &str) -> Option<(String
         return process_comm_content(process);
     }
     let task_rest = if let Some(rest) = normalized.strip_prefix("/proc/self/task/") {
-        Some(rest)
+        Some((rest, process.pid()))
     } else if let Some(rest) = normalized.strip_prefix("/proc/") {
         if let Some((pid_text, rest)) = rest.split_once("/task/") {
             let pid = pid_text.parse::<i32>().ok()?;
-            if pid != process.pid() {
-                let entry = user_thread_entry_by_process_pid(pid)?;
-                if entry.process.pid() != pid {
-                    return None;
-                }
+            if !live_process_exists(process, pid) {
+                return None;
             }
-            Some(rest)
+            Some((rest, pid))
         } else {
             None
         }
     } else {
         None
     };
-    if let Some(rest) = task_rest {
+    if let Some((rest, task_pid)) = task_rest {
         let tid_text = rest.strip_suffix("/comm")?;
         let tid = tid_text.parse::<i32>().ok()?;
-        let target_name = if tid == process.pid() {
+        let target_name = if task_pid == process.pid() && tid == process.pid() {
             Some(process.prctl_name())
         } else if let Some(entry) = user_thread_entry_by_tid(tid) {
-            (entry.process.pid() == process.pid()).then(|| entry.process.prctl_name())
+            (entry.process.pid() == task_pid).then(|| entry.process.prctl_name())
         } else {
             None
         }?;
