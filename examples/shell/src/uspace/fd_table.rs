@@ -336,6 +336,9 @@ pub(super) fn sys_fallocate(
     let Some(end) = (offset as u64).checked_add(len as u64) else {
         return neg_errno(LinuxError::EFBIG);
     };
+    if end > MAX_IN_MEMORY_FILE_SIZE {
+        return neg_errno(LinuxError::EFBIG);
+    }
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     if end > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
@@ -3298,7 +3301,7 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => {
                 if !file_is_writable(file.status_flags) {
-                    return Err(LinuxError::EINVAL);
+                    return Err(LinuxError::EBADF);
                 }
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
