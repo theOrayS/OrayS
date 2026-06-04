@@ -25,6 +25,7 @@ macro_rules! user_trace {
 // layout.  Both supported LTP ABIs here are 64-bit, so the header is three
 // pointer-sized words: list head pointer, futex offset, and pending-list pointer.
 const ROBUST_LIST_HEAD_LEN: usize = size_of::<usize>() * 3;
+const SYNTHETIC_INIT_PID: i32 = 1;
 
 pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
@@ -188,6 +189,13 @@ pub(super) fn sys_get_robust_list(
 ) -> isize {
     let tid = if pid == 0 { current_tid() } else { pid };
     let Some(entry) = user_thread_entry_by_tid(tid) else {
+        // PID 1 is modelled as a visible synthetic init process by /proc and
+        // process-group syscalls. It has no real task extension to expose here,
+        // but callers that lost permission after setuid should see EPERM for an
+        // existing foreign process rather than ESRCH for a missing process.
+        if tid == SYNTHETIC_INIT_PID {
+            return neg_errno(LinuxError::EPERM);
+        }
         return neg_errno(LinuxError::ESRCH);
     };
     if entry.process.pid() != process.pid() {
