@@ -243,6 +243,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         shared_mmap_ranges: Mutex::new(Vec::new()),
         mmap_sigbus_ranges: Mutex::new(Vec::new()),
         mmap_ranges: Mutex::new(Vec::new()),
+        mlock_future: AtomicBool::new(false),
+        mlockall_accounted_kb: AtomicUsize::new(0),
         fds: Mutex::new(FdTable::new()),
         cwd: Mutex::new(cwd.into()),
         exec_root: Mutex::new(image.exec_root.clone()),
@@ -348,6 +350,8 @@ fn exec_program(
     process.shared_mmap_ranges.lock().clear();
     process.mmap_sigbus_ranges.lock().clear();
     process.mmap_ranges.lock().clear();
+    process.mlock_future.store(false, Ordering::Release);
+    process.mlockall_accounted_kb.store(0, Ordering::Release);
     process.clear_posix_timers();
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
@@ -665,6 +669,7 @@ impl UserProcess {
         size: usize,
         prot: u32,
         shared: bool,
+        anonymous: bool,
         locked: bool,
         may_write: bool,
         file_backing: Option<super::UserMmapFileBacking>,
@@ -679,6 +684,7 @@ impl UserProcess {
             size,
             prot,
             shared,
+            anonymous,
             locked,
             may_write,
             file_backing,
@@ -712,6 +718,36 @@ impl UserProcess {
             .lock()
             .iter()
             .any(|region| region.locked && region.start < end && region.end() > start)
+    }
+
+    pub(super) fn set_all_mmap_locked(&self, locked: bool) {
+        for region in self.mmap_ranges.lock().iter_mut() {
+            region.locked = locked;
+        }
+    }
+
+    pub(super) fn set_mmap_lock_range(&self, start: usize, end: usize, locked: bool) {
+        let mut ranges = self.mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for region in old {
+            let region_end = region.end();
+            if region_end <= start || region.start >= end {
+                ranges.push(region);
+                continue;
+            }
+            if region.start < start {
+                ranges.push(region.subregion_with_lock(region.start, start, region.locked));
+            }
+            let locked_start = region.start.max(start);
+            let locked_end = region_end.min(end);
+            if locked_end > locked_start {
+                ranges.push(region.subregion_with_lock(locked_start, locked_end, locked));
+            }
+            if region_end > end {
+                ranges.push(region.subregion_with_lock(end, region_end, region.locked));
+            }
+        }
+        ranges.sort_by_key(|region| region.start);
     }
 
     pub(super) fn protect_mmap_region(&self, start: usize, end: usize, prot: u32) {
@@ -767,12 +803,14 @@ impl UserProcess {
     }
 
     pub(super) fn locked_mmap_kb(&self) -> usize {
-        self.mmap_ranges
+        let mmap_kb = self
+            .mmap_ranges
             .lock()
             .iter()
             .filter(|region| region.locked)
             .map(|region| region.size / 1024)
-            .sum()
+            .sum::<usize>();
+        mmap_kb + self.mlockall_accounted_kb.load(Ordering::Acquire)
     }
 
     pub(super) fn forget_mmap_range(&self, start: usize, end: usize) {
@@ -832,13 +870,19 @@ impl UserProcess {
 
         let shm_attachments = self.shm_attachments.lock().clone();
         sysv_shm::retain_attachments(&shm_attachments);
+        let mut child_mmap_ranges = self.mmap_regions();
+        for region in child_mmap_ranges.iter_mut() {
+            region.locked = false;
+        }
 
         Ok(Arc::new(UserProcess {
             aspace: Mutex::new(aspace),
             brk: Mutex::new(*self.brk.lock()),
             shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
             mmap_sigbus_ranges: Mutex::new(self.mmap_sigbus_ranges()),
-            mmap_ranges: Mutex::new(self.mmap_regions()),
+            mmap_ranges: Mutex::new(child_mmap_ranges),
+            mlock_future: AtomicBool::new(false),
+            mlockall_accounted_kb: AtomicUsize::new(0),
             fds: Mutex::new(self.fds.lock().fork_copy()?),
             cwd: Mutex::new(self.cwd()),
             exec_root: Mutex::new(self.exec_root()),

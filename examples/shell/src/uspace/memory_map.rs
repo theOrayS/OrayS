@@ -3,21 +3,21 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
+use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
+use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
-use super::linux_abi::{SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
+use super::linux_abi::{neg_errno, SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP};
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::current_process;
 use super::task_context::current_task_ext;
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
+    read_user_bytes, validate_user_write, write_user_bytes, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -172,7 +172,8 @@ pub(super) fn sys_mmap(
     let anonymous = flags_u32 & general::MAP_ANONYMOUS != 0;
     let shared = flags_u32 & general::MAP_SHARED != 0;
     let map_fixed = flags_u32 & general::MAP_FIXED != 0;
-    let locked = flags_u32 & general::MAP_LOCKED != 0;
+    let locked =
+        flags_u32 & general::MAP_LOCKED != 0 || process.mlock_future.load(Ordering::Acquire);
     if len == 0 {
         if !anonymous {
             if let Err(err) = process.fds.lock().mmap_validate_file_fd_exists(fd as i32) {
@@ -355,6 +356,7 @@ pub(super) fn sys_mmap(
         size,
         prot as u32,
         shared,
+        anonymous || dev_zero,
         locked,
         shared_write_allowed,
         file_backing,
@@ -462,6 +464,196 @@ pub(super) fn sys_msync(process: &UserProcess, addr: usize, len: usize, flags: u
         return invalidate_file_backed_ranges(process, addr, end).map_or_else(neg_errno, |_| 0);
     }
     msync_file_backed_ranges(process, addr, end).map_or_else(neg_errno, |_| 0)
+}
+
+pub(super) fn sys_madvise(process: &UserProcess, addr: usize, len: usize, advice: usize) -> isize {
+    if addr & (PAGE_SIZE_4K - 1) != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let advice = advice as u32;
+    if !madvise_advice_known(advice) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if len == 0 {
+        return 0;
+    }
+    let Some(raw_end) = addr.checked_add(len) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    let Some(end) = align_up_checked(raw_end, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if end <= addr || end > USER_STACK_TOP {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+    match advice {
+        general::MADV_DONTNEED => {
+            if !madvise_mapped_range(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            if process.mmap_range_has_locked(addr, end)
+                || madvise_range_satisfies(process, addr, end, |region| {
+                    region.shared && !region.may_write
+                })
+            {
+                return neg_errno(LinuxError::EINVAL);
+            }
+            if madvise_range_is_private_anonymous(process, addr, end) {
+                return zero_user_range(process, addr, end).map_or_else(neg_errno, |_| 0);
+            }
+            0
+        }
+        general::MADV_REMOVE => {
+            if !madvise_mapped_range(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            if !madvise_range_satisfies(process, addr, end, |region| {
+                region.shared
+                    && region.may_write
+                    && region.prot & general::PROT_WRITE != 0
+                    && region.file_backing.is_some()
+            }) {
+                return neg_errno(LinuxError::EINVAL);
+            }
+            zero_user_range(process, addr, end).map_or_else(neg_errno, |_| 0)
+        }
+        general::MADV_FREE | general::MADV_WIPEONFORK | general::MADV_KEEPONFORK => {
+            match madvise_private_anonymous_error(process, addr, end) {
+                None => 0,
+                Some(err) => neg_errno(err),
+            }
+        }
+        general::MADV_MERGEABLE | general::MADV_UNMERGEABLE => {
+            if !madvise_mapped_range(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            if madvise_range_satisfies(process, addr, end, |region| {
+                region.may_write && region.prot & general::PROT_WRITE != 0
+            }) {
+                0
+            } else {
+                neg_errno(LinuxError::EINVAL)
+            }
+        }
+        _ => {
+            if !madvise_mapped_range(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            0
+        }
+    }
+}
+
+fn madvise_advice_known(advice: u32) -> bool {
+    matches!(
+        advice,
+        general::MADV_NORMAL
+            | general::MADV_RANDOM
+            | general::MADV_SEQUENTIAL
+            | general::MADV_WILLNEED
+            | general::MADV_DONTNEED
+            | general::MADV_FREE
+            | general::MADV_REMOVE
+            | general::MADV_DONTFORK
+            | general::MADV_DOFORK
+            | general::MADV_HWPOISON
+            | general::MADV_MERGEABLE
+            | general::MADV_UNMERGEABLE
+            | general::MADV_HUGEPAGE
+            | general::MADV_NOHUGEPAGE
+            | general::MADV_DONTDUMP
+            | general::MADV_DODUMP
+            | general::MADV_WIPEONFORK
+            | general::MADV_KEEPONFORK
+            | general::MADV_COLD
+            | general::MADV_PAGEOUT
+            | general::MADV_POPULATE_READ
+            | general::MADV_POPULATE_WRITE
+            | general::MADV_DONTNEED_LOCKED
+    )
+}
+
+fn madvise_range_is_private_anonymous(process: &UserProcess, start: usize, end: usize) -> bool {
+    madvise_range_satisfies(process, start, end, |region| {
+        !region.shared && region.anonymous
+    })
+}
+
+fn madvise_private_anonymous_error(
+    process: &UserProcess,
+    start: usize,
+    end: usize,
+) -> Option<LinuxError> {
+    let mut cursor = start;
+    let mut regions = process.mmap_regions();
+    regions.sort_by_key(|region| region.start);
+    for region in regions {
+        let region_end = region.end();
+        if region_end <= cursor || region.start >= end {
+            continue;
+        }
+        if region.start > cursor {
+            return Some(LinuxError::ENOMEM);
+        }
+        if region.shared || !region.anonymous {
+            return Some(LinuxError::EINVAL);
+        }
+        cursor = cursor.max(region_end.min(end));
+        if cursor >= end {
+            return None;
+        }
+    }
+    Some(LinuxError::ENOMEM)
+}
+
+fn madvise_mapped_range(process: &UserProcess, start: usize, end: usize) -> bool {
+    let size = end - start;
+    let aspace = process.aspace.lock();
+    aspace.contains_range(VirtAddr::from(start), size)
+        && aspace.can_access_range(VirtAddr::from(start), size, MappingFlags::empty())
+}
+
+fn madvise_range_satisfies<F>(process: &UserProcess, start: usize, end: usize, mut pred: F) -> bool
+where
+    F: FnMut(&super::UserMmapRegion) -> bool,
+{
+    let mut cursor = start;
+    let mut regions = process.mmap_regions();
+    regions.sort_by_key(|region| region.start);
+    for region in regions {
+        let region_end = region.end();
+        if region_end <= cursor || region.start >= end {
+            continue;
+        }
+        if region.start > cursor || !pred(&region) {
+            return false;
+        }
+        cursor = cursor.max(region_end.min(end));
+        if cursor >= end {
+            return true;
+        }
+    }
+    false
+}
+
+fn zero_user_range(process: &UserProcess, start: usize, end: usize) -> Result<(), LinuxError> {
+    let mut zeros = Vec::new();
+    let chunk = MAX_USER_IO_CHUNK.min(PAGE_SIZE_4K * 16);
+    zeros
+        .try_reserve_exact(chunk)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    zeros.resize(chunk, 0);
+    let mut cursor = start;
+    while cursor < end {
+        let len = (end - cursor).min(zeros.len());
+        process
+            .aspace
+            .lock()
+            .write(VirtAddr::from(cursor), &zeros[..len])
+            .map_err(LinuxError::from)?;
+        cursor += len;
+    }
+    Ok(())
 }
 
 fn msync_file_backed_ranges(
@@ -618,14 +810,49 @@ pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize
     {
         return neg_errno(LinuxError::ENOMEM);
     }
+    drop(aspace);
+    process.set_mmap_lock_range(start, end, true);
     0
 }
 
 pub(super) fn sys_munlock(process: &UserProcess, addr: usize, len: usize) -> isize {
     match validate_lock_range(process, addr, len) {
-        Ok(_) => 0,
+        Ok(Some((start, end))) => {
+            process.set_mmap_lock_range(start, end, false);
+            0
+        }
+        Ok(None) => 0,
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn sys_mlockall(process: &UserProcess, flags: usize) -> isize {
+    let supported = general::MCL_CURRENT | general::MCL_FUTURE | general::MCL_ONFAULT;
+    if flags as u32 & !supported != 0
+        || flags as u32 & (general::MCL_CURRENT | general::MCL_FUTURE) == 0
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if flags as u32 & general::MCL_FUTURE != 0 {
+        process.mlock_future.store(true, Ordering::Release);
+    }
+    if flags as u32 & general::MCL_CURRENT != 0 {
+        process.set_all_mmap_locked(true);
+        let brk = process.brk.lock();
+        let heap_bytes = brk.end.saturating_sub(brk.start);
+        let accounted_kb = heap_bytes.max(PAGE_SIZE_4K) / 1024;
+        process
+            .mlockall_accounted_kb
+            .store(accounted_kb.max(1), Ordering::Release);
+    }
+    0
+}
+
+pub(super) fn sys_munlockall(process: &UserProcess) -> isize {
+    process.mlock_future.store(false, Ordering::Release);
+    process.set_all_mmap_locked(false);
+    process.mlockall_accounted_kb.store(0, Ordering::Release);
+    0
 }
 
 fn validate_lock_range(
