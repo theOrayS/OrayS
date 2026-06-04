@@ -14,7 +14,7 @@ use super::signal_abi::{
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 
@@ -141,6 +141,7 @@ struct UserPosixTimerState {
     deadline: Option<core::time::Duration>,
     interval: core::time::Duration,
     overrun: i32,
+    signal_pending: bool,
 }
 
 pub(super) fn socket_timeval_to_duration(
@@ -217,9 +218,14 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 }
 
 pub(super) fn clock_resolution_timespec() -> general::timespec {
+    // Expose the nanosecond-resolution ABI used by the wall/monotonic
+    // time sources. Reporting the scheduler tick as clock resolution is too
+    // coarse for POSIX timer callers: user space may legally use getres() to
+    // construct absolute timer deadlines and a 50ms value can turn those
+    // calculations into invalid negative times on short-uptime systems.
     general::timespec {
         tv_sec: 0,
-        tv_nsec: 50_000_000,
+        tv_nsec: 1,
     }
 }
 
@@ -598,7 +604,11 @@ fn refresh_posix_timer_locked(
     }
     if state.interval == core::time::Duration::ZERO {
         state.deadline = None;
+        if state.signal_pending {
+            return Ok(false);
+        }
         state.overrun = 0;
+        state.signal_pending = true;
         return Ok(true);
     }
 
@@ -607,9 +617,16 @@ fn refresh_posix_timer_locked(
         .unwrap_or(core::time::Duration::ZERO);
     let interval_ns = duration_to_ns_u128(state.interval).max(1);
     let extra_expirations = duration_to_ns_u128(elapsed) / interval_ns;
-    state.overrun = extra_expirations.min(i32::MAX as u128) as i32;
+    let overrun = extra_expirations.min(i32::MAX as u128) as i32;
     let advance = duration_mul_saturating(state.interval, extra_expirations.saturating_add(1));
     state.deadline = Some(saturating_duration_add(deadline, advance));
+
+    if state.signal_pending {
+        state.overrun = state.overrun.max(overrun);
+        return Ok(false);
+    }
+    state.overrun = overrun;
+    state.signal_pending = true;
     Ok(true)
 }
 
@@ -626,46 +643,44 @@ fn deliver_posix_timer_signal(process: &Arc<UserProcess>, notify: PosixTimerNoti
 }
 
 fn arm_posix_timer(process: Arc<UserProcess>, timer: UserPosixTimer, generation: u64) {
-    let _ = axtask::spawn(move || {
-        loop {
-            if process.live_threads.load(Ordering::Acquire) == 0
-                || timer.generation.load(Ordering::Acquire) != generation
-            {
+    let _ = axtask::spawn(move || loop {
+        if process.live_threads.load(Ordering::Acquire) == 0
+            || timer.generation.load(Ordering::Acquire) != generation
+        {
+            break;
+        }
+        let delay = {
+            let state = timer.state.lock();
+            let Some(deadline) = state.deadline else {
                 break;
-            }
-            let delay = {
-                let state = timer.state.lock();
-                let Some(deadline) = state.deadline else {
-                    break;
-                };
-                let now = match clock_now_duration(timer.clock_id) {
-                    Ok(now) => now,
-                    Err(_) => break,
-                };
-                deadline
-                    .checked_sub(now)
-                    .unwrap_or(core::time::Duration::ZERO)
             };
-            if delay == core::time::Duration::ZERO {
-                axtask::yield_now();
-            } else {
-                axtask::sleep(delay);
-            }
-            if process.live_threads.load(Ordering::Acquire) == 0
-                || timer.generation.load(Ordering::Acquire) != generation
-            {
-                break;
-            }
-            let expired = {
-                let mut state = timer.state.lock();
-                match refresh_posix_timer_locked(&timer, &mut state) {
-                    Ok(expired) => expired,
-                    Err(_) => false,
-                }
+            let now = match clock_now_duration(timer.clock_id) {
+                Ok(now) => now,
+                Err(_) => break,
             };
-            if expired {
-                deliver_posix_timer_signal(&process, timer.notify);
+            deadline
+                .checked_sub(now)
+                .unwrap_or(core::time::Duration::ZERO)
+        };
+        if delay == core::time::Duration::ZERO {
+            axtask::yield_now();
+        } else {
+            axtask::sleep(delay);
+        }
+        if process.live_threads.load(Ordering::Acquire) == 0
+            || timer.generation.load(Ordering::Acquire) != generation
+        {
+            break;
+        }
+        let expired = {
+            let mut state = timer.state.lock();
+            match refresh_posix_timer_locked(&timer, &mut state) {
+                Ok(expired) => expired,
+                Err(_) => false,
             }
+        };
+        if expired {
+            deliver_posix_timer_signal(&process, timer.notify);
         }
     });
 }
@@ -694,6 +709,7 @@ pub(super) fn sys_timer_create(
             deadline: None,
             interval: core::time::Duration::ZERO,
             overrun: 0,
+            signal_pending: false,
         })),
         generation: Arc::new(AtomicU64::new(0)),
     };
@@ -737,10 +753,13 @@ pub(super) fn sys_timer_getoverrun(process: &UserProcess, timerid: usize) -> isi
         timer.clone()
     };
     let mut state = timer.state.lock();
-    if let Err(err) = refresh_posix_timer_locked(&timer, &mut state) {
-        return neg_errno(err);
-    }
-    state.overrun as isize
+    let overrun = state.overrun;
+    // POSIX overrun belongs to the signal notification already generated for
+    // the timer.  Reading it must not advance the timer and overwrite that
+    // notification's count; it also opens the approximation window for the
+    // next coalesced periodic notification in this single-pending-signal model.
+    state.signal_pending = false;
+    overrun as isize
 }
 
 pub(super) fn sys_timer_gettime(process: &UserProcess, timerid: usize, curr_value: usize) -> isize {
@@ -834,6 +853,7 @@ pub(super) fn sys_timer_settime(
         state.interval = new_interval;
         state.deadline = deadline;
         state.overrun = 0;
+        state.signal_pending = false;
     }
     if deadline.is_some() {
         arm_posix_timer(process.clone(), timer, generation);
