@@ -11,12 +11,12 @@ use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::UserProcess;
-use super::linux_abi::{USER_MMAP_BASE, neg_errno};
+use super::linux_abi::{neg_errno, USER_MMAP_BASE};
 use super::signal_abi::current_sigcancel_pending;
 use super::task_context::current_task_ext;
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::read_user_value;
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -181,6 +181,17 @@ pub(super) fn wake_addr(process: &UserProcess, uaddr: usize, count: usize) -> us
     // if the user address has already been unmapped, there is no futex queue to
     // wake and no syscall return value to report.
     wake_addr_checked(process, uaddr, count).unwrap_or(0)
+}
+
+pub(super) fn futex_waiter_is_queued(process: &UserProcess, uaddr: usize) -> bool {
+    let Ok(key) = futex_key(process, uaddr) else {
+        return false;
+    };
+    table()
+        .lock()
+        .get(&key)
+        .map(|state| !state.queue.is_empty())
+        .unwrap_or(false)
 }
 
 pub(super) fn wake_task(process: &UserProcess, uaddr: usize, task: &AxTaskRef) {
