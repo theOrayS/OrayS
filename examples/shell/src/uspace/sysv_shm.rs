@@ -8,21 +8,21 @@ use axhal::context::TrapFrame;
 use axhal::mem::virt_to_phys;
 use axsync::Mutex;
 use lazyinit::LazyInit;
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
 use std::string::String;
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::linux_abi::{
-    SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_INFO, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET,
-    SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK, SYSV_SHM_LOCKED,
-    SYSV_SHM_MAX_SEGMENTS, SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, SYSV_SHM_REMAP, SYSV_SHM_RND,
-    SYSV_SHM_STAT, SYSV_SHM_STAT_ANY, SYSV_SHM_UNLOCK, USER_MMAP_BASE, USER_STACK_SIZE,
-    USER_STACK_TOP, neg_errno,
+    neg_errno, SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_INFO, SYSV_IPC_PRIVATE, SYSV_IPC_RMID,
+    SYSV_IPC_SET, SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK,
+    SYSV_SHM_LOCKED, SYSV_SHM_MAX_SEGMENTS, SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, SYSV_SHM_REMAP,
+    SYSV_SHM_RND, SYSV_SHM_STAT, SYSV_SHM_STAT_ANY, SYSV_SHM_UNLOCK, USER_MMAP_BASE,
+    USER_STACK_SIZE, USER_STACK_TOP,
 };
 use super::memory_map::{align_down, align_up_checked, sys_munmap, user_mapping_flags};
 use super::user_memory::{read_user_value, write_user_value};
+use super::UserProcess;
 
 #[derive(Clone)]
 struct SysvShmSegment {
@@ -535,7 +535,7 @@ pub(super) fn sys_shmat(
     let target = {
         let mut brk = process.brk.lock();
         let start = if shmaddr == 0 {
-            let Some(start) = align_up_checked(brk.next_mmap, PAGE_SIZE_4K) else {
+            let Some(start) = align_up_checked(brk.next_mmap, shm_low_boundary()) else {
                 return neg_errno(LinuxError::ENOMEM);
             };
             brk.next_mmap = start
