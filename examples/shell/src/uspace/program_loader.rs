@@ -416,6 +416,7 @@ fn patch_loongarch_musl_syscall_stubs(
     if let Some(offset) = brk_offset {
         patch_loongarch_musl_brk_stub(image, offset)?;
     }
+    patch_loongarch_musl_readlink_wrappers(image)?;
     Ok(())
 }
 
@@ -574,6 +575,115 @@ fn patch_loongarch_musl_syscall_wrapper(
 }
 
 #[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_readlink_wrappers(image: &mut [u8]) -> Result<(), String> {
+    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
+    let Some(readlink_offset) = find_dynsym_file_offset(&elf, "readlink")? else {
+        return Ok(());
+    };
+    let Some(readlinkat_offset) = find_dynsym_file_offset(&elf, "readlinkat")? else {
+        return Ok(());
+    };
+    drop(elf);
+
+    const READLINK_KNOWN_PREFIX: [u32; 4] = [
+        0x02ff_8063, // addi.d sp, sp, -32
+        0x29c0_6061, // st.d ra, sp, 24
+        0x0015_00ac, // move a0, a1
+        0x0015_00c7, // move a3, a2
+    ];
+    const READLINKAT_KNOWN_PREFIX: [u32; 4] = [
+        0x02ff_8063, // addi.d sp, sp, -32
+        0x29c0_6061, // st.d ra, sp, 24
+        0x02c0_2068, // ld.d s0, sp, 8
+        0x4000_24e0, // readlinkat zero-length fast path branch
+    ];
+    if !loongarch_words_match(image, readlink_offset, &READLINK_KNOWN_PREFIX)?
+        || !loongarch_words_match(image, readlinkat_offset, &READLINKAT_KNOWN_PREFIX)?
+    {
+        return Ok(());
+    }
+
+    let syscall_ret_offset = {
+        let call_offset = readlinkat_offset + 0x20;
+        let call = read_u32_le(image, call_offset)?;
+        loongarch_branch_target_offset(call_offset, call)?
+    };
+
+    patch_loongarch_musl_readlink(image, readlink_offset, syscall_ret_offset)?;
+    patch_loongarch_musl_readlinkat(image, readlinkat_offset, syscall_ret_offset)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_readlink(
+    image: &mut [u8],
+    offset: usize,
+    syscall_ret_offset: usize,
+) -> Result<(), String> {
+    const PATCH_LEN: usize = 32;
+    let end = offset
+        .checked_add(PATCH_LEN)
+        .ok_or_else(|| "loongarch musl readlink patch range overflow".to_string())?;
+    if end > image.len() {
+        return Err("loongarch musl readlink patch exceeds image".into());
+    }
+    let tail_call = loongarch_b(offset + 24, syscall_ret_offset)?;
+    let load_at_fdcwd = loongarch_addi_w(4, -100)?;
+    let load_syscall_nr = loongarch_addi_w_a7(general::__NR_readlinkat)?;
+    let patch = [
+        loongarch_move(7, 6).to_le_bytes(), // move a3, a2 (bufsiz)
+        loongarch_move(6, 5).to_le_bytes(), // move a2, a1 (buf)
+        loongarch_move(5, 4).to_le_bytes(), // move a1, a0 (path)
+        load_at_fdcwd.to_le_bytes(),        // a0 = AT_FDCWD
+        load_syscall_nr.to_le_bytes(),
+        0x002b_0000u32.to_le_bytes(), // syscall 0
+        tail_call.to_le_bytes(),
+        0x4c00_0020u32.to_le_bytes(), // ret (unreachable padding)
+    ]
+    .concat();
+    image[offset..end].copy_from_slice(&patch);
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_readlinkat(
+    image: &mut [u8],
+    offset: usize,
+    syscall_ret_offset: usize,
+) -> Result<(), String> {
+    const PATCH_LEN: usize = 16;
+    let end = offset
+        .checked_add(PATCH_LEN)
+        .ok_or_else(|| "loongarch musl readlinkat patch range overflow".to_string())?;
+    if end > image.len() {
+        return Err("loongarch musl readlinkat patch exceeds image".into());
+    }
+    let tail_call = loongarch_b(offset + 8, syscall_ret_offset)?;
+    let load_syscall_nr = loongarch_addi_w_a7(general::__NR_readlinkat)?;
+    let patch = [
+        load_syscall_nr.to_le_bytes(),
+        0x002b_0000u32.to_le_bytes(), // syscall 0
+        tail_call.to_le_bytes(),
+        0x4c00_0020u32.to_le_bytes(), // ret (unreachable padding)
+    ]
+    .concat();
+    image[offset..end].copy_from_slice(&patch);
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_words_match(image: &[u8], offset: usize, words: &[u32]) -> Result<bool, String> {
+    for (idx, expected) in words.iter().enumerate() {
+        let word_offset = offset
+            .checked_add(idx * size_of::<u32>())
+            .ok_or_else(|| "LoongArch prefix offset overflow".to_string())?;
+        if read_u32_le(image, word_offset)? != *expected {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+#[cfg(target_arch = "loongarch64")]
 fn read_u32_le(image: &[u8], offset: usize) -> Result<u32, String> {
     let end = offset
         .checked_add(size_of::<u32>())
@@ -634,6 +744,22 @@ fn loongarch_addi_w_a7(imm: u32) -> Result<u32, String> {
         return Err(format!("LoongArch addi.w immediate out of range: {imm}"));
     }
     Ok(0x0280_000b | (imm << 10))
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_addi_w(rd: u32, imm: i32) -> Result<u32, String> {
+    if rd > 31 {
+        return Err(format!("LoongArch register out of range: {rd}"));
+    }
+    if !(-2048..=2047).contains(&imm) {
+        return Err(format!("LoongArch addi.w immediate out of range: {imm}"));
+    }
+    Ok(0x0280_0000 | (((imm as u32) & 0xfff) << 10) | rd)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_move(rd: u32, rj: u32) -> u32 {
+    0x0015_0000 | (rj << 5) | rd
 }
 
 fn map_elf_image(
