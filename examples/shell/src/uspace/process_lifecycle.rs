@@ -14,6 +14,7 @@ use std::string::String;
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::credentials;
 use super::fd_table::release_posix_record_locks_for_process;
 use super::futex;
 use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
@@ -247,12 +248,14 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         exec_root: Mutex::new(image.exec_root.clone()),
         exec_path: Mutex::new(image.exec_path.clone()),
         hostname: Arc::new(Mutex::new(String::from("arceos"))),
+        domainname: Arc::new(Mutex::new(String::from("localdomain"))),
         prctl_name: Mutex::new(String::from("arceos")),
         children: Mutex::new(Vec::new()),
         child_exit_wait: WaitQueue::new(),
         rlimits: Mutex::new(BTreeMap::new()),
         sched_state: Mutex::new(default_sched_state()),
         nice: AtomicI32::new(0),
+        ioprio: AtomicU32::new(super::resource_sched::default_ioprio()),
         signal_actions: Mutex::new(BTreeMap::new()),
         path_modes: Mutex::new(initial_path_modes()),
         path_inodes: Mutex::new(BTreeMap::new()),
@@ -281,10 +284,16 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         fs_gid: AtomicU32::new(0),
         groups: Mutex::new(Vec::new()),
         credential_generation: AtomicUsize::new(0),
+        cap_effective: AtomicU64::new(credentials::ALL_CAPABILITIES_MASK),
+        cap_permitted: AtomicU64::new(credentials::ALL_CAPABILITIES_MASK),
+        cap_inheritable: AtomicU64::new(0),
+        cap_bounding: AtomicU64::new(credentials::ALL_CAPABILITIES_MASK),
         personality: AtomicUsize::new(0),
         parent_death_signal: AtomicI32::new(0),
         default_timer_slack_ns: AtomicU64::new(DEFAULT_TIMER_SLACK_NS),
         timer_slack_ns: AtomicU64::new(DEFAULT_TIMER_SLACK_NS),
+        posix_timers: Mutex::new(BTreeMap::new()),
+        next_posix_timer_id: AtomicI32::new(1),
         real_timer_generation: AtomicU64::new(0),
         real_timer_deadline_us: AtomicU64::new(0),
         real_timer_interval_us: AtomicU64::new(0),
@@ -339,6 +348,7 @@ fn exec_program(
     process.shared_mmap_ranges.lock().clear();
     process.mmap_sigbus_ranges.lock().clear();
     process.mmap_ranges.lock().clear();
+    process.clear_posix_timers();
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
     Ok((image.entry, image.stack_ptr, image.argc))
@@ -410,6 +420,14 @@ impl UserProcess {
 
     pub(super) fn set_hostname(&self, hostname: String) {
         *self.hostname.lock() = hostname;
+    }
+
+    pub(super) fn domainname(&self) -> String {
+        self.domainname.lock().clone()
+    }
+
+    pub(super) fn set_domainname(&self, domainname: String) {
+        *self.domainname.lock() = domainname;
     }
 
     pub(super) fn prctl_name(&self) -> String {
@@ -581,6 +599,32 @@ impl UserProcess {
         self.shared_mmap_ranges.lock().push((start, size, flags));
     }
 
+    pub(super) fn protect_shared_mmap_range(&self, start: usize, end: usize, flags: MappingFlags) {
+        let mut ranges = self.shared_mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for (range_start, size, range_flags) in old {
+            let Some(range_end) = range_start.checked_add(size) else {
+                continue;
+            };
+            if range_end <= start || range_start >= end {
+                ranges.push((range_start, size, range_flags));
+                continue;
+            }
+            if range_start < start {
+                ranges.push((range_start, start - range_start, range_flags));
+            }
+            let protected_start = range_start.max(start);
+            let protected_end = range_end.min(end);
+            if protected_end > protected_start {
+                ranges.push((protected_start, protected_end - protected_start, flags));
+            }
+            if range_end > end {
+                ranges.push((end, range_end - end, range_flags));
+            }
+        }
+        ranges.sort_by_key(|(range_start, _, _)| *range_start);
+    }
+
     pub(super) fn record_mmap_sigbus_range(&self, start: usize, end: usize) {
         if end <= start {
             return;
@@ -622,6 +666,8 @@ impl UserProcess {
         prot: u32,
         shared: bool,
         locked: bool,
+        may_write: bool,
+        file_backing: Option<super::UserMmapFileBacking>,
     ) {
         let Some(end) = start.checked_add(size) else {
             return;
@@ -634,8 +680,23 @@ impl UserProcess {
             prot,
             shared,
             locked,
+            may_write,
+            file_backing,
         });
         ranges.sort_by_key(|region| region.start);
+    }
+
+    pub(super) fn mmap_range_denies_write(&self, start: usize, end: usize) -> bool {
+        self.mmap_ranges.lock().iter().any(|region| {
+            region.shared && !region.may_write && region.start < end && region.end() > start
+        })
+    }
+
+    pub(super) fn mmap_range_has_locked(&self, start: usize, end: usize) -> bool {
+        self.mmap_ranges
+            .lock()
+            .iter()
+            .any(|region| region.locked && region.start < end && region.end() > start)
     }
 
     pub(super) fn protect_mmap_region(&self, start: usize, end: usize, prot: u32) {
@@ -648,33 +709,15 @@ impl UserProcess {
                 continue;
             }
             if region.start < start {
-                ranges.push(super::UserMmapRegion {
-                    start: region.start,
-                    size: start - region.start,
-                    prot: region.prot,
-                    shared: region.shared,
-                    locked: region.locked,
-                });
+                ranges.push(region.subregion(region.start, start, region.prot));
             }
             let protected_start = region.start.max(start);
             let protected_end = region_end.min(end);
             if protected_end > protected_start {
-                ranges.push(super::UserMmapRegion {
-                    start: protected_start,
-                    size: protected_end - protected_start,
-                    prot,
-                    shared: region.shared,
-                    locked: region.locked,
-                });
+                ranges.push(region.subregion(protected_start, protected_end, prot));
             }
             if region_end > end {
-                ranges.push(super::UserMmapRegion {
-                    start: end,
-                    size: region_end - end,
-                    prot: region.prot,
-                    shared: region.shared,
-                    locked: region.locked,
-                });
+                ranges.push(region.subregion(end, region_end, region.prot));
             }
         }
         ranges.sort_by_key(|region| region.start);
@@ -691,22 +734,10 @@ impl UserProcess {
                 continue;
             }
             if region.start < start {
-                ranges.push(super::UserMmapRegion {
-                    start: region.start,
-                    size: start - region.start,
-                    prot: region.prot,
-                    shared: region.shared,
-                    locked: region.locked,
-                });
+                ranges.push(region.subregion(region.start, start, region.prot));
             }
             if region_end > end {
-                ranges.push(super::UserMmapRegion {
-                    start: end,
-                    size: region_end - end,
-                    prot: region.prot,
-                    shared: region.shared,
-                    locked: region.locked,
-                });
+                ranges.push(region.subregion(end, region_end, region.prot));
             }
         }
         ranges.sort_by_key(|region| region.start);
@@ -798,12 +829,14 @@ impl UserProcess {
             exec_root: Mutex::new(self.exec_root()),
             exec_path: Mutex::new(self.exec_path()),
             hostname: self.hostname.clone(),
+            domainname: self.domainname.clone(),
             prctl_name: Mutex::new(self.prctl_name()),
             children: Mutex::new(Vec::new()),
             child_exit_wait: WaitQueue::new(),
             rlimits: Mutex::new(self.rlimits.lock().clone()),
             sched_state: Mutex::new(self.get_sched_state()),
             nice: AtomicI32::new(self.nice()),
+            ioprio: AtomicU32::new(self.ioprio()),
             signal_actions: Mutex::new(self.signal_actions.lock().clone()),
             path_modes: Mutex::new(self.path_modes.lock().clone()),
             path_inodes: Mutex::new(self.path_inodes.lock().clone()),
@@ -832,10 +865,16 @@ impl UserProcess {
             fs_gid: AtomicU32::new(self.fs_gid()),
             groups: Mutex::new(self.groups()),
             credential_generation: AtomicUsize::new(self.credential_generation()),
+            cap_effective: AtomicU64::new(self.cap_effective()),
+            cap_permitted: AtomicU64::new(self.cap_permitted()),
+            cap_inheritable: AtomicU64::new(self.cap_inheritable()),
+            cap_bounding: AtomicU64::new(self.cap_bounding()),
             personality: AtomicUsize::new(self.personality()),
             parent_death_signal: AtomicI32::new(self.parent_death_signal.load(Ordering::Acquire)),
             default_timer_slack_ns: AtomicU64::new(self.timer_slack_ns()),
             timer_slack_ns: AtomicU64::new(self.timer_slack_ns()),
+            posix_timers: Mutex::new(BTreeMap::new()),
+            next_posix_timer_id: AtomicI32::new(1),
             real_timer_generation: AtomicU64::new(0),
             real_timer_deadline_us: AtomicU64::new(0),
             real_timer_interval_us: AtomicU64::new(0),

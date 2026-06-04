@@ -9,12 +9,15 @@ use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
 use std::vec::Vec;
 
 use super::UserProcess;
+use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
 use super::linux_abi::{SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno};
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::current_process;
 use super::task_context::current_task_ext;
-use super::user_memory::{validate_user_write, write_user_bytes};
+use super::user_memory::{
+    MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
+};
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -144,15 +147,6 @@ pub(super) fn sys_mmap(
     fd: usize,
     offset: usize,
 ) -> isize {
-    if len == 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
-    let Some(size) = align_up_checked(len, PAGE_SIZE_4K) else {
-        return neg_errno(LinuxError::ENOMEM);
-    };
-    if size == 0 {
-        return neg_errno(LinuxError::EINVAL);
-    }
     let flags_u32 = flags as u32;
     match flags_u32 & general::MAP_TYPE {
         general::MAP_SHARED | general::MAP_PRIVATE | general::MAP_SHARED_VALIDATE => {}
@@ -179,18 +173,43 @@ pub(super) fn sys_mmap(
     let shared = flags_u32 & general::MAP_SHARED != 0;
     let map_fixed = flags_u32 & general::MAP_FIXED != 0;
     let locked = flags_u32 & general::MAP_LOCKED != 0;
+    if len == 0 {
+        if !anonymous {
+            if let Err(err) = process.fds.lock().mmap_validate_file_fd_exists(fd as i32) {
+                return neg_errno(err);
+            }
+        }
+        return neg_errno(LinuxError::EINVAL);
+    }
     let dev_zero = !anonymous && process.fds.lock().is_dev_zero(fd as i32);
     if !anonymous {
         if let Err(err) = process.fds.lock().mmap_validate_file_fd(fd as i32) {
             return neg_errno(err);
         }
     }
+    let map_flags = mmap_prot_to_flags(prot as u32);
+    let shared_write_allowed = if anonymous || !shared {
+        true
+    } else {
+        match process.fds.lock().mmap_fd_allows_shared_write(fd as i32) {
+            Ok(allowed) => allowed,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    if map_flags.contains(MappingFlags::WRITE) && !shared_write_allowed {
+        return neg_errno(LinuxError::EACCES);
+    }
+    let Some(size) = align_up_checked(len, PAGE_SIZE_4K) else {
+        return neg_errno(LinuxError::ENOMEM);
+    };
+    if size == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
     let request_addr = if addr == 0 {
         None
     } else {
         Some(align_down(addr, PAGE_SIZE_4K))
     };
-    let map_flags = mmap_prot_to_flags(prot as u32);
     let mmap_limit_end = USER_STACK_TOP - USER_STACK_SIZE;
     let target = if let Some(start) = request_addr {
         let Some(end) = start.checked_add(size) else {
@@ -232,6 +251,19 @@ pub(super) fn sys_mmap(
         user_trace!("user-mmap: target={target:#x} len={size:#x} prot={prot:#x} flags={flags:#x}");
     }
     let file_backed = !anonymous && !dev_zero;
+    let mut file_backing = if file_backed && shared && shared_write_allowed {
+        let file = match process.fds.lock().mmap_file_backing(fd as i32) {
+            Ok(file) => file,
+            Err(err) => return neg_errno(err),
+        };
+        Some(super::UserMmapFileBacking {
+            file,
+            offset: offset as u64,
+            valid_len: 0,
+        })
+    } else {
+        None
+    };
     let populate = file_backed || shared || locked;
     {
         let mut aspace = process.aspace.lock();
@@ -311,11 +343,22 @@ pub(super) fn sys_mmap(
                 sigbus_range = Some((invalid_start, target_end));
             }
         }
+        if let Some(backing) = file_backing.as_mut() {
+            backing.valid_len = copied.min(len);
+        }
     }
     if shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, size, map_flags);
     }
-    process.record_mmap_region(target, size, prot as u32, shared, locked);
+    process.record_mmap_region(
+        target,
+        size,
+        prot as u32,
+        shared,
+        locked,
+        shared_write_allowed,
+        file_backing,
+    );
     if let Some((start, end)) = sigbus_range {
         process.record_mmap_sigbus_range(start, end);
     }
@@ -408,7 +451,117 @@ pub(super) fn sys_msync(process: &UserProcess, addr: usize, len: usize, flags: u
             return neg_errno(LinuxError::ENOMEM);
         }
     }
-    0
+    drop(aspace);
+    if flags & MS_INVALIDATE != 0 && process.mmap_range_has_locked(addr, end) {
+        return neg_errno(LinuxError::EBUSY);
+    }
+    if flags & MS_INVALIDATE != 0 {
+        return invalidate_file_backed_ranges(process, addr, end).map_or_else(neg_errno, |_| 0);
+    }
+    msync_file_backed_ranges(process, addr, end).map_or_else(neg_errno, |_| 0)
+}
+
+fn msync_file_backed_ranges(
+    process: &UserProcess,
+    start: usize,
+    end: usize,
+) -> Result<(), LinuxError> {
+    for region in process.mmap_regions() {
+        let Some(mut backing) = region.file_backing.clone() else {
+            continue;
+        };
+        if !region.shared {
+            continue;
+        }
+        let region_end = region.end();
+        let flush_start = start.max(region.start);
+        let flush_end = end
+            .min(region_end)
+            .min(region.start.saturating_add(backing.valid_len));
+        if flush_end <= flush_start {
+            continue;
+        }
+
+        let total_len = flush_end - flush_start;
+        let mut copied = 0usize;
+        while copied < total_len {
+            let chunk_len = (total_len - copied).min(MAX_USER_IO_CHUNK);
+            let chunk_addr = flush_start.checked_add(copied).ok_or(LinuxError::ENOMEM)?;
+            let region_delta = chunk_addr
+                .checked_sub(region.start)
+                .ok_or(LinuxError::EINVAL)?;
+            let file_offset = backing
+                .offset
+                .checked_add(region_delta as u64)
+                .ok_or(LinuxError::EINVAL)?;
+            let bytes = read_user_bytes(process, chunk_addr, chunk_len)?;
+
+            let mut written = 0usize;
+            while written < bytes.len() {
+                let write_offset = file_offset
+                    .checked_add(written as u64)
+                    .ok_or(LinuxError::EINVAL)?;
+                let n = write_mmap_file_backing(
+                    process,
+                    &mut backing.file,
+                    write_offset,
+                    &bytes[written..],
+                )?;
+                if n == 0 {
+                    return Err(LinuxError::EIO);
+                }
+                written += n;
+            }
+            copied += chunk_len;
+        }
+    }
+    Ok(())
+}
+
+fn invalidate_file_backed_ranges(
+    process: &UserProcess,
+    start: usize,
+    end: usize,
+) -> Result<(), LinuxError> {
+    for region in process.mmap_regions() {
+        let Some(mut backing) = region.file_backing.clone() else {
+            continue;
+        };
+        if !region.shared {
+            continue;
+        }
+        let region_end = region.end();
+        let refresh_start = start.max(region.start);
+        let refresh_end = end.min(region_end);
+        if refresh_end <= refresh_start {
+            continue;
+        }
+
+        let total_len = refresh_end - refresh_start;
+        let mut copied = 0usize;
+        while copied < total_len {
+            let chunk_len = (total_len - copied).min(MAX_USER_IO_CHUNK);
+            let chunk_addr = refresh_start
+                .checked_add(copied)
+                .ok_or(LinuxError::ENOMEM)?;
+            let region_delta = chunk_addr
+                .checked_sub(region.start)
+                .ok_or(LinuxError::EINVAL)?;
+            let file_offset = backing
+                .offset
+                .checked_add(region_delta as u64)
+                .ok_or(LinuxError::EINVAL)?;
+            let mut bytes = Vec::new();
+            bytes
+                .try_reserve_exact(chunk_len)
+                .map_err(|_| LinuxError::ENOMEM)?;
+            bytes.resize(chunk_len, 0);
+            let _ = read_mmap_file_backing(process, &mut backing.file, file_offset, &mut bytes)?;
+            write_user_bytes(process, chunk_addr, &bytes)?;
+            copied += chunk_len;
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn sys_mincore(process: &UserProcess, addr: usize, len: usize, vec: usize) -> isize {
@@ -521,11 +674,21 @@ pub(super) fn sys_mprotect(
     if _len <= 0x40000 {
         user_trace!("user-mprotect: start={start:#x} end={end:#x} prot={_prot:#x}");
     }
+    if _prot as u32 & general::PROT_WRITE != 0 && _process.mmap_range_denies_write(start, end) {
+        return neg_errno(LinuxError::EACCES);
+    }
     let prot_flags = mmap_prot_to_flags(_prot as u32);
     let mut aspace = _process.aspace.lock();
-    match aspace.protect(VirtAddr::from(start), end - start, prot_flags) {
+    let size = end - start;
+    if !aspace.contains_range(VirtAddr::from(start), size)
+        || !aspace.can_access_range(VirtAddr::from(start), size, MappingFlags::empty())
+    {
+        return neg_errno(LinuxError::ENOMEM);
+    }
+    match aspace.protect(VirtAddr::from(start), size, prot_flags) {
         Ok(()) => {
             _process.protect_mmap_region(start, end, _prot as u32);
+            _process.protect_shared_mmap_range(start, end, prot_flags);
             // Thread stacks are typically created as PROT_NONE mappings and then
             // flipped to writable with mprotect(). Pre-fault only the stack-top
             // pages so the first user-space writes succeed without turning the

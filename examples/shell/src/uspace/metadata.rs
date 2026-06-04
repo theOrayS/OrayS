@@ -1814,7 +1814,29 @@ pub(super) fn sys_fstat(process: &UserProcess, fd: usize, statbuf: usize) -> isi
     write_user_value(process, statbuf, &st)
 }
 
-fn stat_to_statx(st: general::stat) -> general::statx {
+fn statx_attributes_from_inode_flags(flags: u32) -> u64 {
+    let mut attrs = 0u64;
+    if flags & general::FS_IMMUTABLE_FL != 0 {
+        attrs |= general::STATX_ATTR_IMMUTABLE as u64;
+    }
+    if flags & general::FS_APPEND_FL != 0 {
+        attrs |= general::STATX_ATTR_APPEND as u64;
+    }
+    if flags & general::FS_NODUMP_FL != 0 {
+        attrs |= general::STATX_ATTR_NODUMP as u64;
+    }
+    attrs
+}
+
+fn statx_attributes_for_path(process: &UserProcess, path: Option<&str>, inode_flags: u32) -> u64 {
+    let mut attrs = statx_attributes_from_inode_flags(inode_flags);
+    if path.is_some_and(|path| process.has_mount_point(path)) {
+        attrs |= general::STATX_ATTR_MOUNT_ROOT as u64;
+    }
+    attrs
+}
+
+fn stat_to_statx(st: general::stat, attributes: u64) -> general::statx {
     let mut stx: general::statx = unsafe { core::mem::zeroed() };
     stx.stx_mask = general::STATX_BASIC_STATS;
     stx.stx_blksize = st.st_blksize as _;
@@ -1825,7 +1847,11 @@ fn stat_to_statx(st: general::stat) -> general::statx {
     stx.stx_ino = st.st_ino as _;
     stx.stx_size = st.st_size as _;
     stx.stx_blocks = st.st_blocks as _;
-    stx.stx_attributes_mask = 0;
+    stx.stx_attributes = attributes as _;
+    stx.stx_attributes_mask = (general::STATX_ATTR_IMMUTABLE
+        | general::STATX_ATTR_APPEND
+        | general::STATX_ATTR_NODUMP
+        | general::STATX_ATTR_MOUNT_ROOT) as _;
     stx.stx_dev_major = ((st.st_dev as u64) >> 8) as _;
     stx.stx_dev_minor = ((st.st_dev as u64) & 0xff) as _;
     stx.stx_rdev_major = ((st.st_rdev as u64) >> 8) as _;
@@ -1871,12 +1897,12 @@ pub(super) fn sys_statx(
         return neg_errno(LinuxError::EINVAL);
     }
 
-    let st = if pathname == 0 {
+    let (st, attributes) = if pathname == 0 {
         if flags & general::AT_EMPTY_PATH == 0 {
             return neg_errno(LinuxError::EFAULT);
         }
-        match stat_empty_path(process, dirfd as i32) {
-            Ok(st) => st,
+        match stat_empty_path_with_attributes(process, dirfd as i32) {
+            Ok(result) => result,
             Err(err) => return neg_errno(err),
         }
     } else {
@@ -1885,8 +1911,8 @@ pub(super) fn sys_statx(
             Err(err) => return neg_errno(err),
         };
         if path.is_empty() && flags & general::AT_EMPTY_PATH != 0 {
-            match stat_empty_path(process, dirfd as i32) {
-                Ok(st) => st,
+            match stat_empty_path_with_attributes(process, dirfd as i32) {
+                Ok(result) => result,
                 Err(err) => return neg_errno(err),
             }
         } else if path.is_empty() {
@@ -1899,30 +1925,43 @@ pub(super) fn sys_statx(
                     Err(err) => return neg_errno(err),
                 }
             };
+            let inode_flags = process.path_inode_flags(resolved_path.as_str());
+            let attributes =
+                statx_attributes_for_path(process, Some(resolved_path.as_str()), inode_flags);
             if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
-                st
+                (st, attributes)
             } else {
                 match process
                     .fds
                     .lock()
                     .stat_path(process, dirfd as i32, path.as_str())
                 {
-                    Ok(st) => st,
+                    Ok(st) => (st, attributes),
                     Err(err) => return neg_errno(err),
                 }
             }
         } else {
+            let resolved_path = {
+                let table = process.fds.lock();
+                match resolve_dirfd_path(process, &table, dirfd as i32, path.as_str()) {
+                    Ok(path) => path,
+                    Err(err) => return neg_errno(err),
+                }
+            };
+            let inode_flags = process.path_inode_flags(resolved_path.as_str());
+            let attributes =
+                statx_attributes_for_path(process, Some(resolved_path.as_str()), inode_flags);
             match process
                 .fds
                 .lock()
                 .stat_path(process, dirfd as i32, path.as_str())
             {
-                Ok(st) => st,
+                Ok(st) => (st, attributes),
                 Err(err) => return neg_errno(err),
             }
         }
     };
-    write_user_value(process, statxbuf, &stat_to_statx(st))
+    write_user_value(process, statxbuf, &stat_to_statx(st, attributes))
 }
 
 fn stat_empty_path(process: &UserProcess, dirfd: i32) -> Result<general::stat, LinuxError> {
@@ -1937,6 +1976,34 @@ fn stat_empty_path(process: &UserProcess, dirfd: i32) -> Result<general::stat, L
             .lock()
             .stat_with_recorded_path(process, dirfd)
             .map(|(_, st)| st)
+    }
+}
+
+fn stat_empty_path_with_attributes(
+    process: &UserProcess,
+    dirfd: i32,
+) -> Result<(general::stat, u64), LinuxError> {
+    if dirfd == general::AT_FDCWD {
+        let cwd = process.cwd();
+        stat_empty_path(process, dirfd).map(|st| {
+            (
+                st,
+                statx_attributes_for_path(process, Some(cwd.as_str()), 0),
+            )
+        })
+    } else {
+        process
+            .fds
+            .lock()
+            .stat_with_recorded_path(process, dirfd)
+            .map(|(path, st)| {
+                let inode_flags = path
+                    .as_deref()
+                    .map(|path| process.path_inode_flags(path))
+                    .unwrap_or(0);
+                let attributes = statx_attributes_for_path(process, path.as_deref(), inode_flags);
+                (st, attributes)
+            })
     }
 }
 
@@ -2119,7 +2186,7 @@ fn utimensat_target(
     flags: u32,
 ) -> Result<(Option<String>, general::stat), LinuxError> {
     if pathname == 0 {
-        return utimensat_fd_target(process, dirfd);
+        return Err(LinuxError::EFAULT);
     }
     let path = read_cstr(process, pathname)?;
     if path.len() >= LINUX_PATH_MAX {

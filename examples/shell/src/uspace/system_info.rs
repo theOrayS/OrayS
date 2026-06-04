@@ -104,6 +104,8 @@ pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize 
     let mut value = default_utsname();
     let hostname = process.hostname();
     write_c_string(&mut value.nodename, hostname.as_bytes());
+    let domainname = process.domainname();
+    write_c_string(&mut value.domainname, domainname.as_bytes());
     write_user_value(process, buf, &value)
 }
 
@@ -188,6 +190,8 @@ const PR_SET_PDEATHSIG: usize = 1;
 const PR_GET_PDEATHSIG: usize = 2;
 const PR_SET_NAME: usize = 15;
 const PR_GET_NAME: usize = 16;
+const PR_CAPBSET_READ: usize = 23;
+const PR_CAPBSET_DROP: usize = 24;
 const PR_SET_TIMERSLACK: usize = 29;
 const PR_GET_TIMERSLACK: usize = 30;
 
@@ -210,6 +214,28 @@ pub(super) fn sys_sethostname(process: &UserProcess, name: usize, len: usize) ->
         String::new()
     };
     process.set_hostname(hostname);
+    0
+}
+
+pub(super) fn sys_setdomainname(process: &UserProcess, name: usize, len: usize) -> isize {
+    if len > HOST_NAME_MAX {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if process.uid() != 0 {
+        return neg_errno(LinuxError::EPERM);
+    }
+    if len > 0 && name == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let domainname = if len > 0 {
+        let Ok(bytes) = read_user_bytes(process, name, len) else {
+            return neg_errno(LinuxError::EFAULT);
+        };
+        String::from_utf8_lossy(&bytes).into_owned()
+    } else {
+        String::new()
+    };
+    process.set_domainname(domainname);
     0
 }
 
@@ -266,6 +292,15 @@ pub(super) fn sys_prctl(
             bytes[..copy_len].copy_from_slice(&name.as_bytes()[..copy_len]);
             write_user_bytes(process, arg2, &bytes).map_or_else(|err| neg_errno(err), |_| 0)
         }
+        PR_CAPBSET_READ => match process.capability_in_bounding_set(arg2 as u32) {
+            Some(true) => 1,
+            Some(false) => 0,
+            None => neg_errno(LinuxError::EINVAL),
+        },
+        PR_CAPBSET_DROP => match process.drop_capability_from_bounding_set(arg2 as u32) {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        },
         PR_SET_TIMERSLACK => {
             let slack = if arg2 == 0 {
                 process.default_timer_slack_ns()

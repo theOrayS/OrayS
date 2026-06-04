@@ -9,14 +9,12 @@ use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr};
 
-use super::{Backend, SharedPages};
+use super::{Backend, SharedPages, pte_flags_for_mapping};
 
 static SHARED_FRAMES: LazyInit<SpinNoIrq<BTreeMap<usize, usize>>> = LazyInit::new();
 
 fn shared_frames() -> &'static SpinNoIrq<BTreeMap<usize, usize>> {
-    if !SHARED_FRAMES.is_inited() {
-        SHARED_FRAMES.init_once(SpinNoIrq::new(BTreeMap::new()));
-    }
+    let _ = SHARED_FRAMES.call_once(|| SpinNoIrq::new(BTreeMap::new()));
     &SHARED_FRAMES
 }
 
@@ -123,7 +121,11 @@ impl Backend {
                     }
                     return false;
                 };
-                if cursor.map(addr, frame, PageSize::Size4K, flags).is_err() {
+                let pte_flags = pte_flags_for_mapping(flags);
+                if cursor
+                    .map(addr, frame, PageSize::Size4K, pte_flags)
+                    .is_err()
+                {
                     warn!(
                         "map_alloc: page-table map failed start={:#x} size={:#x} at={:#x} frame={:#x} flags={:?} populate=true",
                         start, size, addr, frame, flags
@@ -293,7 +295,8 @@ impl Backend {
 
     fn map_fresh_frame(&self, vaddr: VirtAddr, flags: MappingFlags, pt: &mut PageTable) -> bool {
         if let Some(frame) = alloc_frame(true) {
-            let res = pt.cursor().map(vaddr, frame, PageSize::Size4K, flags);
+            let pte_flags = pte_flags_for_mapping(flags);
+            let res = pt.cursor().map(vaddr, frame, PageSize::Size4K, pte_flags);
             if let Err(e) = &res {
                 warn!(
                     "handle_page_fault_alloc: map failed for {:#x}: {:?}",

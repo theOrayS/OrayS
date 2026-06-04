@@ -293,9 +293,7 @@ impl Drop for LocalSocketPairEndpoint {
 
 fn local_socket_listeners() -> &'static Mutex<Vec<LocalSocketListener>> {
     static LISTENERS: LazyInit<Mutex<Vec<LocalSocketListener>>> = LazyInit::new();
-    if !LISTENERS.is_inited() {
-        LISTENERS.init_once(Mutex::new(Vec::new()));
-    }
+    let _ = LISTENERS.call_once(|| Mutex::new(Vec::new()));
     &LISTENERS
 }
 

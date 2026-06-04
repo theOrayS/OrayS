@@ -23,6 +23,7 @@ use super::task_registry::{
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
+const SYNTHETIC_INIT_PID: i32 = 1;
 
 fn proc_maps_perms(prot: u32, shared: bool) -> String {
     let mut perms = String::new();
@@ -241,6 +242,9 @@ fn proc_stat_target_process(process: &UserProcess, path: &str) -> Option<(i32, U
     if let Some(entry) = process.child_thread_entry_by_pid(pid) {
         return Some((pid, UserProcessStat::from(entry.process.as_ref())));
     }
+    if pid == SYNTHETIC_INIT_PID {
+        return Some((pid, UserProcessStat::synthetic_init()));
+    }
     user_thread_entry_by_process_pid(pid)
         .map(|entry| (pid, UserProcessStat::from(entry.process.as_ref())))
 }
@@ -283,6 +287,17 @@ impl UserProcessStat {
             state,
             comm,
             locked_mmap_kb: process.locked_mmap_kb(),
+        }
+    }
+
+    fn synthetic_init() -> Self {
+        Self {
+            ppid: 0,
+            pgid: SYNTHETIC_INIT_PID,
+            sid: SYNTHETIC_INIT_PID,
+            state: 'S',
+            comm: "init".into(),
+            locked_mmap_kb: 0,
         }
     }
 }
@@ -346,6 +361,8 @@ fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String,
         let pid = pid_text.parse::<i32>().ok()?;
         if pid == process.pid() {
             (pid, UserProcessStat::from(process))
+        } else if pid == SYNTHETIC_INIT_PID {
+            (pid, UserProcessStat::synthetic_init())
         } else if let Some(entry) = process.child_thread_entry_by_pid(pid) {
             (pid, UserProcessStat::from(entry.process.as_ref()))
         } else {

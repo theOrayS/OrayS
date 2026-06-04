@@ -16,13 +16,13 @@ use std::vec::Vec;
 use super::UserProcess;
 use super::linux_abi::{
     SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_INFO, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET,
-    SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK,
+    SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK, SYSV_SHM_LOCKED,
     SYSV_SHM_MAX_SEGMENTS, SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, SYSV_SHM_REMAP, SYSV_SHM_RND,
     SYSV_SHM_STAT, SYSV_SHM_STAT_ANY, SYSV_SHM_UNLOCK, USER_MMAP_BASE, USER_STACK_SIZE,
     USER_STACK_TOP, neg_errno,
 };
 use super::memory_map::{align_down, align_up_checked, sys_munmap, user_mapping_flags};
-use super::user_memory::{validate_user_read, write_user_value};
+use super::user_memory::{read_user_value, write_user_value};
 
 #[derive(Clone)]
 struct SysvShmSegment {
@@ -107,17 +107,13 @@ static NEXT_SYSV_SHM_ID: AtomicI32 = AtomicI32::new(1);
 
 fn table() -> &'static Mutex<BTreeMap<i32, SysvShmSegment>> {
     static SYSV_SHM: LazyInit<Mutex<BTreeMap<i32, SysvShmSegment>>> = LazyInit::new();
-    if !SYSV_SHM.is_inited() {
-        SYSV_SHM.init_once(Mutex::new(BTreeMap::new()));
-    }
+    let _ = SYSV_SHM.call_once(|| Mutex::new(BTreeMap::new()));
     &SYSV_SHM
 }
 
 fn removed_segments() -> &'static Mutex<BTreeMap<i32, SysvShmSegment>> {
     static REMOVED_SYSV_SHM: LazyInit<Mutex<BTreeMap<i32, SysvShmSegment>>> = LazyInit::new();
-    if !REMOVED_SYSV_SHM.is_inited() {
-        REMOVED_SYSV_SHM.init_once(Mutex::new(BTreeMap::new()));
-    }
+    let _ = REMOVED_SYSV_SHM.call_once(|| Mutex::new(BTreeMap::new()));
     &REMOVED_SYSV_SHM
 }
 
@@ -435,6 +431,45 @@ fn control_allowed(process: &UserProcess, shmid: i32) -> Result<bool, LinuxError
     Ok(segment_control_allowed(segment, process))
 }
 
+fn set_segment_metadata(
+    process: &UserProcess,
+    shmid: i32,
+    requested: UserShmidDs64,
+) -> Result<(), LinuxError> {
+    let mut table = table().lock();
+    let segment = table.get_mut(&shmid).ok_or(LinuxError::EINVAL)?;
+    if !segment_control_allowed(segment, process) {
+        return Err(LinuxError::EPERM);
+    }
+
+    // Linux IPC_SET accepts user-supplied owner/group and permission bits, but
+    // leaves creator ids and non-permission mode flags untouched.
+    segment.uid = requested.shm_perm.uid;
+    segment.gid = requested.shm_perm.gid;
+    segment.mode = (segment.mode & !0o777) | (requested.shm_perm.mode & 0o777);
+    segment.change_time = current_time_secs();
+    Ok(())
+}
+
+fn set_segment_lock_state(
+    process: &UserProcess,
+    shmid: i32,
+    locked: bool,
+) -> Result<(), LinuxError> {
+    let mut table = table().lock();
+    let segment = table.get_mut(&shmid).ok_or(LinuxError::EINVAL)?;
+    if !segment_control_allowed(segment, process) {
+        return Err(LinuxError::EPERM);
+    }
+
+    if locked {
+        segment.mode |= SYSV_SHM_LOCKED;
+    } else {
+        segment.mode &= !SYSV_SHM_LOCKED;
+    }
+    Ok(())
+}
+
 fn remove(shmid: i32) {
     if let Some(segment) = table().lock().remove(&shmid) {
         // System V IPC_RMID removes the identifier immediately but keeps the
@@ -654,20 +689,21 @@ pub(super) fn sys_shmctl(process: &UserProcess, shmid: usize, cmd: usize, buf: u
             id as isize
         }
         SYSV_IPC_SET => {
-            if let Err(err) = validate_user_read(process, buf, size_of::<UserShmidDs64>()) {
-                return neg_errno(err);
-            }
-            match control_allowed(process, shmid) {
-                Ok(true) => 0,
-                Ok(false) => neg_errno(LinuxError::EPERM),
+            let requested = match read_user_value::<UserShmidDs64>(process, buf) {
+                Ok(value) => value,
+                Err(err) => return neg_errno(err),
+            };
+            match set_segment_metadata(process, shmid, requested) {
+                Ok(()) => 0,
                 Err(err) => neg_errno(err),
             }
         }
-        SYSV_SHM_LOCK | SYSV_SHM_UNLOCK => match control_allowed(process, shmid) {
-            Ok(true) => neg_errno(LinuxError::EPERM),
-            Ok(false) => neg_errno(LinuxError::EPERM),
-            Err(err) => neg_errno(err),
-        },
+        SYSV_SHM_LOCK | SYSV_SHM_UNLOCK => {
+            match set_segment_lock_state(process, shmid, cmd == SYSV_SHM_LOCK) {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            }
+        }
         _ => neg_errno(LinuxError::EINVAL),
     }
 }

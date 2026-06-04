@@ -7,10 +7,23 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::{ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CHOWN_ID_UNCHANGED};
+use super::task_context::current_tid;
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
 
 const NGROUPS_MAX: usize = 65_536;
+const CAPABILITY_VERSION_1: u32 = general::_LINUX_CAPABILITY_VERSION_1;
+const CAPABILITY_VERSION_2: u32 = general::_LINUX_CAPABILITY_VERSION_2;
+const CAPABILITY_VERSION_3: u32 = general::_LINUX_CAPABILITY_VERSION_3;
+const CAP_SETPCAP_BIT: u64 = 1 << general::CAP_SETPCAP;
+pub(super) const ALL_CAPABILITIES_MASK: u64 = (1u64 << (general::CAP_LAST_CAP + 1)) - 1;
+
+#[derive(Clone, Copy)]
+struct CapabilitySets {
+    effective: u64,
+    permitted: u64,
+    inheritable: u64,
+}
 
 impl UserProcess {
     pub(super) fn real_uid(&self) -> u32 {
@@ -119,6 +132,58 @@ impl UserProcess {
     fn mark_credentials_changed(&self) {
         self.credential_generation.fetch_add(1, Ordering::AcqRel);
     }
+
+    pub(super) fn cap_effective(&self) -> u64 {
+        self.cap_effective.load(Ordering::Acquire)
+    }
+
+    pub(super) fn cap_permitted(&self) -> u64 {
+        self.cap_permitted.load(Ordering::Acquire)
+    }
+
+    pub(super) fn cap_inheritable(&self) -> u64 {
+        self.cap_inheritable.load(Ordering::Acquire)
+    }
+
+    pub(super) fn cap_bounding(&self) -> u64 {
+        self.cap_bounding.load(Ordering::Acquire)
+    }
+
+    fn capability_sets(&self) -> CapabilitySets {
+        CapabilitySets {
+            effective: self.cap_effective(),
+            permitted: self.cap_permitted(),
+            inheritable: self.cap_inheritable(),
+        }
+    }
+
+    fn set_capability_sets(&self, sets: CapabilitySets) {
+        self.cap_effective.store(sets.effective, Ordering::Release);
+        self.cap_permitted.store(sets.permitted, Ordering::Release);
+        self.cap_inheritable
+            .store(sets.inheritable, Ordering::Release);
+        self.mark_credentials_changed();
+    }
+
+    pub(super) fn capability_in_bounding_set(&self, cap: u32) -> Option<bool> {
+        if cap > general::CAP_LAST_CAP {
+            return None;
+        }
+        Some(self.cap_bounding() & (1u64 << cap) != 0)
+    }
+
+    pub(super) fn drop_capability_from_bounding_set(&self, cap: u32) -> Result<(), LinuxError> {
+        if cap > general::CAP_LAST_CAP {
+            return Err(LinuxError::EINVAL);
+        }
+        if self.cap_effective() & CAP_SETPCAP_BIT == 0 {
+            return Err(LinuxError::EPERM);
+        }
+        let mask = !(1u64 << cap);
+        self.cap_bounding.fetch_and(mask, Ordering::AcqRel);
+        self.mark_credentials_changed();
+        Ok(())
+    }
 }
 
 fn privileged(process: &UserProcess) -> bool {
@@ -177,6 +242,159 @@ fn parse_res_ids(
     saved: usize,
 ) -> Result<[Option<u32>; 3], LinuxError> {
     parse_id_args([real, effective, saved])
+}
+
+fn capability_words(version: u32) -> Option<usize> {
+    match version {
+        CAPABILITY_VERSION_1 => Some(general::_LINUX_CAPABILITY_U32S_1 as usize),
+        CAPABILITY_VERSION_2 => Some(general::_LINUX_CAPABILITY_U32S_2 as usize),
+        CAPABILITY_VERSION_3 => Some(general::_LINUX_CAPABILITY_U32S_3 as usize),
+        _ => None,
+    }
+}
+
+fn capability_pid_is_self(process: &UserProcess, pid: i32) -> Result<bool, LinuxError> {
+    if pid < 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok(pid == 0 || pid == process.pid() || pid == current_tid())
+}
+
+fn capability_data_ptr(base: usize, idx: usize) -> usize {
+    base + idx * size_of::<general::__user_cap_data_struct>()
+}
+
+fn read_capability_data(
+    process: &UserProcess,
+    data: usize,
+    words: usize,
+) -> Result<CapabilitySets, LinuxError> {
+    let mut effective = 0u64;
+    let mut permitted = 0u64;
+    let mut inheritable = 0u64;
+    for idx in 0..words {
+        let entry = read_user_value::<general::__user_cap_data_struct>(
+            process,
+            capability_data_ptr(data, idx),
+        )?;
+        let shift = idx * u32::BITS as usize;
+        effective |= (entry.effective as u64) << shift;
+        permitted |= (entry.permitted as u64) << shift;
+        inheritable |= (entry.inheritable as u64) << shift;
+    }
+    Ok(CapabilitySets {
+        effective,
+        permitted,
+        inheritable,
+    })
+}
+
+fn write_capability_data(
+    process: &UserProcess,
+    data: usize,
+    words: usize,
+    sets: CapabilitySets,
+) -> isize {
+    for idx in 0..words {
+        let shift = idx * u32::BITS as usize;
+        let entry = general::__user_cap_data_struct {
+            effective: (sets.effective >> shift) as u32,
+            permitted: (sets.permitted >> shift) as u32,
+            inheritable: (sets.inheritable >> shift) as u32,
+        };
+        let ret = write_user_value(process, capability_data_ptr(data, idx), &entry);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    0
+}
+
+fn validate_capability_update(
+    old: CapabilitySets,
+    bounding: u64,
+    next: CapabilitySets,
+) -> Result<(), LinuxError> {
+    let requested = next.effective | next.permitted | next.inheritable;
+    if requested & !ALL_CAPABILITIES_MASK != 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    if next.effective & !next.permitted != 0 {
+        return Err(LinuxError::EPERM);
+    }
+
+    let has_setpcap = old.effective & CAP_SETPCAP_BIT != 0;
+    let added_permitted = next.permitted & !old.permitted;
+    if added_permitted != 0 && (!has_setpcap || added_permitted & !bounding != 0) {
+        return Err(LinuxError::EPERM);
+    }
+
+    let added_inheritable = next.inheritable & !(old.inheritable | old.permitted);
+    if added_inheritable != 0 && (!has_setpcap || added_inheritable & !bounding != 0) {
+        return Err(LinuxError::EPERM);
+    }
+    Ok(())
+}
+
+pub(super) fn sys_capget(process: &UserProcess, header: usize, data: usize) -> isize {
+    let mut header_value =
+        match read_user_value::<general::__user_cap_header_struct>(process, header) {
+            Ok(header) => header,
+            Err(err) => return neg_errno(err),
+        };
+    let words = match capability_words(header_value.version) {
+        Some(words) => words,
+        None => {
+            header_value.version = CAPABILITY_VERSION_3;
+            let ret = write_user_value(process, header, &header_value);
+            return if ret != 0 {
+                ret
+            } else {
+                neg_errno(LinuxError::EINVAL)
+            };
+        }
+    };
+    match capability_pid_is_self(process, header_value.pid) {
+        Ok(true) => {}
+        Ok(false) => return neg_errno(LinuxError::ESRCH),
+        Err(err) => return neg_errno(err),
+    }
+    write_capability_data(process, data, words, process.capability_sets())
+}
+
+pub(super) fn sys_capset(process: &UserProcess, header: usize, data: usize) -> isize {
+    let mut header_value =
+        match read_user_value::<general::__user_cap_header_struct>(process, header) {
+            Ok(header) => header,
+            Err(err) => return neg_errno(err),
+        };
+    let words = match capability_words(header_value.version) {
+        Some(words) => words,
+        None => {
+            header_value.version = CAPABILITY_VERSION_3;
+            let ret = write_user_value(process, header, &header_value);
+            return if ret != 0 {
+                ret
+            } else {
+                neg_errno(LinuxError::EINVAL)
+            };
+        }
+    };
+    match capability_pid_is_self(process, header_value.pid) {
+        Ok(true) => {}
+        Ok(false) => return neg_errno(LinuxError::EPERM),
+        Err(err) => return neg_errno(err),
+    }
+    let next = match read_capability_data(process, data, words) {
+        Ok(sets) => sets,
+        Err(err) => return neg_errno(err),
+    };
+    let old = process.capability_sets();
+    if let Err(err) = validate_capability_update(old, process.cap_bounding(), next) {
+        return neg_errno(err);
+    }
+    process.set_capability_sets(next);
+    0
 }
 
 pub(super) fn set_fs_id<F>(old: u32, id: usize, allow: bool, apply: F) -> isize

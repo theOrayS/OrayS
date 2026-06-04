@@ -2,12 +2,13 @@ use core::ffi::c_long;
 use core::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 
 use axerrno::LinuxError;
+use axsync::Mutex;
 use linux_raw_sys::general;
 use std::sync::Arc;
 
 use super::linux_abi::SIGALRM_NUM;
 use super::process_lifecycle::terminate_current_thread_for_exit_group;
-use super::signal_abi::deliver_user_signal;
+use super::signal_abi::{deliver_user_signal, validate_signal_target};
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
@@ -110,6 +111,26 @@ pub(super) struct UserTimex {
     pub(super) stbcnt: c_long,
     pub(super) tai: i32,
     pub(super) __padding: [i32; 11],
+}
+
+#[derive(Clone)]
+pub(super) struct UserPosixTimer {
+    clock_id: u32,
+    notify: PosixTimerNotify,
+    state: Arc<Mutex<UserPosixTimerState>>,
+    generation: Arc<AtomicU64>,
+}
+
+#[derive(Clone, Copy)]
+enum PosixTimerNotify {
+    None,
+    Signal { signo: i32, tid: Option<i32> },
+}
+
+struct UserPosixTimerState {
+    deadline: Option<core::time::Duration>,
+    interval: core::time::Duration,
+    overrun: i32,
 }
 
 pub(super) fn socket_timeval_to_duration(
@@ -279,6 +300,30 @@ pub(super) fn clock_now_duration(clockid: u32) -> Result<core::time::Duration, L
         general::CLOCK_BOOTTIME_ALARM => Ok(axhal::time::monotonic_time()),
         _ => Err(LinuxError::EINVAL),
     }
+}
+
+fn saturating_duration_add(
+    lhs: core::time::Duration,
+    rhs: core::time::Duration,
+) -> core::time::Duration {
+    lhs.checked_add(rhs).unwrap_or(core::time::Duration::MAX)
+}
+
+fn duration_to_ns_u128(duration: core::time::Duration) -> u128 {
+    duration.as_secs() as u128 * 1_000_000_000u128 + duration.subsec_nanos() as u128
+}
+
+fn duration_mul_saturating(
+    duration: core::time::Duration,
+    multiplier: u128,
+) -> core::time::Duration {
+    if duration == core::time::Duration::ZERO || multiplier == 0 {
+        return core::time::Duration::ZERO;
+    }
+    let nanos = duration_to_ns_u128(duration).saturating_mul(multiplier);
+    let secs = (nanos / 1_000_000_000u128).min(u64::MAX as u128) as u64;
+    let subnanos = (nanos % 1_000_000_000u128) as u32;
+    core::time::Duration::new(secs, subnanos)
 }
 
 pub(super) fn adjusted_wall_time() -> core::time::Duration {
@@ -459,6 +504,331 @@ fn arm_real_itimer(
             delay_us = interval_us;
         }
     });
+}
+
+impl UserProcess {
+    pub(super) fn clear_posix_timers(&self) {
+        let mut timers = self.posix_timers.lock();
+        for timer in timers.values() {
+            timer.generation.fetch_add(1, Ordering::AcqRel);
+        }
+        timers.clear();
+        self.next_posix_timer_id.store(1, Ordering::Release);
+    }
+}
+
+fn parse_posix_timer_notify(
+    process: &UserProcess,
+    sevp: usize,
+) -> Result<PosixTimerNotify, LinuxError> {
+    if sevp == 0 {
+        return Ok(PosixTimerNotify::Signal {
+            signo: SIGALRM_NUM,
+            tid: None,
+        });
+    }
+    let ev = read_user_value::<general::sigevent>(process, sevp)?;
+    match ev.sigev_notify {
+        value if value == general::SIGEV_NONE as i32 => Ok(PosixTimerNotify::None),
+        value if value == general::SIGEV_SIGNAL as i32 => {
+            validate_signal_target(ev.sigev_signo)?;
+            Ok(PosixTimerNotify::Signal {
+                signo: ev.sigev_signo,
+                tid: None,
+            })
+        }
+        value if value == general::SIGEV_THREAD as i32 => {
+            validate_signal_target(ev.sigev_signo)?;
+            // User-space libcs normally implement SIGEV_THREAD above the raw
+            // syscall. Accept it as a non-delivering kernel timer so raw LTP
+            // create/delete coverage observes a valid generic timer object
+            // without inventing a userspace callback ABI in the kernel.
+            Ok(PosixTimerNotify::None)
+        }
+        value if value == general::SIGEV_THREAD_ID as i32 => {
+            validate_signal_target(ev.sigev_signo)?;
+            let tid = unsafe { ev._sigev_un._tid };
+            if tid <= 0 {
+                return Err(LinuxError::EINVAL);
+            }
+            Ok(PosixTimerNotify::Signal {
+                signo: ev.sigev_signo,
+                tid: Some(tid),
+            })
+        }
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn posix_timer_spec_from_state(
+    timer: &UserPosixTimer,
+    state: &UserPosixTimerState,
+) -> Result<general::itimerspec, LinuxError> {
+    let now = clock_now_duration(timer.clock_id)?;
+    let remaining = state
+        .deadline
+        .and_then(|deadline| deadline.checked_sub(now))
+        .unwrap_or(core::time::Duration::ZERO);
+    Ok(general::itimerspec {
+        it_interval: timespec_from_duration(state.interval),
+        it_value: timespec_from_duration(remaining),
+    })
+}
+
+fn refresh_posix_timer_locked(
+    timer: &UserPosixTimer,
+    state: &mut UserPosixTimerState,
+) -> Result<bool, LinuxError> {
+    let Some(deadline) = state.deadline else {
+        return Ok(false);
+    };
+    let now = clock_now_duration(timer.clock_id)?;
+    if now < deadline {
+        return Ok(false);
+    }
+    if state.interval == core::time::Duration::ZERO {
+        state.deadline = None;
+        state.overrun = 0;
+        return Ok(true);
+    }
+
+    let elapsed = now
+        .checked_sub(deadline)
+        .unwrap_or(core::time::Duration::ZERO);
+    let interval_ns = duration_to_ns_u128(state.interval).max(1);
+    let extra_expirations = duration_to_ns_u128(elapsed) / interval_ns;
+    state.overrun = extra_expirations.min(i32::MAX as u128) as i32;
+    let advance = duration_mul_saturating(state.interval, extra_expirations.saturating_add(1));
+    state.deadline = Some(saturating_duration_add(deadline, advance));
+    Ok(true)
+}
+
+fn deliver_posix_timer_signal(process: &Arc<UserProcess>, notify: PosixTimerNotify) {
+    let PosixTimerNotify::Signal { signo, tid } = notify else {
+        return;
+    };
+    let entry = tid
+        .and_then(user_thread_entry_by_tid)
+        .or_else(|| user_thread_entry_for_process(process));
+    if let Some(entry) = entry {
+        let _ = deliver_user_signal(&entry, signo, 0);
+    }
+}
+
+fn arm_posix_timer(process: Arc<UserProcess>, timer: UserPosixTimer, generation: u64) {
+    let _ = axtask::spawn(move || {
+        loop {
+            if process.live_threads.load(Ordering::Acquire) == 0
+                || timer.generation.load(Ordering::Acquire) != generation
+            {
+                break;
+            }
+            let delay = {
+                let state = timer.state.lock();
+                let Some(deadline) = state.deadline else {
+                    break;
+                };
+                let now = match clock_now_duration(timer.clock_id) {
+                    Ok(now) => now,
+                    Err(_) => break,
+                };
+                deadline
+                    .checked_sub(now)
+                    .unwrap_or(core::time::Duration::ZERO)
+            };
+            if delay == core::time::Duration::ZERO {
+                axtask::yield_now();
+            } else {
+                axtask::sleep(delay);
+            }
+            if process.live_threads.load(Ordering::Acquire) == 0
+                || timer.generation.load(Ordering::Acquire) != generation
+            {
+                break;
+            }
+            let expired = {
+                let mut state = timer.state.lock();
+                match refresh_posix_timer_locked(&timer, &mut state) {
+                    Ok(expired) => expired,
+                    Err(_) => false,
+                }
+            };
+            if expired {
+                deliver_posix_timer_signal(&process, timer.notify);
+            }
+        }
+    });
+}
+
+pub(super) fn sys_timer_create(
+    process: &UserProcess,
+    clockid: usize,
+    sevp: usize,
+    timerid: usize,
+) -> isize {
+    let clock_id = clockid as u32;
+    if let Err(err) = validate_clock_id(clock_id) {
+        return neg_errno(err);
+    }
+    if timerid == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let notify = match parse_posix_timer_notify(process, sevp) {
+        Ok(notify) => notify,
+        Err(err) => return neg_errno(err),
+    };
+    let timer = UserPosixTimer {
+        clock_id,
+        notify,
+        state: Arc::new(Mutex::new(UserPosixTimerState {
+            deadline: None,
+            interval: core::time::Duration::ZERO,
+            overrun: 0,
+        })),
+        generation: Arc::new(AtomicU64::new(0)),
+    };
+
+    let mut timers = process.posix_timers.lock();
+    let mut id = process.next_posix_timer_id.load(Ordering::Acquire).max(1);
+    for _ in 0..32_768 {
+        if id <= 0 {
+            id = 1;
+        }
+        if !timers.contains_key(&id) {
+            let next = id.checked_add(1).filter(|value| *value > 0).unwrap_or(1);
+            process.next_posix_timer_id.store(next, Ordering::Release);
+            let ret = write_user_value(process, timerid, &id);
+            if ret != 0 {
+                return ret;
+            }
+            timers.insert(id, timer);
+            return 0;
+        }
+        id = id.checked_add(1).filter(|value| *value > 0).unwrap_or(1);
+    }
+    neg_errno(LinuxError::EAGAIN)
+}
+
+pub(super) fn sys_timer_delete(process: &UserProcess, timerid: usize) -> isize {
+    let mut timers = process.posix_timers.lock();
+    let Some(timer) = timers.remove(&(timerid as i32)) else {
+        return neg_errno(LinuxError::EINVAL);
+    };
+    timer.generation.fetch_add(1, Ordering::AcqRel);
+    0
+}
+
+pub(super) fn sys_timer_getoverrun(process: &UserProcess, timerid: usize) -> isize {
+    let timer = {
+        let timers = process.posix_timers.lock();
+        let Some(timer) = timers.get(&(timerid as i32)) else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        timer.clone()
+    };
+    let mut state = timer.state.lock();
+    if let Err(err) = refresh_posix_timer_locked(&timer, &mut state) {
+        return neg_errno(err);
+    }
+    state.overrun as isize
+}
+
+pub(super) fn sys_timer_gettime(process: &UserProcess, timerid: usize, curr_value: usize) -> isize {
+    if curr_value == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let timer = {
+        let timers = process.posix_timers.lock();
+        let Some(timer) = timers.get(&(timerid as i32)) else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        timer.clone()
+    };
+    let spec = {
+        let mut state = timer.state.lock();
+        if let Err(err) = refresh_posix_timer_locked(&timer, &mut state) {
+            return neg_errno(err);
+        }
+        match posix_timer_spec_from_state(&timer, &state) {
+            Ok(spec) => spec,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    write_user_value(process, curr_value, &spec)
+}
+
+pub(super) fn sys_timer_settime(
+    process: &Arc<UserProcess>,
+    timerid: usize,
+    flags: usize,
+    new_value: usize,
+    old_value: usize,
+) -> isize {
+    let flags = flags as u32;
+    if flags & !general::TIMER_ABSTIME != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if new_value == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let timer = {
+        let timers = process.posix_timers.lock();
+        let Some(timer) = timers.get(&(timerid as i32)) else {
+            return neg_errno(LinuxError::EINVAL);
+        };
+        timer.clone()
+    };
+    let new_spec = match read_user_value::<general::itimerspec>(process, new_value) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    let new_interval = match timespec_to_duration(new_spec.it_interval) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+    let new_value = match timespec_to_duration(new_spec.it_value) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
+
+    let old_spec = {
+        let mut state = timer.state.lock();
+        if let Err(err) = refresh_posix_timer_locked(&timer, &mut state) {
+            return neg_errno(err);
+        }
+        match posix_timer_spec_from_state(&timer, &state) {
+            Ok(spec) => spec,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    if old_value != 0 {
+        let ret = write_user_value(process, old_value, &old_spec);
+        if ret != 0 {
+            return ret;
+        }
+    }
+
+    let generation = timer.generation.fetch_add(1, Ordering::AcqRel) + 1;
+    let deadline = if new_value == core::time::Duration::ZERO {
+        None
+    } else if flags & general::TIMER_ABSTIME != 0 {
+        Some(new_value)
+    } else {
+        match clock_now_duration(timer.clock_id) {
+            Ok(now) => Some(saturating_duration_add(now, new_value)),
+            Err(err) => return neg_errno(err),
+        }
+    };
+    {
+        let mut state = timer.state.lock();
+        state.interval = new_interval;
+        state.deadline = deadline;
+        state.overrun = 0;
+    }
+    if deadline.is_some() {
+        arm_posix_timer(process.clone(), timer, generation);
+    }
+    0
 }
 
 pub(super) fn sys_setitimer(

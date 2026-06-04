@@ -17,11 +17,11 @@ use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
-    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR,
-    ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag,
-    neg_errno, posix_ret_i32,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE,
+    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
+    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE,
+    SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
+    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -84,7 +84,7 @@ pub(super) enum FdEntry {
     Stdout,
     Stderr,
     DevNull,
-    DevZero,
+    DevZero(u32),
     BlockDevice(BlockDeviceEntry),
     Rtc,
     File(FileEntry),
@@ -308,6 +308,28 @@ pub(super) fn sys_fadvise64(
 
 pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().close_for_process(process, fd as i32) {
+        Ok(()) => 0,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_close_range(
+    process: &UserProcess,
+    first: usize,
+    last: usize,
+    flags: usize,
+) -> isize {
+    let flags = flags as u32;
+    let supported = CLOSE_RANGE_UNSHARE | CLOSE_RANGE_CLOEXEC;
+    if flags & !supported != 0 || first > last {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    match process
+        .fds
+        .lock()
+        .close_range_for_process(process, first, last, flags)
+    {
         Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
@@ -1987,9 +2009,15 @@ pub(super) fn sys_flock(process: &UserProcess, fd: usize, operation: usize) -> i
 
 pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().entry(fd as i32) {
-        Ok(FdEntry::DevNull | FdEntry::DevZero | FdEntry::BlockDevice(_) | FdEntry::Rtc) => {
-            neg_errno(LinuxError::EINVAL)
-        }
+        Ok(
+            FdEntry::DevNull
+            | FdEntry::DevZero(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc
+            | FdEntry::Pipe(_)
+            | FdEntry::Socket(_)
+            | FdEntry::LocalSocket(_),
+        ) => neg_errno(LinuxError::EINVAL),
         Ok(_) => 0,
         Err(err) => neg_errno(err),
     }
@@ -2464,7 +2492,7 @@ impl FdTable {
         matches!(
             self.entry(fd),
             Ok(FdEntry::File(FileEntry { path, .. })) if path == "/dev/zero"
-        ) || matches!(self.entry(fd), Ok(FdEntry::DevZero))
+        ) || matches!(self.entry(fd), Ok(FdEntry::DevZero(_)))
     }
 
     pub(super) fn pipe_available_read(&self, fd: i32) -> Result<usize, LinuxError> {
@@ -2497,7 +2525,7 @@ impl FdTable {
                 FdEntry::Stdin => false,
                 FdEntry::Stdout | FdEntry::Stderr => false,
                 FdEntry::DevNull
-                | FdEntry::DevZero
+                | FdEntry::DevZero(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
@@ -2520,7 +2548,7 @@ impl FdTable {
                 FdEntry::Stdout
                 | FdEntry::Stderr
                 | FdEntry::DevNull
-                | FdEntry::DevZero
+                | FdEntry::DevZero(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc => true,
                 FdEntry::File(_) => true,
@@ -2743,7 +2771,10 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::Stdin => Ok(0),
             FdEntry::DevNull => Ok(0),
-            FdEntry::DevZero => {
+            FdEntry::DevZero(status_flags) => {
+                if !file_is_readable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
                 dst.fill(0);
                 Ok(dst.len())
             }
@@ -2790,7 +2821,12 @@ impl FdTable {
                 Ok(src.len())
             }
             FdEntry::DevNull => Ok(src.len()),
-            FdEntry::DevZero => Ok(src.len()),
+            FdEntry::DevZero(status_flags) => {
+                if !file_is_writable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                Ok(src.len())
+            }
             FdEntry::BlockDevice(_) => Ok(src.len()),
             FdEntry::Rtc => Ok(src.len()),
             FdEntry::File(file) => {
@@ -2875,6 +2911,49 @@ impl FdTable {
             release_posix_record_locks_for_file_owner(record_lock_key(file), process.pid());
         }
         self.close_slot(fd as usize)
+    }
+
+    pub(super) fn close_range_for_process(
+        &mut self,
+        process: &UserProcess,
+        first: usize,
+        last: usize,
+        flags: u32,
+    ) -> Result<(), LinuxError> {
+        let Some(last) = last
+            .min(self.entries.len().saturating_sub(1))
+            .checked_add(1)
+        else {
+            return Ok(());
+        };
+        if first >= last {
+            return Ok(());
+        }
+
+        if flags & CLOSE_RANGE_CLOEXEC != 0 {
+            if self.fd_flags.len() < self.entries.len() {
+                self.fd_flags.resize(self.entries.len(), 0);
+            }
+            for idx in first..last {
+                if self.entries[idx].is_some() {
+                    self.fd_flags[idx] |= general::FD_CLOEXEC;
+                }
+            }
+            return Ok(());
+        }
+
+        // CLOSE_RANGE_UNSHARE requests a private fd table before closing.  This
+        // userspace process model does not share FdTable instances across
+        // independent processes; fork already duplicates the table, and threads
+        // in one UserProcess intentionally share it.  Treat UNSHARE as a safe
+        // no-op for now while still applying the requested close operation.
+        let _unshare_requested = flags & CLOSE_RANGE_UNSHARE != 0;
+        for idx in first..last {
+            if self.entries[idx].is_some() {
+                self.close_for_process(process, idx as i32)?;
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn close_all(&mut self) {
@@ -3290,6 +3369,22 @@ impl FdTable {
         read_regular_file_at(process, file, offset, dst)
     }
 
+    pub(super) fn mmap_file_backing(&mut self, fd: i32) -> Result<FileEntry, LinuxError> {
+        let FdEntry::File(file) = self.entry_mut(fd)? else {
+            return match self.entry(fd)? {
+                FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+                FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                    Err(LinuxError::ESPIPE)
+                }
+                _ => Err(LinuxError::EBADF),
+            };
+        };
+        if !file_is_readable(file.status_flags) {
+            return Err(LinuxError::EACCES);
+        }
+        Ok(file.clone())
+    }
+
     pub(super) fn mmap_validate_file_fd(&mut self, fd: i32) -> Result<(), LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => {
@@ -3303,9 +3398,25 @@ impl FdTable {
             FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
                 Err(LinuxError::ESPIPE)
             }
-            FdEntry::DevZero => Ok(()),
+            FdEntry::DevZero(_) => Ok(()),
             _ => Err(LinuxError::EBADF),
         }
+    }
+
+    pub(super) fn mmap_fd_allows_shared_write(&self, fd: i32) -> Result<bool, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::File(file) => Ok(file_is_writable(file.status_flags)),
+            FdEntry::DevZero(status_flags) => Ok(file_is_writable(*status_flags)),
+            FdEntry::Directory(_) | FdEntry::ProcFdDir(_) => Err(LinuxError::EISDIR),
+            FdEntry::Pipe(_) | FdEntry::Socket(_) | FdEntry::LocalSocket(_) => {
+                Err(LinuxError::ESPIPE)
+            }
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
+    pub(super) fn mmap_validate_file_fd_exists(&self, fd: i32) -> Result<(), LinuxError> {
+        self.entry(fd).map(|_| ())
     }
 
     pub(super) fn insert_with_flags(
@@ -3692,7 +3803,7 @@ impl FdTable {
             FdEntry::Stdin => Ok(stdio_stat(true)),
             FdEntry::Stdout | FdEntry::Stderr => Ok(stdio_stat(false)),
             FdEntry::DevNull => Ok(dev_null_stat()),
-            FdEntry::DevZero => Ok(dev_zero_stat()),
+            FdEntry::DevZero(_) => Ok(dev_zero_stat()),
             FdEntry::BlockDevice(dev) => Ok(PathEntry::synthetic_block(dev.path.as_str()).stat()),
             FdEntry::Rtc => Ok(stdio_stat(false)),
             FdEntry::File(file) => Ok(file_attr_to_stat(
@@ -3764,7 +3875,9 @@ impl FdTable {
             }
         }
         match open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0) {
-            Ok(FdEntry::DevNull) | Ok(FdEntry::DevZero) | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
+            Ok(FdEntry::DevNull) | Ok(FdEntry::DevZero(_)) | Ok(FdEntry::Rtc) => {
+                Ok(stdio_stat(false))
+            }
             Ok(FdEntry::BlockDevice(dev)) => {
                 Ok(PathEntry::synthetic_block(dev.path.as_str()).stat())
             }
@@ -3977,6 +4090,16 @@ impl FdTable {
             F_SETPIPE_SZ => match self.entry(fd)? {
                 FdEntry::Pipe(pipe) => Ok(pipe.set_capacity(arg as usize)? as i32),
                 _ => Err(LinuxError::EBADF),
+            },
+            cmd @ (general::F_SETOWN
+            | general::F_GETOWN
+            | general::F_SETSIG
+            | general::F_GETSIG)
+            | cmd @ (15 | 16) => match self.entry(fd)? {
+                FdEntry::Pipe(pipe) => pipe
+                    .fcntl_async_owner(process, cmd, arg)?
+                    .ok_or(LinuxError::EINVAL),
+                _ => Err(LinuxError::EINVAL),
             },
             general::F_SETFL => match self.entry_mut(fd)? {
                 FdEntry::File(file) => {
@@ -4428,9 +4551,7 @@ impl PosixRecordLock {
 fn posix_record_lock_table() -> &'static Mutex<BTreeMap<u64, Vec<PosixRecordLock>>> {
     static POSIX_RECORD_LOCKS: LazyInit<Mutex<BTreeMap<u64, Vec<PosixRecordLock>>>> =
         LazyInit::new();
-    if !POSIX_RECORD_LOCKS.is_inited() {
-        POSIX_RECORD_LOCKS.init_once(Mutex::new(BTreeMap::new()));
-    }
+    let _ = POSIX_RECORD_LOCKS.call_once(|| Mutex::new(BTreeMap::new()));
     &POSIX_RECORD_LOCKS
 }
 
@@ -4666,9 +4787,7 @@ impl FlockState {
 
 fn flock_table() -> &'static Mutex<BTreeMap<u64, FlockState>> {
     static FLOCKS: LazyInit<Mutex<BTreeMap<u64, FlockState>>> = LazyInit::new();
-    if !FLOCKS.is_inited() {
-        FLOCKS.init_once(Mutex::new(BTreeMap::new()));
-    }
+    let _ = FLOCKS.call_once(|| Mutex::new(BTreeMap::new()));
     &FLOCKS
 }
 
@@ -4734,7 +4853,7 @@ impl FdEntry {
             Self::Stdout => Ok(Self::Stdout),
             Self::Stderr => Ok(Self::Stderr),
             Self::DevNull => Ok(Self::DevNull),
-            Self::DevZero => Ok(Self::DevZero),
+            Self::DevZero(status_flags) => Ok(Self::DevZero(*status_flags)),
             Self::BlockDevice(dev) => Ok(Self::BlockDevice(dev.clone())),
             Self::Rtc => Ok(Self::Rtc),
             Self::File(file) => Ok(Self::File(file.clone())),
@@ -5068,6 +5187,33 @@ fn write_regular_file_at(
     process.set_path_sparse_size(file.path.clone(), logical_after);
     touch_regular_file_after_write(process, file);
     Ok(written)
+}
+
+pub(super) fn write_mmap_file_backing(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    write_offset: u64,
+    src: &[u8],
+) -> Result<usize, LinuxError> {
+    if !file_is_writable(file.status_flags) {
+        return Err(LinuxError::EBADF);
+    }
+    // MAP_SHARED writeback is tied to the mapping offset, not to the current
+    // descriptor position. In particular, do not redirect msync writes to EOF
+    // for O_APPEND descriptors.
+    write_regular_file_at(process, file, write_offset, src, None)
+}
+
+pub(super) fn read_mmap_file_backing(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    read_offset: u64,
+    dst: &mut [u8],
+) -> Result<usize, LinuxError> {
+    if !file_is_readable(file.status_flags) {
+        return Err(LinuxError::EBADF);
+    }
+    read_regular_file_at(process, file, read_offset, dst)
 }
 
 fn file_entry_read(
@@ -5616,7 +5762,7 @@ fn open_candidates(
             return Ok(if path_only {
                 FdEntry::Path(PathEntry::synthetic_char("/dev/zero"))
             } else {
-                FdEntry::DevZero
+                FdEntry::DevZero(fcntl_status_flags(flags))
             });
         }
         if is_synthetic_block_device_path(path.as_str()) {
@@ -5659,7 +5805,9 @@ fn open_candidates(
             }
             match (special_type, process.path_rdev(path.as_str())) {
                 (ST_MODE_CHR, Some(DEV_NULL_RDEV)) => return Ok(FdEntry::DevNull),
-                (ST_MODE_CHR, Some(DEV_ZERO_RDEV)) => return Ok(FdEntry::DevZero),
+                (ST_MODE_CHR, Some(DEV_ZERO_RDEV)) => {
+                    return Ok(FdEntry::DevZero(fcntl_status_flags(flags)));
+                }
                 (ST_MODE_BLK, _) => {
                     return Ok(FdEntry::BlockDevice(BlockDeviceEntry {
                         path: path.clone(),
@@ -5678,30 +5826,20 @@ fn open_candidates(
             }
             check_open_permission(process, path.as_str(), flags)?;
             if flags & general::O_ACCMODE == general::O_WRONLY && flags & general::O_NONBLOCK != 0 {
-                // This compatibility layer does not keep a rendezvous table
-                // for named FIFO opens.  A nonblocking writer therefore has
-                // no observable reader and must fail like Linux open(2).
-                return Err(LinuxError::ENXIO);
+                if !PipeEndpoint::named_fifo_has_reader(path.as_str()) {
+                    return Err(LinuxError::ENXIO);
+                }
             }
             if path_only {
                 let mode = process.path_mode(path.as_str()).unwrap_or(0o666);
                 return Ok(FdEntry::Path(PathEntry::fifo(path.as_str(), mode)));
             }
             let status_flags = flags & (general::O_NONBLOCK | general::O_DIRECT);
-            return Ok(match flags & general::O_ACCMODE {
-                general::O_WRONLY => {
-                    let (_, write_end) = PipeEndpoint::new_pair(status_flags);
-                    FdEntry::Pipe(write_end)
-                }
-                // Opening a FIFO with O_RDWR is Linux-specific but common in
-                // tests to avoid blocking; any pipe endpoint is non-seekable,
-                // preserving the required ESPIPE semantics.
-                general::O_RDWR => FdEntry::Pipe(PipeEndpoint::new_fifo_readwrite(status_flags)),
-                _ => {
-                    let (read_end, _) = PipeEndpoint::new_pair(status_flags);
-                    FdEntry::Pipe(read_end)
-                }
-            });
+            return Ok(FdEntry::Pipe(PipeEndpoint::new_named_fifo(
+                path.as_str(),
+                flags & general::O_ACCMODE,
+                status_flags,
+            )));
         }
         if let Some(backing_path) = process.path_hardlink_backing(path.as_str()) {
             if prefer_dir {
