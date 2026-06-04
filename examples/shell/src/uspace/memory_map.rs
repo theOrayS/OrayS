@@ -369,6 +369,9 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
     if len == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    if addr % PAGE_SIZE_4K != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
     let Some(raw_end) = addr.checked_add(len) else {
         return neg_errno(LinuxError::EINVAL);
     };
