@@ -57,7 +57,7 @@ UIMAGE ?= n
 
 # Kernel build options
 KERNEL_APP ?= examples/shell
-KERNEL_FEATURES ?= alloc,paging,irq,multitask,fs,net
+KERNEL_FEATURES ?= alloc,paging,irq,multitask,fs,net,rtc
 KERNEL_RV_FEATURES ?= $(KERNEL_FEATURES)
 KERNEL_LA_FEATURES ?= $(KERNEL_FEATURES)
 KERNEL_APP_FEATURES ?= auto-run-tests,uspace
