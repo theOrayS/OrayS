@@ -10,13 +10,13 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{FdEntry, check_parent_write_search_permission, resolve_dirfd_path};
+use super::fd_table::{check_parent_write_search_permission, resolve_dirfd_path, FdEntry};
 use super::linux_abi::{
-    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK,
-    FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC,
-    PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
-    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE,
-    STATFS_NAME_MAX, SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
+    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
+    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
+    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
+    STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYSFS_MAGIC, TMPFS_MAGIC,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -786,6 +786,7 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::ProcFdDir(dir) => Some(dir.path.as_str()),
         FdEntry::Path(path) => Some(path.path.as_str()),
         FdEntry::MemoryFile(file) => Some(file.path.as_str()),
+        FdEntry::Memfd(_) => None,
         FdEntry::ProcPagemap(file) => Some(file.path.as_str()),
         FdEntry::ProcTimerSlack(file) => Some(file.path.as_str()),
         _ => None,

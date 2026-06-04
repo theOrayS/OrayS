@@ -41,9 +41,8 @@ mod task_registry;
 mod time_abi;
 mod user_memory;
 
-use fd_table::{FdTable, FileEntry};
+use fd_table::FdTable;
 use linux_abi::*;
-use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 pub use process_lifecycle::run_user_program;
@@ -51,6 +50,7 @@ pub use process_lifecycle::run_user_program;
 pub use process_lifecycle::run_user_program_in;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in_timeout;
+use process_lifecycle::ProcessTeardown;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
 
@@ -165,7 +165,7 @@ struct BrkState {
 
 #[derive(Clone)]
 struct UserMmapFileBacking {
-    file: FileEntry,
+    file: fd_table::MmapFileBacking,
     offset: u64,
     /// Number of bytes in this mapping that correspond to real file data.
     ///

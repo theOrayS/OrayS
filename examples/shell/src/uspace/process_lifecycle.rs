@@ -17,7 +17,7 @@ use std::vec::Vec;
 use super::credentials;
 use super::fd_table::release_posix_record_locks_for_process;
 use super::futex;
-use super::linux_abi::{SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE, neg_errno};
+use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::{current_cwd, is_busybox_applet_name};
@@ -26,19 +26,19 @@ use super::sysv_shm;
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
-    user_pc,
+    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
+    UserTaskExt,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
+    live_user_thread_count, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
 };
-use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, FdTable, NO_EXIT_GROUP_CODE, UserProcess};
+use super::{ChildTask, FdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -689,6 +689,21 @@ impl UserProcess {
     pub(super) fn mmap_range_denies_write(&self, start: usize, end: usize) -> bool {
         self.mmap_ranges.lock().iter().any(|region| {
             region.shared && !region.may_write && region.start < end && region.end() > start
+        })
+    }
+
+    pub(super) fn has_shared_writable_mmap_for_memfd(
+        &self,
+        file: &super::fd_table::MemfdEntry,
+    ) -> bool {
+        self.mmap_ranges.lock().iter().any(|region| {
+            region.shared
+                && region.may_write
+                && region.prot & general::PROT_WRITE != 0
+                && region
+                    .file_backing
+                    .as_ref()
+                    .map_or(false, |backing| backing.file.is_memfd_backing(file))
         })
     }
 
