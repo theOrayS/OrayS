@@ -27,6 +27,7 @@ use super::task_registry::{
 use super::UserProcess;
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
+const PROC_SELF_SMAPS_PATH: &str = "/proc/self/smaps";
 const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
 const SYNTHETIC_INIT_PID: i32 = 1;
 
@@ -102,6 +103,101 @@ pub(super) fn proc_self_maps_fd_entry(process: &UserProcess) -> FdEntry {
 pub(super) fn proc_self_maps_path_entry(process: &UserProcess) -> FdEntry {
     let content_len = proc_self_maps_content(process).len();
     FdEntry::Path(PathEntry::synthetic_file(PROC_SELF_MAPS_PATH, content_len))
+}
+
+fn proc_smaps_content_for_target(target: &UserProcess) -> Vec<u8> {
+    let mut regions = target.mmap_regions();
+    regions.sort_by_key(|region| region.start);
+    let aspace = target.aspace.lock();
+    let mut content = String::new();
+    for region in regions {
+        let mut rss_pages = 0usize;
+        let mut page = align_down(region.start, PAGE_SIZE_4K);
+        let end = align_up(region.end(), PAGE_SIZE_4K);
+        while page < end {
+            if aspace.page_table().query(VirtAddr::from(page)).is_ok() {
+                rss_pages = rss_pages.saturating_add(1);
+            }
+            match page.checked_add(PAGE_SIZE_4K) {
+                Some(next) => page = next,
+                None => break,
+            }
+        }
+        let size_kb = region.size.div_ceil(1024);
+        let rss_kb = rss_pages.saturating_mul(PAGE_SIZE_4K / 1024);
+        let locked_kb = if region.locked { size_kb } else { 0 };
+        let vm_flags = if region.locked { "lo" } else { "" };
+        content.push_str(&format!(
+            "{:08x}-{:08x} {} 00000000 00:00 0\n\
+             Size:           {:>8} kB\n\
+             Rss:            {:>8} kB\n\
+             Pss:            {:>8} kB\n\
+             Shared_Clean:   {:>8} kB\n\
+             Shared_Dirty:   {:>8} kB\n\
+             Private_Clean:  {:>8} kB\n\
+             Private_Dirty:  {:>8} kB\n\
+             Referenced:     {:>8} kB\n\
+             Anonymous:      {:>8} kB\n\
+             Locked:         {:>8} kB\n\
+             VmFlags: {}\n",
+            region.start,
+            region.end(),
+            proc_maps_perms(region.prot, region.shared),
+            size_kb,
+            rss_kb,
+            rss_kb,
+            0,
+            0,
+            if region.anonymous { 0 } else { rss_kb },
+            if region.anonymous { rss_kb } else { 0 },
+            rss_kb,
+            if region.anonymous { rss_kb } else { 0 },
+            locked_kb,
+            vm_flags
+        ));
+    }
+    content.into_bytes()
+}
+
+fn proc_smaps_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
+    let normalized = normalize_path("/", path)?;
+    if normalized == PROC_SELF_SMAPS_PATH {
+        return Some((normalized, proc_smaps_content_for_target(process)));
+    }
+    let rest = normalized.strip_prefix("/proc/")?;
+    let pid_text = rest.strip_suffix("/smaps")?;
+    let pid = pid_text.parse::<i32>().ok()?;
+    if pid == process.pid() {
+        return Some((normalized, proc_smaps_content_for_target(process)));
+    }
+    if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+        return Some((
+            normalized,
+            proc_smaps_content_for_target(entry.process.as_ref()),
+        ));
+    }
+    let entry = user_thread_entry_by_process_pid(pid)?;
+    Some((
+        normalized,
+        proc_smaps_content_for_target(entry.process.as_ref()),
+    ))
+}
+
+pub(super) fn proc_smaps_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_smaps_content(process, path)?;
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path,
+        data: Arc::new(data),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_smaps_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_smaps_content(process, path)?;
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        path.as_str(),
+        data.len(),
+    )))
 }
 
 fn proc_pagemap_target_path(process: &UserProcess, path: &str) -> Option<(String, i32)> {
