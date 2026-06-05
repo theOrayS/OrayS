@@ -7,9 +7,9 @@ use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
-use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr};
+use memory_addr::{MemoryAddr, PageIter4K, PhysAddr, VirtAddr, PAGE_SIZE_4K};
 
-use super::{Backend, SharedPages, pte_flags_for_mapping};
+use super::{pte_flags_for_mapping, Backend, SharedPages};
 
 static SHARED_FRAMES: LazyInit<SpinNoIrq<BTreeMap<usize, usize>>> = LazyInit::new();
 
@@ -50,7 +50,7 @@ fn forget_shared_frame(frame: PhysAddr) {
     shared_frames().lock().remove(&frame.as_usize());
 }
 
-fn release_owned_frame(frame: PhysAddr) {
+pub(crate) fn release_owned_frame(frame: PhysAddr) {
     let should_dealloc = {
         let mut frames = shared_frames().lock();
         let key = frame.as_usize();

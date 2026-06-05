@@ -10,7 +10,7 @@ use memory_set::MappingBackend;
 mod alloc;
 mod linear;
 
-pub(crate) use self::alloc::retain_shared_frame;
+pub(crate) use self::alloc::{release_owned_frame, retain_shared_frame};
 
 pub(crate) type SharedPages = Arc<SpinNoIrq<BTreeMap<usize, (PhysAddr, MappingFlags)>>>;
 

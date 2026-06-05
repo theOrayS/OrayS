@@ -1,5 +1,5 @@
 use core::mem::size_of;
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use axerrno::LinuxError;
 use axhal::context::{TrapFrame, UspaceContext};
@@ -8,14 +8,14 @@ use axtask::AxTaskRef;
 use std::sync::Arc;
 
 #[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{FS, Sstatus};
+use riscv::register::sstatus::{Sstatus, FS};
 
-use super::UserProcess;
 use super::linux_abi::neg_errno;
 use super::task_registry::user_thread_entry_by_tid;
 #[cfg(target_arch = "riscv64")]
 use super::user_memory::read_user_value;
 use super::user_memory::write_user_value;
+use super::UserProcess;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
@@ -30,8 +30,12 @@ const SYNTHETIC_INIT_PID: i32 = 1;
 pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
     pub(super) clear_child_tid: AtomicUsize,
+    pub(super) pending_signal_mask: AtomicU64,
     pub(super) pending_signal: AtomicI32,
     pub(super) pending_signal_sender: AtomicI32,
+    pub(super) pending_signal_code: AtomicI32,
+    pub(super) pending_signal_uid: AtomicU32,
+    pub(super) pending_signal_value: AtomicUsize,
     pub(super) signal_mask: AtomicU64,
     /// Mask to restore for fork-like children when libc temporarily blocks all
     /// maskable signals around fork. `u64::MAX` means no restore is pending.
@@ -57,8 +61,12 @@ impl UserTaskExt {
         Self {
             process,
             clear_child_tid: AtomicUsize::new(clear_child_tid),
+            pending_signal_mask: AtomicU64::new(0),
             pending_signal: AtomicI32::new(0),
             pending_signal_sender: AtomicI32::new(0),
+            pending_signal_code: AtomicI32::new(super::linux_abi::SI_TKILL_CODE),
+            pending_signal_uid: AtomicU32::new(0),
+            pending_signal_value: AtomicUsize::new(0),
             signal_mask: AtomicU64::new(signal_mask),
             fork_signal_mask_restore: AtomicU64::new(u64::MAX),
             sigsuspend_restore_mask: AtomicU64::new(u64::MAX),

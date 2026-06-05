@@ -19,11 +19,12 @@ use super::fd_table::{
     sys_chdir, sys_chroot, sys_close, sys_close_range, sys_copy_file_range, sys_dup, sys_dup3,
     sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
     sys_fadvise64, sys_fallocate, sys_fchdir, sys_fcntl, sys_flock, sys_fsync, sys_ftruncate,
-    sys_getcwd, sys_getdents64, sys_ioctl, sys_linkat, sys_lseek, sys_memfd_create, sys_mkdirat,
-    sys_mknodat, sys_openat, sys_pread64, sys_preadv, sys_preadv2, sys_pwrite64, sys_pwritev,
-    sys_pwritev2, sys_read, sys_readahead, sys_readv, sys_renameat2, sys_sendfile, sys_signalfd4,
-    sys_splice, sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat,
-    sys_write, sys_writev,
+    sys_getcwd, sys_getdents64, sys_inotify_init1, sys_ioctl, sys_kcmp, sys_linkat, sys_lseek,
+    sys_memfd_create, sys_mkdirat, sys_mknodat, sys_openat, sys_openat2, sys_pidfd_getfd,
+    sys_pidfd_open, sys_pread64, sys_preadv, sys_preadv2, sys_pwrite64, sys_pwritev, sys_pwritev2,
+    sys_read, sys_readahead, sys_readv, sys_renameat2, sys_sendfile, sys_signalfd4, sys_splice,
+    sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime, sys_unlinkat, sys_write,
+    sys_writev,
 };
 use super::futex::sys_futex;
 use super::linux_abi::neg_errno;
@@ -40,6 +41,10 @@ use super::metadata::{
     sys_truncate, sys_umask, sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
+use super::posix_mq::{
+    sys_mq_getsetattr, sys_mq_notify, sys_mq_open, sys_mq_timedreceive, sys_mq_timedsend,
+    sys_mq_unlink,
+};
 use super::process_abi::{sys_getpgid, sys_getsid, sys_personality, sys_setpgid, sys_setsid};
 use super::process_lifecycle::{
     sys_clone, sys_execve, sys_exit, sys_exit_group, sys_wait4, sys_waitid,
@@ -61,14 +66,16 @@ use super::resource_sched::{sys_getrlimit, sys_setrlimit};
 use super::select_fdset::sys_poll;
 use super::select_fdset::{sys_ppoll, sys_pselect6};
 use super::signal_abi::{
-    sys_kill, sys_rt_sigaction, sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigreturn,
-    sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill, sys_tkill,
+    sys_kill, sys_pidfd_send_signal, sys_rt_sigaction, sys_rt_sigpending, sys_rt_sigprocmask,
+    sys_rt_sigreturn, sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill,
+    sys_tkill,
 };
 use super::system_info::{
     sys_getcpu, sys_getrusage, sys_prctl, sys_setdomainname, sys_sethostname, sys_sysinfo,
     sys_syslog, sys_uname,
 };
 use super::sysv_msg::{sys_msgctl, sys_msgget, sys_msgrcv, sys_msgsnd};
+use super::sysv_sem::{sys_semctl, sys_semget, sys_semop, sys_semtimedop};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
     current_process, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
@@ -170,6 +177,27 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_chdir => sys_chdir(&process, tf.arg0()),
         general::__NR_chroot => sys_chroot(&process, tf.arg0()),
         general::__NR_openat => sys_openat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
+        general::__NR_openat2 => sys_openat2(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
+        general::__NR_mq_open => sys_mq_open(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
+        general::__NR_mq_unlink => sys_mq_unlink(&process, tf.arg0()),
+        general::__NR_mq_timedsend => sys_mq_timedsend(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_mq_timedreceive => sys_mq_timedreceive(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
+        general::__NR_mq_notify => sys_mq_notify(&process, tf.arg0(), tf.arg1()),
+        general::__NR_mq_getsetattr => sys_mq_getsetattr(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_mkdirat => sys_mkdirat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_mknodat => sys_mknodat(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_unlinkat => sys_unlinkat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
@@ -372,6 +400,24 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         )))]
         general::__NR_poll => sys_poll(&process, tf.arg0(), tf.arg1(), tf.arg2() as i32),
         general::__NR_eventfd2 => sys_eventfd2(&process, tf.arg0(), tf.arg1()),
+        general::__NR_inotify_init1 => sys_inotify_init1(&process, tf.arg0()),
+        general::__NR_pidfd_open => sys_pidfd_open(&process, tf.arg0(), tf.arg1()),
+        general::__NR_pidfd_getfd => sys_pidfd_getfd(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_pidfd_send_signal => sys_pidfd_send_signal(
+            &process,
+            tf.arg0() as i32,
+            tf.arg1() as i32,
+            tf.arg2(),
+            tf.arg3(),
+        ),
+        general::__NR_kcmp => sys_kcmp(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3(),
+            tf.arg4(),
+        ),
         general::__NR_timerfd_create => sys_timerfd_create(&process, tf.arg0(), tf.arg1()),
         general::__NR_timerfd_settime => {
             sys_timerfd_settime(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
@@ -468,6 +514,12 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_getcpu => sys_getcpu(&process, tf.arg0(), tf.arg1()),
         general::__NR_gettid => axtask::current().id().as_u64() as isize,
         general::__NR_brk => sys_brk(&process, tf.arg0()),
+        general::__NR_semget => sys_semget(&process, tf.arg0(), tf.arg1(), tf.arg2()),
+        general::__NR_semctl => sys_semctl(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
+        general::__NR_semtimedop => {
+            sys_semtimedop(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
+        }
+        general::__NR_semop => sys_semop(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_msgget => sys_msgget(&process, tf.arg0(), tf.arg1()),
         general::__NR_msgsnd => sys_msgsnd(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_msgrcv => sys_msgrcv(

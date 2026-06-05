@@ -3,16 +3,16 @@ use core::fmt;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use axhal::trap::PageFaultFlags;
 use memory_addr::{
-    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
+    is_aligned_4k, MemoryAddr, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, PAGE_SIZE_4K,
 };
 use memory_set::{MemoryArea, MemorySet};
 
-use crate::backend::{Backend, retain_shared_frame};
+use crate::backend::{retain_shared_frame, Backend};
 use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.
@@ -265,6 +265,32 @@ impl AddrSpace {
         }
 
         let area = MemoryArea::new(start, size, flags, Backend::new_alloc(populate));
+        self.areas
+            .map(area, &mut self.pt, false)
+            .map_err(mapping_err_to_ax_err)?;
+        Ok(())
+    }
+
+    /// Add a mapping backed by already-retained shared physical frames.
+    ///
+    /// `pages` is keyed by the target virtual address for each 4K page. The
+    /// caller owns the frame references before this call; on success the new
+    /// memory area takes those references and releases them on unmap/clear.
+    pub fn map_retained_shared_frames(
+        &mut self,
+        start: VirtAddr,
+        size: usize,
+        flags: MappingFlags,
+        pages: BTreeMap<usize, (PhysAddr, MappingFlags)>,
+    ) -> AxResult {
+        if !self.contains_range(start, size) {
+            return ax_err!(InvalidInput, "address out of range");
+        }
+        if !start.is_aligned_4k() || !is_aligned_4k(size) {
+            return ax_err!(InvalidInput, "address not aligned");
+        }
+
+        let area = MemoryArea::new(start, size, flags, Backend::new_shared(pages, false));
         self.areas
             .map(area, &mut self.pt, false)
             .map_err(mapping_err_to_ax_err)?;

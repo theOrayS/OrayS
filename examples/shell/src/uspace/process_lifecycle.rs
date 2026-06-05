@@ -8,7 +8,7 @@ use axmm::AddrSpace;
 use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
 use linux_raw_sys::general;
-use memory_addr::VirtAddr;
+use memory_addr::{PageIter4K, VirtAddr, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
 use std::string::String;
 use std::sync::Arc;
@@ -243,6 +243,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         shared_mmap_ranges: Mutex::new(Vec::new()),
         mmap_sigbus_ranges: Mutex::new(Vec::new()),
         mmap_ranges: Mutex::new(Vec::new()),
+        exec_shared_mmap_cache: Mutex::new(Vec::new()),
         mlock_future: AtomicBool::new(false),
         mlockall_accounted_kb: AtomicUsize::new(0),
         fds: Mutex::new(FdTable::new()),
@@ -307,6 +308,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
         waited_child_user_ticks: AtomicU64::new(0),
         waited_child_system_ticks: AtomicU64::new(0),
+        max_rss_kb: AtomicUsize::new(0),
+        waited_child_maxrss_kb: AtomicUsize::new(0),
         eval_watchdog_deadline_us: AtomicU64::new(0),
         child_wait_blocked: AtomicBool::new(false),
         syscall_wait_blocked: AtomicBool::new(false),
@@ -340,6 +343,7 @@ fn exec_program(
     let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
     let image = {
         let mut aspace = process.aspace.lock();
+        process.cache_exec_shared_file_mappings(&mut aspace);
         load_program_image(&mut aspace, cwd, path, &argv_refs, Some(env))?
     };
     // execve replaces user mappings while reusing the same page-table root for
@@ -527,9 +531,149 @@ impl UserProcess {
     }
 
     pub(super) fn teardown(&self) {
+        self.release_exec_shared_mmap_cache();
         sysv_shm::release_process_attachments(self);
         self.teardown
             .run(self.pid(), &self.aspace, &self.fds, &self.children);
+    }
+
+    pub(super) fn release_exec_shared_mmap_cache(&self) {
+        let mut cache = self.exec_shared_mmap_cache.lock();
+        for entry in core::mem::take(&mut *cache) {
+            entry.release_retained_frames();
+        }
+    }
+
+    pub(super) fn cache_exec_shared_file_mappings(&self, aspace: &mut AddrSpace) {
+        self.release_exec_shared_mmap_cache();
+        let mut next_cache = Vec::new();
+        for region in self.mmap_regions() {
+            if !region.shared {
+                continue;
+            }
+            let Some(backing) = region.file_backing.clone() else {
+                continue;
+            };
+            if region.size == 0 || region.size % PAGE_SIZE_4K != 0 {
+                continue;
+            }
+            let Some(iter) =
+                PageIter4K::new(VirtAddr::from(region.start), VirtAddr::from(region.end()))
+            else {
+                continue;
+            };
+            let mut pages = Vec::new();
+            for page in iter {
+                let Ok((frame, flags, page_size)) = aspace.page_table().query(page) else {
+                    continue;
+                };
+                if page_size.is_huge() {
+                    continue;
+                }
+                axmm::retain_shared_frame_ref(frame);
+                pages.push((page.as_usize() - region.start, frame, flags));
+            }
+            if pages.len() != region.size / PAGE_SIZE_4K {
+                for (_, frame, _) in pages {
+                    axmm::release_shared_frame_ref(frame);
+                }
+                continue;
+            }
+            next_cache.push(super::UserExecSharedMmapCache {
+                file: backing.file,
+                offset: backing.offset,
+                size: region.size,
+                valid_len: backing.valid_len,
+                pages,
+            });
+        }
+        *self.exec_shared_mmap_cache.lock() = next_cache;
+    }
+
+    pub(super) fn take_exec_shared_mmap_cache(
+        &self,
+        file: &super::fd_table::MmapFileBacking,
+        offset: u64,
+        size: usize,
+    ) -> Option<super::UserExecSharedMmapCache> {
+        let mut cache = self.exec_shared_mmap_cache.lock();
+        let index = cache.iter().position(|entry| {
+            entry.offset == offset && entry.size == size && entry.file.same_backing(file)
+        })?;
+        Some(cache.remove(index))
+    }
+
+    fn atomic_record_max(cell: &AtomicUsize, value: usize) {
+        let mut current = cell.load(Ordering::Acquire);
+        while value > current {
+            match cell.compare_exchange(current, value, Ordering::AcqRel, Ordering::Acquire) {
+                Ok(_) => return,
+                Err(observed) => current = observed,
+            }
+        }
+    }
+
+    pub(super) fn record_self_maxrss_kb(&self, value: usize) {
+        Self::atomic_record_max(&self.max_rss_kb, value);
+    }
+
+    pub(super) fn self_maxrss_kb(&self) -> usize {
+        self.max_rss_kb.load(Ordering::Acquire)
+    }
+
+    pub(super) fn child_maxrss_kb(&self) -> usize {
+        self.waited_child_maxrss_kb.load(Ordering::Acquire)
+    }
+
+    fn record_waited_child_maxrss(&self, value: usize) {
+        Self::atomic_record_max(&self.waited_child_maxrss_kb, value);
+    }
+
+    pub(super) fn sigchld_discards_wait_status(&self) -> bool {
+        let action = self
+            .signal_actions
+            .lock()
+            .get(&(SIGCHLD_NUM as usize))
+            .copied()
+            .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+        let handler = action
+            .sa_handler_kernel
+            .map(|func| func as usize)
+            .unwrap_or(0);
+        handler == 1 || action.sa_flags & general::SA_NOCLDWAIT as u64 != 0
+    }
+
+    pub(super) fn reap_ignored_child(&self, child_pid: i32) -> bool {
+        let mut children = self.children.lock();
+        let Some(index) = children.iter().position(|child| {
+            child.pid == child_pid && child.process.live_threads.load(Ordering::Acquire) == 0
+        }) else {
+            return false;
+        };
+        let _child = children.remove(index);
+        drop(children);
+        self.child_exit_wait.notify_all(false);
+        axtask::reap_exited_tasks();
+        true
+    }
+
+    pub(super) fn reap_exited_ignored_children(&self) {
+        let mut children = self.children.lock();
+        let mut index = 0;
+        let mut reaped = false;
+        while index < children.len() {
+            if children[index].process.live_threads.load(Ordering::Acquire) == 0 {
+                let _child = children.remove(index);
+                reaped = true;
+            } else {
+                index += 1;
+            }
+        }
+        drop(children);
+        if reaped {
+            self.child_exit_wait.notify_all(false);
+            axtask::reap_exited_tasks();
+        }
     }
 
     pub(super) fn add_thread(&self) {
@@ -542,7 +686,7 @@ impl UserProcess {
         if live_before == 1 {
             self.teardown();
             self.exit_wait.notify_all(false);
-            notify_parent_child_exit(self.ppid);
+            notify_parent_child_exit(self.ppid, self.pid());
         }
     }
 
@@ -700,18 +844,20 @@ impl UserProcess {
             return;
         };
         self.forget_mmap_region(start, end);
-        let mut ranges = self.mmap_ranges.lock();
-        ranges.push(super::UserMmapRegion {
-            start,
-            size,
-            prot,
-            shared,
-            anonymous,
-            locked,
-            may_write,
-            file_backing,
-        });
-        ranges.sort_by_key(|region| region.start);
+        {
+            let mut ranges = self.mmap_ranges.lock();
+            ranges.push(super::UserMmapRegion {
+                start,
+                size,
+                prot,
+                shared,
+                anonymous,
+                locked,
+                may_write,
+                file_backing,
+            });
+            ranges.sort_by_key(|region| region.start);
+        }
     }
 
     pub(super) fn mmap_range_denies_write(&self, start: usize, end: usize) -> bool {
@@ -903,6 +1049,7 @@ impl UserProcess {
             shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
             mmap_sigbus_ranges: Mutex::new(self.mmap_sigbus_ranges()),
             mmap_ranges: Mutex::new(child_mmap_ranges),
+            exec_shared_mmap_cache: Mutex::new(Vec::new()),
             mlock_future: AtomicBool::new(false),
             mlockall_accounted_kb: AtomicUsize::new(0),
             fds: Mutex::new(self.fds.lock().fork_copy()?),
@@ -967,6 +1114,8 @@ impl UserProcess {
             start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
             waited_child_user_ticks: AtomicU64::new(0),
             waited_child_system_ticks: AtomicU64::new(0),
+            max_rss_kb: AtomicUsize::new(self.self_maxrss_kb()),
+            waited_child_maxrss_kb: AtomicUsize::new(0),
             eval_watchdog_deadline_us: AtomicU64::new(
                 self.eval_watchdog_deadline_us.load(Ordering::Acquire),
             ),
@@ -996,13 +1145,13 @@ impl UserProcess {
     pub(super) fn record_wait_stopped(&self, sig: i32) {
         self.wait_continued_signal.store(0, Ordering::Release);
         self.wait_stopped_signal.store(sig, Ordering::Release);
-        notify_parent_child_exit(self.ppid);
+        notify_parent_child_exit(self.ppid, self.pid());
     }
 
     pub(super) fn record_wait_continued(&self, sig: i32) {
         self.wait_stopped_signal.store(0, Ordering::Release);
         self.wait_continued_signal.store(sig, Ordering::Release);
-        notify_parent_child_exit(self.ppid);
+        notify_parent_child_exit(self.ppid, self.pid());
     }
 
     fn wait_child_signal_event(
@@ -1240,11 +1389,28 @@ impl UserProcess {
                 .max(0) as u64,
             Ordering::AcqRel,
         );
+        let child_maxrss = child
+            .process
+            .self_maxrss_kb()
+            .max(child.process.child_maxrss_kb());
+        self.record_waited_child_maxrss(child_maxrss);
         let _ = child.task.join();
         child.process.teardown();
         drop(child);
         yield_for_task_gc();
         Ok(Some((child_pid, status)))
+    }
+
+    pub(super) fn child_exited(&self, pid: i32) -> Result<bool, LinuxError> {
+        let children = self.children.lock();
+        if children.is_empty() {
+            return Err(LinuxError::ECHILD);
+        }
+        children
+            .iter()
+            .find(|child| child.pid == pid)
+            .map(|child| child.process.live_threads.load(Ordering::Acquire) == 0)
+            .ok_or(LinuxError::ECHILD)
     }
 
     fn wait_status(&self) -> i32 {
@@ -1260,9 +1426,7 @@ impl UserProcess {
         let children = self.children.lock();
         children
             .iter()
-            .find(|child| {
-                child.pid == pid && child.process.live_threads.load(Ordering::Acquire) != 0
-            })
+            .find(|child| child.pid == pid)
             .map(|child| UserThreadEntry {
                 task: child.task.clone(),
                 process: child.process.clone(),
@@ -1270,8 +1434,13 @@ impl UserProcess {
     }
 }
 
-fn notify_parent_child_exit(ppid: i32) {
+fn notify_parent_child_exit(ppid: i32, child_pid: i32) {
     if let Some(parent) = user_thread_entry_by_process_pid(ppid) {
+        if parent.process.sigchld_discards_wait_status()
+            && parent.process.reap_ignored_child(child_pid)
+        {
+            return;
+        }
         parent.process.child_exit_wait.notify_all(false);
     }
 }
@@ -1639,13 +1808,27 @@ pub(super) fn sys_waitid(
         return neg_errno(LinuxError::EINVAL);
     }
 
-    let pid_filter = match waitid_pid_filter(idtype, id) {
-        Ok(pid_filter) => pid_filter,
-        Err(err) => return neg_errno(err),
-    };
     let nohang = options & general::WNOHANG != 0;
+    let (pid_filter, pidfd_nonblock) = if idtype == general::P_PIDFD {
+        match process.fds.lock().pidfd_wait_target(id) {
+            Ok((pid, nonblock)) => (pid, nonblock),
+            Err(err) => return neg_errno(err),
+        }
+    } else {
+        match waitid_pid_filter(idtype, id) {
+            Ok(pid_filter) => (pid_filter, false),
+            Err(err) => return neg_errno(err),
+        }
+    };
     let want_stopped = options & general::WSTOPPED != 0;
     let want_continued = options & general::WCONTINUED != 0;
+    if pidfd_nonblock && !nohang && !want_stopped && !want_continued {
+        match process.child_exited(pid_filter) {
+            Ok(true) => {}
+            Ok(false) => return neg_errno(LinuxError::EAGAIN),
+            Err(err) => return neg_errno(err),
+        }
+    }
     if want_stopped || want_continued {
         let wait_result = match process.wait_child_signal_event(
             pid_filter,

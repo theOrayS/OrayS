@@ -6,10 +6,11 @@ use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
 use super::task_registry::live_user_thread_count;
+use super::time_abi::{process_times, USER_HZ};
 use super::user_memory::{
     read_user_bytes, validate_user_write, write_user_bytes, write_user_value,
 };
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 pub(super) enum SyslogAction {
     Read,
@@ -51,17 +52,47 @@ fn default_rusage() -> general::rusage {
     unsafe { core::mem::zeroed() }
 }
 
+fn timeval_from_ticks(ticks: isize) -> general::__kernel_old_timeval {
+    let ticks = ticks.max(0) as i128;
+    let user_hz = USER_HZ as i128;
+    general::__kernel_old_timeval {
+        tv_sec: (ticks / user_hz) as _,
+        tv_usec: ((ticks % user_hz) * 1_000_000 / user_hz) as _,
+    }
+}
+
 fn rusage_target_valid(who: i32) -> bool {
     who == general::RUSAGE_SELF as i32
         || who == general::RUSAGE_THREAD as i32
         || who == general::RUSAGE_CHILDREN
 }
 
-pub(super) fn write_default_rusage(process: &UserProcess, who: i32, usage: usize) -> isize {
+fn process_rusage(process: &UserProcess, who: i32) -> Result<general::rusage, LinuxError> {
     if !rusage_target_valid(who) {
-        return neg_errno(LinuxError::EINVAL);
+        return Err(LinuxError::EINVAL);
     }
-    let value = default_rusage();
+    let mut value = default_rusage();
+    let times = process_times(process);
+    match who {
+        who if who == general::RUSAGE_CHILDREN => {
+            value.ru_utime = timeval_from_ticks(times.tms_cutime as isize);
+            value.ru_stime = timeval_from_ticks(times.tms_cstime as isize);
+            value.ru_maxrss = process.child_maxrss_kb() as _;
+        }
+        _ => {
+            value.ru_utime = timeval_from_ticks(times.tms_utime as isize);
+            value.ru_stime = timeval_from_ticks(times.tms_stime as isize);
+            value.ru_maxrss = process.self_maxrss_kb() as _;
+        }
+    }
+    Ok(value)
+}
+
+pub(super) fn write_default_rusage(process: &UserProcess, who: i32, usage: usize) -> isize {
+    let value = match process_rusage(process, who) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
     write_user_value(process, usage, &value)
 }
 

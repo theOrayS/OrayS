@@ -13,11 +13,11 @@ pub use self::aspace::{AddrSpace, AddrSpaceQuery};
 pub use self::backend::Backend;
 
 use axerrno::{AxError, AxResult};
-use axhal::mem::{MemRegionFlags, phys_to_virt};
+use axhal::mem::{phys_to_virt, MemRegionFlags};
 use axhal::paging::MappingFlags;
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
-use memory_addr::{MemoryAddr, PhysAddr, VirtAddr, va};
+use memory_addr::{va, MemoryAddr, PhysAddr, VirtAddr};
 use memory_set::MappingError;
 
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
@@ -93,6 +93,20 @@ pub fn kernel_aspace() -> &'static SpinNoIrq<AddrSpace> {
 /// Returns the root physical address of the kernel page table.
 pub fn kernel_page_table_root() -> PhysAddr {
     KERNEL_ASPACE.lock().page_table_root()
+}
+
+/// Retains a user frame that is temporarily kept outside an address space.
+///
+/// The paired [`release_shared_frame_ref`] must be called if the retained frame
+/// is not installed into another shared mapping.
+pub fn retain_shared_frame_ref(frame: PhysAddr) {
+    backend::retain_shared_frame(frame);
+}
+
+/// Releases a frame reference previously retained with
+/// [`retain_shared_frame_ref`].
+pub fn release_shared_frame_ref(frame: PhysAddr) {
+    backend::release_owned_frame(frame);
 }
 
 /// Initializes virtual memory management.

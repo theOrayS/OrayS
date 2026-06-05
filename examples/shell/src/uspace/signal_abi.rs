@@ -76,6 +76,73 @@ fn unmaskable_signal_bits() -> u64 {
     signal_mask_bit(SIGKILL_NUM) | signal_mask_bit(SIGSTOP_NUM)
 }
 
+fn first_signal_from_mask(mask: u64) -> i32 {
+    if mask == 0 {
+        0
+    } else {
+        mask.trailing_zeros() as i32 + 1
+    }
+}
+
+fn pending_signal_mask(ext: &UserTaskExt) -> u64 {
+    ext.pending_signal_mask.load(Ordering::Acquire)
+}
+
+fn set_pending_signal_hint(ext: &UserTaskExt, mask: u64) {
+    ext.pending_signal
+        .store(first_signal_from_mask(mask), Ordering::Release);
+}
+
+fn queue_pending_signal(ext: &UserTaskExt, sig: i32, sender_pid: i32) {
+    queue_pending_signal_info(ext, sig, sender_pid, SI_TKILL_CODE, 0, 0);
+}
+
+fn queue_pending_signal_info(
+    ext: &UserTaskExt,
+    sig: i32,
+    sender_pid: i32,
+    code: i32,
+    sender_uid: u32,
+    value: usize,
+) {
+    let bit = signal_mask_bit(sig);
+    if bit == 0 {
+        return;
+    }
+    ext.pending_signal_sender
+        .store(sender_pid, Ordering::Release);
+    ext.pending_signal_code.store(code, Ordering::Release);
+    ext.pending_signal_uid.store(sender_uid, Ordering::Release);
+    ext.pending_signal_value.store(value, Ordering::Release);
+    ext.pending_signal_mask.fetch_or(bit, Ordering::AcqRel);
+    ext.pending_signal.store(sig, Ordering::Release);
+}
+
+fn clear_pending_signal(ext: &UserTaskExt, sig: i32) {
+    let bit = signal_mask_bit(sig);
+    if bit == 0 {
+        return;
+    }
+    let next = ext.pending_signal_mask.fetch_and(!bit, Ordering::AcqRel) & !bit;
+    set_pending_signal_hint(ext, next);
+}
+
+fn first_unblocked_pending_signal(ext: &UserTaskExt) -> i32 {
+    let mut mask = pending_signal_mask(ext);
+    while mask != 0 {
+        let sig = first_signal_from_mask(mask);
+        if sig == 0 {
+            break;
+        }
+        let bit = signal_mask_bit(sig);
+        if !signal_is_blocked(ext, sig) {
+            return sig;
+        }
+        mask &= !bit;
+    }
+    0
+}
+
 pub(super) fn all_application_signal_mask() -> u64 {
     !unmaskable_signal_bits()
 }
@@ -141,7 +208,7 @@ pub(super) fn queue_current_synchronous_signal(sig: i32) -> bool {
     };
     if signal_is_blocked(ext, sig)
         || ext.signal_frame.load(Ordering::Acquire) != 0
-        || ext.pending_signal.load(Ordering::Acquire) != 0
+        || pending_signal_mask(ext) != 0
     {
         return false;
     }
@@ -167,36 +234,40 @@ pub(super) fn queue_current_synchronous_signal(sig: i32) -> bool {
 
 pub(super) fn current_sigcancel_pending() -> bool {
     current_task_ext().is_some_and(|ext| {
-        ext.pending_signal.load(Ordering::Acquire) == SIGCANCEL_NUM
+        pending_signal_mask(ext) & signal_mask_bit(SIGCANCEL_NUM) != 0
             && !signal_is_blocked(ext, SIGCANCEL_NUM)
     })
 }
 
 pub(super) fn current_unblocked_signal_pending() -> bool {
-    current_task_ext().is_some_and(|ext| {
-        let sig = ext.pending_signal.load(Ordering::Acquire);
-        sig != 0 && !signal_is_blocked(ext, sig)
-    })
+    current_task_ext().is_some_and(|ext| first_unblocked_pending_signal(ext) != 0)
 }
 
 pub(super) fn current_pending_signal_matches(mask: u64) -> bool {
-    current_task_ext().is_some_and(|ext| {
-        let sig = ext.pending_signal.load(Ordering::Acquire);
-        sig != 0 && signal_mask_bit(sig) & mask != 0
-    })
+    current_task_ext().is_some_and(|ext| pending_signal_mask(ext) & mask != 0)
 }
 
 pub(super) fn take_current_pending_signal_matching(mask: u64) -> Option<(i32, i32)> {
     let ext = current_task_ext()?;
-    let sig = ext.pending_signal.load(Ordering::Acquire);
-    if sig == 0 || signal_mask_bit(sig) & mask == 0 {
-        return None;
+    loop {
+        let pending = pending_signal_mask(ext);
+        let matched = pending & mask;
+        if matched == 0 {
+            return None;
+        }
+        let sig = first_signal_from_mask(matched);
+        let bit = signal_mask_bit(sig);
+        let next = pending & !bit;
+        if ext
+            .pending_signal_mask
+            .compare_exchange(pending, next, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            set_pending_signal_hint(ext, next);
+            let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
+            return Some((sig, sender_pid));
+        }
     }
-    let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
-    ext.pending_signal
-        .compare_exchange(sig, 0, Ordering::AcqRel, Ordering::Acquire)
-        .ok()
-        .map(|_| (sig, sender_pid))
 }
 
 pub(super) fn install_temporary_signal_mask(
@@ -224,6 +295,28 @@ pub(super) fn deliver_user_signal(
     sig: i32,
     sender_pid: i32,
 ) -> Result<(), LinuxError> {
+    deliver_user_signal_inner(entry, sig, sender_pid, SI_TKILL_CODE, 0, 0)
+}
+
+pub(super) fn deliver_user_signal_with_siginfo(
+    entry: &UserThreadEntry,
+    sig: i32,
+    sender_pid: i32,
+    code: i32,
+    sender_uid: u32,
+    value: i32,
+) -> Result<(), LinuxError> {
+    deliver_user_signal_inner(entry, sig, sender_pid, code, sender_uid, value as usize)
+}
+
+fn deliver_user_signal_inner(
+    entry: &UserThreadEntry,
+    sig: i32,
+    sender_pid: i32,
+    code: i32,
+    sender_uid: u32,
+    value: usize,
+) -> Result<(), LinuxError> {
     if sig == 0 {
         return Ok(());
     }
@@ -249,9 +342,7 @@ pub(super) fn deliver_user_signal(
             ext.process.record_wait_continued(sig);
         }
     }
-    ext.pending_signal_sender
-        .store(sender_pid, Ordering::Release);
-    ext.pending_signal.store(sig, Ordering::Release);
+    queue_pending_signal_info(ext, sig, sender_pid, code, sender_uid, value);
     if sig == SIGCANCEL_NUM {
         user_trace!(
             "sigdbg: deliver tid={} blocked={} futex_wait={:#x}",
@@ -270,23 +361,32 @@ pub(super) fn deliver_user_signal(
 }
 
 fn request_pending_default_terminate_signal(ext: &UserTaskExt) {
-    let sig = ext.pending_signal.load(Ordering::Acquire);
-    if sig == 0 || signal_is_blocked(ext, sig) {
-        return;
-    }
-    let action = ext
-        .process
-        .signal_actions
-        .lock()
-        .get(&(sig as usize))
-        .copied()
-        .unwrap_or_else(|| unsafe { core::mem::zeroed() });
-    let handler = action
-        .sa_handler_kernel
-        .map(|func| func as usize)
-        .unwrap_or(0);
-    if handler == 0 && default_signal_terminates(sig) {
-        ext.process.request_signal_exit_group(sig);
+    let mut mask = pending_signal_mask(ext);
+    while mask != 0 {
+        let sig = first_signal_from_mask(mask);
+        if sig == 0 {
+            return;
+        }
+        let bit = signal_mask_bit(sig);
+        mask &= !bit;
+        if signal_is_blocked(ext, sig) {
+            continue;
+        }
+        let action = ext
+            .process
+            .signal_actions
+            .lock()
+            .get(&(sig as usize))
+            .copied()
+            .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+        let handler = action
+            .sa_handler_kernel
+            .map(|func| func as usize)
+            .unwrap_or(0);
+        if handler == 0 && default_signal_terminates(sig) {
+            ext.process.request_signal_exit_group(sig);
+            return;
+        }
     }
 }
 
@@ -380,23 +480,22 @@ fn user_return_hook(tf: &mut TrapFrame) {
     if let Some(code) = ext.process.pending_exit_group() {
         terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
     }
-    if ext.pending_signal.load(Ordering::Acquire) == SIGCANCEL_NUM
+    if pending_signal_mask(ext) & signal_mask_bit(SIGCANCEL_NUM) != 0
         && !signal_is_blocked(ext, SIGCANCEL_NUM)
     {
-        ext.pending_signal.store(0, Ordering::Release);
+        clear_pending_signal(ext, SIGCANCEL_NUM);
         terminate_current_thread(ext.process.as_ref(), 0);
     }
     if ext.signal_frame.load(Ordering::Acquire) == 0 {
         if let Some(restored) = ext.pending_sigreturn.lock().take() {
             *tf = restored;
-            return;
         }
     }
     let _ = ext.process.consume_expired_real_timer();
     #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
     if ext.signal_frame.load(Ordering::Acquire) == 0 {
-        let sig = ext.pending_signal.load(Ordering::Acquire);
-        if sig != 0 && !signal_is_blocked(ext, sig) {
+        let sig = first_unblocked_pending_signal(ext);
+        if sig != 0 {
             let _ = inject_pending_signal(tf, ext, sig);
         }
     }
@@ -451,7 +550,7 @@ fn inject_pending_signal(
         );
     }
     if handler <= 1 {
-        ext.pending_signal.store(0, Ordering::Release);
+        clear_pending_signal(ext, sig);
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
         if handler == 0 && default_signal_terminates(sig) {
@@ -468,10 +567,15 @@ fn inject_pending_signal(
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
 
     let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
+    let code = ext.pending_signal_code.load(Ordering::Acquire);
+    let sender_uid = ext.pending_signal_uid.load(Ordering::Acquire);
+    let value = ext.pending_signal_value.load(Ordering::Acquire);
     let frame = make_riscv_signal_frame(
         sig,
-        SI_TKILL_CODE,
+        code,
         sender_pid,
+        sender_uid,
+        value,
         restore_mask,
         SS_DISABLE,
         RISCV_SIGTRAMP_CODE,
@@ -485,7 +589,7 @@ fn inject_pending_signal(
 
     *ext.pending_sigreturn.lock() = Some(*tf);
     ext.signal_frame.store(frame_addr, Ordering::Release);
-    ext.pending_signal.store(0, Ordering::Release);
+    clear_pending_signal(ext, sig);
     let mut next_mask = current_mask | action.sa_mask.sig[0];
     if action.sa_flags & SA_NODEFER_FLAG == 0 {
         next_mask |= signal_mask_bit(sig);
@@ -526,7 +630,7 @@ fn inject_pending_signal(
         .map(|func| func as usize)
         .unwrap_or(0);
     if handler <= 1 {
-        ext.pending_signal.store(0, Ordering::Release);
+        clear_pending_signal(ext, sig);
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
         if handler == 0 && default_signal_terminates(sig) {
@@ -544,10 +648,15 @@ fn inject_pending_signal(
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
 
     let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
+    let code = ext.pending_signal_code.load(Ordering::Acquire);
+    let sender_uid = ext.pending_signal_uid.load(Ordering::Acquire);
+    let value = ext.pending_signal_value.load(Ordering::Acquire);
     let frame = make_loongarch_signal_frame(
         sig,
-        SI_TKILL_CODE,
+        code,
         sender_pid,
+        sender_uid,
+        value,
         restore_mask,
         SS_DISABLE,
         LOONGARCH_SIGTRAMP_CODE,
@@ -560,7 +669,7 @@ fn inject_pending_signal(
 
     *ext.pending_sigreturn.lock() = Some(*tf);
     ext.signal_frame.store(frame_addr, Ordering::Release);
-    ext.pending_signal.store(0, Ordering::Release);
+    clear_pending_signal(ext, sig);
     let mut next_mask = current_mask | action.sa_mask.sig[0];
     if action.sa_flags & SA_NODEFER_FLAG == 0 {
         next_mask |= signal_mask_bit(sig);
@@ -632,6 +741,9 @@ pub(super) fn sys_rt_sigaction(
             );
         }
         process.signal_actions.lock().insert(signum, new_action);
+        if signum == general::SIGCHLD as usize && process.sigchld_discards_wait_status() {
+            process.reap_exited_ignored_children();
+        }
     }
 
     0
@@ -710,7 +822,7 @@ pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
         apply_riscv_sigcontext(&mut restored, &frame.ucontext.mcontext);
         ext.signal_mask
             .store(frame.ucontext.sigmask.sig[0], Ordering::Release);
-        if ext.pending_signal.load(Ordering::Acquire) == 0 {
+        if pending_signal_mask(ext) == 0 {
             user_trace!(
                 "sigdbg: rt_sigreturn tid={} frame={frame_addr:#x} restore_sp={:#x} restore_tp={:#x} restore_pc={:#x}",
                 current_tid(),
@@ -830,8 +942,7 @@ pub(super) fn sys_rt_sigpending(process: &UserProcess, set: usize, sigsetsize: u
         return neg_errno(err);
     }
 
-    let pending_sig = ext.pending_signal.load(Ordering::Acquire);
-    let pending_mask = signal_mask_bit(pending_sig);
+    let pending_mask = pending_signal_mask(ext);
     write_user_bytes(process, set, &pending_mask.to_ne_bytes())
         .map(|()| 0)
         .unwrap_or_else(neg_errno)
@@ -1051,6 +1162,51 @@ pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -
     ret
 }
 
+pub(super) fn sys_pidfd_send_signal(
+    process: &UserProcess,
+    pidfd: i32,
+    sig: i32,
+    info: usize,
+    flags: usize,
+) -> isize {
+    if flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if let Err(err) = validate_signal_target(sig) {
+        return neg_errno(err);
+    }
+
+    let entry = match process.fds.lock().pidfd_signal_target(process, pidfd) {
+        Ok(entry) => entry,
+        Err(err) => return neg_errno(err),
+    };
+    if !signal_permission_allowed(process, entry.process.as_ref(), sig) {
+        return neg_errno(LinuxError::EPERM);
+    }
+    if sig == 0 {
+        return 0;
+    }
+
+    let result = if info != 0 {
+        let siginfo = match read_user_bytes(process, info, 128) {
+            Ok(bytes) => bytes,
+            Err(err) => return neg_errno(err),
+        };
+        let si_signo = i32::from_ne_bytes(siginfo[0..4].try_into().unwrap());
+        if si_signo != sig {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let si_code = i32::from_ne_bytes(siginfo[8..12].try_into().unwrap());
+        let si_pid = i32::from_ne_bytes(siginfo[16..20].try_into().unwrap());
+        let si_uid = u32::from_ne_bytes(siginfo[20..24].try_into().unwrap());
+        let si_value = i32::from_ne_bytes(siginfo[24..28].try_into().unwrap());
+        deliver_user_signal_with_siginfo(&entry, sig, si_pid, si_code, si_uid, si_value)
+    } else {
+        deliver_user_signal(&entry, sig, process.pid())
+    };
+    result.map_or_else(neg_errno, |_| 0)
+}
+
 #[cfg(target_arch = "riscv64")]
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1213,13 +1369,14 @@ pub(super) fn apply_riscv_sigcontext(tf: &mut TrapFrame, sigcontext: &RiscvSigna
 }
 
 #[cfg(target_arch = "riscv64")]
-fn make_riscv_siginfo(sig: i32, code: i32, tid: i32) -> RiscvSignalInfo {
+fn make_riscv_siginfo(sig: i32, code: i32, tid: i32, uid: u32, value: usize) -> RiscvSignalInfo {
     let mut info = RiscvSignalInfo { bytes: [0; 128] };
     info.bytes[0..4].copy_from_slice(&sig.to_ne_bytes());
     info.bytes[4..8].copy_from_slice(&0i32.to_ne_bytes());
     info.bytes[8..12].copy_from_slice(&code.to_ne_bytes());
     info.bytes[16..20].copy_from_slice(&tid.to_ne_bytes());
-    info.bytes[20..24].copy_from_slice(&0u32.to_ne_bytes());
+    info.bytes[20..24].copy_from_slice(&uid.to_ne_bytes());
+    info.bytes[24..32].copy_from_slice(&value.to_ne_bytes());
     info
 }
 
@@ -1228,13 +1385,15 @@ pub(super) fn make_riscv_signal_frame(
     sig: i32,
     code: i32,
     tid: i32,
+    uid: u32,
+    value: usize,
     current_mask: u64,
     stack_flags: i32,
     trampoline: [u32; 3],
     mcontext: RiscvSignalSigcontext,
 ) -> RiscvSignalFrame {
     RiscvSignalFrame {
-        info: make_riscv_siginfo(sig, code, tid),
+        info: make_riscv_siginfo(sig, code, tid, uid, value),
         ucontext: RiscvSignalUcontext {
             flags: 0,
             link: 0,
@@ -1403,13 +1562,20 @@ pub(super) fn apply_loongarch_sigcontext(tf: &mut TrapFrame, sigcontext: &LoongA
 }
 
 #[cfg(target_arch = "loongarch64")]
-fn make_loongarch_siginfo(sig: i32, code: i32, tid: i32) -> LoongArchSignalInfo {
+fn make_loongarch_siginfo(
+    sig: i32,
+    code: i32,
+    tid: i32,
+    uid: u32,
+    value: usize,
+) -> LoongArchSignalInfo {
     let mut info = LoongArchSignalInfo { bytes: [0; 128] };
     info.bytes[0..4].copy_from_slice(&sig.to_ne_bytes());
     info.bytes[4..8].copy_from_slice(&0i32.to_ne_bytes());
     info.bytes[8..12].copy_from_slice(&code.to_ne_bytes());
     info.bytes[16..20].copy_from_slice(&tid.to_ne_bytes());
-    info.bytes[20..24].copy_from_slice(&0u32.to_ne_bytes());
+    info.bytes[20..24].copy_from_slice(&uid.to_ne_bytes());
+    info.bytes[24..32].copy_from_slice(&value.to_ne_bytes());
     info
 }
 
@@ -1418,13 +1584,15 @@ pub(super) fn make_loongarch_signal_frame(
     sig: i32,
     code: i32,
     tid: i32,
+    uid: u32,
+    value: usize,
     current_mask: u64,
     stack_flags: i32,
     trampoline: [u32; 3],
     mcontext: LoongArchSigcontext,
 ) -> LoongArchSignalFrame {
     LoongArchSignalFrame {
-        info: make_loongarch_siginfo(sig, code, tid),
+        info: make_loongarch_siginfo(sig, code, tid, uid, value),
         ucontext: LoongArchUcontext {
             flags: 0,
             link: 0,
