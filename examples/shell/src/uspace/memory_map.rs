@@ -1107,6 +1107,9 @@ pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize
         Ok(None) => return 0,
         Err(err) => return neg_errno(err),
     };
+    if let Err(err) = enforce_memlock_limit(process, end - start) {
+        return neg_errno(err);
+    }
     let mut aspace = process.aspace.lock();
     if aspace
         .populate_range(VirtAddr::from(start), end - start, PageFaultFlags::READ)
@@ -1137,19 +1140,41 @@ pub(super) fn sys_mlockall(process: &UserProcess, flags: usize) -> isize {
     {
         return neg_errno(LinuxError::EINVAL);
     }
+    let current_lock_bytes = if flags as u32 & general::MCL_CURRENT != 0 {
+        let brk = process.brk.lock();
+        brk.end.saturating_sub(brk.start).max(PAGE_SIZE_4K)
+    } else {
+        0
+    };
+    if let Err(err) = enforce_memlock_limit(process, current_lock_bytes) {
+        return neg_errno(err);
+    }
+
     if flags as u32 & general::MCL_FUTURE != 0 {
         process.mlock_future.store(true, Ordering::Release);
     }
     if flags as u32 & general::MCL_CURRENT != 0 {
         process.set_all_mmap_locked(true);
-        let brk = process.brk.lock();
-        let heap_bytes = brk.end.saturating_sub(brk.start);
-        let accounted_kb = heap_bytes.max(PAGE_SIZE_4K) / 1024;
+        let accounted_kb = current_lock_bytes / 1024;
         process
             .mlockall_accounted_kb
             .store(accounted_kb.max(1), Ordering::Release);
     }
     0
+}
+
+fn enforce_memlock_limit(process: &UserProcess, bytes: usize) -> Result<(), LinuxError> {
+    if bytes == 0 || process.uid() == 0 {
+        return Ok(());
+    }
+    let limit = process.get_rlimit(general::RLIMIT_MEMLOCK).current();
+    if limit == 0 {
+        return Err(LinuxError::EPERM);
+    }
+    if bytes as u64 > limit {
+        return Err(LinuxError::ENOMEM);
+    }
+    Ok(())
 }
 
 pub(super) fn sys_munlockall(process: &UserProcess) -> isize {
