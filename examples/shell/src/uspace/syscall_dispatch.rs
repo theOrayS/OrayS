@@ -68,6 +68,7 @@ use super::system_info::{
     sys_getcpu, sys_getrusage, sys_prctl, sys_setdomainname, sys_sethostname, sys_sysinfo,
     sys_syslog, sys_uname,
 };
+use super::sysv_msg::{sys_msgctl, sys_msgget, sys_msgrcv, sys_msgsnd};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
     current_process, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
@@ -467,6 +468,17 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_getcpu => sys_getcpu(&process, tf.arg0(), tf.arg1()),
         general::__NR_gettid => axtask::current().id().as_u64() as isize,
         general::__NR_brk => sys_brk(&process, tf.arg0()),
+        general::__NR_msgget => sys_msgget(&process, tf.arg0(), tf.arg1()),
+        general::__NR_msgsnd => sys_msgsnd(&process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
+        general::__NR_msgrcv => sys_msgrcv(
+            &process,
+            tf.arg0(),
+            tf.arg1(),
+            tf.arg2(),
+            tf.arg3() as isize,
+            tf.arg4(),
+        ),
+        general::__NR_msgctl => sys_msgctl(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_shmget => sys_shmget(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_shmat => sys_shmat(&process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_shmdt => sys_shmdt(&process, tf, tf.arg0()),
