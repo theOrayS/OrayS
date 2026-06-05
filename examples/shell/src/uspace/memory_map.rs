@@ -1102,6 +1102,18 @@ pub(super) fn sys_mincore(process: &UserProcess, addr: usize, len: usize, vec: u
 }
 
 pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize {
+    mlock_range(process, addr, len, true)
+}
+
+pub(super) fn sys_mlock2(process: &UserProcess, addr: usize, len: usize, flags: usize) -> isize {
+    let flags = flags as u32;
+    if flags & !general::MLOCK_ONFAULT != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    mlock_range(process, addr, len, flags & general::MLOCK_ONFAULT == 0)
+}
+
+fn mlock_range(process: &UserProcess, addr: usize, len: usize, populate: bool) -> isize {
     let (start, end) = match validate_lock_range(process, addr, len) {
         Ok(Some(range)) => range,
         Ok(None) => return 0,
@@ -1110,14 +1122,15 @@ pub(super) fn sys_mlock(process: &UserProcess, addr: usize, len: usize) -> isize
     if let Err(err) = enforce_memlock_limit(process, end - start) {
         return neg_errno(err);
     }
-    let mut aspace = process.aspace.lock();
-    if aspace
-        .populate_range(VirtAddr::from(start), end - start, PageFaultFlags::READ)
-        .is_err()
-    {
-        return neg_errno(LinuxError::ENOMEM);
+    if populate {
+        let mut aspace = process.aspace.lock();
+        if aspace
+            .populate_range(VirtAddr::from(start), end - start, PageFaultFlags::READ)
+            .is_err()
+        {
+            return neg_errno(LinuxError::ENOMEM);
+        }
     }
-    drop(aspace);
     process.set_mmap_lock_range(start, end, true);
     0
 }
