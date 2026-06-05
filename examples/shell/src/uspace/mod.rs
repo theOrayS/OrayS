@@ -35,6 +35,7 @@ mod signal_abi;
 mod synthetic_fs;
 mod syscall_dispatch;
 mod system_info;
+mod sysv_msg;
 mod sysv_shm;
 mod task_context;
 mod task_registry;
