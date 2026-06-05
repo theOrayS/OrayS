@@ -78,6 +78,9 @@ const MEMFD_NAME_MAX: usize = 249;
 const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
 const FALLOC_FL_KEEP_SIZE: usize = 0x01;
 const FALLOC_FL_PUNCH_HOLE: usize = 0x02;
+const FALLOC_FL_COLLAPSE_RANGE: usize = 0x08;
+const FALLOC_FL_ZERO_RANGE: usize = 0x10;
+const FALLOC_FL_INSERT_RANGE: usize = 0x20;
 const POSIX_FADV_MIN: i32 = 0;
 const POSIX_FADV_MAX: i32 = 5;
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
@@ -327,9 +330,27 @@ pub(super) fn sys_fallocate(
     if offset < 0 || len <= 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    let supported_modes = FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE;
-    if mode & !supported_modes != 0
-        || mode & FALLOC_FL_PUNCH_HOLE != 0 && mode & FALLOC_FL_KEEP_SIZE == 0
+    let supported_modes = FALLOC_FL_KEEP_SIZE
+        | FALLOC_FL_PUNCH_HOLE
+        | FALLOC_FL_COLLAPSE_RANGE
+        | FALLOC_FL_ZERO_RANGE
+        | FALLOC_FL_INSERT_RANGE;
+    if mode & !supported_modes != 0 {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
+    let range_ops = [
+        FALLOC_FL_PUNCH_HOLE,
+        FALLOC_FL_COLLAPSE_RANGE,
+        FALLOC_FL_ZERO_RANGE,
+        FALLOC_FL_INSERT_RANGE,
+    ]
+    .into_iter()
+    .filter(|flag| mode & *flag != 0)
+    .count();
+    if range_ops > 1
+        || mode & FALLOC_FL_PUNCH_HOLE != 0 && mode != FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE
+        || mode & FALLOC_FL_COLLAPSE_RANGE != 0 && mode != FALLOC_FL_COLLAPSE_RANGE
+        || mode & FALLOC_FL_INSERT_RANGE != 0 && mode != FALLOC_FL_INSERT_RANGE
     {
         return neg_errno(LinuxError::EOPNOTSUPP);
     }
@@ -348,10 +369,34 @@ pub(super) fn sys_fallocate(
             .fds
             .lock()
             .fallocate_punch_hole(process, fd as i32, offset as u64, len as u64)
+    } else if mode & FALLOC_FL_ZERO_RANGE != 0 {
+        process.fds.lock().fallocate_zero_range(
+            process,
+            fd as i32,
+            offset as u64,
+            len as u64,
+            mode & FALLOC_FL_KEEP_SIZE != 0,
+        )
+    } else if mode & FALLOC_FL_COLLAPSE_RANGE != 0 {
+        process
+            .fds
+            .lock()
+            .fallocate_collapse_range(process, fd as i32, offset as u64, len as u64)
+    } else if mode & FALLOC_FL_INSERT_RANGE != 0 {
+        process
+            .fds
+            .lock()
+            .fallocate_insert_range(process, fd as i32, offset as u64, len as u64)
     } else if mode == FALLOC_FL_KEEP_SIZE {
-        process.fds.lock().fallocate_keep_size(process, fd as i32)
+        process
+            .fds
+            .lock()
+            .fallocate_allocate(process, fd as i32, offset as u64, len as u64, true)
     } else {
-        process.fds.lock().truncate(process, fd as i32, end)
+        process
+            .fds
+            .lock()
+            .fallocate_allocate(process, fd as i32, offset as u64, len as u64, false)
     };
     match result {
         Ok(()) => 0,
@@ -1098,6 +1143,51 @@ pub(super) fn sys_pread64(
 
 pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+    if count > MAX_USER_IO_CHUNK {
+        let mut written = 0usize;
+        while written < count {
+            let base = match buf.checked_add(written) {
+                Some(base) => base,
+                None => {
+                    return if written > 0 {
+                        written as isize
+                    } else {
+                        neg_errno(LinuxError::EFAULT)
+                    };
+                }
+            };
+            let len = (count - written).min(MAX_USER_IO_CHUNK);
+            let src = match read_user_bytes(process, base, len) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    return if written > 0 {
+                        written as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            let n = match process
+                .fds
+                .lock()
+                .write(process, fd as i32, &src, Some(file_size_limit))
+            {
+                Ok(v) => v,
+                Err(err) => {
+                    return if written > 0 {
+                        written as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            written += n;
+            if n < len {
+                return written as isize;
+            }
+        }
+        return written as isize;
+    }
     with_readable_user_buffer(process, buf, count, |src| {
         process
             .fds
@@ -3293,24 +3383,43 @@ impl FdTable {
         }
     }
 
-    pub(super) fn fallocate_keep_size(
+    pub(super) fn fallocate_allocate(
         &mut self,
         process: &UserProcess,
         fd: i32,
+        offset: u64,
+        len: u64,
+        keep_size: bool,
     ) -> Result<(), LinuxError> {
+        let end = offset.checked_add(len).ok_or(LinuxError::EFBIG)?;
         match self.entry_mut(fd)? {
             FdEntry::File(file) => {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+                let logical_size = file_logical_size(process, file)?;
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
+                if !keep_size {
+                    let target_size = logical_size.max(end);
+                    if target_size <= physical_size || target_size < MAX_IN_MEMORY_FILE_SIZE {
+                        file.file.truncate(target_size).map_err(LinuxError::from)?;
+                    }
+                    process.set_path_sparse_size(file.path.clone(), target_size);
+                }
+                process.mark_path_data_range(file.path.clone(), offset, len);
                 Ok(())
             }
             FdEntry::DevNull => Ok(()),
             FdEntry::BlockDevice(_) => Ok(()),
             FdEntry::Rtc => Ok(()),
-            FdEntry::Memfd(file) => file.fallocate_keep_size(),
+            FdEntry::Memfd(file) => {
+                if keep_size {
+                    file.fallocate_keep_size()
+                } else {
+                    file.truncate(end)
+                }
+            }
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -3321,14 +3430,160 @@ impl FdTable {
 
     pub(super) fn fallocate_punch_hole(
         &mut self,
-        _process: &UserProcess,
+        process: &UserProcess,
         fd: i32,
         offset: u64,
         len: u64,
     ) -> Result<(), LinuxError> {
         match self.entry_mut(fd)? {
             FdEntry::Memfd(file) => file.punch_hole(offset, len),
-            FdEntry::File(_) => Err(LinuxError::EOPNOTSUPP),
+            FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+                process.ensure_path_data_ranges(file.path.clone(), physical_size);
+                process.clear_path_data_range(file.path.clone(), offset, len);
+                Ok(())
+            }
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn fallocate_zero_range(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        offset: u64,
+        len: u64,
+        keep_size: bool,
+    ) -> Result<(), LinuxError> {
+        let end = offset.checked_add(len).ok_or(LinuxError::EFBIG)?;
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
+                let logical_size = file_logical_size(process, file)?;
+                process.ensure_path_data_ranges(file.path.clone(), physical_size);
+                if !keep_size {
+                    let target_size = logical_size.max(end);
+                    if target_size <= physical_size || target_size < MAX_IN_MEMORY_FILE_SIZE {
+                        file.file.truncate(target_size).map_err(LinuxError::from)?;
+                    }
+                    process.set_path_sparse_size(file.path.clone(), target_size);
+                }
+                write_sparse_zero_range(process, file.path.clone(), offset, len);
+                touch_regular_file_after_write(process, file);
+                Ok(())
+            }
+            FdEntry::Memfd(file) => {
+                if !file.writable() {
+                    return Err(LinuxError::EBADF);
+                }
+                if !keep_size {
+                    file.truncate(file.size().max(end))?;
+                }
+                let zeros = vec![0u8; len.min(MAX_IN_MEMORY_FILE_SIZE) as usize];
+                file.write_at(offset, &zeros, None).map(|_| ())
+            }
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn fallocate_collapse_range(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        offset: u64,
+        len: u64,
+    ) -> Result<(), LinuxError> {
+        let end = offset.checked_add(len).ok_or(LinuxError::EFBIG)?;
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                let size = file_logical_size(process, file)?;
+                if end > size {
+                    return Err(LinuxError::EINVAL);
+                }
+                let mut data = read_regular_file_to_vec(process, file, size)?;
+                data.drain(offset as usize..end as usize);
+                rewrite_regular_file_from_vec(process, file, &data)?;
+                Ok(())
+            }
+            FdEntry::Memfd(file) => {
+                if !file.writable() {
+                    return Err(LinuxError::EBADF);
+                }
+                let size = file.size();
+                if end > size {
+                    return Err(LinuxError::EINVAL);
+                }
+                let mut data = vec![0u8; size as usize];
+                file.read_at(0, &mut data)?;
+                data.drain(offset as usize..end as usize);
+                file.truncate(0)?;
+                file.write_at(0, &data, None).map(|_| ())
+            }
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn fallocate_insert_range(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        offset: u64,
+        len: u64,
+    ) -> Result<(), LinuxError> {
+        match self.entry_mut(fd)? {
+            FdEntry::File(file) => {
+                if !file_is_writable(file.status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                let size = file_logical_size(process, file)?;
+                let new_size = size.checked_add(len).ok_or(LinuxError::EFBIG)?;
+                if offset > size || new_size > MAX_IN_MEMORY_FILE_SIZE {
+                    return Err(LinuxError::EINVAL);
+                }
+                let mut data = read_regular_file_to_vec(process, file, size)?;
+                data.splice(offset as usize..offset as usize, vec![0u8; len as usize]);
+                rewrite_regular_file_from_vec(process, file, &data)?;
+                Ok(())
+            }
+            FdEntry::Memfd(file) => {
+                if !file.writable() {
+                    return Err(LinuxError::EBADF);
+                }
+                let size = file.size();
+                let new_size = size.checked_add(len).ok_or(LinuxError::EFBIG)?;
+                if offset > size || new_size > MAX_IN_MEMORY_FILE_SIZE {
+                    return Err(LinuxError::EINVAL);
+                }
+                let mut data = vec![0u8; size as usize];
+                file.read_at(0, &mut data)?;
+                data.splice(offset as usize..offset as usize, vec![0u8; len as usize]);
+                file.truncate(0)?;
+                file.write_at(0, &data, None).map(|_| ())
+            }
             FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
@@ -5687,6 +5942,55 @@ fn file_logical_size(process: &UserProcess, file: &FileEntry) -> Result<u64, Lin
         .max(physical_size))
 }
 
+fn read_regular_file_to_vec(
+    process: &UserProcess,
+    file: &FileEntry,
+    size: u64,
+) -> Result<Vec<u8>, LinuxError> {
+    if size > MAX_IN_MEMORY_FILE_SIZE {
+        return Err(LinuxError::EFBIG);
+    }
+    let mut data = vec![0u8; size as usize];
+    let read = read_regular_file_at(process, file, 0, &mut data)?;
+    data[read..].fill(0);
+    Ok(data)
+}
+
+fn rewrite_regular_file_from_vec(
+    process: &UserProcess,
+    file: &mut FileEntry,
+    data: &[u8],
+) -> Result<(), LinuxError> {
+    if data.len() as u64 > MAX_IN_MEMORY_FILE_SIZE {
+        return Err(LinuxError::EFBIG);
+    }
+    file.file.truncate(0).map_err(LinuxError::from)?;
+    process.truncate_path_sparse_file(file.path.clone(), 0);
+    if !data.is_empty() {
+        let _ = file.file.write_at(0, data).map_err(LinuxError::from)?;
+        process.write_path_sparse_data(file.path.clone(), 0, data);
+    } else {
+        process.set_path_sparse_size(file.path.clone(), 0);
+    }
+    touch_regular_file_after_write(process, file);
+    Ok(())
+}
+
+fn write_sparse_zero_range(process: &UserProcess, path: String, offset: u64, len: u64) {
+    const ZERO_CHUNK: usize = 64 * 1024;
+    let mut written = 0u64;
+    let zeros = vec![0u8; ZERO_CHUNK.min(len as usize)];
+    while written < len {
+        let chunk = (len - written).min(zeros.len() as u64) as usize;
+        process.write_path_sparse_data(
+            path.clone(),
+            offset.saturating_add(written),
+            &zeros[..chunk],
+        );
+        written = written.saturating_add(chunk as u64);
+    }
+}
+
 fn stat_time(sec: i64, nsec: u64) -> general::timespec {
     const NSEC_PER_SEC: u64 = 1_000_000_000;
     general::timespec {
@@ -5785,6 +6089,36 @@ fn read_regular_file_at(
         logical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
     );
     dst[..read_len].fill(0);
+    if let Some(mut ranges) = process.path_data_ranges(file.path.as_str()) {
+        ranges.sort_by_key(|(start, _)| *start);
+        let read_end = offset.saturating_add(read_len as u64);
+        for (range_start, range_end) in ranges {
+            let data_start = range_start.max(offset);
+            let data_end = range_end.min(read_end);
+            if data_start >= data_end || data_start >= physical_size {
+                continue;
+            }
+            let physical_end = data_end.min(physical_size);
+            let dst_start = data_start.saturating_sub(offset) as usize;
+            let mut physical_read = 0usize;
+            let physical_len = physical_end.saturating_sub(data_start) as usize;
+            while physical_read < physical_len {
+                let chunk = file
+                    .file
+                    .read_at(
+                        data_start.saturating_add(physical_read as u64),
+                        &mut dst[dst_start + physical_read..dst_start + physical_len],
+                    )
+                    .map_err(LinuxError::from)?;
+                if chunk == 0 {
+                    break;
+                }
+                physical_read += chunk;
+            }
+        }
+        process.copy_path_sparse_data(file.path.as_str(), offset, &mut dst[..read_len]);
+        return Ok(read_len);
+    }
     if offset < physical_size {
         let physical_len = cmp::min(
             read_len,
@@ -5834,6 +6168,57 @@ fn limit_regular_file_write_len<'a>(
     Ok(&src[..src.len().min(allowed)])
 }
 
+fn file_data_block_floor(offset: u64) -> u64 {
+    offset / 512 * 512
+}
+
+fn file_data_block_ceil(offset: u64) -> u64 {
+    offset.saturating_add(511) / 512 * 512
+}
+
+fn missing_path_data_512_blocks(process: &UserProcess, path: &str, offset: u64, len: u64) -> u64 {
+    if len == 0 {
+        return 0;
+    }
+    let start = file_data_block_floor(offset);
+    let end = file_data_block_ceil(offset.saturating_add(len));
+    if start >= end {
+        return 0;
+    }
+    let Some(mut ranges) = process.path_data_ranges(path) else {
+        return end.saturating_sub(start) / 512;
+    };
+    ranges.sort_by_key(|(range_start, _)| *range_start);
+    let mut cursor = start;
+    let mut missing = 0u64;
+    for (range_start, range_end) in ranges {
+        if range_end <= cursor {
+            continue;
+        }
+        let covered_start = range_start.max(start);
+        let covered_end = range_end.min(end);
+        if covered_end <= covered_start {
+            continue;
+        }
+        if covered_start > cursor {
+            missing = missing.saturating_add(covered_start.saturating_sub(cursor) / 512);
+        }
+        cursor = cursor.max(covered_end);
+        if cursor >= end {
+            break;
+        }
+    }
+    if cursor < end {
+        missing = missing.saturating_add(end.saturating_sub(cursor) / 512);
+    }
+    missing
+}
+
+fn can_use_reclaimed_path_blocks(process: &UserProcess, path: &str, offset: u64, len: u64) -> bool {
+    let blocks = missing_path_data_512_blocks(process, path, offset, len);
+    blocks > 0 && process.path_free_512_blocks(path) >= blocks
+}
+
 fn write_regular_file_at(
     process: &UserProcess,
     file: &mut FileEntry,
@@ -5857,17 +6242,68 @@ fn write_regular_file_at(
                 .min(usize::MAX as u64) as usize,
         );
         if physical_len > 0 {
-            let count = file
-                .file
-                .write_at(write_offset, &src[..physical_len])
-                .map_err(LinuxError::from)?;
+            let count = match file.file.write_at(write_offset, &src[..physical_len]) {
+                Ok(count) => count,
+                Err(err) => {
+                    let err = LinuxError::from(err);
+                    if err == LinuxError::ENOSPC
+                        && can_use_reclaimed_path_blocks(
+                            process,
+                            file.path.as_str(),
+                            write_offset,
+                            physical_len as u64,
+                        )
+                    {
+                        process.write_path_sparse_data(
+                            file.path.clone(),
+                            write_offset,
+                            &src[..physical_len],
+                        );
+                        physical_len
+                    } else {
+                        return Err(err);
+                    }
+                }
+            };
             written += count;
             process.mark_path_data_range(file.path.clone(), write_offset, count as u64);
             if count < physical_len {
-                let logical_after = logical_before.max(write_offset.saturating_add(written as u64));
-                process.set_path_sparse_size(file.path.clone(), logical_after);
-                touch_regular_file_after_write(process, file);
-                return Ok(written);
+                let sparse_offset = write_offset.saturating_add(written as u64);
+                let sparse_len = physical_len - count;
+                let sparse_end = sparse_offset.saturating_add(sparse_len as u64);
+                let preallocated_sparse_extent = process
+                    .path_sparse_size(file.path.as_str())
+                    .is_some_and(|size| sparse_end <= size);
+                let sparse_backed = path_data_ranges_cover(
+                    process,
+                    file.path.as_str(),
+                    sparse_offset,
+                    sparse_len as u64,
+                ) || preallocated_sparse_extent;
+                let reclaimed_sparse_space = if sparse_backed {
+                    false
+                } else {
+                    can_use_reclaimed_path_blocks(
+                        process,
+                        file.path.as_str(),
+                        sparse_offset,
+                        sparse_len as u64,
+                    )
+                };
+                if sparse_backed || reclaimed_sparse_space {
+                    process.write_path_sparse_data(
+                        file.path.clone(),
+                        sparse_offset,
+                        &src[written..physical_len],
+                    );
+                    written = physical_len;
+                } else {
+                    let logical_after =
+                        logical_before.max(write_offset.saturating_add(written as u64));
+                    process.set_path_sparse_size(file.path.clone(), logical_after);
+                    touch_regular_file_after_write(process, file);
+                    return Ok(written);
+                }
             }
         }
     }
@@ -5997,6 +6433,31 @@ fn regular_file_data_ranges(
         normalized.push((start, end));
     }
     Ok(normalized)
+}
+
+fn path_data_ranges_cover(process: &UserProcess, path: &str, offset: u64, len: u64) -> bool {
+    if len == 0 {
+        return true;
+    }
+    let end = offset.saturating_add(len);
+    let Some(mut ranges) = process.path_data_ranges(path) else {
+        return false;
+    };
+    ranges.sort_by_key(|(start, _)| *start);
+    let mut cursor = offset;
+    for (range_start, range_end) in ranges {
+        if range_end <= cursor {
+            continue;
+        }
+        if range_start > cursor {
+            return false;
+        }
+        cursor = cursor.max(range_end);
+        if cursor >= end {
+            return true;
+        }
+    }
+    false
 }
 
 fn file_entry_seek_data_or_hole(

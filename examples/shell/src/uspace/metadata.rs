@@ -37,6 +37,11 @@ const XATTR_REPLACE: usize = 0x2;
 const XATTR_NAME_MAX: usize = 255;
 const XATTR_SIZE_MAX: usize = 65_536;
 const NSEC_PER_SEC: i64 = 1_000_000_000;
+// Reclaimed-space credits are stored as zero-length sparse-data sentinels.
+// Real userspace paths in this shell are bounded far below this offset, while
+// keeping the credit in path_sparse_data avoids widening UserProcess state for
+// a bookkeeping value that only matters to sparse regular-file emulation.
+const PATH_FREE_BLOCK_CREDIT_BASE: u64 = 1 << 63;
 
 #[derive(Clone, Copy)]
 enum UtimeSelection {
@@ -556,7 +561,9 @@ impl UserProcess {
             return;
         }
         let mut all_ranges = self.path_data_ranges.lock();
+        let path_key = path.clone();
         let ranges = all_ranges.entry(path).or_default();
+        let missing_blocks = Self::missing_data_range_512_blocks(ranges, start, end);
         let mut merged = Vec::new();
         let mut pending_start = start;
         let mut pending_end = end;
@@ -575,10 +582,201 @@ impl UserProcess {
         merged.push((pending_start, pending_end));
         merged.sort_by_key(|(range_start, _)| *range_start);
         *ranges = merged;
+        drop(all_ranges);
+
+        let _ = self.consume_path_free_512_blocks(path_key.as_str(), missing_blocks);
     }
 
     pub(super) fn path_data_ranges(&self, path: &str) -> Option<Vec<(u64, u64)>> {
         self.path_data_ranges.lock().get(path).cloned()
+    }
+
+    fn take_path_free_512_block_credit(extents: &mut Vec<(u64, Vec<u8>)>) -> u64 {
+        let mut blocks = 0u64;
+        extents.retain(|(offset, data)| {
+            if data.is_empty() && *offset >= PATH_FREE_BLOCK_CREDIT_BASE {
+                blocks = blocks.saturating_add(offset.saturating_sub(PATH_FREE_BLOCK_CREDIT_BASE));
+                false
+            } else {
+                true
+            }
+        });
+        blocks
+    }
+
+    fn store_path_free_512_block_credit(extents: &mut Vec<(u64, Vec<u8>)>, blocks: u64) {
+        if blocks == 0 {
+            return;
+        }
+        let encoded = PATH_FREE_BLOCK_CREDIT_BASE.saturating_add(blocks);
+        extents.push((encoded, Vec::new()));
+        extents.sort_by_key(|(offset, _)| *offset);
+    }
+
+    fn credit_path_free_512_blocks(&self, path: String, blocks: u64) {
+        if blocks == 0 {
+            return;
+        }
+        let mut all_data = self.path_sparse_data.lock();
+        let extents = all_data.entry(path).or_default();
+        let current = Self::take_path_free_512_block_credit(extents);
+        Self::store_path_free_512_block_credit(extents, current.saturating_add(blocks));
+    }
+
+    pub(super) fn path_free_512_blocks(&self, path: &str) -> u64 {
+        let all_data = self.path_sparse_data.lock();
+        let Some(extents) = all_data.get(path) else {
+            return 0;
+        };
+        extents
+            .iter()
+            .filter_map(|(offset, data)| {
+                if data.is_empty() && *offset >= PATH_FREE_BLOCK_CREDIT_BASE {
+                    Some(offset.saturating_sub(PATH_FREE_BLOCK_CREDIT_BASE))
+                } else {
+                    None
+                }
+            })
+            .fold(0u64, u64::saturating_add)
+    }
+
+    pub(super) fn consume_path_free_512_blocks(&self, path: &str, blocks: u64) -> bool {
+        if blocks == 0 {
+            return true;
+        }
+        let mut all_data = self.path_sparse_data.lock();
+        let Some(extents) = all_data.get_mut(path) else {
+            return false;
+        };
+        let current = Self::take_path_free_512_block_credit(extents);
+        if current < blocks {
+            Self::store_path_free_512_block_credit(extents, current);
+            return false;
+        }
+        Self::store_path_free_512_block_credit(extents, current - blocks);
+        if extents.is_empty() {
+            all_data.remove(path);
+        }
+        true
+    }
+
+    fn missing_data_range_512_blocks(ranges: &[(u64, u64)], start: u64, end: u64) -> u64 {
+        let mut sorted = ranges.to_vec();
+        sorted.sort_by_key(|(range_start, _)| *range_start);
+        let mut cursor = start;
+        let mut missing = 0u64;
+        for (range_start, range_end) in sorted {
+            if range_end <= cursor {
+                continue;
+            }
+            let covered_start = range_start.max(start);
+            let covered_end = range_end.min(end);
+            if covered_end <= covered_start {
+                continue;
+            }
+            if covered_start > cursor {
+                missing = missing.saturating_add(
+                    covered_start.saturating_sub(cursor) / Self::sparse_data_block_size(),
+                );
+            }
+            cursor = cursor.max(covered_end);
+            if cursor >= end {
+                break;
+            }
+        }
+        if cursor < end {
+            missing =
+                missing.saturating_add(end.saturating_sub(cursor) / Self::sparse_data_block_size());
+        }
+        missing
+    }
+
+    pub(super) fn clear_path_data_range(&self, path: String, offset: u64, len: u64) {
+        if len == 0 {
+            return;
+        }
+        let start = Self::data_range_block_floor(offset);
+        let end = Self::data_range_block_ceil(offset.saturating_add(len));
+        if start >= end {
+            return;
+        }
+
+        let mut all_data = self.path_sparse_data.lock();
+        let remove_empty = if let Some(extents) = all_data.get_mut(path.as_str()) {
+            let mut retained = Vec::new();
+            for (extent_offset, data) in extents.drain(..) {
+                let extent_end = extent_offset.saturating_add(data.len() as u64);
+                if extent_end <= offset || extent_offset >= offset.saturating_add(len) {
+                    retained.push((extent_offset, data));
+                    continue;
+                }
+                if extent_offset < offset {
+                    let keep = offset.saturating_sub(extent_offset) as usize;
+                    retained.push((extent_offset, data[..keep].to_vec()));
+                }
+                if extent_end > offset.saturating_add(len) {
+                    let skip = offset.saturating_add(len).saturating_sub(extent_offset) as usize;
+                    retained.push((offset.saturating_add(len), data[skip..].to_vec()));
+                }
+            }
+            if retained.is_empty() {
+                true
+            } else {
+                *extents = retained;
+                false
+            }
+        } else {
+            false
+        };
+        if remove_empty {
+            all_data.remove(path.as_str());
+        }
+        drop(all_data);
+
+        let mut all_ranges = self.path_data_ranges.lock();
+        let Some(ranges) = all_ranges.get_mut(path.as_str()) else {
+            return;
+        };
+        let mut retained = Vec::new();
+        let mut freed_blocks = 0u64;
+        for (range_start, range_end) in ranges.drain(..) {
+            if range_end <= start || range_start >= end {
+                retained.push((range_start, range_end));
+                continue;
+            }
+            let freed_start = range_start.max(start);
+            let freed_end = range_end.min(end);
+            if freed_start < freed_end {
+                freed_blocks = freed_blocks.saturating_add(
+                    freed_end.saturating_sub(freed_start) / Self::sparse_data_block_size(),
+                );
+            }
+            if range_start < start {
+                retained.push((range_start, start));
+            }
+            if range_end > end {
+                retained.push((end, range_end));
+            }
+        }
+        *ranges = retained;
+        drop(all_ranges);
+
+        self.credit_path_free_512_blocks(path, freed_blocks);
+    }
+
+    pub(super) fn path_allocated_512_blocks(&self, path: &str, logical_size: u64) -> Option<u64> {
+        let ranges = self.path_data_ranges.lock().get(path)?.clone();
+        let mut blocks = 0u64;
+        for (start, end) in ranges {
+            if start >= logical_size || start >= end {
+                continue;
+            }
+            let start = Self::data_range_block_floor(start);
+            let end = Self::data_range_block_ceil(end.min(logical_size));
+            blocks =
+                blocks.saturating_add(end.saturating_sub(start) / Self::sparse_data_block_size());
+        }
+        Some(blocks)
     }
 
     pub(super) fn clear_path_sparse_file(&self, path: &str) {
@@ -767,6 +965,9 @@ pub(super) fn apply_recorded_path_metadata(
     }
     if let Some(size) = process.path_sparse_size(path) {
         st.st_size = size.min(i64::MAX as u64) as _;
+    }
+    if let Some(blocks) = process.path_allocated_512_blocks(path, st.st_size.max(0) as u64) {
+        st.st_blocks = blocks.min(i64::MAX as u64) as _;
     }
     if let Some(times) = process.path_times(path) {
         times.apply_to_stat(&mut st);
