@@ -582,6 +582,9 @@ pub(super) fn sys_shmat(
     if let Some((old_shmid, _)) = process.shm_attachments.lock().insert(target, (shmid, size)) {
         decrement_attach(old_shmid, process.pid());
     }
+    process.record_self_maxrss_kb(
+        size.saturating_add(PAGE_SIZE_4K - 1) / PAGE_SIZE_4K * (PAGE_SIZE_4K / 1024),
+    );
     target as isize
 }
 

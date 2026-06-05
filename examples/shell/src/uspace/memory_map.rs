@@ -6,6 +6,7 @@ use axhal::paging::MappingFlags;
 use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
 use linux_raw_sys::general;
 use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
+use std::collections::BTreeMap;
 use std::vec::Vec;
 
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
@@ -32,7 +33,16 @@ pub(super) fn sys_brk(process: &UserProcess, addr: usize) -> isize {
         return brk.end as isize;
     }
     brk.end = addr;
-    brk.end as isize
+    let heap_kb = rss_kb_from_bytes(brk.end.saturating_sub(brk.start));
+    let new_end = brk.end;
+    drop(brk);
+    process.record_self_maxrss_kb(heap_kb);
+    new_end as isize
+}
+
+fn rss_kb_from_bytes(bytes: usize) -> usize {
+    let pages = bytes.saturating_add(PAGE_SIZE_4K - 1) / PAGE_SIZE_4K;
+    pages.saturating_mul(PAGE_SIZE_4K / 1024)
 }
 
 pub(super) fn mmap_prot_to_flags(prot: u32) -> MappingFlags {
@@ -265,6 +275,54 @@ pub(super) fn sys_mmap(
     } else {
         None
     };
+    if let Some(cache) = file_backing
+        .as_ref()
+        .and_then(|backing| process.take_exec_shared_mmap_cache(&backing.file, offset as u64, size))
+    {
+        let mut pages = BTreeMap::new();
+        for (delta, frame, _) in cache.pages.iter().copied() {
+            let Some(page_addr) = target.checked_add(delta) else {
+                cache.release_retained_frames();
+                return neg_errno(LinuxError::ENOMEM);
+            };
+            pages.insert(page_addr, (frame, map_flags));
+        }
+        if pages.len() != size / PAGE_SIZE_4K {
+            cache.release_retained_frames();
+            return neg_errno(LinuxError::ENOMEM);
+        }
+        {
+            let mut aspace = process.aspace.lock();
+            if map_fixed {
+                process.forget_mmap_region(target, target_end);
+                let _ = aspace.unmap(VirtAddr::from(target), size);
+            }
+            if let Err(err) =
+                aspace.map_retained_shared_frames(VirtAddr::from(target), size, map_flags, pages)
+            {
+                cache.release_retained_frames();
+                return neg_errno(LinuxError::from(err));
+            }
+        }
+        if let Some(backing) = file_backing.as_mut() {
+            backing.valid_len = cache.valid_len.min(len);
+        }
+        if shared && map_flags.contains(MappingFlags::WRITE) {
+            process.record_shared_mmap(target, size, map_flags);
+        }
+        process.record_mmap_region(
+            target,
+            size,
+            prot as u32,
+            shared,
+            anonymous || dev_zero,
+            locked,
+            shared_write_allowed,
+            file_backing,
+        );
+        process.record_self_maxrss_kb(rss_kb_from_bytes(size));
+        return target as isize;
+    }
     let populate = file_backed || shared || locked;
     {
         let mut aspace = process.aspace.lock();
@@ -361,6 +419,7 @@ pub(super) fn sys_mmap(
         shared_write_allowed,
         file_backing,
     );
+    process.record_self_maxrss_kb(rss_kb_from_bytes(size));
     if let Some((start, end)) = sigbus_range {
         process.record_mmap_sigbus_range(start, end);
     }
@@ -506,6 +565,7 @@ fn mremap_shrink_in_place(
         region.may_write,
         region.file_backing,
     );
+    process.record_self_maxrss_kb(rss_kb_from_bytes(region.size));
     old_addr as isize
 }
 
@@ -552,6 +612,7 @@ fn mremap_try_expand_in_place(
         region.may_write,
         region.file_backing,
     );
+    process.record_self_maxrss_kb(rss_kb_from_bytes(region.size));
     if source.shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(old_end, extension, map_flags);
     }
@@ -636,6 +697,7 @@ fn mremap_move(
         region.may_write,
         region.file_backing,
     );
+    process.record_self_maxrss_kb(rss_kb_from_bytes(region.size));
     if source.shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, new_size, map_flags);
     }

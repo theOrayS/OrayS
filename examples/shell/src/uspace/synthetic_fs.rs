@@ -19,6 +19,8 @@ use super::linux_abi::{
 };
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
+use super::sysv_msg;
+use super::sysv_sem;
 use super::sysv_shm;
 use super::task_context::task_ext;
 use super::task_registry::{
@@ -29,6 +31,7 @@ use super::UserProcess;
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 const PROC_SELF_SMAPS_PATH: &str = "/proc/self/smaps";
 const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
+const PROC_VERSION_PATH: &str = "/proc/version";
 const SYNTHETIC_INIT_PID: i32 = 1;
 
 fn proc_maps_perms(prot: u32, shared: bool) -> String {
@@ -398,6 +401,8 @@ struct UserProcessStat {
     state: char,
     comm: String,
     locked_mmap_kb: usize,
+    vm_peak_kb: usize,
+    vm_rss_kb: usize,
 }
 
 impl UserProcessStat {
@@ -426,6 +431,8 @@ impl UserProcessStat {
             state,
             comm,
             locked_mmap_kb: process.locked_mmap_kb(),
+            vm_peak_kb: 0,
+            vm_rss_kb: 0,
         }
     }
 
@@ -437,6 +444,8 @@ impl UserProcessStat {
             state: 'S',
             comm: "init".into(),
             locked_mmap_kb: 0,
+            vm_peak_kb: 0,
+            vm_rss_kb: 0,
         }
     }
 }
@@ -554,7 +563,17 @@ fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String,
          Tgid:\t{pid}\n\
          Pid:\t{pid}\n\
          PPid:\t{}\n\
+         VmPeak:\t{} kB\n\
+         VmSize:\t{} kB\n\
+         VmHWM:\t{} kB\n\
+         VmRSS:\t{} kB\n\
+         VmData:\t{} kB\n\
+         VmStk:\t0 kB\n\
+         VmExe:\t0 kB\n\
+         VmLib:\t0 kB\n\
+         VmPTE:\t0 kB\n\
          VmLck:\t{} kB\n\
+         VmSwap:\t0 kB\n\
          Uid:\t{}\t{}\t{}\t{}\n\
          Gid:\t{}\t{}\t{}\t{}\n\
          Groups:\t{groups}\n",
@@ -562,6 +581,11 @@ fn proc_pid_status_content(process: &UserProcess, path: &str) -> Option<(String,
         stat.state,
         stat.state,
         stat.ppid,
+        stat.vm_peak_kb,
+        stat.vm_rss_kb,
+        stat.vm_peak_kb,
+        stat.vm_rss_kb,
+        stat.vm_rss_kb,
         stat.locked_mmap_kb,
         process.real_uid(),
         process.uid(),
@@ -770,6 +794,29 @@ pub(super) fn proc_exe_link_target(process: &UserProcess, path: &str) -> Option<
     (path == "/proc/self/exe" || path == pid_path).then(|| process.exec_path())
 }
 
+const SYNTHETIC_PROC_VERSION_CONTENT: &[u8] =
+    b"Linux version 6.0.0 (oskernel2026-orays) #1 SMP PREEMPT\n";
+
+pub(super) fn synthetic_proc_version_content(path: &str) -> Option<(&'static str, &'static [u8])> {
+    (normalize_path("/", path).as_deref() == Some(PROC_VERSION_PATH))
+        .then_some((PROC_VERSION_PATH, SYNTHETIC_PROC_VERSION_CONTENT))
+}
+
+pub(super) fn synthetic_proc_version_fd_entry(path: &'static str, data: &'static [u8]) -> FdEntry {
+    FdEntry::MemoryFile(MemoryFileEntry {
+        path: path.into(),
+        data: Arc::new(data.to_vec()),
+        offset: 0,
+    })
+}
+
+pub(super) fn synthetic_proc_version_path_entry(
+    path: &'static str,
+    data: &'static [u8],
+) -> FdEntry {
+    FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
+}
+
 pub(super) fn synthetic_userdb_content(path: &str) -> Option<(&'static str, &'static [u8])> {
     match normalize_path("/", path).as_deref() {
         Some(ETC_PASSWD_PATH) => Some((ETC_PASSWD_PATH, DEFAULT_PASSWD_CONTENT)),
@@ -835,7 +882,57 @@ pub(super) fn synthetic_kernel_config_path_entry(
     FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
 }
 
+const PROC_SYSVIPC_SEM_PATH: &str = "/proc/sysvipc/sem";
 const PROC_SYSVIPC_SHM_PATH: &str = "/proc/sysvipc/shm";
+const PROC_SYSVIPC_MSG_PATH: &str = "/proc/sysvipc/msg";
+
+pub(super) fn proc_sysvipc_msg_fd_entry(path: &str) -> Option<FdEntry> {
+    let normalized = normalize_path("/", path)?;
+    if normalized != PROC_SYSVIPC_MSG_PATH {
+        return None;
+    }
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path: normalized,
+        data: Arc::new(sysv_msg::proc_sysvipc_msg_content()),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_sysvipc_msg_path_entry(path: &str) -> Option<FdEntry> {
+    let normalized = normalize_path("/", path)?;
+    if normalized != PROC_SYSVIPC_MSG_PATH {
+        return None;
+    }
+    let size = sysv_msg::proc_sysvipc_msg_content().len();
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        normalized.as_str(),
+        size,
+    )))
+}
+
+pub(super) fn proc_sysvipc_sem_fd_entry(path: &str) -> Option<FdEntry> {
+    let normalized = normalize_path("/", path)?;
+    if normalized != PROC_SYSVIPC_SEM_PATH {
+        return None;
+    }
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path: normalized,
+        data: Arc::new(sysv_sem::proc_sysvipc_sem_content()),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_sysvipc_sem_path_entry(path: &str) -> Option<FdEntry> {
+    let normalized = normalize_path("/", path)?;
+    if normalized != PROC_SYSVIPC_SEM_PATH {
+        return None;
+    }
+    let size = sysv_sem::proc_sysvipc_sem_content().len();
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        normalized.as_str(),
+        size,
+    )))
+}
 
 pub(super) fn proc_sysvipc_shm_fd_entry(path: &str) -> Option<FdEntry> {
     let normalized = normalize_path("/", path)?;
@@ -865,6 +962,12 @@ const PROC_SYS_KERNEL_CORE_PATTERN_PATH: &str = "/proc/sys/kernel/core_pattern";
 const PROC_SYS_KERNEL_CORE_PATTERN_CONTENT: &[u8] = b"core\n";
 
 pub(super) fn synthetic_proc_sys_content(path: &str) -> Option<(&'static str, &'static [u8])> {
+    if let Some(content) = sysv_msg::proc_sys_kernel_msg_content(path) {
+        return Some(content);
+    }
+    if let Some(content) = sysv_sem::proc_sys_kernel_sem_content(path) {
+        return Some(content);
+    }
     match normalize_path("/", path).as_deref() {
         Some(PROC_SYS_KERNEL_CORE_PATTERN_PATH) => Some((
             PROC_SYS_KERNEL_CORE_PATTERN_PATH,

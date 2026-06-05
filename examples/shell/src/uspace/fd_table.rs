@@ -1,6 +1,7 @@
 use core::cmp;
 use core::mem::{offset_of, size_of};
 use core::ptr;
+use core::sync::atomic::Ordering;
 use core::time::Duration;
 
 use axerrno::LinuxError;
@@ -30,6 +31,10 @@ use super::metadata::{
     generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
     synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV,
 };
+use super::posix_mq::{
+    proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
+    ProcMqQueuesMaxEntry,
+};
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
@@ -41,19 +46,24 @@ use super::signal_abi::{
 };
 use super::synthetic_fs::{
     dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
-    proc_comm_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
-    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
-    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    proc_smaps_fd_entry, proc_smaps_path_entry, proc_sysvipc_shm_fd_entry,
-    proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
-    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
-    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
-    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
-    synthetic_proc_sys_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
+    proc_comm_path_entry, proc_exe_link_target, proc_pagemap_fd_entry, proc_pagemap_path_entry,
+    proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
+    proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
+    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry,
+    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
+    proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
+    proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
+    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
+    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
+    synthetic_proc_version_content, synthetic_proc_version_fd_entry,
+    synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
     synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
-use super::task_registry::user_thread_entry_by_process_pid;
+use super::task_registry::{
+    user_thread_entry_by_process_pid, user_thread_entry_for_process, UserThreadEntry,
+};
 use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
@@ -107,9 +117,13 @@ pub(super) enum FdEntry {
     Socket(SocketEntry),
     LocalSocket(LocalSocketEntry),
     EventFd(EventFdEntry),
+    Inotify(InotifyEntry),
     Epoll(EpollEntry),
     TimerFd(TimerFdEntry),
     SignalFd(SignalFdEntry),
+    PidFd(PidFdEntry),
+    PosixMq(PosixMqDescriptor),
+    ProcMqQueuesMax(ProcMqQueuesMaxEntry),
 }
 
 #[derive(Clone)]
@@ -185,6 +199,16 @@ pub(super) enum MmapFileBacking {
     Memfd(MemfdEntry),
 }
 
+impl MmapFileBacking {
+    pub(super) fn same_backing(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::File(left), Self::File(right)) => left.path == right.path,
+            (Self::Memfd(left), Self::Memfd(right)) => left.same_backing(right),
+            _ => false,
+        }
+    }
+}
+
 struct MemfdState {
     data: Vec<u8>,
     seals: u32,
@@ -211,6 +235,18 @@ pub(super) struct EventFdEntry {
     counter: Arc<Mutex<u64>>,
     status_flags: u32,
     semaphore: bool,
+}
+
+#[derive(Clone)]
+pub(super) struct InotifyEntry {
+    status_flags: u32,
+}
+
+#[derive(Clone)]
+pub(super) struct PidFdEntry {
+    target_pid: i32,
+    target_process: Arc<UserProcess>,
+    status_flags: u32,
 }
 
 #[derive(Clone)]
@@ -276,6 +312,145 @@ pub(super) fn sys_openat(
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+pub(super) fn sys_openat2(
+    process: &UserProcess,
+    dirfd: usize,
+    pathname: usize,
+    how: usize,
+    size: usize,
+) -> isize {
+    const OPEN_HOW_SIZE: usize = size_of::<general::open_how>();
+    const OPEN_HOW_MAX_EXT_BYTES: usize = 4096;
+
+    if size < OPEN_HOW_SIZE {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if size - OPEN_HOW_SIZE > OPEN_HOW_MAX_EXT_BYTES {
+        return neg_errno(LinuxError::E2BIG);
+    }
+
+    let open_how = match read_user_value::<general::open_how>(process, how) {
+        Ok(how) => how,
+        Err(err) => return neg_errno(err),
+    };
+    if size > OPEN_HOW_SIZE {
+        let extra_ptr = match how.checked_add(OPEN_HOW_SIZE) {
+            Some(ptr) => ptr,
+            None => return neg_errno(LinuxError::EFAULT),
+        };
+        let extra = match read_user_bytes(process, extra_ptr, size - OPEN_HOW_SIZE) {
+            Ok(bytes) => bytes,
+            Err(err) => return neg_errno(err),
+        };
+        if extra.iter().any(|byte| *byte != 0) {
+            return neg_errno(LinuxError::E2BIG);
+        }
+    }
+
+    if open_how.flags > u32::MAX as u64
+        || open_how.mode > u32::MAX as u64
+        || open_how.resolve > u32::MAX as u64
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let flags = open_how.flags as u32;
+    let mode = open_how.mode as u32;
+    let resolve = open_how.resolve as u32;
+    let supported_resolve = general::RESOLVE_NO_XDEV
+        | general::RESOLVE_NO_MAGICLINKS
+        | general::RESOLVE_NO_SYMLINKS
+        | general::RESOLVE_BENEATH
+        | general::RESOLVE_IN_ROOT
+        | general::RESOLVE_CACHED;
+    if resolve & !supported_resolve != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let mode_is_allowed = flags & general::O_CREAT != 0 || tmpfile_requested(flags);
+    if mode & !0o7777 != 0 || (mode != 0 && !mode_is_allowed) {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let path = match read_cstr(process, pathname) {
+        Ok(path) => path,
+        Err(err) => return neg_errno(err),
+    };
+    let mut table = process.fds.lock();
+    if let Err(err) = openat2_resolve_guard(process, &table, dirfd as i32, path.as_str(), resolve) {
+        return neg_errno(err);
+    }
+    match table.open(process, dirfd as i32, path.as_str(), flags, mode) {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+fn openat2_resolve_guard(
+    process: &UserProcess,
+    table: &FdTable,
+    dirfd: i32,
+    path: &str,
+    resolve: u32,
+) -> Result<(), LinuxError> {
+    if resolve == 0 {
+        return Ok(());
+    }
+
+    if resolve & general::RESOLVE_BENEATH != 0
+        && (path.starts_with('/') || openat2_has_parent_escape(path))
+    {
+        return Err(LinuxError::EXDEV);
+    }
+    if resolve & general::RESOLVE_IN_ROOT != 0 && path.starts_with('/') {
+        return Err(LinuxError::ENOENT);
+    }
+
+    let resolved_path = resolve_dirfd_path(process, table, dirfd, path)?;
+    if resolve & general::RESOLVE_NO_XDEV != 0 && openat2_is_procfs_path(resolved_path.as_str()) {
+        return Err(LinuxError::EXDEV);
+    }
+
+    if resolve & (general::RESOLVE_NO_MAGICLINKS | general::RESOLVE_NO_SYMLINKS) != 0
+        && openat2_is_proc_magiclink(process, resolved_path.as_str())
+    {
+        return Err(LinuxError::ELOOP);
+    }
+    if resolve & general::RESOLVE_NO_SYMLINKS != 0
+        && openat2_contains_recorded_symlink(process, resolved_path.as_str())?
+    {
+        return Err(LinuxError::ELOOP);
+    }
+    Ok(())
+}
+
+fn openat2_has_parent_escape(path: &str) -> bool {
+    path.split('/').any(|component| component == "..")
+}
+
+fn openat2_is_procfs_path(path: &str) -> bool {
+    normalize_path("/", path).is_some_and(|path| path == "/proc" || path.starts_with("/proc/"))
+}
+
+fn openat2_is_proc_magiclink(process: &UserProcess, path: &str) -> bool {
+    proc_exe_link_target(process, path).is_some()
+}
+
+fn openat2_contains_recorded_symlink(
+    process: &UserProcess,
+    path: &str,
+) -> Result<bool, LinuxError> {
+    let path = normalize_path("/", path).ok_or(LinuxError::EINVAL)?;
+    let components: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+    let mut prefix = String::new();
+    for component in components {
+        prefix.push('/');
+        prefix.push_str(component);
+        if process.path_symlink(prefix.as_str()).is_some() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 pub(super) fn sys_memfd_create(process: &UserProcess, name: usize, flags: usize) -> isize {
@@ -499,6 +674,142 @@ pub(super) fn sys_eventfd2(process: &UserProcess, initval: usize, flags: usize) 
     ) {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_inotify_init1(process: &UserProcess, flags: usize) -> isize {
+    let flags = flags as u32;
+    let supported = general::IN_CLOEXEC | general::IN_NONBLOCK;
+    if flags & !supported != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let fd_flags = fd_cloexec_flag(flags & general::IN_CLOEXEC != 0);
+    let status_flags = if flags & general::IN_NONBLOCK != 0 {
+        general::O_NONBLOCK
+    } else {
+        0
+    };
+    match process
+        .fds
+        .lock()
+        .insert_with_flags(FdEntry::Inotify(InotifyEntry::new(status_flags)), fd_flags)
+    {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_pidfd_open(process: &UserProcess, pid: usize, flags: usize) -> isize {
+    let pid = pid as i32;
+    let flags = flags as u32;
+    if pid <= 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if flags & !general::O_NONBLOCK != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    let target_process = if pid == process.pid() {
+        match user_thread_entry_for_process(process) {
+            Some(entry) => entry.process,
+            None => return neg_errno(LinuxError::ESRCH),
+        }
+    } else {
+        match process
+            .child_thread_entry_by_pid(pid)
+            .or_else(|| user_thread_entry_by_process_pid(pid))
+        {
+            Some(entry) => entry.process,
+            None => return neg_errno(LinuxError::ESRCH),
+        }
+    };
+    match process.fds.lock().insert_with_flags(
+        FdEntry::PidFd(PidFdEntry::new(
+            pid,
+            target_process,
+            flags & general::O_NONBLOCK,
+        )),
+        fd_cloexec_flag(true),
+    ) {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_pidfd_getfd(
+    process: &UserProcess,
+    pidfd: usize,
+    targetfd: usize,
+    flags: usize,
+) -> isize {
+    if flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let pidfd = pidfd as i32;
+    let targetfd = targetfd as i32;
+    let target_process = match process.fds.lock().entry(pidfd) {
+        Ok(FdEntry::PidFd(pidfd)) => {
+            if pidfd.exited() {
+                return neg_errno(LinuxError::ESRCH);
+            }
+            pidfd.target_process.clone()
+        }
+        Ok(_) => return neg_errno(LinuxError::EBADF),
+        Err(err) => return neg_errno(err),
+    };
+    if !process_fd_access_allowed(process, target_process.as_ref()) {
+        return neg_errno(LinuxError::EPERM);
+    }
+
+    let entry = match target_process
+        .fds
+        .lock()
+        .entry(targetfd)
+        .and_then(FdEntry::duplicate_for_fork)
+    {
+        Ok(entry) => entry,
+        Err(err) => return neg_errno(err),
+    };
+    match process
+        .fds
+        .lock()
+        .insert_with_flags(entry, general::FD_CLOEXEC)
+    {
+        Ok(fd) => fd as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_kcmp(
+    process: &UserProcess,
+    pid1: usize,
+    pid2: usize,
+    kcmp_type: usize,
+    idx1: usize,
+    idx2: usize,
+) -> isize {
+    const KCMP_FILE: usize = 0;
+
+    if kcmp_type != KCMP_FILE {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let pid1 = pid1 as i32;
+    let pid2 = pid2 as i32;
+    if pid1 <= 0 || pid2 <= 0 {
+        return neg_errno(LinuxError::ESRCH);
+    }
+    let left = match kcmp_file_description_key(process, pid1, idx1 as i32) {
+        Ok(key) => key,
+        Err(err) => return neg_errno(err),
+    };
+    let right = match kcmp_file_description_key(process, pid2, idx2 as i32) {
+        Ok(key) => key,
+        Err(err) => return neg_errno(err),
+    };
+    if left.is_some() && left == right {
+        0
+    } else {
+        1
     }
 }
 
@@ -878,6 +1189,60 @@ impl EventFdEntry {
             }
             axtask::yield_now();
         }
+    }
+}
+
+impl InotifyEntry {
+    fn new(status_flags: u32) -> Self {
+        Self {
+            status_flags: status_flags & general::O_NONBLOCK,
+        }
+    }
+
+    fn status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    fn set_status_flags(&mut self, flags: u32) {
+        self.status_flags = flags & general::O_NONBLOCK;
+    }
+
+    fn nonblocking(&self) -> bool {
+        self.status_flags & general::O_NONBLOCK != 0
+    }
+
+    fn read(&self) -> Result<usize, LinuxError> {
+        if self.nonblocking() {
+            Err(LinuxError::EAGAIN)
+        } else {
+            Err(LinuxError::EINTR)
+        }
+    }
+}
+
+impl PidFdEntry {
+    fn new(target_pid: i32, target_process: Arc<UserProcess>, status_flags: u32) -> Self {
+        Self {
+            target_pid,
+            target_process,
+            status_flags: status_flags & general::O_NONBLOCK,
+        }
+    }
+
+    fn status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    fn set_status_flags(&mut self, flags: u32) {
+        self.status_flags = flags & general::O_NONBLOCK;
+    }
+
+    fn nonblocking(&self) -> bool {
+        self.status_flags & general::O_NONBLOCK != 0
+    }
+
+    fn exited(&self) -> bool {
+        self.target_process.live_threads.load(Ordering::Acquire) == 0
     }
 }
 
@@ -2910,8 +3275,12 @@ impl FdTable {
                 | FdEntry::ProcTimerSlack(_) => true,
                 FdEntry::Path(_) => false,
                 FdEntry::EventFd(eventfd) => eventfd.poll_readable(),
+                FdEntry::Inotify(_) => false,
                 FdEntry::TimerFd(timerfd) => timerfd.poll_readable(),
                 FdEntry::SignalFd(signalfd) => signalfd.poll_readable(),
+                FdEntry::PidFd(pidfd) => pidfd.exited(),
+                FdEntry::PosixMq(mq) => mq.poll_readable(),
+                FdEntry::ProcMqQueuesMax(_) => true,
                 FdEntry::Epoll(_) => false,
                 FdEntry::Pipe(pipe) => pipe.poll_readable(),
                 FdEntry::Socket(socket) => socket.poll(mode),
@@ -2933,9 +3302,13 @@ impl FdTable {
                 | FdEntry::MemoryFile(_)
                 | FdEntry::ProcPagemap(_)
                 | FdEntry::ProcTimerSlack(_)
+                | FdEntry::Inotify(_)
                 | FdEntry::TimerFd(_)
                 | FdEntry::SignalFd(_)
+                | FdEntry::PidFd(_)
                 | FdEntry::Epoll(_) => false,
+                FdEntry::PosixMq(mq) => mq.poll_writable(),
+                FdEntry::ProcMqQueuesMax(_) => true,
                 FdEntry::EventFd(eventfd) => eventfd.poll_writable(),
                 FdEntry::Pipe(pipe) => pipe.poll_writable(),
                 FdEntry::Socket(socket) => socket.poll(mode),
@@ -3000,7 +3373,9 @@ impl FdTable {
             | FdEntry::LocalSocket(_)
             | FdEntry::EventFd(_)
             | FdEntry::TimerFd(_)
-            | FdEntry::SignalFd(_) => Ok(()),
+            | FdEntry::SignalFd(_)
+            | FdEntry::PidFd(_)
+            | FdEntry::PosixMq(_) => Ok(()),
             FdEntry::Epoll(_) => {
                 if self.epoll_reaches(fd, epfd, &mut Vec::new()) {
                     return Err(LinuxError::ELOOP);
@@ -3180,8 +3555,11 @@ impl FdTable {
             FdEntry::Socket(socket) => socket.read(dst),
             FdEntry::LocalSocket(socket) => socket.read(dst),
             FdEntry::EventFd(eventfd) => eventfd.read(process, dst),
+            FdEntry::Inotify(inotify) => inotify.read(),
             FdEntry::TimerFd(timerfd) => timerfd.read(process, dst),
             FdEntry::SignalFd(signalfd) => signalfd.read(process, dst),
+            FdEntry::ProcMqQueuesMax(entry) => entry.read(dst),
+            FdEntry::PosixMq(_) => Err(LinuxError::EBADF),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -3224,7 +3602,9 @@ impl FdTable {
                 }
                 file.write(process, src)
             }
+            FdEntry::ProcMqQueuesMax(entry) => entry.write(src),
             FdEntry::TimerFd(_) | FdEntry::SignalFd(_) => Err(LinuxError::EINVAL),
+            FdEntry::PosixMq(_) => Err(LinuxError::EBADF),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -3654,6 +4034,8 @@ impl FdTable {
             FdEntry::Memfd(file) => file.seek(pos),
             FdEntry::ProcPagemap(file) => file.seek(pos),
             FdEntry::ProcTimerSlack(file) => file.seek(pos),
+            FdEntry::ProcMqQueuesMax(file) => file.seek(pos),
+            FdEntry::PosixMq(_) => Err(LinuxError::ESPIPE),
             FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
             FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
             _ => Err(LinuxError::ESPIPE),
@@ -4106,6 +4488,103 @@ impl FdTable {
             .and_then(|entry| entry.as_mut())
             .ok_or(LinuxError::EBADF)
     }
+
+    pub(super) fn file_description_key(&self, fd: i32) -> Result<Option<(u8, usize)>, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::File(file) => Ok(Some((1, Arc::as_ptr(&file.offset) as usize))),
+            FdEntry::Memfd(file) => Ok(Some((2, Arc::as_ptr(&file.offset) as usize))),
+            FdEntry::EventFd(eventfd) => Ok(Some((3, Arc::as_ptr(&eventfd.counter) as usize))),
+            FdEntry::TimerFd(timerfd) => Ok(Some((4, Arc::as_ptr(&timerfd.state) as usize))),
+            FdEntry::Epoll(epoll) => Ok(Some((5, Arc::as_ptr(&epoll.registrations) as usize))),
+            _ => Ok(None),
+        }
+    }
+
+    pub(super) fn pidfd_wait_target(&self, fd: i32) -> Result<(i32, bool), LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::PidFd(pidfd) => Ok((pidfd.target_pid, pidfd.nonblocking())),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    pub(super) fn pidfd_signal_target(
+        &self,
+        process: &UserProcess,
+        fd: i32,
+    ) -> Result<UserThreadEntry, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::PidFd(pidfd) => {
+                if pidfd.exited() {
+                    return Err(LinuxError::ESRCH);
+                }
+                user_thread_entry_for_process(pidfd.target_process.as_ref())
+                    .ok_or(LinuxError::ESRCH)
+            }
+            FdEntry::Directory(dir) => proc_pid_signal_target(process, dir.path.as_str()),
+            FdEntry::SyntheticDir(dir) => proc_pid_signal_target(process, dir.path.as_str()),
+            FdEntry::Path(path) => proc_pid_signal_target(process, path.path.as_str()),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+}
+
+fn proc_pid_signal_target(
+    process: &UserProcess,
+    path: &str,
+) -> Result<UserThreadEntry, LinuxError> {
+    const SYNTHETIC_INIT_PID: i32 = 1;
+
+    let normalized = normalize_path("/", path).ok_or(LinuxError::EBADF)?;
+    let target_pid = if normalized == "/proc/self" {
+        process.pid()
+    } else if let Some(rest) = normalized.strip_prefix("/proc/") {
+        let Some(component) = rest.split('/').next() else {
+            return Err(LinuxError::EBADF);
+        };
+        component.parse::<i32>().map_err(|_| LinuxError::EBADF)?
+    } else {
+        return Err(LinuxError::EBADF);
+    };
+    if target_pid == process.pid() {
+        return user_thread_entry_for_process(process).ok_or(LinuxError::ESRCH);
+    }
+    user_thread_entry_by_process_pid(target_pid).ok_or_else(|| {
+        if target_pid == SYNTHETIC_INIT_PID && process.uid() != 0 {
+            LinuxError::EPERM
+        } else {
+            LinuxError::ESRCH
+        }
+    })
+}
+
+fn process_fd_access_allowed(caller: &UserProcess, target: &UserProcess) -> bool {
+    if caller.uid() == 0 {
+        return true;
+    }
+    let caller_real = caller.real_uid();
+    let caller_effective = caller.uid();
+    caller_real == target.real_uid()
+        || caller_real == target.saved_uid()
+        || caller_effective == target.real_uid()
+        || caller_effective == target.saved_uid()
+}
+
+fn kcmp_file_description_key(
+    process: &UserProcess,
+    pid: i32,
+    fd: i32,
+) -> Result<Option<(u8, usize)>, LinuxError> {
+    if pid == process.pid() {
+        return process.fds.lock().file_description_key(fd);
+    }
+    let entry = process
+        .child_thread_entry_by_pid(pid)
+        .or_else(|| user_thread_entry_by_process_pid(pid))
+        .ok_or(LinuxError::ESRCH)?;
+    if !process_fd_access_allowed(process, entry.process.as_ref()) {
+        return Err(LinuxError::EPERM);
+    }
+    entry.process.fds.lock().file_description_key(fd)
 }
 
 fn get_proc_fd_dirents(
@@ -4490,11 +4969,15 @@ impl FdTable {
             FdEntry::Socket(socket) => Ok(socket.stat()),
             FdEntry::LocalSocket(socket) => Ok(socket.stat()),
             FdEntry::EventFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[eventfd]", 0).stat()),
+            FdEntry::Inotify(_) => Ok(PathEntry::synthetic_file("anon_inode:[inotify]", 0).stat()),
             FdEntry::Epoll(_) => Ok(PathEntry::synthetic_file("anon_inode:[eventpoll]", 0).stat()),
             FdEntry::TimerFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[timerfd]", 0).stat()),
             FdEntry::SignalFd(_) => {
                 Ok(PathEntry::synthetic_file("anon_inode:[signalfd]", 0).stat())
             }
+            FdEntry::PidFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[pidfd]", 0).stat()),
+            FdEntry::PosixMq(mq) => Ok(mq.stat()),
+            FdEntry::ProcMqQueuesMax(entry) => Ok(entry.stat()),
         }
     }
 
@@ -4755,8 +5238,12 @@ impl FdTable {
                 FdEntry::Memfd(file) => Ok(file.status_flags as i32),
                 FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
                 FdEntry::EventFd(eventfd) => Ok(eventfd.status_flags() as i32),
+                FdEntry::Inotify(inotify) => Ok(inotify.status_flags() as i32),
                 FdEntry::TimerFd(timerfd) => Ok(timerfd.status_flags() as i32),
                 FdEntry::SignalFd(signalfd) => Ok(signalfd.status_flags() as i32),
+                FdEntry::PidFd(pidfd) => Ok(pidfd.status_flags() as i32),
+                FdEntry::PosixMq(mq) => Ok(mq.status_flags() as i32),
+                FdEntry::ProcMqQueuesMax(entry) => Ok(entry.status_flags() as i32),
                 FdEntry::ProcTimerSlack(file) => Ok(file.status_flags as i32),
                 _ => Ok(0),
             },
@@ -4806,12 +5293,28 @@ impl FdTable {
                     eventfd.set_status_flags(arg as u32);
                     Ok(0)
                 }
+                FdEntry::Inotify(inotify) => {
+                    inotify.set_status_flags(arg as u32);
+                    Ok(0)
+                }
                 FdEntry::TimerFd(timerfd) => {
                     timerfd.set_status_flags(arg as u32);
                     Ok(0)
                 }
                 FdEntry::SignalFd(signalfd) => {
                     signalfd.set_status_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::PidFd(pidfd) => {
+                    pidfd.set_status_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::PosixMq(mq) => {
+                    mq.set_status_flags(arg as u32);
+                    Ok(0)
+                }
+                FdEntry::ProcMqQueuesMax(entry) => {
+                    entry.set_status_flags(arg as u32);
                     Ok(0)
                 }
                 _ => Ok(0),
@@ -5813,9 +6316,13 @@ impl FdEntry {
             Self::Socket(socket) => socket.duplicate().map(Self::Socket),
             Self::LocalSocket(socket) => Ok(Self::LocalSocket(socket.duplicate())),
             Self::EventFd(eventfd) => Ok(Self::EventFd(eventfd.clone())),
+            Self::Inotify(inotify) => Ok(Self::Inotify(inotify.clone())),
             Self::Epoll(epoll) => Ok(Self::Epoll(epoll.clone())),
             Self::TimerFd(timerfd) => Ok(Self::TimerFd(timerfd.clone())),
             Self::SignalFd(signalfd) => Ok(Self::SignalFd(signalfd.clone())),
+            Self::PidFd(pidfd) => Ok(Self::PidFd(pidfd.clone())),
+            Self::PosixMq(mq) => Ok(Self::PosixMq(mq.clone())),
+            Self::ProcMqQueuesMax(entry) => Ok(Self::ProcMqQueuesMax(entry.clone())),
         }
     }
 }
@@ -6720,6 +7227,13 @@ fn tmpfile_requested(flags: u32) -> bool {
     flags & general::O_TMPFILE == general::O_TMPFILE
 }
 
+fn synthetic_readonly_open_writes(flags: u32) -> bool {
+    matches!(
+        flags & general::O_ACCMODE,
+        general::O_WRONLY | general::O_RDWR
+    ) || flags & general::O_TRUNC != 0
+}
+
 fn open_candidates(
     process: &UserProcess,
     table: &FdTable,
@@ -6789,6 +7303,17 @@ fn open_candidates(
                 })
             });
         }
+        if let Some(entry) = proc_pid_dir_entry(process, path.as_str(), path_only) {
+            if !path_only
+                && (matches!(
+                    flags & general::O_ACCMODE,
+                    general::O_WRONLY | general::O_RDWR
+                ) || flags & (general::O_CREAT | general::O_TRUNC) != 0)
+            {
+                return Err(LinuxError::EISDIR);
+            }
+            return Ok(entry);
+        }
         if let Some(entry) = if path_only {
             proc_task_dir_path_entry(process, path.as_str())
         } else {
@@ -6803,6 +7328,45 @@ fn open_candidates(
                 return Err(LinuxError::EISDIR);
             }
             return Ok(entry);
+        }
+        if let Some(target) = proc_exe_link_target(process, path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & O_NOFOLLOW_FLAG != 0 {
+                if path_only {
+                    return Ok(FdEntry::Path(PathEntry::symlink(path.as_str())));
+                }
+                return Err(LinuxError::ELOOP);
+            }
+            if synthetic_readonly_open_writes(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            let target_flags = flags & !general::O_CREAT;
+            return open_fd_entry(
+                process,
+                table,
+                general::AT_FDCWD,
+                target.as_str(),
+                target_flags,
+                mode,
+            );
+        }
+        if let Some((synthetic_path, data)) = synthetic_proc_version_content(path.as_str()) {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
+                return Err(LinuxError::EEXIST);
+            }
+            if synthetic_readonly_open_writes(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(if path_only {
+                synthetic_proc_version_path_entry(synthetic_path, data)
+            } else {
+                synthetic_proc_version_fd_entry(synthetic_path, data)
+            });
         }
         if is_proc_self_maps_path(path.as_str()) {
             if prefer_dir {
@@ -6893,6 +7457,32 @@ fn open_candidates(
             return Ok(entry);
         }
         if let Some(entry) = if path_only {
+            proc_sysvipc_msg_path_entry(path.as_str())
+        } else {
+            proc_sysvipc_msg_fd_entry(path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
+            proc_sysvipc_sem_path_entry(path.as_str())
+        } else {
+            proc_sysvipc_sem_fd_entry(path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
             proc_sysvipc_shm_path_entry(path.as_str())
         } else {
             proc_sysvipc_shm_fd_entry(path.as_str())
@@ -6933,18 +7523,34 @@ fn open_candidates(
                 });
             }
         }
+        if let Some(entry) = if path_only {
+            proc_sys_fs_mqueue_path_entry(path.as_str())
+        } else {
+            proc_sys_fs_mqueue_fd_entry(path.as_str(), fcntl_status_flags(flags))
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(entry);
+        }
         if let Some((synthetic_path, data)) = synthetic_proc_sys_content(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
             }
             if !path_only && synthetic_file_is_writable_open(flags) {
-                return Err(LinuxError::EPERM);
-            }
-            return Ok(if path_only {
-                synthetic_proc_sys_path_entry(synthetic_path, data)
+                if synthetic_path != "/proc/sys/kernel/sem" {
+                    return Err(LinuxError::EPERM);
+                }
             } else {
-                synthetic_proc_sys_fd_entry(synthetic_path, data)
-            });
+                return Ok(if path_only {
+                    synthetic_proc_sys_path_entry(synthetic_path, data)
+                } else {
+                    synthetic_proc_sys_fd_entry(synthetic_path, data)
+                });
+            }
+            if axfs::api::metadata(synthetic_path).is_err() {
+                return Err(LinuxError::ENOENT);
+            }
         }
         if path == "/dev/null" {
             if prefer_dir {
@@ -7223,6 +7829,53 @@ fn proc_fd_dir_path(process: &UserProcess, path: &str) -> Option<String> {
     }
     let pid_path = format!("/proc/{}/fd", process.pid());
     (normalized == pid_path).then_some(normalized)
+}
+
+fn proc_pid_dir_entry(process: &UserProcess, path: &str, path_only: bool) -> Option<FdEntry> {
+    const SYNTHETIC_INIT_PID: i32 = 1;
+
+    let normalized = normalize_path("/", path)?;
+    let pid = if normalized == "/proc/self" {
+        process.pid()
+    } else {
+        let rest = normalized.strip_prefix("/proc/")?;
+        if rest.contains('/') {
+            return None;
+        }
+        rest.parse::<i32>().ok()?
+    };
+    if pid != process.pid()
+        && pid != SYNTHETIC_INIT_PID
+        && process.child_thread_entry_by_pid(pid).is_none()
+        && user_thread_entry_by_process_pid(pid).is_none()
+    {
+        return None;
+    }
+
+    if path_only {
+        return Some(FdEntry::Path(PathEntry::synthetic_dir(normalized.as_str())));
+    }
+
+    let dirents = [
+        ("stat", general::DT_REG as u8),
+        ("status", general::DT_REG as u8),
+        ("task", general::DT_DIR as u8),
+        ("comm", general::DT_REG as u8),
+    ]
+    .into_iter()
+    .map(|(name, d_type)| {
+        SyntheticDirent::new(
+            name.into(),
+            d_type,
+            format!("{}/{}", normalized.as_str(), name),
+        )
+    })
+    .collect();
+    Some(FdEntry::SyntheticDir(SyntheticDirEntry::new(
+        normalized.clone(),
+        parent_path(normalized.as_str()).into(),
+        dirents,
+    )))
 }
 
 fn proc_fd_target_number(process: &UserProcess, path: &str) -> Option<i32> {

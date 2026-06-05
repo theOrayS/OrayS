@@ -991,6 +991,7 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::Memfd(_) => None,
         FdEntry::ProcPagemap(file) => Some(file.path.as_str()),
         FdEntry::ProcTimerSlack(file) => Some(file.path.as_str()),
+        FdEntry::ProcMqQueuesMax(_) => Some("/proc/sys/fs/mqueue/queues_max"),
         _ => None,
     }
 }

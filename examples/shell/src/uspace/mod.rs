@@ -6,6 +6,7 @@ use axns::AxNamespace;
 use axsync::Mutex;
 use axtask::{AxTaskRef, WaitQueue};
 use linux_raw_sys::general;
+use memory_addr::PhysAddr;
 use std::collections::BTreeMap;
 use std::string::String;
 use std::sync::Arc;
@@ -25,6 +26,7 @@ mod memory_map;
 mod memory_policy;
 mod metadata;
 mod mount_abi;
+mod posix_mq;
 mod process_abi;
 mod process_lifecycle;
 mod program_loader;
@@ -36,6 +38,7 @@ mod synthetic_fs;
 mod syscall_dispatch;
 mod system_info;
 mod sysv_msg;
+mod sysv_sem;
 mod sysv_shm;
 mod task_context;
 mod task_registry;
@@ -78,6 +81,7 @@ struct UserProcess {
     shared_mmap_ranges: Mutex<Vec<(usize, usize, MappingFlags)>>,
     mmap_sigbus_ranges: Mutex<Vec<(usize, usize)>>,
     mmap_ranges: Mutex<Vec<UserMmapRegion>>,
+    exec_shared_mmap_cache: Mutex<Vec<UserExecSharedMmapCache>>,
     mlock_future: AtomicBool,
     mlockall_accounted_kb: AtomicUsize,
     fds: Mutex<FdTable>,
@@ -142,6 +146,8 @@ struct UserProcess {
     start_clock_ticks: AtomicU64,
     waited_child_user_ticks: AtomicU64,
     waited_child_system_ticks: AtomicU64,
+    max_rss_kb: AtomicUsize,
+    waited_child_maxrss_kb: AtomicUsize,
     eval_watchdog_deadline_us: AtomicU64,
     child_wait_blocked: AtomicBool,
     syscall_wait_blocked: AtomicBool,
@@ -188,6 +194,22 @@ struct UserMmapRegion {
     locked: bool,
     may_write: bool,
     file_backing: Option<UserMmapFileBacking>,
+}
+
+struct UserExecSharedMmapCache {
+    file: fd_table::MmapFileBacking,
+    offset: u64,
+    size: usize,
+    valid_len: usize,
+    pages: Vec<(usize, PhysAddr, MappingFlags)>,
+}
+
+impl UserExecSharedMmapCache {
+    fn release_retained_frames(self) {
+        for (_, frame, _) in self.pages {
+            axmm::release_shared_frame_ref(frame);
+        }
+    }
 }
 
 impl UserMmapRegion {
