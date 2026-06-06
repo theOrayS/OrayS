@@ -228,6 +228,26 @@ impl PipeEndpoint {
             .is_some_and(|state| state.peers.readers.load(Ordering::Acquire) > 0)
     }
 
+    pub(super) fn wait_for_fifo_open_peer(&self) -> Result<(), LinuxError> {
+        if self.fifo_path.is_none() || self.nonblocking() || self.readable == self.writable {
+            return Ok(());
+        }
+        loop {
+            let peer_count = if self.writable {
+                self.peers.readers.load(Ordering::Acquire)
+            } else {
+                self.peers.writers.load(Ordering::Acquire)
+            };
+            if peer_count > 0 {
+                return Ok(());
+            }
+            if Self::interrupted() {
+                return Err(LinuxError::EINTR);
+            }
+            Self::sleep_while_blocked();
+        }
+    }
+
     pub(super) fn new_named_fifo(path: &str, access: u32, status_flags: u32) -> Self {
         let state = named_fifo_state(path);
         let readable = access != general::O_WRONLY;

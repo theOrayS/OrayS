@@ -1,8 +1,8 @@
 use core::mem::{size_of, MaybeUninit};
 use core::ptr;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use axerrno::LinuxError;
-use axfs::fops::{File, OpenOptions};
 use axhal::paging::MappingFlags;
 use linux_raw_sys::general;
 use memory_addr::VirtAddr;
@@ -13,6 +13,39 @@ use super::linux_abi::IOV_MAX;
 use super::{neg_errno, UserProcess};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
+
+static PSEUDO_RANDOM_STATE: AtomicU64 = AtomicU64::new(0x9e37_79b9_7f4a_7c15);
+
+fn next_pseudo_random_u64() -> u64 {
+    loop {
+        let current = PSEUDO_RANDOM_STATE.load(Ordering::Acquire);
+        let time_mix =
+            axhal::time::wall_time_nanos() ^ axhal::time::monotonic_time_nanos().rotate_left(17);
+        let mut next = current ^ time_mix ^ 0xbf58_476d_1ce4_e5b9;
+        next ^= next << 13;
+        next ^= next >> 7;
+        next ^= next << 17;
+        if next == 0 {
+            next = 0x94d0_49bb_1331_11eb;
+        }
+        if PSEUDO_RANDOM_STATE
+            .compare_exchange(current, next, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            return next;
+        }
+    }
+}
+
+pub(super) fn fill_pseudo_random_bytes(dst: &mut [u8]) {
+    let mut offset = 0;
+    while offset < dst.len() {
+        let bytes = next_pseudo_random_u64().to_ne_bytes();
+        let len = (dst.len() - offset).min(bytes.len());
+        dst[offset..offset + len].copy_from_slice(&bytes[..len]);
+        offset += len;
+    }
+}
 
 pub(super) fn validate_user_read(
     process: &UserProcess,
@@ -41,32 +74,19 @@ pub(super) fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags
         return neg_errno(err);
     }
 
-    let mut opts = OpenOptions::new();
-    opts.read(true);
-    let mut file = match File::open("/dev/urandom", &opts) {
-        Ok(file) => file,
-        Err(err) => return neg_errno(LinuxError::from(err)),
-    };
-
     let mut filled = 0usize;
     let mut chunk = [0u8; 256];
     while filled < len {
         let chunk_len = (len - filled).min(chunk.len());
-        let n = match file.read(&mut chunk[..chunk_len]) {
-            Ok(n) => n,
-            Err(err) => return neg_errno(LinuxError::from(err)),
-        };
-        if n == 0 {
-            break;
-        }
+        fill_pseudo_random_bytes(&mut chunk[..chunk_len]);
         let dst = match buf.checked_add(filled) {
             Some(dst) => dst,
             None => return neg_errno(LinuxError::EFAULT),
         };
-        if let Err(err) = write_user_bytes(process, dst, &chunk[..n]) {
+        if let Err(err) = write_user_bytes(process, dst, &chunk[..chunk_len]) {
             return neg_errno(err);
         }
-        filled += n;
+        filled += chunk_len;
     }
     filled as isize
 }

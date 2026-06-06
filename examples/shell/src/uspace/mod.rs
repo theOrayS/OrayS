@@ -54,6 +54,8 @@ pub use process_lifecycle::run_user_program;
 pub use process_lifecycle::run_user_program_in;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in_timeout;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::seed_initial_path_mode;
 use process_lifecycle::ProcessTeardown;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
