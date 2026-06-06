@@ -25,6 +25,7 @@ multitask = [
 ]
 irq = []
 tls = ["axhal/tls"]
+uspace = ["axhal/uspace"]
 preempt = ["irq", "percpu?/preempt", "kernel_guard/preempt"]
 smp = ["kspin/smp"]
 

@@ -1,5 +1,6 @@
 use core::cmp;
 use core::mem::{offset_of, size_of};
+use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::sync::atomic::Ordering;
 use core::time::Duration;
@@ -7,6 +8,7 @@ use core::time::Duration;
 use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
+use axsync::{Mutex as AxMutex, MutexGuard as AxMutexGuard};
 use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
 use std::collections::BTreeMap;
@@ -29,7 +31,7 @@ use super::metadata::{
     apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
     dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
     generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
-    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV,
+    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
 };
 use super::posix_mq::{
     proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
@@ -46,10 +48,11 @@ use super::signal_abi::{
 };
 use super::synthetic_fs::{
     dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
-    proc_comm_path_entry, proc_exe_link_target, proc_pagemap_fd_entry, proc_pagemap_path_entry,
-    proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
-    proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
-    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry,
+    proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry, proc_meminfo_path_entry,
+    proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
+    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
+    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
+    proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
     proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
     proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
     proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
@@ -58,9 +61,10 @@ use super::synthetic_fs::{
     synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
     synthetic_proc_version_content, synthetic_proc_version_fd_entry,
     synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry,
+    synthetic_userdb_path_entry, ProcSysFileEntry,
 };
 use super::system_info::write_default_winsize;
+use super::task_context::current_task_ext;
 use super::task_registry::{
     user_thread_entry_by_process_pid, user_thread_entry_for_process, UserThreadEntry,
 };
@@ -77,6 +81,21 @@ use super::{PathTimes, UserProcess};
 pub(super) struct FdTable {
     pub(super) entries: Vec<Option<FdEntry>>,
     pub(super) fd_flags: Vec<u32>,
+}
+
+pub(super) struct ProcessFdTable {
+    state: AxMutex<ProcessFdTableState>,
+}
+
+struct ProcessFdTableState {
+    base: FdTable,
+    unshared: BTreeMap<i32, FdTable>,
+    aliases: BTreeMap<i32, i32>,
+}
+
+pub(super) struct ProcessFdTableGuard<'a> {
+    state: AxMutexGuard<'a, ProcessFdTableState>,
+    pid: i32,
 }
 
 const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
@@ -124,6 +143,7 @@ pub(super) enum FdEntry {
     PidFd(PidFdEntry),
     PosixMq(PosixMqDescriptor),
     ProcMqQueuesMax(ProcMqQueuesMaxEntry),
+    ProcSysFile(ProcSysFileEntry),
 }
 
 #[derive(Clone)]
@@ -621,9 +641,16 @@ pub(super) fn sys_close_range(
         return neg_errno(LinuxError::EINVAL);
     }
 
+    if flags & CLOSE_RANGE_UNSHARE != 0 {
+        let shared = Arc::strong_count(&process.fds) > 1;
+        if let Err(err) = process.fds.unshare_for_pid_if_shared(process.pid(), shared) {
+            return neg_errno(err);
+        }
+    }
+
     match process
         .fds
-        .lock()
+        .lock_for_pid(process.pid())
         .close_range_for_process(process, first, last, flags)
     {
         Ok(()) => 0,
@@ -1483,6 +1510,68 @@ pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usiz
     if let Ok(socket) = socket_entry(process, fd) {
         return recv_socket_data_to_user(process, socket.posix_fd, buf, count, 0);
     }
+    if count > MAX_USER_IO_CHUNK {
+        let mut total = 0usize;
+        while total < count {
+            let base = match buf.checked_add(total) {
+                Some(base) => base,
+                None => {
+                    return if total > 0 {
+                        total as isize
+                    } else {
+                        neg_errno(LinuxError::EFAULT)
+                    };
+                }
+            };
+            let len = (count - total).min(MAX_USER_IO_CHUNK);
+            if let Err(err) = validate_user_write(process, base, len) {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+            let mut bytes = match user_io_buffer(len) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    return if total > 0 {
+                        total as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            let n = match process.fds.lock().read(process, fd as i32, &mut bytes) {
+                Ok(n) => n,
+                Err(err) => {
+                    return if total > 0 {
+                        total as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            if n > len {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(LinuxError::EINVAL)
+                };
+            }
+            if let Err(err) = write_user_bytes(process, base, &bytes[..n]) {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+            total += n;
+            if n < len {
+                return total as isize;
+            }
+        }
+        return total as isize;
+    }
     with_writable_user_buffer(process, buf, count, |dst| {
         process.fds.lock().read(process, fd as i32, dst)
     })
@@ -1937,6 +2026,12 @@ enum SpliceEndpointKind {
     Stream,
 }
 
+#[derive(Clone, Copy)]
+enum VmspliceDirection {
+    ToPipe,
+    FromPipe,
+}
+
 pub(super) fn sys_splice(
     process: &UserProcess,
     fd_in: usize,
@@ -2016,12 +2111,13 @@ pub(super) fn sys_splice(
                     };
                 }
             };
-            if available == 0 && nonblocking {
-                return if copied > 0 {
-                    copied as isize
-                } else {
-                    neg_errno(LinuxError::EAGAIN)
-                };
+            if available == 0 {
+                if copied > 0 {
+                    break;
+                }
+                if nonblocking {
+                    return neg_errno(LinuxError::EAGAIN);
+                }
             }
             if available > 0 {
                 chunk_len = chunk_len.min(available);
@@ -2038,12 +2134,13 @@ pub(super) fn sys_splice(
                     };
                 }
             };
-            if available == 0 && nonblocking {
-                return if copied > 0 {
-                    copied as isize
-                } else {
-                    neg_errno(LinuxError::EAGAIN)
-                };
+            if available == 0 {
+                if copied > 0 {
+                    break;
+                }
+                if nonblocking {
+                    return neg_errno(LinuxError::EAGAIN);
+                }
             }
             if available > 0 {
                 chunk_len = chunk_len.min(available);
@@ -2145,6 +2242,137 @@ pub(super) fn sys_splice(
     copied as isize
 }
 
+pub(super) fn sys_tee(
+    process: &UserProcess,
+    fd_in: usize,
+    fd_out: usize,
+    len: usize,
+    flags: usize,
+) -> isize {
+    let supported_flags = (general::SPLICE_F_MOVE
+        | general::SPLICE_F_NONBLOCK
+        | general::SPLICE_F_MORE
+        | general::SPLICE_F_GIFT) as usize;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
+    match process
+        .fds
+        .lock()
+        .tee_pipe(fd_in as i32, fd_out as i32, len, nonblocking)
+    {
+        Ok(copied) => copied as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+pub(super) fn sys_vmsplice(
+    process: &UserProcess,
+    fd: usize,
+    iov: usize,
+    iovcnt: usize,
+    flags: usize,
+) -> isize {
+    let supported_flags = (general::SPLICE_F_MOVE
+        | general::SPLICE_F_NONBLOCK
+        | general::SPLICE_F_MORE
+        | general::SPLICE_F_GIFT) as usize;
+    if flags & !supported_flags != 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
+    let fd = fd as i32;
+    let direction = match process.fds.lock().vmsplice_pipe_direction(fd) {
+        Ok(direction) => direction,
+        Err(err) => return neg_errno(err),
+    };
+    let iov_entries = match read_iovec_entries(process, iov, iovcnt) {
+        Ok(iov_entries) => iov_entries,
+        Err(err) => return neg_errno(err),
+    };
+
+    let mut total = 0isize;
+    for entry in iov_entries {
+        let mut base = entry.iov_base as usize;
+        let mut remaining = entry.iov_len as usize;
+        match direction {
+            VmspliceDirection::ToPipe => {
+                if let Err(err) = validate_user_read(process, base, remaining) {
+                    return if total > 0 { total } else { neg_errno(err) };
+                }
+                while remaining > 0 {
+                    let len = remaining.min(MAX_USER_IO_CHUNK);
+                    let src = match read_user_bytes(process, base, len) {
+                        Ok(bytes) => bytes,
+                        Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                    };
+                    let written =
+                        match process
+                            .fds
+                            .lock()
+                            .vmsplice_write_pipe(fd, &src, nonblocking)
+                        {
+                            Ok(written) => written,
+                            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                        };
+                    total += written as isize;
+                    if written == 0 {
+                        return total;
+                    }
+                    base = base.saturating_add(written);
+                    remaining -= written;
+                    if written < len || remaining > 0 {
+                        return total;
+                    }
+                }
+            }
+            VmspliceDirection::FromPipe => {
+                if let Err(err) = validate_user_write(process, base, remaining) {
+                    return if total > 0 { total } else { neg_errno(err) };
+                }
+                while remaining > 0 {
+                    let len = remaining.min(MAX_USER_IO_CHUNK);
+                    let mut bytes = match user_io_buffer(len) {
+                        Ok(bytes) => bytes,
+                        Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                    };
+                    let read =
+                        match process
+                            .fds
+                            .lock()
+                            .vmsplice_read_pipe(fd, &mut bytes, nonblocking)
+                        {
+                            Ok(read) => read,
+                            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                        };
+                    if read > len {
+                        return if total > 0 {
+                            total
+                        } else {
+                            neg_errno(LinuxError::EINVAL)
+                        };
+                    }
+                    if let Err(err) = write_user_bytes(process, base, &bytes[..read]) {
+                        return if total > 0 { total } else { neg_errno(err) };
+                    }
+                    total += read as isize;
+                    if read == 0 {
+                        return total;
+                    }
+                    base = base.saturating_add(read);
+                    remaining -= read;
+                    if read < len || remaining > 0 {
+                        return total;
+                    }
+                }
+            }
+        }
+    }
+
+    total
+}
+
 fn splice_input_kind(
     table: &FdTable,
     fd: i32,
@@ -2170,6 +2398,15 @@ fn splice_input_kind(
             } else {
                 Ok(SpliceEndpointKind::Stream)
             }
+        }
+        FdEntry::ProcSysFile(file) => {
+            if has_offset {
+                return Err(LinuxError::ESPIPE);
+            }
+            if !file_is_readable(file.status_flags()) {
+                return Err(LinuxError::EBADF);
+            }
+            Ok(SpliceEndpointKind::Stream)
         }
         FdEntry::Socket(_) => Err(LinuxError::EINVAL),
         FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
@@ -2207,6 +2444,15 @@ fn splice_output_kind(
             } else {
                 Ok(SpliceEndpointKind::Stream)
             }
+        }
+        FdEntry::ProcSysFile(file) => {
+            if has_offset {
+                return Err(LinuxError::ESPIPE);
+            }
+            if !file_is_writable(file.status_flags()) {
+                return Err(LinuxError::EBADF);
+            }
+            Ok(SpliceEndpointKind::Stream)
         }
         FdEntry::Socket(_) => Err(LinuxError::EINVAL),
         FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
@@ -2751,7 +2997,10 @@ fn rename_target_stat(process: &UserProcess, path: &str) -> Result<general::stat
 }
 
 pub(super) fn sys_getcwd(process: &UserProcess, buf: usize, size: usize) -> isize {
-    let cwd = process.cwd();
+    let cwd = match visible_cwd(process) {
+        Ok(cwd) => cwd,
+        Err(err) => return neg_errno(err),
+    };
     let mut bytes = cwd.into_bytes();
     bytes.push(0);
     if bytes.len() > size {
@@ -2759,6 +3008,28 @@ pub(super) fn sys_getcwd(process: &UserProcess, buf: usize, size: usize) -> isiz
     }
     write_user_bytes(process, buf, &bytes)
         .map_or_else(|err| neg_errno(err), |_| bytes.len() as isize)
+}
+
+fn visible_cwd(process: &UserProcess) -> Result<String, LinuxError> {
+    let cwd = process.cwd();
+    let root = process.fs_root();
+    if root == "/" {
+        return Ok(cwd);
+    }
+    if cwd == root {
+        return Ok("/".into());
+    }
+    let mut prefix = root;
+    if !prefix.ends_with('/') {
+        prefix.push('/');
+    }
+    cwd.strip_prefix(prefix.as_str())
+        .map(|tail| {
+            let mut visible = String::from("/");
+            visible.push_str(tail);
+            visible
+        })
+        .ok_or(LinuxError::ENOENT)
 }
 
 pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
@@ -3184,6 +3455,194 @@ fn write_user_bytes_ret(process: &UserProcess, dst: usize, bytes: &[u8]) -> isiz
     }
 }
 
+impl ProcessFdTable {
+    pub(super) fn new() -> Self {
+        Self::from_table(FdTable::new())
+    }
+
+    pub(super) fn from_table(base: FdTable) -> Self {
+        Self {
+            state: AxMutex::new(ProcessFdTableState {
+                base,
+                unshared: BTreeMap::new(),
+                aliases: BTreeMap::new(),
+            }),
+        }
+    }
+
+    fn current_pid() -> i32 {
+        current_task_ext()
+            .map(|ext| ext.process.pid())
+            .unwrap_or_default()
+    }
+
+    pub(super) fn lock(&self) -> ProcessFdTableGuard<'_> {
+        self.lock_for_pid(Self::current_pid())
+    }
+
+    pub(super) fn lock_for_pid(&self, pid: i32) -> ProcessFdTableGuard<'_> {
+        ProcessFdTableGuard {
+            state: self.state.lock(),
+            pid,
+        }
+    }
+
+    pub(super) fn fork_copy_for_pid(&self, pid: i32) -> Result<FdTable, LinuxError> {
+        self.lock_for_pid(pid).fork_copy()
+    }
+
+    pub(super) fn share_table_for_child_pid(&self, parent_pid: i32, child_pid: i32) {
+        let mut state = self.state.lock();
+        if let Some(owner) = state.unshared_owner_for_pid(parent_pid) {
+            if child_pid != owner {
+                state.aliases.insert(child_pid, owner);
+            }
+        }
+    }
+
+    pub(super) fn unshare_for_pid_if_shared(
+        &self,
+        pid: i32,
+        shared: bool,
+    ) -> Result<(), LinuxError> {
+        if !shared {
+            return Ok(());
+        }
+        let mut state = self.state.lock();
+        let owner = state.unshared_owner_for_pid(pid);
+        let copy = match owner {
+            Some(owner) => state
+                .unshared
+                .get(&owner)
+                .expect("unshared fd table owner must exist")
+                .fork_copy()?,
+            None => state.base.fork_copy()?,
+        };
+        if let Some(owner) = owner {
+            state.detach_unshared_alias(pid, owner);
+        }
+        state.unshared.insert(pid, copy);
+        Ok(())
+    }
+
+    pub(super) fn close_all_for_pid(&self, pid: i32, close_base: bool) {
+        let mut tables = Vec::new();
+        {
+            let mut state = self.state.lock();
+            if let Some(table) = state.detach_process_table(pid) {
+                tables.push(table);
+            }
+            if close_base {
+                tables.push(core::mem::replace(&mut state.base, FdTable::new()));
+                for (_, table) in core::mem::take(&mut state.unshared) {
+                    tables.push(table);
+                }
+                state.aliases.clear();
+            }
+        }
+        for mut table in tables {
+            table.close_all();
+        }
+    }
+}
+
+impl Deref for ProcessFdTableGuard<'_> {
+    type Target = FdTable;
+
+    fn deref(&self) -> &Self::Target {
+        if let Some(owner) = self.state.unshared_owner_for_pid(self.pid) {
+            self.state
+                .unshared
+                .get(&owner)
+                .expect("unshared fd table owner must exist")
+        } else {
+            &self.state.base
+        }
+    }
+}
+
+impl DerefMut for ProcessFdTableGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        if let Some(owner) = self.state.unshared_owner_for_pid(self.pid) {
+            self.state
+                .unshared
+                .get_mut(&owner)
+                .expect("unshared fd table owner must exist")
+        } else {
+            &mut self.state.base
+        }
+    }
+}
+
+impl ProcessFdTableState {
+    fn unshared_owner_for_pid(&self, pid: i32) -> Option<i32> {
+        self.aliases
+            .get(&pid)
+            .copied()
+            .or_else(|| self.unshared.contains_key(&pid).then_some(pid))
+    }
+
+    fn detach_unshared_alias(&mut self, pid: i32, owner: i32) {
+        self.aliases.remove(&pid);
+        if pid != owner {
+            return;
+        }
+
+        let Some(new_owner) = self
+            .aliases
+            .iter()
+            .find_map(|(&alias, &alias_owner)| (alias_owner == owner).then_some(alias))
+        else {
+            return;
+        };
+        let Some(table) = self.unshared.remove(&owner) else {
+            return;
+        };
+        self.unshared.insert(new_owner, table);
+        let aliases = self
+            .aliases
+            .iter()
+            .filter_map(|(&alias, &alias_owner)| (alias_owner == owner).then_some(alias))
+            .collect::<Vec<_>>();
+        for alias in aliases {
+            if alias == new_owner {
+                self.aliases.remove(&alias);
+            } else {
+                self.aliases.insert(alias, new_owner);
+            }
+        }
+    }
+
+    fn detach_process_table(&mut self, pid: i32) -> Option<FdTable> {
+        let owner = self.unshared_owner_for_pid(pid)?;
+        self.aliases.remove(&pid);
+        if pid != owner {
+            return None;
+        }
+
+        let aliases = self
+            .aliases
+            .iter()
+            .filter_map(|(&alias, &alias_owner)| (alias_owner == owner).then_some(alias))
+            .collect::<Vec<_>>();
+        if aliases.is_empty() {
+            return self.unshared.remove(&owner);
+        }
+
+        let new_owner = aliases[0];
+        let table = self.unshared.remove(&owner)?;
+        self.unshared.insert(new_owner, table);
+        for alias in aliases {
+            if alias == new_owner {
+                self.aliases.remove(&alias);
+            } else {
+                self.aliases.insert(alias, new_owner);
+            }
+        }
+        None
+    }
+}
+
 impl FdTable {
     pub(super) fn new() -> Self {
         Self {
@@ -3210,7 +3669,15 @@ impl FdTable {
                 0
             });
         }
-        Ok(Self { entries, fd_flags })
+        let table = Self { entries, fd_flags };
+        table.track_existing_exec_write_opens();
+        Ok(table)
+    }
+
+    fn track_existing_exec_write_opens(&self) {
+        for entry in self.entries.iter().flatten() {
+            track_exec_write_open(entry);
+        }
     }
 
     pub(super) fn is_stdio(&self, fd: i32) -> bool {
@@ -3246,6 +3713,59 @@ impl FdTable {
         }
     }
 
+    fn tee_pipe(
+        &self,
+        fd_in: i32,
+        fd_out: i32,
+        len: usize,
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        let src = match self.entry(fd_in)? {
+            FdEntry::Pipe(pipe) => pipe,
+            _ => return Err(LinuxError::EINVAL),
+        };
+        let dst = match self.entry(fd_out)? {
+            FdEntry::Pipe(pipe) => pipe,
+            _ => return Err(LinuxError::EINVAL),
+        };
+        src.tee_to(dst, len, nonblocking)
+    }
+
+    fn vmsplice_pipe_direction(&self, fd: i32) -> Result<VmspliceDirection, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) if pipe.writable() => Ok(VmspliceDirection::ToPipe),
+            FdEntry::Pipe(pipe) if pipe.readable() => Ok(VmspliceDirection::FromPipe),
+            FdEntry::Pipe(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
+    fn vmsplice_write_pipe(
+        &self,
+        fd: i32,
+        src: &[u8],
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) if pipe.writable() => pipe.write_partial(src, nonblocking),
+            FdEntry::Pipe(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
+    fn vmsplice_read_pipe(
+        &self,
+        fd: i32,
+        dst: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) if pipe.readable() => pipe.read_partial(dst, nonblocking),
+            FdEntry::Pipe(_) => Err(LinuxError::EBADF),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
     pub(super) fn pipe_capacity(&self, fd: i32) -> Result<usize, LinuxError> {
         match self.entry(fd)? {
             FdEntry::Pipe(pipe) => Ok(pipe.capacity()),
@@ -3272,7 +3792,8 @@ impl FdTable {
                 | FdEntry::MemoryFile(_)
                 | FdEntry::Memfd(_)
                 | FdEntry::ProcPagemap(_)
-                | FdEntry::ProcTimerSlack(_) => true,
+                | FdEntry::ProcTimerSlack(_)
+                | FdEntry::ProcSysFile(_) => true,
                 FdEntry::Path(_) => false,
                 FdEntry::EventFd(eventfd) => eventfd.poll_readable(),
                 FdEntry::Inotify(_) => false,
@@ -3309,6 +3830,7 @@ impl FdTable {
                 | FdEntry::Epoll(_) => false,
                 FdEntry::PosixMq(mq) => mq.poll_writable(),
                 FdEntry::ProcMqQueuesMax(_) => true,
+                FdEntry::ProcSysFile(_) => true,
                 FdEntry::EventFd(eventfd) => eventfd.poll_writable(),
                 FdEntry::Pipe(pipe) => pipe.poll_writable(),
                 FdEntry::Socket(socket) => socket.poll(mode),
@@ -3548,6 +4070,7 @@ impl FdTable {
                 }
                 file.read(process, dst)
             }
+            FdEntry::ProcSysFile(file) => file.read(dst),
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
                 Err(LinuxError::EISDIR)
             }
@@ -3603,6 +4126,7 @@ impl FdTable {
                 file.write(process, src)
             }
             FdEntry::ProcMqQueuesMax(entry) => entry.write(src),
+            FdEntry::ProcSysFile(entry) => entry.write(src),
             FdEntry::TimerFd(_) | FdEntry::SignalFd(_) => Err(LinuxError::EINVAL),
             FdEntry::PosixMq(_) => Err(LinuxError::EBADF),
             _ => Err(LinuxError::EBADF),
@@ -3641,11 +4165,14 @@ impl FdTable {
     }
 
     fn close_slot(&mut self, idx: usize) -> Result<(), LinuxError> {
-        if let Some(FdEntry::File(file)) = self.entries[idx].as_ref() {
-            release_flock_on_last_close(file);
-        }
-        if let Some(FdEntry::Socket(socket)) = self.entries[idx].as_ref() {
-            socket.close()?;
+        if let Some(entry) = self.entries[idx].as_ref() {
+            if let FdEntry::File(file) = entry {
+                release_flock_on_last_close(file);
+            }
+            if let FdEntry::Socket(socket) = entry {
+                socket.close()?;
+            }
+            untrack_exec_write_open(entry);
         }
         self.entries[idx] = None;
         if let Some(flags) = self.fd_flags.get_mut(idx) {
@@ -3704,11 +4231,9 @@ impl FdTable {
             return Ok(());
         }
 
-        // CLOSE_RANGE_UNSHARE requests a private fd table before closing.  This
-        // userspace process model does not share FdTable instances across
-        // independent processes; fork already duplicates the table, and threads
-        // in one UserProcess intentionally share it.  Treat UNSHARE as a safe
-        // no-op for now while still applying the requested close operation.
+        // CLOSE_RANGE_UNSHARE is applied by ProcessFdTable before selecting the
+        // active table for this process.  At this layer only the requested
+        // close/CLOEXEC operation remains.
         let _unshare_requested = flags & CLOSE_RANGE_UNSHARE != 0;
         for idx in first..last {
             if self.entries[idx].is_some() {
@@ -4035,6 +4560,7 @@ impl FdTable {
             FdEntry::ProcPagemap(file) => file.seek(pos),
             FdEntry::ProcTimerSlack(file) => file.seek(pos),
             FdEntry::ProcMqQueuesMax(file) => file.seek(pos),
+            FdEntry::ProcSysFile(file) => file.seek(pos),
             FdEntry::PosixMq(_) => Err(LinuxError::ESPIPE),
             FdEntry::Pipe(_) => Err(LinuxError::ESPIPE),
             FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Err(LinuxError::ESPIPE),
@@ -4448,6 +4974,7 @@ impl FdTable {
             .skip(min_fd)
             .find(|(_, slot)| slot.is_none())
         {
+            track_exec_write_open(&entry);
             *slot = Some(entry);
             self.fd_flags[idx] = fd_flags & general::FD_CLOEXEC;
             return Ok(idx as i32);
@@ -4455,6 +4982,7 @@ impl FdTable {
         if self.entries.len() >= FD_TABLE_LIMIT {
             return Err(LinuxError::EMFILE);
         }
+        track_exec_write_open(&entry);
         self.entries.push(Some(entry));
         self.fd_flags.push(fd_flags & general::FD_CLOEXEC);
         Ok((self.entries.len() - 1) as i32)
@@ -4978,6 +5506,7 @@ impl FdTable {
             FdEntry::PidFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[pidfd]", 0).stat()),
             FdEntry::PosixMq(mq) => Ok(mq.stat()),
             FdEntry::ProcMqQueuesMax(entry) => Ok(entry.stat()),
+            FdEntry::ProcSysFile(entry) => Ok(entry.stat()),
         }
     }
 
@@ -5150,10 +5679,10 @@ impl FdTable {
         dirfd: i32,
         path: &str,
     ) -> Result<general::statfs, LinuxError> {
+        let resolved_path = self.resolve_path(process, dirfd, path)?;
         let entry = open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0)?;
         let uid = process.fs_uid();
         if uid != 0 {
-            let resolved_path = self.resolve_path(process, dirfd, path)?;
             if !self.parent_dirs_searchable(
                 process,
                 resolved_path.as_str(),
@@ -5163,7 +5692,11 @@ impl FdTable {
                 return Err(LinuxError::EACCES);
             }
         }
-        Ok(generic_statfs(fd_entry_statfs_path(&entry)))
+        let mut st = generic_statfs(fd_entry_statfs_path(&entry));
+        if process.path_on_nosymfollow_mount(resolved_path.as_str()) {
+            st.f_flags |= ST_NOSYMFOLLOW_FLAG as general::__kernel_long_t;
+        }
+        Ok(st)
     }
 
     pub(super) fn fcntl(
@@ -5244,6 +5777,7 @@ impl FdTable {
                 FdEntry::PidFd(pidfd) => Ok(pidfd.status_flags() as i32),
                 FdEntry::PosixMq(mq) => Ok(mq.status_flags() as i32),
                 FdEntry::ProcMqQueuesMax(entry) => Ok(entry.status_flags() as i32),
+                FdEntry::ProcSysFile(entry) => Ok(entry.status_flags() as i32),
                 FdEntry::ProcTimerSlack(file) => Ok(file.status_flags as i32),
                 _ => Ok(0),
             },
@@ -5317,11 +5851,18 @@ impl FdTable {
                     entry.set_status_flags(arg as u32);
                     Ok(0)
                 }
+                FdEntry::ProcSysFile(entry) => {
+                    entry.set_status_flags(arg as u32);
+                    Ok(0)
+                }
                 _ => Ok(0),
             },
             general::F_GETLK => self.fcntl_getlk(process, fd, arg),
             general::F_SETLK => self.fcntl_setlk(process, fd, arg, false),
             general::F_SETLKW => self.fcntl_setlk(process, fd, arg, true),
+            general::F_OFD_GETLK => self.fcntl_getlk_ofd(process, fd, arg),
+            general::F_OFD_SETLK => self.fcntl_setlk_ofd(process, fd, arg, false),
+            general::F_OFD_SETLKW => self.fcntl_setlk_ofd(process, fd, arg, true),
             general::F_GETLEASE => self.fcntl_getlease(fd),
             general::F_SETLEASE => self.fcntl_setlease(fd, arg as u32),
             _ => Err(LinuxError::EINVAL),
@@ -5357,7 +5898,11 @@ impl FdTable {
             lock.l_whence = general::SEEK_SET as _;
             lock.l_start = conflict.start as _;
             lock.l_len = conflict.len as _;
-            lock.l_pid = conflict.owner_pid as _;
+            lock.l_pid = if conflict.owner_id > 0 && conflict.owner_id <= i32::MAX as i64 {
+                conflict.owner_id as _
+            } else {
+                -1
+            };
         } else {
             lock.l_type = general::F_UNLCK as _;
         }
@@ -5385,6 +5930,66 @@ impl FdTable {
                 (
                     record_lock_key(file),
                     normalize_record_lock(file, process, &lock)?,
+                )
+            }
+            _ => return Err(LinuxError::EBADF),
+        };
+        apply_record_lock(key, request, wait)?;
+        Ok(0)
+    }
+
+    fn fcntl_getlk_ofd(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        arg: usize,
+    ) -> Result<i32, LinuxError> {
+        let mut lock: general::flock = read_user_value(process, arg)?;
+        validate_flock(&lock)?;
+        let (key, request) = match self.entry(fd)? {
+            FdEntry::File(file) => (
+                record_lock_key(file),
+                normalize_ofd_record_lock(file, &lock)?,
+            ),
+            _ => return Err(LinuxError::EBADF),
+        };
+        if let Some(conflict) = first_record_lock_conflict(key, &request) {
+            lock.l_type = conflict.typ;
+            lock.l_whence = general::SEEK_SET as _;
+            lock.l_start = conflict.start as _;
+            lock.l_len = conflict.len as _;
+            lock.l_pid = if conflict.owner_id > 0 && conflict.owner_id <= i32::MAX as i64 {
+                conflict.owner_id as _
+            } else {
+                -1
+            };
+        } else {
+            lock.l_type = general::F_UNLCK as _;
+        }
+        if write_user_value(process, arg, &lock) == 0 {
+            Ok(0)
+        } else {
+            Err(LinuxError::EFAULT)
+        }
+    }
+
+    fn fcntl_setlk_ofd(
+        &mut self,
+        process: &UserProcess,
+        fd: i32,
+        arg: usize,
+        wait: bool,
+    ) -> Result<i32, LinuxError> {
+        let lock: general::flock = read_user_value(process, arg)?;
+        validate_flock(&lock)?;
+        let (key, request) = match self.entry(fd)? {
+            FdEntry::File(file) => {
+                if !record_lock_access_allowed(file, lock.l_type as u32) {
+                    return Err(LinuxError::EBADF);
+                }
+                (
+                    record_lock_key(file),
+                    normalize_ofd_record_lock(file, &lock)?,
                 )
             }
             _ => return Err(LinuxError::EBADF),
@@ -5962,7 +6567,7 @@ fn validate_flock(lock: &general::flock) -> Result<(), LinuxError> {
 
 #[derive(Clone)]
 struct PosixRecordLock {
-    owner_pid: i32,
+    owner_id: i64,
     typ: i16,
     start: i64,
     len: i64,
@@ -5982,7 +6587,7 @@ impl PosixRecordLock {
     }
 
     fn conflicts_with(&self, request: &Self) -> bool {
-        if self.owner_pid == request.owner_pid || !self.overlaps(request) {
+        if self.owner_id == request.owner_id || !self.overlaps(request) {
             return false;
         }
         match request.typ as u32 {
@@ -6002,8 +6607,37 @@ fn posix_record_lock_table() -> &'static Mutex<BTreeMap<u64, Vec<PosixRecordLock
     &POSIX_RECORD_LOCKS
 }
 
+fn record_lock_wait_table() -> &'static Mutex<BTreeMap<i64, i64>> {
+    static RECORD_LOCK_WAITS: LazyInit<Mutex<BTreeMap<i64, i64>>> = LazyInit::new();
+    let _ = RECORD_LOCK_WAITS.call_once(|| Mutex::new(BTreeMap::new()));
+    &RECORD_LOCK_WAITS
+}
+
+fn record_lock_wait_would_deadlock(
+    waits: &BTreeMap<i64, i64>,
+    waiting_owner: i64,
+    mut blocking_owner: i64,
+) -> bool {
+    while let Some(next_owner) = waits.get(&blocking_owner).copied() {
+        if next_owner == waiting_owner {
+            return true;
+        }
+        blocking_owner = next_owner;
+    }
+    blocking_owner == waiting_owner
+}
+
 fn record_lock_key(file: &FileEntry) -> u64 {
     path_inode(Some(file.path.as_str()))
+}
+
+fn ofd_record_lock_owner(file: &FileEntry) -> i64 {
+    let ptr = Arc::as_ptr(&file.offset) as usize as u64;
+    // Keep OFD owners disjoint from positive process-id POSIX owners.  The
+    // descriptor offset Arc is shared by dup/forked file descriptions and unique
+    // for independent open() calls, matching the ownership boundary LTP's OFD
+    // lock tests exercise.
+    -((ptr & (i64::MAX as u64)) as i64) - 1
 }
 
 fn record_lock_access_allowed(file: &FileEntry, typ: u32) -> bool {
@@ -6018,6 +6652,21 @@ fn record_lock_access_allowed(file: &FileEntry, typ: u32) -> bool {
 fn normalize_record_lock(
     file: &FileEntry,
     process: &UserProcess,
+    lock: &general::flock,
+) -> Result<PosixRecordLock, LinuxError> {
+    normalize_record_lock_with_owner(file, process.pid() as i64, lock)
+}
+
+fn normalize_ofd_record_lock(
+    file: &FileEntry,
+    lock: &general::flock,
+) -> Result<PosixRecordLock, LinuxError> {
+    normalize_record_lock_with_owner(file, ofd_record_lock_owner(file), lock)
+}
+
+fn normalize_record_lock_with_owner(
+    file: &FileEntry,
+    owner_id: i64,
     lock: &general::flock,
 ) -> Result<PosixRecordLock, LinuxError> {
     let base = match lock.l_whence as u32 {
@@ -6044,7 +6693,7 @@ fn normalize_record_lock(
         start.checked_add(len).ok_or(LinuxError::EINVAL)?;
     }
     Ok(PosixRecordLock {
-        owner_pid: process.pid(),
+        owner_id,
         typ: lock.l_type,
         start,
         len,
@@ -6059,19 +6708,21 @@ fn lock_len_from_range(start: i64, end: i64) -> i64 {
     }
 }
 
-fn cleanup_dead_record_locks(locks: &mut Vec<PosixRecordLock>, current_pid: i32) {
+fn cleanup_dead_record_locks(locks: &mut Vec<PosixRecordLock>, current_owner_id: i64) {
     locks.retain(|lock| {
-        lock.owner_pid == current_pid || user_thread_entry_by_process_pid(lock.owner_pid).is_some()
+        lock.owner_id == current_owner_id
+            || lock.owner_id < 0
+            || (lock.owner_id <= i32::MAX as i64
+                && user_thread_entry_by_process_pid(lock.owner_id as i32).is_some())
     });
 }
 
 fn merge_record_locks(locks: &mut Vec<PosixRecordLock>) {
-    locks.sort_by_key(|lock| (lock.owner_pid, lock.typ, lock.start, lock.end()));
+    locks.sort_by_key(|lock| (lock.owner_id, lock.typ, lock.start, lock.end()));
     let mut merged: Vec<PosixRecordLock> = Vec::new();
     for lock in locks.drain(..) {
         if let Some(last) = merged.last_mut() {
-            if last.owner_pid == lock.owner_pid && last.typ == lock.typ && lock.start <= last.end()
-            {
+            if last.owner_id == lock.owner_id && last.typ == lock.typ && lock.start <= last.end() {
                 let end = last.end().max(lock.end());
                 last.len = lock_len_from_range(last.start, end);
                 continue;
@@ -6086,7 +6737,7 @@ fn remove_record_lock_range(locks: &mut Vec<PosixRecordLock>, request: &PosixRec
     let request_end = request.end();
     let mut next = Vec::new();
     for lock in locks.drain(..) {
-        if lock.owner_pid != request.owner_pid || !lock.overlaps(request) {
+        if lock.owner_id != request.owner_id || !lock.overlaps(request) {
             next.push(lock);
             continue;
         }
@@ -6111,8 +6762,8 @@ fn remove_record_lock_range(locks: &mut Vec<PosixRecordLock>, request: &PosixRec
 fn first_record_lock_conflict(key: u64, request: &PosixRecordLock) -> Option<PosixRecordLock> {
     let mut table = posix_record_lock_table().lock();
     let locks = table.get_mut(&key)?;
-    cleanup_dead_record_locks(locks, request.owner_pid);
-    locks.sort_by_key(|lock| (lock.start, lock.end(), lock.owner_pid));
+    cleanup_dead_record_locks(locks, request.owner_id);
+    locks.sort_by_key(|lock| (lock.start, lock.end(), lock.owner_id));
     let conflict = locks
         .iter()
         .find(|lock| lock.conflicts_with(request))
@@ -6127,20 +6778,35 @@ fn apply_record_lock(key: u64, request: PosixRecordLock, wait: bool) -> Result<(
     loop {
         let mut table = posix_record_lock_table().lock();
         let locks = table.entry(key).or_insert_with(Vec::new);
-        cleanup_dead_record_locks(locks, request.owner_pid);
-        if request.typ as u32 != general::F_UNLCK
-            && locks.iter().any(|lock| lock.conflicts_with(&request))
-        {
+        cleanup_dead_record_locks(locks, request.owner_id);
+        let conflict_owner = (request.typ as u32 != general::F_UNLCK)
+            .then(|| {
+                locks
+                    .iter()
+                    .find(|lock| lock.conflicts_with(&request))
+                    .map(|lock| lock.owner_id)
+            })
+            .flatten();
+        if let Some(conflict_owner) = conflict_owner {
             if !wait {
                 if locks.is_empty() {
                     table.remove(&key);
                 }
                 return Err(LinuxError::EAGAIN);
             }
+            {
+                let mut waits = record_lock_wait_table().lock();
+                if record_lock_wait_would_deadlock(&waits, request.owner_id, conflict_owner) {
+                    waits.remove(&request.owner_id);
+                    return Err(LinuxError::EDEADLK);
+                }
+                waits.insert(request.owner_id, conflict_owner);
+            }
             drop(table);
             axtask::yield_now();
             continue;
         }
+        record_lock_wait_table().lock().remove(&request.owner_id);
         remove_record_lock_range(locks, &request);
         if request.typ as u32 != general::F_UNLCK {
             locks.push(request);
@@ -6156,7 +6822,9 @@ fn apply_record_lock(key: u64, request: PosixRecordLock, wait: bool) -> Result<(
 fn release_posix_record_locks_for_file_owner(key: u64, owner_pid: i32) {
     let mut table = posix_record_lock_table().lock();
     let should_remove = if let Some(locks) = table.get_mut(&key) {
-        locks.retain(|lock| lock.owner_pid != owner_pid);
+        let owner_id = owner_pid as i64;
+        locks.retain(|lock| lock.owner_id != owner_id);
+        record_lock_wait_table().lock().remove(&owner_id);
         locks.is_empty()
     } else {
         false
@@ -6168,10 +6836,12 @@ fn release_posix_record_locks_for_file_owner(key: u64, owner_pid: i32) {
 
 pub(super) fn release_posix_record_locks_for_process(owner_pid: i32) {
     let mut table = posix_record_lock_table().lock();
+    let owner_id = owner_pid as i64;
+    record_lock_wait_table().lock().remove(&owner_id);
     let empty_keys: Vec<u64> = table
         .iter_mut()
         .filter_map(|(key, locks)| {
-            locks.retain(|lock| lock.owner_pid != owner_pid);
+            locks.retain(|lock| lock.owner_id != owner_id);
             locks.is_empty().then_some(*key)
         })
         .collect();
@@ -6323,6 +6993,7 @@ impl FdEntry {
             Self::PidFd(pidfd) => Ok(Self::PidFd(pidfd.clone())),
             Self::PosixMq(mq) => Ok(Self::PosixMq(mq.clone())),
             Self::ProcMqQueuesMax(entry) => Ok(Self::ProcMqQueuesMax(entry.clone())),
+            Self::ProcSysFile(entry) => Ok(Self::ProcSysFile(entry.clone())),
         }
     }
 }
@@ -6440,6 +7111,76 @@ fn file_is_writable(status_flags: u32) -> bool {
         status_flags & general::O_ACCMODE,
         general::O_WRONLY | general::O_RDWR
     )
+}
+
+fn exec_write_open_table() -> &'static Mutex<BTreeMap<String, usize>> {
+    static EXEC_WRITE_OPEN_COUNTS: LazyInit<Mutex<BTreeMap<String, usize>>> = LazyInit::new();
+    let _ = EXEC_WRITE_OPEN_COUNTS.call_once(|| Mutex::new(BTreeMap::new()));
+    &EXEC_WRITE_OPEN_COUNTS
+}
+
+fn exec_running_table() -> &'static Mutex<BTreeMap<String, usize>> {
+    static EXEC_RUNNING_COUNTS: LazyInit<Mutex<BTreeMap<String, usize>>> = LazyInit::new();
+    let _ = EXEC_RUNNING_COUNTS.call_once(|| Mutex::new(BTreeMap::new()));
+    &EXEC_RUNNING_COUNTS
+}
+
+fn track_exec_write_open(entry: &FdEntry) {
+    let FdEntry::File(file) = entry else {
+        return;
+    };
+    if !file_is_writable(file.status_flags) {
+        return;
+    }
+    let mut counts = exec_write_open_table().lock();
+    *counts.entry(file.path.clone()).or_insert(0) += 1;
+}
+
+fn untrack_exec_write_open(entry: &FdEntry) {
+    let FdEntry::File(file) = entry else {
+        return;
+    };
+    if !file_is_writable(file.status_flags) {
+        return;
+    }
+    let mut counts = exec_write_open_table().lock();
+    if let Some(count) = counts.get_mut(file.path.as_str()) {
+        if *count <= 1 {
+            counts.remove(file.path.as_str());
+        } else {
+            *count -= 1;
+        }
+    }
+}
+
+pub(super) fn executable_write_open(path: &str) -> bool {
+    exec_write_open_table()
+        .lock()
+        .get(path)
+        .copied()
+        .unwrap_or(0)
+        > 0
+}
+
+pub(super) fn track_running_executable(path: &str) {
+    let mut counts = exec_running_table().lock();
+    let count = counts.entry(path.into()).or_insert(0);
+    *count += 1;
+}
+
+pub(super) fn untrack_running_executable(path: &str) {
+    let mut counts = exec_running_table().lock();
+    if let Some(count) = counts.get_mut(path) {
+        if *count <= 1 {
+            counts.remove(path);
+        } else {
+            *count -= 1;
+        }
+    }
+}
+
+fn executable_running(path: &str) -> bool {
+    exec_running_table().lock().get(path).copied().unwrap_or(0) > 0
 }
 
 fn file_logical_size(process: &UserProcess, file: &FileEntry) -> Result<u64, LinuxError> {
@@ -7234,6 +7975,14 @@ fn synthetic_readonly_open_writes(flags: u32) -> bool {
     ) || flags & general::O_TRUNC != 0
 }
 
+fn open_would_write_or_truncate(flags: u32) -> bool {
+    flags & O_PATH_FLAG == 0
+        && (matches!(
+            flags & general::O_ACCMODE,
+            general::O_WRONLY | general::O_RDWR
+        ) || flags & general::O_TRUNC != 0)
+}
+
 fn open_candidates(
     process: &UserProcess,
     table: &FdTable,
@@ -7252,6 +8001,12 @@ fn open_candidates(
     let file_opts = if path_only { &path_opts } else { opts };
     let mut last_err = LinuxError::ENOENT;
     for path in candidates {
+        if !path_only
+            && process.path_on_nosymfollow_mount(path.as_str())
+            && process.path_contains_followed_symlink(path.as_str(), true)?
+        {
+            return Err(LinuxError::ELOOP);
+        }
         if flags & O_NOFOLLOW_FLAG != 0 {
             let resolved_path = process.resolve_parent_symlinks(path.as_str())?;
             if resolved_path != *path {
@@ -7367,6 +8122,19 @@ fn open_candidates(
             } else {
                 synthetic_proc_version_fd_entry(synthetic_path, data)
             });
+        }
+        if let Some(entry) = if path_only {
+            proc_meminfo_path_entry(path.as_str())
+        } else {
+            proc_meminfo_fd_entry(path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
         }
         if is_proc_self_maps_path(path.as_str()) {
             if prefer_dir {
@@ -7533,6 +8301,16 @@ fn open_candidates(
             }
             return Ok(entry);
         }
+        if let Some(entry) = if path_only {
+            proc_sys_file_path_entry(path.as_str())
+        } else {
+            proc_sys_file_fd_entry(path.as_str(), fcntl_status_flags(flags))
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(entry);
+        }
         if let Some((synthetic_path, data)) = synthetic_proc_sys_content(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -7655,6 +8433,9 @@ fn open_candidates(
             if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
                 return Err(LinuxError::EEXIST);
             }
+            if open_would_write_or_truncate(flags) && executable_running(backing_path.as_str()) {
+                return Err(LinuxError::ETXTBSY);
+            }
             check_open_permission(process, backing_path.as_str(), flags)?;
             let file = File::open(backing_path.as_str(), file_opts).map_err(LinuxError::from)?;
             if path_only {
@@ -7719,6 +8500,9 @@ fn open_candidates(
                 path.as_str(),
             )?)
         } else {
+            if open_would_write_or_truncate(flags) && executable_running(path.as_str()) {
+                return Err(LinuxError::ETXTBSY);
+            }
             check_open_permission(process, path.as_str(), flags)?;
             None
         };

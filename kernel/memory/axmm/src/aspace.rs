@@ -108,6 +108,24 @@ impl AddrSpace {
     /// parent and child so copy-on-write can preserve isolation without
     /// eagerly duplicating the process's writable working set.
     pub fn clone_user_mappings_from(&mut self, other: &mut AddrSpace) -> AxResult {
+        self.clone_user_mappings_from_inner(other, true)
+    }
+
+    /// Shares all current user mappings from another address space.
+    ///
+    /// This is intended for vfork-like process creation: the child owns a
+    /// separate page table so exec/exit can tear it down independently, but
+    /// resident writable pages are mapped to the same physical frames so child
+    /// stores before exec/exit remain visible to the blocked parent.
+    pub fn share_user_mappings_from(&mut self, other: &mut AddrSpace) -> AxResult {
+        self.clone_user_mappings_from_inner(other, false)
+    }
+
+    fn clone_user_mappings_from_inner(
+        &mut self,
+        other: &mut AddrSpace,
+        cow_writable: bool,
+    ) -> AxResult {
         if self.va_range != other.va_range {
             return ax_err!(InvalidInput, "address space range mismatch");
         }
@@ -119,7 +137,8 @@ impl AddrSpace {
             let mut retained_frames = Vec::new();
             let mut parent_protect_pages = Vec::new();
             let alloc_missing = area.backend().alloc_missing_on_fault();
-            let cow_pages = area.flags().contains(MappingFlags::WRITE) && alloc_missing;
+            let cow_pages =
+                cow_writable && area.flags().contains(MappingFlags::WRITE) && alloc_missing;
             for vaddr in PageIter4K::new(area.start(), area.end())
                 .expect("memory area bounds must be 4K aligned")
             {

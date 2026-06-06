@@ -45,7 +45,7 @@ mod task_registry;
 mod time_abi;
 mod user_memory;
 
-use fd_table::FdTable;
+use fd_table::{FdTable, ProcessFdTable};
 use linux_abi::*;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
@@ -66,6 +66,7 @@ const DEFAULT_TIMER_SLACK_NS: u64 = 50_000;
 struct MountPoint {
     source_root: String,
     readonly: bool,
+    nosymfollow: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -76,7 +77,8 @@ struct PathTimes {
 }
 
 struct UserProcess {
-    aspace: Mutex<AddrSpace>,
+    aspace: Arc<Mutex<AddrSpace>>,
+    owns_aspace: bool,
     brk: Mutex<BrkState>,
     shared_mmap_ranges: Mutex<Vec<(usize, usize, MappingFlags)>>,
     mmap_sigbus_ranges: Mutex<Vec<(usize, usize)>>,
@@ -84,7 +86,7 @@ struct UserProcess {
     exec_shared_mmap_cache: Mutex<Vec<UserExecSharedMmapCache>>,
     mlock_future: AtomicBool,
     mlockall_accounted_kb: AtomicUsize,
-    fds: Mutex<FdTable>,
+    fds: Arc<ProcessFdTable>,
     cwd: Mutex<String>,
     fs_root: Mutex<String>,
     exec_root: Mutex<String>,
@@ -151,6 +153,7 @@ struct UserProcess {
     eval_watchdog_deadline_us: AtomicU64,
     child_wait_blocked: AtomicBool,
     syscall_wait_blocked: AtomicBool,
+    vfork_exec_done: AtomicBool,
     pid: AtomicI32,
     pgid: AtomicI32,
     sid: AtomicI32,
@@ -192,6 +195,8 @@ struct UserMmapRegion {
     shared: bool,
     anonymous: bool,
     locked: bool,
+    wipe_on_fork: bool,
+    grow_down: bool,
     may_write: bool,
     file_backing: Option<UserMmapFileBacking>,
 }
@@ -231,6 +236,8 @@ impl UserMmapRegion {
             shared: self.shared,
             anonymous: self.anonymous,
             locked: self.locked,
+            wipe_on_fork: self.wipe_on_fork,
+            grow_down: self.grow_down,
             may_write: self.may_write,
             file_backing,
         }

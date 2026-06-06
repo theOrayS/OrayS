@@ -7,8 +7,8 @@ use linux_raw_sys::general;
 use std::vec::Vec;
 
 use super::linux_abi::{
-    DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
-    USER_STACK_SIZE, neg_errno,
+    neg_errno, DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
+    USER_STACK_SIZE,
 };
 use super::task_registry::{
     live_user_process_entries, user_thread_entries_by_process_group,
@@ -18,7 +18,7 @@ use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{UserProcess, task_context::current_tid};
+use super::{task_context::current_tid, UserProcess};
 
 #[repr(C)]
 #[derive(Clone, Copy)]

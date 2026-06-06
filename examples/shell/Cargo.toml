@@ -9,6 +9,7 @@ authors = ["Yuekai Jia <equation618@gmail.com>"]
 [features]
 use-ramfs = ["axstd/myfs", "dep:axfs_vfs", "dep:axfs_ramfs", "dep:crate_interface"]
 uspace = [
+    "axtask/uspace",
     "axstd/fp-simd",
     "dep:axalloc",
     "dep:axerrno",

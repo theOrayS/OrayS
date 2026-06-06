@@ -75,6 +75,7 @@ pub(super) const CHOWN_ID_UNCHANGED: u32 = u32::MAX;
 
 pub(super) const STATFS_BLOCK_SIZE: i64 = 4096;
 pub(super) const STATFS_NAME_MAX: i64 = 63;
+pub(super) const EXT4_SUPER_MAGIC: i64 = 0xef53;
 pub(super) const TMPFS_MAGIC: i64 = 0x0102_1994;
 pub(super) const PROC_SUPER_MAGIC: i64 = 0x9fa0;
 pub(super) const SYSFS_MAGIC: i64 = 0x6265_6572;
@@ -194,7 +195,11 @@ pub(super) fn neg_errno_code(code: u32) -> isize {
 }
 
 pub(super) fn fd_cloexec_flag(enabled: bool) -> u32 {
-    if enabled { general::FD_CLOEXEC } else { 0 }
+    if enabled {
+        general::FD_CLOEXEC
+    } else {
+        0
+    }
 }
 
 pub(super) fn str_err(err: &'static str) -> String {

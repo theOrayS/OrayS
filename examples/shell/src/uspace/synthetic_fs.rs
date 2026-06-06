@@ -1,11 +1,13 @@
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
+use axalloc::global_allocator;
 use axerrno::LinuxError;
 use axtask::AxTaskRef;
+use lazyinit::LazyInit;
 use linux_raw_sys::general;
 use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::string::{String, ToString};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
 use super::fd_table::{
@@ -31,7 +33,9 @@ use super::UserProcess;
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 const PROC_SELF_SMAPS_PATH: &str = "/proc/self/smaps";
 const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
+const PROC_CMDLINE_PATH: &str = "/proc/cmdline";
 const PROC_VERSION_PATH: &str = "/proc/version";
+const PROC_MEMINFO_PATH: &str = "/proc/meminfo";
 const SYNTHETIC_INIT_PID: i32 = 1;
 
 fn proc_maps_perms(prot: u32, shared: bool) -> String {
@@ -796,10 +800,15 @@ pub(super) fn proc_exe_link_target(process: &UserProcess, path: &str) -> Option<
 
 const SYNTHETIC_PROC_VERSION_CONTENT: &[u8] =
     b"Linux version 6.0.0 (oskernel2026-orays) #1 SMP PREEMPT\n";
+const SYNTHETIC_PROC_CMDLINE_CONTENT: &[u8] =
+    b"root=/dev/vda rw console=ttyS0 ltp.oskernel2026=1\n";
 
 pub(super) fn synthetic_proc_version_content(path: &str) -> Option<(&'static str, &'static [u8])> {
-    (normalize_path("/", path).as_deref() == Some(PROC_VERSION_PATH))
-        .then_some((PROC_VERSION_PATH, SYNTHETIC_PROC_VERSION_CONTENT))
+    match normalize_path("/", path).as_deref() {
+        Some(PROC_VERSION_PATH) => Some((PROC_VERSION_PATH, SYNTHETIC_PROC_VERSION_CONTENT)),
+        Some(PROC_CMDLINE_PATH) => Some((PROC_CMDLINE_PATH, SYNTHETIC_PROC_CMDLINE_CONTENT)),
+        _ => None,
+    }
 }
 
 pub(super) fn synthetic_proc_version_fd_entry(path: &'static str, data: &'static [u8]) -> FdEntry {
@@ -815,6 +824,67 @@ pub(super) fn synthetic_proc_version_path_entry(
     data: &'static [u8],
 ) -> FdEntry {
     FdEntry::Path(PathEntry::synthetic_file(path, data.len()))
+}
+
+fn proc_meminfo_content() -> Vec<u8> {
+    let alloc = global_allocator();
+    let free_pages = alloc.available_pages();
+    let used_pages = alloc.used_pages();
+    let total_pages = used_pages.saturating_add(free_pages).max(1);
+    let total_kb = total_pages.saturating_mul(PAGE_SIZE_4K / 1024);
+    let free_kb = free_pages.saturating_mul(PAGE_SIZE_4K / 1024);
+    let used_kb = used_pages.saturating_mul(PAGE_SIZE_4K / 1024);
+    let ratio = PROC_SYS_VM_OVERCOMMIT_RATIO.load(Ordering::Acquire).max(1);
+    let commit_limit_kb = total_kb.saturating_mul(ratio) / 100;
+    let committed_as_kb = used_kb.min(commit_limit_kb / 2);
+
+    format!(
+        "MemTotal:       {total_kb:>8} kB\n\
+         MemFree:        {free_kb:>8} kB\n\
+         MemAvailable:   {free_kb:>8} kB\n\
+         Buffers:               0 kB\n\
+         Cached:                0 kB\n\
+         SwapCached:            0 kB\n\
+         Active:                0 kB\n\
+         Inactive:              0 kB\n\
+         SwapTotal:             0 kB\n\
+         SwapFree:              0 kB\n\
+         Dirty:                 0 kB\n\
+         Writeback:             0 kB\n\
+         AnonPages:      {used_kb:>8} kB\n\
+         Mapped:                0 kB\n\
+         Shmem:                 0 kB\n\
+         KReclaimable:          0 kB\n\
+         Slab:                  0 kB\n\
+         SReclaimable:          0 kB\n\
+         SUnreclaim:            0 kB\n\
+         PageTables:            0 kB\n\
+         CommitLimit:    {commit_limit_kb:>8} kB\n\
+         Committed_AS:   {committed_as_kb:>8} kB\n\
+         VmallocTotal:   34359738367 kB\n\
+         VmallocUsed:           0 kB\n\
+         VmallocChunk:          0 kB\n"
+    )
+    .into_bytes()
+}
+
+pub(super) fn proc_meminfo_fd_entry(path: &str) -> Option<FdEntry> {
+    (normalize_path("/", path).as_deref() == Some(PROC_MEMINFO_PATH)).then(|| {
+        FdEntry::MemoryFile(MemoryFileEntry {
+            path: PROC_MEMINFO_PATH.into(),
+            data: Arc::new(proc_meminfo_content()),
+            offset: 0,
+        })
+    })
+}
+
+pub(super) fn proc_meminfo_path_entry(path: &str) -> Option<FdEntry> {
+    (normalize_path("/", path).as_deref() == Some(PROC_MEMINFO_PATH)).then(|| {
+        FdEntry::Path(PathEntry::synthetic_file(
+            PROC_MEMINFO_PATH,
+            proc_meminfo_content().len(),
+        ))
+    })
 }
 
 pub(super) fn synthetic_userdb_content(path: &str) -> Option<(&'static str, &'static [u8])> {
@@ -960,6 +1030,290 @@ pub(super) fn proc_sysvipc_shm_path_entry(path: &str) -> Option<FdEntry> {
 
 const PROC_SYS_KERNEL_CORE_PATTERN_PATH: &str = "/proc/sys/kernel/core_pattern";
 const PROC_SYS_KERNEL_CORE_PATTERN_CONTENT: &[u8] = b"core\n";
+const PROC_SYS_KERNEL_DOMAINNAME_PATH: &str = "/proc/sys/kernel/domainname";
+const PROC_SYS_KERNEL_HOSTNAME_PATH: &str = "/proc/sys/kernel/hostname";
+const PROC_SYS_FS_PIPE_MAX_SIZE_PATH: &str = "/proc/sys/fs/pipe-max-size";
+const PROC_SYS_VM_MAX_MAP_COUNT_PATH: &str = "/proc/sys/vm/max_map_count";
+const PROC_SYS_VM_MIN_FREE_KBYTES_PATH: &str = "/proc/sys/vm/min_free_kbytes";
+const PROC_SYS_VM_OVERCOMMIT_MEMORY_PATH: &str = "/proc/sys/vm/overcommit_memory";
+const PROC_SYS_VM_OVERCOMMIT_RATIO_PATH: &str = "/proc/sys/vm/overcommit_ratio";
+const PROC_SYS_VM_PANIC_ON_OOM_PATH: &str = "/proc/sys/vm/panic_on_oom";
+const PROC_SYS_KERNEL_NGROUPS_MAX_PATH: &str = "/proc/sys/kernel/ngroups_max";
+const PROC_SYS_DEFAULT_DOMAINNAME: &[u8] = b"localdomain";
+const PROC_SYS_DEFAULT_HOSTNAME: &[u8] = b"arceos";
+const PROC_SYS_KERNEL_NGROUPS_MAX_CONTENT: &[u8] = b"65536\n";
+const PROC_SYS_DEFAULT_PIPE_MAX_SIZE: usize = 65_536;
+const PROC_SYS_DEFAULT_MAX_MAP_COUNT: usize = 65_530;
+const PROC_SYS_DEFAULT_MIN_FREE_KBYTES: usize = 4_096;
+const PROC_SYS_DEFAULT_OVERCOMMIT_RATIO: usize = 50;
+const PROC_SYS_MAX_STRING_LEN: usize = 64;
+
+static PROC_SYS_PIPE_MAX_SIZE: AtomicUsize = AtomicUsize::new(PROC_SYS_DEFAULT_PIPE_MAX_SIZE);
+static PROC_SYS_VM_MAX_MAP_COUNT: AtomicUsize = AtomicUsize::new(PROC_SYS_DEFAULT_MAX_MAP_COUNT);
+static PROC_SYS_VM_MIN_FREE_KBYTES: AtomicUsize =
+    AtomicUsize::new(PROC_SYS_DEFAULT_MIN_FREE_KBYTES);
+static PROC_SYS_VM_OVERCOMMIT_MEMORY: AtomicUsize = AtomicUsize::new(0);
+static PROC_SYS_VM_OVERCOMMIT_RATIO: AtomicUsize =
+    AtomicUsize::new(PROC_SYS_DEFAULT_OVERCOMMIT_RATIO);
+static PROC_SYS_VM_PANIC_ON_OOM: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy)]
+pub(super) enum ProcSysFileKind {
+    Domainname,
+    Hostname,
+    PipeMaxSize,
+    VmMaxMapCount,
+    VmMinFreeKbytes,
+    VmOvercommitMemory,
+    VmOvercommitRatio,
+    VmPanicOnOom,
+}
+
+#[derive(Clone)]
+pub(super) struct ProcSysFileEntry {
+    path: String,
+    kind: ProcSysFileKind,
+    offset: usize,
+    status_flags: u32,
+}
+
+fn proc_sys_file_kind(path: &str) -> Option<(String, ProcSysFileKind)> {
+    let normalized = normalize_path("/", path)?;
+    let kind = match normalized.as_str() {
+        PROC_SYS_KERNEL_DOMAINNAME_PATH => ProcSysFileKind::Domainname,
+        PROC_SYS_KERNEL_HOSTNAME_PATH => ProcSysFileKind::Hostname,
+        PROC_SYS_FS_PIPE_MAX_SIZE_PATH => ProcSysFileKind::PipeMaxSize,
+        PROC_SYS_VM_MAX_MAP_COUNT_PATH => ProcSysFileKind::VmMaxMapCount,
+        PROC_SYS_VM_MIN_FREE_KBYTES_PATH => ProcSysFileKind::VmMinFreeKbytes,
+        PROC_SYS_VM_OVERCOMMIT_MEMORY_PATH => ProcSysFileKind::VmOvercommitMemory,
+        PROC_SYS_VM_OVERCOMMIT_RATIO_PATH => ProcSysFileKind::VmOvercommitRatio,
+        PROC_SYS_VM_PANIC_ON_OOM_PATH => ProcSysFileKind::VmPanicOnOom,
+        _ => return None,
+    };
+    Some((normalized, kind))
+}
+
+fn proc_sys_string_state(kind: ProcSysFileKind) -> &'static Mutex<Vec<u8>> {
+    static DOMAINNAME: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+    static HOSTNAME: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+
+    match kind {
+        ProcSysFileKind::Domainname => {
+            let _ = DOMAINNAME.call_once(|| Mutex::new(PROC_SYS_DEFAULT_DOMAINNAME.to_vec()));
+            &DOMAINNAME
+        }
+        ProcSysFileKind::Hostname => {
+            let _ = HOSTNAME.call_once(|| Mutex::new(PROC_SYS_DEFAULT_HOSTNAME.to_vec()));
+            &HOSTNAME
+        }
+        ProcSysFileKind::PipeMaxSize
+        | ProcSysFileKind::VmMaxMapCount
+        | ProcSysFileKind::VmMinFreeKbytes
+        | ProcSysFileKind::VmOvercommitMemory
+        | ProcSysFileKind::VmOvercommitRatio
+        | ProcSysFileKind::VmPanicOnOom => {
+            unreachable!("numeric proc-sys file is not string-backed")
+        }
+    }
+}
+
+fn proc_sys_file_content(kind: ProcSysFileKind) -> Vec<u8> {
+    match kind {
+        ProcSysFileKind::Domainname | ProcSysFileKind::Hostname => {
+            let state = proc_sys_string_state(kind).lock();
+            let mut content = state.clone();
+            content.push(b'\n');
+            content
+        }
+        ProcSysFileKind::PipeMaxSize => {
+            format!("{}\n", PROC_SYS_PIPE_MAX_SIZE.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::VmMaxMapCount => {
+            format!("{}\n", PROC_SYS_VM_MAX_MAP_COUNT.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::VmMinFreeKbytes => {
+            format!("{}\n", PROC_SYS_VM_MIN_FREE_KBYTES.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::VmOvercommitMemory => format!(
+            "{}\n",
+            PROC_SYS_VM_OVERCOMMIT_MEMORY.load(Ordering::Acquire)
+        )
+        .into_bytes(),
+        ProcSysFileKind::VmOvercommitRatio => {
+            format!("{}\n", PROC_SYS_VM_OVERCOMMIT_RATIO.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::VmPanicOnOom => {
+            format!("{}\n", PROC_SYS_VM_PANIC_ON_OOM.load(Ordering::Acquire)).into_bytes()
+        }
+    }
+}
+
+pub(super) fn proc_sys_vm_max_map_count() -> usize {
+    PROC_SYS_VM_MAX_MAP_COUNT.load(Ordering::Acquire)
+}
+
+fn file_is_readable(status_flags: u32) -> bool {
+    !matches!(status_flags & general::O_ACCMODE, general::O_WRONLY)
+}
+
+fn file_is_writable(status_flags: u32) -> bool {
+    matches!(
+        status_flags & general::O_ACCMODE,
+        general::O_WRONLY | general::O_RDWR
+    )
+}
+
+fn write_proc_sys_string(kind: ProcSysFileKind, src: &[u8]) -> Result<(), LinuxError> {
+    let text = core::str::from_utf8(src).map_err(|_| LinuxError::EINVAL)?;
+    let value = text
+        .trim_end_matches(|c| matches!(c, '\n' | '\r' | '\0'))
+        .as_bytes();
+    if value.len() > PROC_SYS_MAX_STRING_LEN {
+        return Err(LinuxError::EINVAL);
+    }
+    let mut state = proc_sys_string_state(kind).lock();
+    state.clear();
+    state.extend_from_slice(value);
+    Ok(())
+}
+
+fn write_proc_sys_pipe_max_size(src: &[u8]) -> Result<(), LinuxError> {
+    let text = core::str::from_utf8(src).map_err(|_| LinuxError::EINVAL)?;
+    let value_text = text.split_whitespace().next().ok_or(LinuxError::EINVAL)?;
+    let value = value_text
+        .parse::<usize>()
+        .map_err(|_| LinuxError::EINVAL)?;
+    if value == 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    PROC_SYS_PIPE_MAX_SIZE.store(value, Ordering::Release);
+    Ok(())
+}
+
+fn write_proc_sys_usize(
+    src: &[u8],
+    min: usize,
+    max: Option<usize>,
+    target: &AtomicUsize,
+) -> Result<(), LinuxError> {
+    let text = core::str::from_utf8(src).map_err(|_| LinuxError::EINVAL)?;
+    let value_text = text.split_whitespace().next().ok_or(LinuxError::EINVAL)?;
+    let value = value_text
+        .parse::<usize>()
+        .map_err(|_| LinuxError::EINVAL)?;
+    if value < min || max.is_some_and(|max| value > max) {
+        return Err(LinuxError::EINVAL);
+    }
+    target.store(value, Ordering::Release);
+    Ok(())
+}
+
+impl ProcSysFileEntry {
+    fn new(path: String, kind: ProcSysFileKind, status_flags: u32) -> Self {
+        Self {
+            path,
+            kind,
+            offset: 0,
+            status_flags,
+        }
+    }
+
+    pub(super) fn path(&self) -> &str {
+        self.path.as_str()
+    }
+
+    pub(super) fn status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    pub(super) fn set_status_flags(&mut self, flags: u32) {
+        self.status_flags =
+            (self.status_flags & general::O_ACCMODE) | (flags & general::O_NONBLOCK);
+    }
+
+    pub(super) fn stat(&self) -> general::stat {
+        PathEntry::synthetic_file_with_mode(
+            self.path.as_str(),
+            proc_sys_file_content(self.kind).len(),
+            0o644,
+        )
+        .stat()
+    }
+
+    pub(super) fn read(&mut self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        if !file_is_readable(self.status_flags) {
+            return Err(LinuxError::EBADF);
+        }
+        let data = proc_sys_file_content(self.kind);
+        let start = self.offset.min(data.len());
+        let end = core::cmp::min(start + dst.len(), data.len());
+        let len = end.saturating_sub(start);
+        dst[..len].copy_from_slice(&data[start..end]);
+        self.offset = end;
+        Ok(len)
+    }
+
+    pub(super) fn write(&mut self, src: &[u8]) -> Result<usize, LinuxError> {
+        if !file_is_writable(self.status_flags) {
+            return Err(LinuxError::EBADF);
+        }
+        if src.is_empty() {
+            return Ok(0);
+        }
+        match self.kind {
+            ProcSysFileKind::Domainname | ProcSysFileKind::Hostname => {
+                write_proc_sys_string(self.kind, src)?
+            }
+            ProcSysFileKind::PipeMaxSize => write_proc_sys_pipe_max_size(src)?,
+            ProcSysFileKind::VmMaxMapCount => {
+                write_proc_sys_usize(src, 1, None, &PROC_SYS_VM_MAX_MAP_COUNT)?
+            }
+            ProcSysFileKind::VmMinFreeKbytes => {
+                write_proc_sys_usize(src, 0, None, &PROC_SYS_VM_MIN_FREE_KBYTES)?
+            }
+            ProcSysFileKind::VmOvercommitMemory => {
+                write_proc_sys_usize(src, 0, Some(2), &PROC_SYS_VM_OVERCOMMIT_MEMORY)?
+            }
+            ProcSysFileKind::VmOvercommitRatio => {
+                write_proc_sys_usize(src, 0, None, &PROC_SYS_VM_OVERCOMMIT_RATIO)?
+            }
+            ProcSysFileKind::VmPanicOnOom => {
+                write_proc_sys_usize(src, 0, Some(1), &PROC_SYS_VM_PANIC_ON_OOM)?
+            }
+        }
+        self.offset = self.offset.saturating_add(src.len());
+        Ok(src.len())
+    }
+
+    pub(super) fn seek(&mut self, pos: axio::SeekFrom) -> Result<u64, LinuxError> {
+        let size = proc_sys_file_content(self.kind).len() as i64;
+        let next = match pos {
+            axio::SeekFrom::Start(offset) => offset as i64,
+            axio::SeekFrom::Current(offset) => self.offset as i64 + offset,
+            axio::SeekFrom::End(offset) => size + offset,
+        };
+        if next < 0 {
+            return Err(LinuxError::EINVAL);
+        }
+        self.offset = next as usize;
+        Ok(self.offset as u64)
+    }
+}
+
+pub(super) fn proc_sys_file_fd_entry(path: &str, status_flags: u32) -> Option<FdEntry> {
+    proc_sys_file_kind(path)
+        .map(|(path, kind)| FdEntry::ProcSysFile(ProcSysFileEntry::new(path, kind, status_flags)))
+}
+
+pub(super) fn proc_sys_file_path_entry(path: &str) -> Option<FdEntry> {
+    proc_sys_file_kind(path).map(|(path, kind)| {
+        FdEntry::Path(PathEntry::synthetic_file_with_mode(
+            path.as_str(),
+            proc_sys_file_content(kind).len(),
+            0o644,
+        ))
+    })
+}
 
 pub(super) fn synthetic_proc_sys_content(path: &str) -> Option<(&'static str, &'static [u8])> {
     if let Some(content) = sysv_msg::proc_sys_kernel_msg_content(path) {
@@ -972,6 +1326,10 @@ pub(super) fn synthetic_proc_sys_content(path: &str) -> Option<(&'static str, &'
         Some(PROC_SYS_KERNEL_CORE_PATTERN_PATH) => Some((
             PROC_SYS_KERNEL_CORE_PATTERN_PATH,
             PROC_SYS_KERNEL_CORE_PATTERN_CONTENT,
+        )),
+        Some(PROC_SYS_KERNEL_NGROUPS_MAX_PATH) => Some((
+            PROC_SYS_KERNEL_NGROUPS_MAX_PATH,
+            PROC_SYS_KERNEL_NGROUPS_MAX_CONTENT,
         )),
         _ => None,
     }

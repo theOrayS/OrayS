@@ -572,6 +572,50 @@ const LTP_STABLE_CASES: &[&str] = &[
     "pidfd_getfd02",
     "inotify_init1_01",
     "inotify_init1_02",
+    "clone05",
+    "close_range01",
+    "close_range02",
+    "crash02",
+    "creat07",
+    "dirtypipe",
+    "doio",
+    "ebizzy",
+    "execve02",
+    "execve03",
+    "execve04",
+    "fcntl17",
+    "fcntl17_64",
+    "fcntl34",
+    "fcntl34_64",
+    "fcntl36",
+    "fcntl36_64",
+    "getrusage03",
+    "getrusage04",
+    "kcmp01",
+    "kcmp02",
+    "kill10",
+    "madvise07",
+    "madvise10",
+    "mesgq_nstest",
+    "mmap18",
+    "mmapstress01",
+    "mmapstress02",
+    "mmapstress03",
+    "mmapstress05",
+    "mount07",
+    "pipeio",
+    "realpath01",
+    "sbrk01",
+    "sem_nstest",
+    "semtest_2ns",
+    "sendmsg02",
+    "splice06",
+    "tee01",
+    "tee02",
+    "vmsplice01",
+    "vmsplice02",
+    "vmsplice03",
+    "vmsplice04",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
@@ -1805,6 +1849,16 @@ fn ensure_busybox_path_wrappers(dir: &str, busybox_path: &str) -> io::Result<()>
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_helper_busybox_path(suite_dir: &str, busybox_path: &str) -> String {
+    let musl_busybox = "/musl/busybox";
+    if suite_dir != "/musl" && matches!(fs::metadata(musl_busybox), Ok(meta) if meta.is_file()) {
+        musl_busybox.into()
+    } else {
+        busybox_path.into()
+    }
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn prepare_ltp_helper_bin(suite_dir: &str, busybox_path: &str) -> io::Result<String> {
     let helper_dir = join_path(
         TESTSUITE_STAGE_ROOT,
@@ -1814,8 +1868,9 @@ fn prepare_ltp_helper_bin(suite_dir: &str, busybox_path: &str) -> io::Result<Str
         remove_dir_all(&helper_dir)?;
     }
     ensure_dir_all(&helper_dir)?;
+    let helper_busybox = ltp_helper_busybox_path(suite_dir, busybox_path);
     for applet in LTP_BUSYBOX_APPLETS {
-        let wrapper = format!("#!/bin/sh\nexec {busybox_path} {applet} \"$@\"\n");
+        let wrapper = format!("#!{helper_busybox} sh\nexec {helper_busybox} {applet} \"$@\"\n");
         write_text_file(&join_path(&helper_dir, applet), &wrapper)?;
     }
     Ok(helper_dir)
@@ -1831,13 +1886,16 @@ fn file_has_shebang(path: &str) -> bool {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ltp_case_env(case: &str, suite_dir: &str, helper_dir: &str, target_dir: &str) -> Vec<String> {
+fn ltp_case_env(case: &str, suite_dir: &str, _helper_dir: &str, target_dir: &str) -> Vec<String> {
     let mut env = vec![
-        // Keep the testsuite bin directory in PATH for execlp()-based helper
-        // binaries, while preserving the current working directory first after
-        // helper applets. Some LTP cases copy resource helpers into their temp
-        // dir and then exec them by basename.
-        format!("PATH={helper_dir}:.:{target_dir}:/musl:/glibc"),
+        // Keep the current run directory and testsuite bin directory first for
+        // resource helpers, then rely on the runtime's /musl and /glibc
+        // busybox-applet aliases for shell tools such as cp/chmod/awk.  Avoid
+        // putting /tmp helper scripts ahead of those aliases: ramfs-created
+        // files default to 0666, and chmod metadata is per-process in this
+        // userspace model, so those wrappers can shadow working applet aliases
+        // with EACCES inside LTP's system("cp ...") helpers.
+        format!("PATH=.:{target_dir}:/musl:/glibc:/bin:/usr/bin"),
         format!("LTPROOT={}/ltp", suite_dir.trim_end_matches('/')),
         "TMPDIR=/tmp/ltp-work".into(),
         format!("{LTP_CASE_TIMEOUT_ENV}={}", ltp_case_timeout_secs()),

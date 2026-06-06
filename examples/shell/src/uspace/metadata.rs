@@ -12,9 +12,9 @@ use std::vec::Vec;
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
 use super::fd_table::{check_parent_write_search_permission, resolve_dirfd_path, FdEntry};
 use super::linux_abi::{
-    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, FILE_MODE_GROUP_EXECUTE,
-    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
-    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
+    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, EXT4_SUPER_MAGIC,
+    FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID,
+    LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RLIMIT_FSIZE_RESOURCE,
     STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
     ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYSFS_MAGIC, TMPFS_MAGIC,
 };
@@ -440,6 +440,28 @@ impl UserProcess {
                 return Ok(current);
             }
         }
+    }
+
+    pub(super) fn path_contains_followed_symlink(
+        &self,
+        path: &str,
+        follow_final: bool,
+    ) -> Result<bool, LinuxError> {
+        let current = normalize_path("/", path).ok_or(LinuxError::EINVAL)?;
+        let components: Vec<&str> = current.split('/').filter(|part| !part.is_empty()).collect();
+        let mut prefix = String::new();
+        for (idx, component) in components.iter().enumerate() {
+            prefix.push('/');
+            prefix.push_str(component);
+            let is_final = idx + 1 == components.len();
+            if is_final && !follow_final {
+                continue;
+            }
+            if self.path_symlink(prefix.as_str()).is_some() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(super) fn path_symlink_stat(&self, path: &str) -> Option<general::stat> {
@@ -992,6 +1014,7 @@ pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
         FdEntry::ProcPagemap(file) => Some(file.path.as_str()),
         FdEntry::ProcTimerSlack(file) => Some(file.path.as_str()),
         FdEntry::ProcMqQueuesMax(_) => Some("/proc/sys/fs/mqueue/queues_max"),
+        FdEntry::ProcSysFile(file) => Some(file.path()),
         _ => None,
     }
 }
@@ -1824,10 +1847,20 @@ fn statfs_type_for_path(path: Option<&str>) -> i64 {
         Some(path) if path == "/proc" || path.starts_with("/proc/") => PROC_SUPER_MAGIC,
         Some(path) if path == "/sys" || path.starts_with("/sys/") => SYSFS_MAGIC,
         Some(path) if path == "/dev" || path.starts_with("/dev/") => DEVFS_MAGIC,
+        Some(path)
+            if path == "/tmp"
+                || path.starts_with("/tmp/")
+                || path == "/dev/shm"
+                || path.starts_with("/dev/shm/") =>
+        {
+            TMPFS_MAGIC
+        }
         Some(path) if path.starts_with("pipe:") => PIPEFS_MAGIC,
-        _ => TMPFS_MAGIC,
+        _ => EXT4_SUPER_MAGIC,
     }
 }
+
+pub(super) const ST_NOSYMFOLLOW_FLAG: u64 = 0x2000;
 
 pub(super) fn generic_statfs(path: Option<&str>) -> general::statfs {
     let alloc = global_allocator();

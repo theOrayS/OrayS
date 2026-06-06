@@ -3,7 +3,7 @@ use linux_raw_sys::general;
 use std::string::{String, ToString};
 
 use super::fd_table::resolve_dirfd_path;
-use super::linux_abi::{ST_MODE_DIR, ST_MODE_TYPE_MASK, neg_errno};
+use super::linux_abi::{neg_errno, ST_MODE_DIR, ST_MODE_TYPE_MASK};
 use super::runtime_paths::normalize_path;
 use super::user_memory::read_cstr;
 use super::{MountPoint, UserProcess};
@@ -12,7 +12,8 @@ const SUPPORTED_MOUNT_FLAGS: u32 = general::MS_BIND
     | general::MS_REC
     | general::MS_SILENT
     | general::MS_RDONLY
-    | general::MS_REMOUNT;
+    | general::MS_REMOUNT
+    | general::MS_NOSYMFOLLOW;
 
 const SUPPORTED_UMOUNT_FLAGS: u32 = general::MNT_FORCE
     | general::MNT_DETACH
@@ -39,7 +40,7 @@ impl UserProcess {
         join_mount_source(mount.source_root.as_str(), rest)
     }
 
-    pub(super) fn path_on_readonly_mount(&self, path: &str) -> bool {
+    fn best_mount_flag(&self, path: &str, flag: impl Fn(&MountPoint) -> bool) -> bool {
         let mount_points = self.mount_points.lock();
         let mut best: Option<(&str, bool)> = None;
         for (target, mount) in mount_points.iter() {
@@ -47,10 +48,18 @@ impl UserProcess {
                 continue;
             }
             if best.is_none_or(|(best_target, _)| target.len() > best_target.len()) {
-                best = Some((target.as_str(), mount.readonly));
+                best = Some((target.as_str(), flag(mount)));
             }
         }
-        best.is_some_and(|(_, readonly)| readonly)
+        best.is_some_and(|(_, enabled)| enabled)
+    }
+
+    pub(super) fn path_on_readonly_mount(&self, path: &str) -> bool {
+        self.best_mount_flag(path, |mount| mount.readonly)
+    }
+
+    pub(super) fn path_on_nosymfollow_mount(&self, path: &str) -> bool {
+        self.best_mount_flag(path, |mount| mount.nosymfollow)
     }
 
     pub(super) fn paths_cross_mount(&self, lhs: &str, rhs: &str) -> bool {
@@ -74,11 +83,19 @@ impl UserProcess {
         best_mount_target(&mount_points, lhs) != best_mount_target(&mount_points, rhs)
     }
 
-    fn add_mount_point(&self, target: String, source_root: String, readonly: bool, remount: bool) {
+    fn add_mount_point(
+        &self,
+        target: String,
+        source_root: String,
+        readonly: bool,
+        nosymfollow: bool,
+        remount: bool,
+    ) {
         let mut mount_points = self.mount_points.lock();
         if remount {
             if let Some(mount) = mount_points.get_mut(target.as_str()) {
                 mount.readonly = readonly;
+                mount.nosymfollow = nosymfollow;
                 return;
             }
         }
@@ -87,6 +104,7 @@ impl UserProcess {
             MountPoint {
                 source_root,
                 readonly,
+                nosymfollow,
             },
         );
     }
@@ -146,8 +164,9 @@ pub(super) fn sys_mount(
         Err(err) => return neg_errno(err),
     };
     let readonly = flags & general::MS_RDONLY != 0;
+    let nosymfollow = flags & general::MS_NOSYMFOLLOW != 0;
     let remount = flags & general::MS_REMOUNT != 0;
-    process.add_mount_point(target_path, source_root, readonly, remount);
+    process.add_mount_point(target_path, source_root, readonly, nosymfollow, remount);
     0
 }
 

@@ -10,7 +10,9 @@ use std::collections::BTreeMap;
 use std::vec::Vec;
 
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
-use super::linux_abi::{neg_errno, SIGSEGV_NUM, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP};
+use super::linux_abi::{
+    neg_errno, SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP,
+};
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::current_process;
@@ -107,6 +109,9 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         && flags.contains(PageFaultFlags::WRITE)
         && vaddr.as_usize() >= USER_MMAP_BASE
         && vaddr.as_usize() < USER_STACK_TOP;
+    if _from_user {
+        let _ = process.handle_mmap_grow_down_fault(vaddr.as_usize(), flags);
+    }
     let handled = {
         let mut aspace = process.aspace.lock();
         if should_trace {
@@ -216,17 +221,32 @@ pub(super) fn sys_mmap(
     if size == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    // Linux's vm.max_map_count limits the number of visible VMA entries.
+    // Our synthetic /proc/<pid>/maps always exposes text/heap/stack plus
+    // recorded mmap regions.  Allow the mapping that crosses the limit, then
+    // fail the next one, matching the LTP-visible Linux boundary where the
+    // stopped child has max_map_count + 1 map lines.
+    let visible_map_count = process.mmap_regions().len().saturating_add(3);
+    if visible_map_count > super::synthetic_fs::proc_sys_vm_max_map_count() {
+        return neg_errno(LinuxError::ENOMEM);
+    }
     let request_addr = if addr == 0 {
         None
     } else {
         Some(align_down(addr, PAGE_SIZE_4K))
     };
     let mmap_limit_end = USER_STACK_TOP - USER_STACK_SIZE;
+    let exact_fixed = flags_u32 & (general::MAP_FIXED | general::MAP_FIXED_NOREPLACE) != 0;
     let target = if let Some(start) = request_addr {
         let Some(end) = start.checked_add(size) else {
             return neg_errno(LinuxError::ENOMEM);
         };
-        if start < USER_MMAP_BASE || end > mmap_limit_end {
+        let min_start = if exact_fixed {
+            USER_ASPACE_BASE
+        } else {
+            USER_MMAP_BASE
+        };
+        if start < min_start || end > mmap_limit_end {
             return neg_errno(LinuxError::ENOMEM);
         }
         start
@@ -317,6 +337,7 @@ pub(super) fn sys_mmap(
             shared,
             anonymous || dev_zero,
             locked,
+            flags_u32 & general::MAP_GROWSDOWN != 0,
             shared_write_allowed,
             file_backing,
         );
@@ -416,6 +437,7 @@ pub(super) fn sys_mmap(
         shared,
         anonymous || dev_zero,
         locked,
+        flags_u32 & general::MAP_GROWSDOWN != 0,
         shared_write_allowed,
         file_backing,
     );
@@ -562,6 +584,7 @@ fn mremap_shrink_in_place(
         region.shared,
         region.anonymous,
         region.locked,
+        region.grow_down,
         region.may_write,
         region.file_backing,
     );
@@ -609,6 +632,7 @@ fn mremap_try_expand_in_place(
         region.shared,
         region.anonymous,
         region.locked,
+        region.grow_down,
         region.may_write,
         region.file_backing,
     );
@@ -694,6 +718,7 @@ fn mremap_move(
         region.shared,
         region.anonymous,
         region.locked,
+        region.grow_down,
         region.may_write,
         region.file_backing,
     );
@@ -853,6 +878,23 @@ pub(super) fn sys_madvise(process: &UserProcess, addr: usize, len: usize, advice
         return neg_errno(LinuxError::ENOMEM);
     }
     match advice {
+        general::MADV_HWPOISON => {
+            if !madvise_mapped_range(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            let size = end - addr;
+            match process
+                .aspace
+                .lock()
+                .protect(VirtAddr::from(addr), size, MappingFlags::USER)
+            {
+                Ok(()) => {
+                    process.record_mmap_sigbus_range(addr, end);
+                    0
+                }
+                Err(err) => neg_errno(LinuxError::from(err)),
+            }
+        }
         general::MADV_DONTNEED => {
             if !madvise_mapped_range(process, addr, end) {
                 return neg_errno(LinuxError::ENOMEM);
@@ -885,7 +927,14 @@ pub(super) fn sys_madvise(process: &UserProcess, addr: usize, len: usize, advice
         }
         general::MADV_FREE | general::MADV_WIPEONFORK | general::MADV_KEEPONFORK => {
             match madvise_private_anonymous_error(process, addr, end) {
-                None => 0,
+                None => {
+                    if advice == general::MADV_WIPEONFORK {
+                        process.set_mmap_wipe_on_fork_range(addr, end, true);
+                    } else if advice == general::MADV_KEEPONFORK {
+                        process.set_mmap_wipe_on_fork_range(addr, end, false);
+                    }
+                    0
+                }
                 Some(err) => neg_errno(err),
             }
         }

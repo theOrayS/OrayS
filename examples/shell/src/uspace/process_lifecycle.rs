@@ -4,6 +4,7 @@ use axalloc::frame_allocator_stats;
 use axerrno::LinuxError;
 use axhal::context::{TrapFrame, UspaceContext};
 use axhal::paging::MappingFlags;
+use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
@@ -14,20 +15,28 @@ use std::string::String;
 use std::sync::Arc;
 use std::vec::Vec;
 
-use super::credentials;
-use super::fd_table::release_posix_record_locks_for_process;
+use super::credentials::{self, access_allowed};
+use super::fd_table::{
+    executable_write_open, release_posix_record_locks_for_process, track_running_executable,
+    untrack_running_executable,
+};
 use super::futex;
-use super::linux_abi::{neg_errno, SIGCHLD_NUM, USER_ASPACE_BASE, USER_ASPACE_SIZE};
+use super::linux_abi::{
+    neg_errno, ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE,
+    USER_ASPACE_SIZE,
+};
+use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
 use super::program_loader::load_program_image;
 use super::resource_sched::default_sched_state;
-use super::runtime_paths::{current_cwd, is_busybox_applet_name, normalize_path};
+use super::runtime_paths::{
+    busybox_applet_target_path, current_cwd, is_busybox_applet_name, normalize_path,
+};
 use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_registered};
 use super::sysv_shm;
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
-    UserTaskExt,
+    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, UserTaskExt,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
@@ -37,15 +46,76 @@ use super::task_registry::{
 };
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
+    MAX_USER_IO_CHUNK,
 };
-use super::{ChildTask, FdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
+use super::{ChildTask, ProcessFdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
 const USER_TASK_KSTACK_SIZE: usize = 16 * 1024;
+const EXEC_PATH_MAX: usize = 4096;
+const EXEC_NAME_MAX: usize = 255;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {};
+}
+
+fn zero_child_wipe_on_fork_ranges(
+    process: &UserProcess,
+    ranges: &[(usize, usize)],
+) -> Result<(), LinuxError> {
+    if ranges.is_empty() {
+        return Ok(());
+    }
+    let chunk = MAX_USER_IO_CHUNK.min(PAGE_SIZE_4K * 16);
+    let mut zeros = Vec::new();
+    zeros
+        .try_reserve_exact(chunk)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    zeros.resize(chunk, 0);
+
+    for (start, end) in ranges.iter().copied() {
+        let mut cursor = start;
+        while cursor < end {
+            let len = (end - cursor).min(zeros.len());
+            process
+                .aspace
+                .lock()
+                .write(VirtAddr::from(cursor), &zeros[..len])
+                .map_err(LinuxError::from)?;
+            cursor += len;
+        }
+    }
+    Ok(())
+}
+
+fn populate_committed_brk_for_fork(aspace: &mut AddrSpace, brk_start: usize, brk_end: usize) {
+    if brk_end <= brk_start {
+        return;
+    }
+    let start = brk_start / PAGE_SIZE_4K * PAGE_SIZE_4K;
+    let end = brk_end.saturating_add(PAGE_SIZE_4K - 1) / PAGE_SIZE_4K * PAGE_SIZE_4K;
+    let mut page = start;
+    while page < end {
+        let _ = aspace.handle_page_fault(VirtAddr::from(page), PageFaultFlags::WRITE);
+        page = page.saturating_add(PAGE_SIZE_4K);
+    }
+}
+
+fn prefault_clone_child_stack_for_fork(aspace: &mut AddrSpace, child_stack: Option<usize>) {
+    let Some(child_stack) = child_stack.filter(|stack| *stack != 0) else {
+        return;
+    };
+    let start = child_stack.saturating_sub(PAGE_SIZE_4K * 2) / PAGE_SIZE_4K * PAGE_SIZE_4K;
+    let end = child_stack.saturating_add(PAGE_SIZE_4K - 1) / PAGE_SIZE_4K * PAGE_SIZE_4K;
+    if end <= start {
+        return;
+    }
+    let mut page = start;
+    while page < end {
+        let _ = aspace.handle_page_fault(VirtAddr::from(page), PageFaultFlags::WRITE);
+        page = page.saturating_add(PAGE_SIZE_4K);
+    }
 }
 
 fn initial_path_modes() -> BTreeMap<String, u32> {
@@ -75,21 +145,23 @@ impl ProcessTeardown {
     pub(super) fn run(
         &self,
         pid: i32,
+        exec_path: &Mutex<String>,
         aspace: &Mutex<AddrSpace>,
-        fds: &Mutex<FdTable>,
+        clear_aspace: bool,
+        fds: &ProcessFdTable,
+        close_fd_base: bool,
         children: &Mutex<Vec<ChildTask>>,
     ) {
         if self.done.swap(true, Ordering::AcqRel) {
             return;
         }
 
+        untrack_running_executable(exec_path.lock().as_str());
         release_posix_record_locks_for_process(pid);
-        aspace.lock().clear();
-        {
-            let mut fds = fds.lock();
-            fds.close_all();
-            *fds = FdTable::new();
+        if clear_aspace {
+            aspace.lock().clear();
         }
+        fds.close_all_for_pid(pid, close_fd_base);
         children.lock().clear();
         axtask::reap_exited_tasks();
     }
@@ -236,9 +308,11 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
     let mut aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
         .map_err(|err| format!("failed to create user address space: {err}"))?;
     let image = load_program_image(&mut aspace, cwd, argv[0], argv, None)?;
+    let exec_path = image.exec_path.clone();
 
     let process = Arc::new(UserProcess {
-        aspace: Mutex::new(aspace),
+        aspace: Arc::new(Mutex::new(aspace)),
+        owns_aspace: true,
         brk: Mutex::new(image.brk),
         shared_mmap_ranges: Mutex::new(Vec::new()),
         mmap_sigbus_ranges: Mutex::new(Vec::new()),
@@ -246,7 +320,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         exec_shared_mmap_cache: Mutex::new(Vec::new()),
         mlock_future: AtomicBool::new(false),
         mlockall_accounted_kb: AtomicUsize::new(0),
-        fds: Mutex::new(FdTable::new()),
+        fds: Arc::new(ProcessFdTable::new()),
         cwd: Mutex::new(cwd.into()),
         fs_root: Mutex::new(String::from("/")),
         exec_root: Mutex::new(image.exec_root.clone()),
@@ -313,6 +387,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         eval_watchdog_deadline_us: AtomicU64::new(0),
         child_wait_blocked: AtomicBool::new(false),
         syscall_wait_blocked: AtomicBool::new(false),
+        vfork_exec_done: AtomicBool::new(false),
         pid: AtomicI32::new(0),
         pgid: AtomicI32::new(0),
         sid: AtomicI32::new(0),
@@ -326,6 +401,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         exit_wait: WaitQueue::new(),
         teardown: ProcessTeardown::new(),
     });
+    track_running_executable(exec_path.as_str());
 
     Ok(LoadedProgram {
         process,
@@ -341,15 +417,20 @@ fn exec_program(
     env: &[String],
 ) -> Result<(usize, usize, usize), String> {
     let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
-    let image = {
+    let mut new_aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
+        .map_err(|err| format!("failed to create exec address space: {err:?}"))?;
+    let image = load_program_image(&mut new_aspace, cwd, path, &argv_refs, Some(env))?;
+    let new_root = new_aspace.page_table_root();
+    {
         let mut aspace = process.aspace.lock();
         process.cache_exec_shared_file_mappings(&mut aspace);
-        load_program_image(&mut aspace, cwd, path, &argv_refs, Some(env))?
-    };
-    // execve replaces user mappings while reusing the same page-table root for
-    // the task.  Task switches only flush when the root changes, so stale user
-    // TLB entries can otherwise survive an exec and make the new image read
-    // pages from the previous program at overlapping virtual addresses.
+        core::mem::swap(&mut *aspace, &mut new_aspace);
+    }
+    // The old address space now lives in `new_aspace`; switch both the live CPU
+    // and the saved task context to the successfully built image before the old
+    // page table is dropped. Failed execve paths never mutate the live image.
+    unsafe { axhal::asm::write_user_page_table(new_root) };
+    axtask::current().set_page_table_root(new_root);
     axhal::asm::flush_tlb(None);
     *process.brk.lock() = image.brk;
     process.shared_mmap_ranges.lock().clear();
@@ -358,16 +439,27 @@ fn exec_program(
     process.mlock_future.store(false, Ordering::Release);
     process.mlockall_accounted_kb.store(0, Ordering::Release);
     process.clear_posix_timers();
+    let old_exec_path = process.exec_path();
+    if old_exec_path != image.exec_path {
+        untrack_running_executable(old_exec_path.as_str());
+        track_running_executable(image.exec_path.as_str());
+    }
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
+    process.vfork_exec_done.store(true, Ordering::Release);
+    process.exit_wait.notify_all(false);
     Ok((image.entry, image.stack_ptr, image.argc))
 }
 
 fn existing_busybox_for_exec_root(exec_root: &str) -> Option<String> {
     let mut candidates = Vec::new();
     if exec_root == "/glibc" {
-        candidates.push("/glibc/busybox");
+        // The glibc runtime image may contain a minimal busybox without the
+        // shell/applet set used by LTP helpers.  Prefer the packaged musl
+        // busybox for generic /bin applet fallback; it is statically linked
+        // and is safe to use as a tool runner for glibc payloads.
         candidates.push("/musl/busybox");
+        candidates.push("/glibc/busybox");
     } else {
         candidates.push("/musl/busybox");
         candidates.push("/glibc/busybox");
@@ -388,8 +480,30 @@ fn standard_bin_busybox_applet_name(path: &str) -> Option<&str> {
     }
 }
 
+fn rooted_busybox_applet_name(path: &str) -> Option<&str> {
+    let applet = path
+        .strip_prefix("/musl/")
+        .or_else(|| path.strip_prefix("/glibc/"))?;
+    if applet.is_empty()
+        || applet.contains('/')
+        || applet == "busybox"
+        || !is_busybox_applet_name(applet)
+    {
+        None
+    } else {
+        Some(applet)
+    }
+}
+
+fn busybox_exec_alias_target(process: &UserProcess, path: &str) -> Option<String> {
+    busybox_applet_target_path(path)
+        .filter(|target| matches!(std::fs::metadata(target), Ok(meta) if meta.is_file()))
+        .or_else(|| existing_busybox_for_exec_root(process.exec_root().as_str()))
+}
+
 fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [String]) -> String {
-    let applet_name = standard_bin_busybox_applet_name(path.as_str());
+    let applet_name = standard_bin_busybox_applet_name(path.as_str())
+        .or_else(|| rooted_busybox_applet_name(path.as_str()));
     let needs_busybox = (matches!(path.as_str(), "/busybox" | "/bin/busybox")
         || applet_name.is_some())
         && !matches!(std::fs::metadata(path.as_str()), Ok(meta) if meta.is_file());
@@ -397,7 +511,7 @@ fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [S
         return path;
     }
 
-    let Some(busybox) = existing_busybox_for_exec_root(process.exec_root().as_str()) else {
+    let Some(busybox) = busybox_exec_alias_target(process, path.as_str()) else {
         return path;
     };
     if let Some(applet) = applet_name {
@@ -533,8 +647,15 @@ impl UserProcess {
     pub(super) fn teardown(&self) {
         self.release_exec_shared_mmap_cache();
         sysv_shm::release_process_attachments(self);
-        self.teardown
-            .run(self.pid(), &self.aspace, &self.fds, &self.children);
+        self.teardown.run(
+            self.pid(),
+            &self.exec_path,
+            self.aspace.as_ref(),
+            self.owns_aspace,
+            self.fds.as_ref(),
+            Arc::strong_count(&self.fds) == 1,
+            &self.children,
+        );
     }
 
     pub(super) fn release_exec_shared_mmap_cache(&self) {
@@ -811,6 +932,71 @@ impl UserProcess {
             .any(|(start, end)| addr >= *start && addr < *end)
     }
 
+    pub(super) fn handle_mmap_grow_down_fault(
+        &self,
+        addr: usize,
+        fault_flags: PageFaultFlags,
+    ) -> bool {
+        const STACK_GUARD_GAP: usize = 256 * PAGE_SIZE_4K;
+
+        let fault_page = addr & !(PAGE_SIZE_4K - 1);
+        let requested_access = MappingFlags::from_bits_truncate(fault_flags.bits());
+        let candidate = {
+            let ranges = self.mmap_ranges.lock();
+            let Some(region) = ranges
+                .iter()
+                .filter(|region| region.grow_down && fault_page < region.start)
+                .min_by_key(|region| region.start - fault_page)
+                .cloned()
+            else {
+                return false;
+            };
+            let grow_end = region.start;
+            if grow_end <= fault_page {
+                return false;
+            }
+            let map_flags = super::memory_map::mmap_prot_to_flags(region.prot);
+            if !map_flags.contains(requested_access) {
+                return false;
+            }
+            if ranges.iter().any(|other| {
+                other.start < grow_end && other.end() > fault_page && other.start != region.start
+            }) {
+                return false;
+            }
+            let guard_floor = fault_page.saturating_sub(STACK_GUARD_GAP);
+            if ranges
+                .iter()
+                .any(|other| other.end() <= fault_page && other.end() > guard_floor)
+            {
+                return false;
+            }
+            (region.start, region.end(), grow_end - fault_page, map_flags)
+        };
+
+        let (old_start, old_end, grow_size, map_flags) = candidate;
+        if self
+            .aspace
+            .lock()
+            .map_alloc(VirtAddr::from(fault_page), grow_size, map_flags, false)
+            .is_err()
+        {
+            return false;
+        }
+
+        let mut ranges = self.mmap_ranges.lock();
+        if let Some(region) = ranges
+            .iter_mut()
+            .find(|region| region.grow_down && region.start == old_start && region.end() == old_end)
+        {
+            region.start = fault_page;
+            region.size = old_end - fault_page;
+            true
+        } else {
+            false
+        }
+    }
+
     fn forget_mmap_sigbus_range(&self, start: usize, end: usize) {
         let mut ranges = self.mmap_sigbus_ranges.lock();
         let old = core::mem::take(&mut *ranges);
@@ -837,6 +1023,7 @@ impl UserProcess {
         shared: bool,
         anonymous: bool,
         locked: bool,
+        grow_down: bool,
         may_write: bool,
         file_backing: Option<super::UserMmapFileBacking>,
     ) {
@@ -853,6 +1040,8 @@ impl UserProcess {
                 shared,
                 anonymous,
                 locked,
+                wipe_on_fork: false,
+                grow_down,
                 may_write,
                 file_backing,
             });
@@ -913,6 +1102,32 @@ impl UserProcess {
             }
             if region_end > end {
                 ranges.push(region.subregion_with_lock(end, region_end, region.locked));
+            }
+        }
+        ranges.sort_by_key(|region| region.start);
+    }
+
+    pub(super) fn set_mmap_wipe_on_fork_range(&self, start: usize, end: usize, enabled: bool) {
+        let mut ranges = self.mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for region in old {
+            let region_end = region.end();
+            if region_end <= start || region.start >= end {
+                ranges.push(region);
+                continue;
+            }
+            if region.start < start {
+                ranges.push(region.subregion(region.start, start, region.prot));
+            }
+            let selected_start = region.start.max(start);
+            let selected_end = region_end.min(end);
+            if selected_end > selected_start {
+                let mut selected = region.subregion(selected_start, selected_end, region.prot);
+                selected.wipe_on_fork = enabled;
+                ranges.push(selected);
+            }
+            if region_end > end {
+                ranges.push(region.subregion(end, region_end, region.prot));
             }
         }
         ranges.sort_by_key(|region| region.start);
@@ -1008,33 +1223,62 @@ impl UserProcess {
     }
 
     pub(super) fn fork(&self) -> Result<Arc<UserProcess>, LinuxError> {
-        let mut aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
-            .map_err(LinuxError::from)?;
-        {
-            let mut parent_aspace = self.aspace.lock();
-            aspace
-                .clone_user_mappings_from(&mut parent_aspace)
-                .map_err(LinuxError::from)?;
-            for (start, size, flags) in self.shared_mmap_ranges() {
-                let start = VirtAddr::from(start);
-                parent_aspace
-                    .protect(start, size, flags)
+        self.fork_with_fd_sharing(false, false, false, None)
+    }
+
+    pub(super) fn fork_with_fd_sharing(
+        &self,
+        share_fds: bool,
+        share_vm: bool,
+        share_writable_mappings: bool,
+        child_stack: Option<usize>,
+    ) -> Result<Arc<UserProcess>, LinuxError> {
+        let child_aspace = if share_vm {
+            self.aspace.clone()
+        } else {
+            let mut aspace =
+                axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
                     .map_err(LinuxError::from)?;
-                aspace
-                    .protect(start, size, flags)
-                    .map_err(LinuxError::from)?;
+            let brk_snapshot = *self.brk.lock();
+            {
+                let mut parent_aspace = self.aspace.lock();
+                populate_committed_brk_for_fork(
+                    &mut parent_aspace,
+                    brk_snapshot.start,
+                    brk_snapshot.end,
+                );
+                prefault_clone_child_stack_for_fork(&mut parent_aspace, child_stack);
+                if share_writable_mappings {
+                    aspace
+                        .share_user_mappings_from(&mut parent_aspace)
+                        .map_err(LinuxError::from)?;
+                } else {
+                    aspace
+                        .clone_user_mappings_from(&mut parent_aspace)
+                        .map_err(LinuxError::from)?;
+                }
+                for (start, size, flags) in self.shared_mmap_ranges() {
+                    let start = VirtAddr::from(start);
+                    parent_aspace
+                        .protect(start, size, flags)
+                        .map_err(LinuxError::from)?;
+                    aspace
+                        .protect(start, size, flags)
+                        .map_err(LinuxError::from)?;
+                }
+                for (start, end) in self.mmap_sigbus_ranges() {
+                    let start = VirtAddr::from(start);
+                    let size = end - start.as_usize();
+                    parent_aspace
+                        .protect(start, size, MappingFlags::USER)
+                        .map_err(LinuxError::from)?;
+                    aspace
+                        .protect(start, size, MappingFlags::USER)
+                        .map_err(LinuxError::from)?;
+                }
             }
-            for (start, end) in self.mmap_sigbus_ranges() {
-                let start = VirtAddr::from(start);
-                let size = end - start.as_usize();
-                parent_aspace
-                    .protect(start, size, MappingFlags::USER)
-                    .map_err(LinuxError::from)?;
-                aspace
-                    .protect(start, size, MappingFlags::USER)
-                    .map_err(LinuxError::from)?;
-            }
-        }
+            Arc::new(Mutex::new(aspace))
+        };
 
         let shm_attachments = self.shm_attachments.lock().clone();
         sysv_shm::retain_attachments(&shm_attachments);
@@ -1042,9 +1286,22 @@ impl UserProcess {
         for region in child_mmap_ranges.iter_mut() {
             region.locked = false;
         }
+        let wipe_on_fork_ranges: Vec<(usize, usize)> = child_mmap_ranges
+            .iter()
+            .filter(|region| region.wipe_on_fork)
+            .map(|region| (region.start, region.end()))
+            .collect();
+        let child_fds = if share_fds {
+            self.fds.clone()
+        } else {
+            Arc::new(ProcessFdTable::from_table(
+                self.fds.fork_copy_for_pid(self.pid())?,
+            ))
+        };
 
-        Ok(Arc::new(UserProcess {
-            aspace: Mutex::new(aspace),
+        let child = Arc::new(UserProcess {
+            aspace: child_aspace,
+            owns_aspace: !share_vm,
             brk: Mutex::new(*self.brk.lock()),
             shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
             mmap_sigbus_ranges: Mutex::new(self.mmap_sigbus_ranges()),
@@ -1052,7 +1309,7 @@ impl UserProcess {
             exec_shared_mmap_cache: Mutex::new(Vec::new()),
             mlock_future: AtomicBool::new(false),
             mlockall_accounted_kb: AtomicUsize::new(0),
-            fds: Mutex::new(self.fds.lock().fork_copy()?),
+            fds: child_fds,
             cwd: Mutex::new(self.cwd()),
             fs_root: Mutex::new(self.fs_root()),
             exec_root: Mutex::new(self.exec_root()),
@@ -1121,6 +1378,7 @@ impl UserProcess {
             ),
             child_wait_blocked: AtomicBool::new(false),
             syscall_wait_blocked: AtomicBool::new(false),
+            vfork_exec_done: AtomicBool::new(false),
             pid: AtomicI32::new(0),
             pgid: AtomicI32::new(self.pgid()),
             sid: AtomicI32::new(self.sid()),
@@ -1133,7 +1391,12 @@ impl UserProcess {
             wait_continued_signal: AtomicI32::new(0),
             exit_wait: WaitQueue::new(),
             teardown: ProcessTeardown::new(),
-        }))
+        });
+        if !share_vm {
+            zero_child_wipe_on_fork_ranges(child.as_ref(), &wipe_on_fork_ranges)?;
+        }
+        track_running_executable(child.exec_path().as_str());
+        Ok(child)
     }
 
     pub(super) fn add_child(&self, task: AxTaskRef, process: Arc<UserProcess>) -> i32 {
@@ -1445,6 +1708,90 @@ fn notify_parent_child_exit(ppid: i32, child_pid: i32) {
     }
 }
 
+fn exec_path_exceeds_linux_limits(path: &str) -> bool {
+    path.len() >= EXEC_PATH_MAX
+        || path
+            .split('/')
+            .any(|component| component.len() > EXEC_NAME_MAX)
+}
+
+fn exec_path_stat(process: &UserProcess, path: &str) -> Result<(general::stat, bool), LinuxError> {
+    let attr = axfs::api::metadata(path).map_err(LinuxError::from)?;
+    let mut st: general::stat = unsafe { core::mem::zeroed() };
+    st.st_dev = 1;
+    st.st_ino = path_inode(Some(path));
+    st.st_mode = file_type_mode(attr.file_type()) | attr.permissions().bits() as u32;
+    st.st_nlink = 1;
+    st.st_size = attr.size() as _;
+    st.st_blksize = 512;
+    st.st_blocks = attr.blocks() as _;
+    let has_recorded_mode = process.path_mode(path).is_some();
+    Ok((
+        apply_recorded_path_metadata(process, path, st),
+        has_recorded_mode,
+    ))
+}
+
+fn check_exec_parent_components(
+    process: &UserProcess,
+    path: &str,
+    uid: u32,
+    gid: u32,
+) -> Result<(), LinuxError> {
+    let components: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+    if components.len() <= 1 {
+        return Ok(());
+    }
+
+    let mut current = String::new();
+    for component in &components[..components.len() - 1] {
+        current.push('/');
+        current.push_str(component);
+        let (st, has_recorded_mode) = exec_path_stat(process, current.as_str())?;
+        if st.st_mode & ST_MODE_TYPE_MASK != ST_MODE_DIR {
+            return Err(LinuxError::ENOTDIR);
+        }
+        if (has_recorded_mode || st.st_mode & 0o111 != 0)
+            && !access_allowed(&st, ACCESS_X_OK, uid, gid)
+        {
+            return Err(LinuxError::EACCES);
+        }
+    }
+    Ok(())
+}
+
+fn validate_execve_target(process: &UserProcess, cwd: &str, path: &str) -> Result<(), LinuxError> {
+    if path.is_empty() {
+        return Err(LinuxError::ENOENT);
+    }
+    if exec_path_exceeds_linux_limits(path) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+
+    let normalized = normalize_path(cwd, path).ok_or(LinuxError::EINVAL)?;
+    if exec_path_exceeds_linux_limits(normalized.as_str()) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+    let resolved = process
+        .resolve_path_symlink(normalized.as_str())?
+        .unwrap_or(normalized);
+    let physical = process
+        .path_hardlink_backing(resolved.as_str())
+        .unwrap_or_else(|| resolved.clone());
+    let uid = process.fs_uid();
+    let gid = process.fs_gid();
+    check_exec_parent_components(process, resolved.as_str(), uid, gid)?;
+    let (st, has_recorded_mode) = exec_path_stat(process, physical.as_str())?;
+    if (has_recorded_mode || st.st_mode & 0o111 != 0) && !access_allowed(&st, ACCESS_X_OK, uid, gid)
+    {
+        return Err(LinuxError::EACCES);
+    }
+    if executable_write_open(physical.as_str()) {
+        return Err(LinuxError::ETXTBSY);
+    }
+    Ok(())
+}
+
 pub(super) fn sys_execve(
     process: &UserProcess,
     _tf: &TrapFrame,
@@ -1452,20 +1799,26 @@ pub(super) fn sys_execve(
     argv: usize,
     _envp: usize,
 ) -> isize {
-    let path = match read_cstr(process, pathname) {
+    let raw_path = match read_cstr(process, pathname) {
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let mut argv = match read_execve_argv(process, argv, path.as_str()) {
+    let mut argv = match read_execve_argv(process, argv, raw_path.as_str()) {
         Ok(argv) => argv,
         Err(err) => return neg_errno(err),
     };
-    let path = resolve_execve_compat_path(process, path, &mut argv);
+    let path = resolve_execve_compat_path(process, raw_path.clone(), &mut argv);
     let env = match read_execve_envp(process, _envp) {
         Ok(env) => env,
         Err(err) => return neg_errno(err),
     };
     let cwd = process.cwd();
+    if let Err(err) = validate_execve_target(process, cwd.as_str(), path.as_str()) {
+        return neg_errno(err);
+    }
+    if !process.owns_aspace {
+        return neg_errno(LinuxError::EAGAIN);
+    }
     let (entry, stack_ptr, argc) =
         match exec_program(process, cwd.as_str(), path.as_str(), &argv, &env) {
             Ok(image) => image,
@@ -1477,9 +1830,6 @@ pub(super) fn sys_execve(
                 } else {
                     LinuxError::ENOEXEC
                 };
-                if errno == LinuxError::ENOEXEC {
-                    println!("execve-load-failure: path={path} err={err}");
-                }
                 return neg_errno(errno);
             }
         };
@@ -1520,6 +1870,7 @@ pub(super) fn sys_clone(
         .unwrap_or((0, u64::MAX));
     let vfork_flags = general::CLONE_VM as usize | general::CLONE_VFORK as usize;
     let process_allowed_flags = vfork_flags
+        | general::CLONE_FILES as usize
         | general::CLONE_SETTLS as usize
         | general::CLONE_PARENT_SETTID as usize
         | general::CLONE_CHILD_SETTID as usize
@@ -1545,25 +1896,32 @@ pub(super) fn sys_clone(
             return neg_errno(LinuxError::EFAULT);
         }
 
-        let child_process = match process.fork() {
+        let share_fds = clone_flags & general::CLONE_FILES as usize != 0;
+        let vfork_requested = clone_flags & vfork_flags == vfork_flags;
+        // Treat vfork-style process creation as fork-like for address-space
+        // ownership while still blocking the parent below.  The child gets a
+        // separate page table with writable pages shared, preserving vfork's
+        // pre-exec memory visibility without letting child exec/exit clear the
+        // parent's AddrSpace.
+        let share_vm = false;
+        let share_writable_mappings = vfork_requested;
+        let child_process = match process.fork_with_fd_sharing(
+            share_fds,
+            share_vm,
+            share_writable_mappings,
+            (!share_vm).then_some(child_stack),
+        ) {
             Ok(process) => process,
-            Err(err) => {
-                println!(
-                    "clone-failure-diagnostic: err={err:?} flags={flags:#x} clone_flags={clone_flags:#x} exit_signal={exit_signal} child_stack={child_stack:#x} parent_sp={:#x} parent_pc={:#x} clone_vm={} clone_vfork={}",
-                    tf.regs.sp,
-                    user_pc(tf),
-                    clone_flags & general::CLONE_VM as usize != 0,
-                    clone_flags & general::CLONE_VFORK as usize != 0,
-                );
-                return neg_errno(err);
-            }
+            Err(err) => return neg_errno(err),
         };
         let mut child_tf = child_trap_frame(tf, child_stack);
         if clone_flags & general::CLONE_SETTLS as usize != 0 {
             child_tf.regs.tp = tls;
         }
         #[cfg(target_arch = "riscv64")]
-        fixup_riscv_clone_child_return(process.as_ref(), &mut child_tf);
+        if child_stack != 0 {
+            fixup_riscv_clone_child_return(process.as_ref(), &mut child_tf);
+        }
         let child_context = UspaceContext::from(&child_tf);
         let task_process = child_process.clone();
         let mut task = TaskInner::new(
@@ -1573,6 +1931,9 @@ pub(super) fn sys_clone(
         );
         let pid = task.id().as_u64() as i32;
         child_process.set_pid(pid);
+        if share_fds {
+            process.fds.share_table_for_child_pid(process.pid(), pid);
+        }
         if clone_flags & general::CLONE_PARENT_SETTID as usize != 0 {
             let ret = write_user_value(process.as_ref(), ptid, &pid);
             if ret != 0 {
@@ -1609,7 +1970,28 @@ pub(super) fn sys_clone(
         ));
         let task = axtask::spawn_task(task);
         register_user_task(task.clone(), child_process.clone());
-        process.add_child(task, child_process);
+        process.add_child(task, child_process.clone());
+        if vfork_requested {
+            let wait_condition = || {
+                child_process.live_threads.load(Ordering::Acquire) == 0
+                    || child_process.vfork_exec_done.load(Ordering::Acquire)
+                    || process.pending_exit_group().is_some()
+                    || process.eval_watchdog_expired()
+            };
+            if let Some(timeout) = process.eval_watchdog_remaining() {
+                if child_process
+                    .exit_wait
+                    .wait_timeout_until(timeout, wait_condition)
+                {
+                    return neg_errno(LinuxError::EINTR);
+                }
+            } else {
+                child_process.exit_wait.wait_until(wait_condition);
+            }
+            if process.pending_exit_group().is_some() || process.eval_watchdog_expired() {
+                return neg_errno(LinuxError::EINTR);
+            }
+        }
         return pid as isize;
     }
 
