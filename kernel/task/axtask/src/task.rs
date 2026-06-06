@@ -1,13 +1,15 @@
 use alloc::{boxed::Box, string::String, sync::Arc};
 use core::ops::Deref;
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use core::{alloc::Layout, cell::UnsafeCell, fmt, ptr::NonNull};
 
 #[cfg(feature = "preempt")]
 use core::sync::atomic::AtomicUsize;
 
 use kspin::SpinNoIrq;
-use memory_addr::{VirtAddr, align_up_4k};
+#[cfg(feature = "uspace")]
+use memory_addr::PhysAddr;
+use memory_addr::{align_up_4k, VirtAddr};
 
 use axhal::context::TaskContext;
 #[cfg(feature = "tls")]
@@ -184,6 +186,21 @@ impl TaskInner {
     #[inline]
     pub const fn ctx_mut(&mut self) -> &mut TaskContext {
         self.ctx.get_mut()
+    }
+
+    /// Updates the saved user page-table root for this task.
+    ///
+    /// `execve` can atomically swap a process to a freshly built address space
+    /// while the task is running in the kernel.  The hardware page-table root is
+    /// updated immediately by that syscall path; this method keeps the saved
+    /// task context consistent so the next scheduler switch does not restore the
+    /// pre-exec root.
+    #[cfg(feature = "uspace")]
+    pub fn set_page_table_root(&self, root: PhysAddr) {
+        // SAFETY: a task context is only saved/restored by the scheduler.  This
+        // is used for the current task while it is executing in the kernel, so
+        // no concurrent context switch is mutating this `UnsafeCell`.
+        unsafe { (&mut *self.ctx.get()).set_page_table_root(root) };
     }
 
     /// Returns the top address of the kernel stack.

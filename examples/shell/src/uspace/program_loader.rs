@@ -7,16 +7,16 @@ use axmm::AddrSpace;
 use linux_raw_sys::auxvec;
 #[cfg(target_arch = "loongarch64")]
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::string::{String, ToString};
 use std::vec::Vec;
-use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::sections::SectionData;
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::symbol_table::Entry;
+use xmas_elf::ElfFile;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, USER_BRK_GROW_SIZE,
@@ -26,7 +26,7 @@ use super::memory_map::{align_down, align_up, user_mapping_flags};
 use super::runtime_paths::{
     derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
 };
-use super::{BrkState, str_err};
+use super::{str_err, BrkState};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,
@@ -77,7 +77,11 @@ pub(super) fn load_program_image(
     argv: &[&str],
     env_override: Option<&[String]>,
 ) -> Result<LoadedImage, String> {
-    let prepared = prepare_program(cwd, program_path, argv, 0)?;
+    let mut prepared = prepare_program(cwd, program_path, argv, 0)?;
+    #[cfg(target_arch = "riscv64")]
+    patch_riscv_musl_main_syscall_stubs(prepared.exec_root.as_str(), &mut prepared.image)?;
+    #[cfg(target_arch = "loongarch64")]
+    patch_loongarch_musl_main_syscall_stubs(prepared.exec_root.as_str(), &mut prepared.image)?;
     let elf = ElfFile::new(&prepared.image).map_err(|err| format!("invalid ELF: {err}"))?;
     let main = analyze_elf(&elf, USER_PIE_LOAD_BASE)?;
     let exec_root = effective_exec_root(prepared.exec_root.as_str(), main.interpreter.as_deref());
@@ -385,6 +389,24 @@ fn read_interp_path(elf: &ElfFile<'_>, ph: &ProgramHeader<'_>) -> Result<String,
 }
 
 #[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_main_syscall_stubs(
+    exec_root: &str,
+    image: &mut [u8],
+) -> Result<(), String> {
+    if exec_root != "/musl" {
+        return Ok(());
+    }
+    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl executable ELF: {err}"))?;
+    let brk_offset = find_dynsym_file_offset(&elf, "brk")?
+        .or_else(|| find_symbol_file_offset(&elf, "brk").ok().flatten());
+    drop(elf);
+    if let Some(offset) = brk_offset {
+        patch_loongarch_musl_brk_stub(image, offset)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
 fn patch_loongarch_musl_syscall_stubs(
     exec_root: &str,
     raw_interp: &str,
@@ -408,6 +430,7 @@ fn patch_loongarch_musl_syscall_stubs(
         offsets.push((offset, syscall_nr));
     }
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
+    let sbrk_offset = find_dynsym_file_offset(&elf, "sbrk")?;
     let gethostname_offset = find_dynsym_file_offset(&elf, "gethostname")?;
     let syscall_ret_offset = find_symbol_file_offset(&elf, "__syscall_ret")?;
     drop(elf);
@@ -418,12 +441,30 @@ fn patch_loongarch_musl_syscall_stubs(
     if let Some(offset) = brk_offset {
         patch_loongarch_musl_brk_stub(image, offset)?;
     }
+    if let (Some(offset), Some(syscall_ret_offset)) = (sbrk_offset, syscall_ret_offset) {
+        patch_loongarch_musl_sbrk_stub(image, offset, syscall_ret_offset)?;
+    }
     if let (Some(gethostname_offset), Some(syscall_ret_offset)) =
         (gethostname_offset, syscall_ret_offset)
     {
         patch_loongarch_musl_gethostname_wrapper(image, gethostname_offset, syscall_ret_offset)?;
     }
     patch_loongarch_musl_readlink_wrappers(image)?;
+    Ok(())
+}
+
+#[cfg(target_arch = "riscv64")]
+fn patch_riscv_musl_main_syscall_stubs(exec_root: &str, image: &mut [u8]) -> Result<(), String> {
+    if exec_root != "/musl" {
+        return Ok(());
+    }
+    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl executable ELF: {err}"))?;
+    let brk_offset = find_dynsym_file_offset(&elf, "brk")?
+        .or_else(|| find_symbol_file_offset(&elf, "brk").ok().flatten());
+    drop(elf);
+    if let Some(offset) = brk_offset {
+        patch_riscv_musl_brk_stub(image, offset)?;
+    }
     Ok(())
 }
 
@@ -438,6 +479,7 @@ fn patch_riscv_musl_syscall_stubs(
     }
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
+    let sbrk_offset = find_dynsym_file_offset(&elf, "sbrk")?;
     let nice_offset = find_dynsym_file_offset(&elf, "nice")?;
     let getpriority_offset = find_dynsym_file_offset(&elf, "getpriority")?;
     let setpriority_offset = find_dynsym_file_offset(&elf, "setpriority")?;
@@ -447,6 +489,9 @@ fn patch_riscv_musl_syscall_stubs(
     drop(elf);
     if let Some(offset) = brk_offset {
         patch_riscv_musl_brk_stub(image, offset)?;
+    }
+    if let (Some(offset), Some(syscall_ret_offset)) = (sbrk_offset, syscall_ret_offset) {
+        patch_riscv_musl_sbrk_stub(image, offset, syscall_ret_offset)?;
     }
     if let (
         Some(nice_offset),
@@ -486,6 +531,9 @@ fn find_dynsym_file_offset(elf: &ElfFile<'_>, name: &str) -> Result<Option<usize
     for entry in entries {
         if entry.get_name(elf).unwrap_or("") == name {
             let value = entry.value() as usize;
+            if value == 0 {
+                continue;
+            }
             return vaddr_to_file_offset(elf, value).map(Some);
         }
     }
@@ -556,6 +604,83 @@ fn patch_riscv_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), Stri
         ];
         image[offset..end].copy_from_slice(&patch);
     }
+    Ok(())
+}
+
+#[cfg(target_arch = "riscv64")]
+fn patch_riscv_musl_sbrk_stub(
+    image: &mut [u8],
+    offset: usize,
+    syscall_ret_offset: usize,
+) -> Result<(), String> {
+    const ENOMEM_SBRK_STUB: [u8; 24] = [
+        0x63, 0x06, 0x05, 0x00, // beqz a0, +12
+        0x13, 0x05, 0x40, 0xff, // li a0, -ENOMEM
+        0x6f, 0xe0, 0xcf, 0xd2, // j __syscall_ret
+        0x93, 0x08, 0x60, 0x0d, // li a7, __NR_brk
+        0x73, 0x00, 0x00, 0x00, // ecall
+        0x67, 0x80, 0x00, 0x00, // ret
+    ];
+    const HELPER_LEN: usize = 40;
+    let end = offset
+        .checked_add(ENOMEM_SBRK_STUB.len())
+        .ok_or_else(|| "riscv musl sbrk stub prefix range overflow".to_string())?;
+    if !image
+        .get(offset..end)
+        .is_some_and(|prefix| prefix == ENOMEM_SBRK_STUB)
+    {
+        return Ok(());
+    }
+
+    let helper_offset = reserve_elf_rx_patch_area(image, HELPER_LEN)?;
+    let entry_jump = riscv_j(offset, helper_offset)?;
+    image[offset..offset + size_of::<u32>()].copy_from_slice(&entry_jump.to_le_bytes());
+
+    let branch_to_fail = riscv_bne(helper_offset + 24, helper_offset + 32, 10, 12)?;
+    let syscall_ret_jump = riscv_j(helper_offset + 36, syscall_ret_offset)?;
+    let helper = [
+        0xaa,
+        0x85, // mv a1, a0 (save increment).
+        0x01,
+        0x45, // li a0, 0 (query current break).
+        0x93,
+        0x08,
+        0x60,
+        0x0d, // li a7, __NR_brk (214).
+        0x73,
+        0x00,
+        0x00,
+        0x00, // ecall -> current break in a0.
+        0x33,
+        0x06,
+        0xb5,
+        0x00, // add a2, a0, a1 (target break).
+        0xaa,
+        0x85, // mv a1, a0 (save old break for sbrk return).
+        0x32,
+        0x85, // mv a0, a2 (request target break).
+        0x73,
+        0x00,
+        0x00,
+        0x00, // ecall.
+        branch_to_fail.to_le_bytes()[0],
+        branch_to_fail.to_le_bytes()[1],
+        branch_to_fail.to_le_bytes()[2],
+        branch_to_fail.to_le_bytes()[3],
+        0x2e,
+        0x85, // mv a0, a1 (return old break on success).
+        0x82,
+        0x80, // ret.
+        0x13,
+        0x05,
+        0x40,
+        0xff, // li a0, -ENOMEM.
+        syscall_ret_jump.to_le_bytes()[0],
+        syscall_ret_jump.to_le_bytes()[1],
+        syscall_ret_jump.to_le_bytes()[2],
+        syscall_ret_jump.to_le_bytes()[3],
+    ];
+    image[helper_offset..helper_offset + HELPER_LEN].copy_from_slice(&helper);
     Ok(())
 }
 
@@ -687,6 +812,42 @@ fn riscv_j(from_offset: usize, to_offset: usize) -> Result<u32, String> {
 }
 
 #[cfg(target_arch = "riscv64")]
+fn riscv_bne(from_offset: usize, to_offset: usize, rs1: u32, rs2: u32) -> Result<u32, String> {
+    riscv_branch(0x1, from_offset, to_offset, rs1, rs2)
+}
+
+#[cfg(target_arch = "riscv64")]
+fn riscv_branch(
+    funct3: u32,
+    from_offset: usize,
+    to_offset: usize,
+    rs1: u32,
+    rs2: u32,
+) -> Result<u32, String> {
+    if funct3 > 0x7 || rs1 > 31 || rs2 > 31 {
+        return Err("RISC-V branch register/function out of range".into());
+    }
+    let delta = (to_offset as i64)
+        .checked_sub(from_offset as i64)
+        .ok_or_else(|| "RISC-V branch delta overflow".to_string())?;
+    if delta % 2 != 0 {
+        return Err(format!("unaligned RISC-V branch delta: {delta}"));
+    }
+    if !(-(1 << 12)..(1 << 12)).contains(&delta) {
+        return Err(format!("RISC-V branch delta out of range: {delta}"));
+    }
+    let imm = (delta as u32) & 0x1fff;
+    Ok(((imm & 0x1000) << 19)
+        | ((imm & 0x07e0) << 20)
+        | (rs2 << 20)
+        | (rs1 << 15)
+        | (funct3 << 12)
+        | ((imm & 0x001e) << 7)
+        | ((imm & 0x0800) >> 4)
+        | 0x63)
+}
+
+#[cfg(target_arch = "riscv64")]
 fn riscv_jal_with_rd(rd: u32, from_offset: usize, to_offset: usize) -> Result<u32, String> {
     if rd > 31 {
         return Err(format!("RISC-V jal register out of range: {rd}"));
@@ -736,6 +897,60 @@ fn patch_loongarch_musl_brk_stub(image: &mut [u8], offset: usize) -> Result<(), 
         .concat();
         image[offset..end].copy_from_slice(&patch);
     }
+    Ok(())
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn patch_loongarch_musl_sbrk_stub(
+    image: &mut [u8],
+    offset: usize,
+    syscall_ret_offset: usize,
+) -> Result<(), String> {
+    const ENOMEM_SBRK_STUB: [u8; 24] = [
+        0x80, 0x10, 0x00, 0x44, // bnez a0, +16
+        0x0b, 0x58, 0x83, 0x02, // a7 = __NR_brk
+        0x00, 0x00, 0x2b, 0x00, // syscall 0
+        0x20, 0x00, 0x00, 0x4c, // ret
+        0x04, 0xd0, 0xbf, 0x02, // a0 = -ENOMEM
+        0xff, 0x3b, 0xe3, 0x53, // b __syscall_ret
+    ];
+    const SYSCALL: u32 = 0x002b_0000;
+    const RET: u32 = 0x4c00_0020;
+    const HELPER_LEN: usize = 52;
+    let end = offset
+        .checked_add(ENOMEM_SBRK_STUB.len())
+        .ok_or_else(|| "loongarch musl sbrk stub prefix range overflow".to_string())?;
+    if !image
+        .get(offset..end)
+        .is_some_and(|prefix| prefix == ENOMEM_SBRK_STUB)
+    {
+        return Ok(());
+    }
+
+    let helper_offset = reserve_elf_rx_patch_area(image, HELPER_LEN)?;
+    let entry_jump = loongarch_b(offset, helper_offset)?;
+    image[offset..offset + size_of::<u32>()].copy_from_slice(&entry_jump.to_le_bytes());
+
+    let load_syscall_nr = loongarch_addi_w_a7(general::__NR_brk)?;
+    let branch_to_fail = loongarch_bne(helper_offset + 32, helper_offset + 44, 4, 6)?;
+    let syscall_ret_jump = loongarch_b(helper_offset + 48, syscall_ret_offset)?;
+    let patch = [
+        loongarch_move(5, 4).to_le_bytes(), // move a1, a0 (save increment).
+        loongarch_addi_w(4, 0)?.to_le_bytes(), // a0 = 0 (query current break).
+        load_syscall_nr.to_le_bytes(),
+        SYSCALL.to_le_bytes(),
+        loongarch_add_d(6, 4, 5).to_le_bytes(), // a2 = current break + increment.
+        loongarch_move(5, 4).to_le_bytes(),     // a1 = old break.
+        loongarch_move(4, 6).to_le_bytes(),     // a0 = target break.
+        SYSCALL.to_le_bytes(),
+        branch_to_fail.to_le_bytes(),
+        loongarch_move(4, 5).to_le_bytes(), // return old break on success.
+        RET.to_le_bytes(),
+        loongarch_addi_w(4, -12)?.to_le_bytes(), // a0 = -ENOMEM.
+        syscall_ret_jump.to_le_bytes(),
+    ]
+    .concat();
+    image[helper_offset..helper_offset + HELPER_LEN].copy_from_slice(&patch);
     Ok(())
 }
 
@@ -936,6 +1151,108 @@ fn read_u32_le(image: &[u8], offset: usize) -> Result<u32, String> {
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn read_u16_le(image: &[u8], offset: usize) -> Result<u16, String> {
+    let end = offset
+        .checked_add(size_of::<u16>())
+        .ok_or_else(|| "ELF halfword read range overflow".to_string())?;
+    let bytes = image
+        .get(offset..end)
+        .ok_or_else(|| "ELF halfword read exceeds image".to_string())?;
+    Ok(u16::from_le_bytes(bytes.try_into().unwrap()))
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn read_u64_le(image: &[u8], offset: usize) -> Result<u64, String> {
+    let end = offset
+        .checked_add(size_of::<u64>())
+        .ok_or_else(|| "ELF word read range overflow".to_string())?;
+    let bytes = image
+        .get(offset..end)
+        .ok_or_else(|| "ELF word read exceeds image".to_string())?;
+    Ok(u64::from_le_bytes(bytes.try_into().unwrap()))
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn write_u64_le(image: &mut [u8], offset: usize, value: u64) -> Result<(), String> {
+    let end = offset
+        .checked_add(size_of::<u64>())
+        .ok_or_else(|| "ELF word write range overflow".to_string())?;
+    let bytes = image
+        .get_mut(offset..end)
+        .ok_or_else(|| "ELF word write exceeds image".to_string())?;
+    bytes.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn reserve_elf_rx_patch_area(image: &mut [u8], patch_len: usize) -> Result<usize, String> {
+    const PT_LOAD: u32 = 1;
+    const PF_X: u32 = 1;
+    if image.len() < 64 || image.get(0..4) != Some(b"\x7fELF") {
+        return Err("invalid ELF image for RX patch reservation".into());
+    }
+    let phoff = read_u64_le(image, 32)? as usize;
+    let phentsize = read_u16_le(image, 54)? as usize;
+    let phnum = read_u16_le(image, 56)? as usize;
+    if phentsize < 56 {
+        return Err("unsupported ELF program header size".into());
+    }
+
+    let mut load_offsets = Vec::new();
+    for idx in 0..phnum {
+        let ph = phoff
+            .checked_add(idx * phentsize)
+            .ok_or_else(|| "ELF program header offset overflow".to_string())?;
+        let p_type = read_u32_le(image, ph)?;
+        if p_type == PT_LOAD {
+            load_offsets.push(read_u64_le(image, ph + 8)? as usize);
+        }
+    }
+
+    for idx in 0..phnum {
+        let ph = phoff
+            .checked_add(idx * phentsize)
+            .ok_or_else(|| "ELF program header offset overflow".to_string())?;
+        let p_type = read_u32_le(image, ph)?;
+        let p_flags = read_u32_le(image, ph + 4)?;
+        if p_type != PT_LOAD || p_flags & PF_X == 0 {
+            continue;
+        }
+        let p_offset = read_u64_le(image, ph + 8)? as usize;
+        let p_filesz = read_u64_le(image, ph + 32)? as usize;
+        let p_memsz = read_u64_le(image, ph + 40)? as usize;
+        if p_memsz < p_filesz {
+            continue;
+        }
+        let old_end = p_offset
+            .checked_add(p_filesz)
+            .ok_or_else(|| "ELF LOAD end overflow".to_string())?;
+        let patch_offset = align_up(old_end, size_of::<u32>());
+        let patch_end = patch_offset
+            .checked_add(patch_len)
+            .ok_or_else(|| "ELF RX patch end overflow".to_string())?;
+        let next_load = load_offsets
+            .iter()
+            .copied()
+            .filter(|off| *off > p_offset)
+            .min()
+            .unwrap_or(image.len());
+        if patch_end > next_load || patch_end > image.len() {
+            continue;
+        }
+        let new_filesz = patch_end
+            .checked_sub(p_offset)
+            .ok_or_else(|| "ELF RX patch size underflow".to_string())?;
+        let new_memsz = p_memsz.max(new_filesz);
+        write_u64_le(image, ph + 32, new_filesz as u64)?;
+        write_u64_le(image, ph + 40, new_memsz as u64)?;
+        return Ok(patch_offset);
+    }
+
+    Err("no executable ELF LOAD segment has padding for musl sbrk patch".into())
+}
+
 #[cfg(target_arch = "loongarch64")]
 fn loongarch_bl(from_offset: usize, to_offset: usize) -> Result<u32, String> {
     loongarch_branch(0x15, from_offset, to_offset)
@@ -965,6 +1282,29 @@ fn loongarch_branch_target_offset(branch_offset: usize, instruction: u32) -> Res
 #[cfg(target_arch = "loongarch64")]
 fn loongarch_b(from_offset: usize, to_offset: usize) -> Result<u32, String> {
     loongarch_branch(0x14, from_offset, to_offset)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_bne(from_offset: usize, to_offset: usize, rj: u32, rd: u32) -> Result<u32, String> {
+    if rj > 31 || rd > 31 {
+        return Err("LoongArch branch register out of range".into());
+    }
+    let delta = (to_offset as i64)
+        .checked_sub(from_offset as i64)
+        .ok_or_else(|| "LoongArch conditional branch delta overflow".to_string())?;
+    if delta % 4 != 0 {
+        return Err(format!(
+            "unaligned LoongArch conditional branch delta: {delta}"
+        ));
+    }
+    let words = delta / 4;
+    if !(-(1 << 15)..(1 << 15)).contains(&words) {
+        return Err(format!(
+            "LoongArch conditional branch delta out of range: {delta}"
+        ));
+    }
+    let raw = (words as u32) & 0xffff;
+    Ok((0x17 << 26) | (raw << 10) | (rj << 5) | rd)
 }
 
 #[cfg(target_arch = "loongarch64")]
@@ -1016,6 +1356,11 @@ fn loongarch_addi_w(rd: u32, imm: i32) -> Result<u32, String> {
 #[cfg(target_arch = "loongarch64")]
 fn loongarch_move(rd: u32, rj: u32) -> u32 {
     0x0015_0000 | (rj << 5) | rd
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn loongarch_add_d(rd: u32, rj: u32, rk: u32) -> u32 {
+    0x0010_8000 | (rk << 10) | (rj << 5) | rd
 }
 
 fn map_elf_image(

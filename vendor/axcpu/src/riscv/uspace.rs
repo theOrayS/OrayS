@@ -1,5 +1,6 @@
 //! Structures and functions for user space.
 
+use core::arch::naked_asm;
 use memory_addr::VirtAddr;
 use riscv::register::sstatus::Sstatus;
 #[cfg(feature = "fp-simd")]
@@ -79,34 +80,34 @@ impl UspaceContext {
     ///
     /// This function is unsafe because it changes processor mode and the stack.
     pub unsafe fn enter_uspace(&self, kstack_top: VirtAddr) -> ! {
-        use riscv::register::{sepc, sscratch};
-
         crate::asm::disable_irqs();
-        // Address of the top of the kernel stack after saving the trap frame.
-        let kernel_trap_addr = kstack_top.as_usize() - core::mem::size_of::<TrapFrame>();
-        unsafe {
-            sscratch::write(kstack_top.as_usize());
-            sepc::write(self.0.sepc);
-            core::arch::asm!(
-                include_asm_macros!(),
-                "
-                mv      sp, {tf}
-
-                STR     gp, {kernel_trap_addr}, 3
-                LDR     gp, sp, 3
-
-                STR     tp, {kernel_trap_addr}, 4
-                LDR     tp, sp, 4
-
-                LDR     t0, sp, 33
-                csrw    sstatus, t0
-                POP_GENERAL_REGS
-                LDR     sp, sp, 2
-                sret",
-                tf = in(reg) &(self.0),
-                kernel_trap_addr = in(reg) kernel_trap_addr,
-                options(noreturn),
-            )
-        }
+        unsafe { enter_uspace_raw(core::ptr::addr_of!(self.0), kstack_top.as_usize()) }
     }
+}
+
+#[unsafe(naked)]
+unsafe extern "C" fn enter_uspace_raw(_tf: *const TrapFrame, _kstack_top: usize) -> ! {
+    naked_asm!(
+        include_asm_macros!(),
+        "
+        csrw    sscratch, a1
+        addi    a1, a1, -{trapframe_size}
+        LDR     t0, a0, 32
+        csrw    sepc, t0
+
+        STR     gp, a1, 3
+        LDR     gp, a0, 3
+
+        STR     tp, a1, 4
+        LDR     tp, a0, 4
+
+        LDR     t0, a0, 33
+        csrw    sstatus, t0
+        mv      sp, a0
+        POP_GENERAL_REGS
+        LDR     sp, sp, 2
+        sret
+        ",
+        trapframe_size = const core::mem::size_of::<TrapFrame>(),
+    )
 }

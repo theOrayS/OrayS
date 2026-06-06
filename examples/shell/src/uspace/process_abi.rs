@@ -4,7 +4,7 @@ use axerrno::LinuxError;
 
 use super::linux_abi::{LINUX_PERSONALITY_MASK, LINUX_PERSONALITY_QUERY};
 use super::task_registry::{live_user_process_entries, user_thread_entry_by_process_pid};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 const SYNTHETIC_INIT_PID: i32 = 1;
 

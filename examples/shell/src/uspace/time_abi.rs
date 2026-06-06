@@ -231,7 +231,13 @@ pub(super) fn clock_resolution_timespec() -> general::timespec {
 
 pub(super) fn clock_getres_timespec(clockid: u32) -> Result<general::timespec, LinuxError> {
     validate_clock_id(clockid)?;
-    Ok(clock_resolution_timespec())
+    Ok(match clockid {
+        general::CLOCK_REALTIME_COARSE | general::CLOCK_MONOTONIC_COARSE => general::timespec {
+            tv_sec: 0,
+            tv_nsec: 10_000_000,
+        },
+        _ => clock_resolution_timespec(),
+    })
 }
 
 pub(super) fn zero_timespec() -> general::timespec {
@@ -1097,6 +1103,13 @@ pub(super) fn sys_clock_nanosleep(
     req: usize,
     rem: usize,
 ) -> isize {
+    let clockid = clockid as u32;
+    if matches!(
+        clockid,
+        general::CLOCK_PROCESS_CPUTIME_ID | general::CLOCK_THREAD_CPUTIME_ID
+    ) {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
     let duration = match read_timespec_duration(process, req) {
         Ok(duration) => duration,
         Err(err) => return neg_errno(err),
@@ -1105,7 +1118,7 @@ pub(super) fn sys_clock_nanosleep(
         return neg_errno(LinuxError::EINVAL);
     }
     if flags as u32 & general::TIMER_ABSTIME != 0 {
-        let now = match clock_now_duration(clockid as u32) {
+        let now = match clock_now_duration(clockid) {
             Ok(now) => now,
             Err(err) => return neg_errno(err),
         };

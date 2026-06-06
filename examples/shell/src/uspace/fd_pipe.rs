@@ -297,6 +297,14 @@ impl PipeEndpoint {
         *self.status_flags.lock()
     }
 
+    pub(super) const fn readable(&self) -> bool {
+        self.readable
+    }
+
+    pub(super) const fn writable(&self) -> bool {
+        self.writable
+    }
+
     pub(super) fn set_status_flags(&self, flags: u32) {
         let access = self.status_flags() & general::O_ACCMODE;
         *self.status_flags.lock() =
@@ -398,6 +406,74 @@ impl PipeEndpoint {
         self.peers.buffered.load(Ordering::Acquire)
     }
 
+    pub(super) fn tee_to(
+        &self,
+        dst: &Self,
+        len: usize,
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        if len == 0 {
+            return Ok(0);
+        }
+        if !self.readable || !dst.writable {
+            return Err(LinuxError::EBADF);
+        }
+        if Arc::ptr_eq(&self.buffer, &dst.buffer) {
+            return Err(LinuxError::EINVAL);
+        }
+        loop {
+            if dst.write_peer_closed() {
+                Self::raise_sigpipe();
+                return Err(LinuxError::EPIPE);
+            }
+            let mut src_ring = self.buffer.lock();
+            let available_read = src_ring.available_read();
+            if available_read == 0 {
+                if self.read_peer_closed() {
+                    return Ok(0);
+                }
+                drop(src_ring);
+                if nonblocking || self.nonblocking() {
+                    return Err(LinuxError::EAGAIN);
+                }
+                if Self::interrupted() {
+                    return Err(LinuxError::EINTR);
+                }
+                Self::sleep_while_blocked();
+                continue;
+            }
+            let mut dst_ring = dst.buffer.lock();
+            let available_write = dst_ring.available_write();
+            if available_write == 0 {
+                drop(dst_ring);
+                drop(src_ring);
+                if nonblocking || dst.nonblocking() {
+                    return Err(LinuxError::EAGAIN);
+                }
+                if Self::interrupted() {
+                    return Err(LinuxError::EINTR);
+                }
+                Self::sleep_while_blocked();
+                continue;
+            }
+
+            let to_copy = len.min(available_read).min(available_write);
+            let mut cursor = src_ring.head;
+            for _ in 0..to_copy {
+                let byte = src_ring.data[cursor];
+                cursor = (cursor + 1) % src_ring.capacity;
+                dst_ring.write_byte(byte);
+                dst.peers.buffered.fetch_add(1, Ordering::AcqRel);
+            }
+            drop(dst_ring);
+            drop(src_ring);
+            if to_copy > 0 {
+                dst.notify_async_readable();
+            }
+            return Ok(to_copy);
+        }
+    }
+
     fn sleep_while_blocked() {
         if let Some(ext) = current_task_ext() {
             ext.process.set_syscall_wait_blocked(true);
@@ -464,7 +540,11 @@ impl PipeEndpoint {
             })
     }
 
-    pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+    fn read_with_nonblocking(
+        &self,
+        dst: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
         if !self.readable {
             return Err(LinuxError::EBADF);
         }
@@ -477,7 +557,7 @@ impl PipeEndpoint {
                     return Ok(read_len);
                 }
                 drop(ring);
-                if self.nonblocking() {
+                if nonblocking || self.nonblocking() {
                     return Err(LinuxError::EAGAIN);
                 }
                 if Self::interrupted() {
@@ -499,6 +579,18 @@ impl PipeEndpoint {
             }
         }
         Ok(read_len)
+    }
+
+    pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        self.read_with_nonblocking(dst, false)
+    }
+
+    pub(super) fn read_partial(
+        &self,
+        dst: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        self.read_with_nonblocking(dst, nonblocking)
     }
 
     pub(super) fn write(&self, src: &[u8]) -> Result<usize, LinuxError> {
@@ -547,6 +639,44 @@ impl PipeEndpoint {
             self.notify_async_readable();
         }
         Ok(written)
+    }
+
+    pub(super) fn write_partial(&self, src: &[u8], nonblocking: bool) -> Result<usize, LinuxError> {
+        if !self.writable {
+            return Err(LinuxError::EBADF);
+        }
+        if src.is_empty() {
+            return Ok(0);
+        }
+        loop {
+            if self.write_peer_closed() {
+                Self::raise_sigpipe();
+                return Err(LinuxError::EPIPE);
+            }
+            let mut ring = self.buffer.lock();
+            let available = ring.available_write();
+            if available == 0 {
+                drop(ring);
+                if nonblocking || self.nonblocking() {
+                    return Err(LinuxError::EAGAIN);
+                }
+                if Self::interrupted() {
+                    return Err(LinuxError::EINTR);
+                }
+                Self::sleep_while_blocked();
+                continue;
+            }
+            let to_write = src.len().min(available);
+            for byte in &src[..to_write] {
+                ring.write_byte(*byte);
+                self.peers.buffered.fetch_add(1, Ordering::AcqRel);
+            }
+            drop(ring);
+            if to_write > 0 {
+                self.notify_async_readable();
+            }
+            return Ok(to_write);
+        }
     }
 
     pub(super) fn stat(&self) -> general::stat {
