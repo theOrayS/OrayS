@@ -8,6 +8,8 @@ use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
+#[cfg(feature = "auto-run-tests")]
+use lazyinit::LazyInit;
 use linux_raw_sys::general;
 use memory_addr::{PageIter4K, VirtAddr, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
@@ -128,7 +130,30 @@ fn initial_path_modes() -> BTreeMap<String, u32> {
     // writable view instead of the backing ramfs default directory mode.
     modes.insert(String::from("/tmp"), 0o1777);
     modes.insert(String::from("/tmp/ltp-work"), 0o1777);
+    #[cfg(feature = "auto-run-tests")]
+    {
+        for (path, mode) in initial_path_mode_overrides().lock().iter() {
+            modes.insert(path.clone(), *mode);
+        }
+    }
     modes
+}
+
+#[cfg(feature = "auto-run-tests")]
+static INITIAL_PATH_MODE_OVERRIDES: LazyInit<Mutex<BTreeMap<String, u32>>> = LazyInit::new();
+
+#[cfg(feature = "auto-run-tests")]
+fn initial_path_mode_overrides() -> &'static Mutex<BTreeMap<String, u32>> {
+    let _ = INITIAL_PATH_MODE_OVERRIDES.call_once(|| Mutex::new(BTreeMap::new()));
+    &INITIAL_PATH_MODE_OVERRIDES
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn seed_initial_path_mode(path: &str, mode: u32) {
+    let normalized = normalize_path("/", path).unwrap_or_else(|| String::from(path));
+    initial_path_mode_overrides()
+        .lock()
+        .insert(normalized, mode & 0o7777);
 }
 
 pub(super) struct ProcessTeardown {

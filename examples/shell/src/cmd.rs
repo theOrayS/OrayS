@@ -764,8 +764,9 @@ const DEFAULT_GROUP_TIMEOUT_SECS: u64 = 60;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LIBCTEST_GROUP_TIMEOUT_SECS: u64 = 120;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-const DISABLED_OFFICIAL_TEST_GROUPS: &[&str] =
-    &["libctest", "lmbench", "cyclictest", "iozone", "unixbench"];
+const LIBCTEST_CASE_TIMEOUT_SECS: u64 = 5;
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const DISABLED_OFFICIAL_TEST_GROUPS: &[&str] = &[];
 
 macro_rules! print_err {
     ($cmd: literal, $msg: expr) => {
@@ -1566,11 +1567,38 @@ fn copy_script_file(
         })
         .collect::<Vec<_>>()
         .join("\n");
+    if src.ends_with("iperf_testcode.sh") {
+        script = rewrite_iperf_daemon_server(&script, busybox_path);
+    }
     if raw_script.ends_with('\n') {
         script.push('\n');
     }
     let mut dst_file = File::create(dst)?;
     dst_file.write_all(script.as_bytes())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn rewrite_iperf_daemon_server(script: &str, busybox_path: &str) -> String {
+    let mut rewritten = Vec::new();
+    for line in script.lines() {
+        if line.trim() == "$iperf -s -p $port -D" {
+            rewritten.push(String::from("$iperf -s -p $port &"));
+            rewritten.push(String::from("server_pid=$!"));
+            rewritten.push(format!("{busybox_path} sleep 1"));
+            continue;
+        }
+        if line.contains("#### OS COMP TEST GROUP END iperf-") {
+            rewritten.push(format!(
+                "[ -n \"$server_pid\" ] && {busybox_path} kill -TERM \"$server_pid\" 2>/dev/null || true"
+            ));
+            rewritten.push(format!("{busybox_path} sleep 1"));
+            rewritten.push(format!(
+                "[ -n \"$server_pid\" ] && {busybox_path} kill -KILL \"$server_pid\" 2>/dev/null || true"
+            ));
+        }
+        rewritten.push(String::from(line));
+    }
+    rewritten.join("\n")
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1829,12 +1857,15 @@ fn prefix_busybox_applet(line: &str, applet: &str, busybox_path: &str) -> Option
 fn create_busybox_applet_wrapper(dir: &str, busybox_path: &str, applet: &str) -> io::Result<()> {
     let wrapper_path = join_path(dir, applet);
     if fs::metadata(&wrapper_path).is_ok() {
+        uspace::seed_initial_path_mode(&wrapper_path, 0o755);
         return Ok(());
     }
 
     let mut wrapper = File::create(&wrapper_path)?;
     writeln!(wrapper, "#!{busybox_path} sh")?;
-    writeln!(wrapper, "exec {busybox_path} {applet} \"$@\"")
+    writeln!(wrapper, "exec {busybox_path} {applet} \"$@\"")?;
+    uspace::seed_initial_path_mode(&wrapper_path, 0o755);
+    Ok(())
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1870,8 +1901,10 @@ fn prepare_ltp_helper_bin(suite_dir: &str, busybox_path: &str) -> io::Result<Str
     ensure_dir_all(&helper_dir)?;
     let helper_busybox = ltp_helper_busybox_path(suite_dir, busybox_path);
     for applet in LTP_BUSYBOX_APPLETS {
+        let wrapper_path = join_path(&helper_dir, applet);
         let wrapper = format!("#!{helper_busybox} sh\nexec {helper_busybox} {applet} \"$@\"\n");
-        write_text_file(&join_path(&helper_dir, applet), &wrapper)?;
+        write_text_file(&wrapper_path, &wrapper)?;
+        uspace::seed_initial_path_mode(&wrapper_path, 0o755);
     }
     Ok(helper_dir)
 }
@@ -2278,6 +2311,78 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn run_libctest_suite(suite_dir: &str, cwd: &str) -> Result<(), String> {
+    let label = suite_label(suite_dir, "libctest");
+    let timeout_secs = LIBCTEST_CASE_TIMEOUT_SECS;
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+    let mut timed_out = 0usize;
+    let mut seen_commands = 0usize;
+
+    println!("#### OS COMP TEST GROUP START {label} ####");
+    for script_name in ["run-static.sh", "run-dynamic.sh"] {
+        let script_path = join_path(suite_dir, script_name);
+        let script = match fs::read_to_string(&script_path) {
+            Ok(script) => script,
+            Err(err) => {
+                println!("libctest: read {script_path} failed: {err}");
+                failed += 1;
+                continue;
+            }
+        };
+        for line in script.lines() {
+            let Some((entry, case)) = parse_libctest_command(line.trim()) else {
+                continue;
+            };
+            seen_commands += 1;
+            let entry_arg = format!("./{entry}");
+            let entry_path = join_path(cwd, entry);
+            println!("========== START {entry} {case} ==========");
+            let result = if !matches!(fs::metadata(&entry_path), Ok(meta) if meta.is_file()) {
+                Err(format!("missing libctest entry: {entry_path}"))
+            } else {
+                run_user_program_argv_in_timeout(cwd, &[entry_arg.as_str(), case], timeout_secs)
+            };
+            match result {
+                Ok(0) => {
+                    println!("Pass!");
+                    passed += 1;
+                }
+                Ok(status @ (137 | 143)) => {
+                    println!("FAIL libctest {entry} {case}: timeout");
+                    println!("return: {status}, timeout: {timeout_secs}s");
+                    failed += 1;
+                    timed_out += 1;
+                }
+                Ok(status) => {
+                    println!("FAIL libctest {entry} {case}: {status}");
+                    failed += 1;
+                }
+                Err(err) => {
+                    println!("FAIL libctest {entry} {case}: -1");
+                    if err.to_ascii_lowercase().contains("timeout") {
+                        timed_out += 1;
+                    }
+                    println!("{err}");
+                    failed += 1;
+                }
+            }
+            uspace::cleanup_user_processes();
+            println!("========== END {entry} {case} ==========");
+        }
+    }
+
+    if seen_commands == 0 {
+        println!("libctest: no runnable commands found");
+        failed += 1;
+    }
+    uspace::cleanup_user_processes();
+    println!("libctest cases: {passed} passed, {failed} failed, {timed_out} timed out");
+    println!("#### OS COMP TEST GROUP END {label} ####");
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 pub fn maybe_run_official_tests() {
     let selected_groups = selected_official_test_groups();
     let mut scripts = Vec::new();
@@ -2392,6 +2497,18 @@ pub fn maybe_run_official_tests() {
             }
             continue;
         }
+        if group == "libctest" {
+            if let Err(err) = run_libctest_suite(&suite_dir, &cwd) {
+                println!("autorun: libctest suite failed: {err}");
+            }
+            if use_staged_dir {
+                let _ = remove_dir_all(&cwd);
+            }
+            if let Some(dir) = unstaged_script_dir {
+                let _ = remove_dir_all(&dir);
+            }
+            continue;
+        }
         let chmod_args = busybox_path_wrapper_chmod_args(path_dir);
         let command = format!(
             "{shell_path} chmod 755 {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
@@ -2400,17 +2517,30 @@ pub fn maybe_run_official_tests() {
             "libctest" => LIBCTEST_GROUP_TIMEOUT_SECS,
             _ => DEFAULT_GROUP_TIMEOUT_SECS,
         };
+        let label = suite_label(&suite_dir, group);
+        let mut close_timed_out_group = false;
         match run_user_program_argv_in_timeout(
             &cwd,
             &[&shell_path, "sh", "-c", &command],
             timeout_secs,
         ) {
-            Ok(137) => println!("autorun: {cwd}/{script} timed out after {timeout_secs}s"),
+            Ok(137) => {
+                println!("autorun: {cwd}/{script} timed out after {timeout_secs}s");
+                close_timed_out_group = true;
+            }
             Ok(status) if status != 0 => {
                 println!("autorun: {cwd}/{script} exited with status {status}");
             }
             Ok(_) => {}
-            Err(err) => println!("autorun: {cwd}/{script} failed: {err}"),
+            Err(err) => {
+                println!("autorun: {cwd}/{script} failed: {err}");
+                if err.to_ascii_lowercase().contains("timeout") {
+                    close_timed_out_group = true;
+                }
+            }
+        }
+        if close_timed_out_group {
+            println!("#### OS COMP TEST GROUP END {label} ####");
         }
         uspace::cleanup_user_processes();
         if use_staged_dir {

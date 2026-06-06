@@ -72,9 +72,9 @@ use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
 use super::user_memory::{
-    read_cstr, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, with_readable_user_buffer, with_writable_user_buffer,
-    write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
 use super::{PathTimes, UserProcess};
 
@@ -121,6 +121,7 @@ pub(super) enum FdEntry {
     Stderr,
     DevNull,
     DevZero(u32),
+    DevRandom(u32),
     BlockDevice(BlockDeviceEntry),
     Rtc,
     File(FileEntry),
@@ -322,14 +323,18 @@ pub(super) fn sys_openat(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    match process.fds.lock().open(
+    let fd = match process.fds.lock().open(
         process,
         dirfd as i32,
         path.as_str(),
         flags as u32,
         mode as u32,
     ) {
-        Ok(fd) => fd as isize,
+        Ok(fd) => fd,
+        Err(err) => return neg_errno(err),
+    };
+    match complete_open_fd(process, fd) {
+        Ok(()) => fd as isize,
         Err(err) => neg_errno(err),
     }
 }
@@ -396,14 +401,39 @@ pub(super) fn sys_openat2(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let mut table = process.fds.lock();
-    if let Err(err) = openat2_resolve_guard(process, &table, dirfd as i32, path.as_str(), resolve) {
-        return neg_errno(err);
-    }
-    match table.open(process, dirfd as i32, path.as_str(), flags, mode) {
-        Ok(fd) => fd as isize,
+    let fd = {
+        let mut table = process.fds.lock();
+        if let Err(err) =
+            openat2_resolve_guard(process, &table, dirfd as i32, path.as_str(), resolve)
+        {
+            return neg_errno(err);
+        }
+        match table.open(process, dirfd as i32, path.as_str(), flags, mode) {
+            Ok(fd) => fd,
+            Err(err) => return neg_errno(err),
+        }
+    };
+    match complete_open_fd(process, fd) {
+        Ok(()) => fd as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+fn complete_open_fd(process: &UserProcess, fd: i32) -> Result<(), LinuxError> {
+    let fifo = {
+        let table = process.fds.lock();
+        match table.entry(fd)? {
+            FdEntry::Pipe(pipe) => Some(pipe.clone()),
+            _ => None,
+        }
+    };
+    if let Some(pipe) = fifo {
+        if let Err(err) = pipe.wait_for_fifo_open_peer() {
+            let _ = process.fds.lock().close_for_process(process, fd);
+            return Err(err);
+        }
+    }
+    Ok(())
 }
 
 fn openat2_resolve_guard(
@@ -2146,6 +2176,101 @@ pub(super) fn sys_splice(
                 chunk_len = chunk_len.min(available);
             }
         }
+        if out_kind == SpliceEndpointKind::Stream {
+            let splice_endpoints = {
+                let table = process.fds.lock();
+                match (
+                    table.splice_local_socket_output(fd_out),
+                    table.splice_pipe_input(fd_in),
+                ) {
+                    (Ok(output_socket), Ok(input_pipe)) => Ok((output_socket, input_pipe)),
+                    (Err(err), _) | (_, Err(err)) => Err(err),
+                }
+            };
+            let (output_socket, input_pipe) = match splice_endpoints {
+                Ok(endpoints) => endpoints,
+                Err(err) => {
+                    return if copied > 0 {
+                        copied as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            if let Some(output_socket) = output_socket {
+                // Reserve the local-socket output capacity before consuming from
+                // the splice input.  Otherwise another writer can fill the
+                // stream buffer between an availability check and the later
+                // write, losing bytes already read from a pipe/socket input.
+                // The pipe input and socket output are cloned while the fd table
+                // is locked, then the reservation path only locks endpoint
+                // buffers.  This preserves the repository's normal fd-table ->
+                // endpoint lock order and avoids a socket-buffer -> fd-table
+                // deadlock.
+                let written = output_socket.write_from_pipe_splice_reservation(
+                    process,
+                    &input_pipe,
+                    chunk_len,
+                    nonblocking,
+                );
+                let written = match written {
+                    Ok(written) => written,
+                    Err(err) => {
+                        return if copied > 0 {
+                            copied as isize
+                        } else {
+                            neg_errno(err)
+                        };
+                    }
+                };
+                if in_kind == SpliceEndpointKind::RegularFile {
+                    if let Some(pos) = off_in.as_mut() {
+                        *pos = pos.saturating_add(written as u64);
+                    } else if let Err(err) =
+                        process.fds.lock().advance_file_offset_fd(fd_in, written)
+                    {
+                        return if copied > 0 {
+                            copied as isize
+                        } else {
+                            neg_errno(err)
+                        };
+                    }
+                }
+                copied += written;
+                if written == 0 || written < chunk_len {
+                    break;
+                }
+                continue;
+            }
+        }
+        if out_kind == SpliceEndpointKind::Stream {
+            let available = match process.fds.lock().splice_stream_available_write(fd_out) {
+                Ok(available) => available,
+                Err(err) => {
+                    return if copied > 0 {
+                        copied as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            if available == 0 {
+                if copied > 0 {
+                    break;
+                }
+                if nonblocking {
+                    return neg_errno(LinuxError::EAGAIN);
+                }
+                if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+                    return neg_errno(LinuxError::EINTR);
+                }
+                axtask::yield_now();
+                continue;
+            }
+            if available > 0 {
+                chunk_len = chunk_len.min(available);
+            }
+        }
 
         let mut buf = match user_io_buffer(chunk_len) {
             Ok(buf) => buf,
@@ -2519,7 +2644,12 @@ fn splice_read_input(
                 .read_file_at_current_offset_into_fd(process, fd, dst)
                 .map(|(_, read)| read),
         },
-        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => table.read(process, fd, dst),
+        SpliceEndpointKind::Pipe => table.read(process, fd, dst),
+        SpliceEndpointKind::Stream => match table.entry_mut(fd)? {
+            FdEntry::LocalSocket(socket) => socket.read_partial(dst),
+            FdEntry::ProcSysFile(file) => file.read(dst),
+            _ => Err(LinuxError::EINVAL),
+        },
     }
 }
 
@@ -2537,9 +2667,12 @@ fn splice_write_output(
             Some(pos) => table.write_file_at(process, fd, pos, src, Some(file_size_limit)),
             None => table.write(process, fd, src, Some(file_size_limit)),
         },
-        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => {
-            table.write(process, fd, src, Some(file_size_limit))
-        }
+        SpliceEndpointKind::Pipe => table.write(process, fd, src, Some(file_size_limit)),
+        SpliceEndpointKind::Stream => match table.entry_mut(fd)? {
+            FdEntry::LocalSocket(socket) => socket.write_partial(src),
+            FdEntry::ProcSysFile(entry) => entry.write(src),
+            _ => Err(LinuxError::EINVAL),
+        },
     }
 }
 
@@ -2793,6 +2926,7 @@ pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
         Ok(
             FdEntry::DevNull
             | FdEntry::DevZero(_)
+            | FdEntry::DevRandom(_)
             | FdEntry::BlockDevice(_)
             | FdEntry::Rtc
             | FdEntry::Pipe(_)
@@ -3706,9 +3840,34 @@ impl FdTable {
         }
     }
 
+    fn splice_pipe_input(&self, fd: i32) -> Result<PipeEndpoint, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::Pipe(pipe) => Ok(pipe.clone()),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
     fn splice_pipe_available_write(&self, fd: i32) -> Result<usize, LinuxError> {
         match self.entry(fd)? {
             FdEntry::Pipe(pipe) => Ok(pipe.capacity().saturating_sub(pipe.available_read())),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
+    fn splice_stream_available_write(&self, fd: i32) -> Result<usize, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::LocalSocket(socket) => socket.available_write_after_growth(),
+            // Proc/sys writes are synchronous in-kernel updates rather than bounded socket
+            // queues, so there is no stream buffer capacity to pre-limit here.
+            FdEntry::ProcSysFile(_) => Ok(usize::MAX),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
+    fn splice_local_socket_output(&self, fd: i32) -> Result<Option<LocalSocketEntry>, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::LocalSocket(socket) => Ok(Some(socket.duplicate())),
+            FdEntry::ProcSysFile(_) => Ok(None),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -3783,6 +3942,7 @@ impl FdTable {
                 FdEntry::Stdout | FdEntry::Stderr => false,
                 FdEntry::DevNull
                 | FdEntry::DevZero(_)
+                | FdEntry::DevRandom(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
@@ -3813,6 +3973,7 @@ impl FdTable {
                 | FdEntry::Stderr
                 | FdEntry::DevNull
                 | FdEntry::DevZero(_)
+                | FdEntry::DevRandom(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc => true,
                 FdEntry::File(_) | FdEntry::Memfd(_) => true,
@@ -4050,6 +4211,13 @@ impl FdTable {
                 dst.fill(0);
                 Ok(dst.len())
             }
+            FdEntry::DevRandom(status_flags) => {
+                if !file_is_readable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                fill_pseudo_random_bytes(dst);
+                Ok(dst.len())
+            }
             FdEntry::BlockDevice(_) => {
                 dst.fill(0);
                 Ok(dst.len())
@@ -4101,6 +4269,12 @@ impl FdTable {
             }
             FdEntry::DevNull => Ok(src.len()),
             FdEntry::DevZero(status_flags) => {
+                if !file_is_writable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                Ok(src.len())
+            }
+            FdEntry::DevRandom(status_flags) => {
                 if !file_is_writable(*status_flags) {
                     return Err(LinuxError::EBADF);
                 }
@@ -4919,6 +5093,7 @@ impl FdTable {
                 Err(LinuxError::ESPIPE)
             }
             FdEntry::DevZero(_) => Ok(()),
+            FdEntry::DevRandom(_) => Err(LinuxError::ENODEV),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -5479,6 +5654,7 @@ impl FdTable {
             FdEntry::Stdout | FdEntry::Stderr => Ok(stdio_stat(false)),
             FdEntry::DevNull => Ok(dev_null_stat()),
             FdEntry::DevZero(_) => Ok(dev_zero_stat()),
+            FdEntry::DevRandom(_) => Ok(PathEntry::synthetic_char("/dev/urandom").stat()),
             FdEntry::BlockDevice(dev) => Ok(PathEntry::synthetic_block(dev.path.as_str()).stat()),
             FdEntry::Rtc => Ok(stdio_stat(false)),
             FdEntry::File(file) => Ok(file_attr_to_stat(
@@ -5557,9 +5733,10 @@ impl FdTable {
             }
         }
         match open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0) {
-            Ok(FdEntry::DevNull) | Ok(FdEntry::DevZero(_)) | Ok(FdEntry::Rtc) => {
-                Ok(stdio_stat(false))
-            }
+            Ok(FdEntry::DevNull)
+            | Ok(FdEntry::DevZero(_))
+            | Ok(FdEntry::DevRandom(_))
+            | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
             Ok(FdEntry::BlockDevice(dev)) => {
                 Ok(PathEntry::synthetic_block(dev.path.as_str()).stat())
             }
@@ -6971,6 +7148,7 @@ impl FdEntry {
             Self::Stderr => Ok(Self::Stderr),
             Self::DevNull => Ok(Self::DevNull),
             Self::DevZero(status_flags) => Ok(Self::DevZero(*status_flags)),
+            Self::DevRandom(status_flags) => Ok(Self::DevRandom(*status_flags)),
             Self::BlockDevice(dev) => Ok(Self::BlockDevice(dev.clone())),
             Self::Rtc => Ok(Self::Rtc),
             Self::File(file) => Ok(Self::File(file.clone())),
@@ -8348,6 +8526,16 @@ fn open_candidates(
                 FdEntry::Path(PathEntry::synthetic_char("/dev/zero"))
             } else {
                 FdEntry::DevZero(fcntl_status_flags(flags))
+            });
+        }
+        if path == "/dev/urandom" || path == "/dev/random" {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_char(path.as_str()))
+            } else {
+                FdEntry::DevRandom(fcntl_status_flags(flags))
             });
         }
         if is_synthetic_block_device_path(path.as_str()) {
