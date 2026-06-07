@@ -559,14 +559,7 @@ fn parse_posix_timer_notify(
                 tid: None,
             })
         }
-        value if value == general::SIGEV_THREAD as i32 => {
-            validate_signal_target(ev.sigev_signo)?;
-            // User-space libcs normally implement SIGEV_THREAD above the raw
-            // syscall. Accept it as a non-delivering kernel timer so raw LTP
-            // create/delete coverage observes a valid generic timer object
-            // without inventing a userspace callback ABI in the kernel.
-            Ok(PosixTimerNotify::None)
-        }
+        value if value == general::SIGEV_THREAD as i32 => Err(LinuxError::EINVAL),
         value if value == general::SIGEV_THREAD_ID as i32 => {
             validate_signal_target(ev.sigev_signo)?;
             let tid = unsafe { ev._sigev_un._tid };
@@ -903,6 +896,9 @@ pub(super) fn sys_setitimer(
         },
         None => (0, 0),
     };
+    if which != general::ITIMER_REAL as i32 && (first_us != 0 || interval_us != 0) {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
 
     interval_cell.store(interval_us, Ordering::Release);
     if first_us == 0 {
@@ -916,9 +912,6 @@ pub(super) fn sys_setitimer(
     if which == general::ITIMER_REAL as i32 {
         let generation = process.real_timer_generation.fetch_add(1, Ordering::AcqRel) + 1;
         if first_us != 0 {
-            // Only ITIMER_REAL currently delivers SIGALRM.  The virtual/prof
-            // slots are still tracked so getitimer/setitimer report real state
-            // instead of ENOSYS/EINVAL to user space.
             arm_real_itimer(process.clone(), generation, first_us, interval_us);
         }
     }
