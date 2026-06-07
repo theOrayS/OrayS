@@ -6,16 +6,16 @@ use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::string::{String, ToString};
 use std::vec::Vec;
+use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::sections::SectionData;
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::symbol_table::Entry;
-use xmas_elf::ElfFile;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, USER_BRK_GROW_SIZE,
@@ -25,7 +25,7 @@ use super::memory_map::{align_down, align_up, user_mapping_flags};
 use super::runtime_paths::{
     derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
 };
-use super::{str_err, BrkState};
+use super::{BrkState, str_err};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,
@@ -65,6 +65,171 @@ struct ElfLoadInfo {
 struct AuxEntry {
     key: usize,
     value: usize,
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+type MuslPatchManifestEntry = (
+    &'static str,
+    &'static str,
+    &'static [&'static str],
+    &'static str,
+);
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+const MUSL_PATCH_RETIREMENT_DIRECTIVE: &str =
+    "temporary; requires raw syscall + musl + glibc cross-check evidence before stable promotion";
+
+#[cfg(target_arch = "riscv64")]
+const RISCV_MUSL_PATCH_MANIFEST: &[MuslPatchManifestEntry] = &[
+    (
+        "main-executable",
+        "brk",
+        &["brk"],
+        "temporary musl brk ENOSYS-stub replacement",
+    ),
+    (
+        "interpreter",
+        "brk",
+        &["brk"],
+        "temporary musl brk ENOSYS-stub replacement",
+    ),
+    (
+        "interpreter",
+        "sbrk",
+        &["brk"],
+        "temporary musl sbrk wrapper over raw brk",
+    ),
+    (
+        "interpreter",
+        "nice",
+        &["getpriority", "setpriority"],
+        "temporary musl nice wrapper over priority syscalls",
+    ),
+    (
+        "interpreter",
+        "gethostname",
+        &["uname"],
+        "temporary musl gethostname errno-normalization wrapper",
+    ),
+];
+
+#[cfg(target_arch = "loongarch64")]
+const LOONGARCH_MUSL_PATCH_MANIFEST: &[MuslPatchManifestEntry] = &[
+    (
+        "main-executable",
+        "brk",
+        &["brk"],
+        "temporary musl brk ENOSYS-stub replacement",
+    ),
+    (
+        "interpreter",
+        "sched_setparam",
+        &["sched_setparam"],
+        "temporary musl sched wrapper over raw syscall",
+    ),
+    (
+        "interpreter",
+        "sched_getparam",
+        &["sched_getparam"],
+        "temporary musl sched wrapper over raw syscall",
+    ),
+    (
+        "interpreter",
+        "sched_setscheduler",
+        &["sched_setscheduler"],
+        "temporary musl sched wrapper over raw syscall",
+    ),
+    (
+        "interpreter",
+        "sched_getscheduler",
+        &["sched_getscheduler"],
+        "temporary musl sched wrapper over raw syscall",
+    ),
+    (
+        "interpreter",
+        "brk",
+        &["brk"],
+        "temporary musl brk ENOSYS-stub replacement",
+    ),
+    (
+        "interpreter",
+        "sbrk",
+        &["brk"],
+        "temporary musl sbrk wrapper over raw brk",
+    ),
+    (
+        "interpreter",
+        "gethostname",
+        &["uname"],
+        "temporary musl gethostname errno-normalization wrapper",
+    ),
+    (
+        "interpreter",
+        "readlink",
+        &["readlinkat"],
+        "temporary musl readlink wrapper over readlinkat",
+    ),
+    (
+        "interpreter",
+        "readlinkat",
+        &["readlinkat"],
+        "temporary musl readlinkat errno-normalization wrapper",
+    ),
+];
+
+#[cfg(target_arch = "riscv64")]
+fn validate_riscv_musl_patch_manifest() -> Result<(), String> {
+    validate_musl_patch_manifest(RISCV_MUSL_PATCH_MANIFEST)
+}
+
+#[cfg(target_arch = "riscv64")]
+fn ensure_riscv_musl_patch_manifest_symbol(symbol: &str) -> Result<(), String> {
+    ensure_musl_patch_manifest_symbol("riscv64", RISCV_MUSL_PATCH_MANIFEST, symbol)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn validate_loongarch_musl_patch_manifest() -> Result<(), String> {
+    validate_musl_patch_manifest(LOONGARCH_MUSL_PATCH_MANIFEST)
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn ensure_loongarch_musl_patch_manifest_symbol(symbol: &str) -> Result<(), String> {
+    ensure_musl_patch_manifest_symbol("loongarch64", LOONGARCH_MUSL_PATCH_MANIFEST, symbol)
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn validate_musl_patch_manifest(manifest: &[MuslPatchManifestEntry]) -> Result<(), String> {
+    for (target, symbol, raw_syscalls, reason) in manifest {
+        if target.is_empty()
+            || symbol.is_empty()
+            || raw_syscalls.is_empty()
+            || reason.is_empty()
+            || !reason.contains("temporary")
+            || !MUSL_PATCH_RETIREMENT_DIRECTIVE.contains("raw syscall + musl + glibc")
+        {
+            return Err(format!("incomplete musl patch manifest entry for {symbol}"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
+fn ensure_musl_patch_manifest_symbol(
+    arch: &str,
+    manifest: &[MuslPatchManifestEntry],
+    symbol: &str,
+) -> Result<(), String> {
+    validate_musl_patch_manifest(manifest)?;
+    if manifest
+        .iter()
+        .any(|(_target, manifest_symbol, _raw_syscalls, _reason)| *manifest_symbol == symbol)
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "{arch} musl patch for symbol {symbol} is missing from the manifest"
+        ))
+    }
 }
 
 fn default_exec_env(exec_root: &str, cwd: &str) -> Vec<String> {
@@ -404,6 +569,8 @@ fn patch_loongarch_musl_main_syscall_stubs(
     if exec_root != "/musl" {
         return Ok(());
     }
+    validate_loongarch_musl_patch_manifest()?;
+    ensure_loongarch_musl_patch_manifest_symbol("brk")?;
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl executable ELF: {err}"))?;
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?
         .or_else(|| find_symbol_file_offset(&elf, "brk").ok().flatten());
@@ -423,6 +590,7 @@ fn patch_loongarch_musl_syscall_stubs(
     if exec_root != "/musl" || !raw_interp.contains("ld-musl") {
         return Ok(());
     }
+    validate_loongarch_musl_patch_manifest()?;
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
     let raw_syscall_patches = [
         ("sched_setparam", general::__NR_sched_setparam),
@@ -432,11 +600,15 @@ fn patch_loongarch_musl_syscall_stubs(
     ];
     let mut offsets = Vec::new();
     for (name, syscall_nr) in raw_syscall_patches {
+        ensure_loongarch_musl_patch_manifest_symbol(name)?;
         let Some(offset) = find_dynsym_file_offset(&elf, name)? else {
             continue;
         };
         offsets.push((offset, syscall_nr));
     }
+    ensure_loongarch_musl_patch_manifest_symbol("brk")?;
+    ensure_loongarch_musl_patch_manifest_symbol("sbrk")?;
+    ensure_loongarch_musl_patch_manifest_symbol("gethostname")?;
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
     let sbrk_offset = find_dynsym_file_offset(&elf, "sbrk")?;
     let gethostname_offset = find_dynsym_file_offset(&elf, "gethostname")?;
@@ -466,6 +638,8 @@ fn patch_riscv_musl_main_syscall_stubs(exec_root: &str, image: &mut [u8]) -> Res
     if exec_root != "/musl" {
         return Ok(());
     }
+    validate_riscv_musl_patch_manifest()?;
+    ensure_riscv_musl_patch_manifest_symbol("brk")?;
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl executable ELF: {err}"))?;
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?
         .or_else(|| find_symbol_file_offset(&elf, "brk").ok().flatten());
@@ -485,6 +659,11 @@ fn patch_riscv_musl_syscall_stubs(
     if exec_root != "/musl" || !raw_interp.contains("ld-musl") {
         return Ok(());
     }
+    validate_riscv_musl_patch_manifest()?;
+    ensure_riscv_musl_patch_manifest_symbol("brk")?;
+    ensure_riscv_musl_patch_manifest_symbol("sbrk")?;
+    ensure_riscv_musl_patch_manifest_symbol("nice")?;
+    ensure_riscv_musl_patch_manifest_symbol("gethostname")?;
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
     let brk_offset = find_dynsym_file_offset(&elf, "brk")?;
     let sbrk_offset = find_dynsym_file_offset(&elf, "sbrk")?;
@@ -1041,6 +1220,8 @@ fn patch_loongarch_musl_gethostname_wrapper(
 
 #[cfg(target_arch = "loongarch64")]
 fn patch_loongarch_musl_readlink_wrappers(image: &mut [u8]) -> Result<(), String> {
+    ensure_loongarch_musl_patch_manifest_symbol("readlink")?;
+    ensure_loongarch_musl_patch_manifest_symbol("readlinkat")?;
     let elf = ElfFile::new(image).map_err(|err| format!("invalid musl interpreter ELF: {err}"))?;
     let Some(readlink_offset) = find_dynsym_file_offset(&elf, "readlink")? else {
         return Ok(());
