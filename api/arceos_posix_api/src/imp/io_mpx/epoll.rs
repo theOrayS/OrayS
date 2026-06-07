@@ -140,8 +140,16 @@ impl FileLike for EpollInstance {
         Err(LinuxError::ENOSYS)
     }
 
-    fn set_nonblocking(&self, _nonblocking: bool) -> LinuxResult {
+    fn status_flags(&self) -> LinuxResult<c_int> {
         Ok(())
+    }
+
+    fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
+        if nonblocking {
+            Err(LinuxError::EOPNOTSUPP)
+        } else {
+            Ok(())
+        }
     }
 }
 

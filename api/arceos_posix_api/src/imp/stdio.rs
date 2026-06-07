@@ -3,7 +3,9 @@ use axio::{BufReader, prelude::*};
 use axsync::Mutex;
 
 #[cfg(feature = "fd")]
-use {alloc::sync::Arc, axerrno::LinuxError, axerrno::LinuxResult, axio::PollState};
+use {
+    alloc::sync::Arc, axerrno::LinuxError, axerrno::LinuxResult, axio::PollState, core::ffi::c_int,
+};
 
 fn console_read_bytes(buf: &mut [u8]) -> AxResult<usize> {
     let len = axhal::console::read_bytes(buf);
@@ -133,8 +135,16 @@ impl super::fd_ops::FileLike for Stdin {
         })
     }
 
-    fn set_nonblocking(&self, _nonblocking: bool) -> LinuxResult {
-        Ok(())
+    fn status_flags(&self) -> LinuxResult<c_int> {
+        Ok(0)
+    }
+
+    fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
+        if nonblocking {
+            Err(LinuxError::EOPNOTSUPP)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -169,7 +179,15 @@ impl super::fd_ops::FileLike for Stdout {
         })
     }
 
-    fn set_nonblocking(&self, _nonblocking: bool) -> LinuxResult {
-        Ok(())
+    fn status_flags(&self) -> LinuxResult<c_int> {
+        Ok(0)
+    }
+
+    fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
+        if nonblocking {
+            Err(LinuxError::EOPNOTSUPP)
+        } else {
+            Ok(())
+        }
     }
 }

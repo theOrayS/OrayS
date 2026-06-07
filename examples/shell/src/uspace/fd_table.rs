@@ -5944,7 +5944,7 @@ impl FdTable {
                     }
                     _ => unreachable!(),
                 },
-                _ => Ok(0),
+                _ => Err(LinuxError::EINVAL),
             };
         }
         let socket = match self.entry(fd)? {
@@ -5968,7 +5968,7 @@ impl FdTable {
                     cmd as i32,
                     arg,
                 )),
-                _ => Ok(0),
+                _ => Err(LinuxError::EINVAL),
             };
         }
         match cmd {
@@ -5991,7 +5991,7 @@ impl FdTable {
                 FdEntry::ProcMqQueuesMax(entry) => Ok(entry.status_flags() as i32),
                 FdEntry::ProcSysFile(entry) => Ok(entry.status_flags() as i32),
                 FdEntry::ProcTimerSlack(file) => Ok(file.status_flags as i32),
-                _ => Ok(0),
+                _ => Err(LinuxError::EINVAL),
             },
             F_GETPIPE_SZ => Ok(self.pipe_capacity(fd)? as i32),
             F_SETPIPE_SZ => match self.entry(fd)? {
@@ -6067,7 +6067,7 @@ impl FdTable {
                     entry.set_status_flags(arg as u32);
                     Ok(0)
                 }
-                _ => Ok(0),
+                _ => Err(LinuxError::EINVAL),
             },
             general::F_GETLK => self.fcntl_getlk(process, fd, arg),
             general::F_SETLK => self.fcntl_setlk(process, fd, arg, false),
