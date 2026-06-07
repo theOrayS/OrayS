@@ -164,7 +164,8 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 int utimes(const char *filename, const struct timeval times[2])
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
@@ -178,13 +179,15 @@ void tzset()
 int setitimer(int _which, const struct itimerval *restrict _new, struct itimerval *restrict _old)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 char *ctime_r(const time_t *t, char *buf)
 {
     unimplemented();
+    errno = ENOSYS;
     return NULL;
 }
 
@@ -192,7 +195,8 @@ char *ctime_r(const time_t *t, char *buf)
 clock_t clock(void)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return (clock_t)-1;
 }
 
 #ifdef AX_CONFIG_FP_SIMD

@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,12 +21,14 @@ char *getenv(const char *name)
 int setenv(const char *__name, const char *__value, int __replace)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int unsetenv(const char *__name)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -6,6 +7,7 @@
 void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off)
 {
     unimplemented();
+    errno = ENOSYS;
     return MAP_FAILED;
 }
 
@@ -13,7 +15,8 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off)
 int munmap(void *addr, size_t length)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
@@ -21,19 +24,22 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags,
              ... /* void *new_address */)
 {
     unimplemented();
-    return NULL;
+    errno = ENOSYS;
+    return MAP_FAILED;
 }
 
 // TODO
 int mprotect(void *addr, size_t len, int prot)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int madvise(void *addr, size_t len, int advice)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

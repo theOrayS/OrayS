@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 
@@ -5,5 +6,6 @@
 int ioctl(int __fd, int __request, ...)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

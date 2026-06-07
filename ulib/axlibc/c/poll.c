@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 
@@ -5,5 +6,6 @@
 int poll(struct pollfd *__fds, nfds_t __nfds, int __timeout)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

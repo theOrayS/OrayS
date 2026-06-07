@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <sys/utsname.h>
 
@@ -5,5 +6,6 @@
 int uname(struct utsname *a)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

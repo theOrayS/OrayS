@@ -9,13 +9,13 @@
 int pthread_setcancelstate(int new, int *old)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 int pthread_setcanceltype(int new, int *old)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 // TODO
@@ -29,21 +29,21 @@ void pthread_testcancel(void)
 int pthread_cancel(pthread_t t)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 // TODO
 int pthread_mutex_trylock(pthread_mutex_t *m)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 // TODO
 int pthread_setname_np(pthread_t thread, const char *name)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 int pthread_cond_init(pthread_cond_t *restrict c, const pthread_condattr_t *restrict a)
@@ -61,21 +61,21 @@ int pthread_cond_init(pthread_cond_t *restrict c, const pthread_condattr_t *rest
 int pthread_cond_signal(pthread_cond_t *__cond)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 // TODO
 int pthread_cond_wait(pthread_cond_t *__restrict__ __cond, pthread_mutex_t *__restrict__ __mutex)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 // TODO
 int pthread_cond_broadcast(pthread_cond_t *c)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 #define DEFAULT_STACK_SIZE 131072

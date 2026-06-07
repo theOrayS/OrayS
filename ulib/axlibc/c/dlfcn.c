@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -5,7 +6,7 @@
 // TODO
 int dladdr(const void *__address, Dl_info *__info)
 {
-    unimplemented();
+    errno = ENOSYS;
     return 0;
 }
 
@@ -13,14 +14,14 @@ int dladdr(const void *__address, Dl_info *__info)
 void *dlopen(const char *__file, int __mode)
 {
     unimplemented();
+    errno = ENOSYS;
     return NULL;
 }
 
 // TODO
 char *dlerror()
 {
-    unimplemented();
-    return NULL;
+    return "dynamic loading is not implemented";
 }
 
 // TODO
@@ -28,6 +29,7 @@ void *dlsym(void *__restrict__ __handle, const char *__restrict__ __name)
 {
 
     unimplemented();
+    errno = ENOSYS;
     return NULL;
 }
 
@@ -35,5 +37,6 @@ void *dlsym(void *__restrict__ __handle, const char *__restrict__ __name)
 int dlclose(void *p)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

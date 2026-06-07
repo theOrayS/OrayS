@@ -367,19 +367,24 @@ void qsort(void *base, size_t nel, size_t width, cmpfun cmp)
 int mkstemp(char *__template)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int mkostemp(char *__template, int __flags)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int system(const char *cmd)
 {
+    if (!cmd)
+        return 0;
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

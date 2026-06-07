@@ -4463,9 +4463,9 @@ impl FdTable {
                 process.truncate_path_sparse_file(file.path.clone(), size);
                 Ok(())
             }
-            FdEntry::DevNull => Ok(()),
-            FdEntry::BlockDevice(_) => Ok(()),
-            FdEntry::Rtc => Ok(()),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
+                Err(LinuxError::EOPNOTSUPP)
+            }
             FdEntry::Memfd(file) => file.truncate(size),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
@@ -4502,9 +4502,9 @@ impl FdTable {
                 process.mark_path_data_range(file.path.clone(), offset, len);
                 Ok(())
             }
-            FdEntry::DevNull => Ok(()),
-            FdEntry::BlockDevice(_) => Ok(()),
-            FdEntry::Rtc => Ok(()),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
+                Err(LinuxError::EOPNOTSUPP)
+            }
             FdEntry::Memfd(file) => {
                 if keep_size {
                     file.fallocate_keep_size()
@@ -4538,7 +4538,9 @@ impl FdTable {
                 process.clear_path_data_range(file.path.clone(), offset, len);
                 Ok(())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
+                Err(LinuxError::EOPNOTSUPP)
+            }
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -4585,7 +4587,9 @@ impl FdTable {
                 let zeros = vec![0u8; len.min(MAX_IN_MEMORY_FILE_SIZE) as usize];
                 file.write_at(offset, &zeros, None).map(|_| ())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
+                Err(LinuxError::EOPNOTSUPP)
+            }
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -4630,7 +4634,9 @@ impl FdTable {
                 file.truncate(0)?;
                 file.write_at(0, &data, None).map(|_| ())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
+                Err(LinuxError::EOPNOTSUPP)
+            }
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -4676,7 +4682,9 @@ impl FdTable {
                 file.truncate(0)?;
                 file.write_at(0, &data, None).map(|_| ())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => Ok(()),
+            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
+                Err(LinuxError::EOPNOTSUPP)
+            }
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)

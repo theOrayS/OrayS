@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <sys/file.h>
 
@@ -5,5 +6,6 @@
 int flock(int __fd, int __operation)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

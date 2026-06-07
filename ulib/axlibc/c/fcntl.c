@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -43,14 +44,15 @@ int open(const char *filename, int flags, ...)
 int posix_fadvise(int __fd, unsigned long __offset, unsigned long __len, int __advise)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 // TODO
 int sync_file_range(int fd, off_t pos, off_t len, unsigned flags)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 #endif // AX_CONFIG_FS

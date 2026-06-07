@@ -9,14 +9,16 @@
 // TODO:
 uid_t geteuid(void)
 {
-    unimplemented();
+    // axlibc currently runs without a separate POSIX credential backend here.
+    // Expose the existing single-user root model explicitly instead of
+    // pretending richer uid semantics exist.
     return 0;
 }
 
 // TODO
 uid_t getuid(void)
 {
-    unimplemented();
+    // See geteuid().
     return 0;
 }
 
@@ -24,13 +26,14 @@ uid_t getuid(void)
 pid_t setsid(void)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int isatty(int fd)
 {
-    unimplemented();
+    errno = ENOTTY;
     return 0;
 }
 
@@ -58,70 +61,80 @@ int usleep(unsigned useconds)
 int access(const char *pathname, int mode)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
 ssize_t readlink(const char *path, char *buf, size_t bufsiz)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
 int unlink(const char *pathname)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
 int rmdir(const char *pathname)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
 int fsync(int fd)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int fdatasync(int __fildes)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
 int fchown(int fd, uid_t owner, gid_t group)
 {
     unimplemented("owner: %x group: %x", owner, group);
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO:
 int ftruncate(int fd, off_t length)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int chdir(const char *__path)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int truncate(const char *path, off_t length)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 #endif // AX_CONFIG_FS
@@ -163,12 +176,14 @@ _Noreturn void _exit(int status)
 int execve(const char *__path, char *const *__argv, char *const *__envp)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 pid_t fork(void)
 {
     unimplemented();
+    errno = ENOSYS;
     return -1;
 }
