@@ -833,9 +833,8 @@ pub(super) fn proc_exe_link_target(process: &UserProcess, path: &str) -> Option<
 }
 
 const SYNTHETIC_PROC_VERSION_CONTENT: &[u8] =
-    b"Linux version 6.0.0 (oskernel2026-orays) #1 SMP PREEMPT\n";
-const SYNTHETIC_PROC_CMDLINE_CONTENT: &[u8] =
-    b"root=/dev/vda rw console=ttyS0 ltp.oskernel2026=1\n";
+    b"Linux version 6.0.0 (ArceOS compatibility kernel) #1 SMP PREEMPT\n";
+const SYNTHETIC_PROC_CMDLINE_CONTENT: &[u8] = b"root=/dev/vda rw console=ttyS0\n";
 
 pub(super) fn synthetic_proc_version_content(path: &str) -> Option<(&'static str, &'static [u8])> {
     match normalize_path("/", path).as_deref() {
@@ -947,8 +946,8 @@ const KERNEL_CONFIG_MODULE_BUILD_PATH: &str = "/lib/modules/6.0.0/build/.config"
 const KERNEL_CONFIG_LIB_PATH: &str = "/lib/kernel/config-6.0.0";
 
 const SYNTHETIC_KERNEL_CONFIG_CONTENT: &[u8] = b"\
-# ArceOS synthetic kernel config for LTP feature probes.
-# Keep these entries aligned with implemented kernel/user ABI support.
+# ArceOS synthetic kernel config for implemented Linux ABI surfaces.
+# Entries below are exposed only when backed by syscall/file-descriptor code.
 CONFIG_EVENTFD=y
 ";
 

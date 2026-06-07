@@ -29,8 +29,6 @@ use super::{PathTimes, UserProcess};
 pub(super) const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 pub(super) const DEV_ZERO_RDEV: u64 = 261; // Linux makedev(1, 5).
 const DEV_VDA_RDEV: u64 = 65_024; // Linux makedev(254, 0), virtio block.
-const DEV_SDA_RDEV: u64 = 2_048; // Linux makedev(8, 0).
-const DEV_XVDA_RDEV: u64 = 51_712; // Linux makedev(202, 0).
 const LINUX_PATH_MAX: usize = 4096;
 const XATTR_CREATE: usize = 0x1;
 const XATTR_REPLACE: usize = 0x2;
@@ -1924,8 +1922,6 @@ pub(super) fn synthetic_char_stat_for_path(path: &str, mode: u32) -> general::st
 
 pub(super) fn synthetic_block_stat_for_path(path: &str, mode: u32) -> general::stat {
     let rdev = match normalize_path("/", path).as_deref() {
-        Some("/dev/sda") => DEV_SDA_RDEV,
-        Some("/dev/xvda") => DEV_XVDA_RDEV,
         Some("/dev/vda") => DEV_VDA_RDEV,
         _ => 0,
     };
