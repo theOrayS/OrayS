@@ -34,10 +34,12 @@ class LtpSummarySemanticsTest(unittest.TestCase):
         return "\n".join(
             [
                 "#### OS COMP TEST GROUP START ltp-musl ####",
+                "ltp case list: inline (1 cases, timeout 30s)",
                 f"RUN LTP CASE {case}",
                 f"PASS LTP CASE {case} : 0",
                 "#### OS COMP TEST GROUP END ltp-musl ####",
                 "#### OS COMP TEST GROUP START ltp-glibc ####",
+                "ltp case list: inline (1 cases, timeout 30s)",
                 f"RUN LTP CASE {case}",
                 f"PASS LTP CASE {case} : 0",
                 "#### OS COMP TEST GROUP END ltp-glibc ####",
@@ -115,6 +117,33 @@ class LtpSummarySemanticsTest(unittest.TestCase):
         self.assertEqual(data["categories"]["pass_clean"], [])
         self.assertEqual(data["categories"]["timeout"], ["rv:musl:nanosleep01"])
 
+    def test_case_list_manifest_is_reported(self) -> None:
+        data = self.compact(
+            "\n".join(
+                [
+                    "#### OS COMP TEST GROUP START ltp-musl ####",
+                    "ltp case list: stable (1000 cases, timeout 15s)",
+                    "RUN LTP CASE access01",
+                    "PASS LTP CASE access01 : 0",
+                    "#### OS COMP TEST GROUP END ltp-musl ####",
+                ]
+            )
+        )
+
+        self.assertEqual(
+            data["case_list_manifests"],
+            [
+                {
+                    "group": "ltp-musl",
+                    "name": "stable",
+                    "case_count": 1000,
+                    "timeout_secs": 15,
+                }
+            ],
+        )
+        row = data["case_matrix"]["access01"]["rv"]["musl"]
+        self.assertEqual(row["case_list"]["name"], "stable")
+
     def test_promotion_candidate_requires_four_way_clean_matrix(self) -> None:
         report = self.promotion_report(
             rv_log=self.two_libc_pass_log("openat02"),
@@ -168,6 +197,39 @@ class LtpSummarySemanticsTest(unittest.TestCase):
         self.assertEqual(blocker["arch"], "la")
         self.assertEqual(blocker["libc"], "glibc")
         self.assertEqual(blocker["reasons"], ["TCONF=1"])
+
+    def test_promotion_candidate_blocks_blacklist_selection_mode(self) -> None:
+        def blacklist_log(case: str) -> str:
+            return "\n".join(
+                [
+                    "#### OS COMP TEST GROUP START ltp-musl ####",
+                    "ltp case list: stable-plus-all-minus-blacklist stable=1000 extra=2 deduped=1000 skipped=3 (1002 cases, timeout 30s)",
+                    f"RUN LTP CASE {case}",
+                    f"PASS LTP CASE {case} : 0",
+                    "#### OS COMP TEST GROUP END ltp-musl ####",
+                    "#### OS COMP TEST GROUP START ltp-glibc ####",
+                    "ltp case list: stable-plus-all-minus-blacklist stable=1000 extra=2 deduped=1000 skipped=3 (1002 cases, timeout 30s)",
+                    f"RUN LTP CASE {case}",
+                    f"PASS LTP CASE {case} : 0",
+                    "#### OS COMP TEST GROUP END ltp-glibc ####",
+                ]
+            )
+
+        report = self.promotion_report(
+            rv_log=blacklist_log("chmod06"),
+            la_log=blacklist_log("chmod06"),
+        )
+
+        self.assertEqual(report["candidate_count"], 0)
+        self.assertEqual(report["blocked_count"], 1)
+        blockers = report["blocked"][0]["blockers"]
+        self.assertEqual(len(blockers), 4)
+        self.assertTrue(
+            all(
+                any(reason.startswith("selection-mode=stable-plus-all-minus-blacklist") for reason in blocker["reasons"])
+                for blocker in blockers
+            )
+        )
 
     def test_promotion_candidate_blocks_prior_failure_event_even_if_later_passes(self) -> None:
         report = self.promotion_report(

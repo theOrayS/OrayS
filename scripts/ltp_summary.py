@@ -29,6 +29,10 @@ CASE_RUNTIME_RE = re.compile(r"\bLTP CASE RUNTIME\s+(\S+):\s+(\d+)\s+ms\b")
 CASE_MEMORY_RE = re.compile(
     r"\bLTP MEMORY\s+(\S+)\s+(\S+):\s+free_frames=(\d+)\s+allocated_frames=(\d+)\b"
 )
+CASE_LIST_RE = re.compile(
+    r"\bltp case list:\s+(.+?)\s+\((\d+)\s+cases,\s+timeout\s+(\d+)s\)",
+    re.IGNORECASE,
+)
 INTERNAL_RE = re.compile(r"\b(TFAIL|TBROK|TCONF)\b")
 TIMEOUT_RE = re.compile(
     r"\b(TIMEOUT LTP CASE|timed out|timeout reached|timeout expired|killed after timeout)\b",
@@ -76,6 +80,7 @@ def new_group() -> dict[str, Any]:
         "enosys": 0,
         "panic_trap": 0,
         "suite_summaries": [],
+        "case_list": None,
     }
 
 
@@ -132,6 +137,7 @@ def parse_log(text: str) -> dict[str, Any]:
         "suite_summaries": [],
         "case_events": [],
         "case_details": {},
+        "case_list_manifests": [],
         "groups": {},
     }
     current_group = "ungrouped"
@@ -150,6 +156,18 @@ def parse_log(text: str) -> dict[str, Any]:
         if match := CASE_START_RE.search(line):
             current_case = match.group(1)
             case_bucket(summary, current_group, current_case)
+            continue
+        if match := CASE_LIST_RE.search(line):
+            name, count, timeout_secs = match.groups()
+            manifest = {
+                "group": current_group,
+                "name": name,
+                "case_count": int(count),
+                "timeout_secs": int(timeout_secs),
+            }
+            bucket(summary, current_group)["case_list"] = manifest
+            summary["case_list_manifests"].append(manifest)
+            current_case = None
             continue
         if match := CASE_RESULT_RE.search(line):
             raw_status, case, code_text = match.groups()
@@ -268,6 +286,7 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
             "enosys": group["enosys"],
             "panic_trap": group["panic_trap"],
             "suite_summaries": group["suite_summaries"],
+            "case_list": group.get("case_list"),
         }
 
     rows = []
@@ -289,6 +308,7 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
             "panic_trap": detail["panic_trap"],
             "runtime_ms": detail["runtime_ms"],
             "memory": detail["memory"],
+            "case_list": summary["groups"].get(detail["group"], {}).get("case_list"),
         }
         before = row["memory"].get("before")
         after_cleanup = row["memory"].get("after_cleanup")
@@ -348,6 +368,7 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
         "enosys": summary["enosys"],
         "panic_trap": summary["panic_trap"],
         "suite_summaries": summary["suite_summaries"],
+        "case_list_manifests": summary["case_list_manifests"],
         "groups": {name: compact_group(group) for name, group in summary["groups"].items()},
         "case_matrix_rows": rows,
         "case_matrix": matrix,
@@ -380,7 +401,21 @@ def row_problem_markers(row: dict[str, Any]) -> list[str]:
             problems.append(f"{label}={count}")
     if row["status"] != "PASS":
         problems.append(f"status={row['status']}")
+    promotion_mode_blocker = row.get("promotion_mode_blocker")
+    if promotion_mode_blocker:
+        problems.append(promotion_mode_blocker)
     return problems
+
+
+def promotion_mode_blocker(case_list: dict[str, Any] | None) -> str | None:
+    if not case_list:
+        return None
+    mode = str(case_list.get("name") or "").strip()
+    lowered = mode.lower()
+    blocked_tokens = ("blacklist", "sweep:", "all-minus-blacklist")
+    if lowered == "all" or any(token in lowered for token in blocked_tokens):
+        return f"selection-mode={mode}"
+    return None
 
 
 def promotion_report(
@@ -465,6 +500,7 @@ def promotion_rows(raw_summary: dict[str, Any], data: dict[str, Any], arch: str)
     for row in data["case_matrix_rows"]:
         item = dict(row)
         item["event_failures"] = event_failures[(row["case"], row["arch"], row["libc"])]
+        item["promotion_mode_blocker"] = promotion_mode_blocker(row.get("case_list"))
         rows.append(item)
     return rows
 
@@ -536,6 +572,15 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
         f"- panic/trap matches: {data['panic_trap']}",
         "",
     ]
+    if data["case_list_manifests"]:
+        lines.append("## Case-list manifests")
+        for item in data["case_list_manifests"]:
+            lines.append(
+                "- {group}: `{name}` ({case_count} cases, timeout {timeout_secs}s)".format(
+                    **item
+                )
+            )
+        lines.append("")
     if data["suite_summaries"]:
         lines.append("## Suite summaries")
         for item in data["suite_summaries"]:

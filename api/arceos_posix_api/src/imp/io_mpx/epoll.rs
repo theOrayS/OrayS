@@ -141,7 +141,7 @@ impl FileLike for EpollInstance {
     }
 
     fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(())
+        Ok(0)
     }
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
