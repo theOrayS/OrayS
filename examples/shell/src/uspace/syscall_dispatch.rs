@@ -568,6 +568,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg2(),
             tf.arg3(),
             tf.arg4(),
+            tf.arg5(),
         ),
         general::__NR_get_mempolicy => sys_get_mempolicy(
             &process,

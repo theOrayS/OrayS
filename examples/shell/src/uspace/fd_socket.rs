@@ -16,20 +16,16 @@ use super::fd_pipe::PipeEndpoint;
 use super::fd_table::{resolve_dirfd_path, FdEntry};
 use super::linux_abi::{
     fd_cloexec_flag, neg_errno_code, posix_errno_from_ret, AF_UNIX_DOMAIN,
-    DEFAULT_SOCKET_BUFFER_SIZE, DEFAULT_TCP_MAXSEG, INTERRUPTIBLE_SOCKET_RECV_QUANTUM,
-    IPPROTO_IP_LEVEL, IP_RECVERR_OPT, LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP,
-    LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE, MCAST_JOIN_GROUP_OPT,
-    MCAST_LEAVE_GROUP_OPT, SOL_SOCKET_LEVEL, SO_BROADCAST_OPT, SO_DONTROUTE_OPT, SO_ERROR_OPT,
-    SO_KEEPALIVE_OPT, SO_PEERCRED_OPT, SO_RCVBUFFORCE_OPT, SO_RCVBUF_OPT, SO_RCVTIMEO_OPT,
-    SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUFFORCE_OPT, SO_SNDBUF_OPT, SO_SNDTIMEO_OPT,
-    SO_TYPE_OPT, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, TCP_INFO_OPT, TCP_MAXSEG_OPT,
-    TCP_NODELAY_OPT,
+    INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
+    LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT,
+    LOCAL_SOCKET_INO_BASE, SOL_SOCKET_LEVEL, SO_ERROR_OPT, SO_PEERCRED_OPT, SO_RCVTIMEO_OPT,
+    SO_SNDTIMEO_OPT, SO_TYPE_OPT, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    clear_user_bytes, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
+    validate_user_write, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
 use super::{neg_errno, posix_ret_i32, posix_ret_usize, SelectMode, UserProcess};
 
@@ -42,16 +38,10 @@ macro_rules! socket_entry_or_return {
     };
 }
 
-#[derive(Default)]
-pub(super) struct SocketOptions {
-    pub(super) ip_mcast_joined: bool,
-}
-
 #[derive(Clone)]
 pub(super) struct SocketEntry {
     pub(super) posix_fd: i32,
     pub(super) socktype: i32,
-    pub(super) options: Arc<Mutex<SocketOptions>>,
     read_shutdown: Arc<Mutex<bool>>,
 }
 
@@ -62,7 +52,6 @@ pub(super) struct LocalSocketEntry {
     bound_path: Arc<Mutex<Option<String>>>,
     pair: Option<LocalSocketPairEndpoint>,
     peer_cred: Arc<Mutex<Option<LocalSocketCred>>>,
-    options: Arc<Mutex<SocketOptions>>,
 }
 
 static NEXT_LOCAL_SOCKET_ID: AtomicUsize = AtomicUsize::new(1);
@@ -146,7 +135,6 @@ impl SocketEntry {
         Self {
             posix_fd,
             socktype,
-            options: Arc::new(Mutex::new(SocketOptions::default())),
             read_shutdown: Arc::new(Mutex::new(false)),
         }
     }
@@ -156,7 +144,6 @@ impl SocketEntry {
         Ok(Self {
             posix_fd,
             socktype: self.socktype,
-            options: self.options.clone(),
             read_shutdown: self.read_shutdown.clone(),
         })
     }
@@ -391,13 +378,11 @@ impl LocalSocketEntry {
             bound_path: Arc::new(Mutex::new(None)),
             pair: None,
             peer_cred: Arc::new(Mutex::new(None)),
-            options: Arc::new(Mutex::new(SocketOptions::default())),
         }
     }
 
     pub(super) fn new_pair(socktype: i32, flags: i32) -> (Self, Self) {
         let state = LocalSocketPairState::new();
-        let options = Arc::new(Mutex::new(SocketOptions::default()));
         let nonblocking = flags & posix_ctypes::SOCK_NONBLOCK as i32 != 0;
         let first_id = NEXT_LOCAL_SOCKET_ID.fetch_add(2, Ordering::Relaxed);
         (
@@ -411,7 +396,6 @@ impl LocalSocketEntry {
                     state: state.clone(),
                 }),
                 peer_cred: Arc::new(Mutex::new(None)),
-                options: options.clone(),
             },
             Self {
                 id: first_id + 1,
@@ -420,7 +404,6 @@ impl LocalSocketEntry {
                 bound_path: Arc::new(Mutex::new(None)),
                 pair: Some(LocalSocketPairEndpoint { side: 1, state }),
                 peer_cred: Arc::new(Mutex::new(None)),
-                options,
             },
         )
     }
@@ -438,7 +421,6 @@ impl LocalSocketEntry {
             bound_path: Arc::new(Mutex::new(None)),
             pair: Some(pair),
             peer_cred: Arc::new(Mutex::new(Some(peer_cred))),
-            options: Arc::new(Mutex::new(SocketOptions::default())),
         }
     }
 
@@ -450,7 +432,6 @@ impl LocalSocketEntry {
             bound_path: self.bound_path.clone(),
             pair: self.pair.clone(),
             peer_cred: self.peer_cred.clone(),
-            options: self.options.clone(),
         }
     }
 
@@ -708,34 +689,6 @@ impl LocalSocketEntry {
         st.st_nlink = 1;
         st.st_blksize = 512;
         st
-    }
-}
-
-pub(super) fn socket_option_supported(level: i32, optname: i32) -> bool {
-    if level == SOL_SOCKET_LEVEL {
-        matches!(
-            optname,
-            SO_REUSEADDR_OPT
-                | SO_REUSEPORT_OPT
-                | SO_DONTROUTE_OPT
-                | SO_BROADCAST_OPT
-                | SO_KEEPALIVE_OPT
-                | SO_SNDBUF_OPT
-                | SO_RCVBUF_OPT
-                | SO_RCVTIMEO_OPT
-                | SO_SNDTIMEO_OPT
-                | SO_ERROR_OPT
-                | SO_TYPE_OPT
-        )
-    } else if level == IPPROTO_IP_LEVEL {
-        matches!(
-            optname,
-            IP_RECVERR_OPT | MCAST_JOIN_GROUP_OPT | MCAST_LEAVE_GROUP_OPT
-        )
-    } else if level == posix_ctypes::IPPROTO_TCP as i32 {
-        matches!(optname, TCP_NODELAY_OPT | TCP_MAXSEG_OPT)
-    } else {
-        false
     }
 }
 
@@ -1042,12 +995,82 @@ pub(super) fn recv_socket_data_to_user_with_addr(
     ret
 }
 
+fn capped_iovec_write_len(entries: &[general::iovec]) -> usize {
+    let mut total = 0usize;
+    for entry in entries {
+        if total == MAX_USER_IO_CHUNK {
+            break;
+        }
+        let len = entry.iov_len as usize;
+        total = total.saturating_add(len.min(MAX_USER_IO_CHUNK - total));
+    }
+    total
+}
+
+fn validate_iovec_write(
+    process: &UserProcess,
+    entries: &[general::iovec],
+    limit: usize,
+) -> Result<(), LinuxError> {
+    let mut remaining = limit;
+    for entry in entries {
+        if remaining == 0 {
+            break;
+        }
+        let len = (entry.iov_len as usize).min(remaining);
+        validate_user_write(process, entry.iov_base as usize, len)?;
+        remaining -= len;
+    }
+    Ok(())
+}
+
+fn scatter_iovec_bytes_to_user(
+    process: &UserProcess,
+    entries: &[general::iovec],
+    bytes: &[u8],
+) -> Result<(), LinuxError> {
+    let mut copied = 0usize;
+    for entry in entries {
+        if copied == bytes.len() {
+            break;
+        }
+        let len = (entry.iov_len as usize).min(bytes.len() - copied);
+        if len != 0 {
+            let base = entry.iov_base as usize;
+            write_user_bytes(process, base, &bytes[copied..copied + len])?;
+        }
+        copied += len;
+    }
+    Ok(())
+}
+
+fn recv_socket_data_to_buffer(
+    process: &UserProcess,
+    posix_fd: i32,
+    bytes: &mut [u8],
+    mut recv_once: impl FnMut(*mut c_void) -> isize,
+) -> isize {
+    if bytes.is_empty() {
+        return 0;
+    }
+    let ret = recv_with_real_timer_interrupt(process, posix_fd, || {
+        recv_once(bytes.as_mut_ptr() as *mut c_void)
+    });
+    if ret <= 0 {
+        return ret;
+    }
+    if ret as usize > bytes.len() {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    ret
+}
+
 fn recv_socket_data_to_user_inner(
     process: &UserProcess,
     posix_fd: i32,
     buf: usize,
     len: usize,
-    mut recv_once: impl FnMut(*mut c_void) -> isize,
+    recv_once: impl FnMut(*mut c_void) -> isize,
 ) -> isize {
     if buf == 0 {
         return neg_errno(LinuxError::EFAULT);
@@ -1059,9 +1082,7 @@ fn recv_socket_data_to_user_inner(
         Ok(bytes) => bytes,
         Err(err) => return neg_errno(err),
     };
-    let ret = recv_with_real_timer_interrupt(process, posix_fd, || {
-        recv_once(bytes.as_mut_ptr() as *mut c_void)
-    });
+    let ret = recv_socket_data_to_buffer(process, posix_fd, &mut bytes, recv_once);
     if ret <= 0 {
         return ret;
     }
@@ -1923,69 +1944,99 @@ pub(super) fn sys_recvmsg_bridge(
             }
             Err(err) => return neg_errno(err),
         };
-    let Some(first_iov) = iov_entries.first() else {
+    let receive_len = capped_iovec_write_len(&iov_entries);
+    if receive_len == 0 {
         return 0;
-    };
+    }
+    if let Err(err) = validate_iovec_write(process, &iov_entries, receive_len) {
+        return neg_errno(err);
+    }
     let addr_ptr = msg_value.msg_name as usize;
-    let addr_len_ptr = 0usize;
     let ret = if matches!(is_local_socket_fd(process, fd), Ok(true)) {
-        let len = (first_iov.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        let mut bytes = match user_io_buffer(len) {
+        let mut bytes = match user_io_buffer(receive_len) {
             Ok(bytes) => bytes,
             Err(err) => return neg_errno(err),
         };
         match process.fds.lock().read(process, fd as i32, &mut bytes) {
             Ok(n) => {
-                if let Err(err) =
-                    write_user_bytes(process, first_iov.iov_base as usize, &bytes[..n])
-                {
+                if let Err(err) = scatter_iovec_bytes_to_user(process, &iov_entries, &bytes[..n]) {
                     return neg_errno(err);
+                }
+                if !msg_value.msg_name.is_null() {
+                    msg_value.msg_namelen = 0;
                 }
                 n as isize
             }
             Err(err) => neg_errno(err),
         }
     } else if msg_value.msg_name.is_null() {
-        recv_socket_data_to_user(
-            process,
-            socket_entry_or_return!(process, fd).posix_fd,
-            first_iov.iov_base as usize,
-            first_iov.iov_len as usize,
-            flags as i32,
-        )
+        let socket = socket_entry_or_return!(process, fd);
+        let mut bytes = match user_io_buffer(receive_len) {
+            Ok(bytes) => bytes,
+            Err(err) => return neg_errno(err),
+        };
+        let ret = recv_socket_data_to_buffer(process, socket.posix_fd, &mut bytes, |dst| unsafe {
+            arceos_posix_api::sys_recv(socket.posix_fd, dst, receive_len, flags as i32)
+        });
+        if ret > 0 {
+            if let Err(err) =
+                scatter_iovec_bytes_to_user(process, &iov_entries, &bytes[..ret as usize])
+            {
+                return neg_errno(err);
+            }
+        }
+        ret
     } else {
         if let Err(err) = validate_user_write(process, addr_ptr, msg_value.msg_namelen as usize) {
             return neg_errno(err);
         }
-        let mut addr_len_value = msg_value.msg_namelen as posix_ctypes::socklen_t;
+        let user_addr_len = msg_value.msg_namelen as usize;
+        let mut addr_len_value = user_addr_len as posix_ctypes::socklen_t;
         let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
         let posix_fd = socket_entry_or_return!(process, fd).posix_fd;
-        let len = (first_iov.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        recv_socket_data_to_user_inner(
-            process,
-            posix_fd,
-            first_iov.iov_base as usize,
-            len,
-            |dst| unsafe {
-                arceos_posix_api::sys_recvfrom(
-                    posix_fd,
-                    dst,
-                    len,
-                    flags as i32,
-                    &mut local_addr,
-                    &mut addr_len_value,
-                )
-            },
-        )
+        let mut bytes = match user_io_buffer(receive_len) {
+            Ok(bytes) => bytes,
+            Err(err) => return neg_errno(err),
+        };
+        let ret = recv_socket_data_to_buffer(process, posix_fd, &mut bytes, |dst| unsafe {
+            arceos_posix_api::sys_recvfrom(
+                posix_fd,
+                dst,
+                receive_len,
+                flags as i32,
+                &mut local_addr,
+                &mut addr_len_value,
+            )
+        });
+        if ret > 0 {
+            if let Err(err) =
+                scatter_iovec_bytes_to_user(process, &iov_entries, &bytes[..ret as usize])
+            {
+                return neg_errno(err);
+            }
+        }
+        if ret >= 0 && addr_len_value != 0 {
+            let copy_len = cmp::min(
+                user_addr_len,
+                cmp::min(addr_len_value as usize, size_of::<posix_ctypes::sockaddr>()),
+            );
+            if copy_len > 0 {
+                let local_addr_bytes = sockaddr_bytes(&local_addr);
+                if let Err(err) = write_user_bytes(process, addr_ptr, &local_addr_bytes[..copy_len])
+                {
+                    return neg_errno(err);
+                }
+            }
+            msg_value.msg_namelen = addr_len_value as i32;
+        }
+        ret
     };
     if ret >= 0 {
         msg_value.msg_flags = 0;
-        let _ = write_user_value(process, msg, &msg_value);
-        if !msg_value.msg_name.is_null() {
-            // The basic LTP cases only assert errno/return value.  Keep the
-            // name buffer untouched unless recvfrom() filled it through the
-            // lower POSIX layer.
-            let _ = addr_len_ptr;
+        msg_value.msg_controllen = 0;
+        let write_ret = write_user_value(process, msg, &msg_value);
+        if write_ret != 0 {
+            return write_ret;
         }
     }
     ret
@@ -2068,39 +2119,7 @@ pub(super) fn sys_setsockopt_bridge(
     {
         return neg_errno(LinuxError::EINVAL);
     }
-    if level_i32 == IPPROTO_IP_LEVEL
-        && matches!(optname_i32, MCAST_JOIN_GROUP_OPT | MCAST_LEAVE_GROUP_OPT)
-    {
-        if optval == 0 || optlen < size_of::<u32>() {
-            neg_errno(LinuxError::EINVAL)
-        } else {
-            let mut table = process.fds.lock();
-            match table.entry_mut(fd as i32) {
-                Ok(FdEntry::Socket(socket)) => {
-                    let mut options = socket.options.lock();
-                    if optname_i32 == MCAST_JOIN_GROUP_OPT {
-                        options.ip_mcast_joined = true;
-                        0
-                    } else if options.ip_mcast_joined {
-                        options.ip_mcast_joined = false;
-                        0
-                    } else {
-                        neg_errno(LinuxError::EADDRNOTAVAIL)
-                    }
-                }
-                Ok(_) => neg_errno(LinuxError::ENOTSOCK),
-                Err(err) => neg_errno(err),
-            }
-        }
-    } else if !socket_option_supported(level_i32, optname_i32) {
-        if level_i32 == SOL_SOCKET_LEVEL
-            && matches!(optname_i32, SO_SNDBUFFORCE_OPT | SO_RCVBUFFORCE_OPT)
-        {
-            0
-        } else {
-            neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
-        }
-    } else if level_i32 == SOL_SOCKET_LEVEL
+    if level_i32 == SOL_SOCKET_LEVEL
         && matches!(optname_i32, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT)
     {
         if optlen < size_of::<general::timeval>() {
@@ -2124,7 +2143,7 @@ pub(super) fn sys_setsockopt_bridge(
             }
         }
     } else {
-        0
+        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
     }
 }
 
@@ -2153,17 +2172,6 @@ pub(super) fn sys_getsockopt_bridge(
     };
     let level = level as i32;
     let optname = optname as i32;
-    if level == posix_ctypes::IPPROTO_TCP as i32 && optname == TCP_INFO_OPT {
-        if len == 0 {
-            return neg_errno(LinuxError::EINVAL);
-        }
-        let out_len = len.min(TCP_INFO_COMPAT_SIZE);
-        if let Err(err) = clear_user_bytes(process, optval, out_len) {
-            return neg_errno(err);
-        }
-        let out_len = out_len as posix_ctypes::socklen_t;
-        return write_user_value(process, optlen, &out_len);
-    }
     if len > SOCKET_OPTLEN_MAX {
         return neg_errno(LinuxError::EINVAL);
     }
@@ -2200,17 +2208,8 @@ pub(super) fn sys_getsockopt_bridge(
         match optname {
             SO_ERROR_OPT => 0,
             SO_TYPE_OPT => socket.socktype,
-            SO_SNDBUF_OPT | SO_RCVBUF_OPT => DEFAULT_SOCKET_BUFFER_SIZE,
-            _ if socket_option_supported(level, optname) => 0,
             _ => return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level)),
         }
-    } else if level == posix_ctypes::IPPROTO_TCP as i32 && socket_option_supported(level, optname) {
-        match optname {
-            TCP_MAXSEG_OPT => DEFAULT_TCP_MAXSEG,
-            _ => 0,
-        }
-    } else if level == IPPROTO_IP_LEVEL && socket_option_supported(level, optname) {
-        0
     } else {
         return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level));
     };
@@ -2279,8 +2278,6 @@ fn sys_getsockopt_local_socket(
         match optname {
             SO_ERROR_OPT => 0,
             SO_TYPE_OPT => socket.socktype,
-            SO_SNDBUF_OPT | SO_RCVBUF_OPT => DEFAULT_SOCKET_BUFFER_SIZE,
-            _ if socket_option_supported(level, optname) => 0,
             _ => return neg_errno_code(LINUX_ENOPROTOOPT),
         }
     } else {
