@@ -6,7 +6,7 @@ use axfs::fops::OpenOptions;
 use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
-use super::fd_ops::{get_file_like, FileLike};
+use super::fd_ops::{FileLike, get_file_like};
 use crate::{ctypes, utils::char_ptr_to_str};
 
 pub struct File {
@@ -64,6 +64,52 @@ fn api_metadata_to_stat(metadata: axfs::api::Metadata) -> ctypes::stat {
         st_blksize: 512,
         ..Default::default()
     }
+}
+
+fn stat_path(path: &str) -> LinuxResult<ctypes::stat> {
+    Ok(api_metadata_to_stat(axfs::api::metadata(path)?))
+}
+
+fn parent_and_basename(path: &str) -> (&str, &str) {
+    match path.rsplit_once('/') {
+        Some(("", name)) => ("/", name),
+        Some((parent, name)) => (parent, name),
+        None => (".", path),
+    }
+}
+
+fn final_component_is_symlink(path: &str) -> LinuxResult<bool> {
+    if path.ends_with('/') {
+        return Ok(false);
+    }
+
+    let trimmed = path.trim_end_matches('/');
+    if trimmed.is_empty() || matches!(trimmed, "." | "..") {
+        return Ok(false);
+    }
+
+    let (parent, name) = parent_and_basename(trimmed);
+    if name.is_empty() || matches!(name, "." | "..") {
+        return Ok(false);
+    }
+
+    for entry in axfs::api::read_dir(parent)? {
+        let entry = entry?;
+        if entry.file_name() == name {
+            return Ok(entry.file_type().is_symlink());
+        }
+    }
+    Ok(false)
+}
+
+fn lstat_path(path: &str) -> LinuxResult<ctypes::stat> {
+    // axfs currently exposes only following path metadata.  If the parent
+    // directory says the final component is a symlink, fail honestly instead
+    // of reporting the symlink target as lstat(2) metadata.
+    if final_component_is_symlink(path)? {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    stat_path(path)
 }
 
 impl FileLike for File {
@@ -177,10 +223,7 @@ pub unsafe fn sys_stat(path: *const c_char, buf: *mut ctypes::stat) -> c_int {
         if buf.is_null() {
             return Err(LinuxError::EFAULT);
         }
-        let mut options = OpenOptions::new();
-        options.read(true);
-        let file = axfs::fops::File::open(path?, &options)?;
-        let st = File::new(file).stat()?;
+        let st = stat_path(path?)?;
         unsafe { write_stat_output(buf, st) };
         Ok(0)
     })
@@ -221,7 +264,7 @@ pub unsafe fn sys_lstat(path: *const c_char, buf: *mut ctypes::stat) -> ctypes::
         if buf.is_null() {
             return Err(LinuxError::EFAULT);
         }
-        let st = api_metadata_to_stat(axfs::api::metadata(path?)?);
+        let st = lstat_path(path?)?;
         unsafe { write_stat_output(buf, st) };
         Ok(0)
     })
