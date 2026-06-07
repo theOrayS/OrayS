@@ -1919,7 +1919,7 @@ fn file_has_shebang(path: &str) -> bool {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ltp_case_env(case: &str, suite_dir: &str, _helper_dir: &str, target_dir: &str) -> Vec<String> {
+fn ltp_case_env(suite_dir: &str, target_dir: &str, needs_case_resource_helper: bool) -> Vec<String> {
     let mut env = vec![
         // Keep the current run directory and testsuite bin directory first for
         // resource helpers, then rely on the runtime's /musl and /glibc
@@ -1937,11 +1937,13 @@ fn ltp_case_env(case: &str, suite_dir: &str, _helper_dir: &str, target_dir: &str
         // depend on a Linux loop-device stack that this kernel does not model.
         "LTP_DEV=/dev/vda".into(),
     ];
-    if case == "chdir01" {
-        // chdir01 needs an LTP test device only to mount a scratch filesystem.
-        // The evaluator has no loop-device stack, so run the real test body on
-        // tmpfs with a synthetic block device that satisfies the LTP framework's
-        // size probe instead of allocating a 300 MiB loop image.
+    if needs_case_resource_helper {
+        // Some LTP binaries are accompanied by per-case helper programs that
+        // ask the LTP framework to acquire a scratch filesystem device.  The
+        // evaluator exposes one synthetic block-backed test device but not a
+        // Linux loop-device stack, so declare the real supported filesystem
+        // type for every helper-backed case instead of naming individual LTP
+        // cases here.
         env.push("LTP_FORCE_SINGLE_FS_TYPE=tmpfs".into());
         env.push("LTP_DEV_FS_TYPE=tmpfs".into());
     }
@@ -1971,8 +1973,12 @@ fn ltp_case_has_resource_helper(target_dir: &str, case: &str) -> bool {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn prepare_ltp_case_run_dir(target_dir: &str, case: &str) -> io::Result<String> {
-    if !ltp_case_has_resource_helper(target_dir, case) {
+fn prepare_ltp_case_run_dir(
+    target_dir: &str,
+    case: &str,
+    needs_case_resource_helper: bool,
+) -> io::Result<String> {
+    if !needs_case_resource_helper {
         return Ok(target_dir.into());
     }
 
@@ -2198,7 +2204,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
     let label = suite_label(suite_dir, "ltp");
     let target_dir = join_path(suite_dir, "ltp/testcases/bin");
     let busybox_path = join_path(suite_dir, "busybox");
-    let helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
+    let _helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
         .map_err(|err| format!("prepare ltp helper bin failed: {err}"))?;
     let (case_list_name, cases) = selected_ltp_cases(&target_dir)?;
     let timeout_secs = ltp_case_timeout_secs();
@@ -2230,7 +2236,8 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             cleanup_ltp_scratch();
             continue;
         }
-        let run_dir = match prepare_ltp_case_run_dir(&target_dir, case) {
+        let needs_case_resource_helper = ltp_case_has_resource_helper(&target_dir, case);
+        let run_dir = match prepare_ltp_case_run_dir(&target_dir, case, needs_case_resource_helper) {
             Ok(run_dir) => run_dir,
             Err(err) => {
                 println!("FAIL LTP CASE {case} : -1");
@@ -2245,7 +2252,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
         } else {
             path.clone()
         };
-        let env = ltp_case_env(case, suite_dir, &helper_dir, &target_dir);
+        let env = ltp_case_env(suite_dir, &target_dir, needs_case_resource_helper);
         let result = if file_has_shebang(&path) {
             let command = format!("{}{program_arg}", ltp_env_shell_prefix(&env));
             run_user_program_argv_in_timeout(
