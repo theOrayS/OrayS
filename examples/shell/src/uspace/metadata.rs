@@ -2423,7 +2423,7 @@ fn utimensat_target(
     flags: u32,
 ) -> Result<(Option<String>, general::stat), LinuxError> {
     if pathname == 0 {
-        return Err(LinuxError::EFAULT);
+        return utimensat_fd_target(process, dirfd);
     }
     let path = read_cstr(process, pathname)?;
     if path.len() >= LINUX_PATH_MAX {

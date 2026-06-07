@@ -23,8 +23,9 @@ use super::linux_abi::{
     fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
     CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
     FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR,
-    ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
+    RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK,
+    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
+    ST_MODE_TYPE_MASK,
 };
 use super::memory_map::align_up;
 use super::metadata::{
@@ -114,6 +115,17 @@ const FALLOC_FL_INSERT_RANGE: usize = 0x20;
 const POSIX_FADV_MIN: i32 = 0;
 const POSIX_FADV_MAX: i32 = 5;
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
+
+fn current_fd_table_limit() -> usize {
+    let Some(task) = current_task_ext() else {
+        return FD_TABLE_LIMIT;
+    };
+    let soft_limit = task.process.get_rlimit(RLIMIT_NOFILE_RESOURCE).current();
+    cmp::min(
+        FD_TABLE_LIMIT,
+        soft_limit.min(FD_TABLE_LIMIT as u64) as usize,
+    )
+}
 
 pub(super) enum FdEntry {
     Stdin,
@@ -4759,7 +4771,7 @@ impl FdTable {
         if min_fd < 0 {
             return Err(LinuxError::EINVAL);
         }
-        if min_fd as usize >= FD_TABLE_LIMIT {
+        if min_fd as usize >= current_fd_table_limit() {
             return Err(LinuxError::EINVAL);
         }
         let entry = self.entry(fd)?.duplicate_for_fork()?;
@@ -4784,7 +4796,15 @@ impl FdTable {
             return Err(LinuxError::EBADF);
         }
         let newfd = newfd as usize;
-        if newfd >= FD_TABLE_LIMIT {
+        if newfd
+            >= cmp::min(
+                FD_TABLE_LIMIT,
+                process
+                    .get_rlimit(RLIMIT_NOFILE_RESOURCE)
+                    .current()
+                    .min(FD_TABLE_LIMIT as u64) as usize,
+            )
+        {
             return Err(LinuxError::EBADF);
         }
         if self.entries.len() <= newfd {
@@ -5131,7 +5151,8 @@ impl FdTable {
         min_fd: usize,
         fd_flags: u32,
     ) -> Result<i32, LinuxError> {
-        if min_fd >= FD_TABLE_LIMIT {
+        let fd_limit = current_fd_table_limit();
+        if min_fd >= fd_limit {
             return Err(LinuxError::EMFILE);
         }
         if self.entries.len() < min_fd {
@@ -5145,7 +5166,7 @@ impl FdTable {
             .entries
             .iter_mut()
             .enumerate()
-            .take(FD_TABLE_LIMIT)
+            .take(fd_limit)
             .skip(min_fd)
             .find(|(_, slot)| slot.is_none())
         {
@@ -5154,7 +5175,7 @@ impl FdTable {
             self.fd_flags[idx] = fd_flags & general::FD_CLOEXEC;
             return Ok(idx as i32);
         }
-        if self.entries.len() >= FD_TABLE_LIMIT {
+        if self.entries.len() >= fd_limit {
             return Err(LinuxError::EMFILE);
         }
         track_exec_write_open(&entry);
@@ -5587,6 +5608,12 @@ impl FdTable {
         }
         let abs_path = resolve_dirfd_path(process, self, dirfd, path)?;
         let abs_path = process.resolve_parent_symlinks(abs_path.as_str())?;
+        let abs_path = if let Some(backing_path) = dev_shm_host_path(abs_path.as_str()) {
+            ensure_dev_shm_dir()?;
+            backing_path
+        } else {
+            abs_path
+        };
         let parent_st = check_parent_write_search_permission(process, abs_path.as_str())?;
         if let Some(backing_path) = process.path_hardlink_backing(abs_path.as_str()) {
             if backing_path != abs_path {

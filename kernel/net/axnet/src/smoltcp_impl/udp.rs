@@ -2,7 +2,7 @@ use core::net::SocketAddr;
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::time::Duration;
 
-use axerrno::{AxError, AxResult, ax_err, ax_err_type};
+use axerrno::{ax_err, ax_err_type, AxError, AxResult};
 use axio::PollState;
 use axsync::Mutex;
 use spin::RwLock;
@@ -13,10 +13,10 @@ use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
 
 use super::addr::UNSPECIFIED_ENDPOINT;
 use super::udp_loopback::{
-    UdpLoopbackQueue, is_loopback_endpoint, register_udp_loopback, send_udp_loopback,
-    unregister_udp_loopback, update_udp_loopback_peer,
+    is_loopback_endpoint, register_udp_loopback, send_udp_loopback, unregister_udp_loopback,
+    update_udp_loopback_peer, UdpLoopbackQueue,
 };
-use super::{SOCKET_SET, SocketSetWrapper};
+use super::{SocketSetWrapper, SOCKET_SET};
 
 /// A UDP socket that provides POSIX-like APIs.
 pub struct UdpSocket {
@@ -141,6 +141,9 @@ impl UdpSocket {
     pub fn send_to(&self, buf: &[u8], remote_addr: SocketAddr) -> AxResult<usize> {
         if remote_addr.port() == 0 || remote_addr.ip().is_unspecified() {
             return ax_err!(InvalidInput, "socket send_to() failed: invalid address");
+        }
+        if self.local_addr.read().is_none() {
+            self.bind(SocketAddr::from(UNSPECIFIED_ENDPOINT))?;
         }
         let remote_endpoint = IpEndpoint::from(remote_addr);
         if is_loopback_endpoint(remote_endpoint) {
