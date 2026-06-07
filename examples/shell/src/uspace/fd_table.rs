@@ -114,7 +114,7 @@ const FALLOC_FL_ZERO_RANGE: usize = 0x10;
 const FALLOC_FL_INSERT_RANGE: usize = 0x20;
 const POSIX_FADV_MIN: i32 = 0;
 const POSIX_FADV_MAX: i32 = 5;
-const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda", "sda", "xvda"];
+const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda"];
 
 fn current_fd_table_limit() -> usize {
     let Some(task) = current_task_ext() else {
