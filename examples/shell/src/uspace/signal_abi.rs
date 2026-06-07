@@ -480,12 +480,6 @@ fn user_return_hook(tf: &mut TrapFrame) {
     if let Some(code) = ext.process.pending_exit_group() {
         terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
     }
-    if pending_signal_mask(ext) & signal_mask_bit(SIGCANCEL_NUM) != 0
-        && !signal_is_blocked(ext, SIGCANCEL_NUM)
-    {
-        clear_pending_signal(ext, SIGCANCEL_NUM);
-        terminate_current_thread(ext.process.as_ref(), 0);
-    }
     if ext.signal_frame.load(Ordering::Acquire) == 0 {
         if let Some(restored) = ext.pending_sigreturn.lock().take() {
             *tf = restored;

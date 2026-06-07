@@ -1,3 +1,4 @@
+use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use axalloc::frame_allocator_stats;
@@ -28,7 +29,7 @@ use super::linux_abi::{
     USER_ASPACE_SIZE,
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
-use super::program_loader::load_program_image;
+use super::program_loader::{load_program_image, LoadedMapping};
 use super::resource_sched::default_sched_state;
 use super::runtime_paths::{
     busybox_applet_target_path, current_cwd, is_busybox_applet_name, normalize_path,
@@ -47,8 +48,8 @@ use super::task_registry::{
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
-    read_cstr, read_execve_argv, read_execve_envp, write_user_bytes, write_user_value,
-    MAX_USER_IO_CHUNK,
+    read_cstr, read_execve_argv, read_execve_envp, read_user_value, write_user_bytes,
+    write_user_value, MAX_USER_IO_CHUNK,
 };
 use super::{ChildTask, ProcessFdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
 
@@ -427,6 +428,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         teardown: ProcessTeardown::new(),
     });
     track_running_executable(exec_path.as_str());
+    record_loaded_image_mappings(process.as_ref(), &image.mappings);
 
     Ok(LoadedProgram {
         process,
@@ -461,6 +463,7 @@ fn exec_program(
     process.shared_mmap_ranges.lock().clear();
     process.mmap_sigbus_ranges.lock().clear();
     process.mmap_ranges.lock().clear();
+    record_loaded_image_mappings(process, &image.mappings);
     process.mlock_future.store(false, Ordering::Release);
     process.mlockall_accounted_kb.store(0, Ordering::Release);
     process.clear_posix_timers();
@@ -474,6 +477,22 @@ fn exec_program(
     process.vfork_exec_done.store(true, Ordering::Release);
     process.exit_wait.notify_all(false);
     Ok((image.entry, image.stack_ptr, image.argc))
+}
+
+fn record_loaded_image_mappings(process: &UserProcess, mappings: &[LoadedMapping]) {
+    for mapping in mappings {
+        process.record_mmap_region(
+            mapping.start,
+            mapping.size,
+            mapping.prot,
+            false,
+            false,
+            false,
+            false,
+            mapping.prot & general::PROT_WRITE != 0,
+            None,
+        );
+    }
 }
 
 fn existing_busybox_for_exec_root(exec_root: &str) -> Option<String> {
@@ -2312,6 +2331,7 @@ pub(super) fn terminate_current_thread_for_exit_group(process: &UserProcess, cod
 }
 
 fn terminate_current_thread_inner(process: &UserProcess, code: i32, teardown_now: bool) -> ! {
+    release_current_robust_futexes();
     clear_current_tid_and_wake();
     perform_deferred_self_unmap();
     unregister_user_task(current_tid());
@@ -2320,6 +2340,61 @@ fn terminate_current_thread_inner(process: &UserProcess, code: i32, teardown_now
     }
     process.note_thread_exit(code);
     axtask::exit(code)
+}
+
+fn release_current_robust_futexes() {
+    const ROBUST_LIST_NEXT_OFFSET: usize = 0;
+    const ROBUST_LIST_FUTEX_OFFSET_OFFSET: usize = size_of::<usize>();
+    const ROBUST_LIST_PENDING_OFFSET: usize = size_of::<usize>() * 2;
+    const MAX_ROBUST_LIST_NODES: usize = 2048;
+
+    let Some(ext) = current_task_ext() else {
+        return;
+    };
+    let head = ext.robust_list_head.load(Ordering::Acquire);
+    if head == 0 {
+        return;
+    }
+    let process = ext.process.as_ref();
+    let tid = current_tid() as u32;
+    let head_list = head + ROBUST_LIST_NEXT_OFFSET;
+    let futex_offset =
+        match read_user_value::<isize>(process, head + ROBUST_LIST_FUTEX_OFFSET_OFFSET) {
+            Ok(offset) => offset,
+            Err(_) => return,
+        };
+    let pending = read_user_value::<usize>(process, head + ROBUST_LIST_PENDING_OFFSET).unwrap_or(0);
+
+    let mut node = match read_user_value::<usize>(process, head_list) {
+        Ok(next) => next,
+        Err(_) => return,
+    };
+    let mut visited = 0usize;
+    while node != 0 && node != head_list && visited < MAX_ROBUST_LIST_NODES {
+        let next = read_user_value::<usize>(process, node).unwrap_or(0);
+        release_robust_futex_node(process, node, futex_offset, tid);
+        node = next;
+        visited += 1;
+    }
+    if pending != 0 {
+        release_robust_futex_node(process, pending, futex_offset, tid);
+    }
+}
+
+fn release_robust_futex_node(process: &UserProcess, node: usize, futex_offset: isize, tid: u32) {
+    let Some(futex_addr) = node.checked_add_signed(futex_offset) else {
+        return;
+    };
+    let Ok(owner) = read_user_value::<u32>(process, futex_addr) else {
+        return;
+    };
+    if owner & general::FUTEX_TID_MASK != tid {
+        return;
+    }
+    let next = (owner & general::FUTEX_WAITERS) | general::FUTEX_OWNER_DIED;
+    if write_user_value(process, futex_addr, &next) == 0 && owner & general::FUTEX_WAITERS != 0 {
+        let _ = futex::wake_addr(process, futex_addr, usize::MAX);
+    }
 }
 
 fn clear_current_tid_and_wake() {

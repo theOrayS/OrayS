@@ -68,19 +68,53 @@ fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let heap_end = align_up(brk.end.max(brk.start + PAGE_SIZE_4K), PAGE_SIZE_4K);
     let stack_top = align_down(USER_STACK_TOP, PAGE_SIZE_4K);
     let stack_base = stack_top - USER_STACK_SIZE;
-    let mut content = format!(
-        "{text_start:08x}-{text_end:08x} r-xp 00000000 00:00 0 {exec_path}\n\
-         {heap_start:08x}-{heap_end:08x} rw-p 00000000 00:00 0 [heap]\n\
-         {stack_base:08x}-{stack_top:08x} rw-p 00000000 00:00 0 [stack]\n"
-    );
-    for region in process.mmap_regions() {
-        content.push_str(&format!(
-            "{:08x}-{:08x} {} 00000000 00:00 0\n",
-            region.start,
-            region.end(),
-            proc_maps_perms(region.prot, region.shared)
+    let regions = process.mmap_regions();
+    let has_loaded_image_maps = regions
+        .iter()
+        .any(|region| region.start < heap_start && region.prot & general::PROT_EXEC != 0);
+    let mut lines = Vec::<(usize, String)>::new();
+    if !has_loaded_image_maps {
+        lines.push((
+            text_start,
+            format!("{text_start:08x}-{text_end:08x} r-xp 00000000 00:00 0 {exec_path}\n"),
         ));
     }
+    lines.push((
+        heap_start,
+        format!("{heap_start:08x}-{heap_end:08x} rw-p 00000000 00:00 0 [heap]\n"),
+    ));
+    lines.push((
+        stack_base,
+        format!("{stack_base:08x}-{stack_top:08x} rw-p 00000000 00:00 0 [stack]\n"),
+    ));
+    for region in regions {
+        let path = if region.start < heap_start {
+            exec_path.as_str()
+        } else {
+            ""
+        };
+        let suffix = if path.is_empty() {
+            "\n".to_string()
+        } else {
+            format!(" {path}\n")
+        };
+        lines.push((
+            region.start,
+            format!(
+                "{:08x}-{:08x} {} 00000000 00:00 0{}",
+                region.start,
+                region.end(),
+                proc_maps_perms(region.prot, region.shared),
+                suffix
+            ),
+        ));
+    }
+    lines.sort_by_key(|(start, _)| *start);
+    let content = lines
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .concat();
     content.into_bytes()
 }
 

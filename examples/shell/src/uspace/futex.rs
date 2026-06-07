@@ -78,6 +78,32 @@ fn wake_addr_checked(
     Ok(woken)
 }
 
+fn wake_requeue_addr_checked(
+    process: &UserProcess,
+    uaddr: usize,
+    wake_count: usize,
+    requeue_count: usize,
+    uaddr2: usize,
+    cmp: Option<u32>,
+) -> Result<usize, LinuxError> {
+    if uaddr2 == 0 || uaddr2 % size_of::<u32>() != 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    if let Some(expected) = cmp {
+        let current = read_user_value::<u32>(process, uaddr)?;
+        if current != expected {
+            return Err(LinuxError::EAGAIN);
+        }
+    }
+    // Validate the destination futex even though this implementation wakes the
+    // source waiters directly. For non-PI condition-variable requeue users this
+    // is a correctness-preserving fallback: awakened waiters return to libc and
+    // contend on the mutex futex in userspace instead of being moved by the
+    // kernel as an optimization.
+    let _ = futex_key(process, uaddr2)?;
+    wake_addr_checked(process, uaddr, wake_count.saturating_add(requeue_count))
+}
+
 fn read_futex_timeout(
     process: &UserProcess,
     timeout: usize,
@@ -245,6 +271,23 @@ pub(super) fn sys_futex(
             )
         }
         general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val) {
+            Ok(woken) => woken as isize,
+            Err(err) => neg_errno(err),
+        },
+        general::FUTEX_REQUEUE => {
+            match wake_requeue_addr_checked(process, uaddr, val, timeout, _uaddr2, None) {
+                Ok(woken) => woken as isize,
+                Err(err) => neg_errno(err),
+            }
+        }
+        general::FUTEX_CMP_REQUEUE => match wake_requeue_addr_checked(
+            process,
+            uaddr,
+            val,
+            timeout,
+            _uaddr2,
+            Some(_val3 as u32),
+        ) {
             Ok(woken) => woken as isize,
             Err(err) => neg_errno(err),
         },

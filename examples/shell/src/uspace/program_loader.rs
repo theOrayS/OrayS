@@ -5,7 +5,6 @@ use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use linux_raw_sys::auxvec;
-#[cfg(target_arch = "loongarch64")]
 use linux_raw_sys::general;
 use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::string::{String, ToString};
@@ -33,8 +32,16 @@ pub(super) struct LoadedImage {
     pub(super) stack_ptr: usize,
     pub(super) argc: usize,
     pub(super) brk: BrkState,
+    pub(super) mappings: Vec<LoadedMapping>,
     pub(super) exec_root: String,
     pub(super) exec_path: String,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct LoadedMapping {
+    pub(super) start: usize,
+    pub(super) size: usize,
+    pub(super) prot: u32,
 }
 
 struct PreparedProgram {
@@ -88,7 +95,7 @@ pub(super) fn load_program_image(
 
     aspace.clear();
 
-    map_elf_image(aspace, &prepared.image, &elf, &main)?;
+    let mut mappings = map_elf_image(aspace, &prepared.image, &elf, &main)?;
     let mut max_mapped_end = main.max_segment_end;
     let mut runtime_entry = main.entry;
     let mut interp_base = 0usize;
@@ -114,7 +121,7 @@ pub(super) fn load_program_image(
                 PAGE_SIZE_4K,
             ),
         )?;
-        map_elf_image(aspace, &interp_image, &interp_elf, &interp)?;
+        mappings.extend(map_elf_image(aspace, &interp_image, &interp_elf, &interp)?);
         max_mapped_end = cmp::max(max_mapped_end, interp.max_segment_end);
         runtime_entry = interp.entry;
         interp_base = interp.base;
@@ -184,6 +191,7 @@ pub(super) fn load_program_image(
                 PAGE_SIZE_4K,
             ),
         },
+        mappings,
         exec_root,
         exec_path: prepared.path,
     })
@@ -1368,13 +1376,17 @@ fn map_elf_image(
     image: &[u8],
     elf: &ElfFile<'_>,
     info: &ElfLoadInfo,
-) -> Result<(), String> {
+) -> Result<Vec<LoadedMapping>, String> {
+    let mut mappings = Vec::new();
     for ph in elf.program_iter() {
         if ph.get_type().map_err(str_err)? == PhType::Load {
-            map_load_segment(aspace, image, &ph, info.load_bias)?;
+            if let Some(mapping) = map_load_segment(aspace, image, &ph, info.load_bias)? {
+                mappings.push(mapping);
+            }
         }
     }
-    Ok(())
+    mappings.sort_by_key(|mapping| mapping.start);
+    Ok(mappings)
 }
 
 fn map_load_segment(
@@ -1382,11 +1394,11 @@ fn map_load_segment(
     image: &[u8],
     ph: &ProgramHeader<'_>,
     load_bias: usize,
-) -> Result<(), String> {
+) -> Result<Option<LoadedMapping>, String> {
     let start = load_bias + ph.virtual_addr() as usize;
     let mem_size = ph.mem_size() as usize;
     if mem_size == 0 {
-        return Ok(());
+        return Ok(None);
     }
     let seg_start = align_down(start, PAGE_SIZE_4K);
     let seg_end = align_up(start + mem_size, PAGE_SIZE_4K);
@@ -1414,7 +1426,11 @@ fn map_load_segment(
             .write(VirtAddr::from(start), data)
             .map_err(|err| format!("failed to write ELF segment at {start:#x}: {err}"))?;
     }
-    Ok(())
+    Ok(Some(LoadedMapping {
+        start: seg_start,
+        size: seg_size,
+        prot: prot_from_ph(ph.flags()),
+    }))
 }
 
 fn phdr_addr(elf: &ElfFile<'_>, load_bias: usize) -> Option<usize> {
@@ -1619,6 +1635,20 @@ fn flags_from_ph(flags: PhFlags) -> MappingFlags {
     }
     if flags.is_execute() {
         out |= MappingFlags::EXECUTE;
+    }
+    out
+}
+
+fn prot_from_ph(flags: PhFlags) -> u32 {
+    let mut out = 0u32;
+    if flags.is_read() || flags.is_execute() {
+        out |= general::PROT_READ;
+    }
+    if flags.is_write() {
+        out |= general::PROT_WRITE;
+    }
+    if flags.is_execute() {
+        out |= general::PROT_EXEC;
     }
     out
 }
