@@ -7,9 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 // LOCK used by `puts()`
 #ifdef AX_CONFIG_MULTITASK
@@ -76,7 +76,8 @@ static int out(FILE *f, const char *s, size_t l)
 int getchar(void)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 int fflush(FILE *f)
@@ -169,7 +170,8 @@ int vfprintf(FILE *restrict f, const char *restrict fmt, va_list ap)
 int sscanf(const char *restrict __s, const char *restrict __format, ...)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 #ifdef AX_CONFIG_FS
@@ -289,28 +291,32 @@ int fileno(FILE *f)
 int feof(FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int fseek(FILE *__stream, long __off, int __whence)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 off_t ftello(FILE *__stream)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 char *tmpnam(char *buf)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NULL;
 }
 
 // TODO
@@ -323,67 +329,77 @@ void clearerr(FILE *f)
 int ferror(FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 FILE *freopen(const char *restrict filename, const char *restrict mode, FILE *restrict f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NULL;
 }
 
 // TODO
 int fscanf(FILE *restrict f, const char *restrict fmt, ...)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 // TODO
 long ftell(FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 int getc(FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 // TODO
 int remove(const char *path)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 int setvbuf(FILE *restrict f, char *restrict buf, int type, size_t size)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 // TODO
 FILE *tmpfile(void)
 {
     unimplemented();
+    errno = ENOSYS;
     return NULL;
 }
 
 int ungetc(int c, FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 ssize_t getdelim(char **restrict s, size_t *restrict n, int delim, FILE *restrict f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 ssize_t getline(char **restrict s, size_t *restrict n, FILE *restrict f)
@@ -394,18 +410,21 @@ ssize_t getline(char **restrict s, size_t *restrict n, FILE *restrict f)
 int __uflow(FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 int getc_unlocked(FILE *f)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return EOF;
 }
 
 FILE *fdopen(int fd, const char *mode)
 {
     unimplemented();
+    errno = ENOSYS;
     return NULL;
 }
 

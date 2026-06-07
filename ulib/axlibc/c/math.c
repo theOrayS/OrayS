@@ -1,6 +1,8 @@
 #ifdef AX_CONFIG_FP_SIMD
 
+#include <errno.h>
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -117,7 +119,8 @@ double floor(double x)
 double rint(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 long long llrint(double x)
@@ -128,31 +131,36 @@ long long llrint(double x)
 double sqrt(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double round(double x)
 {
     unimplemented();
-    return x;
+    errno = ENOSYS;
+    return NAN;
 }
 
 long double roundl(long double x)
 {
     unimplemented();
-    return x;
+    errno = ENOSYS;
+    return NAN;
 }
 
 long long llroundl(long double x)
 {
     unimplemented();
-    return x;
+    errno = ENOSYS;
+    return LLONG_MIN;
 }
 
 double cos(double __x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double ceil(double x)
@@ -183,100 +191,119 @@ double ceil(double x)
 double sin(double __x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double asin(double __x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 long double ceill(long double x)
 {
     unimplemented();
-    return x;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double acos(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double atan(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double atan2(double y, double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double cosh(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double exp(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double frexp(double x, int *e)
 {
     unimplemented();
-    return 0;
+    if (e)
+        *e = 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double ldexp(double x, int n)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double log10(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double modf(double x, double *iptr)
 {
     unimplemented();
-    return 0;
+    if (iptr)
+        *iptr = NAN;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double sinh(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double tan(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 // TODO
 double tanh(double x)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return NAN;
 }
 
 double copysign(double x, double y)

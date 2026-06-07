@@ -37,7 +37,8 @@ int sigaction(int sig, const struct sigaction *restrict act, struct sigaction *r
 int kill(pid_t __pid, int __sig)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 int sigemptyset(sigset_t *set)
@@ -56,7 +57,8 @@ int sigemptyset(sigset_t *set)
 int raise(int __sig)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 int sigaddset(sigset_t *set, int sig)
@@ -74,7 +76,7 @@ int sigaddset(sigset_t *set, int sig)
 int pthread_sigmask(int __how, const sigset_t *restrict __newmask, sigset_t *restrict __oldmask)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 
 #ifdef AX_CONFIG_MULTITASK
@@ -82,6 +84,6 @@ int pthread_sigmask(int __how, const sigset_t *restrict __newmask, sigset_t *res
 int pthread_kill(pthread_t t, int sig)
 {
     unimplemented();
-    return 0;
+    return ENOSYS;
 }
 #endif

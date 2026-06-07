@@ -1,5 +1,7 @@
 use core::ffi::{c_int, c_long};
 
+use axerrno::LinuxError;
+
 use crate::ctypes;
 
 const PAGE_SIZE_4K: usize = 4096;
@@ -37,7 +39,7 @@ pub fn sys_sysconf(name: c_int) -> c_long {
             // Maximum number of files per process
             #[cfg(feature = "fd")]
             ctypes::_SC_OPEN_MAX => Ok(super::fd_ops::AX_FILE_LIMIT),
-            _ => Ok(0),
+            _ => Err(LinuxError::EINVAL),
         }
     })
 }

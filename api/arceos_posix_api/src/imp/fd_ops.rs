@@ -3,7 +3,7 @@ use core::ffi::c_int;
 
 use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
-use axns::{ResArc, def_resource};
+use axns::{def_resource, ResArc};
 use flatten_objects::FlattenObjects;
 use spin::RwLock;
 
@@ -133,7 +133,7 @@ pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
             }
             _ => {
                 warn!("unsupported fcntl parameters: cmd {}", cmd);
-                Ok(0)
+                Err(LinuxError::EINVAL)
             }
         }
     })

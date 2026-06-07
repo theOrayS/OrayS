@@ -6,5 +6,6 @@
 int getrusage(int __who, struct rusage *__usage)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }

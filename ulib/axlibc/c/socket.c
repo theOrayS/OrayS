@@ -27,21 +27,23 @@ int accept4(int fd, struct sockaddr *restrict addr, socklen_t *restrict len, int
 int getsockopt(int fd, int level, int optname, void *restrict optval, socklen_t *restrict optlen)
 {
     unimplemented();
+    errno = ENOPROTOOPT;
     return -1;
 }
 
 int setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)
 {
-    unimplemented("fd: %d, level: %d, optname: %d, optval: %d, optlen: %d", fd, level, optname,
-                  *(int *)optval, optlen);
-    return 0;
+    unimplemented("fd: %d, level: %d, optname: %d, optlen: %d", fd, level, optname, optlen);
+    errno = ENOPROTOOPT;
+    return -1;
 }
 
 // TODO
 ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 {
     unimplemented();
-    return 0;
+    errno = ENOSYS;
+    return -1;
 }
 
 #endif // AX_CONFIG_NET

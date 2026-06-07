@@ -6,7 +6,7 @@ use axfs::fops::OpenOptions;
 use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
-use super::fd_ops::{FileLike, get_file_like};
+use super::fd_ops::{get_file_like, FileLike};
 use crate::{ctypes, utils::char_ptr_to_str};
 
 pub struct File {
@@ -32,6 +32,40 @@ impl File {
     }
 }
 
+fn file_attr_to_stat(metadata: axfs::fops::FileAttr) -> ctypes::stat {
+    let ty = metadata.file_type() as u8;
+    let perm = metadata.perm().bits() as u32;
+    let st_mode = ((ty as u32) << 12) | perm;
+    ctypes::stat {
+        st_ino: 1,
+        st_nlink: 1,
+        st_mode,
+        st_uid: 1000,
+        st_gid: 1000,
+        st_size: metadata.size() as _,
+        st_blocks: metadata.blocks() as _,
+        st_blksize: 512,
+        ..Default::default()
+    }
+}
+
+fn api_metadata_to_stat(metadata: axfs::api::Metadata) -> ctypes::stat {
+    let ty = metadata.file_type() as u8;
+    let perm = metadata.permissions().bits() as u32;
+    let st_mode = ((ty as u32) << 12) | perm;
+    ctypes::stat {
+        st_ino: 1,
+        st_nlink: 1,
+        st_mode,
+        st_uid: 1000,
+        st_gid: 1000,
+        st_size: metadata.size() as _,
+        st_blocks: metadata.blocks() as _,
+        st_blksize: 512,
+        ..Default::default()
+    }
+}
+
 impl FileLike for File {
     fn read(&self, buf: &mut [u8]) -> LinuxResult<usize> {
         Ok(self.inner.lock().read(buf)?)
@@ -43,20 +77,7 @@ impl FileLike for File {
 
     fn stat(&self) -> LinuxResult<ctypes::stat> {
         let metadata = self.inner.lock().get_attr()?;
-        let ty = metadata.file_type() as u8;
-        let perm = metadata.perm().bits() as u32;
-        let st_mode = ((ty as u32) << 12) | perm;
-        Ok(ctypes::stat {
-            st_ino: 1,
-            st_nlink: 1,
-            st_mode,
-            st_uid: 1000,
-            st_gid: 1000,
-            st_size: metadata.size() as _,
-            st_blocks: metadata.blocks() as _,
-            st_blksize: 512,
-            ..Default::default()
-        })
+        Ok(file_attr_to_stat(metadata))
     }
 
     fn into_any(self: Arc<Self>) -> Arc<dyn core::any::Any + Send + Sync> {
@@ -200,7 +221,7 @@ pub unsafe fn sys_lstat(path: *const c_char, buf: *mut ctypes::stat) -> ctypes::
         if buf.is_null() {
             return Err(LinuxError::EFAULT);
         }
-        let st = ctypes::stat::default(); // TODO
+        let st = api_metadata_to_stat(axfs::api::metadata(path?)?);
         unsafe { write_stat_output(buf, st) };
         Ok(0)
     })

@@ -32,18 +32,19 @@ pub unsafe fn sys_getrlimit(resource: c_int, rlimits: *mut ctypes::rlimit) -> c_
     debug!("sys_getrlimit <= {} {:#x}", resource, rlimits as usize);
     syscall_body!(sys_getrlimit, {
         match resource as u32 {
-            ctypes::RLIMIT_DATA => {}
             ctypes::RLIMIT_STACK => {}
             ctypes::RLIMIT_NOFILE => {}
-            _ => return Err(LinuxError::EINVAL),
+            _ => return Err::<c_int, LinuxError>(LinuxError::EINVAL),
         }
         if rlimits.is_null() {
-            return Ok(0);
+            return Err(LinuxError::EFAULT);
         }
         if let Some(limit) = current_rlimit(resource as u32) {
             unsafe { write_rlimit_output(rlimits, limit) };
+            Ok(0)
+        } else {
+            Err(LinuxError::ENOSYS)
         }
-        Ok(0)
     })
 }
 
@@ -58,12 +59,14 @@ pub unsafe fn sys_setrlimit(resource: c_int, rlimits: *mut crate::ctypes::rlimit
     debug!("sys_setrlimit <= {} {:#x}", resource, rlimits as usize);
     syscall_body!(sys_setrlimit, {
         match resource as u32 {
-            crate::ctypes::RLIMIT_DATA => {}
             crate::ctypes::RLIMIT_STACK => {}
             crate::ctypes::RLIMIT_NOFILE => {}
-            _ => return Err(LinuxError::EINVAL),
+            _ => return Err::<c_int, LinuxError>(LinuxError::EINVAL),
         }
-        // Currently do not support set resources
-        Ok(0)
+        if rlimits.is_null() {
+            return Err(LinuxError::EFAULT);
+        }
+        // Currently do not support changing resource limits.
+        Err::<c_int, LinuxError>(LinuxError::ENOSYS)
     })
 }
