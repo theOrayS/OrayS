@@ -19,21 +19,37 @@ pub trait FileLike: Send + Sync {
     fn stat(&self) -> LinuxResult<ctypes::stat>;
     fn into_any(self: Arc<Self>) -> Arc<dyn core::any::Any + Send + Sync>;
     fn poll(&self) -> LinuxResult<PollState>;
-    fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(0)
-    }
+    fn status_flags(&self) -> LinuxResult<c_int>;
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult;
 }
 
+pub(crate) struct FdEntry {
+    file: Arc<dyn FileLike>,
+    fd_flags: c_int,
+}
+
+impl FdEntry {
+    fn new(file: Arc<dyn FileLike>) -> Self {
+        Self { file, fd_flags: 0 }
+    }
+
+    fn with_flags(file: Arc<dyn FileLike>, fd_flags: c_int) -> Self {
+        Self {
+            file,
+            fd_flags: fd_flags & ctypes::FD_CLOEXEC as c_int,
+        }
+    }
+}
+
 def_resource! {
-    pub(crate) static FD_TABLE: ResArc<RwLock<FlattenObjects<Arc<dyn FileLike>, AX_FILE_LIMIT>>> = ResArc::new();
+    pub(crate) static FD_TABLE: ResArc<RwLock<FlattenObjects<FdEntry, AX_FILE_LIMIT>>> = ResArc::new();
 }
 
 pub fn get_file_like(fd: c_int) -> LinuxResult<Arc<dyn FileLike>> {
     FD_TABLE
         .read()
         .get(fd as usize)
-        .cloned()
+        .map(|entry| entry.file.clone())
         .ok_or(LinuxError::EBADF)
 }
 
@@ -45,15 +61,18 @@ pub fn poll_file_like(fd: c_int) -> LinuxResult<PollState> {
 }
 
 pub fn add_file_like(f: Arc<dyn FileLike>) -> LinuxResult<c_int> {
-    Ok(FD_TABLE.write().add(f).map_err(|_| LinuxError::EMFILE)? as c_int)
+    Ok(FD_TABLE
+        .write()
+        .add(FdEntry::new(f))
+        .map_err(|_| LinuxError::EMFILE)? as c_int)
 }
 
 pub fn close_file_like(fd: c_int) -> LinuxResult {
-    let f = FD_TABLE
+    let entry = FD_TABLE
         .write()
         .remove(fd as usize)
         .ok_or(LinuxError::EBADF)?;
-    drop(f);
+    drop(entry);
     Ok(())
 }
 
@@ -66,10 +85,41 @@ pub fn sys_close(fd: c_int) -> c_int {
     syscall_body!(sys_close, close_file_like(fd).map(|_| 0))
 }
 
-fn dup_fd(old_fd: c_int) -> LinuxResult<c_int> {
+fn dup_fd_from(old_fd: c_int, min_fd: c_int, fd_flags: c_int) -> LinuxResult<c_int> {
+    if min_fd < 0 || min_fd as usize >= AX_FILE_LIMIT {
+        return Err(LinuxError::EINVAL);
+    }
+
     let f = get_file_like(old_fd)?;
-    let new_fd = add_file_like(f)?;
-    Ok(new_fd)
+    let mut fd_table = FD_TABLE.write();
+    for new_fd in min_fd as usize..AX_FILE_LIMIT {
+        if !fd_table.is_assigned(new_fd) {
+            fd_table
+                .add_at(new_fd, FdEntry::with_flags(f, fd_flags))
+                .map_err(|_| LinuxError::EMFILE)?;
+            return Ok(new_fd as c_int);
+        }
+    }
+    Err(LinuxError::EMFILE)
+}
+
+fn dup_fd(old_fd: c_int) -> LinuxResult<c_int> {
+    dup_fd_from(old_fd, 0, 0)
+}
+
+fn fd_flags(fd: c_int) -> LinuxResult<c_int> {
+    FD_TABLE
+        .read()
+        .get(fd as usize)
+        .map(|entry| entry.fd_flags)
+        .ok_or(LinuxError::EBADF)
+}
+
+fn set_fd_flags(fd: c_int, flags: c_int) -> LinuxResult<c_int> {
+    let mut fd_table = FD_TABLE.write();
+    let entry = fd_table.get_mut(fd as usize).ok_or(LinuxError::EBADF)?;
+    entry.fd_flags = flags & ctypes::FD_CLOEXEC as c_int;
+    Ok(0)
 }
 
 /// Duplicate a file descriptor.
@@ -97,12 +147,13 @@ pub fn sys_dup2(old_fd: c_int, new_fd: c_int) -> c_int {
         }
 
         let f = get_file_like(old_fd)?;
-        FD_TABLE
+        match FD_TABLE
             .write()
-            .add_at(new_fd as usize, f)
-            .map_err(|_| LinuxError::EMFILE)?;
-
-        Ok(new_fd)
+            .add_or_replace_at(new_fd as usize, FdEntry::new(f))
+        {
+            Ok(_) | Err(Some(_)) => Ok(new_fd),
+            Err(None) => Err(LinuxError::EBADF),
+        }
     })
 }
 
@@ -113,21 +164,12 @@ pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
     debug!("sys_fcntl <= fd: {} cmd: {} arg: {}", fd, cmd, arg);
     syscall_body!(sys_fcntl, {
         match cmd as u32 {
-            ctypes::F_DUPFD => dup_fd(fd),
-            ctypes::F_DUPFD_CLOEXEC => {
-                // TODO: Change fd flags
-                dup_fd(fd)
-            }
-            ctypes::F_GETFL => {
-                if fd == 0 || fd == 1 || fd == 2 {
-                    return Ok(0);
-                }
-                get_file_like(fd)?.status_flags()
-            }
+            ctypes::F_DUPFD => dup_fd_from(fd, arg as c_int, 0),
+            ctypes::F_DUPFD_CLOEXEC => dup_fd_from(fd, arg as c_int, ctypes::FD_CLOEXEC as c_int),
+            ctypes::F_GETFD => fd_flags(fd),
+            ctypes::F_SETFD => set_fd_flags(fd, arg as c_int),
+            ctypes::F_GETFL => get_file_like(fd)?.status_flags(),
             ctypes::F_SETFL => {
-                if fd == 0 || fd == 1 || fd == 2 {
-                    return Ok(0);
-                }
                 get_file_like(fd)?.set_nonblocking(arg & (ctypes::O_NONBLOCK as usize) > 0)?;
                 Ok(0)
             }
@@ -143,13 +185,13 @@ pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
 fn init_stdio() {
     let mut fd_table = flatten_objects::FlattenObjects::new();
     fd_table
-        .add_at(0, Arc::new(stdin()) as _)
+        .add_at(0, FdEntry::new(Arc::new(stdin()) as _))
         .unwrap_or_else(|_| panic!()); // stdin
     fd_table
-        .add_at(1, Arc::new(stdout()) as _)
+        .add_at(1, FdEntry::new(Arc::new(stdout()) as _))
         .unwrap_or_else(|_| panic!()); // stdout
     fd_table
-        .add_at(2, Arc::new(stdout()) as _)
+        .add_at(2, FdEntry::new(Arc::new(stdout()) as _))
         .unwrap_or_else(|_| panic!()); // stderr
     FD_TABLE.init_new(spin::RwLock::new(fd_table));
 }
