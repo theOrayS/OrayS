@@ -37,12 +37,22 @@ def scan_time(root: Path) -> list[str]:
     if not setitimer_block:
         findings.append("examples/shell/src/uspace/time_abi.rs: missing sys_setitimer")
     else:
-        required = ["which != general::ITIMER_REAL", "first_us != 0 || interval_us != 0", "LinuxError::EOPNOTSUPP"]
+        required = [
+            "itimer_clock_micros(process, which)",
+            "deadline_cell.store(now_us.saturating_add(first_us)",
+            "process.real_timer_generation",
+        ]
         for token in required:
             if token not in setitimer_block:
-                findings.append(f"setitimer must reject armed ITIMER_VIRTUAL/PROF with unsupported errno; missing {token}")
+                findings.append(f"setitimer must arm timers against their real backing clock; missing {token}")
+        if "which != general::ITIMER_REAL" in setitimer_block and "LinuxError::EOPNOTSUPP" in setitimer_block:
+            findings.append("setitimer must not preserve LTP capability by rejecting armed ITIMER_VIRTUAL/PROF")
         if "virtual/prof" in setitimer_block and "report real state" in setitimer_block:
             findings.append("setitimer still documents fake tracked virtual/prof timer state")
+    if "fn itimer_clock_micros" not in text or "general::ITIMER_VIRTUAL" not in text or "general::ITIMER_PROF" not in text:
+        findings.append("time_abi must expose real backing clocks for ITIMER_VIRTUAL and ITIMER_PROF")
+    if "consume_expired_cpu_timers" not in text:
+        findings.append("time_abi must check CPU-backed interval timers on user return")
     return findings
 
 

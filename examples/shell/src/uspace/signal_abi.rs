@@ -486,6 +486,7 @@ fn user_return_hook(tf: &mut TrapFrame) {
         }
     }
     let _ = ext.process.consume_expired_real_timer();
+    let _ = ext.process.consume_expired_cpu_timers();
     #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
     if ext.signal_frame.load(Ordering::Acquire) == 0 {
         let sig = first_unblocked_pending_signal(ext);
