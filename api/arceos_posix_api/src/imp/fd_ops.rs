@@ -21,6 +21,14 @@ pub trait FileLike: Send + Sync {
     fn poll(&self) -> LinuxResult<PollState>;
     fn status_flags(&self) -> LinuxResult<c_int>;
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult;
+
+    fn set_status_flags(&self, flags: c_int) -> LinuxResult {
+        let allowed = (ctypes::O_ACCMODE | ctypes::O_NONBLOCK) as c_int;
+        if flags & !allowed != 0 {
+            return Err(LinuxError::EOPNOTSUPP);
+        }
+        self.set_nonblocking(flags & ctypes::O_NONBLOCK as c_int != 0)
+    }
 }
 
 pub(crate) struct FdEntry {
@@ -168,10 +176,7 @@ pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
             ctypes::F_GETFD => fd_flags(fd),
             ctypes::F_SETFD => set_fd_flags(fd, arg as c_int),
             ctypes::F_GETFL => get_file_like(fd)?.status_flags(),
-            ctypes::F_SETFL => {
-                get_file_like(fd)?.set_nonblocking(arg & (ctypes::O_NONBLOCK as usize) > 0)?;
-                Ok(0)
-            }
+            ctypes::F_SETFL => get_file_like(fd)?.set_status_flags(arg as c_int).map(|_| 0),
             _ => {
                 warn!("unsupported fcntl parameters: cmd {}", cmd);
                 Err(LinuxError::EINVAL)

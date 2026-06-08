@@ -1,5 +1,8 @@
 use alloc::sync::Arc;
-use core::ffi::c_int;
+use core::{
+    ffi::c_int,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
@@ -16,6 +19,8 @@ enum RingBufferStatus {
 }
 
 const RING_BUFFER_SIZE: usize = 256;
+const PIPE_STAT_DEV: ctypes::dev_t = 0x7069_7065;
+const PIPE_STAT_BLKSIZE: ctypes::blksize_t = 4096;
 
 pub struct PipeRingBuffer {
     arr: [u8; RING_BUFFER_SIZE],
@@ -74,21 +79,36 @@ impl PipeRingBuffer {
     }
 }
 
+struct PipePeerCounts {
+    readers: AtomicUsize,
+    writers: AtomicUsize,
+}
+
 pub struct Pipe {
     readable: bool,
     buffer: Arc<Mutex<PipeRingBuffer>>,
+    peer_counts: Arc<PipePeerCounts>,
+    nonblocking: AtomicBool,
 }
 
 impl Pipe {
     pub fn new() -> (Pipe, Pipe) {
         let buffer = Arc::new(Mutex::new(PipeRingBuffer::new()));
+        let peer_counts = Arc::new(PipePeerCounts {
+            readers: AtomicUsize::new(1),
+            writers: AtomicUsize::new(1),
+        });
         let read_end = Pipe {
             readable: true,
             buffer: buffer.clone(),
+            peer_counts: peer_counts.clone(),
+            nonblocking: AtomicBool::new(false),
         };
         let write_end = Pipe {
             readable: false,
             buffer,
+            peer_counts,
+            nonblocking: AtomicBool::new(false),
         };
         (read_end, write_end)
     }
@@ -102,7 +122,25 @@ impl Pipe {
     }
 
     pub fn write_end_close(&self) -> bool {
-        Arc::strong_count(&self.buffer) == 1
+        self.peer_counts.writers.load(Ordering::Acquire) == 0
+    }
+
+    pub fn read_end_close(&self) -> bool {
+        self.peer_counts.readers.load(Ordering::Acquire) == 0
+    }
+
+    fn notify_read_end_closed(&self) {
+        let _ = crate::signal::raise_sigpipe();
+    }
+}
+
+impl Drop for Pipe {
+    fn drop(&mut self) {
+        if self.readable {
+            self.peer_counts.readers.fetch_sub(1, Ordering::AcqRel);
+        } else {
+            self.peer_counts.writers.fetch_sub(1, Ordering::AcqRel);
+        }
     }
 }
 
@@ -110,6 +148,9 @@ impl FileLike for Pipe {
     fn read(&self, buf: &mut [u8]) -> LinuxResult<usize> {
         if !self.readable() {
             return Err(LinuxError::EPERM);
+        }
+        if buf.is_empty() {
+            return Ok(0);
         }
         let mut read_size = 0usize;
         let max_len = buf.len();
@@ -121,6 +162,9 @@ impl FileLike for Pipe {
                     return Ok(read_size);
                 }
                 drop(ring_buffer);
+                if self.nonblocking.load(Ordering::Acquire) {
+                    return Err(LinuxError::EAGAIN);
+                }
                 // Data not ready, wait for write end
                 crate::sys_sched_yield(); // TODO: use synconize primitive
                 continue;
@@ -132,6 +176,9 @@ impl FileLike for Pipe {
                 buf[read_size] = ring_buffer.read_byte();
                 read_size += 1;
             }
+            if read_size > 0 {
+                return Ok(read_size);
+            }
         }
     }
 
@@ -139,13 +186,39 @@ impl FileLike for Pipe {
         if !self.writable() {
             return Err(LinuxError::EPERM);
         }
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let mut write_size = 0usize;
         let max_len = buf.len();
         loop {
+            if self.read_end_close() {
+                self.notify_read_end_closed();
+                return if write_size == 0 {
+                    Err(LinuxError::EPIPE)
+                } else {
+                    Ok(write_size)
+                };
+            }
             let mut ring_buffer = self.buffer.lock();
             let loop_write = ring_buffer.available_write();
             if loop_write == 0 {
                 drop(ring_buffer);
+                if self.read_end_close() {
+                    self.notify_read_end_closed();
+                    return if write_size == 0 {
+                        Err(LinuxError::EPIPE)
+                    } else {
+                        Ok(write_size)
+                    };
+                }
+                if self.nonblocking.load(Ordering::Acquire) {
+                    return if write_size == 0 {
+                        Err(LinuxError::EAGAIN)
+                    } else {
+                        Ok(write_size)
+                    };
+                }
                 // Buffer is full, wait for read end to consume
                 crate::sys_sched_yield(); // TODO: use synconize primitive
                 continue;
@@ -162,13 +235,15 @@ impl FileLike for Pipe {
 
     fn stat(&self) -> LinuxResult<ctypes::stat> {
         let st_mode = 0o10000 | 0o600u32; // S_IFIFO | rw-------
+        let st_ino = (Arc::as_ptr(&self.buffer) as usize as ctypes::ino_t).max(1);
         Ok(ctypes::stat {
-            st_ino: 1,
+            st_dev: PIPE_STAT_DEV,
+            st_ino,
             st_nlink: 1,
             st_mode,
-            st_uid: 1000,
-            st_gid: 1000,
-            st_blksize: 4096,
+            st_uid: 0,
+            st_gid: 0,
+            st_blksize: PIPE_STAT_BLKSIZE,
             ..Default::default()
         })
     }
@@ -180,21 +255,26 @@ impl FileLike for Pipe {
     fn poll(&self) -> LinuxResult<PollState> {
         let buf = self.buffer.lock();
         Ok(PollState {
-            readable: self.readable() && buf.available_read() > 0,
+            readable: self.readable() && (buf.available_read() > 0 || self.write_end_close()),
             writable: self.writable() && buf.available_write() > 0,
         })
     }
 
     fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(0)
+        let mut flags = if self.readable() {
+            ctypes::O_RDONLY as c_int
+        } else {
+            ctypes::O_WRONLY as c_int
+        };
+        if self.nonblocking.load(Ordering::Acquire) {
+            flags |= ctypes::O_NONBLOCK as c_int;
+        }
+        Ok(flags)
     }
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
-        if nonblocking {
-            Err(LinuxError::EOPNOTSUPP)
-        } else {
-            Ok(())
-        }
+        self.nonblocking.store(nonblocking, Ordering::Release);
+        Ok(())
     }
 }
 

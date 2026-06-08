@@ -215,6 +215,7 @@ dependencies = [
  "axsync",
  "axtask",
  "bindgen",
+ "crate_interface",
  "ctor_bare",
  "flatten_objects",
  "lazy_static",

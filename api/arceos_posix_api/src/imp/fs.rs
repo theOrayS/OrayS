@@ -1,5 +1,8 @@
 use alloc::{string::String, sync::Arc};
-use core::ffi::{c_char, c_int};
+use core::{
+    ffi::{c_char, c_int},
+    sync::atomic::{AtomicI32, Ordering},
+};
 
 use axerrno::{LinuxError, LinuxResult};
 use axfs::fops::OpenOptions;
@@ -12,13 +15,15 @@ use crate::{ctypes, utils::char_ptr_to_str};
 pub struct File {
     inner: Mutex<axfs::fops::File>,
     path: String,
+    status_flags: AtomicI32,
 }
 
 impl File {
-    fn new(inner: axfs::fops::File, path: &str) -> Self {
+    fn new(inner: axfs::fops::File, path: &str, flags: c_int) -> Self {
         Self {
             inner: Mutex::new(inner),
             path: path.into(),
+            status_flags: AtomicI32::new(open_status_flags(flags)),
         }
     }
 
@@ -154,7 +159,11 @@ impl FileLike for File {
     }
 
     fn write(&self, buf: &[u8]) -> LinuxResult<usize> {
-        Ok(self.inner.lock().write(buf)?)
+        let mut inner = self.inner.lock();
+        if self.status_flags.load(Ordering::Acquire) & ctypes::O_APPEND as c_int != 0 {
+            inner.seek(SeekFrom::End(0))?;
+        }
+        Ok(inner.write(buf)?)
     }
 
     fn stat(&self) -> LinuxResult<ctypes::stat> {
@@ -174,15 +183,28 @@ impl FileLike for File {
     }
 
     fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(0)
+        Ok(self.status_flags.load(Ordering::Acquire))
     }
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
+        let mask = ctypes::O_NONBLOCK as c_int;
         if nonblocking {
-            Err(LinuxError::EOPNOTSUPP)
+            self.status_flags.fetch_or(mask, Ordering::AcqRel);
         } else {
-            Ok(())
+            self.status_flags.fetch_and(!mask, Ordering::AcqRel);
         }
+        Ok(())
+    }
+
+    fn set_status_flags(&self, flags: c_int) -> LinuxResult {
+        let allowed = (ctypes::O_ACCMODE | ctypes::O_APPEND | ctypes::O_NONBLOCK) as c_int;
+        if flags & !allowed != 0 {
+            return Err(LinuxError::EOPNOTSUPP);
+        }
+        let access = self.status_flags.load(Ordering::Acquire) & ctypes::O_ACCMODE as c_int;
+        let mutable = flags & (ctypes::O_APPEND | ctypes::O_NONBLOCK) as c_int;
+        self.status_flags.store(access | mutable, Ordering::Release);
+        Ok(())
     }
 }
 
@@ -217,6 +239,11 @@ fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> OpenOptions {
     options
 }
 
+fn open_status_flags(flags: c_int) -> c_int {
+    let flags = flags as u32;
+    (flags & (ctypes::O_ACCMODE | ctypes::O_APPEND | ctypes::O_NONBLOCK)) as c_int
+}
+
 /// Open a file by `filename` and insert it into the file descriptor table.
 ///
 /// Return its index in the file table (`fd`). Return `EMFILE` if it already
@@ -232,7 +259,7 @@ pub unsafe fn sys_open(filename: *const c_char, flags: c_int, mode: ctypes::mode
         let options = flags_to_options(flags, mode);
         let filename = filename?;
         let file = axfs::fops::File::open(filename, &options)?;
-        File::new(file, filename).add_to_fd_table()
+        File::new(file, filename, flags).add_to_fd_table()
     })
 }
 

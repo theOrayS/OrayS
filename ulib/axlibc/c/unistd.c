@@ -141,24 +141,41 @@ int truncate(const char *path, off_t length)
 
 #ifdef AX_CONFIG_PIPE
 
+static int apply_pipe2_fcntl(int fd, int cmd, int value)
+{
+    return fcntl(fd, cmd, value);
+}
+
 int pipe2(int fd[2], int flag)
 {
     if (!flag)
         return pipe(fd);
-    if (flag & ~(O_CLOEXEC | O_NONBLOCK))
-        return -EINVAL;
+    if (flag & ~(O_CLOEXEC | O_NONBLOCK)) {
+        errno = EINVAL;
+        return -1;
+    }
 
     int res = pipe(fd);
     if (res != 0)
         return res;
 
-    if (flag & O_CLOEXEC) {
-        fcntl(fd[0], F_SETFD, FD_CLOEXEC);
-        fcntl(fd[1], F_SETFD, FD_CLOEXEC);
+    if ((flag & O_CLOEXEC) &&
+        (apply_pipe2_fcntl(fd[0], F_SETFD, FD_CLOEXEC) < 0 ||
+         apply_pipe2_fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)) {
+        int saved_errno = errno;
+        close(fd[0]);
+        close(fd[1]);
+        errno = saved_errno;
+        return -1;
     }
-    if (flag & O_NONBLOCK) {
-        fcntl(fd[0], F_SETFL, O_NONBLOCK);
-        fcntl(fd[1], F_SETFL, O_NONBLOCK);
+    if ((flag & O_NONBLOCK) &&
+        (apply_pipe2_fcntl(fd[0], F_SETFL, O_NONBLOCK) < 0 ||
+         apply_pipe2_fcntl(fd[1], F_SETFL, O_NONBLOCK) < 0)) {
+        int saved_errno = errno;
+        close(fd[0]);
+        close(fd[1]);
+        errno = saved_errno;
+        return -1;
     }
 
     return 0;

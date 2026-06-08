@@ -47,6 +47,7 @@ mod user_memory;
 
 use fd_table::{FdTable, ProcessFdTable};
 use linux_abi::*;
+use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 pub use process_lifecycle::run_user_program;
@@ -56,11 +57,25 @@ pub use process_lifecycle::run_user_program_in;
 pub use process_lifecycle::run_user_program_in_timeout;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::seed_initial_path_mode;
-use process_lifecycle::ProcessTeardown;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
 
 struct AxNamespaceImpl;
+struct PosixSignalIfImpl;
+
+#[crate_interface::impl_interface]
+impl arceos_posix_api::PosixSignalIf for PosixSignalIfImpl {
+    fn raise_sigpipe() -> bool {
+        let Some(ext) = task_context::current_task_ext() else {
+            return false;
+        };
+        let Some(entry) = task_registry::user_thread_entry_by_tid(task_context::current_tid())
+        else {
+            return false;
+        };
+        signal_abi::deliver_user_signal(&entry, linux_abi::SIGPIPE_NUM, ext.process.pid()).is_ok()
+    }
+}
 
 const DEFAULT_TIMER_SLACK_NS: u64 = 50_000;
 

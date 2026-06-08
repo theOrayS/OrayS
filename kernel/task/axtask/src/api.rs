@@ -164,6 +164,15 @@ pub fn set_priority(prio: isize) -> bool {
     current_run_queue::<NoPreemptIrqSave>().set_current_priority(prio)
 }
 
+/// Set the priority for the specified task.
+///
+/// This is the task-targeted counterpart of [`set_priority`].  It lets POSIX
+/// scheduler syscalls update the scheduler backend of another live user task
+/// instead of only changing syscall readback state.
+pub fn set_task_priority(task: &AxTaskRef, prio: isize) -> bool {
+    select_run_queue::<NoPreemptIrqSave>(task).set_task_priority(task, prio)
+}
+
 /// Set the affinity for the current task.
 /// [`AxCpuMask`] is used to specify the CPU affinity.
 /// Returns `true` if the affinity is set successfully.

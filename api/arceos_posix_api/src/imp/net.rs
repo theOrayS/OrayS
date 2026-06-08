@@ -405,11 +405,11 @@ impl FileLike for Socket {
             Socket::Udp(udpsocket) => udpsocket.lock().is_nonblocking(),
             Socket::Tcp(tcpsocket) => tcpsocket.lock().is_nonblocking(),
         };
-        Ok(if nonblock {
-            ctypes::O_NONBLOCK as c_int
-        } else {
-            0
-        })
+        let mut flags = ctypes::O_RDWR as c_int;
+        if nonblock {
+            flags |= ctypes::O_NONBLOCK as c_int;
+        }
+        Ok(flags)
     }
 
     fn set_nonblocking(&self, nonblock: bool) -> LinuxResult {

@@ -20,37 +20,64 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-FILE __stdin_FILE = {.fd = 0, .buffer_len = 0};
+FILE __stdin_FILE = {.fd = 0, .buffer_len = 0, .flags = 0};
 
-FILE __stdout_FILE = {.fd = 1, .buffer_len = 0};
+FILE __stdout_FILE = {.fd = 1, .buffer_len = 0, .flags = 0};
 
-FILE __stderr_FILE = {.fd = 2, .buffer_len = 0};
+FILE __stderr_FILE = {.fd = 2, .buffer_len = 0, .flags = 0};
 
 FILE *const stdin = &__stdin_FILE;
 FILE *const stdout = &__stdout_FILE;
 FILE *const stderr = &__stderr_FILE;
 
-// Returns: number of chars written, negative for failure
-// Warn: buffer_len[f] will not be changed
-static int __write_buffer(FILE *f)
+static int __is_standard_stream(FILE *f)
 {
-    int r = 0;
-    if (f->buffer_len == 0)
-        return 0;
-    r = write(f->fd, f->buf, f->buffer_len);
-    return r;
+    return f == stdin || f == stdout || f == stderr;
 }
 
-// Clear buffer_len[f]
-static void __clear_buffer(FILE *f)
+static void __mark_file_error(FILE *f)
 {
+    if (f)
+        f->flags |= F_ERR;
+}
+
+static void __mark_file_eof(FILE *f)
+{
+    if (f)
+        f->flags |= F_EOF;
+}
+
+// Returns: number of chars written if the full buffer was flushed, negative for
+// failure.  On failure any unwritten tail remains in f->buf so a short write
+// cannot be reported as success while silently dropping buffered data.
+static int __write_buffer(FILE *f)
+{
+    if (f->buffer_len == 0)
+        return 0;
+    size_t written = 0;
+    while (written < f->buffer_len) {
+        ssize_t r = write(f->fd, f->buf + written, f->buffer_len - written);
+        if (r > 0) {
+            written += r;
+            continue;
+        }
+        if (r == 0)
+            errno = EIO;
+        __mark_file_error(f);
+        if (written > 0) {
+            size_t remaining = f->buffer_len - written;
+            memmove(f->buf, f->buf + written, remaining);
+            f->buffer_len = remaining;
+        }
+        return -1;
+    }
     f->buffer_len = 0;
+    return written;
 }
 
 static int __fflush(FILE *f)
 {
     int r = __write_buffer(f);
-    __clear_buffer(f);
     return r >= 0 ? 0 : r;
 }
 
@@ -62,11 +89,8 @@ static int out(FILE *f, const char *s, size_t l)
         f->buf[f->buffer_len++] = c;
         if (f->buffer_len == FILE_BUF_SIZE || c == '\n') {
             int r = __write_buffer(f);
-            __clear_buffer(f);
             if (r < 0)
                 return r;
-            if (r < f->buffer_len)
-                return ret + r;
             ret += r;
         }
     }
@@ -75,8 +99,23 @@ static int out(FILE *f, const char *s, size_t l)
 
 int getchar(void)
 {
-    unimplemented();
-    errno = ENOSYS;
+    return getc(stdin);
+}
+
+int getc(FILE *f)
+{
+    if (!f) {
+        errno = EINVAL;
+        return EOF;
+    }
+    unsigned char c;
+    ssize_t len = read(f->fd, &c, 1);
+    if (len == 1)
+        return c;
+    if (len == 0)
+        __mark_file_eof(f);
+    else
+        __mark_file_error(f);
     return EOF;
 }
 
@@ -176,6 +215,19 @@ int sscanf(const char *restrict __s, const char *restrict __format, ...)
 
 #ifdef AX_CONFIG_FS
 
+static FILE *__new_file_for_fd(int fd)
+{
+    FILE *f = (FILE *)malloc(sizeof(FILE));
+    if (!f) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    f->fd = fd;
+    f->buffer_len = 0;
+    f->flags = 0;
+    return f;
+}
+
 int __fmodeflags(const char *mode)
 {
     int flags;
@@ -198,31 +250,43 @@ int __fmodeflags(const char *mode)
     return flags;
 }
 
+static int __fd_mode_compatible(int fd_flags, int mode_flags)
+{
+    int fd_access = fd_flags & O_ACCMODE;
+    int mode_access = mode_flags & O_ACCMODE;
+    if (mode_access == O_RDWR)
+        return fd_access == O_RDWR;
+    if (mode_access == O_WRONLY)
+        return fd_access == O_WRONLY || fd_access == O_RDWR;
+    if (mode_access == O_RDONLY)
+        return fd_access == O_RDONLY || fd_access == O_RDWR;
+    return 0;
+}
+
 FILE *fopen(const char *filename, const char *mode)
 {
     FILE *f;
     int flags;
 
-    if (!strchr("rwa", *mode)) {
+    if (!mode || !strchr("rwa", *mode)) {
         errno = EINVAL;
         return 0;
     }
 
-    f = (FILE *)malloc(sizeof(FILE));
-
     flags = __fmodeflags(mode);
-    // TODO: currently mode is unused in ax_open
     int fd = open(filename, flags, 0666);
     if (fd < 0)
         return NULL;
-    f->fd = fd;
 
+    f = __new_file_for_fd(fd);
+    if (!f)
+        close(fd);
     return f;
 }
 
 char *fgets(char *restrict s, int n, FILE *restrict f)
 {
-    if (n == 0)
+    if (n <= 0)
         return NULL;
     if (n == 1) {
         *s = '\0';
@@ -232,44 +296,70 @@ char *fgets(char *restrict s, int n, FILE *restrict f)
     int cnt = 0;
     while (cnt < n - 1) {
         char c;
-        if (read(f->fd, (void *)&c, 1) > 0) {
-            if (c != '\n')
-                s[cnt++] = c;
-            else
+        ssize_t len = read(f->fd, (void *)&c, 1);
+        if (len > 0) {
+            s[cnt++] = c;
+            if (c == '\n')
                 break;
-        } else
+        } else if (len == 0) {
+            __mark_file_eof(f);
             break;
+        } else {
+            __mark_file_error(f);
+            if (cnt == 0)
+                return NULL;
+            break;
+        }
     }
+    if (cnt == 0 && (f->flags & F_EOF))
+        return NULL;
     s[cnt] = '\0';
     return s;
 }
 
 size_t fread(void *restrict destv, size_t size, size_t nmemb, FILE *restrict f)
 {
+    if (size == 0 || nmemb == 0)
+        return 0;
+
     size_t total = size * nmemb;
     size_t read_len = 0;
-    size_t len = 0;
-    do {
-        len = read(f->fd, destv + read_len, total - read_len);
-        if (len < 0)
+    char *dest = (char *)destv;
+    while (read_len < total) {
+        ssize_t len = read(f->fd, dest + read_len, total - read_len);
+        if (len > 0) {
+            read_len += len;
+        } else if (len == 0) {
+            __mark_file_eof(f);
             break;
-        read_len += len;
-    } while (len > 0);
-    return read_len == size * nmemb ? nmemb : read_len / size;
+        } else {
+            __mark_file_error(f);
+            break;
+        }
+    }
+    return read_len / size;
 }
 
 size_t fwrite(const void *restrict src, size_t size, size_t nmemb, FILE *restrict f)
 {
+    if (size == 0 || nmemb == 0)
+        return 0;
+
     size_t total = size * nmemb;
     size_t write_len = 0;
-    size_t len = 0;
-    do {
-        len = write(f->fd, src + write_len, total - write_len);
-        if (len < 0)
+    const char *bytes = (const char *)src;
+    while (write_len < total) {
+        ssize_t len = write(f->fd, bytes + write_len, total - write_len);
+        if (len > 0) {
+            write_len += len;
+        } else if (len == 0) {
             break;
-        write_len += len;
-    } while (len > 0);
-    return write_len == size * nmemb ? nmemb : write_len / size;
+        } else {
+            __mark_file_error(f);
+            break;
+        }
+    }
+    return write_len / size;
 }
 
 int fputs(const char *restrict s, FILE *restrict f)
@@ -280,7 +370,20 @@ int fputs(const char *restrict s, FILE *restrict f)
 
 int fclose(FILE *f)
 {
-    return close(f->fd);
+    if (!f) {
+        errno = EINVAL;
+        return EOF;
+    }
+    int flush_ret = fflush(f);
+    int close_ret = close(f->fd);
+    int saved_errno = errno;
+    if (!__is_standard_stream(f))
+        free(f);
+    if (flush_ret < 0 || close_ret < 0) {
+        errno = saved_errno;
+        return EOF;
+    }
+    return 0;
 }
 
 int fileno(FILE *f)
@@ -290,25 +393,36 @@ int fileno(FILE *f)
 
 int feof(FILE *f)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return -1;
+    return f && (f->flags & F_EOF) ? 1 : 0;
 }
 
 // TODO
 int fseek(FILE *__stream, long __off, int __whence)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return -1;
+    if (!__stream) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (fflush(__stream) < 0)
+        return -1;
+    if (lseek(__stream->fd, __off, __whence) < 0) {
+        __mark_file_error(__stream);
+        return -1;
+    }
+    __stream->flags &= ~F_EOF;
+    return 0;
 }
 
-// TODO
 off_t ftello(FILE *__stream)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return -1;
+    if (!__stream) {
+        errno = EINVAL;
+        return -1;
+    }
+    off_t pos = lseek(__stream->fd, 0, SEEK_CUR);
+    if (pos < 0)
+        __mark_file_error(__stream);
+    return pos;
 }
 
 // TODO
@@ -319,18 +433,15 @@ char *tmpnam(char *buf)
     return NULL;
 }
 
-// TODO
 void clearerr(FILE *f)
 {
-    unimplemented();
+    if (f)
+        f->flags &= ~(F_EOF | F_ERR);
 }
 
-// TODO
 int ferror(FILE *f)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return -1;
+    return f && (f->flags & F_ERR) ? 1 : 0;
 }
 
 // TODO
@@ -349,19 +460,9 @@ int fscanf(FILE *restrict f, const char *restrict fmt, ...)
     return EOF;
 }
 
-// TODO
 long ftell(FILE *f)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return -1;
-}
-
-int getc(FILE *f)
-{
-    unimplemented();
-    errno = ENOSYS;
-    return EOF;
+    return ftello(f);
 }
 
 // TODO
@@ -409,23 +510,40 @@ ssize_t getline(char **restrict s, size_t *restrict n, FILE *restrict f)
 
 int __uflow(FILE *f)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return EOF;
+    return getc(f);
 }
 
 int getc_unlocked(FILE *f)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return EOF;
+    return getc(f);
 }
 
 FILE *fdopen(int fd, const char *mode)
 {
-    unimplemented();
-    errno = ENOSYS;
-    return NULL;
+    if (!mode || !strchr("rwa", *mode)) {
+        errno = EINVAL;
+        return NULL;
+    }
+    int fd_flags = fcntl(fd, F_GETFL);
+    if (fd_flags < 0)
+        return NULL;
+    int mode_flags = __fmodeflags(mode);
+    if (!__fd_mode_compatible(fd_flags, mode_flags)) {
+        errno = EBADF;
+        return NULL;
+    }
+    if ((mode_flags & O_APPEND) && !(fd_flags & O_APPEND)) {
+        if (fcntl(fd, F_SETFL, fd_flags | O_APPEND) < 0)
+            return NULL;
+        fd_flags = fcntl(fd, F_GETFL);
+        if (fd_flags < 0)
+            return NULL;
+        if (!(fd_flags & O_APPEND)) {
+            errno = EOPNOTSUPP;
+            return NULL;
+        }
+    }
+    return __new_file_for_fd(fd);
 }
 
 #endif // AX_CONFIG_FS
