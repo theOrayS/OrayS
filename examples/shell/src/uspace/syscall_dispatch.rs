@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{SYSCALL, register_trap_handler};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -78,7 +78,7 @@ use super::sysv_msg::{sys_msgctl, sys_msgget, sys_msgrcv, sys_msgsnd};
 use super::sysv_sem::{sys_semctl, sys_semget, sys_semop, sys_semtimedop};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
-    current_process, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
+    current_process, current_tid, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
     sys_set_tid_address, user_pc,
 };
 use super::time_abi::{

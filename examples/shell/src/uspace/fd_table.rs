@@ -3018,17 +3018,45 @@ pub(super) fn sys_flock(process: &UserProcess, fd: usize, operation: usize) -> i
 
 pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
     match process.fds.lock().entry(fd as i32) {
+        Ok(FdEntry::File(file)) => match file.file.flush().map_err(LinuxError::from) {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        },
+        Ok(FdEntry::Memfd(_)) => {
+            // memfd is RAM-backed state in this compatibility layer.  There is
+            // no lower storage device to flush, so all data is already durable
+            // for the lifetime of the memfd object.
+            0
+        }
         Ok(
-            FdEntry::DevNull
+            FdEntry::Stdin
+            | FdEntry::Stdout
+            | FdEntry::Stderr
+            | FdEntry::DevNull
             | FdEntry::DevZero(_)
             | FdEntry::DevRandom(_)
             | FdEntry::BlockDevice(_)
             | FdEntry::Rtc
+            | FdEntry::Directory(_)
+            | FdEntry::ProcFdDir(_)
+            | FdEntry::SyntheticDir(_)
+            | FdEntry::Path(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::ProcTimerSlack(_)
             | FdEntry::Pipe(_)
             | FdEntry::Socket(_)
-            | FdEntry::LocalSocket(_),
+            | FdEntry::LocalSocket(_)
+            | FdEntry::EventFd(_)
+            | FdEntry::Inotify(_)
+            | FdEntry::Epoll(_)
+            | FdEntry::TimerFd(_)
+            | FdEntry::SignalFd(_)
+            | FdEntry::PidFd(_)
+            | FdEntry::PosixMq(_)
+            | FdEntry::ProcMqQueuesMax(_)
+            | FdEntry::ProcSysFile(_),
         ) => neg_errno(LinuxError::EINVAL),
-        Ok(_) => 0,
         Err(err) => neg_errno(err),
     }
 }
@@ -3671,10 +3699,17 @@ fn socket_ioctl_set_ifflags(process: &UserProcess, arg: usize) -> isize {
     if arg == 0 {
         return neg_errno(LinuxError::EFAULT);
     }
-    match validate_user_read(process, arg, IFREQ_SIZE) {
-        Ok(()) => 0,
-        Err(err) => neg_errno(err),
+    if let Err(err) = validate_user_read(process, arg, IFREQ_SIZE) {
+        return neg_errno(err);
     }
+    if process.uid() != 0 {
+        return neg_errno(LinuxError::EPERM);
+    }
+    // The loopback interface can be reported, but this userspace kernel does not
+    // yet have a netdev control plane that can mutate interface flags.  Reject
+    // the privileged mutation explicitly instead of validating the ifreq and
+    // returning a fake success.
+    neg_errno(LinuxError::EOPNOTSUPP)
 }
 
 fn write_user_bytes_ret(process: &UserProcess, dst: usize, bytes: &[u8]) -> isize {

@@ -463,6 +463,10 @@ fn sched_policy_needs_privilege(policy: i32) -> bool {
     )
 }
 
+fn sched_policy_requires_unsupported_backend(policy: i32) -> bool {
+    matches!(policy as u32, general::SCHED_DEADLINE)
+}
+
 fn scheduler_backend_priority(process: &UserProcess, state: UserSchedState) -> isize {
     match state.policy as u32 {
         general::SCHED_FIFO | general::SCHED_RR => {
@@ -482,9 +486,9 @@ fn apply_task_scheduler_state(
     // axtask exposes a CFS-style nice hook.  Linux policy state is still
     // preserved for get* calls; map accepted policy/priority into the nearest
     // available backend priority so sched_set* changes affect scheduling
-    // where the configured scheduler supports it.  FIFO/RR backends that do
-    // not yet consume the priority hook must not turn an otherwise accepted
-    // POSIX scheduler state change into a spurious userspace failure.
+    // where the configured scheduler supports it.  SCHED_DEADLINE is rejected
+    // before this point because no deadline backend exists to make runtime,
+    // deadline, and period observable.
     let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));
 }
 
@@ -612,6 +616,9 @@ pub(super) fn sys_sched_setscheduler(
         Ok(param) => param,
         Err(err) => return neg_errno(err),
     };
+    if sched_policy_requires_unsupported_backend(policy) {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
     if !sched_param_accepts_policy(policy, param) {
         return neg_errno(LinuxError::EINVAL);
     }
@@ -709,13 +716,7 @@ fn sched_state_from_attr(attr: UserSchedAttr) -> Result<UserSchedState, LinuxErr
         {
             return Err(LinuxError::EINVAL);
         }
-        return Ok(UserSchedState {
-            policy,
-            param,
-            sched_runtime: attr.sched_runtime,
-            sched_deadline: attr.sched_deadline,
-            sched_period: attr.sched_period,
-        });
+        return Err(LinuxError::EOPNOTSUPP);
     }
     if !sched_param_accepts_policy(policy, param) {
         return Err(LinuxError::EINVAL);

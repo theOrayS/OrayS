@@ -1,4 +1,4 @@
-use core::mem::{size_of, MaybeUninit};
+use core::mem::{MaybeUninit, size_of};
 use core::ptr;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -10,7 +10,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
 
@@ -454,10 +454,19 @@ fn read_cstr_efault(
 }
 
 fn log_read_cstr_efault(
-    _process: &UserProcess,
-    _ptr: usize,
-    _fault_addr: usize,
-    _reason: &'static str,
-    _aspace: &axmm::AddrSpace,
+    process: &UserProcess,
+    ptr: usize,
+    fault_addr: usize,
+    reason: &'static str,
+    aspace: &axmm::AddrSpace,
 ) {
+    let mapped = aspace.query_address(VirtAddr::from(fault_addr)).pte_mapped;
+    user_trace!(
+        "user-read-cstr: EFAULT pid={} ptr={:#x} fault={:#x} mapped={} reason={}",
+        process.pid(),
+        ptr,
+        fault_addr,
+        mapped,
+        reason
+    );
 }

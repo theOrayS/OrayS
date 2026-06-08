@@ -13,7 +13,13 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 macro_rules! user_trace {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) => {{
+        if option_env!("USER_TRACE").is_some() {
+            println!($($arg)*);
+        } else {
+            let _ = core::format_args!($($arg)*);
+        }
+    }};
 }
 
 mod credentials;
