@@ -317,8 +317,12 @@ pub(super) fn process_times(process: &UserProcess) -> Tms {
     let elapsed = clock_ticks_now()
         .saturating_sub(process.start_clock_ticks.load(Ordering::Acquire))
         .min(c_long::MAX as u64) as c_long;
-    let user_ticks = elapsed / 2;
-    let system_ticks = elapsed.saturating_sub(user_ticks);
+    // The userspace kernel does not yet expose per-task CPU accounting split by
+    // user/kernel mode.  Use the real monotonic lifetime tick count as the
+    // observable process time and avoid fabricating a half-user/half-system
+    // split that would claim system CPU accounting we do not have.
+    let user_ticks = elapsed;
+    let system_ticks = 0;
     Tms {
         tms_utime: user_ticks,
         tms_stime: system_ticks,

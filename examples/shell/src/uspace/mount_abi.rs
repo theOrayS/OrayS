@@ -3,7 +3,7 @@ use linux_raw_sys::general;
 use std::string::{String, ToString};
 
 use super::fd_table::resolve_dirfd_path;
-use super::linux_abi::{neg_errno, ST_MODE_DIR, ST_MODE_TYPE_MASK};
+use super::linux_abi::{ST_MODE_DIR, ST_MODE_TYPE_MASK, neg_errno};
 use super::runtime_paths::normalize_path;
 use super::user_memory::read_cstr;
 use super::{MountPoint, UserProcess};
@@ -246,41 +246,17 @@ fn resolve_mount_source(
         "sysfs" => Ok("/sys".into()),
         "tmpfs" => Ok(target_path.into()),
         "vfat" | "msdos" | "fat" | "ext2" | "ext3" | "ext4" => {
-            let source = source.ok_or(LinuxError::EINVAL)?;
-            // The evaluator exposes a single block-backed root filesystem and does not
-            // model partition device nodes in devfs.  Accept only conventional block
-            // device names, then expose that already-mounted backing filesystem through
-            // the process mount namespace rather than pretending to attach a new disk.
-            if is_supported_block_device_name(source) {
-                Ok("/".into())
-            } else {
-                Err(LinuxError::ENODEV)
-            }
+            let _source = source.ok_or(LinuxError::EINVAL)?;
+            // Block filesystem mounting requires a real VFS block-device attach path.
+            // Do not alias /dev/vd*/sd*/xvd* to the already-mounted root filesystem:
+            // that would report a successful mount without attaching the requested
+            // device.  Until a backing block-mount implementation exists, fail
+            // explicitly after userspace pointer/target validation.
+            Err(LinuxError::EOPNOTSUPP)
         }
         "" => Err(LinuxError::EINVAL),
         _ => Err(LinuxError::ENODEV),
     }
-}
-
-fn is_supported_block_device_name(source: &str) -> bool {
-    let Some(path) = normalize_path("/", source) else {
-        return false;
-    };
-    let Some(name) = path.strip_prefix("/dev/") else {
-        return false;
-    };
-    let Some(disk) = name
-        .strip_prefix("vd")
-        .or_else(|| name.strip_prefix("sd"))
-        .or_else(|| name.strip_prefix("xvd"))
-    else {
-        return false;
-    };
-    let mut chars = disk.chars();
-    let Some(letter) = chars.next() else {
-        return false;
-    };
-    letter.is_ascii_lowercase() && chars.all(|ch| ch.is_ascii_digit())
 }
 
 fn mount_path_rest<'a>(path: &'a str, target: &str) -> Option<&'a str> {

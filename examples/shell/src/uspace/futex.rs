@@ -11,16 +11,12 @@ use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::linux_abi::{neg_errno, USER_MMAP_BASE};
+use super::UserProcess;
+use super::linux_abi::{USER_MMAP_BASE, neg_errno};
 use super::signal_abi::current_sigcancel_pending;
-use super::task_context::current_task_ext;
+use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::read_user_value;
-use super::UserProcess;
-
-macro_rules! user_trace {
-    ($($arg:tt)*) => {};
-}
 
 pub(super) struct FutexState {
     pub(super) seq: AtomicU32,
@@ -232,7 +228,7 @@ pub(super) fn wake_task(process: &UserProcess, uaddr: usize, task: &AxTaskRef) {
 
 pub(super) fn sys_futex(
     process: &UserProcess,
-    _tf: &TrapFrame,
+    tf: &TrapFrame,
     uaddr: usize,
     futex_op: usize,
     val: usize,

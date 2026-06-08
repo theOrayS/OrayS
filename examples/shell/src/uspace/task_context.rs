@@ -8,18 +8,14 @@ use axtask::AxTaskRef;
 use std::sync::Arc;
 
 #[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{Sstatus, FS};
+use riscv::register::sstatus::{FS, Sstatus};
 
+use super::UserProcess;
 use super::linux_abi::neg_errno;
 use super::task_registry::user_thread_entry_by_tid;
 #[cfg(target_arch = "riscv64")]
 use super::user_memory::read_user_value;
 use super::user_memory::write_user_value;
-use super::UserProcess;
-
-macro_rules! user_trace {
-    ($($arg:tt)*) => {};
-}
 
 // Linux validates set_robust_list(2) against the userspace robust_list_head
 // layout.  Both supported LTP ABIs here are 64-bit, so the header is three
@@ -172,10 +168,10 @@ pub(super) fn user_pc(tf: &TrapFrame) -> usize {
     tf.elr as usize
 }
 
-pub(super) fn sys_set_tid_address(_tf: &TrapFrame, _tidptr: usize) -> isize {
-    set_current_clear_child_tid(_tidptr);
+pub(super) fn sys_set_tid_address(tf: &TrapFrame, tidptr: usize) -> isize {
+    set_current_clear_child_tid(tidptr);
     user_trace!(
-        "user-set-tid: tid={} tidptr={_tidptr:#x} sp={:#x} tp={:#x} ra={:#x} pc={:#x}",
+        "user-set-tid: tid={} tidptr={tidptr:#x} sp={:#x} tp={:#x} ra={:#x} pc={:#x}",
         current_tid(),
         tf.regs.sp,
         tf.regs.tp,

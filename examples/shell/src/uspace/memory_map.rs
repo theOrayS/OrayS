@@ -3,28 +3,23 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
+use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
 use linux_raw_sys::general;
-use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
 use std::collections::BTreeMap;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
 use super::linux_abi::{
-    neg_errno, SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP,
+    SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
 };
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
-use super::task_context::current_process;
-use super::task_context::current_task_ext;
+use super::task_context::{current_process, current_task_ext, current_tid, user_pc};
 use super::user_memory::{
-    read_user_bytes, validate_user_write, write_user_bytes, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
 };
-use super::UserProcess;
-
-macro_rules! user_trace {
-    ($($arg:tt)*) => {};
-}
 
 pub(super) fn sys_brk(process: &UserProcess, addr: usize) -> isize {
     let mut brk = process.brk.lock();
@@ -115,7 +110,7 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
     let handled = {
         let mut aspace = process.aspace.lock();
         if should_trace {
-            let _query = aspace
+            let query = aspace
                 .page_table()
                 .query(VirtAddr::from(align_down(vaddr.as_usize(), PAGE_SIZE_4K)));
             user_trace!(
@@ -127,7 +122,7 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         }
         let handled = aspace.handle_page_fault(vaddr, flags);
         if should_trace {
-            let _query = aspace
+            let query = aspace
                 .page_table()
                 .query(VirtAddr::from(align_down(vaddr.as_usize(), PAGE_SIZE_4K)));
             user_trace!("user-pf: handled={handled} query_after={query:?}");
@@ -776,7 +771,7 @@ pub(super) fn sys_munmap(process: &UserProcess, tf: &TrapFrame, addr: usize, len
     }
     let self_stack_unmap = (start..end).contains(&tf.regs.sp);
     if start >= USER_MMAP_BASE && end - start <= 0x40000 {
-        let _query = process
+        let query = process
             .aspace
             .lock()
             .page_table()
