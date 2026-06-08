@@ -20,6 +20,7 @@ struct aibuf {
         struct sockaddr_in sin;
         struct sockaddr_in6 sin6;
     } sa;
+    char canonname[256];
     volatile int lock[1];
     short slot, ref;
 };

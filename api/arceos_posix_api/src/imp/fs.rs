@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 use core::ffi::{c_char, c_int};
 
 use axerrno::{LinuxError, LinuxResult};
@@ -11,12 +11,14 @@ use crate::{ctypes, utils::char_ptr_to_str};
 
 pub struct File {
     inner: Mutex<axfs::fops::File>,
+    path: String,
 }
 
 impl File {
-    fn new(inner: axfs::fops::File) -> Self {
+    fn new(inner: axfs::fops::File, path: &str) -> Self {
         Self {
             inner: Mutex::new(inner),
+            path: path.into(),
         }
     }
 
@@ -32,42 +34,76 @@ impl File {
     }
 }
 
-fn file_attr_to_stat(metadata: axfs::fops::FileAttr) -> ctypes::stat {
-    let ty = metadata.file_type() as u8;
-    let perm = metadata.perm().bits() as u32;
-    let st_mode = ((ty as u32) << 12) | perm;
+const DEFAULT_STAT_DEV: ctypes::dev_t = 1;
+const DEFAULT_STAT_UID: ctypes::uid_t = 0;
+const DEFAULT_STAT_GID: ctypes::gid_t = 0;
+const DEFAULT_STAT_BLKSIZE: ctypes::blksize_t = 512;
+
+fn path_inode(path: Option<&str>) -> ctypes::ino_t {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let Some(path) = path else {
+        return 1;
+    };
+    let mut hash = FNV_OFFSET;
+    for &byte in path.as_bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash.max(1) as _
+}
+
+fn stat_from_parts(
+    file_type: u8,
+    perm: u32,
+    size: u64,
+    blocks: u64,
+    path: Option<&str>,
+) -> ctypes::stat {
+    let st_mode = ((file_type as u32) << 12) | perm;
     ctypes::stat {
-        st_ino: 1,
-        st_nlink: 1,
+        st_dev: DEFAULT_STAT_DEV,
+        st_ino: path_inode(path),
+        st_nlink: if file_type == axfs::fops::FileType::Dir as u8 {
+            2
+        } else {
+            1
+        },
         st_mode,
-        st_uid: 1000,
-        st_gid: 1000,
-        st_size: metadata.size() as _,
-        st_blocks: metadata.blocks() as _,
-        st_blksize: 512,
+        // axfs currently does not expose uid/gid/timestamps through Metadata.
+        // Keep the default centralized and visible rather than scattering
+        // ad-hoc owners across stat implementations.
+        st_uid: DEFAULT_STAT_UID,
+        st_gid: DEFAULT_STAT_GID,
+        st_size: size as _,
+        st_blocks: blocks as _,
+        st_blksize: DEFAULT_STAT_BLKSIZE,
         ..Default::default()
     }
 }
 
-fn api_metadata_to_stat(metadata: axfs::api::Metadata) -> ctypes::stat {
-    let ty = metadata.file_type() as u8;
-    let perm = metadata.permissions().bits() as u32;
-    let st_mode = ((ty as u32) << 12) | perm;
-    ctypes::stat {
-        st_ino: 1,
-        st_nlink: 1,
-        st_mode,
-        st_uid: 1000,
-        st_gid: 1000,
-        st_size: metadata.size() as _,
-        st_blocks: metadata.blocks() as _,
-        st_blksize: 512,
-        ..Default::default()
-    }
+fn file_attr_to_stat(metadata: axfs::fops::FileAttr, path: Option<&str>) -> ctypes::stat {
+    stat_from_parts(
+        metadata.file_type() as u8,
+        metadata.perm().bits() as u32,
+        metadata.size(),
+        metadata.blocks(),
+        path,
+    )
+}
+
+fn api_metadata_to_stat(metadata: axfs::api::Metadata, path: Option<&str>) -> ctypes::stat {
+    stat_from_parts(
+        metadata.file_type() as u8,
+        metadata.permissions().bits() as u32,
+        metadata.size(),
+        metadata.blocks(),
+        path,
+    )
 }
 
 fn stat_path(path: &str) -> LinuxResult<ctypes::stat> {
-    Ok(api_metadata_to_stat(axfs::api::metadata(path)?))
+    Ok(api_metadata_to_stat(axfs::api::metadata(path)?, Some(path)))
 }
 
 fn parent_and_basename(path: &str) -> (&str, &str) {
@@ -123,7 +159,7 @@ impl FileLike for File {
 
     fn stat(&self) -> LinuxResult<ctypes::stat> {
         let metadata = self.inner.lock().get_attr()?;
-        Ok(file_attr_to_stat(metadata))
+        Ok(file_attr_to_stat(metadata, Some(self.path.as_str())))
     }
 
     fn into_any(self: Arc<Self>) -> Arc<dyn core::any::Any + Send + Sync> {
@@ -194,8 +230,9 @@ pub unsafe fn sys_open(filename: *const c_char, flags: c_int, mode: ctypes::mode
     debug!("sys_open <= {:?} {:#o} {:#o}", filename, flags, mode);
     syscall_body!(sys_open, {
         let options = flags_to_options(flags, mode);
-        let file = axfs::fops::File::open(filename?, &options)?;
-        File::new(file).add_to_fd_table()
+        let filename = filename?;
+        let file = axfs::fops::File::open(filename, &options)?;
+        File::new(file, filename).add_to_fd_table()
     })
 }
 

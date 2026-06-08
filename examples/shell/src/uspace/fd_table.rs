@@ -18,64 +18,64 @@ use std::vec::Vec;
 
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
-    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
-    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK,
-    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
-    ST_MODE_TYPE_MASK,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE,
+    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
+    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME,
+    SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
+    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE,
+    fd_cloexec_flag, neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
-    dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
-    generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
-    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
+    DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG, apply_recorded_path_metadata,
+    canonical_permission_path, dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path,
+    fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
+    stdio_stat, synthetic_block_stat_for_path, synthetic_char_stat_for_path,
 };
 use super::posix_mq::{
-    proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
-    ProcMqQueuesMaxEntry,
+    PosixMqDescriptor, ProcMqQueuesMaxEntry, proc_sys_fs_mqueue_fd_entry,
+    proc_sys_fs_mqueue_path_entry,
 };
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
 };
-use super::select_fdset::{yield_poll_wait, SelectMode};
+use super::select_fdset::{SelectMode, yield_poll_wait};
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
 };
 use super::synthetic_fs::{
-    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
-    proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry, proc_meminfo_path_entry,
-    proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
-    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
-    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
-    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
-    proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
-    proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
-    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
-    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
-    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
-    synthetic_proc_version_content, synthetic_proc_version_fd_entry,
+    ProcSysFileEntry, dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path,
+    proc_comm_fd_entry, proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry,
+    proc_meminfo_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry,
+    proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
+    proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
+    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry,
+    proc_sys_file_path_entry, proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
+    proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
+    proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
+    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
+    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
+    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
+    synthetic_proc_sys_path_entry, synthetic_proc_version_content, synthetic_proc_version_fd_entry,
     synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry, ProcSysFileEntry,
+    synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::task_context::current_task_ext;
 use super::task_registry::{
-    user_thread_entry_by_process_pid, user_thread_entry_for_process, UserThreadEntry,
+    UserThreadEntry, user_thread_entry_by_process_pid, user_thread_entry_for_process,
 };
 use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
 use super::user_memory::{
-    fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes,
+    read_user_value, user_io_buffer, validate_user_read, validate_user_write,
+    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
 };
 use super::{PathTimes, UserProcess};
 
@@ -165,7 +165,6 @@ pub(super) struct FileEntry {
     pub(super) path: String,
     pub(super) status_flags: u32,
     offset: Arc<Mutex<u64>>,
-    lease_type: Arc<Mutex<u32>>,
 }
 
 #[derive(Clone)]
@@ -201,6 +200,90 @@ pub(super) struct SyntheticDirent {
 #[derive(Clone)]
 pub(super) struct BlockDeviceEntry {
     pub(super) path: String,
+    status_flags: u32,
+    offset: Arc<Mutex<u64>>,
+    storage: Arc<Mutex<Vec<u8>>>,
+}
+
+fn checked_seek_offset(base: u64, delta: i64) -> Result<u64, LinuxError> {
+    base.checked_add_signed(delta).ok_or(LinuxError::EINVAL)
+}
+
+fn synthetic_block_device_storage(path: &str) -> Arc<Mutex<Vec<u8>>> {
+    static DEVICES: LazyInit<Mutex<BTreeMap<String, Arc<Mutex<Vec<u8>>>>>> = LazyInit::new();
+    let _ = DEVICES.call_once(|| Mutex::new(BTreeMap::new()));
+    let key = normalize_path("/", path).unwrap_or_else(|| path.to_string());
+    let mut devices = DEVICES.lock();
+    devices
+        .entry(key)
+        .or_insert_with(|| Arc::new(Mutex::new(Vec::new())))
+        .clone()
+}
+
+impl BlockDeviceEntry {
+    fn new(path: String, flags: u32) -> Self {
+        let storage = synthetic_block_device_storage(path.as_str());
+        Self {
+            path,
+            status_flags: fcntl_status_flags(flags),
+            offset: Arc::new(Mutex::new(0)),
+            storage,
+        }
+    }
+
+    fn read(&mut self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        if !file_is_readable(self.status_flags) {
+            return Err(LinuxError::EBADF);
+        }
+        let mut offset = self.offset.lock();
+        if *offset >= SYNTHETIC_BLOCK_DEVICE_SIZE {
+            return Ok(0);
+        }
+        let count = cmp::min(dst.len() as u64, SYNTHETIC_BLOCK_DEVICE_SIZE - *offset) as usize;
+        dst[..count].fill(0);
+        let start = *offset as usize;
+        let storage = self.storage.lock();
+        if start < storage.len() {
+            let copied = cmp::min(count, storage.len() - start);
+            dst[..copied].copy_from_slice(&storage[start..start + copied]);
+        }
+        *offset = offset.saturating_add(count as u64);
+        Ok(count)
+    }
+
+    fn write(&mut self, src: &[u8]) -> Result<usize, LinuxError> {
+        if !file_is_writable(self.status_flags) {
+            return Err(LinuxError::EBADF);
+        }
+        let mut offset = self.offset.lock();
+        if *offset >= SYNTHETIC_BLOCK_DEVICE_SIZE {
+            return Err(LinuxError::ENOSPC);
+        }
+        let count = cmp::min(src.len() as u64, SYNTHETIC_BLOCK_DEVICE_SIZE - *offset) as usize;
+        let start = *offset as usize;
+        let end = start.checked_add(count).ok_or(LinuxError::EFBIG)?;
+        let mut storage = self.storage.lock();
+        if storage.len() < end {
+            storage.resize(end, 0);
+        }
+        storage[start..end].copy_from_slice(&src[..count]);
+        *offset = offset.saturating_add(count as u64);
+        Ok(count)
+    }
+
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, LinuxError> {
+        let mut offset = self.offset.lock();
+        let next = match pos {
+            SeekFrom::Start(value) => value,
+            SeekFrom::Current(delta) => checked_seek_offset(*offset, delta)?,
+            SeekFrom::End(delta) => checked_seek_offset(SYNTHETIC_BLOCK_DEVICE_SIZE, delta)?,
+        };
+        if next > SYNTHETIC_BLOCK_DEVICE_SIZE {
+            return Err(LinuxError::EINVAL);
+        }
+        *offset = next;
+        Ok(next)
+    }
 }
 
 #[derive(Clone)]
@@ -3430,7 +3513,7 @@ pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize
         _ => {}
     }
     if req as u32 == BLKGETSIZE64 && process.fds.lock().is_block_device(fd as i32) {
-        let size: u64 = 512 * 1024 * 1024;
+        let size: u64 = SYNTHETIC_BLOCK_DEVICE_SIZE;
         return write_user_value(process, arg, &size);
     }
     if req as u32 == FIONREAD {
@@ -3827,7 +3910,10 @@ impl FdTable {
     }
 
     pub(super) fn is_stdio(&self, fd: i32) -> bool {
-        matches!(fd, 0..=2)
+        matches!(
+            self.entry(fd),
+            Ok(FdEntry::Stdin | FdEntry::Stdout | FdEntry::Stderr)
+        )
     }
 
     pub(super) fn is_rtc(&self, fd: i32) -> bool {
@@ -4230,10 +4316,7 @@ impl FdTable {
                 fill_pseudo_random_bytes(dst);
                 Ok(dst.len())
             }
-            FdEntry::BlockDevice(_) => {
-                dst.fill(0);
-                Ok(dst.len())
-            }
+            FdEntry::BlockDevice(dev) => dev.read(dst),
             FdEntry::Rtc => Ok(0),
             FdEntry::File(file) => {
                 if !file_is_readable(file.status_flags) {
@@ -4292,7 +4375,7 @@ impl FdTable {
                 }
                 Ok(src.len())
             }
-            FdEntry::BlockDevice(_) => Ok(src.len()),
+            FdEntry::BlockDevice(dev) => dev.write(src),
             FdEntry::Rtc => Ok(src.len()),
             FdEntry::File(file) => {
                 if !file_is_writable(file.status_flags) {
@@ -4354,6 +4437,7 @@ impl FdTable {
         if let Some(entry) = self.entries[idx].as_ref() {
             if let FdEntry::File(file) = entry {
                 release_flock_on_last_close(file);
+                release_file_lease_on_last_close(file);
             }
             if let FdEntry::Socket(socket) = entry {
                 socket.close()?;
@@ -4743,7 +4827,7 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => file_entry_seek(process, file, pos),
             FdEntry::DevNull => Ok(0),
-            FdEntry::BlockDevice(_) => Ok(0),
+            FdEntry::BlockDevice(dev) => dev.seek(pos),
             FdEntry::Rtc => Ok(0),
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
                 Err(LinuxError::EISDIR)
@@ -6212,29 +6296,24 @@ impl FdTable {
 
     fn fcntl_getlease(&mut self, fd: i32) -> Result<i32, LinuxError> {
         match self.entry(fd)? {
-            FdEntry::File(file) => Ok(*file.lease_type.lock() as i32),
+            FdEntry::File(file) => Ok(file_lease_type(file) as i32),
             _ => Err(LinuxError::EINVAL),
         }
     }
 
     fn fcntl_setlease(&mut self, fd: i32, lease_type: u32) -> Result<i32, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::File(file) => match lease_type {
-                general::F_RDLCK => {
-                    if file.status_flags & general::O_ACCMODE != general::O_RDONLY {
-                        return Err(LinuxError::EAGAIN);
-                    }
-                    *file.lease_type.lock() = lease_type;
-                    Ok(())
-                }
-                general::F_WRLCK | general::F_UNLCK => {
-                    *file.lease_type.lock() = lease_type;
-                    Ok(())
-                }
-                _ => Err(LinuxError::EINVAL),
-            },
+        let file = match self.entry(fd)? {
+            FdEntry::File(file) => file,
             _ => return Err(LinuxError::EINVAL),
-        }?;
+        };
+        match lease_type {
+            general::F_RDLCK | general::F_WRLCK | general::F_UNLCK => {}
+            _ => return Err(LinuxError::EINVAL),
+        }
+        if !file_lease_access_allowed(file, lease_type) {
+            return Err(LinuxError::EAGAIN);
+        }
+        apply_file_lease(file, lease_type)?;
         Ok(0)
     }
 }
@@ -7059,6 +7138,139 @@ pub(super) fn release_posix_record_locks_for_process(owner_pid: i32) {
         .collect();
     for key in empty_keys {
         table.remove(&key);
+    }
+}
+
+struct FileLeaseState {
+    exclusive_owner: Option<usize>,
+    shared_owners: Vec<usize>,
+}
+
+impl FileLeaseState {
+    fn new() -> Self {
+        Self {
+            exclusive_owner: None,
+            shared_owners: Vec::new(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.exclusive_owner.is_none() && self.shared_owners.is_empty()
+    }
+
+    fn lease_for(&self, owner: usize) -> u32 {
+        if self.exclusive_owner == Some(owner) {
+            general::F_WRLCK
+        } else if self.shared_owners.contains(&owner) {
+            general::F_RDLCK
+        } else {
+            general::F_UNLCK
+        }
+    }
+
+    fn unlock(&mut self, owner: usize) {
+        if self.exclusive_owner == Some(owner) {
+            self.exclusive_owner = None;
+        }
+        self.shared_owners.retain(|held_owner| *held_owner != owner);
+    }
+
+    fn lock_shared(&mut self, owner: usize) -> Result<(), LinuxError> {
+        if matches!(self.exclusive_owner, Some(held_owner) if held_owner != owner) {
+            return Err(LinuxError::EAGAIN);
+        }
+        self.exclusive_owner = None;
+        if !self.shared_owners.contains(&owner) {
+            self.shared_owners.push(owner);
+        }
+        Ok(())
+    }
+
+    fn lock_exclusive(&mut self, owner: usize) -> Result<(), LinuxError> {
+        if matches!(self.exclusive_owner, Some(held_owner) if held_owner != owner) {
+            return Err(LinuxError::EAGAIN);
+        }
+        if self
+            .shared_owners
+            .iter()
+            .any(|held_owner| *held_owner != owner)
+        {
+            return Err(LinuxError::EAGAIN);
+        }
+        self.shared_owners.retain(|held_owner| *held_owner != owner);
+        self.exclusive_owner = Some(owner);
+        Ok(())
+    }
+}
+
+fn file_lease_table() -> &'static Mutex<BTreeMap<u64, FileLeaseState>> {
+    static FILE_LEASES: LazyInit<Mutex<BTreeMap<u64, FileLeaseState>>> = LazyInit::new();
+    let _ = FILE_LEASES.call_once(|| Mutex::new(BTreeMap::new()));
+    &FILE_LEASES
+}
+
+fn file_lease_key(file: &FileEntry) -> u64 {
+    path_inode(Some(file.path.as_str()))
+}
+
+fn file_lease_owner(file: &FileEntry) -> usize {
+    Arc::as_ptr(&file.offset) as usize
+}
+
+fn file_lease_access_allowed(file: &FileEntry, lease_type: u32) -> bool {
+    match lease_type {
+        general::F_RDLCK => file_is_readable(file.status_flags),
+        general::F_WRLCK => file_is_writable(file.status_flags),
+        general::F_UNLCK => true,
+        _ => false,
+    }
+}
+
+fn file_lease_type(file: &FileEntry) -> u32 {
+    file_lease_table()
+        .lock()
+        .get(&file_lease_key(file))
+        .map(|state| state.lease_for(file_lease_owner(file)))
+        .unwrap_or(general::F_UNLCK)
+}
+
+fn apply_file_lease(file: &FileEntry, lease_type: u32) -> Result<(), LinuxError> {
+    let key = file_lease_key(file);
+    let owner = file_lease_owner(file);
+    let mut table = file_lease_table().lock();
+    match lease_type {
+        general::F_UNLCK => {
+            let should_remove = if let Some(state) = table.get_mut(&key) {
+                state.unlock(owner);
+                state.is_empty()
+            } else {
+                false
+            };
+            if should_remove {
+                table.remove(&key);
+            }
+            Ok(())
+        }
+        general::F_RDLCK | general::F_WRLCK => {
+            let state = table.entry(key).or_insert_with(FileLeaseState::new);
+            let result = if lease_type == general::F_RDLCK {
+                state.lock_shared(owner)
+            } else {
+                state.lock_exclusive(owner)
+            };
+            let should_remove = result.is_err() && state.is_empty();
+            if should_remove {
+                table.remove(&key);
+            }
+            result
+        }
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn release_file_lease_on_last_close(file: &FileEntry) {
+    if Arc::strong_count(&file.offset) == 1 {
+        let _ = apply_file_lease(file, general::F_UNLCK);
     }
 }
 
@@ -8580,7 +8792,7 @@ fn open_candidates(
             return Ok(if path_only {
                 FdEntry::Path(PathEntry::synthetic_block(path.as_str()))
             } else {
-                FdEntry::BlockDevice(BlockDeviceEntry { path: path.clone() })
+                FdEntry::BlockDevice(BlockDeviceEntry::new(path.clone(), flags))
             });
         }
         if path == "/dev/misc/rtc" || path == "/dev/rtc" {
@@ -8617,9 +8829,10 @@ fn open_candidates(
                     return Ok(FdEntry::DevZero(fcntl_status_flags(flags)));
                 }
                 (ST_MODE_BLK, _) => {
-                    return Ok(FdEntry::BlockDevice(BlockDeviceEntry {
-                        path: path.clone(),
-                    }));
+                    return Ok(FdEntry::BlockDevice(BlockDeviceEntry::new(
+                        path.clone(),
+                        flags,
+                    )));
                 }
                 _ => {}
             }
@@ -8673,7 +8886,6 @@ fn open_candidates(
                 path: backing_path,
                 status_flags: fcntl_status_flags(flags),
                 offset: Arc::new(Mutex::new(0)),
-                lease_type: Arc::new(Mutex::new(general::F_UNLCK)),
             }));
         }
         if prefer_dir {
@@ -8749,7 +8961,6 @@ fn open_candidates(
                     path: path.clone(),
                     status_flags: fcntl_status_flags(flags),
                     offset: Arc::new(Mutex::new(0)),
-                    lease_type: Arc::new(Mutex::new(general::F_UNLCK)),
                 }));
             }
             Err(err) => {
