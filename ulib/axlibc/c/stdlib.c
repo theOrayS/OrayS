@@ -356,11 +356,25 @@ long double strtold(const char *restrict s, char **restrict p)
 
 typedef int (*cmpfun)(const void *, const void *);
 
-// TODO
 void qsort(void *base, size_t nel, size_t width, cmpfun cmp)
 {
-    unimplemented();
-    return;
+    if (!base || !cmp || width == 0 || nel < 2)
+        return;
+
+    char *array = base;
+    for (size_t i = 1; i < nel; i++) {
+        size_t j = i;
+        while (j > 0 && cmp(array + j * width, array + (j - 1) * width) < 0) {
+            char *lhs = array + (j - 1) * width;
+            char *rhs = array + j * width;
+            for (size_t byte = 0; byte < width; byte++) {
+                char tmp = lhs[byte];
+                lhs[byte] = rhs[byte];
+                rhs[byte] = tmp;
+            }
+            j--;
+        }
+    }
 }
 
 // TODO
@@ -379,7 +393,6 @@ int mkostemp(char *__template, int __flags)
     return -1;
 }
 
-// TODO
 int system(const char *cmd)
 {
     if (!cmd)

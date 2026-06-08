@@ -6,16 +6,14 @@
 #include <time.h>
 #include <unistd.h>
 
-// TODO:
+// axlibc currently runs without a separate POSIX credential backend here.
+// Expose the existing single-user root model explicitly instead of pretending
+// richer uid semantics exist.
 uid_t geteuid(void)
 {
-    // axlibc currently runs without a separate POSIX credential backend here.
-    // Expose the existing single-user root model explicitly instead of
-    // pretending richer uid semantics exist.
     return 0;
 }
 
-// TODO
 uid_t getuid(void)
 {
     // See geteuid().
@@ -30,9 +28,14 @@ pid_t setsid(void)
     return -1;
 }
 
-// TODO
 int isatty(int fd)
 {
+#ifdef AX_CONFIG_FD
+    if (fcntl(fd, F_GETFD) < 0)
+        return 0;
+#else
+    (void)fd;
+#endif
     errno = ENOTTY;
     return 0;
 }

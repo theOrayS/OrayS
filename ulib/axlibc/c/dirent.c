@@ -46,21 +46,27 @@ int dirfd(DIR *d)
     return d->fd;
 }
 
-// TODO
 DIR *opendir(const char *__name)
 {
-    unimplemented();
-    return NULL;
+    int fd = open(__name, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd < 0)
+        return NULL;
+    DIR *dir = fdopendir(fd);
+    if (!dir) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+    }
+    return dir;
 }
 
-// TODO
 struct dirent *readdir(DIR *__dirp)
 {
-    unimplemented();
+    (void)__dirp;
+    errno = ENOSYS;
     return NULL;
 }
 
-// TODO
 int readdir_r(DIR *restrict dir, struct dirent *restrict buf, struct dirent **restrict result)
 {
     struct dirent *de;
@@ -85,7 +91,6 @@ int readdir_r(DIR *restrict dir, struct dirent *restrict buf, struct dirent **re
     return 0;
 }
 
-// TODO
 void rewinddir(DIR *dir)
 {
     // LOCK(dir->lock);

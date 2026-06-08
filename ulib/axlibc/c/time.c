@@ -168,11 +168,9 @@ int utimes(const char *filename, const struct timeval times[2])
     return -1;
 }
 
-// TODO
 void tzset()
 {
-    unimplemented();
-    return;
+    timezone = 0;
 }
 
 // TODO
