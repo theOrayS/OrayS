@@ -6,7 +6,7 @@ use axsync::Mutex;
 use linux_raw_sys::general;
 use std::sync::Arc;
 
-use super::linux_abi::SIGALRM_NUM;
+use super::linux_abi::{SIGALRM_NUM, SIGPROF_NUM, SIGVTALRM_NUM};
 use super::process_lifecycle::terminate_current_thread_for_exit_group;
 use super::signal_abi::{
     current_unblocked_signal_pending, deliver_user_signal, validate_signal_target,
@@ -34,33 +34,38 @@ impl UserProcess {
         self.real_timer_deadline_us.load(Ordering::Acquire) != 0
     }
 
-    fn take_expired_real_timer(&self, allow_interval: bool) -> Option<u64> {
-        let deadline = self.real_timer_deadline_us.load(Ordering::Acquire);
-        if deadline == 0 || monotonic_time_micros() < deadline {
+    fn take_expired_itimer(&self, which: i32, allow_interval: bool) -> Option<u64> {
+        let (deadline_cell, interval_cell) = itimer_cells(self, which).ok()?;
+        let deadline = deadline_cell.load(Ordering::Acquire);
+        let now = itimer_clock_micros(self, which).ok()?;
+        if deadline == 0 || now < deadline {
             return None;
         }
 
-        let interval = self.real_timer_interval_us.load(Ordering::Acquire);
+        let interval = interval_cell.load(Ordering::Acquire);
         if interval != 0 && !allow_interval {
             return None;
         }
         let next_deadline = if interval == 0 {
             0
         } else {
-            monotonic_time_micros().saturating_add(interval)
+            now.saturating_add(interval)
         };
-        if self
-            .real_timer_deadline_us
+        if deadline_cell
             .compare_exchange(deadline, next_deadline, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
         {
             return None;
         }
 
-        if interval == 0 {
+        if interval == 0 && which == general::ITIMER_REAL as i32 {
             self.real_timer_generation.fetch_add(1, Ordering::AcqRel);
         }
         Some(interval)
+    }
+
+    fn take_expired_real_timer(&self, allow_interval: bool) -> Option<u64> {
+        self.take_expired_itimer(general::ITIMER_REAL as i32, allow_interval)
     }
 
     pub(super) fn consume_expired_real_timer(&self) -> bool {
@@ -71,6 +76,22 @@ impl UserProcess {
             let _ = deliver_user_signal(&entry, SIGALRM_NUM, 0);
         }
         true
+    }
+
+    pub(super) fn consume_expired_cpu_timers(&self) -> bool {
+        let mut delivered = false;
+        for (which, signo) in [
+            (general::ITIMER_VIRTUAL as i32, SIGVTALRM_NUM),
+            (general::ITIMER_PROF as i32, SIGPROF_NUM),
+        ] {
+            if self.take_expired_itimer(which, true).is_some() {
+                if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
+                    let _ = deliver_user_signal(&entry, signo, 0);
+                }
+                delivered = true;
+            }
+        }
+        delivered
     }
 }
 
@@ -285,6 +306,30 @@ pub(super) fn process_times(process: &UserProcess) -> Tms {
     }
 }
 
+fn ticks_to_micros(ticks: c_long) -> u64 {
+    if ticks <= 0 {
+        0
+    } else {
+        (ticks as u64).saturating_mul(1_000_000) / USER_HZ as u64
+    }
+}
+
+fn itimer_clock_micros(process: &UserProcess, which: i32) -> Result<u64, LinuxError> {
+    match which {
+        value if value == general::ITIMER_REAL as i32 => Ok(monotonic_time_micros()),
+        value if value == general::ITIMER_VIRTUAL as i32 => {
+            Ok(ticks_to_micros(process_times(process).tms_utime))
+        }
+        value if value == general::ITIMER_PROF as i32 => {
+            let times = process_times(process);
+            Ok(ticks_to_micros(
+                times.tms_utime.saturating_add(times.tms_stime),
+            ))
+        }
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
 pub(super) fn monotonic_time_micros() -> u64 {
     axhal::time::monotonic_time()
         .as_micros()
@@ -485,10 +530,11 @@ fn itimer_cells(process: &UserProcess, which: i32) -> Result<(&AtomicU64, &Atomi
 fn current_itimer(process: &UserProcess, which: i32) -> Result<general::itimerval, LinuxError> {
     let (deadline_cell, interval_cell) = itimer_cells(process, which)?;
     let deadline = deadline_cell.load(Ordering::Acquire);
+    let now = itimer_clock_micros(process, which)?;
     let remaining = if deadline == 0 {
         0
     } else {
-        deadline.saturating_sub(monotonic_time_micros())
+        deadline.saturating_sub(now)
     };
     Ok(general::itimerval {
         it_interval: micros_to_timeval(interval_cell.load(Ordering::Acquire)),
@@ -896,18 +942,15 @@ pub(super) fn sys_setitimer(
         },
         None => (0, 0),
     };
-    if which != general::ITIMER_REAL as i32 && (first_us != 0 || interval_us != 0) {
-        return neg_errno(LinuxError::EOPNOTSUPP);
-    }
-
     interval_cell.store(interval_us, Ordering::Release);
     if first_us == 0 {
         deadline_cell.store(0, Ordering::Release);
     } else {
-        deadline_cell.store(
-            monotonic_time_micros().saturating_add(first_us),
-            Ordering::Release,
-        );
+        let now_us = match itimer_clock_micros(process, which) {
+            Ok(now) => now,
+            Err(err) => return neg_errno(err),
+        };
+        deadline_cell.store(now_us.saturating_add(first_us), Ordering::Release);
     }
     if which == general::ITIMER_REAL as i32 {
         let generation = process.real_timer_generation.fetch_add(1, Ordering::AcqRel) + 1;

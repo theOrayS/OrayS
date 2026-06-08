@@ -56,6 +56,23 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SIGEV_THREAD", result.stdout)
 
+    def test_detects_itimer_virtual_prof_rejection(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/time_abi.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "    interval_cell.store(interval_us, Ordering::Release);",
+            "    if which != general::ITIMER_REAL as i32 && (first_us != 0 || interval_us != 0) {\n"
+            "        return neg_errno(LinuxError::EOPNOTSUPP);\n"
+            "    }\n\n"
+            "    interval_cell.store(interval_us, Ordering::Release);",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ITIMER_VIRTUAL/PROF", result.stdout)
+
     def test_detects_recvmsg_first_iov_only(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/fd_socket.rs"
