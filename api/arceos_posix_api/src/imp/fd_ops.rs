@@ -3,7 +3,7 @@ use core::ffi::c_int;
 
 use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
-use axns::{def_resource, ResArc};
+use axns::{ResArc, def_resource};
 use flatten_objects::FlattenObjects;
 use spin::RwLock;
 
@@ -79,9 +79,10 @@ pub fn close_file_like(fd: c_int) -> LinuxResult {
 /// Close a file by `fd`.
 pub fn sys_close(fd: c_int) -> c_int {
     debug!("sys_close <= {}", fd);
-    if (0..=2).contains(&fd) {
-        return 0; // stdin, stdout, stderr
-    }
+    // stdin/stdout/stderr are ordinary descriptors once installed in the
+    // process FD table.  Closing them must make later I/O observe EBADF and
+    // free the descriptor for reuse; returning success without removing the
+    // entry hides real POSIX-visible state changes.
     syscall_body!(sys_close, close_file_like(fd).map(|_| 0))
 }
 
@@ -158,8 +159,6 @@ pub fn sys_dup2(old_fd: c_int, new_fd: c_int) -> c_int {
 }
 
 /// Manipulate file descriptor.
-///
-/// TODO: `SET/GET` command is ignored, hard-code stdin/stdout
 pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
     debug!("sys_fcntl <= fd: {} cmd: {} arg: {}", fd, cmd, arg);
     syscall_body!(sys_fcntl, {

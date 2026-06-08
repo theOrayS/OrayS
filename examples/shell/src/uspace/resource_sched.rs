@@ -1,5 +1,6 @@
 use core::cmp;
 use core::mem::size_of;
+use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
@@ -7,8 +8,8 @@ use linux_raw_sys::general;
 use std::vec::Vec;
 
 use super::linux_abi::{
-    neg_errno, DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
-    USER_STACK_SIZE,
+    DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
+    USER_STACK_SIZE, neg_errno,
 };
 use super::task_registry::{
     live_user_process_entries, user_thread_entries_by_process_group,
@@ -18,7 +19,7 @@ use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{task_context::current_tid, UserProcess};
+use super::{UserProcess, task_context::current_tid};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -132,23 +133,20 @@ impl UserProcess {
     }
 
     pub(super) fn nice(&self) -> i32 {
-        self.nice.load(core::sync::atomic::Ordering::Acquire)
+        self.nice.load(Ordering::Acquire)
     }
 
     pub(super) fn set_nice(&self, nice: i32) {
-        self.nice.store(
-            nice.clamp(MIN_NICE, MAX_NICE),
-            core::sync::atomic::Ordering::Release,
-        );
+        self.nice
+            .store(nice.clamp(MIN_NICE, MAX_NICE), Ordering::Release);
     }
 
     pub(super) fn ioprio(&self) -> u32 {
-        self.ioprio.load(core::sync::atomic::Ordering::Acquire)
+        self.ioprio.load(Ordering::Acquire)
     }
 
     pub(super) fn set_ioprio(&self, ioprio: u32) {
-        self.ioprio
-            .store(ioprio, core::sync::atomic::Ordering::Release);
+        self.ioprio.store(ioprio, Ordering::Release);
     }
 }
 
@@ -165,9 +163,13 @@ const IOPRIO_CLASS_RT: u32 = 1;
 const IOPRIO_CLASS_BE: u32 = 2;
 const IOPRIO_CLASS_IDLE: u32 = 3;
 const IOPRIO_NR_LEVELS: u32 = 8;
+const DEFAULT_IOPRIO: u32 = (IOPRIO_CLASS_BE << IOPRIO_CLASS_SHIFT) | 4;
+
+static SYNTHETIC_INIT_NICE: AtomicI32 = AtomicI32::new(DEFAULT_NICE);
+static SYNTHETIC_INIT_IOPRIO: AtomicU32 = AtomicU32::new(DEFAULT_IOPRIO);
 
 pub(super) fn default_ioprio() -> u32 {
-    encode_ioprio(IOPRIO_CLASS_BE, 4)
+    DEFAULT_IOPRIO
 }
 
 fn encode_ioprio(class: u32, data: u32) -> u32 {
@@ -325,7 +327,7 @@ impl UserProcessRef<'_> {
         match self {
             UserProcessRef::Borrowed(process) => process.nice(),
             UserProcessRef::Owned(process) => process.nice(),
-            UserProcessRef::InitProcess => DEFAULT_NICE,
+            UserProcessRef::InitProcess => SYNTHETIC_INIT_NICE.load(Ordering::Acquire),
         }
     }
 
@@ -341,7 +343,9 @@ impl UserProcessRef<'_> {
         match self {
             UserProcessRef::Borrowed(process) => process.set_nice(nice),
             UserProcessRef::Owned(process) => process.set_nice(nice),
-            UserProcessRef::InitProcess => {}
+            UserProcessRef::InitProcess => {
+                SYNTHETIC_INIT_NICE.store(clamp_nice(nice), Ordering::Release)
+            }
         }
     }
 
@@ -349,7 +353,7 @@ impl UserProcessRef<'_> {
         match self {
             UserProcessRef::Borrowed(process) => process.ioprio(),
             UserProcessRef::Owned(process) => process.ioprio(),
-            UserProcessRef::InitProcess => default_ioprio(),
+            UserProcessRef::InitProcess => SYNTHETIC_INIT_IOPRIO.load(Ordering::Acquire),
         }
     }
 
@@ -357,8 +361,12 @@ impl UserProcessRef<'_> {
         match self {
             UserProcessRef::Borrowed(process) => process.set_ioprio(ioprio),
             UserProcessRef::Owned(process) => process.set_ioprio(ioprio),
-            UserProcessRef::InitProcess => {}
+            UserProcessRef::InitProcess => SYNTHETIC_INIT_IOPRIO.store(ioprio, Ordering::Release),
         }
+    }
+
+    fn is_current_process(&self) -> bool {
+        matches!(self, UserProcessRef::Borrowed(_))
     }
 }
 
@@ -389,8 +397,12 @@ pub(super) fn sys_setpriority(process: &UserProcess, which: u32, who: i32, nice:
             return neg_errno(LinuxError::EACCES);
         }
     }
+    let updates_current_task = targets.iter().any(UserProcessRef::is_current_process);
     for target in targets {
         target.set_nice(nice);
+    }
+    if updates_current_task {
+        let _ = axtask::set_priority(nice as isize);
     }
     0
 }

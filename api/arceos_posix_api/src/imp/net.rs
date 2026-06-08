@@ -1,4 +1,9 @@
-use alloc::{sync::Arc, vec, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::ffi::{c_char, c_int, c_void};
 use core::mem::size_of;
 use core::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -20,6 +25,106 @@ const SHUT_RDWR: c_int = 2;
 const MSG_OOB: c_int = 0x1;
 const MSG_ERRQUEUE: c_int = 0x2000;
 const UDP_MAX_PAYLOAD_LEN: usize = 65_507;
+const SOCKET_STAT_DEV: ctypes::dev_t = 1;
+const SOCKET_STAT_BLKSIZE: ctypes::blksize_t = 4096;
+const AI_PASSIVE: c_int = 0x01;
+const AI_CANONNAME: c_int = 0x02;
+const AI_NUMERICHOST: c_int = 0x04;
+const AI_ADDRCONFIG: c_int = 0x20;
+const AI_NUMERICSERV: c_int = 0x400;
+const SUPPORTED_AI_FLAGS: c_int =
+    AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_ADDRCONFIG | AI_NUMERICSERV;
+
+#[derive(Clone, Copy)]
+struct ResolvedAddrInfoHints {
+    flags: c_int,
+    socktype: c_int,
+    protocol: c_int,
+}
+
+impl ResolvedAddrInfoHints {
+    fn from_ptr(hints: *const ctypes::addrinfo) -> Result<Self, c_int> {
+        let raw = if hints.is_null() {
+            ctypes::addrinfo::default()
+        } else {
+            unsafe { *hints }
+        };
+        if raw.ai_flags & !SUPPORTED_AI_FLAGS != 0 {
+            return Err(ctypes::EAI_BADFLAGS);
+        }
+        match raw.ai_family as u32 {
+            ctypes::AF_UNSPEC | ctypes::AF_INET => {}
+            _ => return Err(ctypes::EAI_FAMILY),
+        }
+        let (socktype, protocol) =
+            normalize_getaddrinfo_socktype(raw.ai_socktype, raw.ai_protocol)?;
+        Ok(Self {
+            flags: raw.ai_flags,
+            socktype,
+            protocol,
+        })
+    }
+}
+
+fn normalize_getaddrinfo_socktype(
+    socktype: c_int,
+    protocol: c_int,
+) -> Result<(c_int, c_int), c_int> {
+    match (socktype as u32, protocol as u32) {
+        (0, 0) => Ok((ctypes::SOCK_STREAM as c_int, ctypes::IPPROTO_TCP as c_int)),
+        (0, ctypes::IPPROTO_TCP) => {
+            Ok((ctypes::SOCK_STREAM as c_int, ctypes::IPPROTO_TCP as c_int))
+        }
+        (0, ctypes::IPPROTO_UDP) => Ok((ctypes::SOCK_DGRAM as c_int, ctypes::IPPROTO_UDP as c_int)),
+        (ctypes::SOCK_STREAM, 0 | ctypes::IPPROTO_TCP) => {
+            Ok((ctypes::SOCK_STREAM as c_int, ctypes::IPPROTO_TCP as c_int))
+        }
+        (ctypes::SOCK_DGRAM, 0 | ctypes::IPPROTO_UDP) => {
+            Ok((ctypes::SOCK_DGRAM as c_int, ctypes::IPPROTO_UDP as c_int))
+        }
+        (ctypes::SOCK_STREAM | ctypes::SOCK_DGRAM, _) => Err(ctypes::EAI_SERVICE),
+        _ => Err(ctypes::EAI_SOCKTYPE),
+    }
+}
+
+fn optional_cstr(ptr: *const c_char) -> Result<Option<&'static str>, c_int> {
+    if ptr.is_null() {
+        return Ok(None);
+    }
+    char_ptr_to_str(ptr).map(Some).map_err(|_| ctypes::EAI_FAIL)
+}
+
+fn parse_getaddrinfo_service(servname: Option<&str>) -> Result<u16, c_int> {
+    let Some(service) = servname else {
+        return Ok(0);
+    };
+    if service.is_empty() {
+        return Ok(0);
+    }
+    match service.parse::<u16>() {
+        Ok(port) => Ok(port),
+        Err(_) => Err(ctypes::EAI_SERVICE),
+    }
+}
+
+fn copy_canonname_to_aibuf(buf: &mut ctypes::aibuf, canonname: Option<&str>) {
+    let Some(canonname) = canonname else {
+        return;
+    };
+    if buf.canonname.is_empty() {
+        return;
+    }
+    let max_len = buf.canonname.len() - 1;
+    let len = core::cmp::min(canonname.len(), max_len);
+    for (dst, src) in buf.canonname[..len]
+        .iter_mut()
+        .zip(canonname.as_bytes().iter().copied())
+    {
+        *dst = src as c_char;
+    }
+    buf.canonname[len] = 0;
+    buf.ai.ai_canonname = buf.canonname.as_mut_ptr();
+}
 
 unsafe fn readable_socket_buffer<'a>(
     buf: *const c_void,
@@ -273,15 +378,16 @@ impl FileLike for Socket {
     }
 
     fn stat(&self) -> LinuxResult<ctypes::stat> {
-        // not really implemented
         let st_mode = 0o140000 | 0o777u32; // S_IFSOCK | rwxrwxrwx
+        let inode = (self as *const Self as usize as ctypes::ino_t).max(1);
         Ok(ctypes::stat {
-            st_ino: 1,
+            st_dev: SOCKET_STAT_DEV,
+            st_ino: inode,
             st_nlink: 1,
             st_mode,
-            st_uid: 1000,
-            st_gid: 1000,
-            st_blksize: 4096,
+            st_uid: 0,
+            st_gid: 0,
+            st_blksize: SOCKET_STAT_BLKSIZE,
             ..Default::default()
         })
     }
@@ -359,17 +465,17 @@ fn sockaddr_from_ipv4(addr: ctypes::sockaddr_in) -> ctypes::sockaddr {
     }
 }
 
-fn into_sockaddr(addr: SocketAddr) -> (ctypes::sockaddr, ctypes::socklen_t) {
+fn into_sockaddr(addr: SocketAddr) -> LinuxResult<(ctypes::sockaddr, ctypes::socklen_t)> {
     debug!("    Sockaddr: {}", addr);
     match addr {
         SocketAddr::V4(addr) => {
             let addr = ctypes::sockaddr_in::from(addr);
-            (
+            Ok((
                 sockaddr_from_ipv4(addr),
                 size_of::<ctypes::sockaddr>() as ctypes::socklen_t,
-            )
+            ))
         }
-        SocketAddr::V6(_) => panic!("IPv6 is not supported"),
+        SocketAddr::V6(_) => Err(LinuxError::EAFNOSUPPORT),
     }
 }
 
@@ -381,12 +487,13 @@ unsafe fn write_sockaddr_output(
     addr: *mut ctypes::sockaddr,
     addrlen: *mut ctypes::socklen_t,
     value: SocketAddr,
-) {
-    let (sockaddr, len) = into_sockaddr(value);
+) -> LinuxResult<()> {
+    let (sockaddr, len) = into_sockaddr(value)?;
     unsafe {
         core::ptr::write_unaligned(addr, sockaddr);
         core::ptr::write_unaligned(addrlen, len);
     }
+    Ok(())
 }
 
 fn from_sockaddr(
@@ -561,7 +668,7 @@ pub unsafe fn sys_recvfrom(
 
         let res = socket.recvfrom(buf)?;
         if let Some(addr) = res.1 {
-            unsafe { write_sockaddr_output(socket_addr, addrlen, addr) };
+            unsafe { write_sockaddr_output(socket_addr, addrlen, addr)? };
         }
         Ok(res.0)
     })
@@ -626,7 +733,7 @@ pub unsafe fn sys_accept(
         let new_socket = socket.accept()?;
         let addr = new_socket.peer_addr()?;
         let new_fd = Socket::add_to_fd_table(Socket::Tcp(Mutex::new(new_socket)))?;
-        unsafe { write_sockaddr_output(socket_addr, socket_len, addr) };
+        unsafe { write_sockaddr_output(socket_addr, socket_len, addr)? };
         Ok(new_fd)
     })
 }
@@ -644,10 +751,11 @@ pub fn sys_shutdown(socket_fd: c_int, flag: c_int) -> c_int {
 
 /// Query addresses for a domain name.
 ///
-/// Only IPv4. Ports are always 0. Ignore servname and hint.
-/// Results' ai_flags and ai_canonname are 0 or NULL.
+/// IPv4 TCP and UDP are supported.  Unsupported families, socket types,
+/// protocols, flags, and non-numeric services return standard EAI_* errors
+/// instead of silently producing a TCP/IPv4 answer or panicking on IPv6.
 ///
-/// Return address number if success.
+/// Return address number if success, 0 for no name, or a negative EAI_* value.
 ///
 /// # Safety
 ///
@@ -655,73 +763,115 @@ pub fn sys_shutdown(socket_fd: c_int, flag: c_int) -> c_int {
 pub unsafe fn sys_getaddrinfo(
     nodename: *const c_char,
     servname: *const c_char,
-    _hints: *const ctypes::addrinfo,
+    hints: *const ctypes::addrinfo,
     res: *mut *mut ctypes::addrinfo,
 ) -> c_int {
-    let name = char_ptr_to_str(nodename);
-    let port = char_ptr_to_str(servname);
-    debug!("sys_getaddrinfo <= {:?} {:?}", name, port);
-    syscall_body!(sys_getaddrinfo, {
-        if nodename.is_null() && servname.is_null() {
-            return Ok(0);
-        }
+    let name = optional_cstr(nodename);
+    let service = optional_cstr(servname);
+    debug!("sys_getaddrinfo <= {:?} {:?}", name, service);
+    let result = (|| -> Result<c_int, c_int> {
         if res.is_null() {
-            return Err(LinuxError::EFAULT);
+            return Err(ctypes::EAI_SYSTEM);
         }
+        unsafe { write_addrinfo_result(res, core::ptr::null_mut()) };
 
-        let port = port.map_or(0, |p| p.parse::<u16>().unwrap_or(0));
-        let ip_addrs = if let Ok(domain) = name {
-            if let Ok(a) = domain.parse::<IpAddr>() {
-                vec![a]
-            } else {
-                axnet::dns_query(domain)?
+        let hints = ResolvedAddrInfoHints::from_ptr(hints)?;
+        let name = name?;
+        let service = service?;
+        if name.is_none() && service.is_none() {
+            return Err(ctypes::EAI_NONAME);
+        }
+        let port = parse_getaddrinfo_service(service)?;
+
+        let ip_addrs = match name {
+            Some(domain) if domain.is_empty() => vec![Ipv4Addr::LOCALHOST.into()],
+            Some(domain) => {
+                if let Ok(ip) = domain.parse::<IpAddr>() {
+                    vec![ip]
+                } else {
+                    if hints.flags & AI_NUMERICHOST != 0 {
+                        return Err(ctypes::EAI_NONAME);
+                    }
+                    axnet::dns_query(domain).map_err(|_| ctypes::EAI_NONAME)?
+                }
             }
-        } else {
-            vec![Ipv4Addr::LOCALHOST.into()]
+            None if hints.flags & AI_PASSIVE != 0 => vec![Ipv4Addr::UNSPECIFIED.into()],
+            None => vec![Ipv4Addr::LOCALHOST.into()],
         };
 
-        let len = ip_addrs.len().min(ctypes::MAXADDRS as usize);
-        if len == 0 {
-            return Ok(0);
-        }
+        let canonname = if hints.flags & AI_CANONNAME != 0 {
+            match name {
+                Some(domain) if !domain.is_empty() => Some(String::from(domain)),
+                _ => ip_addrs.iter().find_map(|ip| match ip {
+                    IpAddr::V4(ip) => Some(ip.to_string()),
+                    IpAddr::V6(_) => None,
+                }),
+            }
+        } else {
+            None
+        };
 
-        let mut out: Vec<ctypes::aibuf> = Vec::with_capacity(len);
-        for (i, &ip) in ip_addrs.iter().enumerate().take(len) {
-            let buf = match ip {
-                IpAddr::V4(ip) => ctypes::aibuf {
-                    ai: ctypes::addrinfo {
-                        ai_family: ctypes::AF_INET as _,
-                        // TODO: This is a hard-code part, only return TCP parameters
-                        ai_socktype: ctypes::SOCK_STREAM as _,
-                        ai_protocol: ctypes::IPPROTO_TCP as _,
-                        ai_addrlen: size_of::<ctypes::sockaddr_in>() as _,
-                        ai_addr: core::ptr::null_mut(),
-                        ai_canonname: core::ptr::null_mut(),
-                        ai_next: core::ptr::null_mut(),
-                        ai_flags: 0,
-                    },
-                    sa: ctypes::aibuf_sa {
-                        sin: SocketAddrV4::new(ip, port).into(),
-                    },
-                    slot: i as i16,
-                    lock: [0],
-                    ref_: 0,
+        let max_results = core::cmp::min(ip_addrs.len(), ctypes::MAXADDRS as usize);
+        let mut out: Vec<ctypes::aibuf> = Vec::with_capacity(max_results);
+        let mut saw_unsupported_ip = false;
+        for ip in ip_addrs.into_iter().take(max_results) {
+            let IpAddr::V4(ip) = ip else {
+                saw_unsupported_ip = true;
+                continue;
+            };
+            let i = out.len();
+            let buf = ctypes::aibuf {
+                ai: ctypes::addrinfo {
+                    ai_family: ctypes::AF_INET as _,
+                    ai_socktype: hints.socktype,
+                    ai_protocol: hints.protocol,
+                    ai_addrlen: size_of::<ctypes::sockaddr_in>() as _,
+                    ai_addr: core::ptr::null_mut(),
+                    ai_canonname: core::ptr::null_mut(),
+                    ai_next: core::ptr::null_mut(),
+                    ai_flags: hints.flags,
                 },
-                _ => panic!("IPv6 is not supported"),
+                sa: ctypes::aibuf_sa {
+                    sin: SocketAddrV4::new(ip, port).into(),
+                },
+                canonname: [0; 256],
+                slot: i as i16,
+                lock: [0],
+                ref_: 0,
             };
             out.push(buf);
             out[i].ai.ai_addr =
                 unsafe { core::ptr::addr_of_mut!(out[i].sa.sin) as *mut ctypes::sockaddr };
+            if i == 0 {
+                copy_canonname_to_aibuf(&mut out[i], canonname.as_deref());
+            }
             if i > 0 {
                 out[i - 1].ai.ai_next = core::ptr::addr_of_mut!(out[i].ai);
             }
         }
 
+        if out.is_empty() {
+            return Err(if saw_unsupported_ip {
+                ctypes::EAI_FAMILY
+            } else {
+                ctypes::EAI_NONAME
+            });
+        }
+        let len = out.len();
         out[0].ref_ = len as i16;
         unsafe { write_addrinfo_result(res, core::ptr::addr_of_mut!(out[0].ai)) };
         core::mem::forget(out); // drop in `sys_freeaddrinfo`
-        Ok(len)
-    })
+        Ok(len as c_int)
+    })();
+    match result {
+        Ok(count) => count,
+        Err(err) => {
+            if !res.is_null() {
+                unsafe { write_addrinfo_result(res, core::ptr::null_mut()) };
+            }
+            err
+        }
+    }
 }
 
 /// Write the allocated addrinfo result head back to the caller.
@@ -779,7 +929,7 @@ pub unsafe fn sys_getsockname(
             return Err(LinuxError::EINVAL);
         }
         let sockaddr = Socket::from_fd(sock_fd)?.local_addr()?;
-        unsafe { write_sockaddr_output(addr, addrlen, sockaddr) };
+        unsafe { write_sockaddr_output(addr, addrlen, sockaddr)? };
         Ok(0)
     })
 }
@@ -802,7 +952,7 @@ pub unsafe fn sys_getpeername(
             return Err(LinuxError::EINVAL);
         }
         let sockaddr = Socket::from_fd(sock_fd)?.peer_addr()?;
-        unsafe { write_sockaddr_output(addr, addrlen, sockaddr) };
+        unsafe { write_sockaddr_output(addr, addrlen, sockaddr)? };
         Ok(0)
     })
 }

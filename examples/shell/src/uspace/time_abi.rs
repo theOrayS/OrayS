@@ -1,5 +1,5 @@
 use core::ffi::c_long;
-use core::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 
 use axerrno::LinuxError;
 use axsync::Mutex;
@@ -14,9 +14,36 @@ use super::signal_abi::{
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
 use super::user_memory::{read_user_value, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
+static TIME_DISCIPLINE: TimeDisciplineState = TimeDisciplineState::new();
+
+struct TimeDisciplineState {
+    offset: AtomicI64,
+    freq: AtomicI64,
+    maxerror: AtomicI64,
+    esterror: AtomicI64,
+    status: AtomicI32,
+    constant: AtomicI64,
+    tick: AtomicI64,
+    tai: AtomicI32,
+}
+
+impl TimeDisciplineState {
+    const fn new() -> Self {
+        Self {
+            offset: AtomicI64::new(0),
+            freq: AtomicI64::new(0),
+            maxerror: AtomicI64::new(0),
+            esterror: AtomicI64::new(0),
+            status: AtomicI32::new(0),
+            constant: AtomicI64::new(0),
+            tick: AtomicI64::new(10_000),
+            tai: AtomicI32::new(0),
+        }
+    }
+}
 
 const NSEC_PER_SEC: i128 = 1_000_000_000;
 pub(super) const USER_HZ: c_long = 100;
@@ -354,9 +381,10 @@ pub(super) fn timespec_to_duration(
 
 pub(super) fn clock_now_duration(clockid: u32) -> Result<core::time::Duration, LinuxError> {
     match clockid {
-        general::CLOCK_REALTIME | general::CLOCK_REALTIME_COARSE | general::CLOCK_TAI => {
-            Ok(adjusted_wall_time())
-        }
+        general::CLOCK_REALTIME | general::CLOCK_REALTIME_COARSE => Ok(adjusted_wall_time()),
+        general::CLOCK_TAI => Ok(adjusted_wall_time_with_extra_ns(
+            TIME_DISCIPLINE.tai.load(Ordering::Acquire) as i128 * NSEC_PER_SEC,
+        )),
         general::CLOCK_MONOTONIC
         | general::CLOCK_MONOTONIC_RAW
         | general::CLOCK_MONOTONIC_COARSE
@@ -394,9 +422,13 @@ fn duration_mul_saturating(
 }
 
 pub(super) fn adjusted_wall_time() -> core::time::Duration {
+    adjusted_wall_time_with_extra_ns(0)
+}
+
+fn adjusted_wall_time_with_extra_ns(extra_ns: i128) -> core::time::Duration {
     let raw_ns = duration_to_ns_i128(axhal::time::wall_time());
     let offset_ns = REALTIME_OFFSET_NS.load(Ordering::Acquire) as i128;
-    let adjusted_ns = raw_ns + offset_ns;
+    let adjusted_ns = raw_ns + offset_ns + extra_ns;
     if adjusted_ns <= 0 {
         return core::time::Duration::ZERO;
     }
@@ -409,6 +441,22 @@ pub(super) fn set_realtime_offset_from_timespec(ts: general::timespec) {
     let target_ns = ts.tv_sec as i128 * NSEC_PER_SEC + ts.tv_nsec as i128;
     let raw_ns = duration_to_ns_i128(axhal::time::wall_time());
     REALTIME_OFFSET_NS.store(clamp_i128_to_i64(target_ns - raw_ns), Ordering::Release);
+}
+
+fn add_realtime_offset_ns(delta_ns: i128) {
+    let mut current = REALTIME_OFFSET_NS.load(Ordering::Acquire);
+    loop {
+        let next = clamp_i128_to_i64(current as i128 + delta_ns);
+        match REALTIME_OFFSET_NS.compare_exchange(
+            current,
+            next,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => return,
+            Err(observed) => current = observed,
+        }
+    }
 }
 
 fn duration_to_ns_i128(duration: core::time::Duration) -> i128 {
@@ -477,14 +525,32 @@ pub(super) fn adjtimex_input_valid(input: UserTimex) -> bool {
     if !adjtimex_modes_valid(modes) {
         return false;
     }
-    if modes & ADJ_TICK != 0 {
-        return adjtimex_tick_valid(input.tick);
+    if modes & ADJ_MICRO != 0 && modes & ADJ_NANO != 0 {
+        return false;
+    }
+    if modes & ADJ_TICK != 0 && !adjtimex_tick_valid(input.tick) {
+        return false;
+    }
+    if modes & ADJ_SETOFFSET != 0 {
+        let bound = if modes & ADJ_NANO != 0 {
+            1_000_000_000
+        } else {
+            1_000_000
+        };
+        if input.time.tv_usec <= -bound || input.time.tv_usec >= bound {
+            return false;
+        }
     }
     true
 }
 
+fn adjtimex_unsupported_update(input: UserTimex) -> bool {
+    let unsupported_effect_modes = ADJ_FREQUENCY | ADJ_TIMECONST | ADJ_TICK;
+    input.modes & unsupported_effect_modes != 0
+}
+
 pub(super) fn adjtimex_changes_clock(input: UserTimex) -> bool {
-    input.modes != 0
+    input.modes != 0 && input.modes != ADJ_OFFSET_SS_READ
 }
 
 fn default_timex() -> UserTimex {
@@ -496,9 +562,87 @@ fn default_timex() -> UserTimex {
     output
 }
 
+fn current_timex() -> UserTimex {
+    let mut output = default_timex();
+    output.offset = TIME_DISCIPLINE.offset.load(Ordering::Acquire) as c_long;
+    output.freq = TIME_DISCIPLINE.freq.load(Ordering::Acquire) as c_long;
+    output.maxerror = TIME_DISCIPLINE.maxerror.load(Ordering::Acquire) as c_long;
+    output.esterror = TIME_DISCIPLINE.esterror.load(Ordering::Acquire) as c_long;
+    output.status = TIME_DISCIPLINE.status.load(Ordering::Acquire);
+    output.constant = TIME_DISCIPLINE.constant.load(Ordering::Acquire) as c_long;
+    output.tick = TIME_DISCIPLINE.tick.load(Ordering::Acquire) as c_long;
+    output.tai = TIME_DISCIPLINE.tai.load(Ordering::Acquire);
+    output
+}
+
 pub(super) fn write_default_timex(process: &UserProcess, tx: usize) -> isize {
-    let output = default_timex();
+    let output = current_timex();
     write_user_value(process, tx, &output)
+}
+
+fn adjtimex_subsecond_scale(input: UserTimex) -> i128 {
+    if input.modes & ADJ_NANO != 0 {
+        1
+    } else {
+        1_000
+    }
+}
+
+fn adjtimex_offset_delta_ns(input: UserTimex) -> i128 {
+    (input.offset as i128).saturating_mul(adjtimex_subsecond_scale(input))
+}
+
+fn adjtimex_setoffset_delta_ns(input: UserTimex) -> i128 {
+    let subsecond = (input.time.tv_usec as i128).saturating_mul(adjtimex_subsecond_scale(input));
+    (input.time.tv_sec as i128)
+        .saturating_mul(NSEC_PER_SEC)
+        .saturating_add(subsecond)
+}
+
+fn apply_adjtimex_update(input: UserTimex) {
+    let modes = input.modes;
+    if modes & ADJ_OFFSET != 0 || modes == ADJ_OFFSET_SINGLESHOT {
+        TIME_DISCIPLINE
+            .offset
+            .store(input.offset as i64, Ordering::Release);
+        add_realtime_offset_ns(adjtimex_offset_delta_ns(input));
+    }
+    if modes & ADJ_SETOFFSET != 0 {
+        add_realtime_offset_ns(adjtimex_setoffset_delta_ns(input));
+    }
+    if modes & ADJ_FREQUENCY != 0 {
+        TIME_DISCIPLINE
+            .freq
+            .store(input.freq as i64, Ordering::Release);
+    }
+    if modes & ADJ_MAXERROR != 0 {
+        TIME_DISCIPLINE
+            .maxerror
+            .store(input.maxerror as i64, Ordering::Release);
+    }
+    if modes & ADJ_ESTERROR != 0 {
+        TIME_DISCIPLINE
+            .esterror
+            .store(input.esterror as i64, Ordering::Release);
+    }
+    if modes & ADJ_STATUS != 0 {
+        TIME_DISCIPLINE
+            .status
+            .store(input.status, Ordering::Release);
+    }
+    if modes & ADJ_TIMECONST != 0 {
+        TIME_DISCIPLINE
+            .constant
+            .store(input.constant as i64, Ordering::Release);
+    }
+    if modes & ADJ_TICK != 0 {
+        TIME_DISCIPLINE
+            .tick
+            .store(input.tick as i64, Ordering::Release);
+    }
+    if modes & ADJ_TAI != 0 {
+        TIME_DISCIPLINE.tai.store(input.tai, Ordering::Release);
+    }
 }
 
 pub(super) fn itimerval_to_micros_pair(
@@ -688,44 +832,46 @@ fn deliver_posix_timer_signal(process: &Arc<UserProcess>, notify: PosixTimerNoti
 }
 
 fn arm_posix_timer(process: Arc<UserProcess>, timer: UserPosixTimer, generation: u64) {
-    let _ = axtask::spawn(move || loop {
-        if process.live_threads.load(Ordering::Acquire) == 0
-            || timer.generation.load(Ordering::Acquire) != generation
-        {
-            break;
-        }
-        let delay = {
-            let state = timer.state.lock();
-            let Some(deadline) = state.deadline else {
+    let _ = axtask::spawn(move || {
+        loop {
+            if process.live_threads.load(Ordering::Acquire) == 0
+                || timer.generation.load(Ordering::Acquire) != generation
+            {
                 break;
-            };
-            let now = match clock_now_duration(timer.clock_id) {
-                Ok(now) => now,
-                Err(_) => break,
-            };
-            deadline
-                .checked_sub(now)
-                .unwrap_or(core::time::Duration::ZERO)
-        };
-        if delay == core::time::Duration::ZERO {
-            axtask::yield_now();
-        } else {
-            axtask::sleep(delay);
-        }
-        if process.live_threads.load(Ordering::Acquire) == 0
-            || timer.generation.load(Ordering::Acquire) != generation
-        {
-            break;
-        }
-        let expired = {
-            let mut state = timer.state.lock();
-            match refresh_posix_timer_locked(&timer, &mut state) {
-                Ok(expired) => expired,
-                Err(_) => false,
             }
-        };
-        if expired {
-            deliver_posix_timer_signal(&process, timer.notify);
+            let delay = {
+                let state = timer.state.lock();
+                let Some(deadline) = state.deadline else {
+                    break;
+                };
+                let now = match clock_now_duration(timer.clock_id) {
+                    Ok(now) => now,
+                    Err(_) => break,
+                };
+                deadline
+                    .checked_sub(now)
+                    .unwrap_or(core::time::Duration::ZERO)
+            };
+            if delay == core::time::Duration::ZERO {
+                axtask::yield_now();
+            } else {
+                axtask::sleep(delay);
+            }
+            if process.live_threads.load(Ordering::Acquire) == 0
+                || timer.generation.load(Ordering::Acquire) != generation
+            {
+                break;
+            }
+            let expired = {
+                let mut state = timer.state.lock();
+                match refresh_posix_timer_locked(&timer, &mut state) {
+                    Ok(expired) => expired,
+                    Err(_) => false,
+                }
+            };
+            if expired {
+                deliver_posix_timer_signal(&process, timer.notify);
+            }
         }
     });
 }
@@ -1082,8 +1228,14 @@ pub(super) fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
     if !adjtimex_input_valid(input) {
         return neg_errno(LinuxError::EINVAL);
     }
-    if adjtimex_changes_clock(input) && process.uid() != 0 {
+    if adjtimex_unsupported_update(input) {
+        return neg_errno(LinuxError::EOPNOTSUPP);
+    }
+    if adjtimex_changes_clock(input) && !can_set_system_time(process) {
         return neg_errno(LinuxError::EPERM);
+    }
+    if adjtimex_changes_clock(input) {
+        apply_adjtimex_update(input);
     }
 
     let ret = write_default_timex(process, tx);

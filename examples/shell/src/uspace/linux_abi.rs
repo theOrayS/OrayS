@@ -10,6 +10,7 @@ pub(super) const USER_STACK_TOP: usize = USER_ASPACE_BASE + USER_ASPACE_SIZE - U
 pub(super) const USER_MMAP_BASE: usize = 0x10_0000_0000;
 pub(super) const USER_BRK_GROW_SIZE: usize = 64 * 1024 * 1024;
 pub(super) const MAX_IN_MEMORY_FILE_SIZE: u64 = 128 * 1024 * 1024;
+pub(super) const SYNTHETIC_BLOCK_DEVICE_SIZE: u64 = 16 * 1024 * 1024;
 pub(super) const USER_PIE_LOAD_BASE: usize = USER_ASPACE_BASE;
 pub(super) const MAX_SCRIPT_INTERPRETER_DEPTH: usize = 4;
 pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
@@ -180,11 +181,7 @@ pub(super) fn neg_errno_code(code: u32) -> isize {
 }
 
 pub(super) fn fd_cloexec_flag(enabled: bool) -> u32 {
-    if enabled {
-        general::FD_CLOEXEC
-    } else {
-        0
-    }
+    if enabled { general::FD_CLOEXEC } else { 0 }
 }
 
 pub(super) fn str_err(err: &'static str) -> String {

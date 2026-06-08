@@ -145,11 +145,31 @@ pub unsafe extern "C" fn getaddrinfo(
     hints: *const ctypes::addrinfo,
     res: *mut *mut ctypes::addrinfo,
 ) -> c_int {
-    let ret = e(sys_getaddrinfo(nodename, servname, hints, res));
+    let ret = sys_getaddrinfo(nodename, servname, hints, res);
     match ret {
-        r if r < 0 => ctypes::EAI_FAIL,
+        r if r > 0 => 0,
         0 => ctypes::EAI_NONAME,
-        _ => 0,
+        r if matches!(
+            r,
+            ctypes::EAI_BADFLAGS
+                | ctypes::EAI_NONAME
+                | ctypes::EAI_AGAIN
+                | ctypes::EAI_FAIL
+                | ctypes::EAI_FAMILY
+                | ctypes::EAI_SOCKTYPE
+                | ctypes::EAI_SERVICE
+                | ctypes::EAI_MEMORY
+                | ctypes::EAI_SYSTEM
+                | ctypes::EAI_OVERFLOW
+        ) =>
+        {
+            r
+        }
+        r if r < 0 => {
+            crate::errno::set_errno(r.abs());
+            ctypes::EAI_SYSTEM
+        }
+        _ => ctypes::EAI_FAIL,
     }
 }
 
