@@ -15,6 +15,9 @@ use axsync::Mutex;
 use crate::ctypes;
 use crate::imp::fd_ops::{FileLike, add_file_like, get_file_like};
 
+const EPOLL_STAT_DEV: ctypes::dev_t = 0x6570_6f6c_6c;
+const EPOLL_STAT_BLKSIZE: ctypes::blksize_t = 4096;
+
 pub struct EpollInstance {
     events: Mutex<BTreeMap<usize, ctypes::epoll_event>>,
 }
@@ -124,10 +127,15 @@ impl FileLike for EpollInstance {
 
     fn stat(&self) -> LinuxResult<ctypes::stat> {
         let st_mode = 0o600u32; // rw-------
+        let st_ino = (self as *const Self as usize as ctypes::ino_t).max(1);
         Ok(ctypes::stat {
-            st_ino: 1,
+            st_dev: EPOLL_STAT_DEV,
+            st_ino,
             st_nlink: 1,
             st_mode,
+            st_uid: 0,
+            st_gid: 0,
+            st_blksize: EPOLL_STAT_BLKSIZE,
             ..Default::default()
         })
     }
@@ -141,7 +149,7 @@ impl FileLike for EpollInstance {
     }
 
     fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(0)
+        Ok(ctypes::O_RDWR as c_int)
     }
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {

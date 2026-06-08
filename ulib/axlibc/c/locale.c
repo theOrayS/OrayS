@@ -1,11 +1,18 @@
 #include <limits.h>
 #include <locale.h>
-#include <stdio.h>
+#include <stddef.h>
+#include <string.h>
 
-// TODO
+static char current_locale[] = "C";
+
 char *setlocale(int __category, const char *__locale)
 {
-    unimplemented();
+    if (__category < LC_CTYPE || __category > LC_ALL)
+        return NULL;
+    if (!__locale)
+        return current_locale;
+    if (__locale[0] == '\0' || strcmp(__locale, "C") == 0 || strcmp(__locale, "POSIX") == 0)
+        return current_locale;
     return NULL;
 }
 

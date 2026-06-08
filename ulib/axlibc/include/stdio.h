@@ -3,16 +3,17 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define _IOFBF 0
 #define _IOLBF 1
 #define _IONBF 2
 
 #define FILE_BUF_SIZE 1024
-// TODO: complete this struct
 struct IO_FILE {
     int fd;
     uint16_t buffer_len;
+    uint16_t flags;
     char buf[FILE_BUF_SIZE];
 };
 

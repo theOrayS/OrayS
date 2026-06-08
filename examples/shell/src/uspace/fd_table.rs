@@ -6926,8 +6926,8 @@ fn ofd_record_lock_owner(file: &FileEntry) -> i64 {
     let ptr = Arc::as_ptr(&file.offset) as usize as u64;
     // Keep OFD owners disjoint from positive process-id POSIX owners.  The
     // descriptor offset Arc is shared by dup/forked file descriptions and unique
-    // for independent open() calls, matching the ownership boundary LTP's OFD
-    // lock tests exercise.
+    // for independent open() calls, matching Linux open-file-description
+    // lock ownership boundaries.
     -((ptr & (i64::MAX as u64)) as i64) - 1
 }
 
@@ -8288,9 +8288,8 @@ fn record_created_path_metadata(
     {
         // Linux clears S_ISGID for newly-created non-directories in an SGID
         // directory when the creator is unprivileged and not a member of the
-        // inherited group. Root/CAP_FSETID-style creators keep requested
-        // setgid, which preserves the open10/creat08 root_setgid case while
-        // still clearing it for creat09's unprivileged mismatch.
+        // inherited group. Root/CAP_FSETID-style creators keep the requested
+        // setgid bit; unprivileged creators outside the inherited group lose it.
         mode &= !FILE_MODE_SET_GID;
     }
     let gid = if parent_setgid {

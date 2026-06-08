@@ -209,6 +209,12 @@ impl<G: BaseGuard> Drop for AxRunQueueRef<'_, G> {
     }
 }
 
+impl<G: BaseGuard> AxRunQueueRef<'_, G> {
+    pub(crate) fn set_task_priority(&mut self, task: &AxTaskRef, prio: isize) -> bool {
+        self.inner.scheduler.lock().set_priority(task, prio)
+    }
+}
+
 /// A reference to the current run queue with specific guard.
 ///
 /// Note:

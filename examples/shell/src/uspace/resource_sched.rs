@@ -12,7 +12,7 @@ use super::linux_abi::{
     USER_STACK_SIZE, neg_errno,
 };
 use super::task_registry::{
-    live_user_process_entries, user_thread_entries_by_process_group,
+    UserThreadEntry, live_user_process_entries, user_thread_entries_by_process_group,
     user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
@@ -229,7 +229,7 @@ fn priority_targets(
             } else if target == 1 {
                 targets.push(UserProcessRef::InitProcess);
             } else if let Some(entry) = user_thread_entry_by_process_pid(target) {
-                targets.push(UserProcessRef::Owned(entry.process));
+                targets.push(UserProcessRef::Owned(entry));
             }
         }
         general::PRIO_PGRP => {
@@ -238,7 +238,7 @@ fn priority_targets(
                 return Err(LinuxError::ESRCH);
             }
             for entry in user_thread_entries_by_process_group(target) {
-                targets.push(UserProcessRef::Owned(entry.process));
+                targets.push(UserProcessRef::Owned(entry));
             }
         }
         general::PRIO_USER => {
@@ -251,7 +251,7 @@ fn priority_targets(
             }
             for entry in live_user_process_entries() {
                 if entry.process.pid() != process.pid() && entry.process.uid() == target {
-                    targets.push(UserProcessRef::Owned(entry.process));
+                    targets.push(UserProcessRef::Owned(entry));
                 }
             }
         }
@@ -281,7 +281,7 @@ fn ioprio_targets(
             } else if target == 1 {
                 targets.push(UserProcessRef::InitProcess);
             } else if let Some(entry) = user_thread_entry_by_process_pid(target) {
-                targets.push(UserProcessRef::Owned(entry.process));
+                targets.push(UserProcessRef::Owned(entry));
             }
         }
         IOPRIO_WHO_PGRP => {
@@ -290,7 +290,7 @@ fn ioprio_targets(
                 return Err(LinuxError::ESRCH);
             }
             for entry in user_thread_entries_by_process_group(target) {
-                targets.push(UserProcessRef::Owned(entry.process));
+                targets.push(UserProcessRef::Owned(entry));
             }
         }
         IOPRIO_WHO_USER => {
@@ -303,7 +303,7 @@ fn ioprio_targets(
             }
             for entry in live_user_process_entries() {
                 if entry.process.pid() != process.pid() && entry.process.uid() == target {
-                    targets.push(UserProcessRef::Owned(entry.process));
+                    targets.push(UserProcessRef::Owned(entry));
                 }
             }
         }
@@ -318,7 +318,7 @@ fn ioprio_targets(
 
 enum UserProcessRef<'a> {
     Borrowed(&'a UserProcess),
-    Owned(std::sync::Arc<UserProcess>),
+    Owned(UserThreadEntry),
     InitProcess,
 }
 
@@ -326,7 +326,7 @@ impl UserProcessRef<'_> {
     fn nice(&self) -> i32 {
         match self {
             UserProcessRef::Borrowed(process) => process.nice(),
-            UserProcessRef::Owned(process) => process.nice(),
+            UserProcessRef::Owned(entry) => entry.process.nice(),
             UserProcessRef::InitProcess => SYNTHETIC_INIT_NICE.load(Ordering::Acquire),
         }
     }
@@ -334,15 +334,21 @@ impl UserProcessRef<'_> {
     fn uid(&self) -> u32 {
         match self {
             UserProcessRef::Borrowed(process) => process.uid(),
-            UserProcessRef::Owned(process) => process.uid(),
+            UserProcessRef::Owned(entry) => entry.process.uid(),
             UserProcessRef::InitProcess => 0,
         }
     }
 
     fn set_nice(&self, nice: i32) {
         match self {
-            UserProcessRef::Borrowed(process) => process.set_nice(nice),
-            UserProcessRef::Owned(process) => process.set_nice(nice),
+            UserProcessRef::Borrowed(process) => {
+                process.set_nice(nice);
+                let _ = axtask::set_priority(nice as isize);
+            }
+            UserProcessRef::Owned(entry) => {
+                entry.process.set_nice(nice);
+                let _ = axtask::set_task_priority(&entry.task, nice as isize);
+            }
             UserProcessRef::InitProcess => {
                 SYNTHETIC_INIT_NICE.store(clamp_nice(nice), Ordering::Release)
             }
@@ -352,7 +358,7 @@ impl UserProcessRef<'_> {
     fn ioprio(&self) -> u32 {
         match self {
             UserProcessRef::Borrowed(process) => process.ioprio(),
-            UserProcessRef::Owned(process) => process.ioprio(),
+            UserProcessRef::Owned(entry) => entry.process.ioprio(),
             UserProcessRef::InitProcess => SYNTHETIC_INIT_IOPRIO.load(Ordering::Acquire),
         }
     }
@@ -360,13 +366,9 @@ impl UserProcessRef<'_> {
     fn set_ioprio(&self, ioprio: u32) {
         match self {
             UserProcessRef::Borrowed(process) => process.set_ioprio(ioprio),
-            UserProcessRef::Owned(process) => process.set_ioprio(ioprio),
+            UserProcessRef::Owned(entry) => entry.process.set_ioprio(ioprio),
             UserProcessRef::InitProcess => SYNTHETIC_INIT_IOPRIO.store(ioprio, Ordering::Release),
         }
-    }
-
-    fn is_current_process(&self) -> bool {
-        matches!(self, UserProcessRef::Borrowed(_))
     }
 }
 
@@ -397,12 +399,8 @@ pub(super) fn sys_setpriority(process: &UserProcess, which: u32, who: i32, nice:
             return neg_errno(LinuxError::EACCES);
         }
     }
-    let updates_current_task = targets.iter().any(UserProcessRef::is_current_process);
     for target in targets {
         target.set_nice(nice);
-    }
-    if updates_current_task {
-        let _ = axtask::set_priority(nice as isize);
     }
     0
 }
@@ -465,6 +463,31 @@ fn sched_policy_needs_privilege(policy: i32) -> bool {
     )
 }
 
+fn scheduler_backend_priority(process: &UserProcess, state: UserSchedState) -> isize {
+    match state.policy as u32 {
+        general::SCHED_FIFO | general::SCHED_RR => {
+            let linux_rt_prio = state.param.sched_priority.clamp(1, 99);
+            -1 - (((linux_rt_prio - 1) * 19) / 98) as isize
+        }
+        general::SCHED_IDLE => 19,
+        _ => process.nice() as isize,
+    }
+}
+
+fn apply_task_scheduler_state(
+    task: &axtask::AxTaskRef,
+    process: &UserProcess,
+    state: UserSchedState,
+) {
+    // axtask exposes a CFS-style nice hook.  Linux policy state is still
+    // preserved for get* calls; map accepted policy/priority into the nearest
+    // available backend priority so sched_set* changes affect scheduling
+    // where the configured scheduler supports it.  FIFO/RR backends that do
+    // not yet consume the priority hook must not turn an otherwise accepted
+    // POSIX scheduler state change into a spurious userspace failure.
+    let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));
+}
+
 fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {
     if pid < 0 {
         return Err(LinuxError::EINVAL);
@@ -510,10 +533,13 @@ fn set_sched_target_state(
         return Err(LinuxError::EINVAL);
     }
     if pid == 0 || pid == current_tid() || pid == process.pid() {
+        let current = axtask::current();
+        apply_task_scheduler_state(current.as_task_ref(), process, state);
         process.set_sched_state(state);
         return Ok(());
     }
     let entry = user_thread_entry_by_process_pid(pid).ok_or(LinuxError::ESRCH)?;
+    apply_task_scheduler_state(&entry.task, &entry.process, state);
     entry.process.set_sched_state(state);
     Ok(())
 }

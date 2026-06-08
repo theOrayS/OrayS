@@ -7,6 +7,15 @@ use {
     alloc::sync::Arc, axerrno::LinuxError, axerrno::LinuxResult, axio::PollState, core::ffi::c_int,
 };
 
+#[cfg(feature = "fd")]
+const STDIO_STAT_DEV: crate::ctypes::dev_t = 0x7374_6469_6f;
+#[cfg(feature = "fd")]
+const STDIO_STAT_BLKSIZE: crate::ctypes::blksize_t = 4096;
+#[cfg(feature = "fd")]
+const STDIN_RDEV: crate::ctypes::dev_t = 0x0300;
+#[cfg(feature = "fd")]
+const STDOUT_RDEV: crate::ctypes::dev_t = 0x0301;
+
 fn console_read_bytes(buf: &mut [u8]) -> AxResult<usize> {
     let len = axhal::console::read_bytes(buf);
     for c in &mut buf[..len] {
@@ -116,10 +125,16 @@ impl super::fd_ops::FileLike for Stdin {
 
     fn stat(&self) -> LinuxResult<crate::ctypes::stat> {
         let st_mode = 0o20000 | 0o440u32; // S_IFCHR | r--r-----
+        let st_ino = (self.inner as *const _ as usize as crate::ctypes::ino_t).max(1);
         Ok(crate::ctypes::stat {
-            st_ino: 1,
+            st_dev: STDIO_STAT_DEV,
+            st_ino,
             st_nlink: 1,
             st_mode,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev: STDIN_RDEV,
+            st_blksize: STDIO_STAT_BLKSIZE,
             ..Default::default()
         })
     }
@@ -131,12 +146,12 @@ impl super::fd_ops::FileLike for Stdin {
     fn poll(&self) -> LinuxResult<PollState> {
         Ok(PollState {
             readable: true,
-            writable: true,
+            writable: false,
         })
     }
 
     fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(0)
+        Ok(crate::ctypes::O_RDONLY as c_int)
     }
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
@@ -160,10 +175,16 @@ impl super::fd_ops::FileLike for Stdout {
 
     fn stat(&self) -> LinuxResult<crate::ctypes::stat> {
         let st_mode = 0o20000 | 0o220u32; // S_IFCHR | -w--w----
+        let st_ino = (self.inner as *const _ as usize as crate::ctypes::ino_t).max(1);
         Ok(crate::ctypes::stat {
-            st_ino: 1,
+            st_dev: STDIO_STAT_DEV,
+            st_ino,
             st_nlink: 1,
             st_mode,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev: STDOUT_RDEV,
+            st_blksize: STDIO_STAT_BLKSIZE,
             ..Default::default()
         })
     }
@@ -174,13 +195,13 @@ impl super::fd_ops::FileLike for Stdout {
 
     fn poll(&self) -> LinuxResult<PollState> {
         Ok(PollState {
-            readable: true,
+            readable: false,
             writable: true,
         })
     }
 
     fn status_flags(&self) -> LinuxResult<c_int> {
-        Ok(0)
+        Ok(crate::ctypes::O_WRONLY as c_int)
     }
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {

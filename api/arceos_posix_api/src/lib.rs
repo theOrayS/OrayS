@@ -5,6 +5,7 @@
 #![cfg_attr(all(not(test), not(doc)), no_std)]
 #![feature(doc_cfg)]
 #![feature(doc_auto_cfg)]
+#![feature(linkage)]
 #![allow(clippy::missing_safety_doc)]
 
 #[macro_use]
@@ -18,6 +19,7 @@ extern crate alloc;
 mod utils;
 
 mod imp;
+mod signal;
 
 /// Platform-specific constants and parameters.
 pub mod config {
@@ -29,6 +31,8 @@ pub mod config {
 #[path = "./ctypes_gen.rs"]
 #[allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals, clippy::upper_case_acronyms, missing_docs)]
 pub mod ctypes;
+
+pub use signal::PosixSignalIf;
 
 pub use imp::io::{sys_read, sys_write, sys_writev};
 pub use imp::resources::{sys_getrlimit, sys_setrlimit};
