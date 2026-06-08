@@ -18,10 +18,8 @@ int pthread_setcanceltype(int new, int *old)
     return ENOSYS;
 }
 
-// TODO
 void pthread_testcancel(void)
 {
-    unimplemented();
     return;
 }
 
