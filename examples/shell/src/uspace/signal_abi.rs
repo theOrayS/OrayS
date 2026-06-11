@@ -243,6 +243,24 @@ pub(super) fn current_pending_signal_matches(mask: u64) -> bool {
     current_task_ext().is_some_and(|ext| pending_signal_mask(ext) & mask != 0)
 }
 
+pub(super) fn thread_waits_for_signal(entry: &UserThreadEntry, sig: i32) -> bool {
+    let Some(ext) = super::task_context::task_ext(&entry.task) else {
+        return false;
+    };
+    ext.signal_wait.load(Ordering::Acquire)
+        && ext.signal_wait_mask.load(Ordering::Acquire) & signal_mask_bit(sig) != 0
+}
+
+fn enter_signal_wait(ext: &UserTaskExt, wait_mask: u64) {
+    ext.signal_wait_mask.store(wait_mask, Ordering::Release);
+    ext.signal_wait.store(true, Ordering::Release);
+}
+
+fn leave_signal_wait(ext: &UserTaskExt) {
+    ext.signal_wait.store(false, Ordering::Release);
+    ext.signal_wait_mask.store(0, Ordering::Release);
+}
+
 pub(super) fn take_current_pending_signal_matching(mask: u64) -> Option<(i32, i32)> {
     let ext = current_task_ext()?;
     loop {
@@ -957,11 +975,11 @@ pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: u
     ext.sigsuspend_restore_mask
         .store(old_mask, Ordering::Release);
     ext.signal_mask.store(suspend_mask, Ordering::Release);
-    ext.signal_wait.store(true, Ordering::Release);
+    enter_signal_wait(ext, 0);
 
     while !current_unblocked_signal_pending() {
         if let Some(code) = ext.process.pending_exit_group() {
-            ext.signal_wait.store(false, Ordering::Release);
+            leave_signal_wait(ext);
             ext.sigsuspend_restore_mask
                 .store(NO_SIGSUSPEND_RESTORE_MASK, Ordering::Release);
             ext.signal_mask.store(old_mask, Ordering::Release);
@@ -973,7 +991,7 @@ pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: u
         }
         axtask::yield_now();
     }
-    ext.signal_wait.store(false, Ordering::Release);
+    leave_signal_wait(ext);
 
     neg_errno(LinuxError::EINTR)
 }
@@ -1020,10 +1038,10 @@ pub(super) fn sys_rt_sigtimedwait(
     let Some(ext) = current_task_ext() else {
         return neg_errno(LinuxError::EINVAL);
     };
-    ext.signal_wait.store(true, Ordering::Release);
+    enter_signal_wait(ext, wait_mask);
     loop {
         if let Some((sig, sender_pid)) = take_current_pending_signal_matching(wait_mask) {
-            ext.signal_wait.store(false, Ordering::Release);
+            leave_signal_wait(ext);
             if info != 0 {
                 let mut siginfo = [0u8; 128];
                 siginfo[0..4].copy_from_slice(&sig.to_ne_bytes());
@@ -1042,18 +1060,22 @@ pub(super) fn sys_rt_sigtimedwait(
                 .as_micros()
                 .min(u64::MAX as u128) as u64;
             if now_us >= deadline_us {
-                ext.signal_wait.store(false, Ordering::Release);
+                leave_signal_wait(ext);
                 return neg_errno(LinuxError::EAGAIN);
             }
         }
 
         if let Some(code) = ext.process.pending_exit_group() {
-            ext.signal_wait.store(false, Ordering::Release);
+            leave_signal_wait(ext);
             terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
         }
         let _ = ext.process.consume_expired_real_timer();
+        if ext.process.eval_watchdog_expired() {
+            leave_signal_wait(ext);
+            return neg_errno(LinuxError::EINTR);
+        }
         if current_unblocked_signal_pending() && !current_pending_signal_matches(wait_mask) {
-            ext.signal_wait.store(false, Ordering::Release);
+            leave_signal_wait(ext);
             return neg_errno(LinuxError::EINTR);
         }
         axtask::yield_now();
@@ -1078,7 +1100,13 @@ pub(super) fn sys_kill(process: &UserProcess, pid: i32, sig: i32) -> isize {
             return neg_errno(LinuxError::ESRCH);
         };
         let ret = deliver_user_signal_result(&entry, sig, process.pid());
-        if ret == 0 && process.pending_exit_group().is_some() {
+        let terminate_self = ret == 0 && process.pending_exit_group().is_some();
+        // `terminate_current_if_exit_group_pending()` never returns.  Do not
+        // keep `UserThreadEntry` (and therefore its AxTaskRef/UserProcess Arc)
+        // live across that no-return edge, otherwise self-signals leave the
+        // exited task permanently retained in the axtask GC queue.
+        drop(entry);
+        if terminate_self {
             terminate_current_if_exit_group_pending(process);
         }
         return ret;
@@ -1116,7 +1144,9 @@ pub(super) fn sys_tkill(process: &UserProcess, tid: i32, sig: i32) -> isize {
         );
     }
     let ret = deliver_user_signal_result(&entry, sig, process.pid());
-    if ret == 0 && tid == current_tid() && process.pending_exit_group().is_some() {
+    let terminate_self = ret == 0 && tid == current_tid() && process.pending_exit_group().is_some();
+    drop(entry);
+    if terminate_self {
         terminate_current_if_exit_group_pending(process);
     }
     ret
@@ -1147,7 +1177,9 @@ pub(super) fn sys_tgkill(process: &UserProcess, tgid: i32, tid: i32, sig: i32) -
         return neg_errno(LinuxError::EAGAIN);
     }
     let ret = deliver_user_signal_result(&entry, sig, process.pid());
-    if ret == 0 && tid == current_tid() && process.pending_exit_group().is_some() {
+    let terminate_self = ret == 0 && tid == current_tid() && process.pending_exit_group().is_some();
+    drop(entry);
+    if terminate_self {
         terminate_current_if_exit_group_pending(process);
     }
     ret

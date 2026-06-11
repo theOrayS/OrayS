@@ -10,7 +10,7 @@ mod aspace;
 mod backend;
 
 pub use self::aspace::{AddrSpace, AddrSpaceQuery};
-pub use self::backend::Backend;
+pub use self::backend::{Backend, SharedFrameStats};
 
 use axerrno::{AxError, AxResult};
 use axhal::mem::{phys_to_virt, MemRegionFlags};
@@ -107,6 +107,11 @@ pub fn retain_shared_frame_ref(frame: PhysAddr) {
 /// [`retain_shared_frame_ref`].
 pub fn release_shared_frame_ref(frame: PhysAddr) {
     backend::release_owned_frame(frame);
+}
+
+/// Returns diagnostic counters for retained shared/COW user frames.
+pub fn shared_frame_stats() -> SharedFrameStats {
+    backend::shared_frame_stats()
 }
 
 /// Initializes virtual memory management.

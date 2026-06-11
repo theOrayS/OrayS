@@ -16,10 +16,19 @@ mod page;
 use axallocator::{AllocResult, BaseAllocator, BitmapPageAllocator, ByteAllocator, PageAllocator};
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::NonNull;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use kspin::SpinNoIrq;
 
 const PAGE_SIZE: usize = 0x1000;
 const MIN_HEAP_SIZE: usize = 0x8000; // 32 K
+const MAX_SMALL_HEAP_EXPAND_SIZE: usize = 0x400000; // 4 MiB
+// Keep medium, short-lived buffers (task stacks, page-table side buffers,
+// executable/load scratch vectors in long LTP runs) page-backed so
+// deallocation returns frames to the page allocator instead of permanently
+// growing the byte heap.  A 4 KiB threshold is intentionally page-sized: the
+// page allocator already rounds these layouts up, while smaller metadata stays
+// in TLSF to avoid pathological one-page-per-node waste.
+const LARGE_DIRECT_ALLOC_THRESHOLD: usize = PAGE_SIZE;
 
 pub use page::GlobalPage;
 
@@ -31,6 +40,94 @@ pub struct FrameAllocatorStats {
     /// Frames currently allocated from the frame allocator.
     pub allocated_frames: usize,
 }
+
+/// A coarse snapshot of currently live global-allocation requests.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AllocationBucketStats {
+    /// Inclusive upper bound for request sizes covered by this bucket.
+    pub max_size: usize,
+    /// Number of live allocations in this bucket.
+    pub active_count: usize,
+    /// Sum of requested bytes for live allocations in this bucket.
+    pub active_bytes: usize,
+    /// Number of live allocations in this bucket that bypass the byte heap and
+    /// are backed directly by pages.
+    pub direct_count: usize,
+    /// Sum of requested bytes for live direct-page allocations in this bucket.
+    pub direct_bytes: usize,
+}
+
+const ALLOCATION_BUCKET_LIMITS: [usize; 14] = [
+    8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 65536, usize::MAX,
+];
+
+static ALLOCATION_BUCKET_COUNTS: [AtomicUsize; 14] = [
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+];
+
+static ALLOCATION_BUCKET_BYTES: [AtomicUsize; 14] = [
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+];
+
+static ALLOCATION_BUCKET_DIRECT_COUNTS: [AtomicUsize; 14] = [
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+];
+
+static ALLOCATION_BUCKET_DIRECT_BYTES: [AtomicUsize; 14] = [
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+];
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "slab")] {
@@ -112,24 +209,64 @@ impl GlobalAllocator {
     /// memory, it asks the page allocator for more memory and adds it to the
     /// byte allocator.
     pub fn alloc(&self, layout: Layout) -> AllocResult<NonNull<u8>> {
+        if should_direct_page_alloc(layout) {
+            let pages = pages_for_layout(layout);
+            let align = layout.align().max(PAGE_SIZE);
+            return self.alloc_pages(pages, align).map(|ptr| {
+                record_allocation(layout, true);
+                // SAFETY: the page allocator never returns null on success.
+                unsafe { NonNull::new_unchecked(ptr as *mut u8) }
+            });
+        }
+
         // simple two-level allocator: if no heap memory, allocate from the page allocator.
         let mut balloc = self.balloc.lock();
         loop {
             if let Ok(ptr) = balloc.alloc(layout) {
+                record_allocation(layout, false);
                 return Ok(ptr);
             } else {
-                let old_size = balloc.total_bytes();
-                let expand_size = old_size
-                    .max(layout.size())
-                    .next_power_of_two()
-                    .max(PAGE_SIZE);
-                let heap_ptr = self.alloc_pages(expand_size / PAGE_SIZE, PAGE_SIZE)?;
-                debug!(
-                    "expand heap memory: [{:#x}, {:#x})",
-                    heap_ptr,
-                    heap_ptr + expand_size
-                );
-                balloc.add_memory(heap_ptr, expand_size)?;
+                let request_size = layout.size().saturating_add(layout.align()).max(PAGE_SIZE);
+                let min_expand = align_up_to_page(request_size);
+                let desired_expand = balloc
+                    .total_bytes()
+                    .max(request_size)
+                    .checked_next_power_of_two()
+                    .unwrap_or(request_size);
+                let mut expand_size = if request_size <= MAX_SMALL_HEAP_EXPAND_SIZE {
+                    desired_expand.min(MAX_SMALL_HEAP_EXPAND_SIZE)
+                } else {
+                    desired_expand
+                };
+                expand_size = align_up_to_page(expand_size).max(min_expand);
+
+                loop {
+                    let pages = expand_size / PAGE_SIZE;
+                    match self.alloc_pages(pages, PAGE_SIZE) {
+                        Ok(heap_ptr) => match balloc.add_memory(heap_ptr, expand_size) {
+                            Ok(()) => {
+                                debug!(
+                                    "expand heap memory: [{:#x}, {:#x})",
+                                    heap_ptr,
+                                    heap_ptr + expand_size
+                                );
+                                break;
+                            }
+                            Err(err) => {
+                                self.dealloc_pages(heap_ptr, pages);
+                                if expand_size <= min_expand {
+                                    return Err(err);
+                                }
+                            }
+                        },
+                        Err(err) => {
+                            if expand_size <= min_expand {
+                                return Err(err);
+                            }
+                        }
+                    }
+                    expand_size = align_up_to_page((expand_size / 2).max(min_expand));
+                }
             }
         }
     }
@@ -142,7 +279,13 @@ impl GlobalAllocator {
     ///
     /// [`alloc`]: GlobalAllocator::alloc
     pub fn dealloc(&self, pos: NonNull<u8>, layout: Layout) {
-        self.balloc.lock().dealloc(pos, layout)
+        if should_direct_page_alloc(layout) {
+            record_deallocation(layout, true);
+            self.dealloc_pages(pos.as_ptr() as usize, pages_for_layout(layout));
+        } else {
+            record_deallocation(layout, false);
+            self.balloc.lock().dealloc(pos, layout)
+        }
     }
 
     /// Allocates contiguous pages.
@@ -214,12 +357,61 @@ impl GlobalAllocator {
     }
 }
 
+fn allocation_bucket_index(size: usize) -> usize {
+    let size = size.max(1);
+    let mut index = 0;
+    while index + 1 < ALLOCATION_BUCKET_LIMITS.len() && size > ALLOCATION_BUCKET_LIMITS[index] {
+        index += 1;
+    }
+    index
+}
+
+fn record_allocation(layout: Layout, direct: bool) {
+    let index = allocation_bucket_index(layout.size());
+    ALLOCATION_BUCKET_COUNTS[index].fetch_add(1, Ordering::Relaxed);
+    ALLOCATION_BUCKET_BYTES[index].fetch_add(layout.size(), Ordering::Relaxed);
+    if direct {
+        ALLOCATION_BUCKET_DIRECT_COUNTS[index].fetch_add(1, Ordering::Relaxed);
+        ALLOCATION_BUCKET_DIRECT_BYTES[index].fetch_add(layout.size(), Ordering::Relaxed);
+    }
+}
+
+fn record_deallocation(layout: Layout, direct: bool) {
+    let index = allocation_bucket_index(layout.size());
+    ALLOCATION_BUCKET_COUNTS[index].fetch_sub(1, Ordering::Relaxed);
+    ALLOCATION_BUCKET_BYTES[index].fetch_sub(layout.size(), Ordering::Relaxed);
+    if direct {
+        ALLOCATION_BUCKET_DIRECT_COUNTS[index].fetch_sub(1, Ordering::Relaxed);
+        ALLOCATION_BUCKET_DIRECT_BYTES[index].fetch_sub(layout.size(), Ordering::Relaxed);
+    }
+}
+
+const fn align_up_to_page(value: usize) -> usize {
+    value.saturating_add(PAGE_SIZE - 1) & !(PAGE_SIZE - 1)
+}
+
+const fn pages_for_layout(layout: Layout) -> usize {
+    let size = if layout.size() == 0 { 1 } else { layout.size() };
+    let bytes = align_up_to_page(size);
+    bytes / PAGE_SIZE
+}
+
+const fn should_direct_page_alloc(layout: Layout) -> bool {
+    layout.size() >= LARGE_DIRECT_ALLOC_THRESHOLD || layout.align() > PAGE_SIZE
+}
+
 unsafe impl GlobalAlloc for GlobalAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         if let Ok(ptr) = GlobalAllocator::alloc(self, layout) {
             ptr.as_ptr()
         } else {
-            alloc::alloc::handle_alloc_error(layout)
+            // The `GlobalAlloc` contract signals allocation failure by
+            // returning a null pointer.  Higher-level infallible allocation
+            // APIs will still call `handle_alloc_error`, while fallible APIs
+            // such as `Vec::try_reserve*` can now propagate ENOMEM to syscall
+            // callers instead of panicking the kernel during long evaluation
+            // runs.
+            core::ptr::null_mut()
         }
     }
 
@@ -239,6 +431,17 @@ pub fn global_allocator() -> &'static GlobalAllocator {
 /// Returns a snapshot of the global frame allocator counters.
 pub fn frame_allocator_stats() -> FrameAllocatorStats {
     GLOBAL_ALLOCATOR.frame_stats()
+}
+
+/// Returns live allocation counters grouped by request size.
+pub fn allocation_bucket_stats() -> [AllocationBucketStats; 14] {
+    core::array::from_fn(|index| AllocationBucketStats {
+        max_size: ALLOCATION_BUCKET_LIMITS[index],
+        active_count: ALLOCATION_BUCKET_COUNTS[index].load(Ordering::Relaxed),
+        active_bytes: ALLOCATION_BUCKET_BYTES[index].load(Ordering::Relaxed),
+        direct_count: ALLOCATION_BUCKET_DIRECT_COUNTS[index].load(Ordering::Relaxed),
+        direct_bytes: ALLOCATION_BUCKET_DIRECT_BYTES[index].load(Ordering::Relaxed),
+    })
 }
 
 /// Initializes the global allocator with the given memory region.

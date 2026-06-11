@@ -13,9 +13,31 @@ use super::{pte_flags_for_mapping, Backend, SharedPages};
 
 static SHARED_FRAMES: LazyInit<SpinNoIrq<BTreeMap<usize, usize>>> = LazyInit::new();
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SharedFrameStats {
+    pub entries: usize,
+    pub total_refs: usize,
+    pub max_refcount: usize,
+}
+
 fn shared_frames() -> &'static SpinNoIrq<BTreeMap<usize, usize>> {
     let _ = SHARED_FRAMES.call_once(|| SpinNoIrq::new(BTreeMap::new()));
     &SHARED_FRAMES
+}
+
+pub(crate) fn shared_frame_stats() -> SharedFrameStats {
+    let frames = shared_frames().lock();
+    let mut total_refs = 0usize;
+    let mut max_refcount = 0usize;
+    for count in frames.values().copied() {
+        total_refs = total_refs.saturating_add(count);
+        max_refcount = max_refcount.max(count);
+    }
+    SharedFrameStats {
+        entries: frames.len(),
+        total_refs,
+        max_refcount,
+    }
 }
 
 fn alloc_frame(zeroed: bool) -> Option<PhysAddr> {

@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use axfs_vfs::{impl_vfs_non_dir_default, VfsError, VfsNodeAttr, VfsNodeOps, VfsResult};
+use axfs_vfs::{VfsError, VfsNodeAttr, VfsNodeOps, VfsResult, impl_vfs_non_dir_default};
 use spin::RwLock;
 
 // The evaluator mounts /tmp and /var as ramfs. Keep a per-file ceiling so
@@ -35,6 +35,10 @@ impl VfsNodeOps for FileNode {
         if size < content.len() as u64 {
             content.truncate(size as _);
         } else {
+            let additional = (size as usize).saturating_sub(content.len());
+            content
+                .try_reserve_exact(additional)
+                .map_err(|_| VfsError::StorageFull)?;
             content.resize(size as _, 0);
         }
         Ok(())
@@ -59,6 +63,10 @@ impl VfsNodeOps for FileNode {
         }
         let mut content = self.content.write();
         if end > content.len() {
+            let additional = end.saturating_sub(content.len());
+            content
+                .try_reserve_exact(additional)
+                .map_err(|_| VfsError::StorageFull)?;
             content.resize(end, 0);
         }
         let dst = &mut content[offset..end];

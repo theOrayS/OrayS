@@ -614,6 +614,22 @@ pub(crate) fn reap_exited_tasks() {
     }
 }
 
+pub(crate) fn exited_task_retention_stats() -> (usize, usize, usize) {
+    EXITED_TASKS.with_current(|exited_tasks| {
+        let queued = exited_tasks.len();
+        let mut retained = 0usize;
+        let mut max_strong = 0usize;
+        for task in exited_tasks.iter() {
+            let strong = Arc::strong_count(task);
+            max_strong = max_strong.max(strong);
+            if strong > 1 {
+                retained += 1;
+            }
+        }
+        (queued, retained, max_strong)
+    })
+}
+
 /// The task routine for migrating the current task to the correct CPU.
 ///
 /// It calls `select_run_queue` to get the correct run queue for the task, and

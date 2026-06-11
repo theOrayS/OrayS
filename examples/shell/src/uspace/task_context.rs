@@ -23,8 +23,16 @@ use super::user_memory::write_user_value;
 const ROBUST_LIST_HEAD_LEN: usize = size_of::<usize>() * 3;
 const SYNTHETIC_INIT_PID: i32 = 1;
 
+#[cfg(feature = "auto-run-tests")]
+static USER_TASK_EXT_LIVE: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "auto-run-tests")]
+static USER_TASK_EXT_CREATED: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "auto-run-tests")]
+static USER_TASK_EXT_DROPPED: AtomicUsize = AtomicUsize::new(0);
+
 pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
+    pub(super) initial_context: Mutex<Option<UspaceContext>>,
     pub(super) clear_child_tid: AtomicUsize,
     pub(super) pending_signal_mask: AtomicU64,
     pub(super) pending_signal: AtomicI32,
@@ -38,6 +46,7 @@ pub(super) struct UserTaskExt {
     pub(super) fork_signal_mask_restore: AtomicU64,
     pub(super) sigsuspend_restore_mask: AtomicU64,
     pub(super) signal_wait: AtomicBool,
+    pub(super) signal_wait_mask: AtomicU64,
     pub(super) poll_wait: AtomicBool,
     pub(super) futex_wait: AtomicUsize,
     pub(super) robust_list_head: AtomicUsize,
@@ -53,9 +62,20 @@ pub(super) struct UserTaskExt {
 }
 
 impl UserTaskExt {
-    pub(super) fn new(process: Arc<UserProcess>, clear_child_tid: usize, signal_mask: u64) -> Self {
+    pub(super) fn new(
+        process: Arc<UserProcess>,
+        initial_context: UspaceContext,
+        clear_child_tid: usize,
+        signal_mask: u64,
+    ) -> Self {
+        #[cfg(feature = "auto-run-tests")]
+        {
+            USER_TASK_EXT_LIVE.fetch_add(1, Ordering::AcqRel);
+            USER_TASK_EXT_CREATED.fetch_add(1, Ordering::AcqRel);
+        }
         Self {
             process,
+            initial_context: Mutex::new(Some(initial_context)),
             clear_child_tid: AtomicUsize::new(clear_child_tid),
             pending_signal_mask: AtomicU64::new(0),
             pending_signal: AtomicI32::new(0),
@@ -67,6 +87,7 @@ impl UserTaskExt {
             fork_signal_mask_restore: AtomicU64::new(u64::MAX),
             sigsuspend_restore_mask: AtomicU64::new(u64::MAX),
             signal_wait: AtomicBool::new(false),
+            signal_wait_mask: AtomicU64::new(0),
             poll_wait: AtomicBool::new(false),
             futex_wait: AtomicUsize::new(0),
             robust_list_head: AtomicUsize::new(0),
@@ -83,12 +104,24 @@ impl UserTaskExt {
     }
 }
 
-axtask::def_task_ext!(UserTaskExt);
-
-pub(super) fn current_process() -> Option<Arc<UserProcess>> {
-    let ext = current_task_ext()?;
-    Some(ext.process.clone())
+#[cfg(feature = "auto-run-tests")]
+impl Drop for UserTaskExt {
+    fn drop(&mut self) {
+        USER_TASK_EXT_LIVE.fetch_sub(1, Ordering::AcqRel);
+        USER_TASK_EXT_DROPPED.fetch_add(1, Ordering::AcqRel);
+    }
 }
+
+#[cfg(feature = "auto-run-tests")]
+pub fn user_task_ext_stats() -> (usize, usize, usize) {
+    (
+        USER_TASK_EXT_LIVE.load(Ordering::Acquire),
+        USER_TASK_EXT_CREATED.load(Ordering::Acquire),
+        USER_TASK_EXT_DROPPED.load(Ordering::Acquire),
+    )
+}
+
+axtask::def_task_ext!(UserTaskExt);
 
 pub(super) fn current_task_ext() -> Option<&'static UserTaskExt> {
     let curr = axtask::current_may_uninit()?;

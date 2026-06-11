@@ -1,5 +1,6 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use alloc::sync::Arc;
 use kernel_guard::NoOp;
 use lazyinit::LazyInit;
 use timer_list::{TimerEvent, TimerList};
@@ -78,6 +79,13 @@ pub fn set_alarm_wakeup(deadline: TimeValue, task: AxTaskRef) {
         let ticket_id = TIMER_TICKET_ID.fetch_add(1, Ordering::AcqRel);
         task.set_timer_ticket(ticket_id);
         timer_list.set(deadline, TaskWakeupEvent { ticket_id, task });
+        program_next_precise_deadline(timer_list);
+    })
+}
+
+pub fn cancel_alarm_wakeup(task: &AxTaskRef) {
+    TIMER_LIST.with_current(|timer_list| {
+        timer_list.cancel(|event| Arc::ptr_eq(&event.task, task));
         program_next_precise_deadline(timer_list);
     })
 }

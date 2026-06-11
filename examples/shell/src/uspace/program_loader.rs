@@ -4,9 +4,13 @@ use core::mem::size_of;
 use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
+use axsync::Mutex;
+use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
 use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use std::fs::File;
+use std::io::Read;
 use std::string::{String, ToString};
 use std::vec::Vec;
 use xmas_elf::ElfFile;
@@ -45,11 +49,15 @@ pub(super) struct LoadedMapping {
 }
 
 struct PreparedProgram {
-    image: Vec<u8>,
     argv: Vec<String>,
     path: String,
     exec_root: String,
 }
+
+const MAX_EXEC_IMAGE_SIZE: usize = 64 * 1024 * 1024;
+// Keep a bounded reusable exec buffer so long full-suite runs do not need a
+// fresh multi-MiB contiguous allocation after the kernel heap is fragmented.
+const RETAINED_EXEC_IMAGE_CAPACITY: usize = 4 * 1024 * 1024;
 
 struct ElfLoadInfo {
     load_bias: usize,
@@ -242,6 +250,82 @@ fn default_exec_env(exec_root: &str, cwd: &str) -> Vec<String> {
     vec![path.into(), "HOME=/".into(), format!("PWD={pwd}")]
 }
 
+fn main_exec_image_buffer() -> &'static Mutex<Vec<u8>> {
+    static BUFFER: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+    let _ = BUFFER.call_once(|| Mutex::new(Vec::new()));
+    &BUFFER
+}
+
+fn interp_exec_image_buffer() -> &'static Mutex<Vec<u8>> {
+    static BUFFER: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+    let _ = BUFFER.call_once(|| Mutex::new(Vec::new()));
+    &BUFFER
+}
+
+fn trim_exec_image_buffer(image: &mut Vec<u8>) {
+    image.clear();
+    if image.capacity() > RETAINED_EXEC_IMAGE_CAPACITY {
+        image.shrink_to(RETAINED_EXEC_IMAGE_CAPACITY);
+    }
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn exec_image_buffer_stats() -> (usize, usize, usize, usize) {
+    let main = main_exec_image_buffer().lock();
+    let main_len = main.len();
+    let main_cap = main.capacity();
+    drop(main);
+    let interp = interp_exec_image_buffer().lock();
+    (main_len, main_cap, interp.len(), interp.capacity())
+}
+
+fn read_exec_image_into(path: &str, label: &str, image: &mut Vec<u8>) -> Result<(), String> {
+    let mut file =
+        File::open(path).map_err(|err| format!("failed to open {label} {path}: {err}"))?;
+    let expected_len = file
+        .metadata()
+        .ok()
+        .and_then(|metadata| usize::try_from(metadata.len()).ok())
+        .unwrap_or(0);
+    if expected_len > MAX_EXEC_IMAGE_SIZE {
+        return Err(format!(
+            "{label} {path} is too large to load ({} bytes, limit {} bytes)",
+            expected_len, MAX_EXEC_IMAGE_SIZE
+        ));
+    }
+
+    image.clear();
+    if expected_len > image.capacity() {
+        image
+            .try_reserve_exact(expected_len - image.capacity())
+            .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
+    }
+
+    let mut chunk = [0u8; 4096];
+    loop {
+        let count = file
+            .read(&mut chunk)
+            .map_err(|err| format!("failed to read {label} {path}: {err}"))?;
+        if count == 0 {
+            return Ok(());
+        }
+        let next_len = image
+            .len()
+            .checked_add(count)
+            .ok_or_else(|| format!("{label} {path} size overflow while loading"))?;
+        if next_len > MAX_EXEC_IMAGE_SIZE {
+            return Err(format!(
+                "{label} {path} is too large to load (exceeds {} bytes)",
+                MAX_EXEC_IMAGE_SIZE
+            ));
+        }
+        image
+            .try_reserve_exact(count)
+            .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
+        image.extend_from_slice(&chunk[..count]);
+    }
+}
+
 pub(super) fn load_program_image(
     aspace: &mut AddrSpace,
     cwd: &str,
@@ -249,36 +333,44 @@ pub(super) fn load_program_image(
     argv: &[&str],
     env_override: Option<&[String]>,
 ) -> Result<LoadedImage, String> {
-    let mut prepared = prepare_program(cwd, program_path, argv, 0)?;
+    let mut main_image = main_exec_image_buffer().lock();
+    let prepared = prepare_program(cwd, program_path, argv, 0, &mut main_image)?;
     #[cfg(target_arch = "riscv64")]
-    patch_riscv_musl_main_syscall_stubs(prepared.exec_root.as_str(), &mut prepared.image)?;
+    patch_riscv_musl_main_syscall_stubs(prepared.exec_root.as_str(), main_image.as_mut_slice())?;
     #[cfg(target_arch = "loongarch64")]
-    patch_loongarch_musl_main_syscall_stubs(prepared.exec_root.as_str(), &mut prepared.image)?;
-    let elf = ElfFile::new(&prepared.image).map_err(|err| format!("invalid ELF: {err}"))?;
+    patch_loongarch_musl_main_syscall_stubs(
+        prepared.exec_root.as_str(),
+        main_image.as_mut_slice(),
+    )?;
+    let elf = ElfFile::new(main_image.as_slice()).map_err(|err| format!("invalid ELF: {err}"))?;
     let main = analyze_elf(&elf, USER_PIE_LOAD_BASE)?;
     let exec_root = effective_exec_root(prepared.exec_root.as_str(), main.interpreter.as_deref());
 
     aspace.clear();
 
-    let mut mappings = map_elf_image(aspace, &prepared.image, &elf, &main)?;
+    let mut mappings = map_elf_image(aspace, main_image.as_slice(), &elf, &main)?;
     let mut max_mapped_end = main.max_segment_end;
     let mut runtime_entry = main.entry;
     let mut interp_base = 0usize;
 
     if let Some(raw_interp) = main.interpreter.as_deref() {
         let interp_path = resolve_runtime_support_file(exec_root.as_str(), raw_interp)?;
-        #[cfg(not(any(target_arch = "loongarch64", target_arch = "riscv64")))]
-        let interp_image = std::fs::read(interp_path.as_str())
-            .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
-        #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
-        let mut interp_image = std::fs::read(interp_path.as_str())
-            .map_err(|err| format!("failed to read interpreter {interp_path}: {err}"))?;
+        let mut interp_image = interp_exec_image_buffer().lock();
+        read_exec_image_into(interp_path.as_str(), "interpreter", &mut interp_image)?;
         #[cfg(target_arch = "loongarch64")]
-        patch_loongarch_musl_syscall_stubs(exec_root.as_str(), raw_interp, &mut interp_image)?;
+        patch_loongarch_musl_syscall_stubs(
+            exec_root.as_str(),
+            raw_interp,
+            interp_image.as_mut_slice(),
+        )?;
         #[cfg(target_arch = "riscv64")]
-        patch_riscv_musl_syscall_stubs(exec_root.as_str(), raw_interp, &mut interp_image)?;
-        let interp_elf =
-            ElfFile::new(&interp_image).map_err(|err| format!("invalid interpreter ELF: {err}"))?;
+        patch_riscv_musl_syscall_stubs(
+            exec_root.as_str(),
+            raw_interp,
+            interp_image.as_mut_slice(),
+        )?;
+        let interp_elf = ElfFile::new(interp_image.as_slice())
+            .map_err(|err| format!("invalid interpreter ELF: {err}"))?;
         let interp = analyze_elf(
             &interp_elf,
             align_up(
@@ -286,10 +378,17 @@ pub(super) fn load_program_image(
                 PAGE_SIZE_4K,
             ),
         )?;
-        mappings.extend(map_elf_image(aspace, &interp_image, &interp_elf, &interp)?);
+        mappings.extend(map_elf_image(
+            aspace,
+            interp_image.as_slice(),
+            &interp_elf,
+            &interp,
+        )?);
         max_mapped_end = cmp::max(max_mapped_end, interp.max_segment_end);
         runtime_entry = interp.entry;
         interp_base = interp.base;
+        drop(interp_elf);
+        trim_exec_image_buffer(&mut interp_image);
     }
 
     let brk_start = align_up(main.max_segment_end, PAGE_SIZE_4K);
@@ -326,6 +425,8 @@ pub(super) fn load_program_image(
         default_env = default_exec_env(exec_root.as_str(), cwd);
         default_env.iter().map(String::as_str).collect::<Vec<_>>()
     };
+    let ph_entry_size = elf.header.pt2.ph_entry_size() as usize;
+    let ph_count = elf.header.pt2.ph_count() as usize;
     let stack_ptr = build_initial_stack(
         aspace,
         stack_base,
@@ -336,9 +437,11 @@ pub(super) fn load_program_image(
         main.entry,
         interp_base,
         main.phdr,
-        elf.header.pt2.ph_entry_size() as usize,
-        elf.header.pt2.ph_count() as usize,
+        ph_entry_size,
+        ph_count,
     )?;
+    drop(elf);
+    trim_exec_image_buffer(&mut main_image);
 
     Ok(LoadedImage {
         entry: runtime_entry,
@@ -384,6 +487,7 @@ fn prepare_program(
     program_path: &str,
     argv: &[&str],
     depth: usize,
+    image: &mut Vec<u8>,
 ) -> Result<PreparedProgram, String> {
     if program_path.is_empty() || argv.is_empty() {
         return Err("empty argv".into());
@@ -393,17 +497,15 @@ fn prepare_program(
     }
 
     let path = resolve_host_path(cwd.to_string(), program_path)?;
-    let image =
-        std::fs::read(path.as_str()).map_err(|err| format!("failed to read {path}: {err}"))?;
+    read_exec_image_into(path.as_str(), "program", image)?;
 
-    if let Some(next_argv) = parse_shebang_argv(path.as_str(), &image, argv)? {
+    if let Some(next_argv) = parse_shebang_argv(path.as_str(), image.as_slice(), argv)? {
         let next_refs = next_argv.iter().map(String::as_str).collect::<Vec<_>>();
         let next_program = next_refs.first().copied().unwrap_or(program_path);
-        return prepare_program(cwd, next_program, &next_refs, depth + 1);
+        return prepare_program(cwd, next_program, &next_refs, depth + 1, image);
     }
 
     Ok(PreparedProgram {
-        image,
         argv: argv.iter().map(|arg| (*arg).to_string()).collect(),
         path: path.clone(),
         exec_root: derive_exec_root_from_path(path.as_str()),
