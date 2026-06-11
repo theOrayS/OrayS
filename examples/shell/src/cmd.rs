@@ -1,5 +1,5 @@
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-use axalloc::frame_allocator_stats;
+use axalloc::{allocation_bucket_stats, frame_allocator_stats, global_allocator};
 use core::str;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 use std::collections::BTreeSet;
@@ -1953,10 +1953,74 @@ fn ltp_case_env(suite_dir: &str, target_dir: &str, needs_case_resource_helper: b
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn print_ltp_memory_stats(case: &str, phase: &str) {
     let stats = frame_allocator_stats();
+    let heap = global_allocator();
+    let exited = axtask::exited_task_retention_stats();
+    let shared = axmm::shared_frame_stats();
+    let (exec_main_len, exec_main_cap, exec_interp_len, exec_interp_cap) =
+        uspace::exec_image_buffer_stats();
+    let (futex_entries, futex_waiters) = uspace::futex_table_stats();
+    let (user_process_objects, user_process_created, user_process_dropped) =
+        uspace::user_process_object_stats();
+    let (
+        user_process_retained,
+        user_process_live,
+        user_process_teardown_done,
+        user_process_exit_pending,
+        user_process_child_edges,
+        user_process_max_child_edges,
+        user_process_max_strong,
+    ) = uspace::user_process_retention_stats();
+    let (user_task_ext_live, user_task_ext_created, user_task_ext_dropped) =
+        uspace::user_task_ext_stats();
     println!(
-        "LTP MEMORY {case} {phase}: free_frames={} allocated_frames={}",
-        stats.free_frames, stats.allocated_frames
+        "LTP MEMORY {case} {phase}: free_frames={} allocated_frames={} heap_used_bytes={} heap_available_bytes={} live_user_tasks={} user_process_objects={} user_process_created={} user_process_dropped={} user_process_retained={} user_process_live={} user_process_teardown_done={} user_process_exit_pending={} user_process_child_edges={} user_process_max_child_edges={} user_process_max_strong={} user_task_ext_live={} user_task_ext_created={} user_task_ext_dropped={} exited_task_queue={} exited_task_retained={} exited_task_max_strong={} posix_fds={} futex_entries={} futex_waiters={} axmm_shared_entries={} axmm_shared_refs={} axmm_shared_max_ref={} exec_main_len={} exec_main_cap={} exec_interp_len={} exec_interp_cap={}",
+        stats.free_frames,
+        stats.allocated_frames,
+        heap.used_bytes(),
+        heap.available_bytes(),
+        uspace::live_user_task_count_for_diagnostics(),
+        user_process_objects,
+        user_process_created,
+        user_process_dropped,
+        user_process_retained,
+        user_process_live,
+        user_process_teardown_done,
+        user_process_exit_pending,
+        user_process_child_edges,
+        user_process_max_child_edges,
+        user_process_max_strong,
+        user_task_ext_live,
+        user_task_ext_created,
+        user_task_ext_dropped,
+        exited.queued,
+        exited.retained,
+        exited.max_strong_count,
+        arceos_posix_api::fd_table_assigned_count(),
+        futex_entries,
+        futex_waiters,
+        shared.entries,
+        shared.total_refs,
+        shared.max_refcount,
+        exec_main_len,
+        exec_main_cap,
+        exec_interp_len,
+        exec_interp_cap
     );
+    if option_env!("LTP_ALLOC_DIAG") == Some("1") {
+        print!("LTP ALLOC {case} {phase}:");
+        for bucket in allocation_bucket_stats() {
+            let max_size = if bucket.max_size == usize::MAX {
+                0
+            } else {
+                bucket.max_size
+            };
+            print!(
+                " le{max_size}_count={} le{max_size}_bytes={} le{max_size}_direct_count={} le{max_size}_direct_bytes={}",
+                bucket.active_count, bucket.active_bytes, bucket.direct_count, bucket.direct_bytes
+            );
+        }
+        println!();
+    }
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1978,10 +2042,16 @@ fn prepare_ltp_case_run_dir(
     case: &str,
     needs_case_resource_helper: bool,
 ) -> io::Result<String> {
-    if !needs_case_resource_helper {
-        return Ok(target_dir.into());
-    }
-
+    let _ = target_dir;
+    let _ = needs_case_resource_helper;
+    // Always execute the testcase from an isolated scratch directory rather than
+    // from the immutable testsuite bin directory.  LTP cases are sequential in
+    // this runner, and many scripts/binaries create helper outputs in their
+    // current working directory.  Leaving those artifacts beside the testcase
+    // binaries accumulates ramfs pages across full sweeps and can make later
+    // cases fail to exec even though the current case has already reported its
+    // real status.  The executable path and target_dir remain in PATH, so helper
+    // discovery is still generic instead of case-name based.
     let run_dir = join_path("/tmp/ltp-work", &format!("{case}-run"));
     if matches!(fs::metadata(&run_dir), Ok(meta) if meta.is_dir()) {
         remove_dir_all(&run_dir)?;

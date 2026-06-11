@@ -19,6 +19,17 @@ pub type AxTaskRef = Arc<AxTask>;
 /// The wrapper type for [`cpumask::CpuMask`] with SMP configuration.
 pub type AxCpuMask = cpumask::CpuMask<{ axconfig::plat::MAX_CPU_NUM }>;
 
+/// Snapshot of exited task handles still waiting for GC.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ExitedTaskRetentionStats {
+    /// Number of task handles currently queued for post-exit GC.
+    pub queued: usize,
+    /// Queued tasks that still have external references and therefore cannot be dropped yet.
+    pub retained: usize,
+    /// Largest observed `Arc` strong count among queued exited tasks.
+    pub max_strong_count: usize,
+}
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "sched-rr")] {
         const MAX_TIME_SLICE: usize = 5;
@@ -223,6 +234,16 @@ pub fn yield_now() {
 /// would otherwise wake the GC task.
 pub fn reap_exited_tasks() {
     crate::run_queue::reap_exited_tasks();
+}
+
+/// Returns a diagnostic snapshot of exited tasks waiting for GC.
+pub fn exited_task_retention_stats() -> ExitedTaskRetentionStats {
+    let (queued, retained, max_strong_count) = crate::run_queue::exited_task_retention_stats();
+    ExitedTaskRetentionStats {
+        queued,
+        retained,
+        max_strong_count,
+    }
 }
 
 /// Current task is going to sleep for the given duration.

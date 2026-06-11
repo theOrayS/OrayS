@@ -33,8 +33,7 @@ pub fn set_current_dir(path: &str) -> io::Result<()> {
 /// Read the entire contents of a file into a bytes vector.
 pub fn read(path: &str) -> io::Result<Vec<u8>> {
     let mut file = File::open(path)?;
-    let size = file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut bytes = Vec::with_capacity(size as usize);
+    let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
     Ok(bytes)
 }
@@ -42,8 +41,7 @@ pub fn read(path: &str) -> io::Result<Vec<u8>> {
 /// Read the entire contents of a file into a string.
 pub fn read_to_string(path: &str) -> io::Result<String> {
     let mut file = File::open(path)?;
-    let size = file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut string = String::with_capacity(size as usize);
+    let mut string = String::new();
     file.read_to_string(&mut string)?;
     Ok(string)
 }

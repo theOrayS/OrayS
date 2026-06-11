@@ -4,15 +4,18 @@ use core::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use axerrno::LinuxError;
 use axsync::Mutex;
 use linux_raw_sys::general;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use super::linux_abi::{SIGALRM_NUM, SIGPROF_NUM, SIGVTALRM_NUM};
 use super::process_lifecycle::terminate_current_thread_for_exit_group;
 use super::signal_abi::{
-    current_unblocked_signal_pending, deliver_user_signal, validate_signal_target,
+    current_unblocked_signal_pending, deliver_user_signal, thread_waits_for_signal,
+    validate_signal_target,
 };
 use super::task_context::{current_task_ext, current_tid};
-use super::task_registry::{user_thread_entry_by_tid, user_thread_entry_for_process};
+use super::task_registry::{
+    user_thread_entry_by_tid, user_thread_entry_for_process, user_thread_entry_for_process_where,
+};
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
 
@@ -47,6 +50,8 @@ impl TimeDisciplineState {
 
 const NSEC_PER_SEC: i128 = 1_000_000_000;
 pub(super) const USER_HZ: c_long = 100;
+const TIMER_HELPER_KSTACK_SIZE: usize = 16 * 1024;
+const TIMER_HELPER_POLL_US: u64 = 10_000;
 
 fn has_effective_capability(process: &UserProcess, cap: u32) -> bool {
     cap <= general::CAP_LAST_CAP && process.cap_effective() & (1u64 << cap) != 0
@@ -59,6 +64,13 @@ fn can_set_system_time(process: &UserProcess) -> bool {
 impl UserProcess {
     pub(super) fn real_timer_armed(&self) -> bool {
         self.real_timer_deadline_us.load(Ordering::Acquire) != 0
+    }
+
+    pub(super) fn clear_real_itimer(&self) {
+        self.real_timer_generation.fetch_add(1, Ordering::AcqRel);
+        self.real_timer_deadline_us.store(0, Ordering::Release);
+        self.real_timer_interval_us.store(0, Ordering::Release);
+        self.timer_wait.notify_all(true);
     }
 
     fn take_expired_itimer(&self, which: i32, allow_interval: bool) -> Option<u64> {
@@ -696,40 +708,76 @@ fn arm_real_itimer(
     first_delay_us: u64,
     interval_us: u64,
 ) {
-    let _ = axtask::spawn(move || {
-        let mut delay_us = first_delay_us;
-        loop {
-            if delay_us == 0 {
-                axtask::yield_now();
-            } else {
-                axtask::sleep(micros_to_duration(delay_us));
-            }
-            if process.real_timer_generation.load(Ordering::Acquire) != generation
-                || process.live_threads.load(Ordering::Acquire) == 0
-            {
-                break;
-            }
-            if process.take_expired_real_timer(true).is_some() {
-                if let Some(entry) = user_thread_entry_for_process(&process) {
-                    let _ = deliver_user_signal(&entry, SIGALRM_NUM, 0);
+    let process = Arc::downgrade(&process);
+    let _ = axtask::spawn_raw(
+        move || {
+            let mut delay_us = first_delay_us;
+            loop {
+                let Some(process) = wait_real_itimer_delay(&process, generation, delay_us) else {
+                    break;
+                };
+                if process.take_expired_real_timer(true).is_some() {
+                    if let Some(entry) = user_thread_entry_for_process(&process) {
+                        let _ = deliver_user_signal(&entry, SIGALRM_NUM, 0);
+                    }
                 }
+                if interval_us == 0 {
+                    break;
+                }
+                delay_us = interval_us;
             }
-            if interval_us == 0 {
-                break;
-            }
-            delay_us = interval_us;
+        },
+        "user-itimer".into(),
+        TIMER_HELPER_KSTACK_SIZE,
+    );
+}
+
+fn wait_real_itimer_delay(
+    process: &Weak<UserProcess>,
+    generation: u64,
+    delay_us: u64,
+) -> Option<Arc<UserProcess>> {
+    let deadline_us = axhal::time::monotonic_time()
+        .as_micros()
+        .saturating_add(delay_us as u128);
+    loop {
+        let current = process.upgrade()?;
+        let live_threads = current.live_threads.load(Ordering::Acquire);
+        let current_generation = current.real_timer_generation.load(Ordering::Acquire);
+        if current_generation != generation || live_threads == 0 {
+            return None;
         }
-    });
+        let now_us = axhal::time::monotonic_time().as_micros();
+        if delay_us == 0 || now_us >= deadline_us {
+            return Some(current);
+        }
+        let remaining_us = deadline_us
+            .saturating_sub(now_us)
+            .min(TIMER_HELPER_POLL_US as u128) as u64;
+        if remaining_us == 0 {
+            axtask::yield_now();
+        } else {
+            current
+                .timer_wait
+                .wait_timeout_until(micros_to_duration(remaining_us), || {
+                    current.real_timer_generation.load(Ordering::Acquire) != generation
+                        || current.live_threads.load(Ordering::Acquire) == 0
+                });
+        }
+    }
 }
 
 impl UserProcess {
     pub(super) fn clear_posix_timers(&self) {
-        let mut timers = self.posix_timers.lock();
-        for timer in timers.values() {
-            timer.generation.fetch_add(1, Ordering::AcqRel);
+        {
+            let mut timers = self.posix_timers.lock();
+            for timer in timers.values() {
+                timer.generation.fetch_add(1, Ordering::AcqRel);
+            }
+            timers.clear();
+            self.next_posix_timer_id.store(1, Ordering::Release);
         }
-        timers.clear();
-        self.next_posix_timer_id.store(1, Ordering::Release);
+        self.timer_wait.notify_all(true);
     }
 }
 
@@ -829,55 +877,114 @@ fn deliver_posix_timer_signal(process: &Arc<UserProcess>, notify: PosixTimerNoti
     };
     let entry = tid
         .and_then(user_thread_entry_by_tid)
+        .or_else(|| {
+            user_thread_entry_for_process_where(process, |entry| {
+                thread_waits_for_signal(entry, signo)
+            })
+        })
         .or_else(|| user_thread_entry_for_process(process));
     if let Some(entry) = entry {
         let _ = deliver_user_signal(&entry, signo, 0);
     }
 }
 
+fn wait_posix_timer_delay(
+    process: &Weak<UserProcess>,
+    timer: &UserPosixTimer,
+    generation: u64,
+    delay: core::time::Duration,
+) -> Option<Arc<UserProcess>> {
+    // POSIX timer expiration is still evaluated against the timer's selected
+    // clock in `refresh_posix_timer_locked`.  This helper only waits for the
+    // computed elapsed delay using monotonic time, so CLOCK_REALTIME jumps near
+    // Y2038 cannot strand the timer task in the wall-time alarm queue.
+    let Some(deadline) = axhal::time::monotonic_time().checked_add(delay) else {
+        return None;
+    };
+    loop {
+        let current = process.upgrade()?;
+        if current.live_threads.load(Ordering::Acquire) == 0
+            || timer.generation.load(Ordering::Acquire) != generation
+        {
+            return None;
+        }
+        let now = axhal::time::monotonic_time();
+        if now >= deadline {
+            return Some(current);
+        }
+        let remaining = deadline.saturating_sub(now);
+        let poll = micros_to_duration(TIMER_HELPER_POLL_US);
+        if remaining > poll {
+            current.timer_wait.wait_timeout_until(poll, || {
+                current.live_threads.load(Ordering::Acquire) == 0
+                    || timer.generation.load(Ordering::Acquire) != generation
+            });
+        } else if remaining.is_zero() {
+            axtask::yield_now();
+        } else {
+            current.timer_wait.wait_timeout_until(remaining, || {
+                current.live_threads.load(Ordering::Acquire) == 0
+                    || timer.generation.load(Ordering::Acquire) != generation
+            });
+        }
+    }
+}
+
 fn arm_posix_timer(process: Arc<UserProcess>, timer: UserPosixTimer, generation: u64) {
-    let _ = axtask::spawn(move || {
-        loop {
-            if process.live_threads.load(Ordering::Acquire) == 0
-                || timer.generation.load(Ordering::Acquire) != generation
-            {
-                break;
-            }
-            let delay = {
-                let state = timer.state.lock();
-                let Some(deadline) = state.deadline else {
+    let process = Arc::downgrade(&process);
+    let _ = axtask::spawn_raw(
+        move || {
+            loop {
+                let Some(current) = process.upgrade() else {
                     break;
                 };
-                let now = match clock_now_duration(timer.clock_id) {
-                    Ok(now) => now,
-                    Err(_) => break,
-                };
-                deadline
-                    .checked_sub(now)
-                    .unwrap_or(core::time::Duration::ZERO)
-            };
-            if delay == core::time::Duration::ZERO {
-                axtask::yield_now();
-            } else {
-                axtask::sleep(delay);
-            }
-            if process.live_threads.load(Ordering::Acquire) == 0
-                || timer.generation.load(Ordering::Acquire) != generation
-            {
-                break;
-            }
-            let expired = {
-                let mut state = timer.state.lock();
-                match refresh_posix_timer_locked(&timer, &mut state) {
-                    Ok(expired) => expired,
-                    Err(_) => false,
+                if current.live_threads.load(Ordering::Acquire) == 0
+                    || timer.generation.load(Ordering::Acquire) != generation
+                {
+                    break;
                 }
-            };
-            if expired {
-                deliver_posix_timer_signal(&process, timer.notify);
+                drop(current);
+                let delay = {
+                    let state = timer.state.lock();
+                    let Some(deadline) = state.deadline else {
+                        break;
+                    };
+                    let now = match clock_now_duration(timer.clock_id) {
+                        Ok(now) => now,
+                        Err(_) => break,
+                    };
+                    deadline
+                        .checked_sub(now)
+                        .unwrap_or(core::time::Duration::ZERO)
+                };
+                if delay == core::time::Duration::ZERO {
+                    axtask::yield_now();
+                } else if wait_posix_timer_delay(&process, &timer, generation, delay).is_none() {
+                    break;
+                }
+                let Some(current) = process.upgrade() else {
+                    break;
+                };
+                if current.live_threads.load(Ordering::Acquire) == 0
+                    || timer.generation.load(Ordering::Acquire) != generation
+                {
+                    break;
+                }
+                let expired = {
+                    let mut state = timer.state.lock();
+                    match refresh_posix_timer_locked(&timer, &mut state) {
+                        Ok(expired) => expired,
+                        Err(_) => false,
+                    }
+                };
+                if expired {
+                    deliver_posix_timer_signal(&current, timer.notify);
+                }
             }
-        }
-    });
+        },
+        "user-posix-timer".into(),
+        TIMER_HELPER_KSTACK_SIZE,
+    );
 }
 
 pub(super) fn sys_timer_create(
@@ -1051,7 +1158,10 @@ pub(super) fn sys_timer_settime(
         state.signal_pending = false;
     }
     if deadline.is_some() {
+        process.timer_wait.notify_all(true);
         arm_posix_timer(process.clone(), timer, generation);
+    } else {
+        process.timer_wait.notify_all(true);
     }
     0
 }
@@ -1104,6 +1214,7 @@ pub(super) fn sys_setitimer(
     }
     if which == general::ITIMER_REAL as i32 {
         let generation = process.real_timer_generation.fetch_add(1, Ordering::AcqRel) + 1;
+        process.timer_wait.notify_all(true);
         if first_us != 0 {
             arm_real_itimer(process.clone(), generation, first_us, interval_us);
         }

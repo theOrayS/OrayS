@@ -16,7 +16,7 @@ use super::linux_abi::{
 };
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
-use super::task_context::{current_process, current_task_ext, current_tid, user_pc};
+use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::user_memory::{
     MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
 };
@@ -90,15 +90,16 @@ pub(super) fn align_up_checked(value: usize, align: usize) -> Option<usize> {
 
 #[register_trap_handler(PAGE_FAULT)]
 fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> bool {
-    let Some(process) = current_process() else {
+    let Some(ext) = current_task_ext() else {
         return false;
     };
+    let process = ext.process.as_ref();
     if let Some(code) = process.pending_exit_group() {
         user_trace!(
             "user-exit-group-pf: tid={} code={code} fault_vaddr={vaddr:#x} flags={flags:?}",
             current_tid(),
         );
-        terminate_current_thread_for_exit_group(process.as_ref(), code);
+        terminate_current_thread_for_exit_group(process, code);
     }
     let should_trace = _from_user
         && flags.contains(PageFaultFlags::WRITE)
@@ -139,7 +140,7 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
             return true;
         }
         process.request_signal_exit_group(signal);
-        terminate_current_thread(process.as_ref(), 128 + signal);
+        terminate_current_thread(process, 128 + signal);
     }
     #[cfg(target_arch = "loongarch64")]
     if handled {

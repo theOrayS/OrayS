@@ -33,7 +33,7 @@ cfg_if::cfg_if! {
 pub use self::net_impl::TcpSocket;
 pub use self::net_impl::UdpSocket;
 pub use self::net_impl::{bench_receive, bench_transmit};
-pub use self::net_impl::{dns_query, is_local_addr, poll_interfaces};
+pub use self::net_impl::{dns_query, is_local_addr, poll_interfaces, socket_count};
 
 use axdriver::{AxDeviceContainer, prelude::*};
 

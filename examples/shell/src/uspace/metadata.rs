@@ -634,6 +634,93 @@ impl UserProcess {
         extents.sort_by_key(|(offset, _)| *offset);
     }
 
+    fn repeated_sparse_byte(data: &[u8]) -> Option<u8> {
+        let (&first, rest) = data.split_first()?;
+        if rest.iter().all(|byte| *byte == first) {
+            Some(first)
+        } else {
+            None
+        }
+    }
+
+    fn copy_sparse_bytes(data: &[u8]) -> Result<Vec<u8>, LinuxError> {
+        let mut out = Vec::new();
+        out.try_reserve_exact(data.len())
+            .map_err(|_| LinuxError::ENOMEM)?;
+        out.extend_from_slice(data);
+        Ok(out)
+    }
+
+    fn clear_sparse_byte_extents(extents: &mut Vec<(u64, Vec<u8>)>, offset: u64, end: u64) {
+        let mut retained = Vec::new();
+        for (extent_offset, mut data) in extents.drain(..) {
+            let extent_end = extent_offset.saturating_add(data.len() as u64);
+            if extent_end <= offset || extent_offset >= end {
+                retained.push((extent_offset, data));
+                continue;
+            }
+
+            if extent_offset < offset {
+                let keep = offset.saturating_sub(extent_offset) as usize;
+                if extent_end > end {
+                    let skip = end.saturating_sub(extent_offset) as usize;
+                    let right = data.split_off(skip);
+                    retained.push((end, right));
+                }
+                data.truncate(keep);
+                retained.push((extent_offset, data));
+            } else if extent_end > end {
+                let skip = end.saturating_sub(extent_offset) as usize;
+                data.drain(..skip);
+                retained.push((end, data));
+            }
+        }
+        *extents = retained;
+    }
+
+    fn clear_sparse_repeat_extents(extents: &mut Vec<(u64, u64, u8)>, offset: u64, end: u64) {
+        let mut retained = Vec::new();
+        for (extent_start, extent_end, byte) in extents.drain(..) {
+            if extent_end <= offset || extent_start >= end {
+                retained.push((extent_start, extent_end, byte));
+                continue;
+            }
+            if extent_start < offset {
+                retained.push((extent_start, offset, byte));
+            }
+            if extent_end > end {
+                retained.push((end, extent_end, byte));
+            }
+        }
+        *extents = retained;
+    }
+
+    fn insert_sparse_repeat_extent(
+        extents: &mut Vec<(u64, u64, u8)>,
+        offset: u64,
+        end: u64,
+        byte: u8,
+    ) {
+        if offset >= end {
+            return;
+        }
+        Self::clear_sparse_repeat_extents(extents, offset, end);
+        extents.push((offset, end, byte));
+        extents.sort_by_key(|(start, _, _)| *start);
+        let mut merged: Vec<(u64, u64, u8)> = Vec::new();
+        for (start, end, byte) in extents.drain(..) {
+            if let Some((_, last_end, last_byte)) = merged.last_mut()
+                && *last_byte == byte
+                && *last_end >= start
+            {
+                *last_end = (*last_end).max(end);
+                continue;
+            }
+            merged.push((start, end, byte));
+        }
+        *extents = merged;
+    }
+
     fn credit_path_free_512_blocks(&self, path: String, blocks: u64) {
         if blocks == 0 {
             return;
@@ -716,36 +803,17 @@ impl UserProcess {
         if len == 0 {
             return;
         }
+        let clear_end = offset.saturating_add(len);
         let start = Self::data_range_block_floor(offset);
-        let end = Self::data_range_block_ceil(offset.saturating_add(len));
+        let end = Self::data_range_block_ceil(clear_end);
         if start >= end {
             return;
         }
 
         let mut all_data = self.path_sparse_data.lock();
         let remove_empty = if let Some(extents) = all_data.get_mut(path.as_str()) {
-            let mut retained = Vec::new();
-            for (extent_offset, data) in extents.drain(..) {
-                let extent_end = extent_offset.saturating_add(data.len() as u64);
-                if extent_end <= offset || extent_offset >= offset.saturating_add(len) {
-                    retained.push((extent_offset, data));
-                    continue;
-                }
-                if extent_offset < offset {
-                    let keep = offset.saturating_sub(extent_offset) as usize;
-                    retained.push((extent_offset, data[..keep].to_vec()));
-                }
-                if extent_end > offset.saturating_add(len) {
-                    let skip = offset.saturating_add(len).saturating_sub(extent_offset) as usize;
-                    retained.push((offset.saturating_add(len), data[skip..].to_vec()));
-                }
-            }
-            if retained.is_empty() {
-                true
-            } else {
-                *extents = retained;
-                false
-            }
+            Self::clear_sparse_byte_extents(extents, offset, clear_end);
+            if extents.is_empty() { true } else { false }
         } else {
             false
         };
@@ -753,6 +821,18 @@ impl UserProcess {
             all_data.remove(path.as_str());
         }
         drop(all_data);
+
+        let mut all_repeats = self.path_sparse_repeats.lock();
+        let remove_empty = if let Some(extents) = all_repeats.get_mut(path.as_str()) {
+            Self::clear_sparse_repeat_extents(extents, offset, clear_end);
+            extents.is_empty()
+        } else {
+            false
+        };
+        if remove_empty {
+            all_repeats.remove(path.as_str());
+        }
+        drop(all_repeats);
 
         let mut all_ranges = self.path_data_ranges.lock();
         let Some(ranges) = all_ranges.get_mut(path.as_str()) else {
@@ -803,6 +883,7 @@ impl UserProcess {
     pub(super) fn clear_path_sparse_file(&self, path: &str) {
         self.path_sparse_sizes.lock().remove(path);
         self.path_sparse_data.lock().remove(path);
+        self.path_sparse_repeats.lock().remove(path);
         self.path_data_ranges.lock().remove(path);
     }
 
@@ -823,6 +904,14 @@ impl UserProcess {
         }
         drop(all_data);
 
+        let mut all_repeats = self.path_sparse_repeats.lock();
+        if let Some(repeats) = all_repeats.remove(old_path) {
+            all_repeats.insert(new_path.clone(), repeats);
+        } else {
+            all_repeats.remove(new_path.as_str());
+        }
+        drop(all_repeats);
+
         let mut all_ranges = self.path_data_ranges.lock();
         if let Some(ranges) = all_ranges.remove(old_path) {
             all_ranges.insert(new_path, ranges);
@@ -837,13 +926,14 @@ impl UserProcess {
         let mut all_data = self.path_sparse_data.lock();
         let remove_empty = if let Some(extents) = all_data.get_mut(path.as_str()) {
             let mut retained = Vec::new();
-            for (offset, data) in extents.drain(..) {
+            for (offset, mut data) in extents.drain(..) {
                 if offset >= size {
                     continue;
                 }
                 let keep = cmp::min(data.len(), size.saturating_sub(offset) as usize);
                 if keep > 0 {
-                    retained.push((offset, data[..keep].to_vec()));
+                    data.truncate(keep);
+                    retained.push((offset, data));
                 }
             }
             if retained.is_empty() {
@@ -857,6 +947,25 @@ impl UserProcess {
         };
         if remove_empty {
             all_data.remove(path.as_str());
+        }
+        drop(all_data);
+
+        let mut all_repeats = self.path_sparse_repeats.lock();
+        let remove_empty = if let Some(extents) = all_repeats.get_mut(path.as_str()) {
+            extents.retain_mut(|(start, end, _)| {
+                if *start >= size {
+                    false
+                } else {
+                    *end = (*end).min(size);
+                    *start < *end
+                }
+            });
+            extents.is_empty()
+        } else {
+            false
+        };
+        if remove_empty {
+            all_repeats.remove(path.as_str());
         }
 
         let mut all_ranges = self.path_data_ranges.lock();
@@ -879,36 +988,48 @@ impl UserProcess {
         }
     }
 
-    pub(super) fn write_path_sparse_data(&self, path: String, offset: u64, data: &[u8]) {
+    pub(super) fn write_path_sparse_data(
+        &self,
+        path: String,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<(), LinuxError> {
         let end = offset.saturating_add(data.len() as u64);
         let logical_size = self.path_sparse_size(path.as_str()).unwrap_or(0).max(end);
         self.set_path_sparse_size(path.clone(), logical_size);
         if data.is_empty() {
-            return;
+            return Ok(());
         }
         self.mark_path_data_range(path.clone(), offset, data.len() as u64);
 
+        let repeated = Self::repeated_sparse_byte(data);
+        let mut all_repeats = self.path_sparse_repeats.lock();
+        let repeats_empty = if let Some(extents) = all_repeats.get_mut(path.as_str()) {
+            Self::clear_sparse_repeat_extents(extents, offset, end);
+            extents.is_empty()
+        } else {
+            false
+        };
+        if repeats_empty {
+            all_repeats.remove(path.as_str());
+        }
+        if let Some(byte) = repeated {
+            let extents = all_repeats.entry(path.clone()).or_default();
+            Self::insert_sparse_repeat_extent(extents, offset, end, byte);
+        }
+        drop(all_repeats);
+
         let mut all_data = self.path_sparse_data.lock();
         let extents = all_data.entry(path).or_default();
-        let mut retained = Vec::new();
-        for (existing_offset, existing_data) in extents.drain(..) {
-            let existing_end = existing_offset.saturating_add(existing_data.len() as u64);
-            if existing_end <= offset || existing_offset >= end {
-                retained.push((existing_offset, existing_data));
-                continue;
-            }
-            if existing_offset < offset {
-                let keep = offset.saturating_sub(existing_offset) as usize;
-                retained.push((existing_offset, existing_data[..keep].to_vec()));
-            }
-            if existing_end > end {
-                let skip = end.saturating_sub(existing_offset) as usize;
-                retained.push((end, existing_data[skip..].to_vec()));
-            }
+        Self::clear_sparse_byte_extents(extents, offset, end);
+        if repeated.is_none() {
+            extents.push((offset, Self::copy_sparse_bytes(data)?));
+            extents.sort_by_key(|(extent_offset, _)| *extent_offset);
         }
-        retained.push((offset, data.to_vec()));
-        retained.sort_by_key(|(extent_offset, _)| *extent_offset);
-        *extents = retained;
+        if extents.is_empty() {
+            all_data.retain(|_, data_extents| !data_extents.is_empty());
+        }
+        Ok(())
     }
 
     pub(super) fn copy_path_sparse_data(&self, path: &str, offset: u64, dst: &mut [u8]) {
@@ -916,6 +1037,21 @@ impl UserProcess {
             return;
         }
         let end = offset.saturating_add(dst.len() as u64);
+        let all_repeats = self.path_sparse_repeats.lock();
+        if let Some(extents) = all_repeats.get(path) {
+            for (extent_offset, extent_end, byte) in extents {
+                if *extent_end <= offset || *extent_offset >= end {
+                    continue;
+                }
+                let copy_start = (*extent_offset).max(offset);
+                let copy_end = (*extent_end).min(end);
+                let dst_start = copy_start.saturating_sub(offset) as usize;
+                let dst_end = copy_end.saturating_sub(offset) as usize;
+                dst[dst_start..dst_end].fill(*byte);
+            }
+        }
+        drop(all_repeats);
+
         let all_data = self.path_sparse_data.lock();
         let Some(extents) = all_data.get(path) else {
             return;

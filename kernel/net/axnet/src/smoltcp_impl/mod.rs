@@ -317,6 +317,10 @@ pub fn poll_interfaces() {
     SOCKET_SET.poll_interfaces();
 }
 
+pub fn socket_count() -> usize {
+    SOCKET_SET.0.lock().iter().count()
+}
+
 /// Benchmark raw socket transmit bandwidth.
 pub fn bench_transmit() {
     ETH0.dev.lock().bench_transmit_bandwidth();

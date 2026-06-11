@@ -84,6 +84,10 @@ pub fn close_file_like(fd: c_int) -> LinuxResult {
     Ok(())
 }
 
+pub fn fd_table_assigned_count() -> usize {
+    FD_TABLE.read().count()
+}
+
 /// Close a file by `fd`.
 pub fn sys_close(fd: c_int) -> c_int {
     debug!("sys_close <= {}", fd);

@@ -54,6 +54,28 @@ fn state(key: usize) -> Arc<FutexState> {
         .clone()
 }
 
+fn prune_empty_key(key: usize) {
+    let mut table = table().lock();
+    let should_remove = table
+        .get(&key)
+        .is_some_and(|state| state.queue.is_empty() && Arc::strong_count(state) == 1);
+    if should_remove {
+        table.remove(&key);
+    }
+}
+
+pub(super) fn prune_empty_futexes() {
+    let mut table = table().lock();
+    table.retain(|_, state| !state.queue.is_empty() || Arc::strong_count(state) > 1);
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn futex_table_stats() -> (usize, usize) {
+    let table = table().lock();
+    let queued = table.values().map(|state| state.queue.len()).sum();
+    (table.len(), queued)
+}
+
 fn wake_addr_checked(
     process: &UserProcess,
     uaddr: usize,
@@ -71,6 +93,8 @@ fn wake_addr_checked(
         }
         woken += 1;
     }
+    drop(state);
+    prune_empty_key(key);
     Ok(woken)
 }
 
@@ -164,7 +188,10 @@ fn wait_addr(
         let dur = process
             .eval_watchdog_remaining()
             .map_or(dur, |remaining| remaining.min(dur));
-        if state.queue.wait_timeout_until(dur, wait_cond) {
+        let timed_out = state.queue.wait_timeout_until(dur, wait_cond);
+        drop(state);
+        prune_empty_key(key);
+        if timed_out {
             if let Some(ext) = current_task_ext() {
                 ext.futex_wait.store(0, Ordering::Release);
             }
@@ -186,6 +213,8 @@ fn wait_addr(
     } else {
         state.queue.wait_until(wait_cond);
     }
+    drop(state);
+    prune_empty_key(key);
     if let Some(ext) = current_task_ext() {
         ext.futex_wait.store(0, Ordering::Release);
     }

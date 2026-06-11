@@ -13,21 +13,21 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use super::fd_pipe::PipeEndpoint;
-use super::fd_table::{resolve_dirfd_path, FdEntry};
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno_code, posix_errno_from_ret, AF_UNIX_DOMAIN,
-    INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
+    AF_UNIX_DOMAIN, INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
     LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT,
-    LOCAL_SOCKET_INO_BASE, SOL_SOCKET_LEVEL, SO_ERROR_OPT, SO_PEERCRED_OPT, SO_RCVTIMEO_OPT,
-    SO_SNDTIMEO_OPT, SO_TYPE_OPT, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
+    LOCAL_SOCKET_INO_BASE, SO_ERROR_OPT, SO_PEERCRED_OPT, SO_RCVTIMEO_OPT, SO_SNDTIMEO_OPT,
+    SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, fd_cloexec_flag,
+    neg_errno_code, posix_errno_from_ret,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
-    validate_user_write, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, write_user_bytes, write_user_value,
 };
-use super::{neg_errno, posix_ret_i32, posix_ret_usize, SelectMode, UserProcess};
+use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
 
 macro_rules! socket_entry_or_return {
     ($process:expr, $fd:expr) => {
@@ -1118,7 +1118,7 @@ where
     };
     if original_timeout.is_some()
         || status_flags & posix_ctypes::O_NONBLOCK as i32 != 0
-        || !process.real_timer_armed()
+        || !socket_block_interrupt_poll_required(process)
     {
         return match posix_ret_usize(recv_once()) {
             Ok(n) => n as isize,
@@ -1596,7 +1596,7 @@ fn accept_with_real_timer_interrupt(
     ))?;
     if original_timeout.is_some()
         || status_flags & posix_ctypes::O_NONBLOCK as i32 != 0
-        || !process.real_timer_armed()
+        || !socket_block_interrupt_poll_required(process)
     {
         return posix_ret_i32(unsafe {
             arceos_posix_api::sys_accept(posix_fd, local_addr, local_len)
@@ -1633,6 +1633,10 @@ fn accept_with_real_timer_interrupt(
         }
         (Err(_), Err(err)) => Err(err),
     }
+}
+
+fn socket_block_interrupt_poll_required(process: &UserProcess) -> bool {
+    process.real_timer_armed() || process.eval_watchdog_remaining().is_some()
 }
 
 fn socket_block_interrupt_pending(process: &UserProcess) -> bool {
@@ -2119,9 +2123,7 @@ pub(super) fn sys_setsockopt_bridge(
     {
         return neg_errno(LinuxError::EINVAL);
     }
-    if level_i32 == SOL_SOCKET_LEVEL
-        && matches!(optname_i32, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT)
-    {
+    if level_i32 == SOL_SOCKET_LEVEL && matches!(optname_i32, SO_RCVTIMEO_OPT | SO_SNDTIMEO_OPT) {
         if optlen < size_of::<general::timeval>() {
             neg_errno(LinuxError::EINVAL)
         } else {

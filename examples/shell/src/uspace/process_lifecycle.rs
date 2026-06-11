@@ -16,6 +16,8 @@ use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use std::collections::BTreeMap;
 use std::string::String;
 use std::sync::Arc;
+#[cfg(feature = "auto-run-tests")]
+use std::sync::Weak;
 use std::vec::Vec;
 
 use super::credentials::{self, access_allowed};
@@ -45,8 +47,8 @@ use super::task_context::{
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, live_user_thread_count, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
+    UserThreadEntry, live_user_thread_count, prune_exited_user_tasks, register_user_task,
+    unregister_user_task, user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
     MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_value,
@@ -59,6 +61,82 @@ const MIN_FORK_FREE_FRAMES: usize = 8192;
 const USER_TASK_KSTACK_SIZE: usize = 16 * 1024;
 const EXEC_PATH_MAX: usize = 4096;
 const EXEC_NAME_MAX: usize = 255;
+
+#[cfg(feature = "auto-run-tests")]
+static USER_PROCESS_OBJECTS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "auto-run-tests")]
+static USER_PROCESS_CREATED: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "auto-run-tests")]
+static USER_PROCESS_DROPPED: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "auto-run-tests")]
+static USER_PROCESS_WEAKS: LazyInit<Mutex<Vec<Weak<UserProcess>>>> = LazyInit::new();
+
+#[cfg(feature = "auto-run-tests")]
+fn user_process_weaks() -> &'static Mutex<Vec<Weak<UserProcess>>> {
+    let _ = USER_PROCESS_WEAKS.call_once(|| Mutex::new(Vec::new()));
+    &USER_PROCESS_WEAKS
+}
+
+#[cfg(feature = "auto-run-tests")]
+fn record_user_process_created(process: &Arc<UserProcess>) {
+    USER_PROCESS_OBJECTS.fetch_add(1, Ordering::AcqRel);
+    USER_PROCESS_CREATED.fetch_add(1, Ordering::AcqRel);
+    user_process_weaks().lock().push(Arc::downgrade(process));
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn user_process_object_stats() -> (usize, usize, usize) {
+    (
+        USER_PROCESS_OBJECTS.load(Ordering::Acquire),
+        USER_PROCESS_CREATED.load(Ordering::Acquire),
+        USER_PROCESS_DROPPED.load(Ordering::Acquire),
+    )
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn user_process_retention_stats() -> (usize, usize, usize, usize, usize, usize, usize) {
+    let mut weaks = user_process_weaks().lock();
+    let mut retained = 0usize;
+    let mut live_threads_nonzero = 0usize;
+    let mut teardown_done = 0usize;
+    let mut exit_pending = 0usize;
+    let mut total_child_edges = 0usize;
+    let mut max_child_edges = 0usize;
+    let mut max_strong_count = 0usize;
+
+    let mut index = 0;
+    while index < weaks.len() {
+        let Some(process) = weaks[index].upgrade() else {
+            weaks.remove(index);
+            continue;
+        };
+        retained += 1;
+        if process.live_threads.load(Ordering::Acquire) != 0 {
+            live_threads_nonzero += 1;
+        }
+        if process.teardown.is_done() {
+            teardown_done += 1;
+        }
+        if process.pending_exit_group().is_some() {
+            exit_pending += 1;
+        }
+        let child_edges = process.children.lock().len();
+        total_child_edges += child_edges;
+        max_child_edges = max_child_edges.max(child_edges);
+        max_strong_count = max_strong_count.max(Arc::strong_count(&process).saturating_sub(1));
+        index += 1;
+    }
+
+    (
+        retained,
+        live_threads_nonzero,
+        teardown_done,
+        exit_pending,
+        total_child_edges,
+        max_child_edges,
+        max_strong_count,
+    )
+}
 
 fn zero_child_wipe_on_fork_ranges(
     process: &UserProcess,
@@ -165,6 +243,10 @@ impl ProcessTeardown {
         }
     }
 
+    pub(super) fn is_done(&self) -> bool {
+        self.done.load(Ordering::Acquire)
+    }
+
     pub(super) fn run(
         &self,
         pid: i32,
@@ -234,6 +316,13 @@ pub fn cleanup_user_processes() {
         }
     }
     yield_for_task_gc();
+    prune_exited_user_tasks();
+    super::futex::prune_empty_futexes();
+}
+
+#[cfg(feature = "auto-run-tests")]
+pub fn live_user_task_count_for_diagnostics() -> usize {
+    live_user_thread_count()
 }
 
 fn run_user_program_in_with_timeout(
@@ -254,16 +343,15 @@ fn run_user_program_in_with_timeout(
             .eval_watchdog_deadline_us
             .store(deadline_us, Ordering::Release);
     }
-    let task_process = process.clone();
     let context = loaded.context;
     let mut task = TaskInner::new(
-        move || user_task_entry(task_process, context),
+        user_task_entry,
         format!("user:{}", argv[0]),
         USER_TASK_KSTACK_SIZE,
     );
     let root = loaded.process.aspace.lock().page_table_root();
     task.ctx_mut().set_page_table_root(root);
-    task.init_task_ext(UserTaskExt::new(loaded.process.clone(), 0, 0));
+    task.init_task_ext(UserTaskExt::new(loaded.process.clone(), context, 0, 0));
     let task = axtask::spawn_task(task);
     process.set_pid(task.id().as_u64() as i32);
     register_user_task(task.clone(), process.clone());
@@ -272,9 +360,10 @@ fn run_user_program_in_with_timeout(
             timeout_secs.saturating_add(2),
         )) {
             Some(code) => {
+                let expired = process.eval_watchdog_expired();
                 let _ = task.join();
                 process.teardown();
-                code
+                if expired { 137 } else { code }
             }
             None => {
                 process.request_exit_group(137);
@@ -296,9 +385,11 @@ fn run_user_program_in_with_timeout(
 fn yield_for_task_gc() {
     for _ in 0..64 {
         axtask::reap_exited_tasks();
+        prune_exited_user_tasks();
         axtask::yield_now();
     }
     axtask::reap_exited_tasks();
+    prune_exited_user_tasks();
 }
 
 fn ensure_user_task_capacity() -> Result<(), LinuxError> {
@@ -311,20 +402,15 @@ fn ensure_user_task_capacity() -> Result<(), LinuxError> {
     Ok(())
 }
 
-fn user_task_entry(_process: Arc<UserProcess>, context: UspaceContext) {
+fn user_task_entry() {
+    let context = current_task_ext()
+        .and_then(|ext| ext.initial_context.lock().take())
+        .expect("user task must have an initial userspace context");
     let curr = axtask::current();
     let kstack_top = curr
         .kernel_stack_top()
         .expect("user task must have a kernel stack");
     unsafe { context.enter_uspace(kstack_top) }
-}
-
-fn user_thread_entry(process: Arc<UserProcess>, context: UspaceContext, child_tid_ptr: usize) {
-    if child_tid_ptr != 0 {
-        let tid = axtask::current().id().as_u64() as i32;
-        let _ = write_user_value(process.as_ref(), child_tid_ptr, &tid);
-    }
-    user_task_entry(process, context)
 }
 
 fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
@@ -353,6 +439,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         prctl_name: Mutex::new(String::from("arceos")),
         children: Mutex::new(Vec::new()),
         child_exit_wait: WaitQueue::new(),
+        timer_wait: WaitQueue::new(),
         rlimits: Mutex::new(BTreeMap::new()),
         sched_state: Mutex::new(default_sched_state()),
         nice: AtomicI32::new(0),
@@ -371,6 +458,7 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         path_times: Mutex::new(BTreeMap::new()),
         path_sparse_sizes: Mutex::new(BTreeMap::new()),
         path_sparse_data: Mutex::new(BTreeMap::new()),
+        path_sparse_repeats: Mutex::new(BTreeMap::new()),
         path_data_ranges: Mutex::new(BTreeMap::new()),
         umask: AtomicU32::new(0),
         mount_points: Arc::new(Mutex::new(BTreeMap::new())),
@@ -424,6 +512,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         exit_wait: WaitQueue::new(),
         teardown: ProcessTeardown::new(),
     });
+    #[cfg(feature = "auto-run-tests")]
+    record_user_process_created(&process);
     track_running_executable(exec_path.as_str());
     record_loaded_image_mappings(process.as_ref(), &image.mappings);
 
@@ -566,6 +656,16 @@ fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [S
 }
 
 impl UserProcess {
+    fn child_creation_interrupted(&self) -> Option<i32> {
+        if let Some(code) = self.pending_exit_group() {
+            return Some(code);
+        }
+        if self.eval_watchdog_expired() || self.teardown.is_done() {
+            return Some(137);
+        }
+        None
+    }
+
     pub(super) fn cwd(&self) -> String {
         self.cwd.lock().clone()
     }
@@ -686,6 +786,8 @@ impl UserProcess {
     }
 
     pub(super) fn teardown(&self) {
+        self.clear_real_itimer();
+        self.clear_posix_timers();
         self.release_exec_shared_mmap_cache();
         sysv_shm::release_process_attachments(self);
         self.teardown.run(
@@ -847,7 +949,10 @@ impl UserProcess {
         let live_before = self.live_threads.fetch_sub(1, Ordering::AcqRel);
         if live_before == 1 {
             self.teardown();
-            self.exit_wait.notify_all(false);
+            // The last thread has made the process wait condition true.  Wake
+            // waiters with reschedule requested so the runner can observe the
+            // state before the exiting task continues through final task GC.
+            self.exit_wait.notify_all(true);
             notify_parent_child_exit(self.ppid, self.pid());
         }
     }
@@ -1360,6 +1465,7 @@ impl UserProcess {
             prctl_name: Mutex::new(self.prctl_name()),
             children: Mutex::new(Vec::new()),
             child_exit_wait: WaitQueue::new(),
+            timer_wait: WaitQueue::new(),
             rlimits: Mutex::new(self.rlimits.lock().clone()),
             sched_state: Mutex::new(self.get_sched_state()),
             nice: AtomicI32::new(self.nice()),
@@ -1378,6 +1484,7 @@ impl UserProcess {
             path_times: Mutex::new(self.path_times.lock().clone()),
             path_sparse_sizes: Mutex::new(self.path_sparse_sizes.lock().clone()),
             path_sparse_data: Mutex::new(self.path_sparse_data.lock().clone()),
+            path_sparse_repeats: Mutex::new(self.path_sparse_repeats.lock().clone()),
             path_data_ranges: Mutex::new(self.path_data_ranges.lock().clone()),
             umask: AtomicU32::new(self.umask.load(Ordering::Acquire)),
             mount_points: self.mount_points.clone(),
@@ -1433,6 +1540,8 @@ impl UserProcess {
             exit_wait: WaitQueue::new(),
             teardown: ProcessTeardown::new(),
         });
+        #[cfg(feature = "auto-run-tests")]
+        record_user_process_created(&child);
         if !share_vm {
             zero_child_wipe_on_fork_ranges(child.as_ref(), &wipe_on_fork_ranges)?;
         }
@@ -1442,7 +1551,13 @@ impl UserProcess {
 
     pub(super) fn add_child(&self, task: AxTaskRef, process: Arc<UserProcess>) -> i32 {
         let pid = task.id().as_u64() as i32;
-        self.children.lock().push(ChildTask { pid, task, process });
+        let mut children = self.children.lock();
+        if let Some(code) = self.child_creation_interrupted() {
+            drop(children);
+            process.request_exit_group(code);
+            return pid;
+        }
+        children.push(ChildTask { pid, task, process });
         pid
     }
 
@@ -1738,6 +1853,14 @@ impl UserProcess {
     }
 }
 
+#[cfg(feature = "auto-run-tests")]
+impl Drop for UserProcess {
+    fn drop(&mut self) {
+        USER_PROCESS_OBJECTS.fetch_sub(1, Ordering::AcqRel);
+        USER_PROCESS_DROPPED.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
 fn notify_parent_child_exit(ppid: i32, child_pid: i32) {
     if let Some(parent) = user_thread_entry_by_process_pid(ppid) {
         if parent.process.sigchld_discards_wait_status()
@@ -1920,6 +2043,9 @@ pub(super) fn sys_clone(
         && (clone_flags & general::CLONE_VM as usize == 0
             || clone_flags & vfork_flags == vfork_flags);
     if fork_like_flags {
+        if process.child_creation_interrupted().is_some() {
+            return neg_errno(LinuxError::EINTR);
+        }
         if let Err(err) = ensure_user_task_capacity() {
             return neg_errno(err);
         }
@@ -1955,6 +2081,11 @@ pub(super) fn sys_clone(
             Ok(process) => process,
             Err(err) => return neg_errno(err),
         };
+        if process.child_creation_interrupted().is_some() {
+            child_process.request_exit_group(137);
+            child_process.teardown();
+            return neg_errno(LinuxError::EINTR);
+        }
         let mut child_tf = child_trap_frame(tf, child_stack);
         if clone_flags & general::CLONE_SETTLS as usize != 0 {
             child_tf.regs.tp = tls;
@@ -1964,9 +2095,8 @@ pub(super) fn sys_clone(
             fixup_riscv_clone_child_return(process.as_ref(), &mut child_tf);
         }
         let child_context = UspaceContext::from(&child_tf);
-        let task_process = child_process.clone();
         let mut task = TaskInner::new(
-            move || user_task_entry(task_process, child_context),
+            user_task_entry,
             "user:fork".into(),
             USER_TASK_KSTACK_SIZE,
         );
@@ -2006,12 +2136,17 @@ pub(super) fn sys_clone(
         };
         task.init_task_ext(UserTaskExt::new(
             child_process.clone(),
+            child_context,
             child_clear_tid,
             child_signal_mask,
         ));
         let task = axtask::spawn_task(task);
         register_user_task(task.clone(), child_process.clone());
+        let parent_interrupted = process.child_creation_interrupted().is_some();
         process.add_child(task, child_process.clone());
+        if parent_interrupted {
+            return neg_errno(LinuxError::EINTR);
+        }
         if vfork_requested {
             let wait_condition = || {
                 child_process.live_threads.load(Ordering::Acquire) == 0
@@ -2058,6 +2193,9 @@ pub(super) fn sys_clone(
         return neg_errno(LinuxError::ENOSYS);
     }
 
+    if process.child_creation_interrupted().is_some() {
+        return neg_errno(LinuxError::EINTR);
+    }
     if let Err(err) = ensure_user_task_capacity() {
         return neg_errno(err);
     }
@@ -2089,9 +2227,8 @@ pub(super) fn sys_clone(
     } else {
         0
     };
-    let task_process = process.clone();
     let mut task = TaskInner::new(
-        move || user_thread_entry(task_process, child_context, child_set_tid),
+        user_task_entry,
         "user:thread".into(),
         USER_TASK_KSTACK_SIZE,
     );
@@ -2100,6 +2237,7 @@ pub(super) fn sys_clone(
     task.ctx_mut().set_page_table_root(root);
     task.init_task_ext(UserTaskExt::new(
         process.clone(),
+        child_context,
         child_clear_tid,
         inherited_signal_mask,
     ));
@@ -2109,6 +2247,15 @@ pub(super) fn sys_clone(
         if ret != 0 {
             return ret;
         }
+    }
+    if child_set_tid != 0 {
+        let ret = write_user_value(process.as_ref(), child_set_tid, &tid);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    if process.child_creation_interrupted().is_some() {
+        return neg_errno(LinuxError::EINTR);
     }
     process.add_thread();
     let spawned = axtask::spawn_task(task);

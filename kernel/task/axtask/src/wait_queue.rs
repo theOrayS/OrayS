@@ -61,16 +61,15 @@ impl WaitQueue {
             curr.set_in_wait_queue(false);
         }
 
-        // Try to cancel a timer event from timer lists.
-        // Just mark task's current timer ticket ID as expired.
+        // Try to cancel a timer event from timer lists and mark the current
+        // ticket as expired. Timed waits that are woken by notify/signals may
+        // otherwise leave future-deadline events in the timer heap; workloads
+        // with many short timed waits (for example pthread condition-variable
+        // timeouts) can grow that heap until later allocations fail.
         #[cfg(feature = "irq")]
         if _from_timer_list {
+            crate::timers::cancel_alarm_wakeup(curr.as_task_ref());
             curr.timer_ticket_expired();
-            // Note:
-            //  this task is still not removed from timer list of target CPU,
-            //  which may cause some redundant timer events because it still needs to
-            //  go through the process of expiring an event from the timer list and invoking the callback.
-            //  (it can be considered a lazy-removal strategy, it will be ignored when it is about to take effect.)
         }
     }
 
@@ -107,6 +106,9 @@ impl WaitQueue {
     /// notify it, or the given duration has elapsed.
     #[cfg(feature = "irq")]
     pub fn wait_timeout(&self, dur: core::time::Duration) -> bool {
+        if dur.is_zero() {
+            return true;
+        }
         let mut rq = current_run_queue::<NoPreemptIrqSave>();
         let curr = crate::current();
         let deadline = axhal::time::wall_time() + dur;
@@ -137,7 +139,16 @@ impl WaitQueue {
         F: Fn() -> bool,
     {
         let curr = crate::current();
+        if condition() {
+            return false;
+        }
+        if dur.is_zero() {
+            return true;
+        }
         let deadline = axhal::time::wall_time() + dur;
+        if axhal::time::wall_time() >= deadline {
+            return true;
+        }
         debug!(
             "task wait_timeout: {}, deadline={:?}",
             curr.id_name(),

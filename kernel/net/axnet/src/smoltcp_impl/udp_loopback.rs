@@ -1,10 +1,13 @@
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+    vec::Vec,
+};
 use core::net::SocketAddr;
 
 use axsync::Mutex;
 use smoltcp::wire::IpEndpoint;
 
-const PORT_NUM: usize = 65536;
 const LOOPBACK_UDP_QUEUE_LIMIT: usize = 1024;
 
 #[derive(Clone)]
@@ -58,7 +61,8 @@ struct UdpLoopbackBinding {
     queue: UdpLoopbackQueue,
 }
 
-static UDP_LOOPBACK_TABLE: Mutex<Vec<Option<Vec<UdpLoopbackBinding>>>> = Mutex::new(Vec::new());
+static UDP_LOOPBACK_TABLE: Mutex<BTreeMap<u16, Vec<UdpLoopbackBinding>>> =
+    Mutex::new(BTreeMap::new());
 
 pub fn is_loopback_endpoint(endpoint: IpEndpoint) -> bool {
     SocketAddr::from(endpoint).ip().is_loopback()
@@ -74,10 +78,7 @@ pub fn loopback_source_endpoint(local: IpEndpoint, remote: IpEndpoint) -> IpEndp
 
 pub fn register_udp_loopback(local: IpEndpoint, queue: UdpLoopbackQueue) {
     let mut table = UDP_LOOPBACK_TABLE.lock();
-    if table.is_empty() {
-        table.resize_with(PORT_NUM, || None);
-    }
-    let bindings = table[local.port as usize].get_or_insert_with(Vec::new);
+    let bindings = table.entry(local.port).or_insert_with(Vec::new);
     bindings.push(UdpLoopbackBinding {
         local,
         peer: None,
@@ -87,25 +88,19 @@ pub fn register_udp_loopback(local: IpEndpoint, queue: UdpLoopbackQueue) {
 
 pub fn unregister_udp_loopback(local: IpEndpoint, queue: &UdpLoopbackQueue) {
     let mut table = UDP_LOOPBACK_TABLE.lock();
-    if table.is_empty() {
-        return;
-    }
-    if let Some(bindings) = &mut table[local.port as usize] {
+    if let Some(bindings) = table.get_mut(&local.port) {
         bindings.retain(|binding| {
             binding.local != local || !Arc::ptr_eq(&binding.queue.queue, &queue.queue)
         });
         if bindings.is_empty() {
-            table[local.port as usize] = None;
+            table.remove(&local.port);
         }
     }
 }
 
 pub fn update_udp_loopback_peer(local: IpEndpoint, queue: &UdpLoopbackQueue, peer: IpEndpoint) {
     let mut table = UDP_LOOPBACK_TABLE.lock();
-    if table.is_empty() {
-        return;
-    }
-    if let Some(bindings) = &mut table[local.port as usize] {
+    if let Some(bindings) = table.get_mut(&local.port) {
         for binding in bindings {
             if binding.local == local && Arc::ptr_eq(&binding.queue.queue, &queue.queue) {
                 binding.peer = Some(peer);
@@ -117,10 +112,7 @@ pub fn update_udp_loopback_peer(local: IpEndpoint, queue: &UdpLoopbackQueue, pee
 
 pub fn send_udp_loopback(local: IpEndpoint, remote: IpEndpoint, buf: &[u8]) -> usize {
     let table = UDP_LOOPBACK_TABLE.lock();
-    if table.is_empty() {
-        return buf.len();
-    }
-    if let Some(bindings) = &table[remote.port as usize] {
+    if let Some(bindings) = table.get(&remote.port) {
         let peer = loopback_source_endpoint(local, remote);
         let has_connected_match = bindings.iter().any(|binding| {
             binding_accepts(binding.local, remote)

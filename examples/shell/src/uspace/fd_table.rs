@@ -13,7 +13,7 @@ use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
 use std::collections::BTreeMap;
 use std::string::{String, ToString};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::vec::Vec;
 
 use super::credentials::access_allowed;
@@ -107,6 +107,13 @@ const LINUX_PATH_MAX: usize = 4096;
 const LINUX_NAME_MAX: usize = 63;
 const MEMFD_NAME_MAX: usize = 249;
 const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
+// Keep the ramfs/VFS backing for regular files bounded and represent larger
+// tmp/scratch extents with the per-process sparse-file overlay below.  The
+// ramfs node stores a file in one Vec, so long evaluator runs can fragment the
+// byte heap enough that growing even a 1 MiB contiguous backing allocation
+// panics.  Bound the physical prefix to one userspace I/O chunk and store the
+// rest as chunked sparse extents; reads/mmap merge both sources.
+const MAX_PHYSICAL_FILE_BACKING_SIZE: u64 = MAX_USER_IO_CHUNK as u64;
 const FALLOC_FL_KEEP_SIZE: usize = 0x01;
 const FALLOC_FL_PUNCH_HOLE: usize = 0x02;
 const FALLOC_FL_COLLAPSE_RANGE: usize = 0x08;
@@ -264,6 +271,10 @@ impl BlockDeviceEntry {
         let end = start.checked_add(count).ok_or(LinuxError::EFBIG)?;
         let mut storage = self.storage.lock();
         if storage.len() < end {
+            let additional = end - storage.len();
+            storage
+                .try_reserve_exact(additional)
+                .map_err(|_| LinuxError::ENOMEM)?;
             storage.resize(end, 0);
         }
         storage[start..end].copy_from_slice(&src[..count]);
@@ -361,7 +372,7 @@ pub(super) struct InotifyEntry {
 #[derive(Clone)]
 pub(super) struct PidFdEntry {
     target_pid: i32,
-    target_process: Arc<UserProcess>,
+    target_process: Weak<UserProcess>,
     status_flags: u32,
 }
 
@@ -678,9 +689,6 @@ pub(super) fn sys_fallocate(
     let Some(end) = (offset as u64).checked_add(len as u64) else {
         return neg_errno(LinuxError::EFBIG);
     };
-    if end > MAX_IN_MEMORY_FILE_SIZE {
-        return neg_errno(LinuxError::EFBIG);
-    }
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     if end > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
@@ -904,7 +912,10 @@ pub(super) fn sys_pidfd_getfd(
             if pidfd.exited() {
                 return neg_errno(LinuxError::ESRCH);
             }
-            pidfd.target_process.clone()
+            match pidfd.target_process() {
+                Some(process) => process,
+                None => return neg_errno(LinuxError::ESRCH),
+            }
         }
         Ok(_) => return neg_errno(LinuxError::EBADF),
         Err(err) => return neg_errno(err),
@@ -1376,9 +1387,13 @@ impl PidFdEntry {
     fn new(target_pid: i32, target_process: Arc<UserProcess>, status_flags: u32) -> Self {
         Self {
             target_pid,
-            target_process,
+            target_process: Arc::downgrade(&target_process),
             status_flags: status_flags & general::O_NONBLOCK,
         }
+    }
+
+    fn target_process(&self) -> Option<Arc<UserProcess>> {
+        self.target_process.upgrade()
     }
 
     fn status_flags(&self) -> u32 {
@@ -1394,7 +1409,9 @@ impl PidFdEntry {
     }
 
     fn exited(&self) -> bool {
-        self.target_process.live_threads.load(Ordering::Acquire) == 0
+        self.target_process
+            .upgrade()
+            .is_none_or(|process| process.live_threads.load(Ordering::Acquire) == 0)
     }
 }
 
@@ -3797,12 +3814,29 @@ impl ProcessFdTable {
                 tables.push(table);
             }
             if close_base {
-                tables.push(core::mem::replace(&mut state.base, FdTable::new()));
+                tables.push(core::mem::replace(&mut state.base, FdTable::empty()));
                 for (_, table) in core::mem::take(&mut state.unshared) {
                     tables.push(table);
                 }
                 state.aliases.clear();
             }
+        }
+        for mut table in tables {
+            table.close_all();
+        }
+    }
+}
+
+impl Drop for ProcessFdTable {
+    fn drop(&mut self) {
+        let mut tables = Vec::new();
+        {
+            let mut state = self.state.lock();
+            tables.push(core::mem::replace(&mut state.base, FdTable::empty()));
+            for (_, table) in core::mem::take(&mut state.unshared) {
+                tables.push(table);
+            }
+            state.aliases.clear();
         }
         for mut table in tables {
             table.close_all();
@@ -3916,6 +3950,13 @@ impl FdTable {
                 Some(FdEntry::Stderr),
             ],
             fd_flags: vec![0, 0, 0],
+        }
+    }
+
+    fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+            fd_flags: Vec::new(),
         }
     }
 
@@ -4576,9 +4617,7 @@ impl FdTable {
                 }
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
-                if size <= physical_size || size < MAX_IN_MEMORY_FILE_SIZE {
-                    file.file.truncate(size).map_err(LinuxError::from)?;
-                }
+                resize_regular_file_physical_prefix(file, physical_size, size)?;
                 process.truncate_path_sparse_file(file.path.clone(), size);
                 Ok(())
             }
@@ -4613,9 +4652,7 @@ impl FdTable {
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
                 if !keep_size {
                     let target_size = logical_size.max(end);
-                    if target_size <= physical_size || target_size < MAX_IN_MEMORY_FILE_SIZE {
-                        file.file.truncate(target_size).map_err(LinuxError::from)?;
-                    }
+                    resize_regular_file_physical_prefix(file, physical_size, target_size)?;
                     process.set_path_sparse_size(file.path.clone(), target_size);
                 }
                 process.mark_path_data_range(file.path.clone(), offset, len);
@@ -4687,9 +4724,7 @@ impl FdTable {
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
                 if !keep_size {
                     let target_size = logical_size.max(end);
-                    if target_size <= physical_size || target_size < MAX_IN_MEMORY_FILE_SIZE {
-                        file.file.truncate(target_size).map_err(LinuxError::from)?;
-                    }
+                    resize_regular_file_physical_prefix(file, physical_size, target_size)?;
                     process.set_path_sparse_size(file.path.clone(), target_size);
                 }
                 write_sparse_zero_range(process, file.path.clone(), offset, len);
@@ -4700,11 +4735,13 @@ impl FdTable {
                 if !file.writable() {
                     return Err(LinuxError::EBADF);
                 }
+                if end > MAX_IN_MEMORY_FILE_SIZE {
+                    return Err(LinuxError::EFBIG);
+                }
                 if !keep_size {
                     file.truncate(file.size().max(end))?;
                 }
-                let zeros = vec![0u8; len.min(MAX_IN_MEMORY_FILE_SIZE) as usize];
-                file.write_at(offset, &zeros, None).map(|_| ())
+                write_memfd_zero_range(file, offset, len)
             }
             FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
                 Err(LinuxError::EOPNOTSUPP)
@@ -4747,8 +4784,7 @@ impl FdTable {
                 if end > size {
                     return Err(LinuxError::EINVAL);
                 }
-                let mut data = vec![0u8; size as usize];
-                file.read_at(0, &mut data)?;
+                let mut data = read_memfd_to_vec(file, size)?;
                 data.drain(offset as usize..end as usize);
                 file.truncate(0)?;
                 file.write_at(0, &data, None).map(|_| ())
@@ -4782,7 +4818,7 @@ impl FdTable {
                     return Err(LinuxError::EINVAL);
                 }
                 let mut data = read_regular_file_to_vec(process, file, size)?;
-                data.splice(offset as usize..offset as usize, vec![0u8; len as usize]);
+                insert_zero_range(&mut data, offset as usize, len as usize)?;
                 rewrite_regular_file_from_vec(process, file, &data)?;
                 Ok(())
             }
@@ -4795,9 +4831,8 @@ impl FdTable {
                 if offset > size || new_size > MAX_IN_MEMORY_FILE_SIZE {
                     return Err(LinuxError::EINVAL);
                 }
-                let mut data = vec![0u8; size as usize];
-                file.read_at(0, &mut data)?;
-                data.splice(offset as usize..offset as usize, vec![0u8; len as usize]);
+                let mut data = read_memfd_to_vec(file, size)?;
+                insert_zero_range(&mut data, offset as usize, len as usize)?;
                 file.truncate(0)?;
                 file.write_at(0, &data, None).map(|_| ())
             }
@@ -5368,8 +5403,10 @@ impl FdTable {
                 if pidfd.exited() {
                     return Err(LinuxError::ESRCH);
                 }
-                user_thread_entry_for_process(pidfd.target_process.as_ref())
-                    .ok_or(LinuxError::ESRCH)
+                let Some(target_process) = pidfd.target_process() else {
+                    return Err(LinuxError::ESRCH);
+                };
+                user_thread_entry_for_process(target_process.as_ref()).ok_or(LinuxError::ESRCH)
             }
             FdEntry::Directory(dir) => proc_pid_signal_target(process, dir.path.as_str()),
             FdEntry::SyntheticDir(dir) => proc_pid_signal_target(process, dir.path.as_str()),
@@ -6658,6 +6695,11 @@ impl MemfdEntry {
         let start = offset as usize;
         let end_usize = end as usize;
         if end_usize > state.data.len() {
+            let additional = end_usize - state.data.len();
+            state
+                .data
+                .try_reserve_exact(additional)
+                .map_err(|_| LinuxError::ENOMEM)?;
             state.data.resize(end_usize, 0);
         }
         state.data[start..end_usize].copy_from_slice(src);
@@ -6679,7 +6721,15 @@ impl MemfdEntry {
         if size > current && state.seals & general::F_SEAL_GROW != 0 {
             return Err(LinuxError::EPERM);
         }
-        state.data.resize(size as usize, 0);
+        let size = usize::try_from(size).map_err(|_| LinuxError::EFBIG)?;
+        if size > state.data.len() {
+            let additional = size - state.data.len();
+            state
+                .data
+                .try_reserve_exact(additional)
+                .map_err(|_| LinuxError::ENOMEM)?;
+        }
+        state.data.resize(size, 0);
         Ok(())
     }
 
@@ -7659,10 +7709,44 @@ fn read_regular_file_to_vec(
     if size > MAX_IN_MEMORY_FILE_SIZE {
         return Err(LinuxError::EFBIG);
     }
-    let mut data = vec![0u8; size as usize];
+    let size = usize::try_from(size).map_err(|_| LinuxError::EFBIG)?;
+    let mut data = Vec::new();
+    data.try_reserve_exact(size)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    data.resize(size, 0);
     let read = read_regular_file_at(process, file, 0, &mut data)?;
     data[read..].fill(0);
     Ok(data)
+}
+
+fn read_memfd_to_vec(file: &MemfdEntry, size: u64) -> Result<Vec<u8>, LinuxError> {
+    if size > MAX_IN_MEMORY_FILE_SIZE {
+        return Err(LinuxError::EFBIG);
+    }
+    let size = usize::try_from(size).map_err(|_| LinuxError::EFBIG)?;
+    let mut data = Vec::new();
+    data.try_reserve_exact(size)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    data.resize(size, 0);
+    file.read_at(0, &mut data)?;
+    Ok(data)
+}
+
+fn insert_zero_range(data: &mut Vec<u8>, offset: usize, len: usize) -> Result<(), LinuxError> {
+    if len == 0 {
+        return Ok(());
+    }
+    if offset > data.len() {
+        return Err(LinuxError::EINVAL);
+    }
+    let old_len = data.len();
+    let new_len = old_len.checked_add(len).ok_or(LinuxError::EFBIG)?;
+    data.try_reserve_exact(len)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    data.resize(new_len, 0);
+    data.copy_within(offset..old_len, offset + len);
+    data[offset..offset + len].fill(0);
+    Ok(())
 }
 
 fn rewrite_regular_file_from_vec(
@@ -7676,28 +7760,61 @@ fn rewrite_regular_file_from_vec(
     file.file.truncate(0).map_err(LinuxError::from)?;
     process.truncate_path_sparse_file(file.path.clone(), 0);
     if !data.is_empty() {
-        let _ = file.file.write_at(0, data).map_err(LinuxError::from)?;
-        process.write_path_sparse_data(file.path.clone(), 0, data);
+        let _ = write_regular_file_at(process, file, 0, data, None)?;
     } else {
         process.set_path_sparse_size(file.path.clone(), 0);
+        touch_regular_file_after_write(process, file);
     }
-    touch_regular_file_after_write(process, file);
     Ok(())
 }
 
 fn write_sparse_zero_range(process: &UserProcess, path: String, offset: u64, len: u64) {
-    const ZERO_CHUNK: usize = 64 * 1024;
-    let mut written = 0u64;
-    let zeros = vec![0u8; ZERO_CHUNK.min(len as usize)];
-    while written < len {
-        let chunk = (len - written).min(zeros.len() as u64) as usize;
+    if len == 0 {
+        return;
+    }
+    process.clear_path_data_range(path.clone(), offset, len);
+    process.mark_path_data_range(path, offset, len);
+}
+
+fn write_sparse_data_chunked(
+    process: &UserProcess,
+    path: String,
+    offset: u64,
+    data: &[u8],
+) -> Result<(), LinuxError> {
+    let mut written = 0usize;
+    while written < data.len() {
+        let chunk_len = (data.len() - written).min(MAX_USER_IO_CHUNK);
+        let chunk_offset = offset
+            .checked_add(written as u64)
+            .ok_or(LinuxError::EFBIG)?;
         process.write_path_sparse_data(
             path.clone(),
-            offset.saturating_add(written),
-            &zeros[..chunk],
-        );
-        written = written.saturating_add(chunk as u64);
+            chunk_offset,
+            &data[written..written + chunk_len],
+        )?;
+        written += chunk_len;
     }
+    Ok(())
+}
+
+fn write_memfd_zero_range(file: &mut MemfdEntry, offset: u64, len: u64) -> Result<(), LinuxError> {
+    const ZERO_CHUNK: usize = 64 * 1024;
+    let chunk = ZERO_CHUNK.min(len.min(usize::MAX as u64) as usize);
+    let mut zeros = Vec::new();
+    zeros
+        .try_reserve_exact(chunk)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    zeros.resize(chunk, 0);
+
+    let mut written = 0u64;
+    while written < len {
+        let chunk_len = (len - written).min(zeros.len() as u64) as usize;
+        let write_offset = offset.checked_add(written).ok_or(LinuxError::EFBIG)?;
+        file.write_at(write_offset, &zeros[..chunk_len], None)?;
+        written = written.saturating_add(chunk_len as u64);
+    }
+    Ok(())
 }
 
 fn stat_time(sec: i64, nsec: u64) -> general::timespec {
@@ -7928,6 +8045,28 @@ fn can_use_reclaimed_path_blocks(process: &UserProcess, path: &str, offset: u64,
     blocks > 0 && process.path_free_512_blocks(path) >= blocks
 }
 
+fn bytes_are_all_zero(src: &[u8]) -> bool {
+    src.iter().all(|byte| *byte == 0)
+}
+
+fn resize_regular_file_physical_prefix(
+    file: &mut FileEntry,
+    physical_size: u64,
+    logical_size: u64,
+) -> Result<(), LinuxError> {
+    let target_physical_size = if logical_size <= MAX_PHYSICAL_FILE_BACKING_SIZE {
+        logical_size
+    } else {
+        physical_size.min(MAX_PHYSICAL_FILE_BACKING_SIZE)
+    };
+    if target_physical_size != physical_size {
+        file.file
+            .truncate(target_physical_size)
+            .map_err(LinuxError::from)?;
+    }
+    Ok(())
+}
+
 fn write_regular_file_at(
     process: &UserProcess,
     file: &mut FileEntry,
@@ -7943,10 +8082,11 @@ fn write_regular_file_at(
     let physical_before = file.file.get_attr().map_err(LinuxError::from)?.size();
     process.ensure_path_data_ranges(file.path.clone(), physical_before);
     let mut written = 0usize;
-    if write_offset < MAX_IN_MEMORY_FILE_SIZE {
+    let physical_write_limit = MAX_IN_MEMORY_FILE_SIZE.min(MAX_PHYSICAL_FILE_BACKING_SIZE);
+    if write_offset < physical_write_limit {
         let physical_len = cmp::min(
             src.len(),
-            MAX_IN_MEMORY_FILE_SIZE
+            physical_write_limit
                 .saturating_sub(write_offset)
                 .min(usize::MAX as u64) as usize,
         );
@@ -7955,19 +8095,22 @@ fn write_regular_file_at(
                 Ok(count) => count,
                 Err(err) => {
                     let err = LinuxError::from(err);
-                    if err == LinuxError::ENOSPC
-                        && can_use_reclaimed_path_blocks(
-                            process,
-                            file.path.as_str(),
-                            write_offset,
-                            physical_len as u64,
-                        )
-                    {
-                        process.write_path_sparse_data(
-                            file.path.clone(),
-                            write_offset,
-                            &src[..physical_len],
-                        );
+                    if err == LinuxError::ENOSPC {
+                        if bytes_are_all_zero(&src[..physical_len]) {
+                            write_sparse_zero_range(
+                                process,
+                                file.path.clone(),
+                                write_offset,
+                                physical_len as u64,
+                            );
+                        } else {
+                            write_sparse_data_chunked(
+                                process,
+                                file.path.clone(),
+                                write_offset,
+                                &src[..physical_len],
+                            )?;
+                        }
                         physical_len
                     } else {
                         return Err(err);
@@ -8000,11 +8143,17 @@ fn write_regular_file_at(
                     )
                 };
                 if sparse_backed || reclaimed_sparse_space {
-                    process.write_path_sparse_data(
-                        file.path.clone(),
-                        sparse_offset,
-                        &src[written..physical_len],
-                    );
+                    let tail = &src[written..physical_len];
+                    if bytes_are_all_zero(tail) {
+                        write_sparse_zero_range(
+                            process,
+                            file.path.clone(),
+                            sparse_offset,
+                            sparse_len as u64,
+                        );
+                    } else {
+                        write_sparse_data_chunked(process, file.path.clone(), sparse_offset, tail)?;
+                    }
                     written = physical_len;
                 } else {
                     let logical_after =
@@ -8019,7 +8168,12 @@ fn write_regular_file_at(
 
     if written < src.len() {
         let sparse_offset = write_offset.saturating_add(written as u64);
-        process.write_path_sparse_data(file.path.clone(), sparse_offset, &src[written..]);
+        let tail = &src[written..];
+        if bytes_are_all_zero(tail) {
+            write_sparse_zero_range(process, file.path.clone(), sparse_offset, tail.len() as u64);
+        } else {
+            write_sparse_data_chunked(process, file.path.clone(), sparse_offset, tail)?;
+        }
         written = src.len();
     }
     let logical_after = logical_before.max(write_offset.saturating_add(written as u64));

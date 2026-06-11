@@ -56,6 +56,18 @@ use linux_abi::*;
 use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
+#[cfg(feature = "auto-run-tests")]
+pub use futex::futex_table_stats;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::live_user_task_count_for_diagnostics;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::user_process_object_stats;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::user_process_retention_stats;
+#[cfg(feature = "auto-run-tests")]
+pub use program_loader::exec_image_buffer_stats;
+#[cfg(feature = "auto-run-tests")]
+pub use task_context::user_task_ext_stats;
 pub use process_lifecycle::run_user_program;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in;
@@ -119,6 +131,7 @@ struct UserProcess {
     prctl_name: Mutex<String>,
     children: Mutex<Vec<ChildTask>>,
     child_exit_wait: WaitQueue,
+    timer_wait: WaitQueue,
     rlimits: Mutex<BTreeMap<u32, UserRlimit>>,
     sched_state: Mutex<UserSchedState>,
     nice: AtomicI32,
@@ -137,6 +150,7 @@ struct UserProcess {
     path_times: Mutex<BTreeMap<String, PathTimes>>,
     path_sparse_sizes: Mutex<BTreeMap<String, u64>>,
     path_sparse_data: Mutex<BTreeMap<String, Vec<(u64, Vec<u8>)>>>,
+    path_sparse_repeats: Mutex<BTreeMap<String, Vec<(u64, u64, u8)>>>,
     path_data_ranges: Mutex<BTreeMap<String, Vec<(u64, u64)>>>,
     umask: AtomicU32,
     mount_points: Arc<Mutex<BTreeMap<String, MountPoint>>>,

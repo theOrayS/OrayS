@@ -1,5 +1,4 @@
-use alloc::{boxed::Box, collections::VecDeque};
-use core::ops::{Deref, DerefMut};
+use alloc::collections::{BTreeMap, VecDeque};
 
 use axerrno::{AxError, AxResult, ax_err};
 use axsync::Mutex;
@@ -9,8 +8,6 @@ use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
 
 use super::loopback::LoopbackTcpEndpoint;
 use super::{LISTEN_QUEUE_SIZE, SOCKET_SET, SocketSetWrapper};
-
-const PORT_NUM: usize = 65536;
 
 struct ListenTableEntry {
     listen_endpoint: IpListenEndpoint,
@@ -48,44 +45,39 @@ impl Drop for ListenTableEntry {
 }
 
 pub struct ListenTable {
-    tcp: Box<[Mutex<Option<Box<ListenTableEntry>>>]>,
+    tcp: Mutex<BTreeMap<u16, ListenTableEntry>>,
 }
 
 impl ListenTable {
     pub fn new() -> Self {
-        let tcp = unsafe {
-            let mut buf = Box::new_uninit_slice(PORT_NUM);
-            for i in 0..PORT_NUM {
-                buf[i].write(Mutex::new(None));
-            }
-            buf.assume_init()
-        };
-        Self { tcp }
+        Self {
+            tcp: Mutex::new(BTreeMap::new()),
+        }
     }
 
     pub fn can_listen(&self, port: u16) -> bool {
-        self.tcp[port as usize].lock().is_none()
+        !self.tcp.lock().contains_key(&port)
     }
 
     pub fn listen(&self, listen_endpoint: IpListenEndpoint) -> AxResult {
         let port = listen_endpoint.port;
         assert_ne!(port, 0);
-        let mut entry = self.tcp[port as usize].lock();
-        if entry.is_none() {
-            *entry = Some(Box::new(ListenTableEntry::new(listen_endpoint)));
-            Ok(())
-        } else {
-            Err(AxError::AddrInUse)
+        let mut table = self.tcp.lock();
+        if table.contains_key(&port) {
+            return Err(AxError::AddrInUse);
         }
+        table.insert(port, ListenTableEntry::new(listen_endpoint));
+        Ok(())
     }
 
     pub fn unlisten(&self, port: u16) {
         debug!("TCP socket unlisten on {}", port);
-        *self.tcp[port as usize].lock() = None;
+        self.tcp.lock().remove(&port);
     }
 
     pub fn can_accept(&self, port: u16) -> AxResult<bool> {
-        if let Some(entry) = self.tcp[port as usize].lock().deref() {
+        let table = self.tcp.lock();
+        if let Some(entry) = table.get(&port) {
             Ok(!entry.loopback_queue.is_empty()
                 || entry.syn_queue.iter().any(|&handle| is_connected(handle)))
         } else {
@@ -94,7 +86,8 @@ impl ListenTable {
     }
 
     pub fn connect_loopback(&self, remote: IpEndpoint, endpoint: LoopbackTcpEndpoint) -> AxResult {
-        if let Some(entry) = self.tcp[remote.port as usize].lock().deref_mut() {
+        let mut table = self.tcp.lock();
+        if let Some(entry) = table.get_mut(&remote.port) {
             if !entry.can_accept(remote.addr) {
                 return ax_err!(ConnectionRefused, "loopback socket connect() failed");
             }
@@ -109,7 +102,8 @@ impl ListenTable {
     }
 
     pub fn accept_loopback(&self, port: u16) -> AxResult<Option<LoopbackTcpEndpoint>> {
-        if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+        let mut table = self.tcp.lock();
+        if let Some(entry) = table.get_mut(&port) {
             Ok(entry.loopback_queue.pop_front())
         } else {
             ax_err!(InvalidInput, "socket accept() failed: not listen")
@@ -117,7 +111,8 @@ impl ListenTable {
     }
 
     pub fn accept(&self, port: u16) -> AxResult<(SocketHandle, (IpEndpoint, IpEndpoint))> {
-        if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+        let mut table = self.tcp.lock();
+        if let Some(entry) = table.get_mut(&port) {
             let syn_queue = &mut entry.syn_queue;
             let (idx, addr_tuple) = syn_queue
                 .iter()
@@ -146,7 +141,8 @@ impl ListenTable {
         dst: IpEndpoint,
         sockets: &mut SocketSet<'_>,
     ) {
-        if let Some(entry) = self.tcp[dst.port as usize].lock().deref_mut() {
+        let mut table = self.tcp.lock();
+        if let Some(entry) = table.get_mut(&dst.port) {
             if !entry.can_accept(dst.addr) {
                 // not listening on this address
                 return;
