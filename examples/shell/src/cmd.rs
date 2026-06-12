@@ -768,6 +768,27 @@ const LIBCTEST_CASE_TIMEOUT_SECS: u64 = 5;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const DISABLED_OFFICIAL_TEST_GROUPS: &[&str] = &[];
 
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn official_group_timeout_secs(group: &str) -> u64 {
+    match group {
+        // cyclictest intentionally starts hackbench with 400 forked workers on
+        // our single-vCPU evaluator.  With honest fork scheduling and blocking
+        // sleeps the script makes forward progress, but the stress phases can
+        // exceed three minutes per libc on the current kernel.  Give this
+        // official stress group enough time to reach its own kill/END markers
+        // instead of classifying slow real execution as a wrapper timeout.
+        "cyclictest" => 600,
+        "iozone" | "lmbench" => 300,
+        "iperf" | "libcbench" | "netperf" => 180,
+        // UnixBench's official script contains many 10s/20s sub-benchmarks.
+        // Give it enough wall time to finish honestly instead of letting the
+        // generic 60s watchdog truncate the run.
+        "unixbench" => 900,
+        "libctest" => LIBCTEST_GROUP_TIMEOUT_SECS,
+        _ => DEFAULT_GROUP_TIMEOUT_SECS,
+    }
+}
+
 macro_rules! print_err {
     ($cmd: literal, $msg: expr) => {
         println!("{}: {}", $cmd, $msg)
@@ -1584,14 +1605,12 @@ fn rewrite_iperf_daemon_server(script: &str, busybox_path: &str) -> String {
         if line.trim() == "$iperf -s -p $port -D" {
             rewritten.push(String::from("$iperf -s -p $port &"));
             rewritten.push(String::from("server_pid=$!"));
-            rewritten.push(format!("{busybox_path} sleep 1"));
             continue;
         }
         if line.contains("#### OS COMP TEST GROUP END iperf-") {
             rewritten.push(format!(
                 "[ -n \"$server_pid\" ] && {busybox_path} kill -TERM \"$server_pid\" 2>/dev/null || true"
             ));
-            rewritten.push(format!("{busybox_path} sleep 1"));
             rewritten.push(format!(
                 "[ -n \"$server_pid\" ] && {busybox_path} kill -KILL \"$server_pid\" 2>/dev/null || true"
             ));
@@ -1919,7 +1938,11 @@ fn file_has_shebang(path: &str) -> bool {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ltp_case_env(suite_dir: &str, target_dir: &str, needs_case_resource_helper: bool) -> Vec<String> {
+fn ltp_case_env(
+    suite_dir: &str,
+    target_dir: &str,
+    needs_case_resource_helper: bool,
+) -> Vec<String> {
     let mut env = vec![
         // Keep the current run directory and testsuite bin directory first for
         // resource helpers, then rely on the runtime's /musl and /glibc
@@ -2307,7 +2330,8 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             continue;
         }
         let needs_case_resource_helper = ltp_case_has_resource_helper(&target_dir, case);
-        let run_dir = match prepare_ltp_case_run_dir(&target_dir, case, needs_case_resource_helper) {
+        let run_dir = match prepare_ltp_case_run_dir(&target_dir, case, needs_case_resource_helper)
+        {
             Ok(run_dir) => run_dir,
             Err(err) => {
                 println!("FAIL LTP CASE {case} : -1");
@@ -2590,10 +2614,7 @@ pub fn maybe_run_official_tests() {
         let command = format!(
             "{shell_path} chmod 755 {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
         );
-        let timeout_secs = match group {
-            "libctest" => LIBCTEST_GROUP_TIMEOUT_SECS,
-            _ => DEFAULT_GROUP_TIMEOUT_SECS,
-        };
+        let timeout_secs = official_group_timeout_secs(group);
         let label = suite_label(&suite_dir, group);
         let mut close_timed_out_group = false;
         match run_user_program_argv_in_timeout(

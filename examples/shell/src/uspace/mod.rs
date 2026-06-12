@@ -52,22 +52,13 @@ mod time_abi;
 mod user_memory;
 
 use fd_table::{FdTable, ProcessFdTable};
+#[cfg(feature = "auto-run-tests")]
+pub use futex::futex_table_stats;
 use linux_abi::*;
-use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 #[cfg(feature = "auto-run-tests")]
-pub use futex::futex_table_stats;
-#[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::live_user_task_count_for_diagnostics;
-#[cfg(feature = "auto-run-tests")]
-pub use process_lifecycle::user_process_object_stats;
-#[cfg(feature = "auto-run-tests")]
-pub use process_lifecycle::user_process_retention_stats;
-#[cfg(feature = "auto-run-tests")]
-pub use program_loader::exec_image_buffer_stats;
-#[cfg(feature = "auto-run-tests")]
-pub use task_context::user_task_ext_stats;
 pub use process_lifecycle::run_user_program;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in;
@@ -75,8 +66,17 @@ pub use process_lifecycle::run_user_program_in;
 pub use process_lifecycle::run_user_program_in_timeout;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::seed_initial_path_mode;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::user_process_object_stats;
+#[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::user_process_retention_stats;
+use process_lifecycle::ProcessTeardown;
+#[cfg(feature = "auto-run-tests")]
+pub use program_loader::exec_image_buffer_stats;
 use resource_sched::{UserRlimit, UserSchedState};
 use select_fdset::SelectMode;
+#[cfg(feature = "auto-run-tests")]
+pub use task_context::user_task_ext_stats;
 
 struct AxNamespaceImpl;
 struct PosixSignalIfImpl;
@@ -148,10 +148,10 @@ struct UserProcess {
     path_inode_flags: Mutex<BTreeMap<String, u32>>,
     path_xattrs: Mutex<BTreeMap<String, BTreeMap<String, Vec<u8>>>>,
     path_times: Mutex<BTreeMap<String, PathTimes>>,
-    path_sparse_sizes: Mutex<BTreeMap<String, u64>>,
-    path_sparse_data: Mutex<BTreeMap<String, Vec<(u64, Vec<u8>)>>>,
-    path_sparse_repeats: Mutex<BTreeMap<String, Vec<(u64, u64, u8)>>>,
-    path_data_ranges: Mutex<BTreeMap<String, Vec<(u64, u64)>>>,
+    path_sparse_sizes: &'static Mutex<BTreeMap<String, u64>>,
+    path_sparse_data: &'static Mutex<BTreeMap<String, Vec<(u64, Vec<u8>)>>>,
+    path_sparse_repeats: &'static Mutex<BTreeMap<String, Vec<(u64, u64, u8)>>>,
+    path_data_ranges: &'static Mutex<BTreeMap<String, Vec<(u64, u64)>>>,
     umask: AtomicU32,
     mount_points: Arc<Mutex<BTreeMap<String, MountPoint>>>,
     shm_attachments: Mutex<BTreeMap<usize, (i32, usize)>>,

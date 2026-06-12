@@ -9,10 +9,9 @@ use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
 use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
-#[cfg(feature = "auto-run-tests")]
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
+use memory_addr::{PageIter4K, VirtAddr, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
 use std::string::String;
 use std::sync::Arc;
@@ -27,38 +26,47 @@ use super::fd_table::{
 };
 use super::futex;
 use super::linux_abi::{
-    ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE, USER_ASPACE_SIZE,
-    neg_errno,
+    neg_errno, ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE,
+    USER_ASPACE_SIZE,
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
-use super::program_loader::{LoadedMapping, load_program_image};
-use super::resource_sched::default_sched_state;
+use super::program_loader::{load_program_image, LoadedMapping};
+use super::resource_sched::{apply_process_scheduler_state_to_task, default_sched_state};
 use super::runtime_paths::{
     busybox_applet_target_path, current_cwd, is_busybox_applet_name, normalize_path,
 };
-use super::signal_abi::{all_application_signal_mask, ensure_user_return_hook_registered};
+use super::signal_abi::{
+    all_application_signal_mask, current_unblocked_signal_pending,
+    ensure_user_return_hook_registered,
+};
 use super::sysv_shm;
 #[cfg(target_arch = "riscv64")]
 use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
-    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
-    user_pc,
+    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
+    UserTaskExt,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, live_user_thread_count, prune_exited_user_tasks, register_user_task,
-    unregister_user_task, user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
+    live_user_thread_count, prune_exited_user_tasks, register_user_task, unregister_user_task,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_value,
-    write_user_bytes, write_user_value,
+    read_cstr, read_execve_argv, read_execve_envp, read_user_value, write_user_bytes,
+    write_user_value, MAX_USER_IO_CHUNK,
 };
-use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE, ProcessFdTable, UserProcess};
+use super::{ChildTask, ProcessFdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
-const USER_TASK_KSTACK_SIZE: usize = 16 * 1024;
+// User tasks execute all Linux syscall emulation and the underlying ArceOS
+// networking/filesystem paths on their kernel stack.  glibc network workloads
+// such as netperf's TCP_RR/CRR path nest socket, scheduler, and userspace-copy
+// helpers deeply enough that the old 16 KiB stack could corrupt adjacent heap
+// state before task exit.  Use a larger real kernel stack rather than special
+// casing any benchmark.
+const USER_TASK_KSTACK_SIZE: usize = 64 * 1024;
 const EXEC_PATH_MAX: usize = 4096;
 const EXEC_NAME_MAX: usize = 255;
 
@@ -75,6 +83,34 @@ static USER_PROCESS_WEAKS: LazyInit<Mutex<Vec<Weak<UserProcess>>>> = LazyInit::n
 fn user_process_weaks() -> &'static Mutex<Vec<Weak<UserProcess>>> {
     let _ = USER_PROCESS_WEAKS.call_once(|| Mutex::new(Vec::new()));
     &USER_PROCESS_WEAKS
+}
+
+static GLOBAL_PATH_SPARSE_SIZES: LazyInit<Mutex<BTreeMap<String, u64>>> = LazyInit::new();
+static GLOBAL_PATH_SPARSE_DATA: LazyInit<Mutex<BTreeMap<String, Vec<(u64, Vec<u8>)>>>> =
+    LazyInit::new();
+static GLOBAL_PATH_SPARSE_REPEATS: LazyInit<Mutex<BTreeMap<String, Vec<(u64, u64, u8)>>>> =
+    LazyInit::new();
+static GLOBAL_PATH_DATA_RANGES: LazyInit<Mutex<BTreeMap<String, Vec<(u64, u64)>>>> =
+    LazyInit::new();
+
+fn global_path_sparse_sizes() -> &'static Mutex<BTreeMap<String, u64>> {
+    let _ = GLOBAL_PATH_SPARSE_SIZES.call_once(|| Mutex::new(BTreeMap::new()));
+    &GLOBAL_PATH_SPARSE_SIZES
+}
+
+fn global_path_sparse_data() -> &'static Mutex<BTreeMap<String, Vec<(u64, Vec<u8>)>>> {
+    let _ = GLOBAL_PATH_SPARSE_DATA.call_once(|| Mutex::new(BTreeMap::new()));
+    &GLOBAL_PATH_SPARSE_DATA
+}
+
+fn global_path_sparse_repeats() -> &'static Mutex<BTreeMap<String, Vec<(u64, u64, u8)>>> {
+    let _ = GLOBAL_PATH_SPARSE_REPEATS.call_once(|| Mutex::new(BTreeMap::new()));
+    &GLOBAL_PATH_SPARSE_REPEATS
+}
+
+fn global_path_data_ranges() -> &'static Mutex<BTreeMap<String, Vec<(u64, u64)>>> {
+    let _ = GLOBAL_PATH_DATA_RANGES.call_once(|| Mutex::new(BTreeMap::new()));
+    &GLOBAL_PATH_DATA_RANGES
 }
 
 #[cfg(feature = "auto-run-tests")]
@@ -363,7 +399,11 @@ fn run_user_program_in_with_timeout(
                 let expired = process.eval_watchdog_expired();
                 let _ = task.join();
                 process.teardown();
-                if expired { 137 } else { code }
+                if expired {
+                    137
+                } else {
+                    code
+                }
             }
             None => {
                 process.request_exit_group(137);
@@ -456,10 +496,10 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         path_inode_flags: Mutex::new(BTreeMap::new()),
         path_xattrs: Mutex::new(BTreeMap::new()),
         path_times: Mutex::new(BTreeMap::new()),
-        path_sparse_sizes: Mutex::new(BTreeMap::new()),
-        path_sparse_data: Mutex::new(BTreeMap::new()),
-        path_sparse_repeats: Mutex::new(BTreeMap::new()),
-        path_data_ranges: Mutex::new(BTreeMap::new()),
+        path_sparse_sizes: global_path_sparse_sizes(),
+        path_sparse_data: global_path_sparse_data(),
+        path_sparse_repeats: global_path_sparse_repeats(),
+        path_data_ranges: global_path_data_ranges(),
         umask: AtomicU32::new(0),
         mount_points: Arc::new(Mutex::new(BTreeMap::new())),
         shm_attachments: Mutex::new(BTreeMap::new()),
@@ -562,7 +602,7 @@ fn exec_program(
     process.set_exec_root(image.exec_root);
     process.set_exec_path(image.exec_path);
     process.vfork_exec_done.store(true, Ordering::Release);
-    process.exit_wait.notify_all(false);
+    process.exit_wait.notify_all(true);
     Ok((image.entry, image.stack_ptr, image.argc))
 }
 
@@ -916,7 +956,7 @@ impl UserProcess {
         };
         let _child = children.remove(index);
         drop(children);
-        self.child_exit_wait.notify_all(false);
+        self.child_exit_wait.notify_all(true);
         axtask::reap_exited_tasks();
         true
     }
@@ -935,7 +975,7 @@ impl UserProcess {
         }
         drop(children);
         if reaped {
-            self.child_exit_wait.notify_all(false);
+            self.child_exit_wait.notify_all(true);
             axtask::reap_exited_tasks();
         }
     }
@@ -981,8 +1021,13 @@ impl UserProcess {
             );
         }
         self.exit_code.store(code, Ordering::Release);
-        self.child_exit_wait.notify_all(false);
-        self.exit_wait.notify_all(false);
+        self.child_exit_wait.notify_all(true);
+        self.exit_wait.notify_all(true);
+        // Threads in nanosleep/clock_nanosleep wait on the process timer queue.
+        // An exit-group request makes those waits interruptible: wake them now so
+        // they can observe pending_exit_group() instead of sleeping until their
+        // original timeout and delaying group teardown.
+        self.timer_wait.notify_all(true);
         for entry in user_thread_entries_by_process_pid(self.pid()) {
             if let Some(ext) = task_ext(&entry.task) {
                 let futex_wait = ext.futex_wait.load(Ordering::Acquire);
@@ -1482,10 +1527,10 @@ impl UserProcess {
             path_inode_flags: Mutex::new(self.path_inode_flags.lock().clone()),
             path_xattrs: Mutex::new(self.path_xattrs.lock().clone()),
             path_times: Mutex::new(self.path_times.lock().clone()),
-            path_sparse_sizes: Mutex::new(self.path_sparse_sizes.lock().clone()),
-            path_sparse_data: Mutex::new(self.path_sparse_data.lock().clone()),
-            path_sparse_repeats: Mutex::new(self.path_sparse_repeats.lock().clone()),
-            path_data_ranges: Mutex::new(self.path_data_ranges.lock().clone()),
+            path_sparse_sizes: self.path_sparse_sizes,
+            path_sparse_data: self.path_sparse_data,
+            path_sparse_repeats: self.path_sparse_repeats,
+            path_data_ranges: self.path_data_ranges,
             umask: AtomicU32::new(self.umask.load(Ordering::Acquire)),
             mount_points: self.mount_points.clone(),
             shm_attachments: Mutex::new(shm_attachments),
@@ -1665,7 +1710,10 @@ impl UserProcess {
                 axtask::yield_now();
                 return Ok(None);
             }
-            if self.pending_exit_group().is_some() || self.eval_watchdog_expired() {
+            if current_unblocked_signal_pending()
+                || self.pending_exit_group().is_some()
+                || self.eval_watchdog_expired()
+            {
                 return Err(LinuxError::EINTR);
             }
             let wait_condition = || {
@@ -1678,6 +1726,7 @@ impl UserProcess {
                         wait_pid_matches(child, pid, current_pgid)
                             && child_event(child, want_stopped, want_continued).is_some()
                     })
+                    || current_unblocked_signal_pending()
                     || self.pending_exit_group().is_some()
                     || self.eval_watchdog_expired()
             };
@@ -1760,7 +1809,10 @@ impl UserProcess {
             if let Some(child) = maybe_child {
                 break child;
             }
-            if self.pending_exit_group().is_some() || self.eval_watchdog_expired() {
+            if current_unblocked_signal_pending()
+                || self.pending_exit_group().is_some()
+                || self.eval_watchdog_expired()
+            {
                 return Err(LinuxError::EINTR);
             }
             let wait_condition = || {
@@ -1772,6 +1824,7 @@ impl UserProcess {
                     || children
                         .iter()
                         .any(|child| wait_pid_matches(child, pid, current_pgid) && is_exited(child))
+                    || current_unblocked_signal_pending()
                     || self.pending_exit_group().is_some()
                     || self.eval_watchdog_expired()
             };
@@ -1868,7 +1921,10 @@ fn notify_parent_child_exit(ppid: i32, child_pid: i32) {
         {
             return;
         }
-        parent.process.child_exit_wait.notify_all(false);
+        // A child-status transition makes wait4()/waitid() predicates true.
+        // Request rescheduling so the woken parent can reap promptly even when
+        // the exiting/signalling child is part of a fork-heavy workload.
+        parent.process.child_exit_wait.notify_all(true);
     }
 }
 
@@ -2095,11 +2151,7 @@ pub(super) fn sys_clone(
             fixup_riscv_clone_child_return(process.as_ref(), &mut child_tf);
         }
         let child_context = UspaceContext::from(&child_tf);
-        let mut task = TaskInner::new(
-            user_task_entry,
-            "user:fork".into(),
-            USER_TASK_KSTACK_SIZE,
-        );
+        let mut task = TaskInner::new(user_task_entry, "user:fork".into(), USER_TASK_KSTACK_SIZE);
         let pid = task.id().as_u64() as i32;
         child_process.set_pid(pid);
         if share_fds {
@@ -2141,6 +2193,7 @@ pub(super) fn sys_clone(
             child_signal_mask,
         ));
         let task = axtask::spawn_task(task);
+        apply_process_scheduler_state_to_task(child_process.as_ref(), &task);
         register_user_task(task.clone(), child_process.clone());
         let parent_interrupted = process.child_creation_interrupted().is_some();
         process.add_child(task, child_process.clone());
@@ -2168,6 +2221,12 @@ pub(super) fn sys_clone(
                 return neg_errno(LinuxError::EINTR);
             }
         }
+        // A fork storm should not let the forking parent monopolize a single
+        // CPU until it has created every child. Linux may schedule the child or
+        // another ready task immediately after fork returns; yield here after
+        // all parent-visible state is installed so woken parents/sleepers can
+        // run promptly under process-heavy workloads.
+        axtask::yield_now();
         return pid as isize;
     }
 
@@ -2227,11 +2286,7 @@ pub(super) fn sys_clone(
     } else {
         0
     };
-    let mut task = TaskInner::new(
-        user_task_entry,
-        "user:thread".into(),
-        USER_TASK_KSTACK_SIZE,
-    );
+    let mut task = TaskInner::new(user_task_entry, "user:thread".into(), USER_TASK_KSTACK_SIZE);
     let tid = task.id().as_u64() as i32;
     let root = process.aspace.lock().page_table_root();
     task.ctx_mut().set_page_table_root(root);
@@ -2259,6 +2314,7 @@ pub(super) fn sys_clone(
     }
     process.add_thread();
     let spawned = axtask::spawn_task(task);
+    apply_process_scheduler_state_to_task(process.as_ref(), &spawned);
     register_user_task(spawned, process.clone());
     tid as isize
 }

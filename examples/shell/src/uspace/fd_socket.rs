@@ -13,21 +13,28 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use super::fd_pipe::PipeEndpoint;
-use super::fd_table::{FdEntry, resolve_dirfd_path};
+use super::fd_table::{resolve_dirfd_path, FdEntry};
 use super::linux_abi::{
-    AF_UNIX_DOMAIN, INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT,
-    LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT,
-    LOCAL_SOCKET_INO_BASE, SO_ERROR_OPT, SO_PEERCRED_OPT, SO_RCVTIMEO_OPT, SO_SNDTIMEO_OPT,
-    SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, fd_cloexec_flag,
-    neg_errno_code, posix_errno_from_ret,
+    fd_cloexec_flag, neg_errno_code, posix_errno_from_ret, AF_UNIX_DOMAIN,
+    INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT,
+    LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE,
+    SOL_SOCKET_LEVEL, SO_ACCEPTCONN_OPT, SO_BROADCAST_OPT, SO_DEBUG_OPT, SO_DOMAIN_OPT,
+    SO_DONTROUTE_OPT, SO_ERROR_OPT, SO_KEEPALIVE_OPT, SO_LINGER_OPT, SO_NO_CHECK_OPT,
+    SO_OOBINLINE_OPT, SO_PASSCRED_OPT, SO_PEERCRED_OPT, SO_PRIORITY_OPT, SO_PROTOCOL_OPT,
+    SO_RCVBUF_OPT, SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT,
+    SO_SNDTIMEO_OPT, SO_TYPE_OPT, ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE, TCP_KEEPCNT_OPT,
+    TCP_KEEPIDLE_OPT, TCP_KEEPINTVL_OPT, TCP_MAXSEG_OPT, TCP_NODELAY_OPT,
+};
+use super::linux_abi::{
+    IP_MULTICAST_LOOP_OPT, IP_MULTICAST_TTL_OPT, IP_RECVERR_OPT, IP_TOS_OPT, IP_TTL_OPT,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, write_user_bytes, write_user_value,
+    read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
+    validate_user_write, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
-use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
+use super::{neg_errno, posix_ret_i32, posix_ret_usize, SelectMode, UserProcess};
 
 macro_rules! socket_entry_or_return {
     ($process:expr, $fd:expr) => {
@@ -43,6 +50,7 @@ pub(super) struct SocketEntry {
     pub(super) posix_fd: i32,
     pub(super) socktype: i32,
     read_shutdown: Arc<Mutex<bool>>,
+    options: Arc<Mutex<SocketCompatOptions>>,
 }
 
 pub(super) struct LocalSocketEntry {
@@ -63,6 +71,12 @@ const LOCAL_SOCKET_INITIAL_BUFFER_SIZE: usize = 4096;
 const LOCAL_SOCKET_MAX_BUFFER_SIZE: usize = 64 * 1024;
 const SOCKET_ADDR_STORAGE_MAX: usize = 128;
 const SOCKET_OPTLEN_MAX: usize = TCP_INFO_COMPAT_SIZE;
+const INET_SOCKET_DEFAULT_BUFFER_SIZE: i32 = 64 * 1024;
+const INET_SOCKET_DEFAULT_TTL: i32 = 64;
+const INET_SOCKET_DEFAULT_MULTICAST_TTL: i32 = 1;
+const TCP_DEFAULT_KEEPIDLE_SECS: i32 = 7200;
+const TCP_DEFAULT_KEEPINTVL_SECS: i32 = 75;
+const TCP_DEFAULT_KEEPCNT: i32 = 9;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum LocalSocketBufferStatus {
@@ -110,6 +124,55 @@ struct LocalSocketListener {
     pending: Vec<LocalSocketPending>,
 }
 
+#[derive(Clone, Copy)]
+struct SocketScalarOption {
+    level: i32,
+    optname: i32,
+    value: i32,
+}
+
+struct SocketCompatOptions {
+    scalars: Vec<SocketScalarOption>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct LinuxLinger {
+    l_onoff: i32,
+    l_linger: i32,
+}
+
+impl SocketCompatOptions {
+    fn new() -> Self {
+        Self {
+            scalars: Vec::new(),
+        }
+    }
+
+    fn get_scalar(&self, level: i32, optname: i32) -> Option<i32> {
+        self.scalars
+            .iter()
+            .find(|option| option.level == level && option.optname == optname)
+            .map(|option| option.value)
+    }
+
+    fn set_scalar(&mut self, level: i32, optname: i32, value: i32) {
+        if let Some(option) = self
+            .scalars
+            .iter_mut()
+            .find(|option| option.level == level && option.optname == optname)
+        {
+            option.value = value;
+            return;
+        }
+        self.scalars.push(SocketScalarOption {
+            level,
+            optname,
+            value,
+        });
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct LinuxMsghdr {
@@ -136,6 +199,7 @@ impl SocketEntry {
             posix_fd,
             socktype,
             read_shutdown: Arc::new(Mutex::new(false)),
+            options: Arc::new(Mutex::new(SocketCompatOptions::new())),
         }
     }
 
@@ -145,6 +209,7 @@ impl SocketEntry {
             posix_fd,
             socktype: self.socktype,
             read_shutdown: self.read_shutdown.clone(),
+            options: self.options.clone(),
         })
     }
 
@@ -712,6 +777,112 @@ fn setsockopt_unsupported_errno_code(_level: i32) -> u32 {
     LINUX_ENOPROTOOPT
 }
 
+fn socket_protocol(socket: &SocketEntry) -> i32 {
+    if socket.socktype as u32 == posix_ctypes::SOCK_DGRAM {
+        posix_ctypes::IPPROTO_UDP as i32
+    } else {
+        posix_ctypes::IPPROTO_TCP as i32
+    }
+}
+
+fn socket_level_supported(socket: &SocketEntry, level: i32) -> bool {
+    level == SOL_SOCKET_LEVEL
+        || level == IPPROTO_IP_LEVEL
+        || (level == posix_ctypes::IPPROTO_TCP as i32
+            && socket.socktype as u32 == posix_ctypes::SOCK_STREAM)
+        || (level == posix_ctypes::IPPROTO_UDP as i32
+            && socket.socktype as u32 == posix_ctypes::SOCK_DGRAM)
+}
+
+fn normalize_bool_option(value: i32) -> i32 {
+    i32::from(value != 0)
+}
+
+fn socket_default_scalar(socket: &SocketEntry, level: i32, optname: i32) -> Option<i32> {
+    if !socket_level_supported(socket, level) {
+        return None;
+    }
+    if level == SOL_SOCKET_LEVEL {
+        match optname {
+            SO_ERROR_OPT => Some(0),
+            SO_TYPE_OPT => Some(socket.socktype),
+            SO_DOMAIN_OPT => Some(posix_ctypes::AF_INET as i32),
+            SO_PROTOCOL_OPT => Some(socket_protocol(socket)),
+            SO_ACCEPTCONN_OPT => Some(0),
+            SO_SNDBUF_OPT | SO_RCVBUF_OPT => Some(INET_SOCKET_DEFAULT_BUFFER_SIZE),
+            SO_DEBUG_OPT | SO_REUSEADDR_OPT | SO_DONTROUTE_OPT | SO_BROADCAST_OPT
+            | SO_KEEPALIVE_OPT | SO_OOBINLINE_OPT | SO_NO_CHECK_OPT | SO_PASSCRED_OPT
+            | SO_REUSEPORT_OPT => Some(0),
+            SO_PRIORITY_OPT => Some(0),
+            _ => None,
+        }
+    } else if level == IPPROTO_IP_LEVEL {
+        match optname {
+            IP_TOS_OPT | IP_RECVERR_OPT => Some(0),
+            IP_TTL_OPT => Some(INET_SOCKET_DEFAULT_TTL),
+            IP_MULTICAST_TTL_OPT => Some(INET_SOCKET_DEFAULT_MULTICAST_TTL),
+            IP_MULTICAST_LOOP_OPT => Some(1),
+            _ => None,
+        }
+    } else if level == posix_ctypes::IPPROTO_TCP as i32 {
+        match optname {
+            TCP_NODELAY_OPT => Some(0),
+            TCP_MAXSEG_OPT => Some(536),
+            TCP_KEEPIDLE_OPT => Some(TCP_DEFAULT_KEEPIDLE_SECS),
+            TCP_KEEPINTVL_OPT => Some(TCP_DEFAULT_KEEPINTVL_SECS),
+            TCP_KEEPCNT_OPT => Some(TCP_DEFAULT_KEEPCNT),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
+fn normalize_socket_scalar(level: i32, optname: i32, value: i32) -> Result<i32, u32> {
+    if level == SOL_SOCKET_LEVEL {
+        match optname {
+            SO_DEBUG_OPT | SO_REUSEADDR_OPT | SO_DONTROUTE_OPT | SO_BROADCAST_OPT
+            | SO_KEEPALIVE_OPT | SO_OOBINLINE_OPT | SO_NO_CHECK_OPT | SO_PASSCRED_OPT
+            | SO_REUSEPORT_OPT => Ok(normalize_bool_option(value)),
+            SO_SNDBUF_OPT | SO_RCVBUF_OPT => {
+                if value <= 0 {
+                    Err(LinuxError::EINVAL.code() as u32)
+                } else {
+                    Ok(cmp::max(value, 2048))
+                }
+            }
+            SO_PRIORITY_OPT => Ok(value),
+            _ => Err(LINUX_ENOPROTOOPT),
+        }
+    } else if level == IPPROTO_IP_LEVEL {
+        match optname {
+            IP_TOS_OPT | IP_RECVERR_OPT | IP_MULTICAST_LOOP_OPT => Ok(normalize_bool_option(value)),
+            IP_TTL_OPT | IP_MULTICAST_TTL_OPT => {
+                if (0..=255).contains(&value) {
+                    Ok(value)
+                } else {
+                    Err(LinuxError::EINVAL.code() as u32)
+                }
+            }
+            _ => Err(LINUX_ENOPROTOOPT),
+        }
+    } else if level == posix_ctypes::IPPROTO_TCP as i32 {
+        match optname {
+            TCP_NODELAY_OPT => Ok(normalize_bool_option(value)),
+            TCP_MAXSEG_OPT | TCP_KEEPIDLE_OPT | TCP_KEEPINTVL_OPT | TCP_KEEPCNT_OPT => {
+                if value <= 0 {
+                    Err(LinuxError::EINVAL.code() as u32)
+                } else {
+                    Ok(value)
+                }
+            }
+            _ => Err(LINUX_ENOPROTOOPT),
+        }
+    } else {
+        Err(LINUX_ENOPROTOOPT)
+    }
+}
+
 pub(super) fn socket_entry(process: &UserProcess, fd: usize) -> Result<SocketEntry, LinuxError> {
     let table = process.fds.lock();
     match table.entry(fd as i32)? {
@@ -1142,6 +1313,7 @@ where
                 if socket_block_interrupt_pending(process) {
                     break neg_errno(LinuxError::EINTR);
                 }
+                axtask::yield_now();
             }
             Err(err) => break neg_errno(err),
         }
@@ -1617,6 +1789,7 @@ fn accept_with_real_timer_interrupt(
                 if socket_block_interrupt_pending(process) {
                     break Err(LinuxError::EINTR);
                 }
+                axtask::yield_now();
             }
             Err(err) => break Err(err),
         }
@@ -2144,6 +2317,42 @@ pub(super) fn sys_setsockopt_bridge(
                 Err(err) => neg_errno(err),
             }
         }
+    } else if level_i32 == SOL_SOCKET_LEVEL && optname_i32 == SO_LINGER_OPT {
+        if optlen < size_of::<LinuxLinger>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let linger = match read_user_value::<LinuxLinger>(process, optval) {
+            Ok(linger) => linger,
+            Err(err) => return neg_errno(err),
+        };
+        if linger.l_linger < 0 {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let stored = if linger.l_onoff != 0 {
+            linger.l_linger
+        } else {
+            -1
+        };
+        socket
+            .options
+            .lock()
+            .set_scalar(level_i32, optname_i32, stored);
+        0
+    } else if socket_default_scalar(&socket, level_i32, optname_i32).is_some() {
+        let value = match read_user_value::<i32>(process, optval) {
+            Ok(value) => value,
+            Err(err) => return neg_errno(err),
+        };
+        match normalize_socket_scalar(level_i32, optname_i32, value) {
+            Ok(value) => {
+                socket
+                    .options
+                    .lock()
+                    .set_scalar(level_i32, optname_i32, value);
+                0
+            }
+            Err(errno) => neg_errno_code(errno),
+        }
     } else {
         neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
     }
@@ -2200,18 +2409,39 @@ pub(super) fn sys_getsockopt_bridge(
         let out_len = size_of::<general::timeval>() as posix_ctypes::socklen_t;
         return write_user_value(process, optlen, &out_len);
     }
+    if level == SOL_SOCKET_LEVEL && optname == SO_LINGER_OPT {
+        if len < size_of::<LinuxLinger>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if let Err(err) = validate_user_write(process, optval, size_of::<LinuxLinger>()) {
+            return neg_errno(err);
+        }
+        let stored = socket
+            .options
+            .lock()
+            .get_scalar(level, optname)
+            .unwrap_or(-1);
+        let value = LinuxLinger {
+            l_onoff: i32::from(stored >= 0),
+            l_linger: cmp::max(stored, 0),
+        };
+        let ret = write_user_value(process, optval, &value);
+        if ret != 0 {
+            return ret;
+        }
+        let out_len = size_of::<LinuxLinger>() as posix_ctypes::socklen_t;
+        return write_user_value(process, optlen, &out_len);
+    }
     if len < size_of::<i32>() {
         return neg_errno(LinuxError::EINVAL);
     }
     if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
         return neg_errno(err);
     }
-    let value = if level == SOL_SOCKET_LEVEL {
-        match optname {
-            SO_ERROR_OPT => 0,
-            SO_TYPE_OPT => socket.socktype,
-            _ => return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level)),
-        }
+    let value = if let Some(value) = socket.options.lock().get_scalar(level, optname) {
+        value
+    } else if let Some(value) = socket_default_scalar(&socket, level, optname) {
+        value
     } else {
         return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level));
     };

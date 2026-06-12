@@ -8,18 +8,18 @@ use linux_raw_sys::general;
 use std::vec::Vec;
 
 use super::linux_abi::{
-    DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
-    USER_STACK_SIZE, neg_errno,
+    neg_errno, DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
+    USER_STACK_SIZE,
 };
 use super::task_registry::{
-    UserThreadEntry, live_user_process_entries, user_thread_entries_by_process_group,
-    user_thread_entry_by_process_pid,
+    live_user_process_entries, user_thread_entries_by_process_group,
+    user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{UserProcess, task_context::current_tid};
+use super::{task_context::current_tid, UserProcess};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -490,6 +490,14 @@ fn apply_task_scheduler_state(
     // before this point because no deadline backend exists to make runtime,
     // deadline, and period observable.
     let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));
+}
+
+pub(super) fn apply_process_scheduler_state_to_task(
+    process: &UserProcess,
+    task: &axtask::AxTaskRef,
+) {
+    let state = process.get_sched_state();
+    apply_task_scheduler_state(task, process, state);
 }
 
 fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState, LinuxError> {

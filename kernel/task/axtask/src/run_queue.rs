@@ -350,8 +350,14 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
             can_preempt
         );
         if can_preempt {
+            // A preemption point should give other ready tasks at the same
+            // priority a chance to run.  Re-inserting the current task at the
+            // front preserves its partial time slice but can starve a task that
+            // was just woken by notify_*() under fork-heavy workloads.  Rotate
+            // the current task to the back; higher-priority tasks are still
+            // selected first by the scheduler.
             self.inner
-                .put_task_with_state(curr.clone(), TaskState::Running, true);
+                .put_task_with_state(curr.clone(), TaskState::Running, false);
             self.inner.resched();
         } else {
             curr.set_preempt_pending(true);
