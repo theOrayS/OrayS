@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use axfs_vfs::{VfsError, VfsNodeAttr, VfsNodeOps, VfsResult, impl_vfs_non_dir_default};
+use axfs_vfs::{impl_vfs_non_dir_default, VfsError, VfsNodeAttr, VfsNodeOps, VfsResult};
 use spin::RwLock;
 
 // The evaluator mounts /tmp and /var as ramfs. Keep a per-file ceiling so
@@ -72,6 +72,12 @@ impl VfsNodeOps for FileNode {
         let dst = &mut content[offset..end];
         dst.copy_from_slice(&buf[..dst.len()]);
         Ok(buf.len())
+    }
+
+    fn fsync(&self) -> VfsResult {
+        // ramfs is already memory-resident.  There is no lower block device to
+        // flush, and all writes are visible once write_at returns.
+        Ok(())
     }
 
     impl_vfs_non_dir_default! {}

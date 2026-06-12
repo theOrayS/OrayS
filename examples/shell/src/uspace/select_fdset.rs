@@ -1,5 +1,6 @@
 use core::mem::size_of;
 use core::sync::atomic::Ordering;
+use core::time::Duration;
 
 use axerrno::LinuxError;
 use linux_raw_sys::general;
@@ -373,9 +374,14 @@ fn sys_poll_until(
 pub(super) fn yield_poll_wait() {
     if let Some(ext) = current_task_ext() {
         ext.poll_wait.store(true, Ordering::Release);
-        axtask::yield_now();
+        // Empty poll/select loops are waiting for an external event, not doing
+        // useful CPU work.  On the single-vCPU evaluator a pure yield lets a
+        // background server immediately re-enter the ready queue and can starve
+        // the shell/client that should produce the event.  Block briefly so the
+        // scheduler can run peers while preserving POSIX retry semantics.
+        axtask::sleep(Duration::from_millis(1));
         ext.poll_wait.store(false, Ordering::Release);
     } else {
-        axtask::yield_now();
+        axtask::sleep(Duration::from_millis(1));
     }
 }

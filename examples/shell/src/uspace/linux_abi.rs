@@ -128,12 +128,38 @@ pub(super) const DEFAULT_GROUP_CONTENT: &[u8] =
 pub(super) const RTC_RD_TIME: u32 = 0x8024_7009;
 
 pub(super) const SOL_SOCKET_LEVEL: i32 = 1;
+pub(super) const SO_DEBUG_OPT: i32 = 1;
+pub(super) const SO_REUSEADDR_OPT: i32 = 2;
 pub(super) const SO_TYPE_OPT: i32 = 3;
 pub(super) const SO_ERROR_OPT: i32 = 4;
+pub(super) const SO_DONTROUTE_OPT: i32 = 5;
+pub(super) const SO_BROADCAST_OPT: i32 = 6;
+pub(super) const SO_SNDBUF_OPT: i32 = 7;
+pub(super) const SO_RCVBUF_OPT: i32 = 8;
+pub(super) const SO_KEEPALIVE_OPT: i32 = 9;
+pub(super) const SO_OOBINLINE_OPT: i32 = 10;
+pub(super) const SO_NO_CHECK_OPT: i32 = 11;
+pub(super) const SO_PRIORITY_OPT: i32 = 12;
+pub(super) const SO_LINGER_OPT: i32 = 13;
+pub(super) const SO_REUSEPORT_OPT: i32 = 15;
+pub(super) const SO_PASSCRED_OPT: i32 = 16;
 pub(super) const SO_RCVTIMEO_OPT: i32 = 20;
 pub(super) const SO_SNDTIMEO_OPT: i32 = 21;
+pub(super) const SO_ACCEPTCONN_OPT: i32 = 30;
 pub(super) const SO_PEERCRED_OPT: i32 = 17;
+pub(super) const SO_PROTOCOL_OPT: i32 = 38;
+pub(super) const SO_DOMAIN_OPT: i32 = 39;
 pub(super) const IPPROTO_IP_LEVEL: i32 = 0;
+pub(super) const IP_TOS_OPT: i32 = 1;
+pub(super) const IP_TTL_OPT: i32 = 2;
+pub(super) const IP_MULTICAST_TTL_OPT: i32 = 33;
+pub(super) const IP_MULTICAST_LOOP_OPT: i32 = 34;
+pub(super) const IP_RECVERR_OPT: i32 = 11;
+pub(super) const TCP_NODELAY_OPT: i32 = 1;
+pub(super) const TCP_MAXSEG_OPT: i32 = 2;
+pub(super) const TCP_KEEPIDLE_OPT: i32 = 4;
+pub(super) const TCP_KEEPINTVL_OPT: i32 = 5;
+pub(super) const TCP_KEEPCNT_OPT: i32 = 6;
 pub(super) const TCP_INFO_COMPAT_SIZE: usize = 256;
 pub(super) const INTERRUPTIBLE_SOCKET_RECV_QUANTUM: core::time::Duration =
     core::time::Duration::from_millis(20);
@@ -181,7 +207,11 @@ pub(super) fn neg_errno_code(code: u32) -> isize {
 }
 
 pub(super) fn fd_cloexec_flag(enabled: bool) -> u32 {
-    if enabled { general::FD_CLOEXEC } else { 0 }
+    if enabled {
+        general::FD_CLOEXEC
+    } else {
+        0
+    }
 }
 
 pub(super) fn str_err(err: &'static str) -> String {

@@ -17,7 +17,7 @@ use super::task_registry::{
     user_thread_entry_by_tid, user_thread_entry_for_process, user_thread_entry_for_process_where,
 };
 use super::user_memory::{read_user_value, write_user_value};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 static TIME_DISCIPLINE: TimeDisciplineState = TimeDisciplineState::new();
@@ -933,53 +933,51 @@ fn wait_posix_timer_delay(
 fn arm_posix_timer(process: Arc<UserProcess>, timer: UserPosixTimer, generation: u64) {
     let process = Arc::downgrade(&process);
     let _ = axtask::spawn_raw(
-        move || {
-            loop {
-                let Some(current) = process.upgrade() else {
+        move || loop {
+            let Some(current) = process.upgrade() else {
+                break;
+            };
+            if current.live_threads.load(Ordering::Acquire) == 0
+                || timer.generation.load(Ordering::Acquire) != generation
+            {
+                break;
+            }
+            drop(current);
+            let delay = {
+                let state = timer.state.lock();
+                let Some(deadline) = state.deadline else {
                     break;
                 };
-                if current.live_threads.load(Ordering::Acquire) == 0
-                    || timer.generation.load(Ordering::Acquire) != generation
-                {
-                    break;
-                }
-                drop(current);
-                let delay = {
-                    let state = timer.state.lock();
-                    let Some(deadline) = state.deadline else {
-                        break;
-                    };
-                    let now = match clock_now_duration(timer.clock_id) {
-                        Ok(now) => now,
-                        Err(_) => break,
-                    };
-                    deadline
-                        .checked_sub(now)
-                        .unwrap_or(core::time::Duration::ZERO)
+                let now = match clock_now_duration(timer.clock_id) {
+                    Ok(now) => now,
+                    Err(_) => break,
                 };
-                if delay == core::time::Duration::ZERO {
-                    axtask::yield_now();
-                } else if wait_posix_timer_delay(&process, &timer, generation, delay).is_none() {
-                    break;
+                deadline
+                    .checked_sub(now)
+                    .unwrap_or(core::time::Duration::ZERO)
+            };
+            if delay == core::time::Duration::ZERO {
+                axtask::yield_now();
+            } else if wait_posix_timer_delay(&process, &timer, generation, delay).is_none() {
+                break;
+            }
+            let Some(current) = process.upgrade() else {
+                break;
+            };
+            if current.live_threads.load(Ordering::Acquire) == 0
+                || timer.generation.load(Ordering::Acquire) != generation
+            {
+                break;
+            }
+            let expired = {
+                let mut state = timer.state.lock();
+                match refresh_posix_timer_locked(&timer, &mut state) {
+                    Ok(expired) => expired,
+                    Err(_) => false,
                 }
-                let Some(current) = process.upgrade() else {
-                    break;
-                };
-                if current.live_threads.load(Ordering::Acquire) == 0
-                    || timer.generation.load(Ordering::Acquire) != generation
-                {
-                    break;
-                }
-                let expired = {
-                    let mut state = timer.state.lock();
-                    match refresh_posix_timer_locked(&timer, &mut state) {
-                        Ok(expired) => expired,
-                        Err(_) => false,
-                    }
-                };
-                if expired {
-                    deliver_posix_timer_signal(&current, timer.notify);
-                }
+            };
+            if expired {
+                deliver_posix_timer_signal(&current, timer.notify);
             }
         },
         "user-posix-timer".into(),
@@ -1245,14 +1243,29 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
     if duration.as_nanos() == 0 {
         return;
     }
-    let deadline = axhal::time::wall_time() + duration;
-    while axhal::time::wall_time() < deadline {
-        if let Some(ext) = current_task_ext()
-            && let Some(code) = ext.process.pending_exit_group()
-        {
+    let Some(deadline) = axhal::time::monotonic_time().checked_add(duration) else {
+        axtask::sleep(duration);
+        return;
+    };
+    let Some(ext) = current_task_ext() else {
+        axtask::sleep(duration);
+        return;
+    };
+    while axhal::time::monotonic_time() < deadline {
+        if let Some(code) = ext.process.pending_exit_group() {
             terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
         }
-        axtask::yield_now();
+        let remaining = deadline.saturating_sub(axhal::time::monotonic_time());
+        if remaining.is_zero() {
+            break;
+        }
+        ext.process.timer_wait.wait_timeout_until(
+            remaining.min(micros_to_duration(TIMER_HELPER_POLL_US)),
+            || {
+                ext.process.pending_exit_group().is_some()
+                    || axhal::time::monotonic_time() >= deadline
+            },
+        );
     }
 }
 
@@ -1260,21 +1273,33 @@ fn sleep_duration_interruptible(duration: core::time::Duration) -> Option<core::
     if duration.as_nanos() == 0 {
         return None;
     }
-    let deadline = axhal::time::wall_time() + duration;
+    let Some(deadline) = axhal::time::monotonic_time().checked_add(duration) else {
+        axtask::sleep(duration);
+        return None;
+    };
+    let Some(ext) = current_task_ext() else {
+        axtask::sleep(duration);
+        return None;
+    };
     loop {
-        let now = axhal::time::wall_time();
+        let now = axhal::time::monotonic_time();
         if now >= deadline {
             return None;
         }
-        if let Some(ext) = current_task_ext()
-            && let Some(code) = ext.process.pending_exit_group()
-        {
+        if let Some(code) = ext.process.pending_exit_group() {
             terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
         }
         if current_unblocked_signal_pending() {
             return Some(deadline.saturating_sub(now));
         }
-        axtask::yield_now();
+        let remaining = deadline.saturating_sub(now);
+        let poll = remaining.min(micros_to_duration(TIMER_HELPER_POLL_US));
+        ext.process.timer_wait.wait_timeout_until(poll, || {
+            axhal::time::monotonic_time() >= deadline
+                || ext.process.pending_exit_group().is_some()
+                || current_unblocked_signal_pending()
+                || ext.process.eval_watchdog_expired()
+        });
     }
 }
 
