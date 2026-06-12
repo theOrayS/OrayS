@@ -82,12 +82,16 @@ KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
 # Remote official evaluation invokes `make` / `make all` with no extra args.
-# Default to the curated stable whitelist: blacklist/sweep modes are scouting
-# tools only, and their skipped/status-0 rows are not promotion evidence.
-# Explicit modes remain available for local investigation:
-#   make all REMOTE_LTP_CASES=stable-plus-blacklist
+# Default to the broad stable-first superset:
+#   LTP_STABLE_CASES + (all guest LTP binaries - stable - active blacklist).
+# This keeps trusted stable cases first, then runs as much of the remaining LTP
+# surface as the severe-blocker blacklist allows.  The blacklist is only a
+# runthrough safety boundary; skipped/timeout/TCONF/TBROK/TFAIL/ENOSYS rows must
+# not be promoted as PASS.
+# Explicit narrower / scouting modes remain available:
+#   make all REMOTE_LTP_CASES=stable
 #   make all REMOTE_LTP_CASES=blacklist
-REMOTE_LTP_CASES ?= stable
+REMOTE_LTP_CASES ?= stable-plus-blacklist
 REMOTE_LTP_BLACKLIST_DIR ?= $(CURDIR)/docs/ltp-full-sweep-blacklist-2026-05-30-arch
 REMOTE_LTP_BLACKLIST_COMMON_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-common.txt
 REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
