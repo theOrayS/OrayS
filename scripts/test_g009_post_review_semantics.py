@@ -66,7 +66,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
         path = tree / "examples/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
-            "matches!(\n            self.entry(fd),\n            Ok(FdEntry::Stdin | FdEntry::Stdout | FdEntry::Stderr)\n        )",
+            "matches!(\n            self.entry(fd),\n            Ok(FdEntry::Stdin(_) | FdEntry::Stdout(_) | FdEntry::Stderr(_))\n        )",
             "matches!(fd, 0..=2)",
         )
         path.write_text(text, encoding="utf-8")

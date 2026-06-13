@@ -50,7 +50,12 @@ def scan_stdio_close(root: Path) -> list[str]:
         findings.append("sys_close must remove every fd through close_file_like")
     if re.search(r"\(0\.\.=2\).*return\s+0", block, re.S):
         findings.append("sys_close still fake-succeeds for stdin/stdout/stderr")
-    if "FdEntry::Stdin | FdEntry::Stdout | FdEntry::Stderr" not in is_stdio:
+    stdio_pattern = (
+        r"FdEntry::Stdin(?:\(_\))?\s*\|\s*"
+        r"FdEntry::Stdout(?:\(_\))?\s*\|\s*"
+        r"FdEntry::Stderr(?:\(_\))?"
+    )
+    if not re.search(stdio_pattern, is_stdio):
         findings.append("shell is_stdio must consult live FdEntry, not numeric fd 0..=2")
     if "matches!(fd, 0..=2)" in is_stdio:
         findings.append("shell is_stdio still treats closed/reused numeric stdio fds as terminals")

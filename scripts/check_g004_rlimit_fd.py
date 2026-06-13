@@ -372,6 +372,15 @@ def scan_shell_fd_table(path: Path, text: str, root: Path = REPO_ROOT) -> list[F
         if term not in text:
             findings.append(Finding(rel, 1, "g004-fd-state-missing", detail))
 
+    stdio_status_terms = {
+        "Stdin(u32)": "stdin should carry status flags so F_GETFL/F_SETFL report real fd state",
+        "Stdout(u32)": "stdout should carry status flags so F_GETFL/F_SETFL report real fd state",
+        "Stderr(u32)": "stderr should carry status flags so F_GETFL/F_SETFL report real fd state",
+    }
+    for term, detail in stdio_status_terms.items():
+        if term not in text:
+            findings.append(Finding(rel, 1, "g004-stdio-status-state-missing", detail))
+
     block = extract_function(text, "fcntl")
     if block is None:
         findings.append(missing_function_finding(rel, "fcntl"))
@@ -390,6 +399,27 @@ def scan_shell_fd_table(path: Path, text: str, root: Path = REPO_ROOT) -> list[F
                     f"FdTable::fcntl must route {cmd} to {handler}",
                 )
             )
+
+    for variant in ("FdEntry::Stdin(status_flags)", "FdEntry::Stdout(status_flags)", "FdEntry::Stderr(status_flags)"):
+        if variant not in block.text:
+            findings.append(
+                Finding(
+                    rel,
+                    block.start_line,
+                    "g004-shell-fcntl-stdio-status-missing",
+                    "FdTable::fcntl must route stdio F_GETFL/F_SETFL through status_flags state",
+                )
+            )
+            break
+    if "fcntl_setfl_flags(arg as u32)" not in block.text:
+        findings.append(
+            Finding(
+                rel,
+                block.start_line,
+                "g004-shell-fcntl-setfl-mask-missing",
+                "F_SETFL must mask to mutable Linux status flags instead of accepting arbitrary bits",
+            )
+        )
 
     for line_no, line in block.iter_lines():
         stripped = line.strip()

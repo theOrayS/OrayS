@@ -221,6 +221,11 @@ pub(super) fn sys_prlimit64(process: &UserProcess, pid: i32, resource: u32, new_
         findings = guard.scan_shell_fd_table(
             Path("examples/shell/src/uspace/fd_table.rs"),
             r'''
+pub(super) enum FdEntry {
+    Stdin(u32),
+    Stdout(u32),
+    Stderr(u32),
+}
 pub(super) struct FdTable {
     fd_flags: Vec<u32>,
 }
@@ -246,6 +251,11 @@ impl FdTable {
         findings = guard.scan_shell_fd_table(
             Path("examples/shell/src/uspace/fd_table.rs"),
             r'''
+pub(super) enum FdEntry {
+    Stdin(u32),
+    Stdout(u32),
+    Stderr(u32),
+}
 pub(super) struct FdTable {
     fd_flags: Vec<u32>,
 }
@@ -257,7 +267,22 @@ impl FdTable {
         match cmd {
             general::F_GETFD => self.get_fd_flags(fd),
             general::F_SETFD => self.set_fd_flags(fd, arg as u32),
-            general::F_GETFL => Err(LinuxError::EINVAL),
+            general::F_GETFL => match self.entry(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => Ok(*status_flags as i32),
+                _ => Err(LinuxError::EINVAL),
+            },
+            general::F_SETFL => match self.entry_mut(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => {
+                    *status_flags =
+                        (*status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
+                _ => Err(LinuxError::EINVAL),
+            },
             _ => Err(LinuxError::EINVAL),
         }
     }

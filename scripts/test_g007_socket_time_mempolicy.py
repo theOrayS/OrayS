@@ -119,7 +119,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
         path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
         text = path.read_text(encoding="utf-8")
         old = """general::__NR_mbind => sys_mbind(
-            &process,
+            process,
             tf.arg0(),
             tf.arg1(),
             tf.arg2(),
@@ -128,7 +128,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
             tf.arg5(),
         ),"""
         new = """general::__NR_mbind => sys_mbind(
-            &process,
+            process,
             tf.arg0(),
             tf.arg1(),
             tf.arg2(),

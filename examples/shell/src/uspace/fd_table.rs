@@ -18,64 +18,64 @@ use std::vec::Vec;
 
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE,
-    DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE,
-    O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME,
-    SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO,
-    ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE,
-    fd_cloexec_flag, neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
+    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK,
+    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
+    ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE,
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG, apply_recorded_path_metadata,
-    canonical_permission_path, dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path,
-    fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
-    stdio_stat, synthetic_block_stat_for_path, synthetic_char_stat_for_path,
+    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
+    dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
+    generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
+    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
 };
 use super::posix_mq::{
-    PosixMqDescriptor, ProcMqQueuesMaxEntry, proc_sys_fs_mqueue_fd_entry,
-    proc_sys_fs_mqueue_path_entry,
+    proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
+    ProcMqQueuesMaxEntry,
 };
 use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
 };
-use super::select_fdset::{SelectMode, yield_poll_wait};
+use super::select_fdset::{yield_poll_wait, SelectMode};
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
 };
 use super::synthetic_fs::{
-    ProcSysFileEntry, dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path,
-    proc_comm_fd_entry, proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry,
-    proc_meminfo_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry,
-    proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
-    proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
-    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry,
-    proc_sys_file_path_entry, proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
-    proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
-    proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
-    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
-    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
-    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
-    synthetic_proc_sys_path_entry, synthetic_proc_version_content, synthetic_proc_version_fd_entry,
+    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
+    proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry, proc_meminfo_path_entry,
+    proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
+    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
+    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
+    proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
+    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
+    proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
+    proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
+    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
+    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
+    synthetic_proc_version_content, synthetic_proc_version_fd_entry,
     synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry,
+    synthetic_userdb_path_entry, ProcSysFileEntry,
 };
 use super::system_info::write_default_winsize;
 use super::task_context::current_task_ext;
 use super::task_registry::{
-    UserThreadEntry, user_thread_entry_by_process_pid, user_thread_entry_for_process,
+    user_thread_entry_by_process_pid, user_thread_entry_for_process, UserThreadEntry,
 };
 use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes,
-    read_user_value, user_io_buffer, validate_user_read, validate_user_write,
-    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
+    fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
 use super::{PathTimes, UserProcess};
 
@@ -135,9 +135,9 @@ fn current_fd_table_limit() -> usize {
 }
 
 pub(super) enum FdEntry {
-    Stdin,
-    Stdout,
-    Stderr,
+    Stdin(u32),
+    Stdout(u32),
+    Stderr(u32),
     DevNull,
     DevZero(u32),
     DevRandom(u32),
@@ -165,6 +165,10 @@ pub(super) enum FdEntry {
     ProcMqQueuesMax(ProcMqQueuesMaxEntry),
     ProcSysFile(ProcSysFileEntry),
 }
+
+const STDIN_STATUS_FLAGS: u32 = general::O_RDONLY;
+const STDOUT_STATUS_FLAGS: u32 = general::O_WRONLY;
+const STDERR_STATUS_FLAGS: u32 = general::O_WRONLY;
 
 #[derive(Clone)]
 pub(super) struct FileEntry {
@@ -3046,9 +3050,9 @@ pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
             0
         }
         Ok(
-            FdEntry::Stdin
-            | FdEntry::Stdout
-            | FdEntry::Stderr
+            FdEntry::Stdin(_)
+            | FdEntry::Stdout(_)
+            | FdEntry::Stderr(_)
             | FdEntry::DevNull
             | FdEntry::DevZero(_)
             | FdEntry::DevRandom(_)
@@ -3945,9 +3949,9 @@ impl FdTable {
     pub(super) fn new() -> Self {
         Self {
             entries: vec![
-                Some(FdEntry::Stdin),
-                Some(FdEntry::Stdout),
-                Some(FdEntry::Stderr),
+                Some(FdEntry::Stdin(STDIN_STATUS_FLAGS)),
+                Some(FdEntry::Stdout(STDOUT_STATUS_FLAGS)),
+                Some(FdEntry::Stderr(STDERR_STATUS_FLAGS)),
             ],
             fd_flags: vec![0, 0, 0],
         }
@@ -3988,7 +3992,7 @@ impl FdTable {
     pub(super) fn is_stdio(&self, fd: i32) -> bool {
         matches!(
             self.entry(fd),
-            Ok(FdEntry::Stdin | FdEntry::Stdout | FdEntry::Stderr)
+            Ok(FdEntry::Stdin(_) | FdEntry::Stdout(_) | FdEntry::Stderr(_))
         )
     }
 
@@ -4112,8 +4116,8 @@ impl FdTable {
         };
         match mode {
             SelectMode::Read => match entry {
-                FdEntry::Stdin => false,
-                FdEntry::Stdout | FdEntry::Stderr => false,
+                FdEntry::Stdin(_) => false,
+                FdEntry::Stdout(_) | FdEntry::Stderr(_) => false,
                 FdEntry::DevNull
                 | FdEntry::DevZero(_)
                 | FdEntry::DevRandom(_)
@@ -4142,9 +4146,9 @@ impl FdTable {
                 FdEntry::LocalSocket(socket) => socket.poll(mode),
             },
             SelectMode::Write => match entry {
-                FdEntry::Stdin => false,
-                FdEntry::Stdout
-                | FdEntry::Stderr
+                FdEntry::Stdin(_) => false,
+                FdEntry::Stdout(_)
+                | FdEntry::Stderr(_)
                 | FdEntry::DevNull
                 | FdEntry::DevZero(_)
                 | FdEntry::DevRandom(_)
@@ -4376,7 +4380,7 @@ impl FdTable {
         dst: &mut [u8],
     ) -> Result<usize, LinuxError> {
         match self.entry_mut(fd)? {
-            FdEntry::Stdin => Ok(0),
+            FdEntry::Stdin(_) => Ok(0),
             FdEntry::DevNull => Ok(0),
             FdEntry::DevZero(status_flags) => {
                 if !file_is_readable(*status_flags) {
@@ -4434,7 +4438,7 @@ impl FdTable {
         file_size_limit: Option<u64>,
     ) -> Result<usize, LinuxError> {
         match self.entry_mut(fd)? {
-            FdEntry::Stdout | FdEntry::Stderr => {
+            FdEntry::Stdout(_) | FdEntry::Stderr(_) => {
                 axhal::console::write_bytes(src);
                 Ok(src.len())
             }
@@ -5841,8 +5845,8 @@ impl FdTable {
 
     pub(super) fn stat(&mut self, fd: i32) -> Result<general::stat, LinuxError> {
         match self.entry_mut(fd)? {
-            FdEntry::Stdin => Ok(stdio_stat(true)),
-            FdEntry::Stdout | FdEntry::Stderr => Ok(stdio_stat(false)),
+            FdEntry::Stdin(_) => Ok(stdio_stat(true)),
+            FdEntry::Stdout(_) | FdEntry::Stderr(_) => Ok(stdio_stat(false)),
             FdEntry::DevNull => Ok(dev_null_stat()),
             FdEntry::DevZero(_) => Ok(dev_zero_stat()),
             FdEntry::DevRandom(_) => Ok(PathEntry::synthetic_char("/dev/urandom").stat()),
@@ -6135,6 +6139,9 @@ impl FdTable {
             general::F_GETFD => self.get_fd_flags(fd),
             general::F_SETFD => self.set_fd_flags(fd, arg as u32),
             general::F_GETFL => match self.entry(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => Ok(*status_flags as i32),
                 FdEntry::File(file) => Ok(file.status_flags as i32),
                 FdEntry::Memfd(file) => Ok(file.status_flags as i32),
                 FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
@@ -6177,6 +6184,13 @@ impl FdTable {
                 _ => Err(LinuxError::EINVAL),
             },
             general::F_SETFL => match self.entry_mut(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => {
+                    *status_flags =
+                        (*status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
                 FdEntry::File(file) => {
                     file.status_flags =
                         (file.status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
@@ -7475,9 +7489,9 @@ fn apply_flock_operation(key: u64, owner: usize, operation: u32) -> Result<(), L
 impl FdEntry {
     pub(super) fn duplicate_for_fork(&self) -> Result<Self, LinuxError> {
         match self {
-            Self::Stdin => Ok(Self::Stdin),
-            Self::Stdout => Ok(Self::Stdout),
-            Self::Stderr => Ok(Self::Stderr),
+            Self::Stdin(status_flags) => Ok(Self::Stdin(*status_flags)),
+            Self::Stdout(status_flags) => Ok(Self::Stdout(*status_flags)),
+            Self::Stderr(status_flags) => Ok(Self::Stderr(*status_flags)),
             Self::DevNull => Ok(Self::DevNull),
             Self::DevZero(status_flags) => Ok(Self::DevZero(*status_flags)),
             Self::DevRandom(status_flags) => Ok(Self::DevRandom(*status_flags)),
