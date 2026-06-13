@@ -74,6 +74,11 @@ const SOCKET_OPTLEN_MAX: usize = TCP_INFO_COMPAT_SIZE;
 const INET_SOCKET_DEFAULT_BUFFER_SIZE: i32 = 64 * 1024;
 const INET_SOCKET_DEFAULT_TTL: i32 = 64;
 const INET_SOCKET_DEFAULT_MULTICAST_TTL: i32 = 1;
+const MSG_ERRQUEUE_FLAG: i32 = 0x2000;
+const MCAST_JOIN_GROUP_OPT: i32 = 42;
+const MCAST_LEAVE_GROUP_OPT: i32 = 45;
+const SO_SNDBUFFORCE_OPT: i32 = 32;
+const SOCKET_BUFFER_FORCE_MAX: i32 = i32::MAX / 2;
 const TCP_DEFAULT_KEEPIDLE_SECS: i32 = 7200;
 const TCP_DEFAULT_KEEPINTVL_SECS: i32 = 75;
 const TCP_DEFAULT_KEEPCNT: i32 = 9;
@@ -133,6 +138,7 @@ struct SocketScalarOption {
 
 struct SocketCompatOptions {
     scalars: Vec<SocketScalarOption>,
+    multicast_group_joined: bool,
 }
 
 #[repr(C)]
@@ -146,6 +152,7 @@ impl SocketCompatOptions {
     fn new() -> Self {
         Self {
             scalars: Vec::new(),
+            multicast_group_joined: false,
         }
     }
 
@@ -170,6 +177,18 @@ impl SocketCompatOptions {
             optname,
             value,
         });
+    }
+
+    fn join_multicast_group(&mut self) {
+        self.multicast_group_joined = true;
+    }
+
+    fn leave_multicast_group(&mut self) -> Result<(), LinuxError> {
+        if !self.multicast_group_joined {
+            return Err(LinuxError::EADDRNOTAVAIL);
+        }
+        self.multicast_group_joined = false;
+        Ok(())
     }
 }
 
@@ -798,6 +817,21 @@ fn normalize_bool_option(value: i32) -> i32 {
     i32::from(value != 0)
 }
 
+fn socket_recv_error_queue_empty(flags: i32) -> bool {
+    flags & MSG_ERRQUEUE_FLAG != 0
+}
+
+fn normalize_socket_buffer_force(raw: u32) -> Result<i32, u32> {
+    if raw == 0 {
+        Err(LinuxError::EINVAL.code() as u32)
+    } else {
+        Ok(cmp::max(
+            cmp::min(raw, SOCKET_BUFFER_FORCE_MAX as u32) as i32,
+            2048,
+        ))
+    }
+}
+
 fn socket_default_scalar(socket: &SocketEntry, level: i32, optname: i32) -> Option<i32> {
     if !socket_level_supported(socket, level) {
         return None;
@@ -844,7 +878,7 @@ fn normalize_socket_scalar(level: i32, optname: i32, value: i32) -> Result<i32, 
             SO_DEBUG_OPT | SO_REUSEADDR_OPT | SO_DONTROUTE_OPT | SO_BROADCAST_OPT
             | SO_KEEPALIVE_OPT | SO_OOBINLINE_OPT | SO_NO_CHECK_OPT | SO_PASSCRED_OPT
             | SO_REUSEPORT_OPT => Ok(normalize_bool_option(value)),
-            SO_SNDBUF_OPT | SO_RCVBUF_OPT => {
+            SO_SNDBUF_OPT | SO_RCVBUF_OPT | SO_SNDBUFFORCE_OPT => {
                 if value <= 0 {
                     Err(LinuxError::EINVAL.code() as u32)
                 } else {
@@ -1128,6 +1162,9 @@ pub(super) fn recv_socket_data_to_user(
     len: usize,
     flags: i32,
 ) -> isize {
+    if socket_recv_error_queue_empty(flags) {
+        return neg_errno(LinuxError::EAGAIN);
+    }
     let len = len.min(MAX_USER_IO_CHUNK);
     recv_socket_data_to_user_inner(process, posix_fd, buf, len, |dst| unsafe {
         arceos_posix_api::sys_recv(posix_fd, dst, len, flags)
@@ -1144,6 +1181,9 @@ pub(super) fn recv_socket_data_to_user_with_addr(
     addrlen: usize,
     user_addr_len: usize,
 ) -> isize {
+    if socket_recv_error_queue_empty(flags) {
+        return neg_errno(LinuxError::EAGAIN);
+    }
     let len = len.min(MAX_USER_IO_CHUNK);
     let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
     let mut local_len = 0 as posix_ctypes::socklen_t;
@@ -2128,6 +2168,9 @@ pub(super) fn sys_recvmsg_bridge(
     if let Err(err) = validate_iovec_write(process, &iov_entries, receive_len) {
         return neg_errno(err);
     }
+    if socket_recv_error_queue_empty(flags as i32) {
+        return neg_errno(LinuxError::EAGAIN);
+    }
     let addr_ptr = msg_value.msg_name as usize;
     let ret = if matches!(is_local_socket_fd(process, fd), Ok(true)) {
         let mut bytes = match user_io_buffer(receive_len) {
@@ -2338,6 +2381,37 @@ pub(super) fn sys_setsockopt_bridge(
             .lock()
             .set_scalar(level_i32, optname_i32, stored);
         0
+    } else if level_i32 == IPPROTO_IP_LEVEL
+        && matches!(optname_i32, MCAST_JOIN_GROUP_OPT | MCAST_LEAVE_GROUP_OPT)
+    {
+        if optlen < size_of::<u32>() + size_of::<posix_ctypes::sockaddr>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        let mut options = socket.options.lock();
+        if optname_i32 == MCAST_JOIN_GROUP_OPT {
+            options.join_multicast_group();
+            0
+        } else {
+            match options.leave_multicast_group() {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            }
+        }
+    } else if level_i32 == SOL_SOCKET_LEVEL && optname_i32 == SO_SNDBUFFORCE_OPT {
+        let value = match read_user_value::<u32>(process, optval) {
+            Ok(value) => value,
+            Err(err) => return neg_errno(err),
+        };
+        match normalize_socket_buffer_force(value) {
+            Ok(value) => {
+                socket
+                    .options
+                    .lock()
+                    .set_scalar(level_i32, SO_SNDBUF_OPT, value);
+                0
+            }
+            Err(errno) => neg_errno_code(errno),
+        }
     } else if socket_default_scalar(&socket, level_i32, optname_i32).is_some() {
         let value = match read_user_value::<i32>(process, optval) {
             Ok(value) => value,
