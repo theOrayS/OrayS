@@ -12,6 +12,7 @@ uspace = [
     "axtask/uspace",
     "axstd/fp-simd",
     "dep:axalloc",
+    "dep:axdriver",
     "dep:axerrno",
     "dep:axfs",
     "dep:axhal",
@@ -35,6 +36,7 @@ default = []
 [dependencies]
 arceos_posix_api = { workspace = true, optional = true, features = ["alloc", "multitask", "fd", "fs", "net", "uspace"] }
 axalloc = { workspace = true, optional = true }
+axdriver = { workspace = true, optional = true, features = ["block", "dyn"] }
 axerrno = { version = "0.1", optional = true }
 axfs = { workspace = true, optional = true }
 axfs_vfs = { version = "0.1", optional = true }

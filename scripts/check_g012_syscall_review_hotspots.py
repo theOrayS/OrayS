@@ -164,8 +164,14 @@ def scan_high_hotspots(root: Path) -> list[str]:
     require_tokens(
         findings,
         resolve,
-        "block-filesystem mount must fail explicitly without a backing mount path",
-        ('"vfat"', "LinuxError::EOPNOTSUPP"),
+        "vfat mount must attach a real mounted filesystem instead of aliasing an existing path",
+        ('"vfat"', "synthetic_block_device_for_mount", "axfs::api::mount_fatfs", "Ok(target_path.into())"),
+    )
+    require_tokens(
+        findings,
+        resolve,
+        "unsupported block filesystems must still fail explicitly",
+        ('"ext2"', '"ext3"', '"ext4"', "LinuxError::EOPNOTSUPP"),
     )
     if "is_supported_block_device_name" in mount:
         findings.append("mount_abi: block-device name alias helper is still present")

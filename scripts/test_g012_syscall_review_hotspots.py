@@ -86,7 +86,13 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
     def test_detects_mount_root_alias(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/mount_abi.rs"
-        path.write_text(path.read_text(encoding="utf-8").replace("Err(LinuxError::EOPNOTSUPP)", "Ok(\"/\".into())", 1), encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            'axfs::api::mount_fatfs(mount_path, dev, format).map_err(LinuxError::from)?;\n            Ok(target_path.into())',
+            'Ok("/".into())',
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("mount", result.stdout)

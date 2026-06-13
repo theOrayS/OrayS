@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 use core::cell::UnsafeCell;
 
 use axfs_vfs::{VfsDirEntry, VfsError, VfsNodePerm, VfsResult};
@@ -15,6 +15,8 @@ pub struct FatFileSystem {
     root_dir: UnsafeCell<Option<VfsNodeRef>>,
 }
 
+struct LeakedFatFileSystem(&'static FatFileSystem);
+
 pub struct FileWrapper<'a>(Mutex<File<'a, Disk, NullTimeProvider, LossyOemCpConverter>>);
 pub struct DirWrapper<'a>(Dir<'a, Disk, NullTimeProvider, LossyOemCpConverter>);
 
@@ -28,7 +30,7 @@ unsafe impl Sync for DirWrapper<'_> {}
 impl FatFileSystem {
     #[cfg(feature = "use-ramdisk")]
     pub fn new(mut disk: Disk) -> Self {
-        let opts = fatfs::FormatVolumeOptions::new();
+        let opts = fatfs::FormatVolumeOptions::new().fat_type(fatfs::FatType::Fat16);
         fatfs::format_volume(&mut disk, opts).expect("failed to format volume");
         let inner = fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
             .expect("failed to initialize FAT filesystem");
@@ -40,6 +42,17 @@ impl FatFileSystem {
 
     #[cfg(not(feature = "use-ramdisk"))]
     pub fn new(disk: Disk) -> Self {
+        let inner = fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
+            .expect("failed to initialize FAT filesystem");
+        Self {
+            inner,
+            root_dir: UnsafeCell::new(None),
+        }
+    }
+
+    pub fn new_formatted(mut disk: Disk) -> Self {
+        let opts = fatfs::FormatVolumeOptions::new().fat_type(fatfs::FatType::Fat16);
+        fatfs::format_volume(&mut disk, opts).expect("failed to format FAT volume");
         let inner = fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
             .expect("failed to initialize FAT filesystem");
         Self {
@@ -221,6 +234,23 @@ impl VfsOps for FatFileSystem {
         let root_dir = unsafe { (*self.root_dir.get()).as_ref().unwrap() };
         root_dir.clone()
     }
+}
+
+impl VfsOps for LeakedFatFileSystem {
+    fn root_dir(&self) -> VfsNodeRef {
+        self.0.root_dir()
+    }
+}
+
+pub(crate) fn new_mountable_fatfs(disk: Disk, format: bool) -> Arc<dyn VfsOps> {
+    let fs = if format {
+        FatFileSystem::new_formatted(disk)
+    } else {
+        FatFileSystem::new(disk)
+    };
+    let fs: &'static FatFileSystem = Box::leak(Box::new(fs));
+    fs.init();
+    Arc::new(LeakedFatFileSystem(fs))
 }
 
 impl fatfs::IoBase for Disk {

@@ -3,9 +3,9 @@
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axfs_vfs::{VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult};
-use axns::{ResArc, def_resource};
+use axns::{def_resource, ResArc};
 use axsync::Mutex;
 use core::array;
 use lazyinit::LazyInit;
@@ -28,7 +28,7 @@ struct MountAnchor {
 
 struct RootDirectory {
     main_fs: Arc<dyn VfsOps>,
-    mounts: Vec<MountPoint>,
+    mounts: Mutex<Vec<MountPoint>>,
 }
 
 static ROOT_DIR: LazyInit<Arc<RootDirectory>> = LazyInit::new();
@@ -88,32 +88,36 @@ impl RootDirectory {
     pub const fn new(main_fs: Arc<dyn VfsOps>) -> Self {
         Self {
             main_fs,
-            mounts: Vec::new(),
+            mounts: Mutex::new(Vec::new()),
         }
     }
 
-    pub fn mount(&mut self, path: &'static str, fs: Arc<dyn VfsOps>) -> AxResult {
+    pub fn mount(&self, path: &'static str, fs: Arc<dyn VfsOps>) -> AxResult {
         if path == "/" {
             return ax_err!(InvalidInput, "cannot mount root filesystem");
         }
         if !path.starts_with('/') {
             return ax_err!(InvalidInput, "mount path must start with '/'");
         }
-        if self.mounts.iter().any(|mp| mp.path == path) {
+        let mut mounts = self.mounts.lock();
+        if mounts.iter().any(|mp| mp.path == path) {
             return ax_err!(InvalidInput, "mount point already exists");
         }
         let mount_point = self.prepare_mount_point(path)?;
         fs.mount(path, mount_point)?;
-        self.mounts.push(MountPoint::new(path, fs));
+        mounts.push(MountPoint::new(path, fs));
         Ok(())
     }
 
-    pub fn _umount(&mut self, path: &str) {
-        self.mounts.retain(|mp| mp.path != path);
+    pub fn _umount(&self, path: &str) -> bool {
+        let mut mounts = self.mounts.lock();
+        let before = mounts.len();
+        mounts.retain(|mp| mp.path != path);
+        mounts.len() != before
     }
 
     pub fn contains(&self, path: &str) -> bool {
-        self.mounts.iter().any(|mp| mp.path == path)
+        self.mounts.lock().iter().any(|mp| mp.path == path)
     }
 
     fn prepare_mount_point(&self, path: &'static str) -> AxResult<VfsNodeRef> {
@@ -153,7 +157,8 @@ impl RootDirectory {
     fn synthetic_mount_entries(&self) -> Vec<VfsDirEntry> {
         let root = self.main_fs.root_dir();
         let mut entries = Vec::new();
-        for mp in &self.mounts {
+        let mounts = self.mounts.lock();
+        for mp in mounts.iter() {
             if root.clone().lookup(mp.path).is_err() {
                 entries.push(VfsDirEntry::new(mp.name(), VfsNodeType::Dir));
             }
@@ -171,7 +176,10 @@ impl RootDirectory {
         }
     }
 
-    fn mounted_fs_match<'a>(&self, path: &'a str) -> (Option<usize>, &'a str) {
+    fn mounted_fs_match<'a>(
+        &self,
+        path: &'a str,
+    ) -> (Option<(&'static str, Arc<dyn VfsOps>)>, &'a str) {
         let path = path.trim_matches('/');
         if let Some(rest) = path.strip_prefix("./") {
             return self.mounted_fs_match(rest);
@@ -179,9 +187,10 @@ impl RootDirectory {
 
         let mut idx = None;
         let mut max_len = 0;
+        let mounts = self.mounts.lock();
 
         // Find the filesystem that has the longest mounted path match.
-        for (i, mp) in self.mounts.iter().enumerate() {
+        for (i, mp) in mounts.iter().enumerate() {
             if let Some(matched_len) = Self::mount_match_len(path, mp.path) {
                 if matched_len > max_len {
                     max_len = matched_len;
@@ -190,7 +199,12 @@ impl RootDirectory {
             }
         }
 
-        idx.map_or((None, path), |i| (Some(i), &path[max_len..]))
+        idx.map_or((None, path), |i| {
+            (
+                Some((mounts[i].path, mounts[i].fs.clone())),
+                &path[max_len..],
+            )
+        })
     }
 
     fn lookup_mounted_fs<F, T>(&self, path: &str, f: F) -> AxResult<T>
@@ -199,7 +213,7 @@ impl RootDirectory {
     {
         debug!("lookup at root: {}", path);
         match self.mounted_fs_match(path) {
-            (Some(idx), rest_path) => f(self.mounts[idx].fs.clone(), rest_path),
+            (Some((_, fs)), rest_path) => f(fs, rest_path),
             (None, rest_path) => f(self.main_fs.clone(), rest_path),
         }
     }
@@ -239,7 +253,7 @@ impl VfsNodeOps for RootDirectory {
     fn rename(&self, src_path: &str, dst_path: &str) -> VfsResult {
         let (src_mount, src_rest) = self.mounted_fs_match(src_path);
         let (dst_mount, dst_rest) = self.mounted_fs_match(dst_path);
-        if src_mount != dst_mount {
+        if src_mount.as_ref().map(|(path, _)| *path) != dst_mount.as_ref().map(|(path, _)| *path) {
             return ax_err!(CrossesDevices);
         }
         if src_rest.is_empty() || dst_rest.is_empty() {
@@ -247,7 +261,7 @@ impl VfsNodeOps for RootDirectory {
         }
 
         let fs = match src_mount {
-            Some(idx) => self.mounts[idx].fs.clone(),
+            Some((_, fs)) => fs,
             None => self.main_fs.clone(),
         };
         fs.root_dir().rename(src_rest, dst_rest)
@@ -344,7 +358,7 @@ pub(crate) fn init_rootfs(mut disk: crate::dev::Disk) {
         RootFileSystemKind::Fat | RootFileSystemKind::Unknown => init_fat_mainfs(disk),
     };
 
-    let mut root_dir = RootDirectory::new(main_fs);
+    let root_dir = RootDirectory::new(main_fs);
 
     #[cfg(feature = "devfs")]
     root_dir
@@ -376,6 +390,33 @@ pub(crate) fn init_rootfs(mut disk: crate::dev::Disk) {
     ROOT_DIR.init_once(Arc::new(root_dir));
     CURRENT_DIR.init_new(Mutex::new(ROOT_DIR.clone()));
     CURRENT_DIR_PATH.init_new(Mutex::new("/".into()));
+}
+
+#[cfg(feature = "fatfs")]
+pub(crate) fn mount_fatfs(
+    path: &'static str,
+    dev: axdriver::AxBlockDevice,
+    format: bool,
+) -> AxResult {
+    let fs = fs::fatfs::new_mountable_fatfs(crate::dev::Disk::new(dev), format);
+    ROOT_DIR.mount(path, fs)
+}
+
+#[cfg(not(feature = "fatfs"))]
+pub(crate) fn mount_fatfs(
+    _path: &'static str,
+    _dev: axdriver::AxBlockDevice,
+    _format: bool,
+) -> AxResult {
+    ax_err!(Unsupported, "FAT support is not enabled")
+}
+
+pub(crate) fn umount(path: &str) -> AxResult {
+    if ROOT_DIR._umount(path) {
+        Ok(())
+    } else {
+        ax_err!(NotFound)
+    }
 }
 
 fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {
