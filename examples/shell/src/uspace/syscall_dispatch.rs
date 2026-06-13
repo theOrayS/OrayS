@@ -1,6 +1,6 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{SYSCALL, register_trap_handler};
+use axhal::trap::{register_trap_handler, SYSCALL};
 use linux_raw_sys::general;
 
 use super::credentials::{
@@ -66,9 +66,9 @@ use super::resource_sched::{sys_getrlimit, sys_setrlimit};
 use super::select_fdset::sys_poll;
 use super::select_fdset::{sys_ppoll, sys_pselect6};
 use super::signal_abi::{
-    sys_kill, sys_pidfd_send_signal, sys_rt_sigaction, sys_rt_sigpending, sys_rt_sigprocmask,
-    sys_rt_sigreturn, sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill,
-    sys_tkill,
+    note_syscall_restart_candidate, sys_kill, sys_pidfd_send_signal, sys_rt_sigaction,
+    sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigreturn, sys_rt_sigsuspend,
+    sys_rt_sigtimedwait, sys_sigaltstack, sys_tgkill, sys_tkill,
 };
 use super::system_info::{
     sys_getcpu, sys_getrusage, sys_prctl, sys_setdomainname, sys_sethostname, sys_sysinfo,
@@ -122,13 +122,11 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         }
     };
     let process = process_ref;
-    match syscall_num as u32 {
+    let ret = match syscall_num as u32 {
         general::__NR_read => sys_read(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_pread64 => sys_pread64(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_write => sys_write(process, tf.arg0(), tf.arg1(), tf.arg2()),
-        general::__NR_pwrite64 => {
-            sys_pwrite64(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
-        }
+        general::__NR_pwrite64 => sys_pwrite64(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_writev => sys_writev(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_readv => sys_readv(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_preadv => sys_preadv(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
@@ -151,9 +149,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
             tf.arg5(),
         ),
-        general::__NR_sendfile => {
-            sys_sendfile(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
-        }
+        general::__NR_sendfile => sys_sendfile(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_splice => sys_splice(
             process,
             tf.arg0(),
@@ -164,9 +160,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg5(),
         ),
         general::__NR_tee => sys_tee(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
-        general::__NR_vmsplice => {
-            sys_vmsplice(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
-        }
+        general::__NR_vmsplice => sys_vmsplice(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_readahead => sys_readahead(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_copy_file_range => sys_copy_file_range(
             process,
@@ -260,9 +254,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg3(),
             tf.arg4(),
         ),
-        general::__NR_getxattr => {
-            sys_getxattr(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
-        }
+        general::__NR_getxattr => sys_getxattr(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_lgetxattr => {
             sys_lgetxattr(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
         }
@@ -464,7 +456,9 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_clock_adjtime => sys_clock_adjtime(process, tf.arg0(), tf.arg1()),
         general::__NR_getrandom => sys_getrandom(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_getitimer => sys_getitimer(process, tf.arg0() as i32, tf.arg1()),
-        general::__NR_setitimer => sys_setitimer(&ext.process, tf.arg0() as i32, tf.arg1(), tf.arg2()),
+        general::__NR_setitimer => {
+            sys_setitimer(&ext.process, tf.arg0() as i32, tf.arg1(), tf.arg2())
+        }
         general::__NR_timer_create => sys_timer_create(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_timer_settime => {
             sys_timer_settime(&ext.process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())
@@ -709,5 +703,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_exit => sys_exit(process, tf, tf.arg0() as i32),
         general::__NR_exit_group => sys_exit_group(process, tf, tf.arg0() as i32),
         _ => neg_errno(LinuxError::ENOSYS),
-    }
+    };
+    note_syscall_restart_candidate(tf, syscall_num as u32, ret);
+    ret
 }

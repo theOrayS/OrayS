@@ -139,6 +139,34 @@ fn first_unblocked_pending_signal(ext: &UserTaskExt) -> i32 {
     0
 }
 
+fn restartable_blocking_syscall(syscall_num: u32) -> bool {
+    matches!(syscall_num, general::__NR_wait4 | general::__NR_waitid)
+}
+
+pub(super) fn note_syscall_restart_candidate(tf: &TrapFrame, syscall_num: u32, ret: isize) {
+    let Some(ext) = current_task_ext() else {
+        return;
+    };
+    let mut frame = ext.syscall_restart_frame.lock();
+    if ret == neg_errno(LinuxError::EINTR) && restartable_blocking_syscall(syscall_num) {
+        *frame = Some(*tf);
+    } else {
+        *frame = None;
+    }
+}
+
+fn take_syscall_restart_frame(ext: &UserTaskExt) -> Option<TrapFrame> {
+    ext.syscall_restart_frame.lock().take()
+}
+
+fn clear_syscall_restart_frame(ext: &UserTaskExt) {
+    *ext.syscall_restart_frame.lock() = None;
+}
+
+fn signal_action_restarts_syscall(action: &general::kernel_sigaction) -> bool {
+    action.sa_flags & general::SA_RESTART as u64 != 0
+}
+
 pub(super) fn all_application_signal_mask() -> u64 {
     !unmaskable_signal_bits()
 }
@@ -567,6 +595,7 @@ fn inject_pending_signal(
         );
     }
     if handler <= 1 {
+        clear_syscall_restart_frame(ext);
         clear_pending_signal(ext, sig);
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
@@ -579,6 +608,12 @@ fn inject_pending_signal(
     }
     let current_mask = ext.signal_mask.load(Ordering::Acquire);
     let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
+    let saved_tf = if signal_action_restarts_syscall(&action) {
+        take_syscall_restart_frame(ext).unwrap_or(*tf)
+    } else {
+        clear_syscall_restart_frame(ext);
+        *tf
+    };
     let frame_size = riscv_signal_frame_size();
     let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
@@ -596,7 +631,7 @@ fn inject_pending_signal(
         restore_mask,
         SS_DISABLE,
         RISCV_SIGTRAMP_CODE,
-        trap_frame_to_riscv_sigcontext(tf),
+        trap_frame_to_riscv_sigcontext(&saved_tf),
     );
 
     let frame_ret = write_user_value(ext.process.as_ref(), frame_addr, &frame);
@@ -604,7 +639,7 @@ fn inject_pending_signal(
         return Err(LinuxError::EFAULT);
     }
 
-    *ext.pending_sigreturn.lock() = Some(*tf);
+    *ext.pending_sigreturn.lock() = Some(saved_tf);
     ext.signal_frame.store(frame_addr, Ordering::Release);
     clear_pending_signal(ext, sig);
     let mut next_mask = current_mask | action.sa_mask.sig[0];
@@ -647,6 +682,7 @@ fn inject_pending_signal(
         .map(|func| func as usize)
         .unwrap_or(0);
     if handler <= 1 {
+        clear_syscall_restart_frame(ext);
         clear_pending_signal(ext, sig);
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
@@ -660,6 +696,12 @@ fn inject_pending_signal(
 
     let current_mask = ext.signal_mask.load(Ordering::Acquire);
     let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
+    let saved_tf = if signal_action_restarts_syscall(&action) {
+        take_syscall_restart_frame(ext).unwrap_or(*tf)
+    } else {
+        clear_syscall_restart_frame(ext);
+        *tf
+    };
     let frame_size = loongarch_signal_frame_size();
     let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
@@ -677,14 +719,14 @@ fn inject_pending_signal(
         restore_mask,
         SS_DISABLE,
         LOONGARCH_SIGTRAMP_CODE,
-        trap_frame_to_loongarch_sigcontext(tf),
+        trap_frame_to_loongarch_sigcontext(&saved_tf),
     );
     let frame_ret = write_user_value(ext.process.as_ref(), frame_addr, &frame);
     if frame_ret != 0 {
         return Err(LinuxError::EFAULT);
     }
 
-    *ext.pending_sigreturn.lock() = Some(*tf);
+    *ext.pending_sigreturn.lock() = Some(saved_tf);
     ext.signal_frame.store(frame_addr, Ordering::Release);
     clear_pending_signal(ext, sig);
     let mut next_mask = current_mask | action.sa_mask.sig[0];
@@ -850,6 +892,7 @@ pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
         }
         ext.signal_frame.store(0, Ordering::Release);
         *ext.pending_sigreturn.lock() = Some(restored);
+        axtask::yield_now();
         0
     }
     #[cfg(target_arch = "loongarch64")]
@@ -874,6 +917,7 @@ pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
             .store(frame.ucontext.sigmask.sig[0], Ordering::Release);
         ext.signal_frame.store(0, Ordering::Release);
         *ext.pending_sigreturn.lock() = Some(restored);
+        axtask::yield_now();
         0
     }
     #[cfg(not(any(target_arch = "riscv64", target_arch = "loongarch64")))]
