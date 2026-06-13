@@ -11,12 +11,12 @@ use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::UserProcess;
-use super::linux_abi::{USER_MMAP_BASE, neg_errno};
+use super::linux_abi::{neg_errno, USER_MMAP_BASE};
 use super::signal_abi::current_sigcancel_pending;
 use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::read_user_value;
+use super::UserProcess;
 
 pub(super) struct FutexState {
     pub(super) seq: AtomicU32,
@@ -86,13 +86,7 @@ fn wake_addr_checked(
         return Ok(0);
     };
     state.seq.fetch_add(1, Ordering::Release);
-    let mut woken = 0usize;
-    for _ in 0..count {
-        if !state.queue.notify_one(true) {
-            break;
-        }
-        woken += 1;
-    }
+    let woken = state.queue.notify_many_unique(count, true);
     drop(state);
     prune_empty_key(key);
     Ok(woken)

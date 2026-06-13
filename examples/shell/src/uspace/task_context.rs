@@ -59,6 +59,7 @@ pub(super) struct UserTaskExt {
     pub(super) signal_frame: AtomicUsize,
     pub(super) last_user_pc: AtomicUsize,
     pub(super) pending_sigreturn: Mutex<Option<TrapFrame>>,
+    pub(super) syscall_restart_frame: Mutex<Option<TrapFrame>>,
 }
 
 impl UserTaskExt {
@@ -100,6 +101,7 @@ impl UserTaskExt {
             signal_frame: AtomicUsize::new(0),
             last_user_pc: AtomicUsize::new(0),
             pending_sigreturn: Mutex::new(None),
+            syscall_restart_frame: Mutex::new(None),
         }
     }
 }

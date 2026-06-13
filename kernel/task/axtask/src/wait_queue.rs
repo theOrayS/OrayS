@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use kernel_guard::{NoOp, NoPreemptIrqSave};
 use kspin::{SpinNoIrq, SpinNoIrqGuard};
 
-use crate::{AxTaskRef, CurrentTask, current_run_queue, select_run_queue};
+use crate::{current_run_queue, select_run_queue, AxTaskRef, CurrentTask};
 
 /// A queue to store sleeping tasks.
 ///
@@ -188,6 +188,33 @@ impl WaitQueue {
         } else {
             false
         }
+    }
+
+    /// Wakes up to `count` distinct tasks, ignoring duplicate queue entries for
+    /// tasks already selected by this call.
+    ///
+    /// Timed waits may leave stale duplicate entries if a task is awakened and
+    /// re-checks a false condition before its final timeout/cancel cleanup.  For
+    /// futex wake, the syscall return value is part of the userspace protocol, so
+    /// it must count distinct waiters rather than raw queue nodes.
+    pub fn notify_many_unique(&self, count: usize, resched: bool) -> usize {
+        if count == 0 {
+            return 0;
+        }
+
+        let mut notified = Vec::new();
+        let mut wq = self.queue.lock();
+        while notified.len() < count {
+            let Some(task) = wq.pop_front() else {
+                break;
+            };
+            if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                continue;
+            }
+            unblock_one_task(task.clone(), resched);
+            notified.push(task);
+        }
+        notified.len()
     }
 
     /// Wakes all tasks in the wait queue.
