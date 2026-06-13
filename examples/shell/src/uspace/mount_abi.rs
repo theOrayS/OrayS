@@ -1,9 +1,12 @@
 use axerrno::LinuxError;
 use linux_raw_sys::general;
+use std::boxed::Box;
 use std::string::{String, ToString};
 
-use super::fd_table::resolve_dirfd_path;
-use super::linux_abi::{ST_MODE_DIR, ST_MODE_TYPE_MASK, neg_errno};
+use super::fd_table::{
+    resolve_dirfd_path, synthetic_block_device_for_mount, synthetic_block_device_is_uninitialized,
+};
+use super::linux_abi::{neg_errno, ST_MODE_DIR, ST_MODE_TYPE_MASK};
 use super::runtime_paths::normalize_path;
 use super::user_memory::read_cstr;
 use super::{MountPoint, UserProcess};
@@ -183,11 +186,16 @@ pub(super) fn sys_umount2(process: &UserProcess, target: usize, flags: usize) ->
         Ok(target_path) => target_path,
         Err(err) => return neg_errno(err),
     };
-    if process.remove_mount_point(target_path.as_str()) {
-        0
-    } else {
-        neg_errno(LinuxError::EINVAL)
+    if !process.remove_mount_point(target_path.as_str()) {
+        return neg_errno(LinuxError::EINVAL);
     }
+    if let Err(err) = axfs::api::umount(target_path.as_str()) {
+        let err = LinuxError::from(err);
+        if err != LinuxError::ENOENT {
+            return neg_errno(err);
+        }
+    }
+    0
 }
 
 fn read_optional_cstr(process: &UserProcess, ptr: usize) -> Result<Option<String>, LinuxError> {
@@ -245,15 +253,21 @@ fn resolve_mount_source(
         "proc" | "procfs" => Ok("/proc".into()),
         "sysfs" => Ok("/sys".into()),
         "tmpfs" => Ok(target_path.into()),
-        "vfat" | "msdos" | "fat" | "ext2" | "ext3" | "ext4" => {
-            let _source = source.ok_or(LinuxError::EINVAL)?;
-            // Block filesystem mounting requires a real VFS block-device attach path.
-            // Do not alias /dev/vd*/sd*/xvd* to the already-mounted root filesystem:
-            // that would report a successful mount without attaching the requested
-            // device.  Until a backing block-mount implementation exists, fail
-            // explicitly after userspace pointer/target validation.
-            Err(LinuxError::EOPNOTSUPP)
+        "vfat" | "msdos" | "fat" => {
+            let source = source.ok_or(LinuxError::EINVAL)?;
+            let source_path = {
+                let fds = process.fds.lock();
+                resolve_dirfd_path(process, &fds, general::AT_FDCWD, source)?
+            };
+            let Some(dev) = synthetic_block_device_for_mount(source_path.as_str()) else {
+                return Err(LinuxError::EOPNOTSUPP);
+            };
+            let format = synthetic_block_device_is_uninitialized(source_path.as_str());
+            let mount_path: &'static str = Box::leak(target_path.to_string().into_boxed_str());
+            axfs::api::mount_fatfs(mount_path, dev, format).map_err(LinuxError::from)?;
+            Ok(target_path.into())
         }
+        "ext2" | "ext3" | "ext4" => Err(LinuxError::EOPNOTSUPP),
         "" => Err(LinuxError::EINVAL),
         _ => Err(LinuxError::ENODEV),
     }

@@ -2059,8 +2059,8 @@ pub(super) fn synthetic_char_stat_for_path(path: &str, mode: u32) -> general::st
 
 pub(super) fn synthetic_block_stat_for_path(path: &str, mode: u32) -> general::stat {
     let rdev = match normalize_path("/", path).as_deref() {
-        Some("/dev/vda") => DEV_VDA_RDEV,
-        _ => 0,
+        Some(path) if is_synthetic_virtio_block_path(path) => DEV_VDA_RDEV,
+        Some(_) | None => 0,
     };
     let mut st = synthetic_char_stat(path_inode(Some(path)), mode, rdev);
     if rdev == DEV_VDA_RDEV {
@@ -2068,6 +2068,18 @@ pub(super) fn synthetic_block_stat_for_path(path: &str, mode: u32) -> general::s
         st.st_blocks = (SYNTHETIC_BLOCK_DEVICE_SIZE / 512).min(i64::MAX as u64) as _;
     }
     st
+}
+
+fn is_synthetic_virtio_block_path(path: &str) -> bool {
+    let Some(name) = path.strip_prefix("/dev/") else {
+        return false;
+    };
+    let rest = name.strip_prefix("vd").unwrap_or("");
+    let mut chars = rest.chars();
+    let Some(letter) = chars.next() else {
+        return false;
+    };
+    letter.is_ascii_lowercase() && chars.all(|ch| ch.is_ascii_digit())
 }
 
 pub(super) fn dev_null_stat() -> general::stat {

@@ -9,6 +9,24 @@ pub use self::file::{File, FileType, Metadata, OpenOptions, Permissions};
 use alloc::{string::String, vec::Vec};
 use axio::{self as io, prelude::*};
 
+/// Mounts a FAT filesystem backed by a block device at an absolute path.
+///
+/// This is intentionally a low-level kernel VFS operation. Callers must pass a
+/// real block-device implementation; compatibility layers should not use this
+/// to alias a mount target to an unrelated existing directory.
+pub fn mount_fatfs(
+    path: &'static str,
+    dev: axdriver::AxBlockDevice,
+    format: bool,
+) -> io::Result<()> {
+    crate::root::mount_fatfs(path, dev, format).map_err(Into::into)
+}
+
+/// Unmounts a filesystem mounted through the kernel VFS mount table.
+pub fn umount(path: &str) -> io::Result<()> {
+    crate::root::umount(path).map_err(Into::into)
+}
+
 /// Returns an iterator over the entries within a directory.
 pub fn read_dir(path: &str) -> io::Result<ReadDir<'_>> {
     ReadDir::new(path)

@@ -152,6 +152,7 @@ version = "0.1.0"
 dependencies = [
  "arceos_posix_api",
  "axalloc",
+ "axdriver",
  "axerrno 0.1.2",
  "axfs",
  "axfs_ramfs",

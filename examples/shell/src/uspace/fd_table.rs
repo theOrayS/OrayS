@@ -5,12 +5,14 @@ use core::ptr;
 use core::sync::atomic::Ordering;
 use core::time::Duration;
 
+use axdriver::prelude::{BaseDriverOps, BlockDriverOps, DevError, DevResult, DeviceType};
 use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
 use axsync::{Mutex as AxMutex, MutexGuard as AxMutexGuard};
 use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
+use std::boxed::Box;
 use std::collections::BTreeMap;
 use std::string::{String, ToString};
 use std::sync::{Arc, Mutex, Weak};
@@ -216,11 +218,16 @@ pub(super) struct BlockDeviceEntry {
     storage: Arc<Mutex<Vec<u8>>>,
 }
 
+struct SyntheticBlockDriver {
+    name: String,
+    storage: Arc<Mutex<Vec<u8>>>,
+}
+
 fn checked_seek_offset(base: u64, delta: i64) -> Result<u64, LinuxError> {
     base.checked_add_signed(delta).ok_or(LinuxError::EINVAL)
 }
 
-fn synthetic_block_device_storage(path: &str) -> Arc<Mutex<Vec<u8>>> {
+pub(super) fn synthetic_block_device_storage(path: &str) -> Arc<Mutex<Vec<u8>>> {
     static DEVICES: LazyInit<Mutex<BTreeMap<String, Arc<Mutex<Vec<u8>>>>>> = LazyInit::new();
     let _ = DEVICES.call_once(|| Mutex::new(BTreeMap::new()));
     let key = normalize_path("/", path).unwrap_or_else(|| path.to_string());
@@ -229,6 +236,84 @@ fn synthetic_block_device_storage(path: &str) -> Arc<Mutex<Vec<u8>>> {
         .entry(key)
         .or_insert_with(|| Arc::new(Mutex::new(Vec::new())))
         .clone()
+}
+
+pub(super) fn synthetic_block_device_for_mount(path: &str) -> Option<axdriver::AxBlockDevice> {
+    if !is_synthetic_block_device_path(path) {
+        return None;
+    }
+    Some(Box::new(SyntheticBlockDriver {
+        name: normalize_path("/", path).unwrap_or_else(|| path.to_string()),
+        storage: synthetic_block_device_storage(path),
+    }))
+}
+
+pub(super) fn synthetic_block_device_is_uninitialized(path: &str) -> bool {
+    is_synthetic_block_device_path(path) && synthetic_block_device_storage(path).lock().is_empty()
+}
+
+impl BaseDriverOps for SyntheticBlockDriver {
+    fn device_name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn device_type(&self) -> DeviceType {
+        DeviceType::Block
+    }
+}
+
+impl BlockDriverOps for SyntheticBlockDriver {
+    fn num_blocks(&self) -> u64 {
+        SYNTHETIC_BLOCK_DEVICE_SIZE / 512
+    }
+
+    fn block_size(&self) -> usize {
+        512
+    }
+
+    fn read_block(&mut self, block_id: u64, buf: &mut [u8]) -> DevResult {
+        let start = checked_block_offset(block_id, buf.len())?;
+        buf.fill(0);
+        let storage = self.storage.lock();
+        if start < storage.len() {
+            let copied = cmp::min(buf.len(), storage.len() - start);
+            buf[..copied].copy_from_slice(&storage[start..start + copied]);
+        }
+        Ok(())
+    }
+
+    fn write_block(&mut self, block_id: u64, buf: &[u8]) -> DevResult {
+        let start = checked_block_offset(block_id, buf.len())?;
+        if buf.is_empty() {
+            return Ok(());
+        }
+        let end = start + buf.len();
+        let mut storage = self.storage.lock();
+        if storage.len() < end {
+            storage.resize(end, 0);
+        }
+        storage[start..end].copy_from_slice(buf);
+        Ok(())
+    }
+
+    fn flush(&mut self) -> DevResult {
+        Ok(())
+    }
+}
+
+fn checked_block_offset(block_id: u64, byte_len: usize) -> DevResult<usize> {
+    if byte_len % 512 != 0 {
+        return Err(DevError::InvalidParam);
+    }
+    let start = block_id
+        .checked_mul(512)
+        .and_then(|offset| usize::try_from(offset).ok())
+        .ok_or(DevError::InvalidParam)?;
+    let end = start.checked_add(byte_len).ok_or(DevError::InvalidParam)?;
+    if end > SYNTHETIC_BLOCK_DEVICE_SIZE as usize {
+        return Err(DevError::InvalidParam);
+    }
+    Ok(start)
 }
 
 impl BlockDeviceEntry {
@@ -9192,10 +9277,16 @@ fn is_synthetic_block_device_path(path: &str) -> bool {
     let Some(name) = path.strip_prefix("/dev/") else {
         return false;
     };
-    !name.contains('/')
-        && SYNTHETIC_BLOCK_DEVICE_NAMES
-            .iter()
-            .any(|candidate| *candidate == name)
+    is_synthetic_virtio_block_name(name)
+}
+
+fn is_synthetic_virtio_block_name(name: &str) -> bool {
+    let rest = name.strip_prefix("vd").unwrap_or("");
+    let mut chars = rest.chars();
+    let Some(letter) = chars.next() else {
+        return false;
+    };
+    letter.is_ascii_lowercase() && chars.all(|ch| ch.is_ascii_digit())
 }
 
 fn synthetic_block_device_names_in_dir(path: &str) -> &'static [&'static str] {
