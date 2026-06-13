@@ -1098,7 +1098,10 @@ fn run_user_program_argv_in_timeout(
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-const LTP_CASE_TIMEOUT_SECS: u64 = 15;
+// Stable LTP contains real file-stress cases (for example ftest03/ftest07)
+// that regularly take tens of seconds on the single-vCPU evaluator.  This
+// watchdog must stay above their honest runtime while still bounding hangs.
+const LTP_CASE_TIMEOUT_SECS: u64 = 90;
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn valid_ltp_case_name(case: &str) -> bool {
