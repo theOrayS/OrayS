@@ -155,6 +155,24 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SYSLOG", result.stdout)
 
+    def test_detects_syslog_control_state_without_snapshot_consumer(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/system_info.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("KLOG_CONTROL_STATE.open.load", "KLOG_CONTROL_STATE.open_no_consumer")
+        text = text.replace(
+            "KLOG_CONTROL_STATE.console_enabled.load",
+            "KLOG_CONTROL_STATE.console_enabled_no_consumer",
+        )
+        text = text.replace(
+            "KLOG_CONTROL_STATE.clear_generation.load",
+            "KLOG_CONTROL_STATE.clear_generation_no_consumer",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("klog snapshot", result.stdout)
+
     def test_detects_syslog_missing_privilege_gate(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/system_info.rs"
