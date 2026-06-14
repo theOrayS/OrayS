@@ -92,6 +92,7 @@ impl UserProcess {
         source_root: String,
         readonly: bool,
         nosymfollow: bool,
+        tmpfs_size_limit: Option<u64>,
         remount: bool,
     ) {
         let mut mount_points = self.mount_points.lock();
@@ -99,6 +100,7 @@ impl UserProcess {
             if let Some(mount) = mount_points.get_mut(target.as_str()) {
                 mount.readonly = readonly;
                 mount.nosymfollow = nosymfollow;
+                mount.tmpfs_size_limit = tmpfs_size_limit;
                 return;
             }
         }
@@ -108,6 +110,7 @@ impl UserProcess {
                 source_root,
                 readonly,
                 nosymfollow,
+                tmpfs_size_limit,
             },
         );
     }
@@ -118,6 +121,34 @@ impl UserProcess {
 
     fn remove_mount_point(&self, target: &str) -> bool {
         self.mount_points.lock().remove(target).is_some()
+    }
+
+    pub(super) fn tmpfs_free_512_blocks_for_path(&self, path: &str) -> Option<u64> {
+        let mount_points = self.mount_points.lock();
+        let mut best: Option<(&str, u64)> = None;
+        for (target, mount) in mount_points.iter() {
+            let Some(limit) = mount.tmpfs_size_limit else {
+                continue;
+            };
+            if mount_path_rest(path, target.as_str()).is_none() {
+                continue;
+            }
+            if best.is_none_or(|(best_target, _)| target.len() > best_target.len()) {
+                best = Some((target.as_str(), limit));
+            }
+        }
+        let (target, limit) = best?;
+        let limit_blocks = limit.saturating_add(511) / 512;
+        let used_blocks = {
+            let all_ranges = self.path_data_ranges.lock();
+            all_ranges
+                .iter()
+                .filter(|(range_path, _)| mount_path_rest(range_path.as_str(), target).is_some())
+                .flat_map(|(_, ranges)| ranges.iter())
+                .map(|(start, end)| end.saturating_sub(*start) / 512)
+                .fold(0u64, u64::saturating_add)
+        };
+        Some(limit_blocks.saturating_sub(used_blocks))
     }
 }
 
@@ -146,6 +177,10 @@ pub(super) fn sys_mount(
         Ok(fstype) => fstype,
         Err(err) => return neg_errno(err),
     };
+    let data = match read_optional_cstr(process, _data) {
+        Ok(data) => data,
+        Err(err) => return neg_errno(err),
+    };
     let target_path = match resolve_mount_target_path(process, target.as_str()) {
         Ok(target_path) => target_path,
         Err(err) => return neg_errno(err),
@@ -168,8 +203,20 @@ pub(super) fn sys_mount(
     };
     let readonly = flags & general::MS_RDONLY != 0;
     let nosymfollow = flags & general::MS_NOSYMFOLLOW != 0;
+    let tmpfs_size_limit = if fstype.as_deref() == Some("tmpfs") {
+        parse_tmpfs_size_limit(data.as_deref())
+    } else {
+        None
+    };
     let remount = flags & general::MS_REMOUNT != 0;
-    process.add_mount_point(target_path, source_root, readonly, nosymfollow, remount);
+    process.add_mount_point(
+        target_path,
+        source_root,
+        readonly,
+        nosymfollow,
+        tmpfs_size_limit,
+        remount,
+    );
     0
 }
 
@@ -271,6 +318,38 @@ fn resolve_mount_source(
         "" => Err(LinuxError::EINVAL),
         _ => Err(LinuxError::ENODEV),
     }
+}
+
+fn parse_tmpfs_size_limit(data: Option<&str>) -> Option<u64> {
+    data?
+        .split(',')
+        .filter_map(|option| option.strip_prefix("size="))
+        .filter_map(parse_tmpfs_size_value)
+        .next()
+}
+
+fn parse_tmpfs_size_value(value: &str) -> Option<u64> {
+    let split = value
+        .char_indices()
+        .find(|(_, ch)| !ch.is_ascii_digit())
+        .map(|(idx, _)| idx)
+        .unwrap_or(value.len());
+    if split == 0 {
+        return None;
+    }
+    let number = value[..split].parse::<u64>().ok()?;
+    let mut suffix = value[split..].trim();
+    if suffix.ends_with('B') || suffix.ends_with('b') {
+        suffix = &suffix[..suffix.len().saturating_sub(1)];
+    }
+    let multiplier = match suffix {
+        "" => 1,
+        "k" | "K" => 1024,
+        "m" | "M" => 1024 * 1024,
+        "g" | "G" => 1024 * 1024 * 1024,
+        _ => return None,
+    };
+    number.checked_mul(multiplier)
 }
 
 fn mount_path_rest<'a>(path: &'a str, target: &str) -> Option<&'a str> {

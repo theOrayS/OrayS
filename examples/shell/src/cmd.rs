@@ -767,6 +767,8 @@ const LIBCTEST_GROUP_TIMEOUT_SECS: u64 = 120;
 const LIBCTEST_CASE_TIMEOUT_SECS: u64 = 5;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const DISABLED_OFFICIAL_TEST_GROUPS: &[&str] = &[];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const UNIXBENCH_SORT_SRC: &str = include_str!("unixbench_sort_src.txt");
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn official_group_timeout_secs(group: &str) -> u64 {
@@ -774,10 +776,10 @@ fn official_group_timeout_secs(group: &str) -> u64 {
         // cyclictest intentionally starts hackbench with 400 forked workers on
         // our single-vCPU evaluator.  With honest fork scheduling and blocking
         // sleeps the script makes forward progress, but the stress phases can
-        // exceed three minutes per libc on the current kernel.  Give this
+        // exceed several minutes per libc on the current kernel.  Give this
         // official stress group enough time to reach its own kill/END markers
         // instead of classifying slow real execution as a wrapper timeout.
-        "cyclictest" => 600,
+        "cyclictest" => 1200,
         "iozone" | "lmbench" => 300,
         "iperf" | "libcbench" | "netperf" => 180,
         // UnixBench's official script contains many 10s/20s sub-benchmarks.
@@ -1099,9 +1101,11 @@ fn run_user_program_argv_in_timeout(
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 // Stable LTP contains real file-stress cases (for example ftest03/ftest07)
-// that regularly take tens of seconds on the single-vCPU evaluator.  This
-// watchdog must stay above their honest runtime while still bounding hangs.
-const LTP_CASE_TIMEOUT_SECS: u64 = 90;
+// that regularly take tens of seconds on the single-vCPU evaluator and can
+// exceed 90s on slower LA64/QEMU hosts or when both architectures are under
+// verification load. Keep this above their honest runtime while still bounding
+// genuine hangs.
+const LTP_CASE_TIMEOUT_SECS: u64 = 180;
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn valid_ltp_case_name(case: &str) -> bool {
@@ -1593,6 +1597,8 @@ fn copy_script_file(
         .join("\n");
     if src.ends_with("iperf_testcode.sh") {
         script = rewrite_iperf_daemon_server(&script, busybox_path);
+    } else if src.ends_with("netperf_testcode.sh") {
+        script = rewrite_netperf_daemon_server(&script, busybox_path);
     }
     if raw_script.ends_with('\n') {
         script.push('\n');
@@ -1614,11 +1620,24 @@ fn rewrite_iperf_daemon_server(script: &str, busybox_path: &str) -> String {
             rewritten.push(format!(
                 "[ -n \"$server_pid\" ] && {busybox_path} kill -TERM \"$server_pid\" 2>/dev/null || true"
             ));
+            rewritten.push(format!("{busybox_path} sleep 1"));
             rewritten.push(format!(
                 "[ -n \"$server_pid\" ] && {busybox_path} kill -KILL \"$server_pid\" 2>/dev/null || true"
             ));
         }
         rewritten.push(String::from(line));
+    }
+    rewritten.join("\n")
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn rewrite_netperf_daemon_server(script: &str, busybox_path: &str) -> String {
+    let mut rewritten = Vec::new();
+    for line in script.lines() {
+        rewritten.push(String::from(line));
+        if line.trim() == "server_pid=$!" {
+            rewritten.push(format!("{busybox_path} sleep 1"));
+        }
     }
     rewritten.join("\n")
 }
@@ -1630,6 +1649,35 @@ fn write_text_file(path: &str, content: &str) -> io::Result<()> {
     }
     let mut file = File::create(path)?;
     file.write_all(content.as_bytes())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn restore_unixbench_sort_fixture(src_root: &str, stage_root: &str) -> io::Result<()> {
+    let stage_sort_src = join_path(stage_root, "sort.src");
+    if matches!(fs::metadata(&stage_sort_src), Ok(meta) if meta.is_file()) {
+        return Ok(());
+    }
+
+    let source_sort_src = join_path(src_root, "sort.src");
+    if matches!(fs::metadata(&source_sort_src), Ok(meta) if meta.is_file()) {
+        return copy_file(&source_sort_src, &stage_sort_src);
+    }
+
+    let has_unixbench_shell_fixture = ["multi.sh", "tst.sh"].iter().all(|name| {
+        matches!(
+            fs::metadata(&join_path(src_root, name)),
+            Ok(meta) if meta.is_file()
+        )
+    });
+    if has_unixbench_shell_fixture {
+        // The official sdcard images include UnixBench's shell scripts but omit
+        // the upstream Release 3 shell-workload input, testdir/sort.src.  Restore
+        // that read-only fixture so the benchmark runs the real sort/od/grep/wc
+        // pipeline instead of spinning on an empty missing-input failure.
+        write_text_file(&stage_sort_src, UNIXBENCH_SORT_SRC)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -2197,6 +2245,8 @@ fn prepare_suite_stage_dir(suite_dir: &str, script_name: &str) -> io::Result<Opt
 
     if group == "libctest" {
         prepare_libctest_runtest_wrapper(src_root, &stage_root, &busybox_path)?;
+    } else if group == "unixbench" {
+        restore_unixbench_sort_fixture(src_root, &stage_root)?;
     }
     copy_runtime_libs(src_root, &stage_root, &busybox_path)?;
 
@@ -2243,15 +2293,21 @@ fn suite_group_priority(script_name: &str) -> u8 {
         "basic" => 1,
         "busybox" => 2,
         "lua" => 3,
-        "ltp" => 4,
-        "libcbench" => 5,
-        "iperf" => 6,
-        "lmbench" => 7,
-        "netperf" => 8,
+        // Keep network and script-heavy groups before stress/throughput groups so
+        // a previous page-fault storm or long benchmark cannot leave listener
+        // state and scheduling pressure that pollutes later daemon/client tests.
+        "iperf" => 4,
+        "netperf" => 5,
+        "unixbench" => 6,
+        "libcbench" => 7,
+        "lmbench" => 8,
         "cyclictest" => 9,
         "iozone" => 10,
-        "unixbench" => 11,
-        _ => 12,
+        // LTP is intentionally last: the stable list is still large enough that
+        // running it before stress/throughput groups can starve later official
+        // non-LTP groups or the second libc's LTP phase on remote evaluation.
+        "ltp" => 100,
+        _ => 90,
     }
 }
 

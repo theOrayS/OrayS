@@ -44,7 +44,9 @@ use super::runtime_paths::{
     busybox_applet_target_path, normalize_path, push_runtime_candidate,
     runtime_absolute_path_candidates, runtime_library_name_candidates,
 };
-use super::select_fdset::{yield_poll_wait, SelectMode};
+use super::select_fdset::{
+    yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until, SelectMode,
+};
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
@@ -116,6 +118,10 @@ const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
 // panics.  Bound the physical prefix to one userspace I/O chunk and store the
 // rest as chunked sparse extents; reads/mmap merge both sources.
 const MAX_PHYSICAL_FILE_BACKING_SIZE: u64 = MAX_USER_IO_CHUNK as u64;
+// Linux regular-file offsets are signed.  Keep fallocate from accepting ranges
+// that wrap past the largest representable file position even when RLIMIT_FSIZE
+// is unlimited.
+const LINUX_MAX_FILE_OFFSET: u64 = i64::MAX as u64;
 const FALLOC_FL_KEEP_SIZE: usize = 0x01;
 const FALLOC_FL_PUNCH_HOLE: usize = 0x02;
 const FALLOC_FL_COLLAPSE_RANGE: usize = 0x08;
@@ -778,6 +784,9 @@ pub(super) fn sys_fallocate(
     let Some(end) = (offset as u64).checked_add(len as u64) else {
         return neg_errno(LinuxError::EFBIG);
     };
+    if end > LINUX_MAX_FILE_OFFSET {
+        return neg_errno(LinuxError::EFBIG);
+    }
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     if end > file_size_limit {
         return neg_errno(LinuxError::EFBIG);
@@ -1224,13 +1233,14 @@ pub(super) fn sys_epoll_pwait(
     sigmask: usize,
     sigsetsize: usize,
 ) -> isize {
+    let syscall_start = poll_clock_now();
     let timeout = if timeout_ms == 0 {
         EpollWaitTimeout::Immediate
     } else if timeout_ms < 0 {
         EpollWaitTimeout::Infinite
     } else {
         EpollWaitTimeout::Until(
-            axhal::time::wall_time() + core::time::Duration::from_millis(timeout_ms as u64),
+            syscall_start + core::time::Duration::from_millis(timeout_ms as u64),
         )
     };
     sys_epoll_wait_with_timeout(
@@ -1247,6 +1257,7 @@ pub(super) fn sys_epoll_pwait2(
     sigmask: usize,
     sigsetsize: usize,
 ) -> isize {
+    let syscall_start = poll_clock_now();
     let timeout = if timeout == 0 {
         EpollWaitTimeout::Infinite
     } else {
@@ -1261,8 +1272,7 @@ pub(super) fn sys_epoll_pwait2(
             EpollWaitTimeout::Immediate
         } else {
             EpollWaitTimeout::Until(
-                axhal::time::wall_time()
-                    + core::time::Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32),
+                syscall_start + core::time::Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32),
             )
         }
     };
@@ -1276,6 +1286,10 @@ enum EpollWaitTimeout {
     Immediate,
     Until(core::time::Duration),
     Infinite,
+}
+
+fn poll_clock_now() -> core::time::Duration {
+    axhal::time::monotonic_time()
 }
 
 fn sys_epoll_wait_with_timeout(
@@ -1310,31 +1324,49 @@ fn sys_epoll_wait_with_timeout(
         {
             let table = process.fds.lock();
             match table.epoll_collect_ready(epfd as i32, maxevents, &mut ready) {
-                Ok(()) => {}
+                Ok(_) => {}
                 Err(err) => return neg_errno(err),
             }
         }
         return copy_epoll_events_to_user(process, events, &ready);
     }
+    let mut polled_once = false;
     loop {
+        if polled_once && matches!(timeout, EpollWaitTimeout::Until(ddl) if poll_clock_now() >= ddl)
+        {
+            return 0;
+        }
         if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
         ready.clear();
-        {
+        let watched = {
             let table = process.fds.lock();
             match table.epoll_collect_ready(epfd as i32, maxevents, &mut ready) {
-                Ok(()) => {}
+                Ok(count) => count,
                 Err(err) => return neg_errno(err),
             }
-        }
+        };
+        polled_once = true;
         if !ready.is_empty() {
             return copy_epoll_events_to_user(process, events, &ready);
         }
-        if matches!(timeout, EpollWaitTimeout::Until(ddl) if axhal::time::wall_time() >= ddl) {
+        if matches!(timeout, EpollWaitTimeout::Until(ddl) if poll_clock_now() >= ddl) {
             return 0;
         }
-        yield_poll_wait();
+        let wait_deadline = match timeout {
+            EpollWaitTimeout::Until(deadline) => Some(deadline),
+            EpollWaitTimeout::Infinite => None,
+            EpollWaitTimeout::Immediate => unreachable!("immediate epoll waits return before loop"),
+        };
+        let timed_out = if watched == 0 {
+            yield_poll_blocking_timeout_until(wait_deadline)
+        } else {
+            yield_poll_wait_until(wait_deadline)
+        };
+        if timed_out {
+            return 0;
+        }
     }
 }
 
@@ -3105,14 +3137,119 @@ pub(super) fn sys_dup3(process: &UserProcess, oldfd: usize, newfd: usize, flags:
 }
 
 pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize) -> isize {
-    match process
-        .fds
-        .lock()
-        .fcntl(process, fd as i32, cmd as u32, arg)
-    {
+    let cmd = cmd as u32;
+    let fd = fd as i32;
+    let result = match cmd {
+        general::F_GETLK => fcntl_getlk_record(process, fd, arg, false),
+        general::F_SETLK => fcntl_setlk_record(process, fd, arg, false, false),
+        general::F_SETLKW => fcntl_setlk_record(process, fd, arg, true, false),
+        general::F_OFD_GETLK => fcntl_getlk_record(process, fd, arg, true),
+        general::F_OFD_SETLK => fcntl_setlk_record(process, fd, arg, false, true),
+        general::F_OFD_SETLKW => fcntl_setlk_record(process, fd, arg, true, true),
+        _ => process.fds.lock().fcntl(process, fd, cmd, arg),
+    };
+    match result {
         Ok(v) => v as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+fn fcntl_record_lock_fd_exists(process: &UserProcess, fd: i32) -> Result<(), LinuxError> {
+    let table = process.fds.lock();
+    table.entry(fd).map(|_| ())
+}
+
+fn fcntl_record_lock_file(process: &UserProcess, fd: i32) -> Result<FileEntry, LinuxError> {
+    let table = process.fds.lock();
+    match table.entry(fd)? {
+        FdEntry::File(file) => Ok(file.clone()),
+        _ => Err(LinuxError::EBADF),
+    }
+}
+
+fn validate_record_lock_whence(lock: &general::flock) -> Result<(), LinuxError> {
+    match lock.l_whence as u32 {
+        general::SEEK_SET | general::SEEK_CUR | general::SEEK_END => Ok(()),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn fcntl_record_lock_request_for_file(
+    process: &UserProcess,
+    file: &FileEntry,
+    lock: &general::flock,
+    ofd: bool,
+    require_access: bool,
+) -> Result<(u64, PosixRecordLock), LinuxError> {
+    if require_access && !record_lock_access_allowed(file, lock.l_type as u32) {
+        return Err(LinuxError::EBADF);
+    }
+    let request = if ofd {
+        normalize_ofd_record_lock(file, lock)?
+    } else {
+        normalize_record_lock(file, process, lock)?
+    };
+    Ok((record_lock_key(file), request))
+}
+
+fn fcntl_getlk_record(
+    process: &UserProcess,
+    fd: i32,
+    arg: usize,
+    ofd: bool,
+) -> Result<i32, LinuxError> {
+    // Linux validates descriptor existence before inspecting the flock payload,
+    // but valid non-file descriptors still report copy-in/flock-shape errors
+    // before file-type/access errors.  Keep that errno priority while still
+    // dropping the fd-table lock before potentially blocking record-lock work.
+    fcntl_record_lock_fd_exists(process, fd)?;
+    let mut lock: general::flock = read_user_value(process, arg)?;
+    validate_flock(&lock)?;
+    validate_record_lock_whence(&lock)?;
+    let file = fcntl_record_lock_file(process, fd)?;
+    let (key, request) = fcntl_record_lock_request_for_file(process, &file, &lock, ofd, false)?;
+    if let Some(conflict) = first_record_lock_conflict(key, &request) {
+        lock.l_type = conflict.typ;
+        lock.l_whence = general::SEEK_SET as _;
+        lock.l_start = conflict.start as _;
+        lock.l_len = conflict.len as _;
+        lock.l_pid = if conflict.owner_id > 0 && conflict.owner_id <= i32::MAX as i64 {
+            conflict.owner_id as _
+        } else {
+            -1
+        };
+    } else {
+        lock.l_type = general::F_UNLCK as _;
+    }
+    if write_user_value(process, arg, &lock) == 0 {
+        Ok(0)
+    } else {
+        Err(LinuxError::EFAULT)
+    }
+}
+
+fn fcntl_setlk_record(
+    process: &UserProcess,
+    fd: i32,
+    arg: usize,
+    wait: bool,
+    ofd: bool,
+) -> Result<i32, LinuxError> {
+    // Match Linux errno priority: bad descriptors fail before bad user flock
+    // pointers, while valid descriptors report copy-in/flock-shape errors before
+    // file-type/access errors.  The actual wait still happens after releasing
+    // fd-table lock.
+    fcntl_record_lock_fd_exists(process, fd)?;
+    let lock: general::flock = read_user_value(process, arg)?;
+    validate_flock(&lock)?;
+    validate_record_lock_whence(&lock)?;
+    let file = fcntl_record_lock_file(process, fd)?;
+    let (key, request) = fcntl_record_lock_request_for_file(process, &file, &lock, ofd, true)?;
+    // F_SETLKW/F_OFD_SETLKW can legitimately block.  Do not hold the fd-table
+    // lock while waiting: the current lock owner must be able to re-enter the fd
+    // table to write data or issue the unlock that makes this request runnable.
+    apply_record_lock(process, key, request, wait)?;
+    Ok(0)
 }
 
 pub(super) fn sys_flock(process: &UserProcess, fd: usize, operation: usize) -> isize {
@@ -4384,7 +4521,7 @@ impl FdTable {
         epfd: i32,
         maxevents: usize,
         out: &mut Vec<general::epoll_event>,
-    ) -> Result<(), LinuxError> {
+    ) -> Result<usize, LinuxError> {
         let registrations = match self.entry(epfd)? {
             FdEntry::Epoll(epoll) => epoll.registrations.clone(),
             _ => return Err(LinuxError::EINVAL),
@@ -4412,7 +4549,7 @@ impl FdTable {
                 registration.last_ready = ready_events;
             }
         }
-        Ok(())
+        Ok(registrations.len())
     }
 
     pub(super) fn epoll_try_fast_no_ready(&self, epfd: i32) -> Result<Option<bool>, LinuxError> {
@@ -4504,7 +4641,7 @@ impl FdTable {
             }
             FdEntry::Pipe(pipe) => pipe.read(dst),
             FdEntry::Socket(socket) => socket.read(dst),
-            FdEntry::LocalSocket(socket) => socket.read(dst),
+            FdEntry::LocalSocket(socket) => socket.read(process, dst),
             FdEntry::EventFd(eventfd) => eventfd.read(process, dst),
             FdEntry::Inotify(inotify) => inotify.read(),
             FdEntry::TimerFd(timerfd) => timerfd.read(process, dst),
@@ -4551,7 +4688,7 @@ impl FdTable {
             FdEntry::Memfd(file) => file.write(src, file_size_limit),
             FdEntry::Pipe(pipe) => pipe.write(src),
             FdEntry::Socket(socket) => socket.write(src),
-            FdEntry::LocalSocket(socket) => socket.write(src),
+            FdEntry::LocalSocket(socket) => socket.write(process, src),
             FdEntry::EventFd(eventfd) => eventfd.write(process, src),
             FdEntry::ProcTimerSlack(file) => {
                 if !file_is_writable(file.status_flags) {
@@ -4603,6 +4740,7 @@ impl FdTable {
             if let FdEntry::File(file) = entry {
                 release_flock_on_last_close(file);
                 release_file_lease_on_last_close(file);
+                release_ofd_record_locks_on_last_close(file);
             }
             if let FdEntry::Socket(socket) = entry {
                 socket.close()?;
@@ -4739,6 +4877,7 @@ impl FdTable {
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 let logical_size = file_logical_size(process, file)?;
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
+                ensure_tmpfs_allocated_range(process, file.path.as_str(), offset, len)?;
                 if !keep_size {
                     let target_size = logical_size.max(end);
                     resize_regular_file_physical_prefix(file, physical_size, target_size)?;
@@ -4816,7 +4955,13 @@ impl FdTable {
                     resize_regular_file_physical_prefix(file, physical_size, target_size)?;
                     process.set_path_sparse_size(file.path.clone(), target_size);
                 }
-                write_sparse_zero_range(process, file.path.clone(), offset, len);
+                let zero_len = if keep_size {
+                    logical_size.saturating_sub(offset).min(len)
+                } else {
+                    len
+                };
+                ensure_tmpfs_allocated_range(process, file.path.as_str(), offset, zero_len)?;
+                write_sparse_zero_range(process, file.path.clone(), offset, zero_len)?;
                 touch_regular_file_after_write(process, file);
                 Ok(())
             }
@@ -6401,7 +6546,7 @@ impl FdTable {
             }
             _ => return Err(LinuxError::EBADF),
         };
-        apply_record_lock(key, request, wait)?;
+        apply_record_lock(process, key, request, wait)?;
         Ok(0)
     }
 
@@ -6461,7 +6606,7 @@ impl FdTable {
             }
             _ => return Err(LinuxError::EBADF),
         };
-        apply_record_lock(key, request, wait)?;
+        apply_record_lock(process, key, request, wait)?;
         Ok(0)
     }
 
@@ -7249,8 +7394,28 @@ fn first_record_lock_conflict(key: u64, request: &PosixRecordLock) -> Option<Pos
     conflict
 }
 
-fn apply_record_lock(key: u64, request: PosixRecordLock, wait: bool) -> Result<(), LinuxError> {
+fn record_lock_wait_interrupted(process: &UserProcess, owner_id: i64) -> bool {
+    if process.pending_exit_group().is_some()
+        || process.eval_watchdog_expired()
+        || current_unblocked_signal_pending()
+    {
+        record_lock_wait_table().lock().remove(&owner_id);
+        true
+    } else {
+        false
+    }
+}
+
+fn apply_record_lock(
+    process: &UserProcess,
+    key: u64,
+    request: PosixRecordLock,
+    wait: bool,
+) -> Result<(), LinuxError> {
     loop {
+        if wait && record_lock_wait_interrupted(process, request.owner_id) {
+            return Err(LinuxError::EINTR);
+        }
         let mut table = posix_record_lock_table().lock();
         let locks = table.entry(key).or_insert_with(Vec::new);
         cleanup_dead_record_locks(locks, request.owner_id);
@@ -7269,6 +7434,12 @@ fn apply_record_lock(key: u64, request: PosixRecordLock, wait: bool) -> Result<(
                 }
                 return Err(LinuxError::EAGAIN);
             }
+            if record_lock_wait_interrupted(process, request.owner_id) {
+                if locks.is_empty() {
+                    table.remove(&key);
+                }
+                return Err(LinuxError::EINTR);
+            }
             {
                 let mut waits = record_lock_wait_table().lock();
                 if record_lock_wait_would_deadlock(&waits, request.owner_id, conflict_owner) {
@@ -7278,7 +7449,11 @@ fn apply_record_lock(key: u64, request: PosixRecordLock, wait: bool) -> Result<(
                 waits.insert(request.owner_id, conflict_owner);
             }
             drop(table);
-            axtask::yield_now();
+            // F_SETLKW is a blocking syscall.  Sleep for the normal poll wait
+            // quantum instead of hot-spinning on yield_now(), so the lock owner
+            // (and helper signalers used by lock tests) can run and release the
+            // conflicting region on single-core evaluator kernels.
+            yield_poll_wait();
             continue;
         }
         record_lock_wait_table().lock().remove(&request.owner_id);
@@ -7300,6 +7475,27 @@ fn release_posix_record_locks_for_file_owner(key: u64, owner_pid: i32) {
         let owner_id = owner_pid as i64;
         locks.retain(|lock| lock.owner_id != owner_id);
         record_lock_wait_table().lock().remove(&owner_id);
+        locks.is_empty()
+    } else {
+        false
+    };
+    if should_remove {
+        table.remove(&key);
+    }
+}
+
+fn release_ofd_record_locks_on_last_close(file: &FileEntry) {
+    if Arc::strong_count(&file.offset) != 1 {
+        return;
+    }
+
+    let owner_id = ofd_record_lock_owner(file);
+    let key = record_lock_key(file);
+    record_lock_wait_table().lock().remove(&owner_id);
+
+    let mut table = posix_record_lock_table().lock();
+    let should_remove = if let Some(locks) = table.get_mut(&key) {
+        locks.retain(|lock| lock.owner_id != owner_id);
         locks.is_empty()
     } else {
         false
@@ -7403,7 +7599,9 @@ fn file_lease_owner(file: &FileEntry) -> usize {
 
 fn file_lease_access_allowed(file: &FileEntry, lease_type: u32) -> bool {
     match lease_type {
-        general::F_RDLCK => file_is_readable(file.status_flags),
+        general::F_RDLCK => {
+            file_is_readable(file.status_flags) && !file_is_writable(file.status_flags)
+        }
         general::F_WRLCK => file_is_writable(file.status_flags),
         general::F_UNLCK => true,
         _ => false,
@@ -7867,12 +8065,31 @@ fn rewrite_regular_file_from_vec(
     Ok(())
 }
 
-fn write_sparse_zero_range(process: &UserProcess, path: String, offset: u64, len: u64) {
+fn write_sparse_zero_range(
+    process: &UserProcess,
+    path: String,
+    offset: u64,
+    len: u64,
+) -> Result<(), LinuxError> {
     if len == 0 {
-        return;
+        return Ok(());
     }
-    process.clear_path_data_range(path.clone(), offset, len);
-    process.mark_path_data_range(path, offset, len);
+    const ZERO_CHUNK: usize = 64 * 1024;
+    let chunk = ZERO_CHUNK.min(len.min(usize::MAX as u64) as usize);
+    let mut zeros = Vec::new();
+    zeros
+        .try_reserve_exact(chunk)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    zeros.resize(chunk, 0);
+
+    let mut written = 0u64;
+    while written < len {
+        let chunk_len = (len - written).min(zeros.len() as u64) as usize;
+        let write_offset = offset.checked_add(written).ok_or(LinuxError::EFBIG)?;
+        process.write_path_sparse_data(path.clone(), write_offset, &zeros[..chunk_len])?;
+        written = written.saturating_add(chunk_len as u64);
+    }
+    Ok(())
 }
 
 fn write_sparse_data_chunked(
@@ -8144,6 +8361,53 @@ fn can_use_reclaimed_path_blocks(process: &UserProcess, path: &str, offset: u64,
     blocks > 0 && process.path_free_512_blocks(path) >= blocks
 }
 
+fn ensure_tmpfs_allocated_range(
+    process: &UserProcess,
+    path: &str,
+    offset: u64,
+    len: u64,
+) -> Result<(), LinuxError> {
+    let Some(free_blocks) = process.tmpfs_free_512_blocks_for_path(path) else {
+        return Ok(());
+    };
+    let missing_blocks = missing_path_data_512_blocks(process, path, offset, len);
+    if missing_blocks > free_blocks {
+        Err(LinuxError::ENOSPC)
+    } else {
+        Ok(())
+    }
+}
+
+fn limit_tmpfs_write_len<'a>(
+    process: &UserProcess,
+    path: &str,
+    src: &'a [u8],
+    write_offset: u64,
+) -> Result<&'a [u8], LinuxError> {
+    let Some(free_blocks) = process.tmpfs_free_512_blocks_for_path(path) else {
+        return Ok(src);
+    };
+    if missing_path_data_512_blocks(process, path, write_offset, src.len() as u64) <= free_blocks {
+        return Ok(src);
+    }
+
+    let mut low = 0usize;
+    let mut high = src.len();
+    while low < high {
+        let mid = low + (high - low).div_ceil(2);
+        if missing_path_data_512_blocks(process, path, write_offset, mid as u64) <= free_blocks {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    if low == 0 {
+        Err(LinuxError::ENOSPC)
+    } else {
+        Ok(&src[..low])
+    }
+}
+
 fn bytes_are_all_zero(src: &[u8]) -> bool {
     src.iter().all(|byte| *byte == 0)
 }
@@ -8173,11 +8437,12 @@ fn write_regular_file_at(
     src: &[u8],
     file_size_limit: Option<u64>,
 ) -> Result<usize, LinuxError> {
-    let src = limit_regular_file_write_len(src, file_size_limit, write_offset)?;
+    let mut src = limit_regular_file_write_len(src, file_size_limit, write_offset)?;
     if src.is_empty() {
         return Ok(0);
     }
     let logical_before = file_logical_size(process, file)?;
+    src = limit_tmpfs_write_len(process, file.path.as_str(), src, write_offset)?;
     let physical_before = file.file.get_attr().map_err(LinuxError::from)?.size();
     process.ensure_path_data_ranges(file.path.clone(), physical_before);
     let mut written = 0usize;
@@ -8201,7 +8466,7 @@ fn write_regular_file_at(
                                 file.path.clone(),
                                 write_offset,
                                 physical_len as u64,
-                            );
+                            )?;
                         } else {
                             write_sparse_data_chunked(
                                 process,
@@ -8249,7 +8514,7 @@ fn write_regular_file_at(
                             file.path.clone(),
                             sparse_offset,
                             sparse_len as u64,
-                        );
+                        )?;
                     } else {
                         write_sparse_data_chunked(process, file.path.clone(), sparse_offset, tail)?;
                     }
@@ -8269,7 +8534,7 @@ fn write_regular_file_at(
         let sparse_offset = write_offset.saturating_add(written as u64);
         let tail = &src[written..];
         if bytes_are_all_zero(tail) {
-            write_sparse_zero_range(process, file.path.clone(), sparse_offset, tail.len() as u64);
+            write_sparse_zero_range(process, file.path.clone(), sparse_offset, tail.len() as u64)?;
         } else {
             write_sparse_data_chunked(process, file.path.clone(), sparse_offset, tail)?;
         }

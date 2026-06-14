@@ -4,7 +4,6 @@ use core::time::Duration;
 
 use axerrno::LinuxError;
 use axsync::Mutex;
-use axtask::WaitQueue;
 use lazyinit::LazyInit;
 use std::collections::BTreeMap;
 use std::string::String;
@@ -37,7 +36,7 @@ const PROC_SYS_KERNEL_MSGMAX_PATH: &str = "/proc/sys/kernel/msgmax";
 const PROC_SYS_KERNEL_MSGMAX_CONTENT: &[u8] = b"8192\n";
 const PROC_SYS_KERNEL_MSGMNB_PATH: &str = "/proc/sys/kernel/msgmnb";
 const PROC_SYS_KERNEL_MSGMNB_CONTENT: &[u8] = b"16384\n";
-static SYSV_MSG_WAIT_QUEUE: WaitQueue = WaitQueue::new();
+const SYSV_MSG_BLOCK_QUANTUM: Duration = Duration::from_millis(1);
 
 #[derive(Clone)]
 struct SysvMessage {
@@ -465,7 +464,6 @@ pub(super) fn sys_msgsnd(
                 queue.cbytes = next_bytes;
                 queue.lspid = process.pid();
                 queue.stime = current_time_secs();
-                SYSV_MSG_WAIT_QUEUE.notify_all(true);
                 return 0;
             }
         }
@@ -477,18 +475,7 @@ pub(super) fn sys_msgsnd(
             return neg_errno(LinuxError::EINTR);
         }
         wait_guard.get_or_insert_with(SyscallWaitBlockedGuard::new);
-        let _ = SYSV_MSG_WAIT_QUEUE.wait_timeout_until(Duration::from_millis(20), || {
-            msgop_interrupted(process) || {
-                let table = table().lock();
-                match table.get(&msqid) {
-                    None => true,
-                    Some(queue) => queue
-                        .cbytes
-                        .checked_add(payload.len())
-                        .is_some_and(|next_bytes| next_bytes <= queue.qbytes),
-                }
-            }
-        });
+        axtask::sleep(SYSV_MSG_BLOCK_QUANTUM);
     }
 }
 
@@ -553,7 +540,6 @@ pub(super) fn sys_msgrcv(
                     queue.cbytes = queue.cbytes.saturating_sub(message.payload.len());
                     queue.lrpid = process.pid();
                     queue.rtime = current_time_secs();
-                    SYSV_MSG_WAIT_QUEUE.notify_all(true);
                 }
                 return copy_len as isize;
             }
@@ -566,15 +552,7 @@ pub(super) fn sys_msgrcv(
             return neg_errno(LinuxError::EINTR);
         }
         wait_guard.get_or_insert_with(SyscallWaitBlockedGuard::new);
-        let _ = SYSV_MSG_WAIT_QUEUE.wait_timeout_until(Duration::from_millis(20), || {
-            msgop_interrupted(process) || {
-                let table = table().lock();
-                match table.get(&msqid) {
-                    None => true,
-                    Some(queue) => select_message_index(&queue.messages, msgtyp, flags).is_some(),
-                }
-            }
-        });
+        axtask::sleep(SYSV_MSG_BLOCK_QUANTUM);
     }
 }
 
@@ -608,7 +586,6 @@ pub(super) fn sys_msgctl(process: &UserProcess, msqid: usize, cmd: usize, buf: u
                 return neg_errno(LinuxError::EPERM);
             }
             table.remove(&msqid);
-            SYSV_MSG_WAIT_QUEUE.notify_all(true);
             0
         }
         SYSV_IPC_STAT => {

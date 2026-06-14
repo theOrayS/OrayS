@@ -132,6 +132,7 @@ impl AddrSpace {
 
         self.clear();
 
+        let mut parent_tlb_flush_needed = false;
         for area in other.areas.iter() {
             let mut shared_pages = BTreeMap::new();
             let mut retained_frames = Vec::new();
@@ -201,6 +202,9 @@ impl AddrSpace {
 
             for (vaddr, flags) in parent_protect_pages {
                 if let Err(err) = other.pt.cursor().protect(vaddr, flags) {
+                    if parent_tlb_flush_needed {
+                        axhal::asm::flush_tlb(None);
+                    }
                     warn!(
                         "clone_user_mappings_from: COW parent protect failed area_start={:#x} area_end={:#x} vaddr={:#x} flags={:?} err={:?}",
                         area.start(),
@@ -212,7 +216,11 @@ impl AddrSpace {
                     self.clear();
                     return ax_err!(BadState, "failed to protect parent COW page");
                 }
+                parent_tlb_flush_needed = true;
             }
+        }
+        if parent_tlb_flush_needed {
+            axhal::asm::flush_tlb(None);
         }
         Ok(())
     }

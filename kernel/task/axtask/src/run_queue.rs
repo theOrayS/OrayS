@@ -418,6 +418,7 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
 
         // Mark the task as blocked, this has to be done before adding it to the wait queue
         // while holding the lock of the wait queue.
+        let keepalive = curr.clone();
         curr.set_state(TaskState::Blocked);
         curr.set_in_wait_queue(true);
 
@@ -431,6 +432,7 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
 
         debug!("task block: {}", curr.id_name());
         self.inner.resched();
+        drop(keepalive);
     }
 
     #[cfg(feature = "irq")]
@@ -442,9 +444,11 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
 
         let now = axhal::time::wall_time();
         if now < deadline {
+            let keepalive = curr.clone();
             crate::timers::set_alarm_wakeup(deadline, curr.clone());
             curr.set_state(TaskState::Blocked);
             self.inner.resched();
+            drop(keepalive);
         }
     }
 
@@ -573,7 +577,16 @@ impl AxRunQueue {
 
             // The strong reference count of `prev_task` will be decremented by 1,
             // but won't be dropped until `gc_entry()` is called.
-            assert!(Arc::strong_count(prev_task.as_task_ref()) > 1);
+            let prev_count = Arc::strong_count(prev_task.as_task_ref());
+            assert!(
+                prev_count > 1,
+                "prev_task {} state {:?} strong_count={} next_task {} state {:?}",
+                prev_task.id_name(),
+                prev_task.state(),
+                prev_count,
+                next_task.id_name(),
+                next_task.state()
+            );
             assert!(Arc::strong_count(&next_task) >= 1);
 
             CurrentTask::set_current(prev_task, next_task);

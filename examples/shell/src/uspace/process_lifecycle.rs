@@ -1,5 +1,6 @@
 use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use core::time::Duration;
 
 use axalloc::frame_allocator_stats;
 use axerrno::LinuxError;
@@ -31,13 +32,15 @@ use super::linux_abi::{
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
 use super::program_loader::{load_program_image, LoadedMapping};
-use super::resource_sched::{apply_process_scheduler_state_to_task, default_sched_state};
+use super::resource_sched::{
+    apply_process_scheduler_state_to_task, child_sched_state_from_parent, default_sched_state,
+};
 use super::runtime_paths::{
     busybox_applet_target_path, current_cwd, is_busybox_applet_name, normalize_path,
 };
 use super::signal_abi::{
-    all_application_signal_mask, current_unblocked_signal_pending,
-    ensure_user_return_hook_registered,
+    all_application_signal_mask, current_unblocked_signal_pending, deliver_user_signal,
+    ensure_user_return_hook_registered, thread_waits_for_signal,
 };
 use super::sysv_shm;
 #[cfg(target_arch = "riscv64")]
@@ -456,7 +459,7 @@ fn user_task_entry() {
 fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
     let mut aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
         .map_err(|err| format!("failed to create user address space: {err}"))?;
-    let image = load_program_image(&mut aspace, cwd, argv[0], argv, None)?;
+    let image = load_program_image(None, &mut aspace, cwd, argv[0], argv, None)?;
     let exec_path = image.exec_path.clone();
 
     let process = Arc::new(UserProcess {
@@ -531,6 +534,9 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         prof_timer_deadline_us: AtomicU64::new(0),
         prof_timer_interval_us: AtomicU64::new(0),
         start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
+        syscall_runtime_micros: AtomicU64::new(0),
+        last_reported_user_ticks: AtomicU64::new(0),
+        last_reported_system_ticks: AtomicU64::new(0),
         waited_child_user_ticks: AtomicU64::new(0),
         waited_child_system_ticks: AtomicU64::new(0),
         max_rss_kb: AtomicUsize::new(0),
@@ -573,7 +579,14 @@ fn exec_program(
     let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
     let mut new_aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
         .map_err(|err| format!("failed to create exec address space: {err:?}"))?;
-    let image = load_program_image(&mut new_aspace, cwd, path, &argv_refs, Some(env))?;
+    let image = load_program_image(
+        Some(process),
+        &mut new_aspace,
+        cwd,
+        path,
+        &argv_refs,
+        Some(env),
+    )?;
     let new_root = new_aspace.page_table_root();
     {
         let mut aspace = process.aspace.lock();
@@ -704,6 +717,24 @@ impl UserProcess {
             return Some(137);
         }
         None
+    }
+
+    fn wait_interrupt_pending(&self) -> bool {
+        if self.consume_expired_real_timer() && current_unblocked_signal_pending() {
+            return true;
+        }
+        current_unblocked_signal_pending()
+            || self.pending_exit_group().is_some()
+            || self.eval_watchdog_expired()
+    }
+
+    fn blocking_wait_remaining(&self) -> Option<Duration> {
+        let mut remaining = self.eval_watchdog_remaining();
+        if let Some(timer_remaining) = self.real_timer_remaining() {
+            remaining =
+                Some(remaining.map_or(timer_remaining, |current| current.min(timer_remaining)));
+        }
+        remaining
     }
 
     pub(super) fn cwd(&self) -> String {
@@ -945,6 +976,35 @@ impl UserProcess {
             .map(|func| func as usize)
             .unwrap_or(0);
         handler == 1 || action.sa_flags & general::SA_NOCLDWAIT as u64 != 0
+    }
+
+    fn sigchld_has_user_handler(&self) -> bool {
+        let action = self
+            .signal_actions
+            .lock()
+            .get(&(SIGCHLD_NUM as usize))
+            .copied()
+            .unwrap_or_else(|| unsafe { core::mem::zeroed() });
+        action
+            .sa_handler_kernel
+            .map(|func| func as usize)
+            .unwrap_or(0)
+            > 1
+    }
+
+    fn reset_caught_signal_handlers_for_exec(&self) {
+        // POSIX/Linux execve preserves SIG_DFL and SIG_IGN dispositions, but
+        // every caught signal must become default in the new image.  User-space
+        // handler addresses belong to the old program; carrying them across
+        // exec can jump into unmapped or non-executable memory when a pending
+        // signal is delivered in the replacement image.
+        self.signal_actions.lock().retain(|_, action| {
+            action
+                .sa_handler_kernel
+                .map(|handler| handler as usize)
+                .unwrap_or(0)
+                <= 1
+        });
     }
 
     pub(super) fn reap_ignored_child(&self, child_pid: i32) -> bool {
@@ -1512,7 +1572,7 @@ impl UserProcess {
             child_exit_wait: WaitQueue::new(),
             timer_wait: WaitQueue::new(),
             rlimits: Mutex::new(self.rlimits.lock().clone()),
-            sched_state: Mutex::new(self.get_sched_state()),
+            sched_state: Mutex::new(child_sched_state_from_parent(self.get_sched_state())),
             nice: AtomicI32::new(self.nice()),
             ioprio: AtomicU32::new(self.ioprio()),
             signal_actions: Mutex::new(self.signal_actions.lock().clone()),
@@ -1562,6 +1622,9 @@ impl UserProcess {
             prof_timer_deadline_us: AtomicU64::new(0),
             prof_timer_interval_us: AtomicU64::new(0),
             start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
+            syscall_runtime_micros: AtomicU64::new(0),
+            last_reported_user_ticks: AtomicU64::new(0),
+            last_reported_system_ticks: AtomicU64::new(0),
             waited_child_user_ticks: AtomicU64::new(0),
             waited_child_system_ticks: AtomicU64::new(0),
             max_rss_kb: AtomicUsize::new(self.self_maxrss_kb()),
@@ -1710,10 +1773,7 @@ impl UserProcess {
                 axtask::yield_now();
                 return Ok(None);
             }
-            if current_unblocked_signal_pending()
-                || self.pending_exit_group().is_some()
-                || self.eval_watchdog_expired()
-            {
+            if self.wait_interrupt_pending() {
                 return Err(LinuxError::EINTR);
             }
             let wait_condition = || {
@@ -1730,14 +1790,17 @@ impl UserProcess {
                     || self.pending_exit_group().is_some()
                     || self.eval_watchdog_expired()
             };
-            if let Some(timeout) = self.eval_watchdog_remaining() {
+            if let Some(timeout) = self.blocking_wait_remaining() {
                 self.child_wait_blocked.store(true, Ordering::Release);
                 if self
                     .child_exit_wait
                     .wait_timeout_until(timeout, wait_condition)
                 {
                     self.child_wait_blocked.store(false, Ordering::Release);
-                    return Err(LinuxError::EINTR);
+                    if self.wait_interrupt_pending() {
+                        return Err(LinuxError::EINTR);
+                    }
+                    continue;
                 }
                 self.child_wait_blocked.store(false, Ordering::Release);
             } else {
@@ -1809,10 +1872,7 @@ impl UserProcess {
             if let Some(child) = maybe_child {
                 break child;
             }
-            if current_unblocked_signal_pending()
-                || self.pending_exit_group().is_some()
-                || self.eval_watchdog_expired()
-            {
+            if self.wait_interrupt_pending() {
                 return Err(LinuxError::EINTR);
             }
             let wait_condition = || {
@@ -1828,14 +1888,17 @@ impl UserProcess {
                     || self.pending_exit_group().is_some()
                     || self.eval_watchdog_expired()
             };
-            if let Some(timeout) = self.eval_watchdog_remaining() {
+            if let Some(timeout) = self.blocking_wait_remaining() {
                 self.child_wait_blocked.store(true, Ordering::Release);
                 if self
                     .child_exit_wait
                     .wait_timeout_until(timeout, wait_condition)
                 {
                     self.child_wait_blocked.store(false, Ordering::Release);
-                    return Err(LinuxError::EINTR);
+                    if self.wait_interrupt_pending() {
+                        return Err(LinuxError::EINTR);
+                    }
+                    continue;
                 }
                 self.child_wait_blocked.store(false, Ordering::Release);
             } else {
@@ -1920,6 +1983,11 @@ fn notify_parent_child_exit(ppid: i32, child_pid: i32) {
             && parent.process.reap_ignored_child(child_pid)
         {
             return;
+        }
+        if parent.process.sigchld_has_user_handler()
+            || thread_waits_for_signal(&parent, SIGCHLD_NUM as i32)
+        {
+            let _ = deliver_user_signal(&parent, SIGCHLD_NUM as i32, child_pid);
         }
         // A child-status transition makes wait4()/waitid() predicates true.
         // Request rescheduling so the woken parent can reap promptly even when
@@ -2053,6 +2121,7 @@ pub(super) fn sys_execve(
                 return neg_errno(errno);
             }
         };
+    process.reset_caught_signal_handlers_for_exec();
     let context = make_uspace_context(entry, stack_ptr, argc);
     process.fds.lock().close_cloexec();
     let kstack_top = axtask::current()
@@ -2204,6 +2273,12 @@ pub(super) fn sys_clone(
             let wait_condition = || {
                 child_process.live_threads.load(Ordering::Acquire) == 0
                     || child_process.vfork_exec_done.load(Ordering::Acquire)
+                    // A vfork parent may resume once the child has committed to
+                    // process exit.  The child can still be finishing kernel-side
+                    // teardown before live_threads reaches zero; waiting for that
+                    // cleanup here turns short child _exit() paths into watchdog
+                    // timeouts even though no user code can run in the child.
+                    || child_process.pending_exit_group().is_some()
                     || process.pending_exit_group().is_some()
                     || process.eval_watchdog_expired()
             };

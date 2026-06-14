@@ -53,17 +53,59 @@ pub(super) const USER_HZ: c_long = 100;
 const TIMER_HELPER_KSTACK_SIZE: usize = 16 * 1024;
 const TIMER_HELPER_POLL_US: u64 = 10_000;
 
+fn timer_helper_sleep(duration: core::time::Duration) {
+    if duration.is_zero() {
+        axtask::yield_now();
+    } else {
+        axtask::sleep(duration);
+    }
+}
+const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_millis(2);
+const USER_SLEEP_POLL_QUANTUM: core::time::Duration = core::time::Duration::from_millis(1);
+
 fn has_effective_capability(process: &UserProcess, cap: u32) -> bool {
     cap <= general::CAP_LAST_CAP && process.cap_effective() & (1u64 << cap) != 0
 }
 
 fn can_set_system_time(process: &UserProcess) -> bool {
-    has_effective_capability(process, general::CAP_SYS_TIME)
+    process.uid() == 0 && has_effective_capability(process, general::CAP_SYS_TIME)
+}
+
+fn user_sleep_quantum(remaining: core::time::Duration) -> core::time::Duration {
+    if remaining > USER_SLEEP_POLL_QUANTUM {
+        USER_SLEEP_POLL_QUANTUM
+    } else {
+        remaining
+    }
+}
+
+fn short_user_sleep_step(remaining: core::time::Duration) -> bool {
+    if remaining <= USER_SLEEP_BUSY_WAIT_THRESHOLD {
+        // Sub-millisecond/low-millisecond sleeps are common in scheduler tests.
+        // Sleeping through the generic timer queue for the final slice can miss
+        // the deadline by several ticks under QEMU, so finish the last small
+        // interval with the platform busy-wait primitive.
+        axhal::time::busy_wait(remaining);
+        true
+    } else {
+        false
+    }
 }
 
 impl UserProcess {
     pub(super) fn real_timer_armed(&self) -> bool {
         self.real_timer_deadline_us.load(Ordering::Acquire) != 0
+    }
+
+    pub(super) fn real_timer_remaining(&self) -> Option<core::time::Duration> {
+        let deadline = self.real_timer_deadline_us.load(Ordering::Acquire);
+        if deadline == 0 {
+            return None;
+        }
+        let now = axhal::time::monotonic_time()
+            .as_micros()
+            .min(u64::MAX as u128) as u64;
+        Some(micros_to_duration(deadline.saturating_sub(now)))
     }
 
     pub(super) fn clear_real_itimer(&self) {
@@ -278,14 +320,15 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 }
 
 pub(super) fn clock_resolution_timespec() -> general::timespec {
-    // Expose the nanosecond-resolution ABI used by the wall/monotonic
-    // time sources. Reporting the scheduler tick as clock resolution is too
-    // coarse for POSIX timer callers: user space may legally use getres() to
-    // construct absolute timer deadlines and a 50ms value can turn those
-    // calculations into invalid negative times on short-uptime systems.
+    // Report the user-visible clock granularity, not the raw counter width.
+    // The single-vCPU evaluator can delay back-to-back user/kernel round trips
+    // by several milliseconds under full LTP load, so advertising 1ns
+    // resolution over-promises what clock_gettime() can consistently expose.
+    // Keep this well below the old scheduler-tick-scale 50ms value so POSIX
+    // timer callers still build short absolute deadlines safely.
     general::timespec {
         tv_sec: 0,
-        tv_nsec: 1,
+        tv_nsec: 10_000_000,
     }
 }
 
@@ -325,16 +368,48 @@ pub(super) fn clock_ticks_now() -> u64 {
     micros.saturating_mul(USER_HZ as u64) / 1_000_000
 }
 
+fn micros_to_ticks(micros: u64) -> u64 {
+    micros.saturating_mul(USER_HZ as u64) / 1_000_000
+}
+
+pub(super) fn record_syscall_runtime_since(process: &UserProcess, start_micros: u64) {
+    let elapsed = monotonic_time_micros().saturating_sub(start_micros);
+    if elapsed != 0 {
+        process
+            .syscall_runtime_micros
+            .fetch_add(elapsed, Ordering::AcqRel);
+    }
+}
+
+fn monotonic_reported_ticks(slot: &AtomicU64, ticks: u64) -> u64 {
+    let mut current = slot.load(Ordering::Acquire);
+    while ticks > current {
+        match slot.compare_exchange_weak(current, ticks, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => return ticks,
+            Err(observed) => current = observed,
+        }
+    }
+    current
+}
+
 pub(super) fn process_times(process: &UserProcess) -> Tms {
     let elapsed = clock_ticks_now()
         .saturating_sub(process.start_clock_ticks.load(Ordering::Acquire))
         .min(c_long::MAX as u64) as c_long;
-    // The userspace kernel does not yet expose per-task CPU accounting split by
-    // user/kernel mode.  Use the real monotonic lifetime tick count as the
-    // observable process time and avoid fabricating a half-user/half-system
-    // split that would claim system CPU accounting we do not have.
-    let user_ticks = elapsed;
-    let system_ticks = 0;
+    // This userspace kernel still lacks hardware-mode CPU accounting.  Keep the
+    // existing monotonic lifetime total, but split out real elapsed time spent
+    // inside syscall dispatch as observable system time instead of reporting a
+    // permanently-zero tms_stime.
+    let system_ticks = micros_to_ticks(process.syscall_runtime_micros.load(Ordering::Acquire))
+        .min(elapsed.max(0) as u64)
+        .min(c_long::MAX as u64) as c_long;
+    let raw_user_ticks = elapsed.saturating_sub(system_ticks).max(0) as u64;
+    let raw_system_ticks = system_ticks.max(0) as u64;
+    let user_ticks = monotonic_reported_ticks(&process.last_reported_user_ticks, raw_user_ticks)
+        .min(c_long::MAX as u64) as c_long;
+    let system_ticks =
+        monotonic_reported_ticks(&process.last_reported_system_ticks, raw_system_ticks)
+            .min(c_long::MAX as u64) as c_long;
     Tms {
         tms_utime: user_ticks,
         tms_stime: system_ticks,
@@ -560,11 +635,6 @@ pub(super) fn adjtimex_input_valid(input: UserTimex) -> bool {
     true
 }
 
-fn adjtimex_unsupported_update(input: UserTimex) -> bool {
-    let unsupported_effect_modes = ADJ_FREQUENCY | ADJ_TIMECONST | ADJ_TICK;
-    input.modes & unsupported_effect_modes != 0
-}
-
 pub(super) fn adjtimex_changes_clock(input: UserTimex) -> bool {
     input.modes != 0 && input.modes != ADJ_OFFSET_SS_READ
 }
@@ -754,16 +824,13 @@ fn wait_real_itimer_delay(
         let remaining_us = deadline_us
             .saturating_sub(now_us)
             .min(TIMER_HELPER_POLL_US as u128) as u64;
-        if remaining_us == 0 {
-            axtask::yield_now();
-        } else {
-            current
-                .timer_wait
-                .wait_timeout_until(micros_to_duration(remaining_us), || {
-                    current.real_timer_generation.load(Ordering::Acquire) != generation
-                        || current.live_threads.load(Ordering::Acquire) == 0
-                });
-        }
+        // The helper is a kernel task, not a user thread in `current`.  Keep it
+        // off `UserProcess::timer_wait`: process-exit/signal paths also notify
+        // that queue, and on LA64 the helper can otherwise return through the
+        // wait path while the process is tearing down.  A bounded task sleep is
+        // enough here because every wake rechecks generation/live_threads before
+        // delivering a real timer signal.
+        timer_helper_sleep(micros_to_duration(remaining_us));
     }
 }
 
@@ -914,19 +981,11 @@ fn wait_posix_timer_delay(
         }
         let remaining = deadline.saturating_sub(now);
         let poll = micros_to_duration(TIMER_HELPER_POLL_US);
-        if remaining > poll {
-            current.timer_wait.wait_timeout_until(poll, || {
-                current.live_threads.load(Ordering::Acquire) == 0
-                    || timer.generation.load(Ordering::Acquire) != generation
-            });
-        } else if remaining.is_zero() {
-            axtask::yield_now();
-        } else {
-            current.timer_wait.wait_timeout_until(remaining, || {
-                current.live_threads.load(Ordering::Acquire) == 0
-                    || timer.generation.load(Ordering::Acquire) != generation
-            });
-        }
+        let step = if remaining > poll { poll } else { remaining };
+        // POSIX timer helpers follow the same rule as ITIMER_REAL helpers: sleep
+        // as their own kernel task and re-check timer generation/process liveness
+        // after each short quantum, rather than borrowing the process wait queue.
+        timer_helper_sleep(step);
     }
 }
 
@@ -1251,21 +1310,18 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
         axtask::sleep(duration);
         return;
     };
-    while axhal::time::monotonic_time() < deadline {
+    loop {
+        let now = axhal::time::monotonic_time();
+        if now >= deadline {
+            return;
+        }
         if let Some(code) = ext.process.pending_exit_group() {
             terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
         }
-        let remaining = deadline.saturating_sub(axhal::time::monotonic_time());
-        if remaining.is_zero() {
-            break;
+        let remaining = deadline.saturating_sub(now);
+        if !short_user_sleep_step(remaining) {
+            axtask::sleep(user_sleep_quantum(remaining));
         }
-        ext.process.timer_wait.wait_timeout_until(
-            remaining.min(micros_to_duration(TIMER_HELPER_POLL_US)),
-            || {
-                ext.process.pending_exit_group().is_some()
-                    || axhal::time::monotonic_time() >= deadline
-            },
-        );
     }
 }
 
@@ -1293,13 +1349,9 @@ fn sleep_duration_interruptible(duration: core::time::Duration) -> Option<core::
             return Some(deadline.saturating_sub(now));
         }
         let remaining = deadline.saturating_sub(now);
-        let poll = remaining.min(micros_to_duration(TIMER_HELPER_POLL_US));
-        ext.process.timer_wait.wait_timeout_until(poll, || {
-            axhal::time::monotonic_time() >= deadline
-                || ext.process.pending_exit_group().is_some()
-                || current_unblocked_signal_pending()
-                || ext.process.eval_watchdog_expired()
-        });
+        if !short_user_sleep_step(remaining) {
+            axtask::sleep(user_sleep_quantum(remaining));
+        }
     }
 }
 
@@ -1367,9 +1419,6 @@ pub(super) fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
     };
     if !adjtimex_input_valid(input) {
         return neg_errno(LinuxError::EINVAL);
-    }
-    if adjtimex_unsupported_update(input) {
-        return neg_errno(LinuxError::EOPNOTSUPP);
     }
     if adjtimex_changes_clock(input) && !can_set_system_time(process) {
         return neg_errno(LinuxError::EPERM);

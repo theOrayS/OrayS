@@ -3,7 +3,7 @@ use core::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use core::time::Duration;
 
-use axerrno::{AxError, AxResult, ax_err, ax_err_type};
+use axerrno::{ax_err, ax_err_type, AxError, AxResult};
 use axio::PollState;
 use axsync::Mutex;
 
@@ -13,7 +13,7 @@ use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
 
 use super::addr::UNSPECIFIED_ENDPOINT;
 use super::loopback::LoopbackTcpEndpoint;
-use super::{ETH0, LISTEN_TABLE, SOCKET_SET, SocketSetWrapper};
+use super::{SocketSetWrapper, ETH0, LISTEN_TABLE, SOCKET_SET};
 
 // State transitions:
 // CLOSED -(connect)-> BUSY -> CONNECTING -> CONNECTED -(shutdown)-> BUSY -> CLOSED
@@ -719,7 +719,13 @@ impl TcpSocket {
                         if deadline.is_some_and(|ddl| axhal::time::wall_time() >= ddl) {
                             return Err(AxError::WouldBlock);
                         }
-                        axtask::yield_now();
+                        // Blocking socket syscalls are waiting for peer/network
+                        // progress, not doing useful CPU work.  A pure yield can
+                        // immediately requeue a hot reader/writer on the single
+                        // vCPU evaluator and starve the peer that would make the
+                        // descriptor ready; sleep for the normal poll quantum
+                        // while preserving the timeout/error semantics above.
+                        axtask::sleep(Duration::from_millis(1));
                     }
                     Err(e) => return Err(e),
                 }

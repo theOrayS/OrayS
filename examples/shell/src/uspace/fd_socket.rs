@@ -2,6 +2,7 @@ use core::cmp;
 use core::ffi::c_void;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use core::time::Duration;
 
 use arceos_posix_api::ctypes as posix_ctypes;
 use axerrno::LinuxError;
@@ -69,6 +70,7 @@ const LOCAL_SOCKET_INITIAL_BUFFER_SIZE: usize = 4096;
 // default pipe-sized splice without requiring a peer read in the middle of the
 // producer's syscall.
 const LOCAL_SOCKET_MAX_BUFFER_SIZE: usize = 64 * 1024;
+const LOCAL_SOCKET_BLOCK_QUANTUM: Duration = Duration::from_millis(1);
 const SOCKET_ADDR_STORAGE_MAX: usize = 128;
 const SOCKET_OPTLEN_MAX: usize = TCP_INFO_COMPAT_SIZE;
 const INET_SOCKET_DEFAULT_BUFFER_SIZE: i32 = 64 * 1024;
@@ -524,7 +526,7 @@ impl LocalSocketEntry {
         *self.peer_cred.lock() = Some(peer_cred);
     }
 
-    pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
+    pub(super) fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
@@ -539,8 +541,11 @@ impl LocalSocketEntry {
                 if self.nonblocking {
                     return Err(LinuxError::EAGAIN);
                 }
+                if socket_block_interrupt_pending(process) {
+                    return Err(LinuxError::EINTR);
+                }
                 drop(buffer);
-                axtask::yield_now();
+                axtask::sleep(LOCAL_SOCKET_BLOCK_QUANTUM);
                 continue;
             }
             let take = cmp::min(available, dst.len() - read_len);
@@ -578,7 +583,7 @@ impl LocalSocketEntry {
         Ok(take)
     }
 
-    pub(super) fn write(&self, src: &[u8]) -> Result<usize, LinuxError> {
+    pub(super) fn write(&self, process: &UserProcess, src: &[u8]) -> Result<usize, LinuxError> {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
@@ -606,8 +611,15 @@ impl LocalSocketEntry {
                         Err(LinuxError::EAGAIN)
                     };
                 }
+                if socket_block_interrupt_pending(process) {
+                    return if written > 0 {
+                        Ok(written)
+                    } else {
+                        Err(LinuxError::EINTR)
+                    };
+                }
                 drop(buffer);
-                axtask::yield_now();
+                axtask::sleep(LOCAL_SOCKET_BLOCK_QUANTUM);
                 continue;
             }
             let take = cmp::min(available, src.len() - written);
