@@ -155,17 +155,17 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SYSLOG", result.stdout)
 
-    def test_detects_syslog_missing_explicit_unsupported(self) -> None:
+    def test_detects_syslog_missing_privilege_gate(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/system_info.rs"
         text = path.read_text(encoding="utf-8")
-        start = text.index("fn unsupported_privileged_syslog")
+        start = text.index("fn privileged_syslog_control")
         end = text.index("pub(super) fn sys_getcpu", start)
-        block = text[start:end].replace("LinuxError::EOPNOTSUPP", "LinuxError::EINVAL", 1)
+        block = text[start:end].replace("LinuxError::EPERM", "LinuxError::EINVAL", 1)
         path.write_text(text[:start] + block + text[end:], encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("EOPNOTSUPP", result.stdout)
+        self.assertIn("privileged control", result.stdout)
 
     def test_detects_syslog_state_action_success_arm(self) -> None:
         tree = self.make_tree()
@@ -173,7 +173,7 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         path.write_text(
             text.replace(
-                "SyslogAction::Close | SyslogAction::Open => unsupported_privileged_syslog(process),",
+                "SyslogAction::Close | SyslogAction::Open => privileged_syslog_control(process),",
                 "SyslogAction::Close | SyslogAction::Open => 0,",
                 1,
             ),
@@ -186,25 +186,36 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
     def test_detects_times_half_split(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/time_abi.rs"
-        path.write_text(
-            path.read_text(encoding="utf-8").replace(
-                "let user_ticks = elapsed;\n    let system_ticks = 0;",
-                "let user_ticks = elapsed / 2;\n    let system_ticks = elapsed.saturating_sub(user_ticks);",
-                1,
-            ),
-            encoding="utf-8",
-        )
+        text = path.read_text(encoding="utf-8")
+        start = text.index("pub(super) fn process_times")
+        end = text.index("pub(super) fn sys_times", start)
+        fake_split = """pub(super) fn process_times(process: &UserProcess) -> Tms {
+    let elapsed = clock_ticks_now()
+        .saturating_sub(process.start_clock_ticks.load(Ordering::Acquire))
+        .min(c_long::MAX as u64) as c_long;
+    let user_ticks = elapsed / 2;
+    let system_ticks = elapsed.saturating_sub(user_ticks);
+    Tms {
+        tms_utime: user_ticks,
+        tms_stime: system_ticks,
+        tms_cutime: 0,
+        tms_cstime: 0,
+    }
+}
+
+"""
+        path.write_text(text[:start] + fake_split + text[end:], encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("process_times", result.stdout)
 
-    def test_detects_sched_deadline_stored_without_backend(self) -> None:
+    def test_detects_sched_deadline_attribute_drop(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/resource_sched.rs"
         text = path.read_text(encoding="utf-8")
         start = text.index("fn sched_state_from_attr")
         end = text.index("pub(super) fn sys_sched_getattr", start)
-        block = text[start:end].replace("LinuxError::EOPNOTSUPP", "LinuxError::EINVAL", 1)
+        block = text[start:end].replace("sched_runtime: attr.sched_runtime", "sched_runtime: 0", 1)
         path.write_text(text[:start] + block + text[end:], encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)

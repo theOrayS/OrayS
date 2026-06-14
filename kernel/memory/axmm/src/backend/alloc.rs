@@ -1,6 +1,6 @@
-use ::alloc::collections::BTreeMap;
-use ::alloc::sync::Arc;
-use ::alloc::vec::Vec;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use axalloc::{frame_allocator_stats, global_allocator};
 use axhal::mem::{phys_to_virt, virt_to_phys};
@@ -284,6 +284,7 @@ impl Backend {
                 );
             } else {
                 forget_shared_frame(old_frame);
+                axhal::asm::flush_tlb(Some(vaddr));
             }
             return res.is_ok();
         }
@@ -311,6 +312,7 @@ impl Backend {
             dealloc_frame(new_frame);
             return false;
         }
+        axhal::asm::flush_tlb(Some(vaddr));
         release_owned_frame(old_frame);
         true
     }

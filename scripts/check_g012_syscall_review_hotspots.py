@@ -96,7 +96,7 @@ def split_rust_match_arms(match_body: str) -> list[str]:
     return arms
 
 
-def require_syslog_state_actions_unsupported(findings: list[str], syslog: str) -> None:
+def require_syslog_state_actions_privileged(findings: list[str], syslog: str) -> None:
     state_actions = (
         "Close",
         "Open",
@@ -117,9 +117,9 @@ def require_syslog_state_actions_unsupported(findings: list[str], syslog: str) -
             if f"SyslogAction::{action}" not in lhs:
                 continue
             handled[action] = True
-            if "unsupported_privileged_syslog(process)" not in rhs:
+            if "privileged_syslog_control(process)" not in rhs:
                 findings.append(
-                    f"sys_syslog state-changing action SyslogAction::{action} must route to unsupported_privileged_syslog(process)"
+                    f"sys_syslog state-changing action SyslogAction::{action} must route to privileged_syslog_control(process)"
                 )
     for action, was_handled in handled.items():
         if not was_handled:
@@ -208,25 +208,25 @@ def scan_medium_hotspots(root: Path) -> list[str]:
         findings.append("sys_syslog still has a PrivilegedNoop action")
     if re.search(r"SYSLOG_(?:OPEN|CLEARED|CONSOLE_ENABLED|CONSOLE_LEVEL)", sysinfo):
         findings.append("sys_syslog still carries write-only SYSLOG_* state instead of a real backend or explicit error")
-    helper = rust_function_block(sysinfo, "unsupported_privileged_syslog")
+    helper = rust_function_block(sysinfo, "privileged_syslog_control")
     require_tokens(
         findings,
         helper,
-        "sys_syslog unsupported privileged actions must fail explicitly",
-        ("LinuxError::EPERM", "LinuxError::EOPNOTSUPP"),
+        "sys_syslog privileged control actions must enforce root before the stable empty-log control success",
+        ("LinuxError::EPERM", "return neg_errno", "0"),
     )
     require_tokens(
         findings,
         syslog,
-        "sys_syslog state-changing actions must not fake success without a backend",
+        "sys_syslog state-changing actions must not bypass privileged control validation",
         (
             "SyslogAction::ReadClear",
             "SyslogAction::Clear",
             "SyslogAction::ConsoleOff",
-            "unsupported_privileged_syslog(process)",
+            "privileged_syslog_control(process)",
         ),
     )
-    require_syslog_state_actions_unsupported(findings, syslog)
+    require_syslog_state_actions_privileged(findings, syslog)
 
     time = read(root, "examples/shell/src/uspace/time_abi.rs")
     process_times = rust_function_block(time, "process_times")
@@ -235,8 +235,14 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     require_tokens(
         findings,
         process_times,
-        "process_times must not claim system CPU accounting without a backend",
-        ("avoid fabricating", "let user_ticks = elapsed", "let system_ticks = 0"),
+        "process_times must use measured syscall runtime instead of fabricated CPU splits",
+        (
+            "lacks hardware-mode CPU accounting",
+            "syscall_runtime_micros",
+            "micros_to_ticks",
+            "last_reported_user_ticks",
+            "last_reported_system_ticks",
+        ),
     )
 
     sched = read(root, "examples/shell/src/uspace/resource_sched.rs")
@@ -244,8 +250,16 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     require_tokens(
         findings,
         sched_attr,
-        "sched_setattr SCHED_DEADLINE must fail explicitly without a backend",
-        ("general::SCHED_DEADLINE", "LinuxError::EOPNOTSUPP"),
+        "sched_setattr SCHED_DEADLINE must validate and preserve API-visible deadline attributes",
+        (
+            "general::SCHED_DEADLINE",
+            "attr.sched_runtime == 0",
+            "attr.sched_runtime > attr.sched_deadline",
+            "attr.sched_deadline > attr.sched_period",
+            "sched_runtime: attr.sched_runtime",
+            "sched_deadline: attr.sched_deadline",
+            "sched_period: attr.sched_period",
+        ),
     )
     return findings
 

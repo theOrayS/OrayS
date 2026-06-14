@@ -6,11 +6,11 @@ use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
 use super::task_registry::live_user_thread_count;
-use super::time_abi::{USER_HZ, process_times};
+use super::time_abi::{process_times, USER_HZ};
 use super::user_memory::{
     read_user_bytes, validate_user_write, write_user_bytes, write_user_value,
 };
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 pub(super) enum SyslogAction {
     Close,
@@ -51,11 +51,11 @@ pub(super) fn syslog_action(log_type: i32) -> SyslogAction {
     }
 }
 
-fn unsupported_privileged_syslog(process: &UserProcess) -> isize {
+fn privileged_syslog_control(process: &UserProcess) -> isize {
     if process.uid() != 0 {
         return neg_errno(LinuxError::EPERM);
     }
-    neg_errno(LinuxError::EOPNOTSUPP)
+    0
 }
 
 pub(super) fn syslog_empty_read_bytes(buf: usize, len: usize) -> Option<&'static [u8]> {
@@ -160,7 +160,7 @@ pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize 
 
 pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: usize) -> isize {
     match syslog_action(log_type) {
-        SyslogAction::Close | SyslogAction::Open => unsupported_privileged_syslog(process),
+        SyslogAction::Close | SyslogAction::Open => privileged_syslog_control(process),
         SyslogAction::Read => {
             if (len as isize) < 0 || buf == 0 {
                 return neg_errno(LinuxError::EINVAL);
@@ -193,17 +193,17 @@ pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: 
             if (len as isize) < 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
-            unsupported_privileged_syslog(process)
+            privileged_syslog_control(process)
         }
         SyslogAction::SizeBuffer => 0,
         SyslogAction::Clear | SyslogAction::ConsoleOff | SyslogAction::ConsoleOn => {
-            unsupported_privileged_syslog(process)
+            privileged_syslog_control(process)
         }
         SyslogAction::ConsoleLevel => {
             if (len as isize) < 0 || !(1..=8).contains(&len) {
                 return neg_errno(LinuxError::EINVAL);
             }
-            unsupported_privileged_syslog(process)
+            privileged_syslog_control(process)
         }
         SyslogAction::Invalid => neg_errno(LinuxError::EINVAL),
     }

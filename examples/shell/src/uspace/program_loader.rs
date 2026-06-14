@@ -8,18 +8,18 @@ use axsync::Mutex;
 use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
 use std::fs::File;
 use std::io::Read;
 use std::string::{String, ToString};
 use std::vec::Vec;
-use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::sections::SectionData;
 #[cfg(any(target_arch = "loongarch64", target_arch = "riscv64"))]
 use xmas_elf::symbol_table::Entry;
+use xmas_elf::ElfFile;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, USER_BRK_GROW_SIZE,
@@ -29,7 +29,7 @@ use super::memory_map::{align_down, align_up, user_mapping_flags};
 use super::runtime_paths::{
     derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
 };
-use super::{BrkState, str_err};
+use super::{str_err, BrkState, UserProcess};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,
@@ -279,14 +279,27 @@ pub fn exec_image_buffer_stats() -> (usize, usize, usize, usize) {
     (main_len, main_cap, interp.len(), interp.capacity())
 }
 
-fn read_exec_image_into(path: &str, label: &str, image: &mut Vec<u8>) -> Result<(), String> {
+fn read_exec_image_into(
+    process: Option<&UserProcess>,
+    path: &str,
+    label: &str,
+    image: &mut Vec<u8>,
+) -> Result<(), String> {
     let mut file =
         File::open(path).map_err(|err| format!("failed to open {label} {path}: {err}"))?;
-    let expected_len = file
+    let physical_len = file
         .metadata()
         .ok()
         .and_then(|metadata| usize::try_from(metadata.len()).ok())
         .unwrap_or(0);
+    let expected_len = process
+        .and_then(|process| {
+            process
+                .path_sparse_size(path)
+                .and_then(|size| usize::try_from(size).ok())
+        })
+        .unwrap_or(0)
+        .max(physical_len);
     if expected_len > MAX_EXEC_IMAGE_SIZE {
         return Err(format!(
             "{label} {path} is too large to load ({} bytes, limit {} bytes)",
@@ -307,7 +320,7 @@ fn read_exec_image_into(path: &str, label: &str, image: &mut Vec<u8>) -> Result<
             .read(&mut chunk)
             .map_err(|err| format!("failed to read {label} {path}: {err}"))?;
         if count == 0 {
-            return Ok(());
+            break;
         }
         let next_len = image
             .len()
@@ -324,9 +337,21 @@ fn read_exec_image_into(path: &str, label: &str, image: &mut Vec<u8>) -> Result<
             .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
         image.extend_from_slice(&chunk[..count]);
     }
+
+    if image.len() < expected_len {
+        image
+            .try_reserve_exact(expected_len - image.len())
+            .map_err(|_| format!("not enough kernel memory to read sparse {label} {path}"))?;
+        image.resize(expected_len, 0);
+    }
+    if let Some(process) = process {
+        process.copy_path_sparse_data(path, 0, image.as_mut_slice());
+    }
+    Ok(())
 }
 
 pub(super) fn load_program_image(
+    process: Option<&UserProcess>,
     aspace: &mut AddrSpace,
     cwd: &str,
     program_path: &str,
@@ -334,7 +359,7 @@ pub(super) fn load_program_image(
     env_override: Option<&[String]>,
 ) -> Result<LoadedImage, String> {
     let mut main_image = main_exec_image_buffer().lock();
-    let prepared = prepare_program(cwd, program_path, argv, 0, &mut main_image)?;
+    let prepared = prepare_program(process, cwd, program_path, argv, 0, &mut main_image)?;
     #[cfg(target_arch = "riscv64")]
     patch_riscv_musl_main_syscall_stubs(prepared.exec_root.as_str(), main_image.as_mut_slice())?;
     #[cfg(target_arch = "loongarch64")]
@@ -356,7 +381,12 @@ pub(super) fn load_program_image(
     if let Some(raw_interp) = main.interpreter.as_deref() {
         let interp_path = resolve_runtime_support_file(exec_root.as_str(), raw_interp)?;
         let mut interp_image = interp_exec_image_buffer().lock();
-        read_exec_image_into(interp_path.as_str(), "interpreter", &mut interp_image)?;
+        read_exec_image_into(
+            process,
+            interp_path.as_str(),
+            "interpreter",
+            &mut interp_image,
+        )?;
         #[cfg(target_arch = "loongarch64")]
         patch_loongarch_musl_syscall_stubs(
             exec_root.as_str(),
@@ -483,6 +513,7 @@ fn effective_exec_root(path_root: &str, interpreter: Option<&str>) -> String {
 }
 
 fn prepare_program(
+    process: Option<&UserProcess>,
     cwd: &str,
     program_path: &str,
     argv: &[&str],
@@ -497,12 +528,12 @@ fn prepare_program(
     }
 
     let path = resolve_host_path(cwd.to_string(), program_path)?;
-    read_exec_image_into(path.as_str(), "program", image)?;
+    read_exec_image_into(process, path.as_str(), "program", image)?;
 
     if let Some(next_argv) = parse_shebang_argv(path.as_str(), image.as_slice(), argv)? {
         let next_refs = next_argv.iter().map(String::as_str).collect::<Vec<_>>();
         let next_program = next_refs.first().copied().unwrap_or(program_path);
-        return prepare_program(cwd, next_program, &next_refs, depth + 1, image);
+        return prepare_program(process, cwd, next_program, &next_refs, depth + 1, image);
     }
 
     Ok(PreparedProgram {

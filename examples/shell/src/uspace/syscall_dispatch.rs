@@ -82,10 +82,10 @@ use super::task_context::{
     sys_set_tid_address, user_pc,
 };
 use super::time_abi::{
-    sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep,
-    sys_clock_settime, sys_getitimer, sys_gettimeofday, sys_nanosleep, sys_setitimer,
-    sys_timer_create, sys_timer_delete, sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime,
-    sys_times,
+    monotonic_time_micros, record_syscall_runtime_since, sys_adjtimex, sys_clock_adjtime,
+    sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_getitimer,
+    sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_timer_create, sys_timer_delete,
+    sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime, sys_times,
 };
 use super::user_memory::sys_getrandom;
 
@@ -122,6 +122,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         }
     };
     let process = process_ref;
+    let syscall_start_micros = monotonic_time_micros();
     let ret = match syscall_num as u32 {
         general::__NR_read => sys_read(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_pread64 => sys_pread64(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
@@ -704,6 +705,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_exit_group => sys_exit_group(process, tf, tf.arg0() as i32),
         _ => neg_errno(LinuxError::ENOSYS),
     };
+    record_syscall_runtime_since(process, syscall_start_micros);
     note_syscall_restart_candidate(tf, syscall_num as u32, ret);
     ret
 }

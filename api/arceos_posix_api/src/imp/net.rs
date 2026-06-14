@@ -419,6 +419,15 @@ impl FileLike for Socket {
         }
         Ok(())
     }
+
+    fn set_status_flags(&self, flags: c_int) -> LinuxResult {
+        // Linux F_SETFL preserves immutable descriptor properties such as the
+        // access mode and ignores creation-only bits.  For sockets the mutable
+        // status bit we model is O_NONBLOCK; rejecting unrelated bits makes
+        // real applications that pass back F_GETFL|O_NONBLOCK observe a bogus
+        // EOPNOTSUPP and can break readiness-driven protocols.
+        self.set_nonblocking(flags & ctypes::O_NONBLOCK as c_int != 0)
+    }
 }
 
 impl From<SocketAddrV4> for ctypes::sockaddr_in {

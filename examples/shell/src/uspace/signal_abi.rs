@@ -385,11 +385,13 @@ fn deliver_user_signal_inner(
         }
     }
     queue_pending_signal_info(ext, sig, sender_pid, code, sender_uid, value);
-    if !signal_is_blocked(ext, sig) {
+    let wakes_signal_wait = ext.signal_wait.load(Ordering::Acquire)
+        && ext.signal_wait_mask.load(Ordering::Acquire) & signal_mask_bit(sig) != 0;
+    if !signal_is_blocked(ext, sig) || wakes_signal_wait {
         // A newly-pending unblocked signal interrupts sleep-like syscalls such
-        // as wait4()/waitid() and nanosleep(). Wake the process wait queues so
-        // those syscalls can return EINTR and run a user handler or terminate
-        // promptly instead of waiting for an unrelated child/timer event.
+        // as wait4()/waitid() and nanosleep().  A blocked signal selected by
+        // sigtimedwait() must also wake that syscall even though it remains
+        // blocked for normal handler delivery.
         ext.process.child_exit_wait.notify_all(true);
         ext.process.timer_wait.notify_all(true);
     }
@@ -1041,7 +1043,15 @@ pub(super) fn sys_rt_sigsuspend(process: &UserProcess, set: usize, sigsetsize: u
         if current_unblocked_signal_pending() {
             break;
         }
-        axtask::yield_now();
+        let mut wait_slice = core::time::Duration::from_millis(10);
+        if let Some(remaining) = ext.process.eval_watchdog_remaining() {
+            wait_slice = wait_slice.min(remaining);
+        }
+        ext.process.timer_wait.wait_timeout_until(wait_slice, || {
+            current_unblocked_signal_pending()
+                || ext.process.pending_exit_group().is_some()
+                || ext.process.eval_watchdog_expired()
+        });
     }
     leave_signal_wait(ext);
 
@@ -1130,7 +1140,28 @@ pub(super) fn sys_rt_sigtimedwait(
             leave_signal_wait(ext);
             return neg_errno(LinuxError::EINTR);
         }
-        axtask::yield_now();
+        let mut wait_slice = core::time::Duration::from_millis(10);
+        if let Some(deadline_us) = deadline_us {
+            let now_us = axhal::time::monotonic_time()
+                .as_micros()
+                .min(u64::MAX as u128) as u64;
+            let remaining_us = deadline_us.saturating_sub(now_us);
+            if remaining_us == 0 {
+                leave_signal_wait(ext);
+                return neg_errno(LinuxError::EAGAIN);
+            }
+            wait_slice = wait_slice.min(core::time::Duration::from_micros(remaining_us));
+        }
+        if let Some(remaining) = ext.process.eval_watchdog_remaining() {
+            wait_slice = wait_slice.min(remaining);
+        }
+        ext.process.timer_wait.wait_timeout_until(wait_slice, || {
+            current_pending_signal_matches(wait_mask)
+                || ext.process.pending_exit_group().is_some()
+                || ext.process.eval_watchdog_expired()
+                || (current_unblocked_signal_pending()
+                    && !current_pending_signal_matches(wait_mask))
+        });
     }
 }
 

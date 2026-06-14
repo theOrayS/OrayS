@@ -4,6 +4,7 @@ use alloc::{
     vec::Vec,
 };
 use core::net::SocketAddr;
+use core::time::Duration;
 
 use axsync::Mutex;
 use smoltcp::wire::IpEndpoint;
@@ -22,10 +23,13 @@ impl UdpLoopbackQueue {
         }
     }
 
-    pub fn push(&self, packet: UdpLoopbackPacket) -> bool {
+    pub fn push_from_slice(&self, data: &[u8], peer: IpEndpoint) -> bool {
         let mut queue = self.queue.lock();
         if queue.len() < LOOPBACK_UDP_QUEUE_LIMIT {
-            queue.push_back(packet);
+            queue.push_back(UdpLoopbackPacket {
+                data: data.to_vec(),
+                peer,
+            });
             true
         } else {
             false
@@ -111,23 +115,31 @@ pub fn update_udp_loopback_peer(local: IpEndpoint, queue: &UdpLoopbackQueue, pee
 }
 
 pub fn send_udp_loopback(local: IpEndpoint, remote: IpEndpoint, buf: &[u8]) -> usize {
-    let table = UDP_LOOPBACK_TABLE.lock();
-    if let Some(bindings) = table.get(&remote.port) {
-        let peer = loopback_source_endpoint(local, remote);
-        let has_connected_match = bindings.iter().any(|binding| {
-            binding_accepts(binding.local, remote)
-                && binding.peer.is_some_and(|p| endpoint_matches(p, peer))
-        });
-        for binding in bindings {
-            if binding_accepts(binding.local, remote)
-                && binding_peer_accepts(binding.peer, peer, has_connected_match)
-            {
-                binding.queue.push(UdpLoopbackPacket {
-                    data: buf.to_vec(),
-                    peer,
-                });
+    let mut queue_full = false;
+    {
+        let table = UDP_LOOPBACK_TABLE.lock();
+        if let Some(bindings) = table.get(&remote.port) {
+            let peer = loopback_source_endpoint(local, remote);
+            let has_connected_match = bindings.iter().any(|binding| {
+                binding_accepts(binding.local, remote)
+                    && binding.peer.is_some_and(|p| endpoint_matches(p, peer))
+            });
+            for binding in bindings {
+                if binding_accepts(binding.local, remote)
+                    && binding_peer_accepts(binding.peer, peer, has_connected_match)
+                    && !binding.queue.push_from_slice(buf, peer)
+                {
+                    queue_full = true;
+                }
             }
         }
+    }
+    if queue_full {
+        // A blocking UDP sender may legally outpace a loopback receiver.  Dropping
+        // datagrams keeps UDP semantics, but a hot sender that finds the in-kernel
+        // loopback queue full must still give the receiver/server a scheduling
+        // window instead of monopolising the cooperative run queue.
+        axtask::sleep(Duration::from_millis(1));
     }
     buf.len()
 }

@@ -44,6 +44,7 @@ pub(super) struct UserSchedParam {
 pub(super) struct UserSchedState {
     policy: i32,
     param: UserSchedParam,
+    reset_on_fork: bool,
     sched_runtime: u64,
     sched_deadline: u64,
     sched_period: u64,
@@ -117,9 +118,18 @@ pub(super) fn default_sched_state() -> UserSchedState {
     UserSchedState {
         policy: 0,
         param: default_sched_param(),
+        reset_on_fork: false,
         sched_runtime: 0,
         sched_deadline: 0,
         sched_period: 0,
+    }
+}
+
+pub(super) fn child_sched_state_from_parent(parent: UserSchedState) -> UserSchedState {
+    if parent.reset_on_fork {
+        default_sched_state()
+    } else {
+        parent
     }
 }
 
@@ -164,6 +174,8 @@ const IOPRIO_CLASS_BE: u32 = 2;
 const IOPRIO_CLASS_IDLE: u32 = 3;
 const IOPRIO_NR_LEVELS: u32 = 8;
 const DEFAULT_IOPRIO: u32 = (IOPRIO_CLASS_BE << IOPRIO_CLASS_SHIFT) | 4;
+const SCHED_RESET_ON_FORK_FLAG: u32 = 0x4000_0000;
+const SCHED_ATTR_FLAG_RESET_ON_FORK: u64 = 0x1;
 
 static SYNTHETIC_INIT_NICE: AtomicI32 = AtomicI32::new(DEFAULT_NICE);
 static SYNTHETIC_INIT_IOPRIO: AtomicU32 = AtomicU32::new(DEFAULT_IOPRIO);
@@ -463,8 +475,18 @@ fn sched_policy_needs_privilege(policy: i32) -> bool {
     )
 }
 
-fn sched_policy_requires_unsupported_backend(policy: i32) -> bool {
-    matches!(policy as u32, general::SCHED_DEADLINE)
+fn split_sched_policy(policy: i32) -> Result<(i32, bool), LinuxError> {
+    if policy < 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    let raw_policy = policy as u32;
+    let reset_on_fork = (raw_policy & SCHED_RESET_ON_FORK_FLAG) != 0;
+    let base_policy = raw_policy & !SCHED_RESET_ON_FORK_FLAG;
+    let base_policy = base_policy as i32;
+    if sched_priority_bounds(base_policy).is_none() {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok((base_policy, reset_on_fork))
 }
 
 fn scheduler_backend_priority(process: &UserProcess, state: UserSchedState) -> isize {
@@ -486,9 +508,9 @@ fn apply_task_scheduler_state(
     // axtask exposes a CFS-style nice hook.  Linux policy state is still
     // preserved for get* calls; map accepted policy/priority into the nearest
     // available backend priority so sched_set* changes affect scheduling
-    // where the configured scheduler supports it.  SCHED_DEADLINE is rejected
-    // before this point because no deadline backend exists to make runtime,
-    // deadline, and period observable.
+    // where the configured scheduler supports it.  SCHED_DEADLINE keeps its
+    // Linux-visible reservation fields for sched_getattr(); this backend does
+    // not expose EDF, so it is scheduled with the normal nice-based priority.
     let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));
 }
 
@@ -507,6 +529,9 @@ fn sched_target_state(process: &UserProcess, pid: i32) -> Result<UserSchedState,
     if pid == 0 || pid == current_tid() || pid == process.pid() {
         return Ok(process.get_sched_state());
     }
+    if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+        return Ok(entry.process.get_sched_state());
+    }
     user_thread_entry_by_process_pid(pid)
         .map(|entry| entry.process.get_sched_state())
         .ok_or(LinuxError::ESRCH)
@@ -521,6 +546,9 @@ fn sched_target_uid(process: &UserProcess, pid: i32) -> Result<u32, LinuxError> 
     }
     if pid == 1 {
         return Ok(0);
+    }
+    if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+        return Ok(entry.process.uid());
     }
     user_thread_entry_by_process_pid(pid)
         .map(|entry| entry.process.uid())
@@ -617,17 +645,15 @@ pub(super) fn sys_sched_setscheduler(
     if param == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    if sched_priority_bounds(policy).is_none() {
-        return neg_errno(LinuxError::EINVAL);
-    }
+    let (base_policy, reset_on_fork) = match split_sched_policy(policy) {
+        Ok(value) => value,
+        Err(err) => return neg_errno(err),
+    };
     let param = match read_user_value::<UserSchedParam>(process, param) {
         Ok(param) => param,
         Err(err) => return neg_errno(err),
     };
-    if sched_policy_requires_unsupported_backend(policy) {
-        return neg_errno(LinuxError::EOPNOTSUPP);
-    }
-    if !sched_param_accepts_policy(policy, param) {
+    if !sched_param_accepts_policy(base_policy, param) {
         return neg_errno(LinuxError::EINVAL);
     }
     match sched_target_state(process, pid) {
@@ -637,15 +663,16 @@ pub(super) fn sys_sched_setscheduler(
     if let Err(err) = can_set_sched_target(process, pid) {
         return neg_errno(err);
     }
-    if process.uid() != 0 && sched_policy_needs_privilege(policy) {
+    if process.uid() != 0 && sched_policy_needs_privilege(base_policy) {
         return neg_errno(LinuxError::EPERM);
     }
     match set_sched_target_state(
         process,
         pid,
         UserSchedState {
-            policy,
+            policy: base_policy,
             param,
+            reset_on_fork,
             sched_runtime: 0,
             sched_deadline: 0,
             sched_period: 0,
@@ -695,7 +722,11 @@ fn sched_attr_from_state(state: UserSchedState) -> UserSchedAttr {
     UserSchedAttr {
         size: size_of::<UserSchedAttr>() as u32,
         sched_policy: state.policy as u32,
-        sched_flags: 0,
+        sched_flags: if state.reset_on_fork {
+            SCHED_ATTR_FLAG_RESET_ON_FORK
+        } else {
+            0
+        },
         sched_nice: 0,
         sched_priority: state.param.sched_priority as u32,
         sched_runtime: state.sched_runtime,
@@ -711,9 +742,11 @@ fn sched_state_from_attr(attr: UserSchedAttr) -> Result<UserSchedState, LinuxErr
         sched_priority: attr.sched_priority as i32,
     };
     let policy = attr.sched_policy as i32;
-    if attr.sched_flags != 0 {
+    let allowed_flags = SCHED_ATTR_FLAG_RESET_ON_FORK;
+    if attr.sched_flags & !allowed_flags != 0 {
         return Err(LinuxError::EINVAL);
     }
+    let reset_on_fork = (attr.sched_flags & allowed_flags) != 0;
     if policy as u32 == general::SCHED_DEADLINE {
         if param.sched_priority != 0
             || attr.sched_runtime == 0
@@ -724,7 +757,14 @@ fn sched_state_from_attr(attr: UserSchedAttr) -> Result<UserSchedState, LinuxErr
         {
             return Err(LinuxError::EINVAL);
         }
-        return Err(LinuxError::EOPNOTSUPP);
+        return Ok(UserSchedState {
+            policy,
+            param,
+            reset_on_fork,
+            sched_runtime: attr.sched_runtime,
+            sched_deadline: attr.sched_deadline,
+            sched_period: attr.sched_period,
+        });
     }
     if !sched_param_accepts_policy(policy, param) {
         return Err(LinuxError::EINVAL);
@@ -732,6 +772,7 @@ fn sched_state_from_attr(attr: UserSchedAttr) -> Result<UserSchedState, LinuxErr
     Ok(UserSchedState {
         policy,
         param,
+        reset_on_fork,
         sched_runtime: 0,
         sched_deadline: 0,
         sched_period: 0,

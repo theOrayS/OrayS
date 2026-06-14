@@ -382,7 +382,13 @@ impl UdpSocket {
                         if deadline.is_some_and(|ddl| axhal::time::wall_time() >= ddl) {
                             return Err(AxError::WouldBlock);
                         }
-                        axtask::yield_now();
+                        // Blocking UDP callers are waiting for peer/network progress.
+                        // On the single-vCPU evaluator, immediately re-queueing a hot
+                        // receiver with yield_now() can starve the peer/control task
+                        // that would make the socket ready.  Sleep for one scheduler
+                        // tick while preserving nonblocking and SO_RCVTIMEO/SO_SNDTIMEO
+                        // EAGAIN semantics.
+                        axtask::sleep(Duration::from_millis(1));
                     }
                     Err(e) => return Err(e),
                 }

@@ -81,6 +81,7 @@ pub(super) const CHOWN_ID_UNCHANGED: u32 = u32::MAX;
 pub(super) const STATFS_BLOCK_SIZE: i64 = 4096;
 pub(super) const STATFS_NAME_MAX: i64 = 63;
 pub(super) const EXT4_SUPER_MAGIC: i64 = 0xef53;
+pub(super) const RAMFS_MAGIC: i64 = 0x8584_58f6;
 pub(super) const TMPFS_MAGIC: i64 = 0x0102_1994;
 pub(super) const PROC_SUPER_MAGIC: i64 = 0x9fa0;
 pub(super) const SYSFS_MAGIC: i64 = 0x6265_6572;

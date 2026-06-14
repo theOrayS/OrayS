@@ -4,7 +4,7 @@ use core::time::Duration;
 
 use axerrno::LinuxError;
 use axsync::Mutex;
-use axtask::WaitQueue;
+use axtask::{self, WaitQueue};
 use lazyinit::LazyInit;
 use std::collections::BTreeMap;
 use std::string::String;
@@ -32,6 +32,7 @@ const SYSV_SEM_UNDO_MAX: i32 = SYSV_SEM_MAX_VALUE;
 const SYSV_IPC_NOWAIT: i16 = 0o4000;
 const SYSV_SEM_UNDO: i16 = 0x1000;
 const SYSV_SEM_KNOWN_FLAGS: i16 = SYSV_IPC_NOWAIT | SYSV_SEM_UNDO;
+const SYSV_SEM_BLOCK_QUANTUM: Duration = Duration::from_millis(1);
 
 const SYSV_SEM_GETPID: i32 = 11;
 const SYSV_SEM_GETVAL: i32 = 12;
@@ -450,31 +451,16 @@ fn blocking_semop(
                 break Err(err);
             }
         }
-        let Some(timeout) = timeout else {
-            let _ = set.queue.wait_timeout_until(Duration::from_millis(20), || {
-                set.removed.load(Ordering::Acquire) || semop_interrupted(process) || {
-                    let state = set.state.lock();
-                    can_apply_ops(&state, &ops).map_or(true, |blocked| blocked.is_none())
-                }
-            });
-            continue;
-        };
-        let elapsed = axhal::time::wall_time().saturating_sub(wait_started);
-        if elapsed >= timeout {
-            break Err(LinuxError::EAGAIN);
-        }
-        let remaining = timeout
-            .saturating_sub(elapsed)
-            .min(Duration::from_millis(20));
-        let timed_out = set.queue.wait_timeout_until(remaining, || {
-            set.removed.load(Ordering::Acquire) || semop_interrupted(process) || {
-                let state = set.state.lock();
-                can_apply_ops(&state, &ops).map_or(true, |blocked| blocked.is_none())
+        let sleep_for = if let Some(timeout) = timeout {
+            let elapsed = axhal::time::wall_time().saturating_sub(wait_started);
+            if elapsed >= timeout {
+                break Err(LinuxError::EAGAIN);
             }
-        });
-        if timed_out && remaining >= timeout.saturating_sub(elapsed) {
-            break Err(LinuxError::EAGAIN);
-        }
+            timeout.saturating_sub(elapsed).min(SYSV_SEM_BLOCK_QUANTUM)
+        } else {
+            SYSV_SEM_BLOCK_QUANTUM
+        };
+        axtask::sleep(sleep_for);
     };
 
     if let Some(ext) = current_task_ext() {

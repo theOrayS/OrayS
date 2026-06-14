@@ -102,6 +102,7 @@ struct MountPoint {
     source_root: String,
     readonly: bool,
     nosymfollow: bool,
+    tmpfs_size_limit: Option<u64>,
 }
 
 #[derive(Clone, Copy)]
@@ -183,6 +184,9 @@ struct UserProcess {
     prof_timer_deadline_us: AtomicU64,
     prof_timer_interval_us: AtomicU64,
     start_clock_ticks: AtomicU64,
+    syscall_runtime_micros: AtomicU64,
+    last_reported_user_ticks: AtomicU64,
+    last_reported_system_ticks: AtomicU64,
     waited_child_user_ticks: AtomicU64,
     waited_child_system_ticks: AtomicU64,
     max_rss_kb: AtomicUsize,
