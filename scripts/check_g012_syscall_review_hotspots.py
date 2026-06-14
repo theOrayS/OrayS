@@ -100,7 +100,6 @@ def require_syslog_state_actions_privileged(findings: list[str], syslog: str) ->
     state_actions = (
         "Close",
         "Open",
-        "ReadClear",
         "Clear",
         "ConsoleOff",
         "ConsoleOn",
@@ -209,6 +208,8 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     if re.search(r"SYSLOG_(?:OPEN|CLEARED|CONSOLE_ENABLED|CONSOLE_LEVEL)", sysinfo):
         findings.append("sys_syslog still carries write-only SYSLOG_* state instead of a real backend or explicit error")
     helper = rust_function_block(sysinfo, "privileged_syslog_control")
+    snapshot = rust_function_block(sysinfo, "klog_snapshot_bytes")
+    copy_snapshot = rust_function_block(sysinfo, "copy_klog_snapshot")
     require_tokens(
         findings,
         helper,
@@ -223,13 +224,38 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     )
     require_tokens(
         findings,
+        snapshot,
+        "sys_syslog control state must be consumed by the syscall-visible klog snapshot, not just stored",
+        (
+            "KLOG_CONTROL_STATE.open.load",
+            "KLOG_CONTROL_STATE.console_enabled.load",
+            "console_level = KLOG_CONTROL_STATE",
+            "KLOG_CONTROL_STATE.clear_generation.load",
+        ),
+    )
+    require_tokens(
+        findings,
+        copy_snapshot,
+        "sys_syslog read/read-clear paths must expose and clear the modeled klog buffer",
+        (
+            "klog_snapshot_bytes",
+            "write_user_bytes",
+            "clear_after_read",
+            "KLOG_CONTROL_STATE",
+            "fetch_add",
+        ),
+    )
+    require_tokens(
+        findings,
         syslog,
-        "sys_syslog state-changing actions must not bypass privileged control validation",
+        "sys_syslog state-changing actions must not bypass privileged control validation and visible read/size effects",
         (
             "SyslogAction::ReadClear",
             "SyslogAction::Clear",
             "SyslogAction::ConsoleOff",
             "privileged_syslog_control(process,",
+            "copy_klog_snapshot(process, buf, len, true)",
+            "KLOG_BUFFER_CAPACITY",
         ),
     )
     require_syslog_state_actions_privileged(findings, syslog)

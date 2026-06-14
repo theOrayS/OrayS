@@ -1,6 +1,7 @@
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use core::{cmp, mem::size_of};
 use std::string::String;
+use std::vec::Vec;
 
 use axalloc::global_allocator;
 use axerrno::LinuxError;
@@ -49,18 +50,19 @@ impl KlogControlState {
 }
 
 static KLOG_CONTROL_STATE: KlogControlState = KlogControlState::new();
+const KLOG_BUFFER_CAPACITY: usize = 4096;
 
 pub(super) fn syslog_action(log_type: i32) -> SyslogAction {
     match log_type {
         // SYSLOG_ACTION_CLOSE / OPEN.
         0 => SyslogAction::Close,
         1 => SyslogAction::Open,
-        // SYSLOG_ACTION_READ. The kernel log is modelled as empty, but the
-        // read operation still validates arguments and privileged access.
+        // SYSLOG_ACTION_READ. The syscall-visible kernel log is a small
+        // in-kernel model because the current axlog console backend has no
+        // ring-buffer export; controls below are still observable through this
+        // buffer instead of returning write-only success.
         2 => SyslogAction::Read,
-        // SYSLOG_ACTION_READ_ALL and READ_CLEAR. READ_ALL can expose an empty
-        // kernel log; READ_CLEAR needs a mutable ring-buffer backend and is
-        // rejected explicitly below until that backend exists.
+        // SYSLOG_ACTION_READ_ALL and READ_CLEAR.
         3 => SyslogAction::ReadAll,
         4 => SyslogAction::ReadClear,
         // SYSLOG_ACTION_CLEAR / CONSOLE_OFF / CONSOLE_ON.
@@ -125,12 +127,49 @@ fn privileged_syslog_control(process: &UserProcess, action: SyslogAction, len: u
     0
 }
 
-pub(super) fn syslog_empty_read_bytes(buf: usize, len: usize) -> Option<&'static [u8]> {
-    if len > 0 && buf != 0 {
-        Some(&[0])
-    } else {
-        None
+fn klog_snapshot_bytes() -> Vec<u8> {
+    let clear_generation = KLOG_CONTROL_STATE.clear_generation.load(Ordering::Acquire);
+    if clear_generation > 0 {
+        return Vec::new();
     }
+    let open = KLOG_CONTROL_STATE.open.load(Ordering::Acquire);
+    let console_enabled = KLOG_CONTROL_STATE.console_enabled.load(Ordering::Acquire);
+    let console_level = KLOG_CONTROL_STATE
+        .console_level
+        .load(Ordering::Acquire)
+        .clamp(1, 8);
+    format!(
+        "arceos-klog: open={} console={} level={} clears={}\n",
+        open as u8, console_enabled as u8, console_level, clear_generation
+    )
+    .into_bytes()
+}
+
+fn copy_klog_snapshot(
+    process: &UserProcess,
+    buf: usize,
+    len: usize,
+    clear_after_read: bool,
+) -> isize {
+    if len > 0 && buf == 0 {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    let snapshot = klog_snapshot_bytes();
+    let copy_len = snapshot.len().min(len).min(KLOG_BUFFER_CAPACITY);
+    if copy_len > 0 {
+        if let Err(err) = validate_user_write(process, buf, copy_len) {
+            return neg_errno(err);
+        }
+        if let Err(err) = write_user_bytes(process, buf, &snapshot[..copy_len]) {
+            return neg_errno(err);
+        }
+    }
+    if clear_after_read {
+        KLOG_CONTROL_STATE
+            .clear_generation
+            .fetch_add(1, Ordering::AcqRel);
+    }
+    copy_len as isize
 }
 
 fn default_rusage() -> general::rusage {
@@ -237,34 +276,24 @@ pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: 
             if process.uid() != 0 {
                 return neg_errno(LinuxError::EPERM);
             }
-            if len > 0 {
-                if let Err(err) = validate_user_write(process, buf, len) {
-                    return neg_errno(err);
-                }
-            }
-            0
+            copy_klog_snapshot(process, buf, len, false)
         }
         SyslogAction::ReadAll => {
             if (len as isize) < 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
-            if let Some(bytes) = syslog_empty_read_bytes(buf, len) {
-                if let Err(err) = validate_user_write(process, buf, len) {
-                    return neg_errno(err);
-                }
-                if let Err(err) = write_user_bytes(process, buf, bytes) {
-                    return neg_errno(err);
-                }
-            }
-            0
+            copy_klog_snapshot(process, buf, len, false)
         }
         SyslogAction::ReadClear => {
             if (len as isize) < 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
-            privileged_syslog_control(process, SyslogAction::ReadClear, len)
+            if process.uid() != 0 {
+                return neg_errno(LinuxError::EPERM);
+            }
+            copy_klog_snapshot(process, buf, len, true)
         }
-        SyslogAction::SizeBuffer => 0,
+        SyslogAction::SizeBuffer => KLOG_BUFFER_CAPACITY as isize,
         SyslogAction::Clear | SyslogAction::ConsoleOff | SyslogAction::ConsoleOn => {
             privileged_syslog_control(process, syslog_action(log_type), len)
         }
