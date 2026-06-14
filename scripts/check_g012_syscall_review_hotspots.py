@@ -117,7 +117,7 @@ def require_syslog_state_actions_privileged(findings: list[str], syslog: str) ->
             if f"SyslogAction::{action}" not in lhs:
                 continue
             handled[action] = True
-            if "privileged_syslog_control(process)" not in rhs:
+            if "privileged_syslog_control(process," not in rhs:
                 findings.append(
                     f"sys_syslog state-changing action SyslogAction::{action} must route to privileged_syslog_control(process)"
                 )
@@ -212,8 +212,14 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     require_tokens(
         findings,
         helper,
-        "sys_syslog privileged control actions must enforce root before the stable empty-log control success",
-        ("LinuxError::EPERM", "return neg_errno", "0"),
+        "sys_syslog privileged control actions must enforce root and update modeled klog/console state",
+        (
+            "LinuxError::EPERM",
+            "return neg_errno",
+            "KLOG_CONTROL_STATE.open.store",
+            "KLOG_CONTROL_STATE.console_level.store",
+            "clear_generation",
+        ),
     )
     require_tokens(
         findings,
@@ -223,7 +229,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
             "SyslogAction::ReadClear",
             "SyslogAction::Clear",
             "SyslogAction::ConsoleOff",
-            "privileged_syslog_control(process)",
+            "privileged_syslog_control(process,",
         ),
     )
     require_syslog_state_actions_privileged(findings, syslog)
@@ -244,6 +250,18 @@ def scan_medium_hotspots(root: Path) -> list[str]:
             "last_reported_system_ticks",
         ),
     )
+    require_tokens(
+        findings,
+        time,
+        "adjtimex frequency/tick discipline must affect CLOCK_REALTIME instead of only storing fields",
+        (
+            "discipline_extra_ns_for_raw",
+            "epoch_raw_ns",
+            "epoch_extra_ns",
+            "ADJ_FREQUENCY | ADJ_TICK",
+            "reset_discipline_epoch",
+        ),
+    )
 
     sched = read(root, "examples/shell/src/uspace/resource_sched.rs")
     sched_attr = rust_function_block(sched, "sched_state_from_attr")
@@ -261,6 +279,19 @@ def scan_medium_hotspots(root: Path) -> list[str]:
             "sched_period: attr.sched_period",
         ),
     )
+    require_tokens(
+        findings,
+        sched,
+        "SCHED_DEADLINE must affect backend scheduling priority rather than only being stored",
+        (
+            "fn deadline_scheduler_backend_priority",
+            "general::SCHED_DEADLINE => deadline_scheduler_backend_priority",
+            "sched_runtime",
+            "sched_period",
+        ),
+    )
+    if "scheduled with the normal nice-based priority" in sched:
+        findings.append("SCHED_DEADLINE comment still admits normal-priority fake success")
     return findings
 
 

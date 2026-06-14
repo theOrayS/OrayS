@@ -1,3 +1,4 @@
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use core::{cmp, mem::size_of};
 use std::string::String;
 
@@ -12,6 +13,7 @@ use super::user_memory::{
 };
 use super::{neg_errno, UserProcess};
 
+#[derive(Clone, Copy)]
 pub(super) enum SyslogAction {
     Close,
     Open,
@@ -25,6 +27,28 @@ pub(super) enum SyslogAction {
     ConsoleLevel,
     Invalid,
 }
+
+struct KlogControlState {
+    open: AtomicBool,
+    console_enabled: AtomicBool,
+    console_level: AtomicI32,
+    saved_console_level: AtomicI32,
+    clear_generation: AtomicU32,
+}
+
+impl KlogControlState {
+    const fn new() -> Self {
+        Self {
+            open: AtomicBool::new(true),
+            console_enabled: AtomicBool::new(true),
+            console_level: AtomicI32::new(7),
+            saved_console_level: AtomicI32::new(7),
+            clear_generation: AtomicU32::new(0),
+        }
+    }
+}
+
+static KLOG_CONTROL_STATE: KlogControlState = KlogControlState::new();
 
 pub(super) fn syslog_action(log_type: i32) -> SyslogAction {
     match log_type {
@@ -51,9 +75,52 @@ pub(super) fn syslog_action(log_type: i32) -> SyslogAction {
     }
 }
 
-fn privileged_syslog_control(process: &UserProcess) -> isize {
+fn privileged_syslog_control(process: &UserProcess, action: SyslogAction, len: usize) -> isize {
     if process.uid() != 0 {
         return neg_errno(LinuxError::EPERM);
+    }
+    match action {
+        SyslogAction::Close => KLOG_CONTROL_STATE.open.store(false, Ordering::Release),
+        SyslogAction::Open => KLOG_CONTROL_STATE.open.store(true, Ordering::Release),
+        SyslogAction::ReadClear | SyslogAction::Clear => {
+            KLOG_CONTROL_STATE
+                .clear_generation
+                .fetch_add(1, Ordering::AcqRel);
+        }
+        SyslogAction::ConsoleOff => {
+            let current = KLOG_CONTROL_STATE.console_level.load(Ordering::Acquire);
+            KLOG_CONTROL_STATE
+                .saved_console_level
+                .store(current, Ordering::Release);
+            KLOG_CONTROL_STATE
+                .console_enabled
+                .store(false, Ordering::Release);
+            KLOG_CONTROL_STATE.console_level.store(1, Ordering::Release);
+        }
+        SyslogAction::ConsoleOn => {
+            let saved = KLOG_CONTROL_STATE
+                .saved_console_level
+                .load(Ordering::Acquire)
+                .clamp(1, 8);
+            KLOG_CONTROL_STATE
+                .console_enabled
+                .store(true, Ordering::Release);
+            KLOG_CONTROL_STATE
+                .console_level
+                .store(saved, Ordering::Release);
+        }
+        SyslogAction::ConsoleLevel => {
+            KLOG_CONTROL_STATE
+                .console_enabled
+                .store(true, Ordering::Release);
+            KLOG_CONTROL_STATE
+                .console_level
+                .store(len as i32, Ordering::Release);
+        }
+        SyslogAction::Read
+        | SyslogAction::ReadAll
+        | SyslogAction::SizeBuffer
+        | SyslogAction::Invalid => {}
     }
     0
 }
@@ -160,7 +227,9 @@ pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize 
 
 pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: usize) -> isize {
     match syslog_action(log_type) {
-        SyslogAction::Close | SyslogAction::Open => privileged_syslog_control(process),
+        SyslogAction::Close | SyslogAction::Open => {
+            privileged_syslog_control(process, syslog_action(log_type), len)
+        }
         SyslogAction::Read => {
             if (len as isize) < 0 || buf == 0 {
                 return neg_errno(LinuxError::EINVAL);
@@ -193,17 +262,17 @@ pub(super) fn sys_syslog(process: &UserProcess, log_type: i32, buf: usize, len: 
             if (len as isize) < 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
-            privileged_syslog_control(process)
+            privileged_syslog_control(process, SyslogAction::ReadClear, len)
         }
         SyslogAction::SizeBuffer => 0,
         SyslogAction::Clear | SyslogAction::ConsoleOff | SyslogAction::ConsoleOn => {
-            privileged_syslog_control(process)
+            privileged_syslog_control(process, syslog_action(log_type), len)
         }
         SyslogAction::ConsoleLevel => {
             if (len as isize) < 0 || !(1..=8).contains(&len) {
                 return neg_errno(LinuxError::EINVAL);
             }
-            privileged_syslog_control(process)
+            privileged_syslog_control(process, SyslogAction::ConsoleLevel, len)
         }
         SyslogAction::Invalid => neg_errno(LinuxError::EINVAL),
     }

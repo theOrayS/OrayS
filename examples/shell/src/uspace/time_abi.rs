@@ -31,6 +31,8 @@ struct TimeDisciplineState {
     constant: AtomicI64,
     tick: AtomicI64,
     tai: AtomicI32,
+    epoch_raw_ns: AtomicI64,
+    epoch_extra_ns: AtomicI64,
 }
 
 impl TimeDisciplineState {
@@ -44,6 +46,8 @@ impl TimeDisciplineState {
             constant: AtomicI64::new(0),
             tick: AtomicI64::new(10_000),
             tai: AtomicI32::new(0),
+            epoch_raw_ns: AtomicI64::new(0),
+            epoch_extra_ns: AtomicI64::new(0),
         }
     }
 }
@@ -519,7 +523,8 @@ pub(super) fn adjusted_wall_time() -> core::time::Duration {
 fn adjusted_wall_time_with_extra_ns(extra_ns: i128) -> core::time::Duration {
     let raw_ns = duration_to_ns_i128(axhal::time::wall_time());
     let offset_ns = REALTIME_OFFSET_NS.load(Ordering::Acquire) as i128;
-    let adjusted_ns = raw_ns + offset_ns + extra_ns;
+    let discipline_ns = discipline_extra_ns_for_raw(raw_ns);
+    let adjusted_ns = raw_ns + offset_ns + discipline_ns + extra_ns;
     if adjusted_ns <= 0 {
         return core::time::Duration::ZERO;
     }
@@ -528,10 +533,46 @@ fn adjusted_wall_time_with_extra_ns(extra_ns: i128) -> core::time::Duration {
     core::time::Duration::new(secs, nanos)
 }
 
+fn discipline_extra_ns_for_raw(raw_ns: i128) -> i128 {
+    let epoch_raw_ns = TIME_DISCIPLINE.epoch_raw_ns.load(Ordering::Acquire) as i128;
+    let epoch_extra_ns = TIME_DISCIPLINE.epoch_extra_ns.load(Ordering::Acquire) as i128;
+    let elapsed_ns = raw_ns.saturating_sub(epoch_raw_ns).max(0);
+    let freq = TIME_DISCIPLINE.freq.load(Ordering::Acquire) as i128;
+    let tick = TIME_DISCIPLINE.tick.load(Ordering::Acquire) as i128;
+    let freq_extra = elapsed_ns
+        .saturating_mul(freq)
+        .saturating_div(65_536)
+        .saturating_div(1_000_000);
+    let base_tick = (1_000_000 / USER_HZ) as i128;
+    let tick_extra = if base_tick > 0 {
+        elapsed_ns
+            .saturating_mul(tick.saturating_sub(base_tick))
+            .saturating_div(base_tick)
+    } else {
+        0
+    };
+    epoch_extra_ns
+        .saturating_add(freq_extra)
+        .saturating_add(tick_extra)
+}
+
+fn reset_discipline_epoch(raw_ns: i128, extra_ns: i128) {
+    TIME_DISCIPLINE
+        .epoch_raw_ns
+        .store(clamp_i128_to_i64(raw_ns), Ordering::Release);
+    TIME_DISCIPLINE
+        .epoch_extra_ns
+        .store(clamp_i128_to_i64(extra_ns), Ordering::Release);
+}
+
 pub(super) fn set_realtime_offset_from_timespec(ts: general::timespec) {
     let target_ns = ts.tv_sec as i128 * NSEC_PER_SEC + ts.tv_nsec as i128;
     let raw_ns = duration_to_ns_i128(axhal::time::wall_time());
-    REALTIME_OFFSET_NS.store(clamp_i128_to_i64(target_ns - raw_ns), Ordering::Release);
+    let discipline_ns = discipline_extra_ns_for_raw(raw_ns);
+    REALTIME_OFFSET_NS.store(
+        clamp_i128_to_i64(target_ns - raw_ns - discipline_ns),
+        Ordering::Release,
+    );
 }
 
 fn add_realtime_offset_ns(delta_ns: i128) {
@@ -675,7 +716,17 @@ fn adjtimex_subsecond_scale(input: UserTimex) -> i128 {
 }
 
 fn adjtimex_offset_delta_ns(input: UserTimex) -> i128 {
-    (input.offset as i128).saturating_mul(adjtimex_subsecond_scale(input))
+    let delta = (input.offset as i128).saturating_mul(adjtimex_subsecond_scale(input));
+    let constant = if input.modes & ADJ_TIMECONST != 0 {
+        input.constant as i64
+    } else {
+        TIME_DISCIPLINE.constant.load(Ordering::Acquire)
+    };
+    if constant <= 0 {
+        delta
+    } else {
+        delta.saturating_div(1_i128 << (constant.clamp(0, 16) as u32))
+    }
 }
 
 fn adjtimex_setoffset_delta_ns(input: UserTimex) -> i128 {
@@ -687,6 +738,8 @@ fn adjtimex_setoffset_delta_ns(input: UserTimex) -> i128 {
 
 fn apply_adjtimex_update(input: UserTimex) {
     let modes = input.modes;
+    let raw_ns = duration_to_ns_i128(axhal::time::wall_time());
+    let extra_ns = discipline_extra_ns_for_raw(raw_ns);
     if modes & ADJ_OFFSET != 0 || modes == ADJ_OFFSET_SINGLESHOT {
         TIME_DISCIPLINE
             .offset
@@ -728,6 +781,9 @@ fn apply_adjtimex_update(input: UserTimex) {
     }
     if modes & ADJ_TAI != 0 {
         TIME_DISCIPLINE.tai.store(input.tai, Ordering::Release);
+    }
+    if modes & (ADJ_FREQUENCY | ADJ_TICK) != 0 {
+        reset_discipline_epoch(raw_ns, extra_ns);
     }
 }
 
