@@ -680,6 +680,26 @@ pub(super) fn adjtimex_changes_clock(input: UserTimex) -> bool {
     input.modes != 0 && input.modes != ADJ_OFFSET_SS_READ
 }
 
+fn adjtimex_unsupported_update(input: UserTimex) -> bool {
+    let modes = input.modes;
+    if modes == 0 || modes == ADJ_OFFSET_SS_READ {
+        return false;
+    }
+    let unit_only = modes & (ADJ_MICRO | ADJ_NANO) != 0
+        && modes
+            & (ADJ_OFFSET
+                | ADJ_FREQUENCY
+                | ADJ_MAXERROR
+                | ADJ_ESTERROR
+                | ADJ_STATUS
+                | ADJ_TIMECONST
+                | ADJ_TAI
+                | ADJ_SETOFFSET
+                | ADJ_TICK)
+            == 0;
+    unit_only
+}
+
 fn default_timex() -> UserTimex {
     let now = adjusted_wall_time();
     let mut output: UserTimex = unsafe { core::mem::zeroed() };
@@ -1475,6 +1495,9 @@ pub(super) fn sys_adjtimex(process: &UserProcess, tx: usize) -> isize {
     };
     if !adjtimex_input_valid(input) {
         return neg_errno(LinuxError::EINVAL);
+    }
+    if adjtimex_unsupported_update(input) {
+        return neg_errno(LinuxError::EOPNOTSUPP);
     }
     if adjtimex_changes_clock(input) && !can_set_system_time(process) {
         return neg_errno(LinuxError::EPERM);
