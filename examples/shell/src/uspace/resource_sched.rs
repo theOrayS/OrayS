@@ -495,9 +495,25 @@ fn scheduler_backend_priority(process: &UserProcess, state: UserSchedState) -> i
             let linux_rt_prio = state.param.sched_priority.clamp(1, 99);
             -1 - (((linux_rt_prio - 1) * 19) / 98) as isize
         }
+        general::SCHED_DEADLINE => deadline_scheduler_backend_priority(state),
         general::SCHED_IDLE => 19,
         _ => process.nice() as isize,
     }
+}
+
+fn deadline_scheduler_backend_priority(state: UserSchedState) -> isize {
+    // ArceOS currently exposes a priority/nice backend rather than a full EDF
+    // scheduler.  Do not claim deadline attributes as a pure bookkeeping no-op:
+    // accepted SCHED_DEADLINE reservations affect the runnable priority in
+    // proportion to their runtime/period utilization, while the ABI-visible
+    // reservation tuple remains available through sched_getattr().
+    let runtime = state.sched_runtime.min(state.sched_period);
+    let utilization_percent = if state.sched_period == 0 {
+        100
+    } else {
+        ((runtime as u128).saturating_mul(100) / state.sched_period as u128) as i32
+    };
+    -1 - ((utilization_percent.clamp(1, 100) - 1) * 19 / 99) as isize
 }
 
 fn apply_task_scheduler_state(
@@ -508,9 +524,7 @@ fn apply_task_scheduler_state(
     // axtask exposes a CFS-style nice hook.  Linux policy state is still
     // preserved for get* calls; map accepted policy/priority into the nearest
     // available backend priority so sched_set* changes affect scheduling
-    // where the configured scheduler supports it.  SCHED_DEADLINE keeps its
-    // Linux-visible reservation fields for sched_getattr(); this backend does
-    // not expose EDF, so it is scheduled with the normal nice-based priority.
+    // where the configured scheduler supports it.
     let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));
 }
 

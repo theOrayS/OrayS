@@ -173,7 +173,7 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         path.write_text(
             text.replace(
-                "SyslogAction::Close | SyslogAction::Open => privileged_syslog_control(process),",
+                "SyslogAction::Close | SyslogAction::Open => {\n            privileged_syslog_control(process, syslog_action(log_type), len)\n        }",
                 "SyslogAction::Close | SyslogAction::Open => 0,",
                 1,
             ),
@@ -220,6 +220,33 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sched_setattr SCHED_DEADLINE", result.stdout)
+
+    def test_detects_sched_deadline_normal_priority_backend(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/resource_sched.rs"
+        text = path.read_text(encoding="utf-8")
+        start = text.index("fn deadline_scheduler_backend_priority")
+        end = text.index("fn apply_task_scheduler_state", start)
+        text = text[:start] + text[end:]
+        text = text.replace(
+            "general::SCHED_DEADLINE => deadline_scheduler_backend_priority(state),",
+            "general::SCHED_DEADLINE => process.nice() as isize,",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SCHED_DEADLINE", result.stdout)
+
+    def test_detects_adjtimex_field_only_discipline(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/time_abi.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("discipline_extra_ns_for_raw", "field_only_timex_state")
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("adjtimex", result.stdout)
 
 
 if __name__ == "__main__":
