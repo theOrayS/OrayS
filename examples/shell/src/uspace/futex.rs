@@ -29,17 +29,28 @@ fn table() -> &'static Mutex<BTreeMap<usize, Arc<FutexState>>> {
     &FUTEXES
 }
 
+fn mapped_futex_key(process: &UserProcess, uaddr: usize) -> Result<usize, LinuxError> {
+    let query = process.aspace.lock().query_address(VirtAddr::from(uaddr));
+    if !query.pte_mapped {
+        return Err(LinuxError::EFAULT);
+    }
+    Ok(query.paddr | (uaddr & 0xfff))
+}
+
 fn futex_key(process: &UserProcess, uaddr: usize) -> Result<usize, LinuxError> {
     // Futex wait queues are keyed by the backing frame, not just the user
     // virtual address: independent LTP processes commonly reuse the same mmap
     // addresses, while forked MAP_SHARED checkpoint pages retain the same
     // physical frame and must still rendezvous across parent/child processes.
     fault_in_user_read(process, uaddr, size_of::<u32>())?;
-    let query = process.aspace.lock().query_address(VirtAddr::from(uaddr));
-    if !query.pte_mapped {
-        return Err(LinuxError::EFAULT);
-    }
-    Ok(query.paddr | (uaddr & 0xfff))
+    mapped_futex_key(process, uaddr)
+}
+
+fn mapped_futex_state(process: &UserProcess, uaddr: usize) -> Option<(usize, Arc<FutexState>)> {
+    let Ok(key) = mapped_futex_key(process, uaddr) else {
+        return None;
+    };
+    table().lock().get(&key).cloned().map(|state| (key, state))
 }
 
 fn state(key: usize) -> Arc<FutexState> {
@@ -226,28 +237,28 @@ pub(super) fn wake_addr(process: &UserProcess, uaddr: usize, count: usize) -> us
     // Best-effort kernel-internal wake path for teardown/cancellation cleanup:
     // if the user address has already been unmapped, there is no futex queue to
     // wake and no syscall return value to report.
-    wake_addr_checked(process, uaddr, count).unwrap_or(0)
+    let Some((key, state)) = mapped_futex_state(process, uaddr) else {
+        return 0;
+    };
+    state.seq.fetch_add(1, Ordering::Release);
+    let woken = state.queue.notify_many_unique(count, true);
+    drop(state);
+    prune_empty_key(key);
+    woken
 }
 
 pub(super) fn futex_waiter_is_queued(process: &UserProcess, uaddr: usize) -> bool {
-    let Ok(key) = futex_key(process, uaddr) else {
-        return false;
-    };
-    table()
-        .lock()
-        .get(&key)
-        .map(|state| !state.queue.is_empty())
+    mapped_futex_state(process, uaddr)
+        .map(|(_, state)| !state.queue.is_empty())
         .unwrap_or(false)
 }
 
 pub(super) fn wake_task(process: &UserProcess, uaddr: usize, task: &AxTaskRef) {
-    let Ok(key) = futex_key(process, uaddr) else {
+    let Some((_, state)) = mapped_futex_state(process, uaddr) else {
         return;
     };
-    if let Some(state) = table().lock().get(&key).cloned() {
-        state.seq.fetch_add(1, Ordering::Release);
-        let _ = state.queue.notify_task(true, task);
-    }
+    state.seq.fetch_add(1, Ordering::Release);
+    let _ = state.queue.notify_task(true, task);
 }
 
 pub(super) fn sys_futex(

@@ -1692,6 +1692,11 @@ fn normalize_lmbench_stage_wrappers(stage_root: &str) -> io::Result<()> {
         return Ok(());
     };
 
+    let lmbench_all = join_path(stage_root, "lmbench_all");
+    if matches!(fs::metadata(&lmbench_all), Ok(meta) if meta.is_file()) {
+        uspace::seed_initial_path_mode(&lmbench_all, 0o755);
+    }
+
     for entry in entries {
         let entry = entry?;
         let path = join_path(stage_root, path_to_str(&entry.file_name()));
@@ -1730,6 +1735,7 @@ fn normalize_lmbench_stage_wrappers(stage_root: &str) -> io::Result<()> {
         // in-suite binary so the benchmark runs the intended lmbench subcommand
         // instead of repeatedly failing with ENOEXEC/ENOENT.
         write_text_file(&path, &format!("#!/bin/sh\nexec ./lmbench_all {args}\n"))?;
+        uspace::seed_initial_path_mode(&path, 0o755);
     }
 
     Ok(())
