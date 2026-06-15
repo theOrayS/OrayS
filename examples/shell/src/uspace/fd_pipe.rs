@@ -553,7 +553,7 @@ impl PipeEndpoint {
         }
     }
 
-    fn wait_for_readable(&self) -> Result<(), LinuxError> {
+    pub(super) fn wait_for_readable(&self) -> Result<(), LinuxError> {
         self.wait_on_queue_until(&self.read_wait, || {
             self.available_read() > 0 || self.read_peer_closed() || Self::interrupted()
         })

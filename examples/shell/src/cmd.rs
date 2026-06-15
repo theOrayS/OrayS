@@ -2423,14 +2423,10 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
         };
         match result {
             Ok(0) => {
-                // The remote evaluator's LTP scorer follows the official
-                // testsuite wrapper wire format: every completed case is
-                // reported as `FAIL LTP CASE <case> : <status>`, with status 0
-                // meaning PASS.  Keep that compatibility line intact so the
-                // scorer can award real passing cases; non-zero exits and
-                // timeouts still report real failures below, and internal
-                // TCONF/TFAIL/TBROK output remains visible for audit.
-                println!("FAIL LTP CASE {case} : 0");
+                // Emit an unambiguous wrapper-level PASS marker for real zero-exit
+                // cases.  Non-zero exits and timeouts still report FAIL below,
+                // and internal TCONF/TFAIL/TBROK output remains visible for audit.
+                println!("PASS LTP CASE {case} : 0");
                 println!("Pass!");
                 passed += 1;
             }

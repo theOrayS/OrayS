@@ -7,6 +7,7 @@ use core::time::Duration;
 use arceos_posix_api::ctypes as posix_ctypes;
 use axerrno::LinuxError;
 use axsync::Mutex;
+use axtask::WaitQueue;
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
 use std::string::String;
@@ -103,6 +104,8 @@ struct LocalSocketBuffer {
 struct LocalSocketPairState {
     buffers: [Mutex<LocalSocketBuffer>; 2],
     open_ends: Mutex<[usize; 2]>,
+    read_wait: [WaitQueue; 2],
+    write_wait: [WaitQueue; 2],
 }
 
 struct LocalSocketPairEndpoint {
@@ -376,6 +379,8 @@ impl LocalSocketPairState {
                 Mutex::new(LocalSocketBuffer::new()),
             ],
             open_ends: Mutex::new([1, 1]),
+            read_wait: [WaitQueue::new(), WaitQueue::new()],
+            write_wait: [WaitQueue::new(), WaitQueue::new()],
         })
     }
 
@@ -384,14 +389,65 @@ impl LocalSocketPairState {
     }
 
     fn close_side(&self, side: usize) {
-        let mut open = self.open_ends.lock();
-        if open[side] > 0 {
-            open[side] -= 1;
+        let became_closed = {
+            let mut open = self.open_ends.lock();
+            if open[side] > 0 {
+                open[side] -= 1;
+            }
+            open[side] == 0
+        };
+        if became_closed {
+            self.notify_all_readable(side);
+            self.notify_all_writable(side);
+            self.notify_all_readable(1 - side);
+            self.notify_all_writable(1 - side);
         }
     }
 
     fn peer_open(&self, side: usize) -> bool {
         self.open_ends.lock()[1 - side] > 0
+    }
+
+    fn notify_readable(&self, side: usize) {
+        self.read_wait[side].notify_one(true);
+    }
+
+    fn notify_writable(&self, side: usize) {
+        self.write_wait[side].notify_one(true);
+    }
+
+    fn notify_all_readable(&self, side: usize) {
+        self.read_wait[side].notify_all(true);
+    }
+
+    fn notify_all_writable(&self, side: usize) {
+        self.write_wait[side].notify_all(true);
+    }
+
+    fn readable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) -> bool {
+        let readable = self.buffers[side].lock().available_read() > 0;
+        readable || !self.peer_open(side) || socket_block_interrupt_pending(process)
+    }
+
+    fn writable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) -> bool {
+        let peer_side = 1 - side;
+        let writable = self.buffers[peer_side]
+            .lock()
+            .available_write_after_growth()
+            > 0;
+        writable || !self.peer_open(side) || socket_block_interrupt_pending(process)
+    }
+
+    fn wait_readable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) {
+        self.read_wait[side].wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
+            self.readable_or_peer_closed_or_interrupted(side, process)
+        });
+    }
+
+    fn wait_writable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) {
+        self.write_wait[side].wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
+            self.writable_or_peer_closed_or_interrupted(side, process)
+        });
     }
 }
 
@@ -545,7 +601,8 @@ impl LocalSocketEntry {
                     return Err(LinuxError::EINTR);
                 }
                 drop(buffer);
-                axtask::sleep(LOCAL_SOCKET_BLOCK_QUANTUM);
+                pair.state
+                    .wait_readable_or_peer_closed_or_interrupted(pair.side, process);
                 continue;
             }
             let take = cmp::min(available, dst.len() - read_len);
@@ -554,6 +611,8 @@ impl LocalSocketEntry {
             }
             read_len += take;
             if read_len > 0 {
+                drop(buffer);
+                pair.state.notify_writable(1 - pair.side);
                 return Ok(read_len);
             }
         }
@@ -580,6 +639,8 @@ impl LocalSocketEntry {
         for byte in &mut dst[..take] {
             *byte = buffer.read_byte();
         }
+        drop(buffer);
+        pair.state.notify_writable(1 - pair.side);
         Ok(take)
     }
 
@@ -619,7 +680,8 @@ impl LocalSocketEntry {
                     };
                 }
                 drop(buffer);
-                axtask::sleep(LOCAL_SOCKET_BLOCK_QUANTUM);
+                pair.state
+                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process);
                 continue;
             }
             let take = cmp::min(available, src.len() - written);
@@ -627,6 +689,8 @@ impl LocalSocketEntry {
                 buffer.write_byte(*byte);
             }
             written += take;
+            drop(buffer);
+            pair.state.notify_readable(peer_side);
         }
         Ok(written)
     }
@@ -652,6 +716,8 @@ impl LocalSocketEntry {
         for byte in &src[..take] {
             buffer.write_byte(*byte);
         }
+        drop(buffer);
+        pair.state.notify_readable(peer_side);
         Ok(take)
     }
 
@@ -680,7 +746,7 @@ impl LocalSocketEntry {
                 if socket_block_interrupt_pending(process) {
                     return Err(LinuxError::EINTR);
                 }
-                axtask::yield_now();
+                pipe.wait_for_readable()?;
                 continue;
             }
             let pipe_available = pipe.available_read();
@@ -702,7 +768,8 @@ impl LocalSocketEntry {
                 if socket_block_interrupt_pending(process) {
                     return Err(LinuxError::EINTR);
                 }
-                axtask::yield_now();
+                pair.state
+                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process);
                 continue;
             }
 
@@ -717,7 +784,7 @@ impl LocalSocketEntry {
                     if socket_block_interrupt_pending(process) {
                         return Err(LinuxError::EINTR);
                     }
-                    axtask::yield_now();
+                    pipe.wait_for_readable()?;
                     continue;
                 }
                 Err(err) => return Err(err),
@@ -728,6 +795,8 @@ impl LocalSocketEntry {
             for byte in &staging[..read] {
                 buffer.write_byte(*byte);
             }
+            drop(buffer);
+            pair.state.notify_readable(peer_side);
             return Ok(read);
         }
     }
