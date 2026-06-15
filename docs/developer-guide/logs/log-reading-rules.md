@@ -21,24 +21,32 @@ python3 scripts/ltp_summary.py --promotion-candidates rv.log la.log
 
 ## 2. wrapper marker 的当前含义
 
-当前 `examples/shell/src/cmd.rs::run_ltp_suite()` 对 completed case 输出：
+当前 `examples/shell/src/cmd.rs::run_ltp_suite()` 对 status `0` 的
+completed case 输出：
+
+```text
+PASS LTP CASE <case> : 0
+```
+
+非 0 wrapper status 仍输出 failure marker；timeout 会额外输出：
 
 ```text
 FAIL LTP CASE <case> : <status>
 ```
 
-其中 status `0` 是 wrapper 层 pass，非 0 是 failure。timeout 会额外输出：
-
 ```text
 TIMEOUT LTP CASE <case> after <n>s
 ```
 
-因此当前日志里出现 `FAIL LTP CASE <case> : 0` 时，含义是“该 case 的 wrapper status 为 0”，不是 testcase 失败；必须交给 parser 结合内部 `TFAIL`/`TBROK`/`TCONF` 解释。
+因此当前日志里出现 `PASS LTP CASE <case> : 0` 时，含义是“该 case
+的 wrapper status 为 0”；仍必须交给 parser 结合内部
+`TFAIL`/`TBROK`/`TCONF` 解释。
 
-`scripts/ltp_summary.py` 以数字 status 为准，并兼容历史/外部日志里的：
+`scripts/ltp_summary.py` 以数字 status 为准，并兼容历史日志里的旧
+marker：
 
 ```text
-PASS LTP CASE <case> : 0
+FAIL LTP CASE <case> : 0
 ```
 
 开发者不要随意改 marker wire format；远程 scorer 和历史 parser 都依赖这层兼容。

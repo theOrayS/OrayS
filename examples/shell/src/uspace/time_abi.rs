@@ -64,7 +64,7 @@ fn timer_helper_sleep(duration: core::time::Duration) {
         axtask::sleep(duration);
     }
 }
-const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_millis(2);
+const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_micros(50);
 const USER_SLEEP_POLL_QUANTUM: core::time::Duration = core::time::Duration::from_millis(1);
 
 fn has_effective_capability(process: &UserProcess, cap: u32) -> bool {
@@ -85,10 +85,10 @@ fn user_sleep_quantum(remaining: core::time::Duration) -> core::time::Duration {
 
 fn short_user_sleep_step(remaining: core::time::Duration) -> bool {
     if remaining <= USER_SLEEP_BUSY_WAIT_THRESHOLD {
-        // Sub-millisecond/low-millisecond sleeps are common in scheduler tests.
-        // Sleeping through the generic timer queue for the final slice can miss
-        // the deadline by several ticks under QEMU, so finish the last small
-        // interval with the platform busy-wait primitive.
+        // Use a tiny spin only for the final sub-tick sliver.  Millisecond-scale
+        // sleeps must block on the timer queue; otherwise several RT test threads
+        // busy-wait in kernel context and starve peers on single-core evaluator
+        // runs.
         axhal::time::busy_wait(remaining);
         true
     } else {

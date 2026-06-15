@@ -1,16 +1,17 @@
-use core::mem::{MaybeUninit, size_of};
+use core::mem::{size_of, MaybeUninit};
 use core::ptr;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use axerrno::LinuxError;
 use axhal::paging::MappingFlags;
+use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
-use memory_addr::VirtAddr;
+use memory_addr::{MemoryAddr, PageIter4K, VirtAddr, PAGE_SIZE_4K};
 use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
 
@@ -63,6 +64,22 @@ pub(super) fn validate_user_write(
     validate_user_access(process, ptr, len, true)
 }
 
+pub(super) fn fault_in_user_read(
+    process: &UserProcess,
+    ptr: usize,
+    len: usize,
+) -> Result<(), LinuxError> {
+    fault_in_user_range(process, ptr, len, false)
+}
+
+pub(super) fn fault_in_user_write(
+    process: &UserProcess,
+    ptr: usize,
+    len: usize,
+) -> Result<(), LinuxError> {
+    fault_in_user_range(process, ptr, len, true)
+}
+
 pub(super) fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags: usize) -> isize {
     const GRND_NONBLOCK: usize = 0x0001;
     const GRND_RANDOM: usize = 0x0002;
@@ -97,38 +114,68 @@ fn validate_user_access(
     len: usize,
     write: bool,
 ) -> Result<(), LinuxError> {
-    if len == 0 {
-        return Ok(());
-    }
-    let valid = if write {
-        user_bytes_mut(process, ptr, len, true).is_some()
-    } else {
-        user_bytes(process, ptr, len, false).is_some()
-    };
-    if ptr == 0 || !valid {
-        return Err(LinuxError::EFAULT);
-    }
-    Ok(())
+    fault_in_user_range(process, ptr, len, write)
 }
 
 fn user_range_fits(ptr: usize, len: usize) -> bool {
     len == 0 || ptr.checked_add(len).is_some()
 }
 
-fn user_range_accessible(process: &UserProcess, ptr: usize, len: usize, write: bool) -> bool {
-    if !user_range_fits(ptr, len) {
-        return false;
+fn fault_in_user_range(
+    process: &UserProcess,
+    ptr: usize,
+    len: usize,
+    write: bool,
+) -> Result<(), LinuxError> {
+    if len == 0 {
+        return Ok(());
     }
-    if user_range_crosses_uncommitted_brk(process, ptr, len) {
-        return false;
+    if ptr == 0
+        || !user_range_fits(ptr, len)
+        || user_range_crosses_uncommitted_brk(process, ptr, len)
+    {
+        return Err(LinuxError::EFAULT);
     }
-    let flags = if write {
+    let end = ptr.checked_add(len).ok_or(LinuxError::EFAULT)?;
+    let access_flags = if write {
         MappingFlags::READ | MappingFlags::WRITE
     } else {
         MappingFlags::READ
     };
-    let aspace = process.aspace.lock();
-    aspace.can_access_range(VirtAddr::from(ptr), len, flags)
+    let fault_flags = if write {
+        PageFaultFlags::WRITE
+    } else {
+        PageFaultFlags::READ
+    };
+
+    // Real Linux copy_to/from_user can fault in legal lazy user pages while it
+    // copies.  Our copy helpers run in kernel context, so they must explicitly
+    // apply MAP_GROWSDOWN and lazy mmap population before calling
+    // AddrSpace::read/write; otherwise a valid stack/TLS/futex pointer can be
+    // misreported as EFAULT and produce an axmm BadAddress warning storm under
+    // thread-heavy glibc workloads.
+    let start_page = VirtAddr::from(ptr.align_down_4k());
+    let end_page = if end.is_aligned_4k() {
+        end
+    } else {
+        end.checked_add(PAGE_SIZE_4K - 1)
+            .ok_or(LinuxError::EFAULT)?
+            .align_down_4k()
+    };
+    let end_page = VirtAddr::from(end_page);
+    if let Some(pages) = PageIter4K::new(start_page, end_page) {
+        for page in pages {
+            let _ = process.handle_mmap_grow_down_fault(page.as_usize(), fault_flags);
+        }
+    }
+
+    let mut aspace = process.aspace.lock();
+    if !aspace.can_access_range(VirtAddr::from(ptr), len, access_flags) {
+        return Err(LinuxError::EFAULT);
+    }
+    aspace
+        .populate_range(VirtAddr::from(ptr), len, fault_flags)
+        .map_err(|_| LinuxError::EFAULT)
 }
 
 fn user_range_crosses_uncommitted_brk(process: &UserProcess, ptr: usize, len: usize) -> bool {
@@ -142,36 +189,6 @@ fn user_range_crosses_uncommitted_brk(process: &UserProcess, ptr: usize, len: us
     ptr < brk.limit && end > brk.end
 }
 
-pub(super) fn user_bytes<'a>(
-    process: &UserProcess,
-    ptr: usize,
-    len: usize,
-    write: bool,
-) -> Option<&'a [u8]> {
-    if len == 0 {
-        return Some(&[]);
-    }
-    if !user_range_accessible(process, ptr, len, write) {
-        return None;
-    }
-    Some(unsafe { core::slice::from_raw_parts(ptr as *const u8, len) })
-}
-
-pub(super) fn user_bytes_mut<'a>(
-    process: &UserProcess,
-    ptr: usize,
-    len: usize,
-    write: bool,
-) -> Option<&'a mut [u8]> {
-    if len == 0 {
-        return Some(&mut []);
-    }
-    if !user_range_accessible(process, ptr, len, write) {
-        return None;
-    }
-    Some(unsafe { core::slice::from_raw_parts_mut(ptr as *mut u8, len) })
-}
-
 pub(super) fn read_user_bytes(
     process: &UserProcess,
     ptr: usize,
@@ -180,9 +197,7 @@ pub(super) fn read_user_bytes(
     if len == 0 {
         return Ok(Vec::new());
     }
-    if ptr == 0 || !user_range_accessible(process, ptr, len, false) {
-        return Err(LinuxError::EFAULT);
-    }
+    fault_in_user_read(process, ptr, len)?;
 
     let mut bytes = Vec::new();
     bytes
@@ -233,9 +248,7 @@ pub(super) fn write_user_bytes(
     if bytes.is_empty() {
         return Ok(());
     }
-    if ptr == 0 || !user_range_accessible(process, ptr, bytes.len(), true) {
-        return Err(LinuxError::EFAULT);
-    }
+    fault_in_user_write(process, ptr, bytes.len())?;
 
     process
         .aspace
@@ -309,7 +322,7 @@ pub(super) fn clear_user_bytes(
     if len == 0 {
         return Ok(());
     }
-    validate_user_write(process, ptr, len)?;
+    fault_in_user_write(process, ptr, len)?;
 
     let mut aspace = process.aspace.lock();
     let mut offset = 0;
@@ -325,7 +338,7 @@ pub(super) fn clear_user_bytes(
 }
 
 pub(super) fn write_user_value<T: Copy>(process: &UserProcess, ptr: usize, value: &T) -> isize {
-    if ptr == 0 || !user_range_accessible(process, ptr, size_of::<T>(), true) {
+    if fault_in_user_write(process, ptr, size_of::<T>()).is_err() {
         return neg_errno(LinuxError::EFAULT);
     }
 
@@ -339,9 +352,7 @@ pub(super) fn write_user_value<T: Copy>(process: &UserProcess, ptr: usize, value
 }
 
 pub(super) fn read_user_value<T: Copy>(process: &UserProcess, ptr: usize) -> Result<T, LinuxError> {
-    if ptr == 0 || !user_range_accessible(process, ptr, size_of::<T>(), false) {
-        return Err(LinuxError::EFAULT);
-    }
+    fault_in_user_read(process, ptr, size_of::<T>())?;
 
     let mut value = MaybeUninit::<T>::uninit();
     let dst =
@@ -424,10 +435,13 @@ pub(super) fn read_cstr(process: &UserProcess, ptr: usize) -> Result<String, Lin
                 return Err(LinuxError::EFAULT);
             }
         };
-        if !aspace.can_access_range(VirtAddr::from(addr), 1, MappingFlags::READ) {
+        drop(aspace);
+        if let Err(err) = fault_in_user_read(process, addr, 1) {
+            let aspace = process.aspace.lock();
             log_read_cstr_efault(process, ptr, addr, "range is not readable", &aspace);
-            return Err(LinuxError::EFAULT);
+            return Err(err);
         }
+        aspace = process.aspace.lock();
         let mut byte = [0u8; 1];
         if aspace.read(VirtAddr::from(addr), &mut byte).is_err() {
             log_read_cstr_efault(process, ptr, addr, "address-space read failed", &aspace);

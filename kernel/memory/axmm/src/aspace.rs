@@ -399,10 +399,10 @@ impl AddrSpace {
                     if !self.area_allows_write(vaddr) {
                         return Ok((paddr, flags, page_size));
                     }
-                    return ax_err!(BadAddress, "write fault was not handled");
+                    return Err(AxError::BadAddress);
                 }
                 if !needs_write && !flags.contains(access_flags) {
-                    return ax_err!(BadAddress, "page permissions do not allow access");
+                    return Err(AxError::BadAddress);
                 }
                 Ok((paddr, flags, page_size))
             }
@@ -410,7 +410,7 @@ impl AddrSpace {
                 let handled = self.handle_page_fault(vaddr, fault_flags)
                     || (needs_write && self.handle_page_fault(vaddr, PageFaultFlags::READ));
                 if !handled {
-                    return ax_err!(BadAddress, "page fault was not handled");
+                    return Err(AxError::BadAddress);
                 }
                 if needs_write {
                     return self.ensure_write_resolved(vaddr);
@@ -418,7 +418,7 @@ impl AddrSpace {
                 let (paddr, flags, page_size) =
                     self.pt.query(vaddr).map_err(|_| AxError::BadAddress)?;
                 if !flags.contains(access_flags) {
-                    return ax_err!(BadAddress, "page permissions do not allow access");
+                    return Err(AxError::BadAddress);
                 }
                 Ok((paddr, flags, page_size))
             }

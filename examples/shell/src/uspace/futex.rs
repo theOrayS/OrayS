@@ -15,7 +15,7 @@ use super::linux_abi::{neg_errno, USER_MMAP_BASE};
 use super::signal_abi::current_sigcancel_pending;
 use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
-use super::user_memory::read_user_value;
+use super::user_memory::{fault_in_user_read, read_user_value};
 use super::UserProcess;
 
 pub(super) struct FutexState {
@@ -34,6 +34,7 @@ fn futex_key(process: &UserProcess, uaddr: usize) -> Result<usize, LinuxError> {
     // virtual address: independent LTP processes commonly reuse the same mmap
     // addresses, while forked MAP_SHARED checkpoint pages retain the same
     // physical frame and must still rendezvous across parent/child processes.
+    fault_in_user_read(process, uaddr, size_of::<u32>())?;
     let query = process.aspace.lock().query_address(VirtAddr::from(uaddr));
     if !query.pte_mapped {
         return Err(LinuxError::EFAULT);
