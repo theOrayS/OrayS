@@ -41,6 +41,11 @@ const NSEC_PER_SEC: i64 = 1_000_000_000;
 // keeping the credit in path_sparse_data avoids widening UserProcess state for
 // a bookkeeping value that only matters to sparse regular-file emulation.
 const PATH_FREE_BLOCK_CREDIT_BASE: u64 = 1 << 63;
+// Keep sparse byte extents bounded like the regular-file physical prefix.  This
+// preserves the no-large-contiguous-allocation invariant while avoiding one
+// metadata/data extent per tiny sequential write (iozone commonly writes 1 KiB
+// records into tmpfs files).
+const SPARSE_BYTE_EXTENT_MERGE_LIMIT: usize = 64 * 1024;
 
 #[derive(Clone, Copy)]
 enum UtimeSelection {
@@ -651,6 +656,49 @@ impl UserProcess {
         Ok(out)
     }
 
+    fn insert_sparse_byte_extent(
+        extents: &mut Vec<(u64, Vec<u8>)>,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<(), LinuxError> {
+        if data.is_empty() {
+            return Ok(());
+        }
+        extents.push((offset, Self::copy_sparse_bytes(data)?));
+        extents.sort_by_key(|(extent_offset, _)| *extent_offset);
+
+        let mut merged: Vec<(u64, Vec<u8>)> = Vec::new();
+        for (extent_offset, data) in extents.drain(..) {
+            if data.is_empty() {
+                merged.push((extent_offset, data));
+                continue;
+            }
+
+            let mut pending = Some((extent_offset, data));
+            if let Some((last_offset, last_data)) = merged.last_mut() {
+                let last_end = last_offset.saturating_add(last_data.len() as u64);
+                let (pending_offset, pending_data) = pending.as_ref().unwrap();
+                if !last_data.is_empty()
+                    && last_end == *pending_offset
+                    && last_data.len().saturating_add(pending_data.len())
+                        <= SPARSE_BYTE_EXTENT_MERGE_LIMIT
+                {
+                    let (_, pending_data) = pending.take().unwrap();
+                    if last_data.try_reserve_exact(pending_data.len()).is_ok() {
+                        last_data.extend_from_slice(&pending_data);
+                        continue;
+                    }
+                    pending = Some((extent_offset, pending_data));
+                }
+            }
+            if let Some(extent) = pending {
+                merged.push(extent);
+            }
+        }
+        *extents = merged;
+        Ok(())
+    }
+
     fn clear_sparse_byte_extents(extents: &mut Vec<(u64, Vec<u8>)>, offset: u64, end: u64) {
         let mut retained = Vec::new();
         for (extent_offset, mut data) in extents.drain(..) {
@@ -1027,8 +1075,7 @@ impl UserProcess {
         let extents = all_data.entry(path).or_default();
         Self::clear_sparse_byte_extents(extents, offset, end);
         if repeated.is_none() {
-            extents.push((offset, Self::copy_sparse_bytes(data)?));
-            extents.sort_by_key(|(extent_offset, _)| *extent_offset);
+            Self::insert_sparse_byte_extent(extents, offset, data)?;
         }
         if extents.is_empty() {
             all_data.retain(|_, data_extents| !data_extents.is_empty());
