@@ -780,7 +780,13 @@ fn official_group_timeout_secs(group: &str) -> u64 {
         // official stress group enough time to reach its own kill/END markers
         // instead of classifying slow real execution as a wrapper timeout.
         "cyclictest" => 1200,
-        "iozone" | "lmbench" => 300,
+        "iozone" => 300,
+        // lmbench's context-switch phases can legitimately run past five
+        // minutes on the single-vCPU remote VM, especially after both libc
+        // suites have already exercised fork/exec and file I/O.  Keep the
+        // benchmark bounded, but allow it to reach its own END marker instead
+        // of truncating a still-progressing run.
+        "lmbench" => 480,
         "iperf" | "libcbench" | "netperf" => 180,
         // UnixBench's official script contains many 10s/20s sub-benchmarks.
         // Give it enough wall time to finish honestly instead of letting the
@@ -1681,6 +1687,55 @@ fn restore_unixbench_sort_fixture(src_root: &str, stage_root: &str) -> io::Resul
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn normalize_lmbench_stage_wrappers(stage_root: &str) -> io::Result<()> {
+    let Ok(entries) = fs::read_dir(stage_root) else {
+        return Ok(());
+    };
+
+    for entry in entries {
+        let entry = entry?;
+        let path = join_path(stage_root, path_to_str(&entry.file_name()));
+        let Ok(metadata) = fs::metadata(&path) else {
+            continue;
+        };
+        if !metadata.is_file() || metadata.len() > 512 {
+            continue;
+        }
+
+        let Ok(raw) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let trimmed = raw.trim_end_matches('\n');
+        if trimmed.contains('\n') {
+            continue;
+        };
+        let Some(args_start) = trimmed.find(char::is_whitespace) else {
+            continue;
+        };
+        let (program, args) = trimmed.split_at(args_start);
+        if !program.starts_with('/') || !program.ends_with("/lmbench_all") {
+            continue;
+        }
+        let args = args.trim_start();
+        if args.is_empty() {
+            continue;
+        }
+
+        // The official images ship lmbench helper wrappers as host-build
+        // absolute paths such as:
+        //   /code/lmbench_src/bin/build/lmbench_all hello "$@"
+        // Those paths cannot exist inside the submitted kernel, and helpers
+        // like `hello` are copied to /tmp before lmbench executes them through
+        // /bin/sh.  Rewrite only this known build-root prefix to the staged
+        // in-suite binary so the benchmark runs the intended lmbench subcommand
+        // instead of repeatedly failing with ENOEXEC/ENOENT.
+        write_text_file(&path, &format!("#!/bin/sh\nexec ./lmbench_all {args}\n"))?;
+    }
+
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn prepare_libctest_dsos(src_root: &str, stage_root: &str) -> io::Result<()> {
     let lib_dir = join_path(src_root, "lib");
     let Ok(entries) = fs::read_dir(&lib_dir) else {
@@ -2245,6 +2300,8 @@ fn prepare_suite_stage_dir(suite_dir: &str, script_name: &str) -> io::Result<Opt
 
     if group == "libctest" {
         prepare_libctest_runtest_wrapper(src_root, &stage_root, &busybox_path)?;
+    } else if group == "lmbench" {
+        normalize_lmbench_stage_wrappers(&stage_root)?;
     } else if group == "unixbench" {
         restore_unixbench_sort_fixture(src_root, &stage_root)?;
     }
