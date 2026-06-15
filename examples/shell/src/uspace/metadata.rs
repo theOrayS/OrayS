@@ -664,47 +664,43 @@ impl UserProcess {
         if data.is_empty() {
             return Ok(());
         }
-        extents.push((offset, Self::copy_sparse_bytes(data)?));
-        extents.sort_by_key(|(extent_offset, _)| *extent_offset);
 
-        let mut merged: Vec<(u64, Vec<u8>)> = Vec::new();
-        for (extent_offset, data) in extents.drain(..) {
-            if data.is_empty() {
-                merged.push((extent_offset, data));
-                continue;
+        // `clear_sparse_byte_extents()` removes any overlap before insertion, so
+        // the common write path only needs an ordered insert and local neighbor
+        // coalescing.  Avoid resorting and re-merging the full extent vector for
+        // every small random write: ftest/iozone create many tiny sparse writes
+        // and full-vector rebuilds turn those honest file operations quadratic.
+        let insert_at = extents.partition_point(|(extent_offset, extent_data)| {
+            if extent_data.is_empty() {
+                false
+            } else {
+                *extent_offset < offset
             }
-
-            let mut pending = Some((extent_offset, data));
-            if let Some((last_offset, last_data)) = merged.last_mut() {
-                let last_end = last_offset.saturating_add(last_data.len() as u64);
-                let (pending_offset, pending_data) = pending.as_ref().unwrap();
-                if !last_data.is_empty()
-                    && last_end == *pending_offset
-                    && last_data.len().saturating_add(pending_data.len())
-                        <= SPARSE_BYTE_EXTENT_MERGE_LIMIT
-                {
-                    let (_, pending_data) = pending.take().unwrap();
-                    if last_data.try_reserve_exact(pending_data.len()).is_ok() {
-                        last_data.extend_from_slice(&pending_data);
-                        continue;
-                    }
-                    pending = Some((extent_offset, pending_data));
-                }
-            }
-            if let Some(extent) = pending {
-                merged.push(extent);
-            }
-        }
-        *extents = merged;
+        });
+        extents.insert(insert_at, (offset, Self::copy_sparse_bytes(data)?));
+        Self::merge_sparse_byte_neighbors(extents, insert_at);
         Ok(())
     }
 
     fn clear_sparse_byte_extents(extents: &mut Vec<(u64, Vec<u8>)>, offset: u64, end: u64) {
+        if offset >= end || extents.is_empty() {
+            return;
+        }
         let mut retained = Vec::new();
-        for (extent_offset, mut data) in extents.drain(..) {
+        let old = core::mem::take(extents);
+        let mut iter = old.into_iter();
+        while let Some((extent_offset, mut data)) = iter.next() {
+            if data.is_empty() {
+                retained.push((extent_offset, data));
+                continue;
+            }
             let extent_end = extent_offset.saturating_add(data.len() as u64);
             if extent_end <= offset || extent_offset >= end {
                 retained.push((extent_offset, data));
+                if extent_offset >= end {
+                    retained.extend(iter);
+                    break;
+                }
                 continue;
             }
 
@@ -724,6 +720,43 @@ impl UserProcess {
             }
         }
         *extents = retained;
+    }
+
+    fn merge_sparse_byte_neighbors(extents: &mut Vec<(u64, Vec<u8>)>, mut idx: usize) {
+        if extents.is_empty() || idx >= extents.len() {
+            return;
+        }
+
+        while idx > 0 && Self::try_merge_sparse_byte_pair(extents, idx - 1) {
+            idx -= 1;
+        }
+        while idx + 1 < extents.len() && Self::try_merge_sparse_byte_pair(extents, idx) {}
+    }
+
+    fn try_merge_sparse_byte_pair(extents: &mut Vec<(u64, Vec<u8>)>, left: usize) -> bool {
+        let right = left + 1;
+        if right >= extents.len() {
+            return false;
+        }
+        if extents[left].1.is_empty() || extents[right].1.is_empty() {
+            return false;
+        }
+        let left_end = extents[left].0.saturating_add(extents[left].1.len() as u64);
+        if left_end != extents[right].0 {
+            return false;
+        }
+        let right_len = extents[right].1.len();
+        if extents[left].1.len().saturating_add(right_len) > SPARSE_BYTE_EXTENT_MERGE_LIMIT {
+            return false;
+        }
+
+        let (_, right_data) = extents.remove(right);
+        if extents[left].1.try_reserve_exact(right_data.len()).is_err() {
+            extents.insert(right, (left_end, right_data));
+            return false;
+        }
+        extents[left].1.extend_from_slice(&right_data);
+        true
     }
 
     fn clear_sparse_repeat_extents(extents: &mut Vec<(u64, u64, u8)>, offset: u64, end: u64) {
@@ -753,20 +786,34 @@ impl UserProcess {
             return;
         }
         Self::clear_sparse_repeat_extents(extents, offset, end);
-        extents.push((offset, end, byte));
-        extents.sort_by_key(|(start, _, _)| *start);
-        let mut merged: Vec<(u64, u64, u8)> = Vec::new();
-        for (start, end, byte) in extents.drain(..) {
-            if let Some((_, last_end, last_byte)) = merged.last_mut()
-                && *last_byte == byte
-                && *last_end >= start
-            {
-                *last_end = (*last_end).max(end);
-                continue;
-            }
-            merged.push((start, end, byte));
+        let insert_at = extents.partition_point(|(start, _, _)| *start < offset);
+        extents.insert(insert_at, (offset, end, byte));
+        Self::merge_sparse_repeat_neighbors(extents, insert_at);
+    }
+
+    fn merge_sparse_repeat_neighbors(extents: &mut Vec<(u64, u64, u8)>, mut idx: usize) {
+        if extents.is_empty() || idx >= extents.len() {
+            return;
         }
-        *extents = merged;
+        while idx > 0 && Self::try_merge_sparse_repeat_pair(extents, idx - 1) {
+            idx -= 1;
+        }
+        while idx + 1 < extents.len() && Self::try_merge_sparse_repeat_pair(extents, idx) {}
+    }
+
+    fn try_merge_sparse_repeat_pair(extents: &mut Vec<(u64, u64, u8)>, left: usize) -> bool {
+        let right = left + 1;
+        if right >= extents.len() {
+            return false;
+        }
+        let (_, left_end, left_byte) = extents[left];
+        let (right_start, right_end, right_byte) = extents[right];
+        if left_byte != right_byte || left_end < right_start {
+            return false;
+        }
+        extents[left].1 = left_end.max(right_end);
+        extents.remove(right);
+        true
     }
 
     fn credit_path_free_512_blocks(&self, path: String, blocks: u64) {
@@ -1090,7 +1137,11 @@ impl UserProcess {
         let end = offset.saturating_add(dst.len() as u64);
         let all_repeats = self.path_sparse_repeats.lock();
         if let Some(extents) = all_repeats.get(path) {
-            for (extent_offset, extent_end, byte) in extents {
+            let first = extents.partition_point(|(_, extent_end, _)| *extent_end <= offset);
+            for (extent_offset, extent_end, byte) in &extents[first..] {
+                if *extent_offset >= end {
+                    break;
+                }
                 if *extent_end <= offset || *extent_offset >= end {
                     continue;
                 }
@@ -1107,8 +1158,17 @@ impl UserProcess {
         let Some(extents) = all_data.get(path) else {
             return;
         };
-        for (extent_offset, data) in extents {
+        let first = extents.partition_point(|(extent_offset, data)| {
+            extent_offset.saturating_add(data.len() as u64) <= offset
+        });
+        for (extent_offset, data) in &extents[first..] {
+            if data.is_empty() {
+                continue;
+            }
             let extent_end = extent_offset.saturating_add(data.len() as u64);
+            if *extent_offset >= end {
+                break;
+            }
             if extent_end <= offset || *extent_offset >= end {
                 continue;
             }
