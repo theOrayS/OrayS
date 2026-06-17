@@ -3,11 +3,11 @@
 
 Counts wrapper-level LTP case result lines and internal LTP quality signals
 (TFAIL/TBROK/TCONF, timeouts, ENOSYS) so RUN_EVAL_DEFAULT_STATUS=0 is not
-mistaken for a clean LTP result.  Current OSKernel logs emit explicit
-`PASS LTP CASE <case> : 0` for zero-exit cases and `FAIL LTP CASE` for non-zero
-or wrapper errors.  The parser still accepts older `FAIL LTP CASE <case> : 0`
-logs and keeps the numeric status as the source of truth for wrapper pass/fail
-classification.
+mistaken for a clean LTP result.  Official OSKernel judge scripts use the
+legacy wrapper record `FAIL LTP CASE <case> : <code>` for every completed case,
+including zero-exit successes.  The parser also accepts intermediate
+`PASS LTP CASE <case> : 0` logs, but keeps the numeric status as the source of
+truth for wrapper pass/fail classification.
 """
 
 from __future__ import annotations
@@ -115,11 +115,13 @@ def case_bucket(summary: dict[str, Any], group: str, case: str) -> dict[str, Any
 def normalize_wrapper_status(raw_status: str, code: int) -> str:
     """Return the semantic wrapper status for an LTP result line.
 
-    Current OSKernel logs use `PASS LTP CASE <case> : 0` for zero-exit cases.
-    Older logs may contain `FAIL LTP CASE <case> : 0`; keep accepting them so
-    historical evidence stays parseable.  The numeric exit status is the source
-    of truth: only status 0 is PASS, and every non-zero status remains FAIL even
-    if an input log ever contains a misleading PASS token.
+    Current official-compatible OSKernel logs use `FAIL LTP CASE <case> : 0`
+    for zero-exit cases because the official judge finalizes cases on that
+    wrapper record.  Intermediate logs may contain `PASS LTP CASE <case> : 0`;
+    keep accepting them so historical evidence stays parseable.  The numeric
+    exit status is the source of truth: only status 0 is PASS, and every
+    non-zero status remains FAIL even if an input log ever contains a misleading
+    PASS token.
     """
 
     return "PASS" if code == 0 else "FAIL"
@@ -563,8 +565,8 @@ def render_promotion_markdown(report: dict[str, Any], paths: list[Path]) -> str:
 def render_markdown(path: Path, data: dict[str, Any]) -> str:
     lines = [f"# LTP summary: `{path}`", ""]
     lines += [
-        f"- PASS LTP CASE: {data['pass_count']}",
-        f"- FAIL LTP CASE: {data['fail_count']}",
+        f"- Wrapper PASS (code 0): {data['pass_count']}",
+        f"- Wrapper FAIL (nonzero/timeout): {data['fail_count']}",
         f"- Internal TFAIL/TBROK/TCONF: {sum(data['internal'].values())} ({dict(data['internal'])})",
         f"- timeout matches: {data['timeouts']}",
         f"- ENOSYS/not implemented matches: {data['enosys']}",

@@ -83,8 +83,8 @@ FAIL LTP CASE <case> : 0
 `*-summary.txt` 顶部通常包含：
 
 ```text
-- PASS LTP CASE: <n>
-- FAIL LTP CASE: <n>
+- Wrapper PASS (code 0): <n>
+- Wrapper FAIL (nonzero/timeout): <n>
 - Internal TFAIL/TBROK/TCONF: ...
 - timeout matches: <n>
 - ENOSYS/not implemented matches: <n>
