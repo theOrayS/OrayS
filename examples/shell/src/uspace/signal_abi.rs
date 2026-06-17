@@ -147,11 +147,14 @@ pub(super) fn note_syscall_restart_candidate(tf: &TrapFrame, syscall_num: u32, r
     let Some(ext) = current_task_ext() else {
         return;
     };
-    let mut frame = ext.syscall_restart_frame.lock();
+    let mut restart_frame = ext.syscall_restart_frame.lock();
     if ret == neg_errno(LinuxError::EINTR) && restartable_blocking_syscall(syscall_num) {
-        *frame = Some(*tf);
+        *restart_frame = Some(*tf);
     } else {
-        *frame = None;
+        // A restart frame is tied to the syscall that was just interrupted.
+        // Once any later syscall reaches a non-restartable result, stale wait
+        // state must not be reused by a future SA_RESTART signal delivery.
+        *restart_frame = None;
     }
 }
 
@@ -526,7 +529,7 @@ fn user_return_hook(tf: &mut TrapFrame) {
     if eval_deadline_us != 0
         && (axhal::time::monotonic_time().as_micros() as u64) >= eval_deadline_us
     {
-        ext.process.request_signal_exit_group(SIGKILL_NUM);
+        ext.process.request_eval_exit_tree(137);
         terminate_current_thread_for_exit_group(ext.process.as_ref(), 137);
     }
     if let Some(code) = ext.process.pending_exit_group() {
@@ -893,6 +896,11 @@ pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
             );
         }
         ext.signal_frame.store(0, Ordering::Release);
+        // A restart frame is only valid for the signal being delivered.  Normal
+        // SA_RESTART delivery consumes it while building the signal frame; if it
+        // is still present when the handler returns, it is stale and must not be
+        // reused by a later signal.
+        clear_syscall_restart_frame(ext);
         *ext.pending_sigreturn.lock() = Some(restored);
         axtask::yield_now();
         0
@@ -918,6 +926,11 @@ pub(super) fn sys_rt_sigreturn(process: &UserProcess) -> isize {
         ext.signal_mask
             .store(frame.ucontext.sigmask.sig[0], Ordering::Release);
         ext.signal_frame.store(0, Ordering::Release);
+        // A restart frame is only valid for the signal being delivered.  Normal
+        // SA_RESTART delivery consumes it while building the signal frame; if it
+        // is still present when the handler returns, it is stale and must not be
+        // reused by a later signal.
+        clear_syscall_restart_frame(ext);
         *ext.pending_sigreturn.lock() = Some(restored);
         axtask::yield_now();
         0

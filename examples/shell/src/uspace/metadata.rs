@@ -709,10 +709,15 @@ impl UserProcess {
                 if extent_end > end {
                     let skip = end.saturating_sub(extent_offset) as usize;
                     let right = data.split_off(skip);
+                    data.truncate(keep);
+                    // Preserve the sorted invariant required by partition-based
+                    // sparse reads and subsequent local insert/merge operations.
+                    retained.push((extent_offset, data));
                     retained.push((end, right));
+                } else {
+                    data.truncate(keep);
+                    retained.push((extent_offset, data));
                 }
-                data.truncate(keep);
-                retained.push((extent_offset, data));
             } else if extent_end > end {
                 let skip = end.saturating_sub(extent_offset) as usize;
                 data.drain(..skip);

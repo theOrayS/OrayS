@@ -2652,6 +2652,12 @@ pub fn maybe_run_official_tests() {
             println!("autorun: skip disabled test group {suite_dir}/{script}");
             continue;
         }
+        if group == "libctest" && suite_dir != "/musl" {
+            println!(
+                "autorun: skip unscored test group {suite_dir}/{script}: official libctest score is musl-only"
+            );
+            continue;
+        }
         let staged_dir = match prepare_suite_stage_dir(&suite_dir, script) {
             Ok(dir) => dir,
             Err(err) => {
