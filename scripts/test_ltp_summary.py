@@ -36,23 +36,23 @@ class LtpSummarySemanticsTest(unittest.TestCase):
                 "#### OS COMP TEST GROUP START ltp-musl ####",
                 "ltp case list: inline (1 cases, timeout 30s)",
                 f"RUN LTP CASE {case}",
-                f"PASS LTP CASE {case} : 0",
+                f"FAIL LTP CASE {case} : 0",
                 "#### OS COMP TEST GROUP END ltp-musl ####",
                 "#### OS COMP TEST GROUP START ltp-glibc ####",
                 "ltp case list: inline (1 cases, timeout 30s)",
                 f"RUN LTP CASE {case}",
-                f"PASS LTP CASE {case} : 0",
+                f"FAIL LTP CASE {case} : 0",
                 "#### OS COMP TEST GROUP END ltp-glibc ####",
             ]
         )
 
-    def test_zero_status_pass_token_is_real_pass_for_current_wire_format(self) -> None:
+    def test_zero_status_fail_token_is_real_pass_for_official_wire_format(self) -> None:
         data = self.compact(
             "\n".join(
                 [
                     "#### OS COMP TEST GROUP START ltp-musl ####",
                     "RUN LTP CASE access01",
-                    "PASS LTP CASE access01 : 0",
+                    "FAIL LTP CASE access01 : 0",
                     "#### OS COMP TEST GROUP END ltp-musl ####",
                 ]
             )
@@ -62,13 +62,13 @@ class LtpSummarySemanticsTest(unittest.TestCase):
         self.assertEqual(data["fail_count"], 0)
         self.assertEqual(data["case_matrix"]["access01"]["rv"]["musl"]["status"], "PASS")
 
-    def test_zero_status_fail_token_remains_legacy_pass_compatible(self) -> None:
+    def test_zero_status_pass_token_remains_intermediate_log_compatible(self) -> None:
         data = self.compact(
             "\n".join(
                 [
                     "#### OS COMP TEST GROUP START ltp-musl ####",
                     "RUN LTP CASE access01",
-                    "FAIL LTP CASE access01 : 0",
+                    "PASS LTP CASE access01 : 0",
                     "#### OS COMP TEST GROUP END ltp-musl ####",
                 ]
             )
