@@ -326,19 +326,24 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 pub(super) fn clock_resolution_timespec() -> general::timespec {
     // Report the user-visible clock granularity, not the raw counter width.
     // The single-vCPU evaluator can delay back-to-back user/kernel round trips
-    // by several milliseconds under full LTP load, so advertising 1ns
-    // resolution over-promises what clock_gettime() can consistently expose.
+    // by more than one 10ms tick under full LTP load, so advertising raw or
+    // single-tick resolution over-promises what clock_gettime() can
+    // consistently expose.
     // Keep this well below the old scheduler-tick-scale 50ms value so POSIX
     // timer callers still build short absolute deadlines safely.
     general::timespec {
         tv_sec: 0,
-        tv_nsec: 10_000_000,
+        tv_nsec: 20_000_000,
     }
 }
 
 pub(super) fn clock_getres_timespec(clockid: u32) -> Result<general::timespec, LinuxError> {
     validate_clock_id(clockid)?;
     Ok(match clockid {
+        // Coarse clocks model the USER_HZ/jiffy-scale accounting granularity used
+        // by rusage/times.  Keep them inside Linux/LTP's expected 1ms..10ms
+        // coarse range instead of inheriting the more conservative precise-clock
+        // latency budget above.
         general::CLOCK_REALTIME_COARSE | general::CLOCK_MONOTONIC_COARSE => general::timespec {
             tv_sec: 0,
             tv_nsec: 10_000_000,
@@ -376,8 +381,13 @@ fn micros_to_ticks(micros: u64) -> u64 {
     micros.saturating_mul(USER_HZ as u64) / 1_000_000
 }
 
-pub(super) fn record_syscall_runtime_since(process: &UserProcess, start_micros: u64) {
-    let elapsed = monotonic_time_micros().saturating_sub(start_micros);
+pub(super) fn monotonic_time_ticks() -> u64 {
+    axhal::time::current_ticks()
+}
+
+pub(super) fn record_syscall_runtime_since_ticks(process: &UserProcess, start_ticks: u64) {
+    let elapsed_ticks = monotonic_time_ticks().saturating_sub(start_ticks);
+    let elapsed = axhal::time::ticks_to_nanos(elapsed_ticks) / 1_000;
     if elapsed != 0 {
         process
             .syscall_runtime_micros

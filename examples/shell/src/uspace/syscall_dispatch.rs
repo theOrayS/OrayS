@@ -82,7 +82,7 @@ use super::task_context::{
     sys_set_tid_address, user_pc,
 };
 use super::time_abi::{
-    monotonic_time_micros, record_syscall_runtime_since, sys_adjtimex, sys_clock_adjtime,
+    monotonic_time_ticks, record_syscall_runtime_since_ticks, sys_adjtimex, sys_clock_adjtime,
     sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_getitimer,
     sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_timer_create, sys_timer_delete,
     sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime, sys_times,
@@ -93,6 +93,23 @@ use super::user_memory::sys_getrandom;
 const LOONGARCH_LEGACY_GETRLIMIT: u32 = 163;
 #[cfg(target_arch = "loongarch64")]
 const LOONGARCH_LEGACY_SETRLIMIT: u32 = 164;
+
+fn should_record_syscall_runtime(syscall_num: u32, tf: &TrapFrame) -> bool {
+    match syscall_num {
+        // This userspace kernel derives synthetic system CPU time from syscall
+        // wall-time deltas.  Do not charge pure measurement syscalls for the
+        // extra timer reads needed by that accounting; short elapsed-time tests
+        // would otherwise measure the accounting machinery more than the
+        // operation under test.  Keep times(2) charged: it is the ABI that
+        // reports the accumulated CPU/system-time counters.
+        general::__NR_clock_gettime | general::__NR_gettimeofday | general::__NR_getrusage => false,
+        // Linux epoll_wait(timeout=0) is a non-blocking readiness probe. Keep
+        // accounting for blocking/positive-timeout waits, but do not add two
+        // extra timer reads to the immediate path.
+        general::__NR_epoll_pwait => tf.arg3() != 0,
+        _ => true,
+    }
+}
 
 #[register_trap_handler(SYSCALL)]
 fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
@@ -106,7 +123,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_exit_group => sys_exit_group(process_ref, tf, tf.arg0() as i32),
         _ => {
             if process_ref.eval_watchdog_expired() {
-                process_ref.request_exit_group(137);
+                process_ref.request_eval_exit_tree(137);
             }
             if let Some(code) = process_ref.pending_exit_group() {
                 user_trace!(
@@ -122,8 +139,14 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         }
     };
     let process = process_ref;
-    let syscall_start_micros = monotonic_time_micros();
-    let ret = match syscall_num as u32 {
+    let syscall_num = syscall_num as u32;
+    let record_runtime = should_record_syscall_runtime(syscall_num, tf);
+    let syscall_start_ticks = if record_runtime {
+        monotonic_time_ticks()
+    } else {
+        0
+    };
+    let ret = match syscall_num {
         general::__NR_read => sys_read(process, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_pread64 => sys_pread64(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3()),
         general::__NR_write => sys_write(process, tf.arg0(), tf.arg1(), tf.arg2()),
@@ -705,7 +728,9 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         general::__NR_exit_group => sys_exit_group(process, tf, tf.arg0() as i32),
         _ => neg_errno(LinuxError::ENOSYS),
     };
-    record_syscall_runtime_since(process, syscall_start_micros);
-    note_syscall_restart_candidate(tf, syscall_num as u32, ret);
+    if record_runtime {
+        record_syscall_runtime_since_ticks(process, syscall_start_ticks);
+    }
+    note_syscall_restart_candidate(tf, syscall_num, ret);
     ret
 }

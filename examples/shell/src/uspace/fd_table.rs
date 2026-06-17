@@ -10,6 +10,7 @@ use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
 use axsync::{Mutex as AxMutex, MutexGuard as AxMutexGuard};
+use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
 use std::boxed::Box;
@@ -512,6 +513,8 @@ impl EpollRegistration {
         }
     }
 }
+
+static EPOLL_IMMEDIATE_IRQ_GUARD: SpinNoIrq<()> = SpinNoIrq::new(());
 
 pub(super) fn sys_openat(
     process: &UserProcess,
@@ -1233,12 +1236,12 @@ pub(super) fn sys_epoll_pwait(
     sigmask: usize,
     sigsetsize: usize,
 ) -> isize {
-    let syscall_start = poll_clock_now();
     let timeout = if timeout_ms == 0 {
         EpollWaitTimeout::Immediate
     } else if timeout_ms < 0 {
         EpollWaitTimeout::Infinite
     } else {
+        let syscall_start = poll_clock_now();
         EpollWaitTimeout::Until(
             syscall_start + core::time::Duration::from_millis(timeout_ms as u64),
         )
@@ -1257,7 +1260,6 @@ pub(super) fn sys_epoll_pwait2(
     sigmask: usize,
     sigsetsize: usize,
 ) -> isize {
-    let syscall_start = poll_clock_now();
     let timeout = if timeout == 0 {
         EpollWaitTimeout::Infinite
     } else {
@@ -1271,6 +1273,7 @@ pub(super) fn sys_epoll_pwait2(
         if ts.tv_sec == 0 && ts.tv_nsec == 0 {
             EpollWaitTimeout::Immediate
         } else {
+            let syscall_start = poll_clock_now();
             EpollWaitTimeout::Until(
                 syscall_start + core::time::Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32),
             )
@@ -1308,11 +1311,13 @@ fn sys_epoll_wait_with_timeout(
         return neg_errno(LinuxError::EFAULT);
     }
     if matches!(timeout, EpollWaitTimeout::Immediate) && sigmask == 0 {
-        let table = process.fds.lock();
-        match table.epoll_try_fast_no_ready(epfd as i32) {
-            Ok(Some(true)) => return 0,
-            Ok(Some(false) | None) => {}
-            Err(err) => return neg_errno(err),
+        let _guard = EPOLL_IMMEDIATE_IRQ_GUARD.lock();
+        if let Some(table) = process.fds.try_lock_for_pid(process.pid()) {
+            match table.epoll_try_fast_no_ready(epfd as i32) {
+                Ok(Some(true)) => return 0,
+                Ok(Some(false) | None) => {}
+                Err(err) => return neg_errno(err),
+            }
         }
     }
     let _signal_mask_guard = match install_temporary_signal_mask(process, sigmask, sigsetsize) {
@@ -3541,7 +3546,7 @@ pub(super) fn sys_chdir(process: &UserProcess, pathname: usize) -> isize {
         return neg_errno(LinuxError::ENAMETOOLONG);
     }
     let visible_path = {
-        let mut table = process.fds.lock();
+        let table = process.fds.lock();
         match table.resolve_path(process, general::AT_FDCWD, path.as_str()) {
             Ok(path) => {
                 let resolved_path = match process.resolve_path_symlink(path.as_str()) {
@@ -3994,6 +3999,12 @@ impl ProcessFdTable {
         }
     }
 
+    pub(super) fn try_lock_for_pid(&self, pid: i32) -> Option<ProcessFdTableGuard<'_>> {
+        self.state
+            .try_lock()
+            .map(|state| ProcessFdTableGuard { state, pid })
+    }
+
     pub(super) fn fork_copy_for_pid(&self, pid: i32) -> Result<FdTable, LinuxError> {
         self.lock_for_pid(pid).fork_copy()
     }
@@ -4336,6 +4347,10 @@ impl FdTable {
         let Ok(entry) = self.entry(fd) else {
             return matches!(mode, SelectMode::Except);
         };
+        Self::poll_entry(entry, mode)
+    }
+
+    fn poll_entry(entry: &FdEntry, mode: SelectMode) -> bool {
         match mode {
             SelectMode::Read => match entry {
                 FdEntry::Stdin(_) => false,
@@ -4531,7 +4546,8 @@ impl FdTable {
             if registration.disabled {
                 continue;
             }
-            let ready_events = self.epoll_ready_events(fd, registration.event.events);
+            let ready_events =
+                Self::epoll_ready_events_for_entry(self.entry(fd).ok(), registration.event.events);
             let edge_triggered = registration.event.events & general::EPOLLET != 0;
             let became_ready = ready_events & !registration.last_ready != 0;
             let should_emit = ready_events != 0 && (!edge_triggered || became_ready);
@@ -4557,42 +4573,133 @@ impl FdTable {
             FdEntry::Epoll(epoll) => epoll.registrations.clone(),
             _ => return Err(LinuxError::EINVAL),
         };
-        let mut registrations = registrations.lock();
-        for (&fd, registration) in registrations.iter_mut() {
+        let Some(registrations) = registrations.try_lock() else {
+            return Ok(None);
+        };
+        for (&fd, registration) in registrations.iter() {
             if registration.disabled {
                 continue;
             }
             if registration.event.events & (general::EPOLLET | general::EPOLLONESHOT) != 0 {
                 return Ok(None);
             }
-            let ready_events = self.epoll_ready_events(fd, registration.event.events);
+            let Some(ready_events) = Self::epoll_ready_events_for_fast_entry(
+                self.entry(fd).ok(),
+                registration.event.events,
+            ) else {
+                return Ok(None);
+            };
             if ready_events != 0 {
                 return Ok(Some(false));
             }
-            registration.last_ready = 0;
         }
         Ok(Some(true))
     }
 
-    fn epoll_ready_events(&self, fd: i32, requested: u32) -> u32 {
+    fn epoll_ready_events_for_entry(entry: Option<&FdEntry>, requested: u32) -> u32 {
+        let Some(entry) = entry else {
+            return general::EPOLLNVAL;
+        };
         let mut ready_events = 0u32;
-        if requested & general::EPOLLIN != 0 && self.poll(fd, SelectMode::Read) {
+        if requested & general::EPOLLIN != 0 && Self::poll_entry(entry, SelectMode::Read) {
             ready_events |= general::EPOLLIN;
         }
-        if requested & general::EPOLLOUT != 0 && self.poll(fd, SelectMode::Write) {
+        if requested & general::EPOLLOUT != 0 && Self::poll_entry(entry, SelectMode::Write) {
             ready_events |= general::EPOLLOUT;
         }
-        if requested & general::EPOLLRDHUP != 0 && self.poll_rdhup(fd) {
+        if requested & general::EPOLLRDHUP != 0
+            && matches!(entry, FdEntry::Socket(socket) if socket.poll_rdhup())
+        {
             ready_events |= general::EPOLLRDHUP;
-        }
-        if self.entry(fd).is_err() {
-            ready_events |= general::EPOLLNVAL;
         }
         ready_events
     }
 
-    fn poll_rdhup(&self, fd: i32) -> bool {
-        matches!(self.entry(fd), Ok(FdEntry::Socket(socket)) if socket.poll_rdhup())
+    fn epoll_ready_events_for_fast_entry(entry: Option<&FdEntry>, requested: u32) -> Option<u32> {
+        let Some(entry) = entry else {
+            return Some(general::EPOLLNVAL);
+        };
+        let mut ready_events = 0u32;
+        if requested & general::EPOLLIN != 0 {
+            if Self::poll_entry_fast(entry, SelectMode::Read)? {
+                ready_events |= general::EPOLLIN;
+            }
+        }
+        if requested & general::EPOLLOUT != 0 {
+            if Self::poll_entry_fast(entry, SelectMode::Write)? {
+                ready_events |= general::EPOLLOUT;
+            }
+        }
+        if requested & general::EPOLLRDHUP != 0 {
+            if matches!(entry, FdEntry::Socket(_)) {
+                return None;
+            }
+        }
+        Some(ready_events)
+    }
+
+    fn poll_entry_fast(entry: &FdEntry, mode: SelectMode) -> Option<bool> {
+        match mode {
+            SelectMode::Read => match entry {
+                FdEntry::Stdin(_) | FdEntry::Stdout(_) | FdEntry::Stderr(_) => Some(false),
+                FdEntry::DevNull
+                | FdEntry::DevZero(_)
+                | FdEntry::DevRandom(_)
+                | FdEntry::BlockDevice(_)
+                | FdEntry::Rtc
+                | FdEntry::File(_)
+                | FdEntry::Directory(_)
+                | FdEntry::ProcFdDir(_)
+                | FdEntry::SyntheticDir(_)
+                | FdEntry::MemoryFile(_)
+                | FdEntry::Memfd(_)
+                | FdEntry::ProcPagemap(_)
+                | FdEntry::ProcTimerSlack(_)
+                | FdEntry::ProcSysFile(_)
+                | FdEntry::ProcMqQueuesMax(_) => Some(true),
+                FdEntry::Path(_) | FdEntry::Inotify(_) | FdEntry::Epoll(_) => Some(false),
+                FdEntry::Pipe(pipe) => Some(pipe.poll_readable()),
+                FdEntry::EventFd(_)
+                | FdEntry::TimerFd(_)
+                | FdEntry::SignalFd(_)
+                | FdEntry::PidFd(_)
+                | FdEntry::PosixMq(_)
+                | FdEntry::Socket(_)
+                | FdEntry::LocalSocket(_) => None,
+            },
+            SelectMode::Write => match entry {
+                FdEntry::Stdin(_) => Some(false),
+                FdEntry::Stdout(_)
+                | FdEntry::Stderr(_)
+                | FdEntry::DevNull
+                | FdEntry::DevZero(_)
+                | FdEntry::DevRandom(_)
+                | FdEntry::BlockDevice(_)
+                | FdEntry::Rtc
+                | FdEntry::File(_)
+                | FdEntry::Memfd(_)
+                | FdEntry::ProcMqQueuesMax(_)
+                | FdEntry::ProcSysFile(_) => Some(true),
+                FdEntry::Directory(_)
+                | FdEntry::ProcFdDir(_)
+                | FdEntry::SyntheticDir(_)
+                | FdEntry::Path(_)
+                | FdEntry::MemoryFile(_)
+                | FdEntry::ProcPagemap(_)
+                | FdEntry::ProcTimerSlack(_)
+                | FdEntry::Inotify(_)
+                | FdEntry::TimerFd(_)
+                | FdEntry::SignalFd(_)
+                | FdEntry::PidFd(_)
+                | FdEntry::Epoll(_) => Some(false),
+                FdEntry::EventFd(_)
+                | FdEntry::Pipe(_)
+                | FdEntry::PosixMq(_)
+                | FdEntry::Socket(_)
+                | FdEntry::LocalSocket(_) => None,
+            },
+            SelectMode::Except => Some(false),
+        }
     }
 
     pub(super) fn read(

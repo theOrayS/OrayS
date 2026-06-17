@@ -347,7 +347,7 @@ pub fn cleanup_user_processes() {
                 continue;
             }
             seen.push(pid);
-            entry.process.request_exit_group(137);
+            entry.process.request_eval_exit_tree(137);
         }
         yield_for_task_gc();
         if live_user_thread_count() == 0 {
@@ -400,6 +400,9 @@ fn run_user_program_in_with_timeout(
         )) {
             Some(code) => {
                 let expired = process.eval_watchdog_expired();
+                if expired {
+                    process.request_eval_exit_tree(137);
+                }
                 let _ = task.join();
                 process.teardown();
                 if expired {
@@ -409,7 +412,7 @@ fn run_user_program_in_with_timeout(
                 }
             }
             None => {
-                process.request_exit_group(137);
+                process.request_eval_exit_tree(137);
                 process.teardown();
                 137
             }
@@ -1063,6 +1066,34 @@ impl UserProcess {
 
     pub(super) fn request_signal_exit_group(&self, sig: i32) {
         self.request_exit_group_inner(128 + sig, signal_wait_status(sig));
+    }
+
+    pub(super) fn request_eval_exit_tree(&self, code: i32) {
+        self.request_eval_exit_tree_inner(code, 0);
+    }
+
+    fn request_eval_exit_tree_inner(&self, code: i32, depth: usize) {
+        const MAX_EVAL_EXIT_TREE_DEPTH: usize = 64;
+
+        // The auto-runner launches a benchmark script as one bounded unit.
+        // Those scripts may fork process trees (for example hackbench/iozone).
+        // When the runner watchdog or post-group cleanup fires, recursively
+        // requesting descendant exit is evaluator hygiene, not Linux exit_group
+        // syscall behavior.  Stop the current process first so it cannot fork
+        // more children, then snapshot descendants without holding the lock.
+        self.request_exit_group(code);
+        if depth >= MAX_EVAL_EXIT_TREE_DEPTH {
+            return;
+        }
+        let children = self
+            .children
+            .lock()
+            .iter()
+            .map(|child| child.process.clone())
+            .collect::<Vec<_>>();
+        for child in children {
+            child.request_eval_exit_tree_inner(code, depth + 1);
+        }
     }
 
     fn request_exit_group_inner(&self, code: i32, term_signal: i32) {
