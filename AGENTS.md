@@ -12,6 +12,19 @@
 - 只做任务所需的最小改动；不要顺手大重构、批量格式化、机械重命名或跨子系统清理。
 - 不要编辑生成物或本地证据文件，除非任务明确要求：`kernel-rv`、`kernel-la`、`sdcard-*.img`、`disk*.img`、`output*.md`、`*.log`、`.axconfig.toml`、`build/`、`target/`。
 - 不允许 fake pass：不得硬编码 LTP case 名、路径、进程名或输出；不得伪造 `TPASS`/wrapper PASS；不得修改 testsuite 或 evaluator 脚本来绕过真实失败；不得隐藏 `TCONF`、timeout、`ENOSYS`、panic/trap。
+- `self-check.md` 中的竞赛合规约束是仓库硬红线；若分数、性能或兼容性捷径与这些约束冲突，优先保持真实语义并暴露失败。禁止：
+  - 对某些测试程序名称或二进制特征进行特殊判断。
+  - 对特定 syscall 参数组合、输入数据、目录结构硬编码结果或分支。
+  - 仅针对高分测试集合实现局部功能，而故意忽略通用 Linux/POSIX 语义。
+  - 利用测评系统环境差异、固定路径、固定时间、固定顺序进行投机。
+  - 为通过测试破坏 Linux syscall 兼容语义或内核基本安全边界。
+  - 通过非通用方式绕过真实的进程、内存、文件系统或同步机制。
+  - 以猜测测例、适配测例、硬编码测例为目标的其他投机性实现，或评审委员会认定的违规测试行为。
+  - 牺牲 Linux syscall 主要功能兼容语义来换取速度。
+  - 跳过必要的权限检查、资源检查或错误处理。
+  - 引入在隐藏条件下可能导致内核崩溃或数据错误的实现。
+  - 只对固定测例有效、对一般程序无效的优化。
+  - 其他不符合正确性、通用性和可解释性的优化。
 - 实验分支可用 blacklist 策略探索全量 LTP，但 blacklist 只用于隔离会卡死、炸内存、破坏评测器或明显不适合当前内核模型的用例；被 blacklist 的 case 不能计为通过，也不能作为 stable/promotion 证据。
 - POSIX/Linux 可见语义必须真实：syscall、errno、flag、struct layout、FD、signal、futex、mmap、用户指针 copy-in/copy-out 的变化都要显式说明。
 - 新增依赖、修改 `vendor/`/`cargo-home/`/`tools/bin/`、远程提交配置或架构启动路径时，必须有明确任务理由和对应验证。
