@@ -57,6 +57,45 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("chdir01", result.stdout)
 
+
+    def test_detects_suite_specific_script_rewrite_function(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text += '\nfn rewrite_iperf_daemon_server(script: &str) -> String { script.into() }\n'
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("rewrite_iperf_daemon_server", result.stdout)
+
+    def test_detects_ltp_file_pattern_rewrite(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            ".map(|line| rewrite_script_line(line, busybox_path, rewrite_busybox_path))",
+            ".map(|line| if line.trim_start() == \"\"$file\"\" { rewrite_script_line(line, busybox_path, rewrite_busybox_path) } else { rewrite_script_line(line, busybox_path, rewrite_busybox_path) })",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("$file", result.stdout)
+
+    def test_detects_exact_test_script_name_branch(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "if raw_script.ends_with('\\n') {",
+            "if src.ends_with(\"iperf_testcode.sh\") { script.push_str(\"# rewrite\"); }\n    if raw_script.ends_with('\\n') {",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("iperf_testcode.sh", result.stdout)
+
     def test_detects_blacklist_default(self) -> None:
         tree = self.make_tree()
         path = tree / "Makefile"

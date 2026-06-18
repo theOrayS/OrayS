@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static guard for G008 musl patch manifest and stable re-proof gates."""
+"""Static guard for G008: musl runtime ELF patching is retired."""
 
 from __future__ import annotations
 
@@ -7,103 +7,87 @@ import argparse
 import re
 from pathlib import Path
 
-RISCV_MANIFEST_ENTRIES = [
-    ("main-executable", "brk"),
-    ("interpreter", "brk"),
-    ("interpreter", "sbrk"),
-    ("interpreter", "nice"),
-    ("interpreter", "gethostname"),
+
+FORBIDDEN_PROGRAM_LOADER_TOKENS = [
+    "MUSL_PATCH_RETIREMENT_DIRECTIVE",
+    "type MuslPatchManifestEntry",
+    "RISCV_MUSL_PATCH_MANIFEST",
+    "LOONGARCH_MUSL_PATCH_MANIFEST",
+    "validate_musl_patch_manifest",
+    "ensure_musl_patch_manifest_symbol",
+    "patch_riscv_musl",
+    "patch_loongarch_musl",
+    "find_dynsym_file_offset",
+    "find_symbol_file_offset",
+    "reserve_elf_rx_patch_area",
+    "ENOSYS_BRK_STUB",
+    "ENOMEM_SBRK_STUB",
+    "patched_prefix_sha256",
+    "original_prefix_sha256",
 ]
-LOONGARCH_MANIFEST_ENTRIES = [
-    ("main-executable", "brk"),
-    ("interpreter", "sched_setparam"),
-    ("interpreter", "sched_getparam"),
-    ("interpreter", "sched_setscheduler"),
-    ("interpreter", "sched_getscheduler"),
-    ("interpreter", "brk"),
-    ("interpreter", "sbrk"),
-    ("interpreter", "gethostname"),
-    ("interpreter", "readlink"),
-    ("interpreter", "readlinkat"),
+
+REQUIRED_RETIRED_DOC_TOKENS = [
+    "Status: retired",
+    "runtime byte patching is prohibited",
+    "do not patch ELF bytes",
+    "raw syscall",
+    "musl",
+    "glibc",
+    "TCONF/TBROK/TFAIL/ENOSYS/timeout/panic/trap",
+    "rebuild or replace the runtime",
 ]
-RISCV_SYMBOLS = sorted({symbol for _target, symbol in RISCV_MANIFEST_ENTRIES})
-LOONGARCH_SYMBOLS = sorted({symbol for _target, symbol in LOONGARCH_MANIFEST_ENTRIES})
-SCHED_SYMBOLS = {
-    "sched_setparam",
-    "sched_getparam",
-    "sched_setscheduler",
-    "sched_getscheduler",
-}
 
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
 
 
-def const_block(text: str, name: str) -> str:
-    marker = f"const {name}"
-    start = text.find(marker)
-    if start < 0:
-        return ""
-    end = text.find(";\n", start)
-    return text[start : end + 2] if end >= 0 else text[start:]
 
-
-def manifest_entry_exists(block: str, target: str, symbol: str) -> bool:
-    return (
-        re.search(
-            rf'\(\s*"{re.escape(target)}"\s*,\s*"{re.escape(symbol)}"\s*,',
-            block,
-            flags=re.MULTILINE,
+def rust_function_names(text: str) -> set[str]:
+    return set(
+        re.findall(
+            r"(?:^|\n)\s*(?:pub(?:\([^)]*\))?\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+            text,
         )
-        is not None
     )
 
+
+def rust_const_names(text: str) -> set[str]:
+    return set(
+        re.findall(
+            r"(?:^|\n)\s*(?:pub(?:\([^)]*\))?\s+)?const\s+([A-Za-z_][A-Za-z0-9_]*)\s*:",
+            text,
+        )
+    )
 
 def scan_program_loader(root: Path) -> list[str]:
     path = root / "examples/shell/src/uspace/program_loader.rs"
     text = read(path)
     findings: list[str] = []
-    if "MUSL_PATCH_RETIREMENT_DIRECTIVE" not in text or "raw syscall + musl + glibc" not in text:
-        findings.append("program_loader: missing musl patch retirement directive with raw/musl/glibc evidence")
-    if "type MuslPatchManifestEntry" not in text:
-        findings.append("program_loader: missing explicit musl patch manifest entry type")
-    for const_name, manifest_entries, symbols in (
-        ("RISCV_MUSL_PATCH_MANIFEST", RISCV_MANIFEST_ENTRIES, RISCV_SYMBOLS),
-        ("LOONGARCH_MUSL_PATCH_MANIFEST", LOONGARCH_MANIFEST_ENTRIES, LOONGARCH_SYMBOLS),
-    ):
-        block = const_block(text, const_name)
-        if not block:
-            findings.append(f"program_loader: missing {const_name}")
-            continue
-        for target, symbol in manifest_entries:
-            if not manifest_entry_exists(block, target, symbol):
-                findings.append(
-                    f"program_loader: {const_name} missing target-specific manifest entry "
-                    f'target={target} symbol={symbol}'
-                )
-        for symbol in symbols:
-            if f'"{symbol}"' not in block:
-                findings.append(f"program_loader: {const_name} missing symbol {symbol}")
-            if symbol in SCHED_SYMBOLS:
-                if "ensure_loongarch_musl_patch_manifest_symbol(name)" not in text:
-                    findings.append("program_loader: sched raw patch loop must validate symbols through the manifest")
-            else:
-                ensure_name = "ensure_riscv_musl_patch_manifest_symbol" if const_name.startswith("RISCV") else "ensure_loongarch_musl_patch_manifest_symbol"
-                if f'{ensure_name}("{symbol}")' not in text:
-                    findings.append(f"program_loader: patch symbol {symbol} is not guarded by {ensure_name}")
-    hidden_patch_calls = re.findall(r'find_(?:dynsym|symbol)_file_offset\(&elf,\s*"([^"]+)"\)', text)
-    manifest_symbols = set(RISCV_SYMBOLS) | set(LOONGARCH_SYMBOLS) | {
-        "__errno_location",
-        "__syscall_ret",
-        "getpriority",
-        "setpriority",
-    }
-    for symbol in hidden_patch_calls:
-        if symbol not in manifest_symbols:
+    function_names = rust_function_names(text)
+    const_names = rust_const_names(text)
+    for name in sorted(function_names):
+        if ("musl" in name and "patch" in name) or name.startswith(("find_dynsym_file_offset", "find_symbol_file_offset", "reserve_elf_rx_patch_area")):
+            findings.append(f"program_loader: retired patch helper function is still defined: {name}")
+    for name in sorted(const_names):
+        if "MUSL" in name and "PATCH" in name:
+            findings.append(f"program_loader: retired musl patch constant is still defined: {name}")
+    for token in FORBIDDEN_PROGRAM_LOADER_TOKENS:
+        if token in text:
             findings.append(
-                f"program_loader: symbol lookup for {symbol} is not covered by the G008 manifest guard"
+                f"program_loader: retired musl runtime patch token is still present: {token}"
             )
+    load_block_start = text.find("pub(super) fn load_program_image")
+    if load_block_start < 0:
+        findings.append("program_loader: missing load_program_image")
+    else:
+        load_block_end = text.find("\nfn effective_exec_root", load_block_start)
+        load_block = text[load_block_start:load_block_end if load_block_end >= 0 else len(text)]
+        for token in ("patch_riscv", "patch_loongarch", "as_mut_slice()"):
+            if token in load_block:
+                findings.append(
+                    f"program_loader: load_program_image still mutates loaded ELF bytes through {token}"
+                )
     return findings
 
 
@@ -112,28 +96,16 @@ def scan_docs(root: Path) -> list[str]:
     gate = root / "docs/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
     findings: list[str] = []
     if not manifest.exists():
-        findings.append("docs: missing musl-runtime-patch-manifest.md")
+        findings.append("docs: missing musl-runtime-patch-manifest.md retirement note")
         return findings
     if not gate.exists():
         findings.append("docs: missing stable-reproof-gate.md")
         return findings
     manifest_text = read(manifest)
-    gate_text = read(gate)
-    required_manifest_tokens = [
-        "temporary compatibility bridge",
-        "raw syscall",
-        "musl",
-        "glibc",
-        "runtime-required",
-        "original_prefix_sha256",
-        "patched_prefix_sha256",
-    ]
-    for token in required_manifest_tokens:
+    for token in REQUIRED_RETIRED_DOC_TOKENS:
         if token not in manifest_text:
-            findings.append(f"musl manifest doc missing required token: {token}")
-    for symbol in sorted(set(RISCV_SYMBOLS + LOONGARCH_SYMBOLS)):
-        if f"`{symbol}`" not in manifest_text:
-            findings.append(f"musl manifest doc missing symbol {symbol}")
+            findings.append(f"retired musl patch doc missing required token: {token}")
+    gate_text = read(gate)
     required_gate_tokens = [
         "Total entries | 1000",
         "Unique cases | 1000",
@@ -206,11 +178,11 @@ def main() -> int:
     findings.extend(scan_docs(root))
     findings.extend(scan_parser_gate(root))
     if findings:
-        print("G008 musl patch/stable gate static check: FAIL")
+        print("G008 musl runtime patch retirement static check: FAIL")
         for finding in findings:
             print(f"- {finding}")
         return 1
-    print("G008 musl patch/stable gate static check: PASS (0 findings)")
+    print("G008 musl runtime patch retirement static check: PASS (0 findings)")
     return 0
 
 
