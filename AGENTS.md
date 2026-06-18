@@ -40,6 +40,7 @@ Rust 风格等无关专题。如果任务是普通文档修改，不需要读取
 ## 常用事实入口
 
 - 当前 stable LTP case 数量：实时读取 `examples/shell/src/cmd.rs::LTP_STABLE_CASES`，不要凭记忆。
+- LoongArch 本地 QEMU 与远程官方评测机的地址映射不同：本地 LA 无串口输出或 0 分不应直接判定为远程 LA 回归。涉及 LA 分数/启动结论时，先区分本地 `run-la`/本地官方 runner 与远程 `make all` 提交构建；远程事实以 `configs/remote-eval/axplat-loongarch64-qemu-virt.toml` 和官方远程评测结果为准。
 - 实验性全量 LTP 入口：当前分支可用 `LTP_CASES=blacklist` / `all-minus-blacklist` / `sweep:blacklist` 从 guest LTP bin 目录枚举全量 case，再扣除默认 blacklist、build-time `LTP_BLACKLIST`、`/ltp_blacklist.txt`、`/tmp/ltp_blacklist.txt`；报告必须列出选择模式、blacklist 来源、跳过数和未闭合 case。
 - LTP 结果真相：优先用 `scripts/ltp_summary.py` 汇总，不要只凭 wrapper 输出肉眼判断。
 - 构建/评测入口：`Makefile`、`run-eval.sh`、`configs/remote-eval/`。
