@@ -2066,6 +2066,12 @@ fn ltp_case_env(
         format!("PATH=.:{target_dir}:/musl:/glibc:/bin:/usr/bin"),
         format!("LTPROOT={}/ltp", suite_dir.trim_end_matches('/')),
         "TMPDIR=/tmp/ltp-work".into(),
+        // Official OSKernel's glibc LTP judge counts the real LTP library
+        // status lines, but it matches their ANSI-colored form exactly.  Force
+        // LTP's own colorized output even though QEMU serial is captured as a
+        // pipe/file; this preserves genuine TPASS/TFAIL/TBROK/TCONF semantics
+        // and only changes their parseable presentation.
+        "LTP_COLORIZE_OUTPUT=1".into(),
         format!("{LTP_CASE_TIMEOUT_ENV}={}", ltp_case_timeout_secs()),
         // The evaluator exposes one synthetic block-backed test device.  Make
         // it visible to LTP's generic device-acquire helper so tests do not
