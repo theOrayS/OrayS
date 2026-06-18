@@ -9,27 +9,58 @@ use core::time::Duration;
 use axsync::Mutex;
 use smoltcp::wire::IpEndpoint;
 
-const LOOPBACK_UDP_QUEUE_LIMIT: usize = 1024;
+use super::udp_packet_metadata_len;
+
+struct UdpLoopbackState {
+    queue: VecDeque<UdpLoopbackPacket>,
+    queued_bytes: usize,
+    byte_limit: usize,
+    packet_limit: usize,
+}
 
 #[derive(Clone)]
 pub struct UdpLoopbackQueue {
-    queue: Arc<Mutex<VecDeque<UdpLoopbackPacket>>>,
+    state: Arc<Mutex<UdpLoopbackState>>,
 }
 
 impl UdpLoopbackQueue {
-    pub fn new() -> Self {
+    pub fn new(recv_buffer_size: usize) -> Self {
         Self {
-            queue: Arc::new(Mutex::new(VecDeque::new())),
+            state: Arc::new(Mutex::new(UdpLoopbackState {
+                queue: VecDeque::new(),
+                queued_bytes: 0,
+                byte_limit: recv_buffer_size,
+                packet_limit: udp_packet_metadata_len(recv_buffer_size),
+            })),
+        }
+    }
+
+    pub fn set_recv_buffer_size(&self, recv_buffer_size: usize) {
+        let mut state = self.state.lock();
+        state.byte_limit = recv_buffer_size;
+        state.packet_limit = udp_packet_metadata_len(recv_buffer_size);
+        while state.queued_bytes > state.byte_limit || state.queue.len() > state.packet_limit {
+            if let Some(packet) = state.queue.pop_back() {
+                state.queued_bytes = state.queued_bytes.saturating_sub(packet.data.len());
+            } else {
+                state.queued_bytes = 0;
+                break;
+            }
         }
     }
 
     pub fn push_from_slice(&self, data: &[u8], peer: IpEndpoint) -> bool {
-        let mut queue = self.queue.lock();
-        if queue.len() < LOOPBACK_UDP_QUEUE_LIMIT {
-            queue.push_back(UdpLoopbackPacket {
+        let mut state = self.state.lock();
+        let queued_bytes = state.queued_bytes.saturating_add(data.len());
+        if data.len() <= state.byte_limit
+            && queued_bytes <= state.byte_limit
+            && state.queue.len() < state.packet_limit
+        {
+            state.queue.push_back(UdpLoopbackPacket {
                 data: data.to_vec(),
                 peer,
             });
+            state.queued_bytes = queued_bytes;
             true
         } else {
             false
@@ -37,15 +68,19 @@ impl UdpLoopbackQueue {
     }
 
     pub fn pop_matching(&self, remote: Option<IpEndpoint>) -> Option<UdpLoopbackPacket> {
-        let mut queue = self.queue.lock();
-        let pos = queue
+        let mut state = self.state.lock();
+        let pos = state
+            .queue
             .iter()
             .position(|packet| remote.map_or(true, |remote| endpoint_matches(remote, packet.peer)));
-        pos.and_then(|pos| queue.remove(pos))
+        pos.and_then(|pos| state.queue.remove(pos))
+            .inspect(|packet| {
+                state.queued_bytes = state.queued_bytes.saturating_sub(packet.data.len());
+            })
     }
 
     pub fn has_packet(&self) -> bool {
-        !self.queue.lock().is_empty()
+        !self.state.lock().queue.is_empty()
     }
 }
 
@@ -94,7 +129,7 @@ pub fn unregister_udp_loopback(local: IpEndpoint, queue: &UdpLoopbackQueue) {
     let mut table = UDP_LOOPBACK_TABLE.lock();
     if let Some(bindings) = table.get_mut(&local.port) {
         bindings.retain(|binding| {
-            binding.local != local || !Arc::ptr_eq(&binding.queue.queue, &queue.queue)
+            binding.local != local || !Arc::ptr_eq(&binding.queue.state, &queue.state)
         });
         if bindings.is_empty() {
             table.remove(&local.port);
@@ -106,7 +141,7 @@ pub fn update_udp_loopback_peer(local: IpEndpoint, queue: &UdpLoopbackQueue, pee
     let mut table = UDP_LOOPBACK_TABLE.lock();
     if let Some(bindings) = table.get_mut(&local.port) {
         for binding in bindings {
-            if binding.local == local && Arc::ptr_eq(&binding.queue.queue, &queue.queue) {
+            if binding.local == local && Arc::ptr_eq(&binding.queue.state, &queue.state) {
                 binding.peer = Some(peer);
                 return;
             }

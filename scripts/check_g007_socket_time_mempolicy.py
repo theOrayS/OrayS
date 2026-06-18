@@ -17,7 +17,19 @@ def function_block(text: str, name: str) -> str:
     start = text.find(marker)
     if start < 0:
         return ""
-    candidates = [pos for pos in (text.find("\nfn ", start + len(marker)), text.find("\npub(super) fn ", start + len(marker)), text.find("\n#[", start + len(marker))) if pos >= 0]
+    candidates = [
+        pos
+        for pos in (
+            text.find("\nfn ", start + len(marker)),
+            text.find("\npub fn ", start + len(marker)),
+            text.find("\npub(super) fn ", start + len(marker)),
+            text.find("\n    fn ", start + len(marker)),
+            text.find("\n    pub fn ", start + len(marker)),
+            text.find("\n    pub(super) fn ", start + len(marker)),
+            text.find("\n#[", start + len(marker)),
+        )
+        if pos >= 0
+    ]
     end = min(candidates) if candidates else len(text)
     return text[start:end]
 
@@ -103,8 +115,6 @@ def scan_socket(root: Path) -> list[str]:
         "SO_DONTROUTE_OPT",
         "SO_BROADCAST_OPT",
         "SO_KEEPALIVE_OPT",
-        "SO_SNDBUF_OPT",
-        "SO_RCVBUF_OPT",
         "IP_RECVERR_OPT",
         "MCAST_JOIN_GROUP_OPT",
         "MCAST_LEAVE_GROUP_OPT",
@@ -114,6 +124,66 @@ def scan_socket(root: Path) -> list[str]:
     for token in fake_sockopt_tokens:
         if token in sockopt_block or token in setsockopt_block or token in getsockopt_block:
             findings.append(f"socket option path still advertises or accepts unbacked option {token}")
+    buffer_tokens = ["SO_SNDBUF_OPT", "SO_RCVBUF_OPT"]
+    buffer_backend_tokens = [
+        "set_socket_send_buffer_size",
+        "set_socket_recv_buffer_size",
+        "socket_send_buffer_size",
+        "socket_recv_buffer_size",
+    ]
+    buffer_backed = all(token in text for token in buffer_backend_tokens)
+    for token in buffer_tokens:
+        if token in sockopt_block or token in setsockopt_block or token in getsockopt_block:
+            if not buffer_backed:
+                findings.append(
+                    f"socket option path still advertises or accepts unbacked option {token}"
+                )
+    api_net = read(root / "api/arceos_posix_api/src/imp/net.rs")
+    axnet_tcp = read(root / "kernel/net/axnet/src/smoltcp_impl/tcp.rs")
+    axnet_udp = read(root / "kernel/net/axnet/src/smoltcp_impl/udp.rs")
+    axnet_mod = read(root / "kernel/net/axnet/src/smoltcp_impl/mod.rs")
+    axnet_loopback = read(root / "kernel/net/axnet/src/smoltcp_impl/loopback.rs")
+    axnet_udp_loopback = read(root / "kernel/net/axnet/src/smoltcp_impl/udp_loopback.rs")
+    listen_table = read(root / "kernel/net/axnet/src/smoltcp_impl/listen_table.rs")
+    if buffer_backed:
+        tcp_recv_set = function_block(axnet_tcp, "set_recv_buffer_size")
+        tcp_send_set = function_block(axnet_tcp, "set_send_buffer_size")
+        backend_required = [
+            (api_net, "set_socket_send_buffer_size"),
+            (api_net, "socket_recv_buffer_size"),
+            (api_net, "socket_buffer_option_error"),
+            (api_net, "LinuxError::ENOPROTOOPT"),
+            (axnet_tcp, "new_tcp_socket_with_buffer_lengths"),
+            (axnet_tcp, "recv_buffer_size"),
+            (axnet_tcp, "clear_backing_allocation"),
+            (axnet_tcp, "loopback_listener_buffer_sizes"),
+            (axnet_tcp, "OperationNotSupported"),
+            (axnet_mod, "fn udp_packet_metadata_len"),
+            (axnet_mod, "udp_packet_metadata_len(recv_len)"),
+            (axnet_mod, "udp_packet_metadata_len(send_len)"),
+            (axnet_loopback, "client_to_server_limit"),
+            (axnet_loopback, "server_to_client_limit"),
+            (axnet_loopback, "loopback_buffer_limit"),
+            (axnet_udp, "new_udp_socket_with_buffer_lengths"),
+            (axnet_udp, "recreate_unbound_socket"),
+            (axnet_udp, "self.loopback_queue.set_recv_buffer_size(size)"),
+            (axnet_udp, "buf.len() > self.send_buffer_size"),
+            (axnet_udp, "OperationNotSupported"),
+            (axnet_udp_loopback, "byte_limit"),
+            (axnet_udp_loopback, "packet_limit"),
+            (axnet_udp_loopback, "udp_packet_metadata_len(recv_buffer_size)"),
+            (listen_table, "recv_buffer_size"),
+            (listen_table, "new_tcp_socket_with_buffer_lengths"),
+        ]
+        for haystack, token in backend_required:
+            if token not in haystack:
+                findings.append(f"SO_SNDBUF/SO_RCVBUF backend is incomplete; missing {token}")
+        if "recv_capacity_limit" in tcp_recv_set or "send_capacity_limit" in tcp_send_set:
+            findings.append("SO_SNDBUF/SO_RCVBUF active TCP resize must compare against global requested size before capacity clamping")
+        if "size < SOCKET_BUFFER_SIZE_MIN" in api_net or re.search(r"if\s+size\s+<\s+1\b", api_net):
+            findings.append("SO_SNDBUF/SO_RCVBUF must clamp zero/small requests instead of rejecting them before backend normalization")
+        if "Unsupported,\n                \"socket" in axnet_tcp or "Unsupported,\n                \"socket" in axnet_udp:
+            findings.append("SO_SNDBUF/SO_RCVBUF active resize still maps through AxError::Unsupported/ENOSYS")
     forbidden_patterns = [
         "ip_mcast_joined",
         "SO_SNDBUFFORCE_OPT | SO_RCVBUFFORCE_OPT",

@@ -13,7 +13,10 @@ use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
 
 use super::addr::UNSPECIFIED_ENDPOINT;
 use super::loopback::LoopbackTcpEndpoint;
-use super::{SocketSetWrapper, ETH0, LISTEN_TABLE, SOCKET_SET};
+use super::{
+    normalize_socket_buffer_len, SocketSetWrapper, ETH0, LISTEN_TABLE, SOCKET_SET, TCP_RX_BUF_LEN,
+    TCP_TX_BUF_LEN,
+};
 
 // State transitions:
 // CLOSED -(connect)-> BUSY -> CONNECTING -> CONNECTED -(shutdown)-> BUSY -> CLOSED
@@ -48,6 +51,8 @@ pub struct TcpSocket {
     send_shutdown: AtomicBool,
     recv_timeout: Mutex<Option<Duration>>,
     send_timeout: Mutex<Option<Duration>>,
+    recv_buffer_size: Mutex<usize>,
+    send_buffer_size: Mutex<usize>,
 }
 
 unsafe impl Sync for TcpSocket {}
@@ -66,6 +71,8 @@ impl TcpSocket {
             send_shutdown: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
             send_timeout: Mutex::new(None),
+            recv_buffer_size: Mutex::new(TCP_RX_BUF_LEN),
+            send_buffer_size: Mutex::new(TCP_TX_BUF_LEN),
         }
     }
 
@@ -74,6 +81,8 @@ impl TcpSocket {
         handle: SocketHandle,
         local_addr: IpEndpoint,
         peer_addr: IpEndpoint,
+        recv_buffer_size: usize,
+        send_buffer_size: usize,
     ) -> Self {
         Self {
             state: AtomicU8::new(STATE_CONNECTED),
@@ -86,10 +95,16 @@ impl TcpSocket {
             send_shutdown: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
             send_timeout: Mutex::new(None),
+            recv_buffer_size: Mutex::new(recv_buffer_size),
+            send_buffer_size: Mutex::new(send_buffer_size),
         }
     }
 
-    fn new_loopback_connected(endpoint: LoopbackTcpEndpoint) -> Self {
+    fn new_loopback_connected(
+        endpoint: LoopbackTcpEndpoint,
+        recv_buffer_size: usize,
+        send_buffer_size: usize,
+    ) -> Self {
         Self {
             state: AtomicU8::new(STATE_CONNECTED),
             handle: UnsafeCell::new(None),
@@ -101,6 +116,8 @@ impl TcpSocket {
             send_shutdown: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
             send_timeout: Mutex::new(None),
+            recv_buffer_size: Mutex::new(recv_buffer_size),
+            send_buffer_size: Mutex::new(send_buffer_size),
         }
     }
 
@@ -169,6 +186,53 @@ impl TcpSocket {
         *self.send_timeout.lock()
     }
 
+    /// Sets the requested receive buffer size.
+    ///
+    /// For sockets that have not become active yet, this size is used when the
+    /// real TCP buffers are allocated on connect or listen.  Once a socket is
+    /// connecting, connected, or listening, a non-idempotent resize is rejected
+    /// with a socket-option errno instead of advertising userspace-only state.
+    pub fn set_recv_buffer_size(&self, size: usize) -> AxResult {
+        let size = normalize_socket_buffer_len(size, TCP_RX_BUF_LEN);
+        match self.update_state(STATE_CLOSED, STATE_CLOSED, || {
+            self.clear_backing_allocation();
+            *self.recv_buffer_size.lock() = size;
+            Ok(())
+        }) {
+            Ok(result) => result,
+            Err(_) if size == self.recv_buffer_size() => Ok(()),
+            Err(_) => ax_err!(
+                OperationNotSupported,
+                "socket receive buffer resize after activation is not supported"
+            ),
+        }
+    }
+
+    pub fn recv_buffer_size(&self) -> usize {
+        *self.recv_buffer_size.lock()
+    }
+
+    /// Sets the requested send buffer size; see [`Self::set_recv_buffer_size`].
+    pub fn set_send_buffer_size(&self, size: usize) -> AxResult {
+        let size = normalize_socket_buffer_len(size, TCP_TX_BUF_LEN);
+        match self.update_state(STATE_CLOSED, STATE_CLOSED, || {
+            self.clear_backing_allocation();
+            *self.send_buffer_size.lock() = size;
+            Ok(())
+        }) {
+            Ok(result) => result,
+            Err(_) if size == self.send_buffer_size() => Ok(()),
+            Err(_) => ax_err!(
+                OperationNotSupported,
+                "socket send buffer resize after activation is not supported"
+            ),
+        }
+    }
+
+    pub fn send_buffer_size(&self) -> usize {
+        *self.send_buffer_size.lock()
+    }
+
     /// Connects to the given address and port.
     ///
     /// The local port is generated automatically.
@@ -178,9 +242,14 @@ impl TcpSocket {
         }
 
         self.update_state(STATE_CLOSED, STATE_CONNECTING, || {
+            self.recv_shutdown.store(false, Ordering::Release);
+            self.send_shutdown.store(false, Ordering::Release);
+            self.clear_backing_allocation();
             // SAFETY: no other threads can read or write these fields.
-            let handle = unsafe { self.handle.get().read() }
-                .unwrap_or_else(|| SOCKET_SET.add(SocketSetWrapper::new_tcp_socket()));
+            let handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket_with_buffer_lengths(
+                self.recv_buffer_size(),
+                self.send_buffer_size(),
+            ));
 
             // TODO: check remote addr unreachable
             let bound_endpoint = self.bound_endpoint()?;
@@ -271,11 +340,18 @@ impl TcpSocket {
     /// [`accept`](Self::accept).
     pub fn listen(&self) -> AxResult {
         self.update_state(STATE_CLOSED, STATE_LISTENING, || {
+            self.recv_shutdown.store(false, Ordering::Release);
+            self.send_shutdown.store(false, Ordering::Release);
+            self.clear_backing_allocation();
             let bound_endpoint = self.bound_endpoint()?;
             unsafe {
                 (*self.local_addr.get()).port = bound_endpoint.port;
             }
-            LISTEN_TABLE.listen(bound_endpoint)?;
+            LISTEN_TABLE.listen(
+                bound_endpoint,
+                self.recv_buffer_size(),
+                self.send_buffer_size(),
+            )?;
             debug!("TCP socket listening on {}", bound_endpoint);
             Ok(())
         })
@@ -298,11 +374,21 @@ impl TcpSocket {
         self.block_on_timeout(self.recv_timeout(), || {
             if let Some(endpoint) = LISTEN_TABLE.accept_loopback(local_port)? {
                 debug!("TCP loopback socket accepted a new connection");
-                return Ok(TcpSocket::new_loopback_connected(endpoint));
+                return Ok(TcpSocket::new_loopback_connected(
+                    endpoint,
+                    self.recv_buffer_size(),
+                    self.send_buffer_size(),
+                ));
             }
             let (handle, (local_addr, peer_addr)) = LISTEN_TABLE.accept(local_port)?;
             debug!("TCP socket accepted a new connection {}", peer_addr);
-            Ok(TcpSocket::new_connected(handle, local_addr, peer_addr))
+            Ok(TcpSocket::new_connected(
+                handle,
+                local_addr,
+                peer_addr,
+                self.recv_buffer_size(),
+                self.send_buffer_size(),
+            ))
         })
     }
 
@@ -317,12 +403,13 @@ impl TcpSocket {
             } else {
                 // SAFETY: `self.handle` should be initialized in a connected socket, and
                 // no other threads can read or write it.
-                let handle = unsafe { self.handle.get().read().unwrap() };
+                let handle = unsafe { (&mut *self.handle.get()).take().unwrap() };
                 SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |socket| {
                     debug!("TCP socket {}: shutting down", handle);
                     socket.close();
                 });
                 SOCKET_SET.poll_interfaces();
+                SOCKET_SET.remove(handle);
             }
             unsafe {
                 self.local_addr.get().write(UNSPECIFIED_ENDPOINT);
@@ -523,12 +610,24 @@ impl TcpSocket {
             ax_err!(NotConnected, "socket is not connected")
         }
     }
+
+    fn clear_backing_allocation(&self) {
+        if let Some(endpoint) = unsafe { (&mut *self.loopback.get()).take() } {
+            endpoint.shutdown();
+        }
+        if let Some(handle) = unsafe { (&mut *self.handle.get()).take() } {
+            SOCKET_SET.remove(handle);
+        }
+    }
 }
 
 /// Private methods
 impl TcpSocket {
     fn connect_loopback(&self, remote_addr: SocketAddr) -> AxResult {
         self.update_state(STATE_CLOSED, STATE_CONNECTED, || {
+            self.recv_shutdown.store(false, Ordering::Release);
+            self.send_shutdown.store(false, Ordering::Release);
+            self.clear_backing_allocation();
             let bound_endpoint = self.bound_endpoint()?;
             let peer_addr = if remote_addr.ip().is_unspecified() {
                 let loopback = match remote_addr {
@@ -544,8 +643,18 @@ impl TcpSocket {
                 bound_endpoint.addr.unwrap_or(peer_endpoint.addr),
                 bound_endpoint.port,
             );
-            let (client_endpoint, server_endpoint) =
-                LoopbackTcpEndpoint::pair(local_endpoint, peer_endpoint);
+            let (client_endpoint, server_endpoint) = {
+                let (server_recv_buffer_size, server_send_buffer_size) =
+                    LISTEN_TABLE.loopback_listener_buffer_sizes(peer_endpoint)?;
+                LoopbackTcpEndpoint::pair(
+                    local_endpoint,
+                    peer_endpoint,
+                    self.recv_buffer_size(),
+                    self.send_buffer_size(),
+                    server_recv_buffer_size,
+                    server_send_buffer_size,
+                )
+            };
 
             LISTEN_TABLE.connect_loopback(peer_endpoint, server_endpoint)?;
             unsafe {

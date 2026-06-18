@@ -1,24 +1,32 @@
 use alloc::collections::{BTreeMap, VecDeque};
 
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axsync::Mutex;
 use smoltcp::iface::{SocketHandle, SocketSet};
 use smoltcp::socket::tcp::{self, State};
 use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
 
 use super::loopback::LoopbackTcpEndpoint;
-use super::{LISTEN_QUEUE_SIZE, SOCKET_SET, SocketSetWrapper};
+use super::{SocketSetWrapper, LISTEN_QUEUE_SIZE, SOCKET_SET};
 
 struct ListenTableEntry {
     listen_endpoint: IpListenEndpoint,
+    recv_buffer_size: usize,
+    send_buffer_size: usize,
     syn_queue: VecDeque<SocketHandle>,
     loopback_queue: VecDeque<LoopbackTcpEndpoint>,
 }
 
 impl ListenTableEntry {
-    pub fn new(listen_endpoint: IpListenEndpoint) -> Self {
+    pub fn new(
+        listen_endpoint: IpListenEndpoint,
+        recv_buffer_size: usize,
+        send_buffer_size: usize,
+    ) -> Self {
         Self {
             listen_endpoint,
+            recv_buffer_size,
+            send_buffer_size,
             syn_queue: VecDeque::with_capacity(LISTEN_QUEUE_SIZE),
             loopback_queue: VecDeque::with_capacity(LISTEN_QUEUE_SIZE),
         }
@@ -59,14 +67,22 @@ impl ListenTable {
         !self.tcp.lock().contains_key(&port)
     }
 
-    pub fn listen(&self, listen_endpoint: IpListenEndpoint) -> AxResult {
+    pub fn listen(
+        &self,
+        listen_endpoint: IpListenEndpoint,
+        recv_buffer_size: usize,
+        send_buffer_size: usize,
+    ) -> AxResult {
         let port = listen_endpoint.port;
         assert_ne!(port, 0);
         let mut table = self.tcp.lock();
         if table.contains_key(&port) {
             return Err(AxError::AddrInUse);
         }
-        table.insert(port, ListenTableEntry::new(listen_endpoint));
+        table.insert(
+            port,
+            ListenTableEntry::new(listen_endpoint, recv_buffer_size, send_buffer_size),
+        );
         Ok(())
     }
 
@@ -96,6 +112,18 @@ impl ListenTable {
             }
             entry.loopback_queue.push_back(endpoint);
             Ok(())
+        } else {
+            ax_err!(ConnectionRefused, "loopback socket connect() failed")
+        }
+    }
+
+    pub fn loopback_listener_buffer_sizes(&self, remote: IpEndpoint) -> AxResult<(usize, usize)> {
+        let table = self.tcp.lock();
+        if let Some(entry) = table.get(&remote.port) {
+            if !entry.can_accept(remote.addr) {
+                return ax_err!(ConnectionRefused, "loopback socket connect() failed");
+            }
+            Ok((entry.recv_buffer_size, entry.send_buffer_size))
         } else {
             ax_err!(ConnectionRefused, "loopback socket connect() failed")
         }
@@ -152,7 +180,10 @@ impl ListenTable {
                 warn!("SYN queue overflow!");
                 return;
             }
-            let mut socket = SocketSetWrapper::new_tcp_socket();
+            let mut socket = SocketSetWrapper::new_tcp_socket_with_buffer_lengths(
+                entry.recv_buffer_size,
+                entry.send_buffer_size,
+            );
             if socket.listen(entry.listen_endpoint).is_ok() {
                 let handle = sockets.add(socket);
                 debug!(

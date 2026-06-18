@@ -52,10 +52,11 @@ pub use imp::io_mpx::sys_select;
 pub use imp::io_mpx::{sys_epoll_create, sys_epoll_ctl, sys_epoll_wait};
 #[cfg(feature = "net")]
 pub use imp::net::{
-    set_socket_recv_timeout, set_socket_send_timeout, socket_recv_timeout, socket_send_timeout,
-    sys_accept, sys_bind, sys_connect, sys_freeaddrinfo, sys_getaddrinfo, sys_getpeername,
-    sys_getsockname, sys_listen, sys_recv, sys_recvfrom, sys_send, sys_sendto, sys_shutdown,
-    sys_socket,
+    set_socket_recv_buffer_size, set_socket_recv_timeout, set_socket_send_buffer_size,
+    set_socket_send_timeout, socket_recv_buffer_size, socket_recv_timeout, socket_send_buffer_size,
+    socket_send_timeout, sys_accept, sys_bind, sys_connect, sys_freeaddrinfo, sys_getaddrinfo,
+    sys_getpeername, sys_getsockname, sys_listen, sys_recv, sys_recvfrom, sys_send, sys_sendto,
+    sys_shutdown, sys_socket,
 };
 #[cfg(feature = "pipe")]
 pub use imp::pipe::sys_pipe;
