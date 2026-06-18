@@ -13,7 +13,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g007_socket_time_mempolicy.py"
 TARGETS = [
+    Path("api/arceos_posix_api/src/imp/net.rs"),
     Path("examples/shell/src/uspace/fd_socket.rs"),
+    Path("kernel/net/axnet/src/smoltcp_impl/mod.rs"),
+    Path("kernel/net/axnet/src/smoltcp_impl/tcp.rs"),
+    Path("kernel/net/axnet/src/smoltcp_impl/udp.rs"),
+    Path("kernel/net/axnet/src/smoltcp_impl/loopback.rs"),
+    Path("kernel/net/axnet/src/smoltcp_impl/udp_loopback.rs"),
+    Path("kernel/net/axnet/src/smoltcp_impl/listen_table.rs"),
     Path("examples/shell/src/uspace/time_abi.rs"),
     Path("examples/shell/src/uspace/memory_policy.rs"),
     Path("examples/shell/src/uspace/syscall_dispatch.rs"),
@@ -99,6 +106,87 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SO_REUSEADDR_OPT", result.stdout)
+
+    def test_detects_socket_buffer_backend_without_listener_plumbing(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/net/axnet/src/smoltcp_impl/listen_table.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "SocketSetWrapper::new_tcp_socket_with_buffer_lengths(\n                entry.recv_buffer_size,\n                entry.send_buffer_size,\n            )",
+            "SocketSetWrapper::new_tcp_socket()",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SO_SNDBUF/SO_RCVBUF backend is incomplete", result.stdout)
+
+    def test_detects_socket_buffer_resize_enosys_mapping(self) -> None:
+        tree = self.make_tree()
+        path = tree / "api/arceos_posix_api/src/imp/net.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("LinuxError::ENOPROTOOPT", "LinuxError::EOPNOTSUPP")
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("LinuxError::ENOPROTOOPT", result.stdout)
+
+    def test_detects_socket_buffer_zero_rejection(self) -> None:
+        tree = self.make_tree()
+        path = tree / "api/arceos_posix_api/src/imp/net.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("if size < 0", "if size < 1", 1)
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("clamp zero/small requests", result.stdout)
+
+    def test_detects_udp_buffer_metadata_not_resized(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/net/axnet/src/smoltcp_impl/mod.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("udp_packet_metadata_len(recv_len)", "8", 1)
+        text = text.replace("udp_packet_metadata_len(send_len)", "8", 1)
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("udp_packet_metadata_len", result.stdout)
+
+    def test_detects_tcp_active_resize_capacity_clamp(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/net/axnet/src/smoltcp_impl/tcp.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "normalize_socket_buffer_len(size, TCP_RX_BUF_LEN)",
+            "normalize_socket_buffer_len(size, self.recv_capacity_limit()?)",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("active TCP resize", result.stdout)
+
+    def test_detects_tcp_loopback_without_buffer_limits(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/net/axnet/src/smoltcp_impl/loopback.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("client_to_server_limit", "client_to_server_unbounded")
+        text = text.replace("server_to_client_limit", "server_to_client_unbounded")
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("client_to_server_limit", result.stdout)
+
+    def test_detects_udp_loopback_without_buffer_limits(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/net/axnet/src/smoltcp_impl/udp_loopback.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace("byte_limit", "unbounded_bytes")
+        text = text.replace("packet_limit", "unbounded_packets")
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("byte_limit", result.stdout)
 
     def test_detects_mempolicy_ignored_mode(self) -> None:
         tree = self.make_tree()

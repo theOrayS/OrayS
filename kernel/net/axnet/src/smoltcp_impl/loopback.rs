@@ -1,16 +1,25 @@
 use alloc::{collections::VecDeque, sync::Arc};
 use core::cmp::min;
 
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axio::PollState;
 use axsync::Mutex;
 use smoltcp::wire::IpEndpoint;
 
 const LOOPBACK_BUFFER_LIMIT: usize = 1024 * 1024;
 
+fn loopback_buffer_limit(sender_send_size: usize, receiver_recv_size: usize) -> usize {
+    min(
+        min(sender_send_size, receiver_recv_size),
+        LOOPBACK_BUFFER_LIMIT,
+    )
+}
+
 struct LoopbackTcpState {
     client_to_server: VecDeque<u8>,
     server_to_client: VecDeque<u8>,
+    client_to_server_limit: usize,
+    server_to_client_limit: usize,
     client_send_open: bool,
     server_send_open: bool,
     client_recv_open: bool,
@@ -29,10 +38,22 @@ impl LoopbackTcpEndpoint {
     pub(crate) fn pair(
         client_addr: IpEndpoint,
         server_addr: IpEndpoint,
+        client_recv_buffer_size: usize,
+        client_send_buffer_size: usize,
+        server_recv_buffer_size: usize,
+        server_send_buffer_size: usize,
     ) -> (LoopbackTcpEndpoint, LoopbackTcpEndpoint) {
         let state = Arc::new(Mutex::new(LoopbackTcpState {
             client_to_server: VecDeque::new(),
             server_to_client: VecDeque::new(),
+            client_to_server_limit: loopback_buffer_limit(
+                client_send_buffer_size,
+                server_recv_buffer_size,
+            ),
+            server_to_client_limit: loopback_buffer_limit(
+                server_send_buffer_size,
+                client_recv_buffer_size,
+            ),
             client_send_open: true,
             server_send_open: true,
             client_recv_open: true,
@@ -82,16 +103,18 @@ impl LoopbackTcpEndpoint {
             return ax_err!(BrokenPipe, "loopback TCP send() failed");
         }
 
-        let tx_queue = if self.server_side {
-            &mut state.server_to_client
+        let (tx_queue, tx_limit) = if self.server_side {
+            let tx_limit = state.server_to_client_limit;
+            (&mut state.server_to_client, tx_limit)
         } else {
-            &mut state.client_to_server
+            let tx_limit = state.client_to_server_limit;
+            (&mut state.client_to_server, tx_limit)
         };
-        if tx_queue.len() >= LOOPBACK_BUFFER_LIMIT {
+        if tx_queue.len() >= tx_limit {
             return Err(AxError::WouldBlock);
         }
 
-        let len = min(buf.len(), LOOPBACK_BUFFER_LIMIT - tx_queue.len());
+        let len = min(buf.len(), tx_limit - tx_queue.len());
         tx_queue.extend(buf[..len].iter().copied());
         Ok(len)
     }
@@ -138,27 +161,29 @@ impl LoopbackTcpEndpoint {
 
     pub(crate) fn poll(&self) -> PollState {
         let state = self.state.lock();
-        let (local_recv_open, peer_send_open, peer_recv_open, rx_len, tx_len) = if self.server_side
-        {
-            (
-                state.server_recv_open,
-                state.client_send_open,
-                state.client_recv_open,
-                state.client_to_server.len(),
-                state.server_to_client.len(),
-            )
-        } else {
-            (
-                state.client_recv_open,
-                state.server_send_open,
-                state.server_recv_open,
-                state.server_to_client.len(),
-                state.client_to_server.len(),
-            )
-        };
+        let (local_recv_open, peer_send_open, peer_recv_open, rx_len, tx_len, tx_limit) =
+            if self.server_side {
+                (
+                    state.server_recv_open,
+                    state.client_send_open,
+                    state.client_recv_open,
+                    state.client_to_server.len(),
+                    state.server_to_client.len(),
+                    state.server_to_client_limit,
+                )
+            } else {
+                (
+                    state.client_recv_open,
+                    state.server_send_open,
+                    state.server_recv_open,
+                    state.server_to_client.len(),
+                    state.client_to_server.len(),
+                    state.client_to_server_limit,
+                )
+            };
         PollState {
             readable: rx_len > 0 || !local_recv_open || !peer_send_open,
-            writable: peer_recv_open && tx_len < LOOPBACK_BUFFER_LIMIT,
+            writable: peer_recv_open && tx_len < tx_limit,
         }
     }
 

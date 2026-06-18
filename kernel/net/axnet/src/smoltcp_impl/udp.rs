@@ -16,7 +16,9 @@ use super::udp_loopback::{
     is_loopback_endpoint, register_udp_loopback, send_udp_loopback, unregister_udp_loopback,
     update_udp_loopback_peer, UdpLoopbackQueue,
 };
-use super::{SocketSetWrapper, SOCKET_SET};
+use super::{
+    normalize_socket_buffer_len, SocketSetWrapper, SOCKET_SET, UDP_RX_BUF_LEN, UDP_TX_BUF_LEN,
+};
 
 /// A UDP socket that provides POSIX-like APIs.
 pub struct UdpSocket {
@@ -27,6 +29,8 @@ pub struct UdpSocket {
     nonblock: AtomicBool,
     recv_timeout: Mutex<Option<Duration>>,
     send_timeout: Mutex<Option<Duration>>,
+    recv_buffer_size: usize,
+    send_buffer_size: usize,
 }
 
 impl UdpSocket {
@@ -39,10 +43,12 @@ impl UdpSocket {
             handle,
             local_addr: RwLock::new(None),
             peer_addr: RwLock::new(None),
-            loopback_queue: UdpLoopbackQueue::new(),
+            loopback_queue: UdpLoopbackQueue::new(UDP_RX_BUF_LEN),
             nonblock: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
             send_timeout: Mutex::new(None),
+            recv_buffer_size: UDP_RX_BUF_LEN,
+            send_buffer_size: UDP_TX_BUF_LEN,
         }
     }
 
@@ -102,6 +108,64 @@ impl UdpSocket {
     #[inline]
     pub fn send_timeout(&self) -> Option<Duration> {
         *self.send_timeout.lock()
+    }
+
+    /// Sets the requested receive buffer size.
+    ///
+    /// If the UDP socket has not yet been bound or connected, recreate the
+    /// backing smoltcp socket with buffers sized from the request.  Once a
+    /// socket is bound/connected, a non-idempotent resize is rejected with a
+    /// socket-option errno rather than pretending the kernel can grow an
+    /// already-active smoltcp buffer.
+    pub fn set_recv_buffer_size(&mut self, size: usize) -> AxResult {
+        let size = normalize_socket_buffer_len(size, UDP_RX_BUF_LEN);
+        if !self.is_unbound() && size != self.recv_buffer_size {
+            return ax_err!(
+                OperationNotSupported,
+                "socket receive buffer resize after activation is not supported"
+            );
+        }
+        self.recv_buffer_size = size;
+        self.loopback_queue.set_recv_buffer_size(size);
+        self.recreate_unbound_socket();
+        Ok(())
+    }
+
+    pub fn recv_buffer_size(&self) -> usize {
+        self.recv_buffer_size
+    }
+
+    /// Sets the requested send buffer size; see [`Self::set_recv_buffer_size`].
+    pub fn set_send_buffer_size(&mut self, size: usize) -> AxResult {
+        let size = normalize_socket_buffer_len(size, UDP_TX_BUF_LEN);
+        if !self.is_unbound() && size != self.send_buffer_size {
+            return ax_err!(
+                OperationNotSupported,
+                "socket send buffer resize after activation is not supported"
+            );
+        }
+        self.send_buffer_size = size;
+        self.recreate_unbound_socket();
+        Ok(())
+    }
+
+    pub fn send_buffer_size(&self) -> usize {
+        self.send_buffer_size
+    }
+
+    fn recreate_unbound_socket(&mut self) {
+        if !self.is_unbound() {
+            return;
+        }
+        SOCKET_SET.remove(self.handle);
+        self.handle = SOCKET_SET.add(SocketSetWrapper::new_udp_socket_with_buffer_lengths(
+            self.recv_buffer_size,
+            self.send_buffer_size,
+        ));
+    }
+
+    fn is_unbound(&self) -> bool {
+        self.local_addr.read().is_none() && self.peer_addr.read().is_none()
     }
 
     /// Binds an unbound socket to the given address and port.
@@ -314,24 +378,12 @@ impl UdpSocket {
             Some(local) => *local,
             None => return ax_err!(NotConnected, "socket send() failed"),
         };
+        if buf.len() > self.send_buffer_size {
+            return Err(AxError::WouldBlock);
+        }
         let len = send_udp_loopback(local_endpoint, remote_endpoint, buf);
         axtask::yield_now();
         Ok(len)
-    }
-
-    fn recv_loopback(&self, buf: &mut [u8], remote: Option<IpEndpoint>) -> AxResult<usize> {
-        self.recv_loopback_from(buf, remote).map(|(len, _)| len)
-    }
-
-    fn recv_loopback_from(
-        &self,
-        buf: &mut [u8],
-        remote: Option<IpEndpoint>,
-    ) -> AxResult<(usize, SocketAddr)> {
-        self.block_on_timeout(self.recv_timeout(), || {
-            self.try_recv_loopback_from(buf, remote)
-                .ok_or(AxError::WouldBlock)
-        })
     }
 
     fn try_recv_loopback_from(

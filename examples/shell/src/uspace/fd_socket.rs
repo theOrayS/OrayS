@@ -21,8 +21,8 @@ use super::linux_abi::{
     INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT,
     LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE,
     SOL_SOCKET_LEVEL, SO_ACCEPTCONN_OPT, SO_DOMAIN_OPT, SO_ERROR_OPT, SO_PEERCRED_OPT,
-    SO_PROTOCOL_OPT, SO_RCVTIMEO_OPT, SO_SNDTIMEO_OPT, SO_TYPE_OPT, ST_MODE_SOCKET,
-    TCP_INFO_COMPAT_SIZE,
+    SO_PROTOCOL_OPT, SO_RCVBUF_OPT, SO_RCVTIMEO_OPT, SO_SNDBUF_OPT, SO_SNDTIMEO_OPT, SO_TYPE_OPT,
+    ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
@@ -2277,6 +2277,21 @@ pub(super) fn sys_setsockopt_bridge(
                 Err(err) => neg_errno(err),
             }
         }
+    } else if level_i32 == SOL_SOCKET_LEVEL && matches!(optname_i32, SO_SNDBUF_OPT | SO_RCVBUF_OPT)
+    {
+        let size = match read_user_value::<i32>(process, optval) {
+            Ok(size) => size,
+            Err(err) => return neg_errno(err),
+        };
+        let result = if optname_i32 == SO_SNDBUF_OPT {
+            arceos_posix_api::set_socket_send_buffer_size(socket.posix_fd, size)
+        } else {
+            arceos_posix_api::set_socket_recv_buffer_size(socket.posix_fd, size)
+        };
+        match result {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        }
     } else {
         neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
     }
@@ -2331,6 +2346,29 @@ pub(super) fn sys_getsockopt_bridge(
             return ret;
         }
         let out_len = size_of::<general::timeval>() as posix_ctypes::socklen_t;
+        return write_user_value(process, optlen, &out_len);
+    }
+    if level == SOL_SOCKET_LEVEL && matches!(optname, SO_SNDBUF_OPT | SO_RCVBUF_OPT) {
+        if len < size_of::<i32>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
+            return neg_errno(err);
+        }
+        let value = if optname == SO_SNDBUF_OPT {
+            arceos_posix_api::socket_send_buffer_size(socket.posix_fd)
+        } else {
+            arceos_posix_api::socket_recv_buffer_size(socket.posix_fd)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(err) => return neg_errno(err),
+        };
+        let ret = write_user_value(process, optval, &value);
+        if ret != 0 {
+            return ret;
+        }
+        let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
         return write_user_value(process, optlen, &out_len);
     }
     if len < size_of::<i32>() {

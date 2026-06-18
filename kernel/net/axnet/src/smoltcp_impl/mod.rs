@@ -14,7 +14,7 @@ use core::ops::DerefMut;
 
 use axdriver::prelude::*;
 use axdriver_net::{DevError, NetBufPtr};
-use axhal::time::{NANOS_PER_MICROS, wall_time_nanos};
+use axhal::time::{wall_time_nanos, NANOS_PER_MICROS};
 use axsync::Mutex;
 use lazyinit::LazyInit;
 use smoltcp::iface::{Config, Interface, SocketHandle, SocketSet};
@@ -47,11 +47,24 @@ const STANDARD_MTU: usize = 1500;
 
 const RANDOM_SEED: u64 = 0xA2CE_05A2_CE05_A2CE;
 
-const TCP_RX_BUF_LEN: usize = 64 * 1024;
-const TCP_TX_BUF_LEN: usize = 64 * 1024;
-const UDP_RX_BUF_LEN: usize = 64 * 1024;
-const UDP_TX_BUF_LEN: usize = 64 * 1024;
+pub(crate) const TCP_RX_BUF_LEN: usize = 64 * 1024;
+pub(crate) const TCP_TX_BUF_LEN: usize = 64 * 1024;
+pub(crate) const UDP_RX_BUF_LEN: usize = 64 * 1024;
+pub(crate) const UDP_TX_BUF_LEN: usize = 64 * 1024;
+pub(crate) const MIN_SOCKET_BUFFER_LEN: usize = 2048;
+const UDP_PACKET_METADATA_MIN: usize = 8;
 const LISTEN_QUEUE_SIZE: usize = 512;
+
+pub(crate) fn normalize_socket_buffer_len(size: usize, capacity: usize) -> usize {
+    core::cmp::min(core::cmp::max(size, MIN_SOCKET_BUFFER_LEN), capacity)
+}
+
+fn udp_packet_metadata_len(buffer_len: usize) -> usize {
+    core::cmp::max(
+        UDP_PACKET_METADATA_MIN,
+        buffer_len.saturating_add(STANDARD_MTU - 1) / STANDARD_MTU,
+    )
+}
 
 static LISTEN_TABLE: LazyInit<ListenTable> = LazyInit::new();
 static SOCKET_SET: LazyInit<SocketSetWrapper> = LazyInit::new();
@@ -82,20 +95,30 @@ impl<'a> SocketSetWrapper<'a> {
         Self(Mutex::new(SocketSet::new(vec![])))
     }
 
-    pub fn new_tcp_socket() -> socket::tcp::Socket<'a> {
-        let tcp_rx_buffer = socket::tcp::SocketBuffer::new(vec![0; TCP_RX_BUF_LEN]);
-        let tcp_tx_buffer = socket::tcp::SocketBuffer::new(vec![0; TCP_TX_BUF_LEN]);
+    pub fn new_tcp_socket_with_buffer_lengths(
+        recv_len: usize,
+        send_len: usize,
+    ) -> socket::tcp::Socket<'a> {
+        let tcp_rx_buffer = socket::tcp::SocketBuffer::new(vec![0; recv_len]);
+        let tcp_tx_buffer = socket::tcp::SocketBuffer::new(vec![0; send_len]);
         socket::tcp::Socket::new(tcp_rx_buffer, tcp_tx_buffer)
     }
 
     pub fn new_udp_socket() -> socket::udp::Socket<'a> {
+        Self::new_udp_socket_with_buffer_lengths(UDP_RX_BUF_LEN, UDP_TX_BUF_LEN)
+    }
+
+    pub fn new_udp_socket_with_buffer_lengths(
+        recv_len: usize,
+        send_len: usize,
+    ) -> socket::udp::Socket<'a> {
         let udp_rx_buffer = socket::udp::PacketBuffer::new(
-            vec![socket::udp::PacketMetadata::EMPTY; 8],
-            vec![0; UDP_RX_BUF_LEN],
+            vec![socket::udp::PacketMetadata::EMPTY; udp_packet_metadata_len(recv_len)],
+            vec![0; recv_len],
         );
         let udp_tx_buffer = socket::udp::PacketBuffer::new(
-            vec![socket::udp::PacketMetadata::EMPTY; 8],
-            vec![0; UDP_TX_BUF_LEN],
+            vec![socket::udp::PacketMetadata::EMPTY; udp_packet_metadata_len(send_len)],
+            vec![0; send_len],
         );
         socket::udp::Socket::new(udp_rx_buffer, udp_tx_buffer)
     }

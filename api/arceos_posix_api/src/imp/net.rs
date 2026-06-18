@@ -348,6 +348,46 @@ impl Socket {
             Socket::Tcp(tcpsocket) => tcpsocket.lock().send_timeout(),
         }
     }
+
+    fn set_recv_buffer_size(&self, size: usize) -> LinuxResult {
+        match self {
+            Socket::Udp(udpsocket) => udpsocket
+                .lock()
+                .set_recv_buffer_size(size)
+                .map_err(socket_buffer_option_error),
+            Socket::Tcp(tcpsocket) => tcpsocket
+                .lock()
+                .set_recv_buffer_size(size)
+                .map_err(socket_buffer_option_error),
+        }
+    }
+
+    fn recv_buffer_size(&self) -> usize {
+        match self {
+            Socket::Udp(udpsocket) => udpsocket.lock().recv_buffer_size(),
+            Socket::Tcp(tcpsocket) => tcpsocket.lock().recv_buffer_size(),
+        }
+    }
+
+    fn set_send_buffer_size(&self, size: usize) -> LinuxResult {
+        match self {
+            Socket::Udp(udpsocket) => udpsocket
+                .lock()
+                .set_send_buffer_size(size)
+                .map_err(socket_buffer_option_error),
+            Socket::Tcp(tcpsocket) => tcpsocket
+                .lock()
+                .set_send_buffer_size(size)
+                .map_err(socket_buffer_option_error),
+        }
+    }
+
+    fn send_buffer_size(&self) -> usize {
+        match self {
+            Socket::Udp(udpsocket) => udpsocket.lock().send_buffer_size(),
+            Socket::Tcp(tcpsocket) => tcpsocket.lock().send_buffer_size(),
+        }
+    }
 }
 
 pub fn set_socket_recv_timeout(sockfd: c_int, timeout: Option<Duration>) -> LinuxResult {
@@ -366,6 +406,41 @@ pub fn set_socket_send_timeout(sockfd: c_int, timeout: Option<Duration>) -> Linu
 
 pub fn socket_send_timeout(sockfd: c_int) -> LinuxResult<Option<Duration>> {
     Ok(Socket::from_fd(sockfd)?.send_timeout())
+}
+
+fn validate_socket_buffer_size(size: c_int) -> LinuxResult<usize> {
+    if size < 0 {
+        Err(LinuxError::EINVAL)
+    } else {
+        Ok(size as usize)
+    }
+}
+
+fn socket_buffer_option_error(err: impl Into<LinuxError>) -> LinuxError {
+    match err.into() {
+        LinuxError::EOPNOTSUPP | LinuxError::ENOSYS => LinuxError::ENOPROTOOPT,
+        other => other,
+    }
+}
+
+pub fn set_socket_recv_buffer_size(sockfd: c_int, size: c_int) -> LinuxResult {
+    Socket::from_fd(sockfd)?.set_recv_buffer_size(validate_socket_buffer_size(size)?)
+}
+
+pub fn socket_recv_buffer_size(sockfd: c_int) -> LinuxResult<c_int> {
+    Ok(Socket::from_fd(sockfd)?
+        .recv_buffer_size()
+        .min(c_int::MAX as usize) as c_int)
+}
+
+pub fn set_socket_send_buffer_size(sockfd: c_int, size: c_int) -> LinuxResult {
+    Socket::from_fd(sockfd)?.set_send_buffer_size(validate_socket_buffer_size(size)?)
+}
+
+pub fn socket_send_buffer_size(sockfd: c_int) -> LinuxResult<c_int> {
+    Ok(Socket::from_fd(sockfd)?
+        .send_buffer_size()
+        .min(c_int::MAX as usize) as c_int)
 }
 
 impl FileLike for Socket {
