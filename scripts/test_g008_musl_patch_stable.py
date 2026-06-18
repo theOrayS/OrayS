@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for the G008 musl patch/stable gate static guard."""
+"""Regression tests for the G008 musl runtime patch retirement guard."""
 
 from __future__ import annotations
 
@@ -44,58 +44,44 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("PASS", result.stdout)
 
-    def test_detects_missing_riscv_manifest_symbol(self) -> None:
+    def test_detects_reintroduced_runtime_patch_function(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/program_loader.rs"
         text = path.read_text(encoding="utf-8")
-        text = text.replace(
-            '    (\n        "interpreter",\n        "nice",\n        &["getpriority", "setpriority"],\n        "temporary musl nice wrapper over priority syscalls",\n    ),\n',
-            "",
-            1,
-        )
+        text += "\nfn patch_riscv_musl_syscall_stubs(image: &mut [u8]) { let _ = image; }\n"
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("nice", result.stdout)
+        self.assertIn("patch_riscv_musl", result.stdout)
 
-    def test_detects_missing_target_specific_manifest_entry(self) -> None:
+    def test_detects_reintroduced_symbol_lookup(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/program_loader.rs"
         text = path.read_text(encoding="utf-8")
-        text = text.replace(
-            '    (\n        "main-executable",\n        "brk",\n        &["brk"],\n        "temporary musl brk ENOSYS-stub replacement",\n    ),\n',
-            "",
-            1,
-        )
+        text += "\nfn find_dynsym_file_offset() {}\n"
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("main-executable", result.stdout)
-        self.assertIn("brk", result.stdout)
+        self.assertIn("find_dynsym_file_offset", result.stdout)
 
-    def test_detects_hidden_symbol_lookup(self) -> None:
+    def test_detects_reintroduced_rx_patch_area(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/uspace/program_loader.rs"
         text = path.read_text(encoding="utf-8")
-        text = text.replace(
-            '    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl executable ELF: {err}"))?;\n',
-            '    let elf = ElfFile::new(image).map_err(|err| format!("invalid musl executable ELF: {err}"))?;\n'
-            '    let _hidden_offset = find_symbol_file_offset(&elf, "hidden_patch")?;\n',
-            1,
-        )
+        text += "\nfn reserve_elf_rx_patch_area() {}\n"
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("hidden_patch", result.stdout)
+        self.assertIn("reserve_elf_rx_patch_area", result.stdout)
 
-    def test_detects_missing_doc_cross_check_contract(self) -> None:
+    def test_detects_missing_retirement_doc_contract(self) -> None:
         tree = self.make_tree()
         path = tree / "docs/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"
-        text = path.read_text(encoding="utf-8").replace("raw syscall", "raw call")
+        text = path.read_text(encoding="utf-8").replace("runtime byte patching is prohibited", "runtime patching may continue")
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("raw syscall", result.stdout)
+        self.assertIn("runtime byte patching is prohibited", result.stdout)
 
     def test_detects_weakened_promotion_arch_default(self) -> None:
         tree = self.make_tree()

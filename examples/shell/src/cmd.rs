@@ -767,8 +767,6 @@ const LIBCTEST_GROUP_TIMEOUT_SECS: u64 = 120;
 const LIBCTEST_CASE_TIMEOUT_SECS: u64 = 5;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const DISABLED_OFFICIAL_TEST_GROUPS: &[&str] = &[];
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-const UNIXBENCH_SORT_SRC: &str = include_str!("unixbench_sort_src.txt");
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn official_group_timeout_secs(group: &str) -> u64 {
@@ -1583,7 +1581,6 @@ fn copy_script_file(
     dst: &str,
     busybox_path: &str,
     rewrite_busybox_path: bool,
-    wrap_ltp_cases: bool,
 ) -> io::Result<()> {
     if let Some(parent) = parent_dir(dst) {
         ensure_dir_all(parent)?;
@@ -1591,61 +1588,14 @@ fn copy_script_file(
     let raw_script = fs::read_to_string(src)?;
     let mut script = raw_script
         .lines()
-        .map(|line| {
-            let line = rewrite_script_line(line, busybox_path, rewrite_busybox_path);
-            if wrap_ltp_cases {
-                rewrite_ltp_case_line(&line, busybox_path)
-            } else {
-                line
-            }
-        })
+        .map(|line| rewrite_script_line(line, busybox_path, rewrite_busybox_path))
         .collect::<Vec<_>>()
         .join("\n");
-    if src.ends_with("iperf_testcode.sh") {
-        script = rewrite_iperf_daemon_server(&script, busybox_path);
-    } else if src.ends_with("netperf_testcode.sh") {
-        script = rewrite_netperf_daemon_server(&script, busybox_path);
-    }
     if raw_script.ends_with('\n') {
         script.push('\n');
     }
     let mut dst_file = File::create(dst)?;
     dst_file.write_all(script.as_bytes())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn rewrite_iperf_daemon_server(script: &str, busybox_path: &str) -> String {
-    let mut rewritten = Vec::new();
-    for line in script.lines() {
-        if line.trim() == "$iperf -s -p $port -D" {
-            rewritten.push(String::from("$iperf -s -p $port &"));
-            rewritten.push(String::from("server_pid=$!"));
-            continue;
-        }
-        if line.contains("#### OS COMP TEST GROUP END iperf-") {
-            rewritten.push(format!(
-                "[ -n \"$server_pid\" ] && {busybox_path} kill -TERM \"$server_pid\" 2>/dev/null || true"
-            ));
-            rewritten.push(format!("{busybox_path} sleep 1"));
-            rewritten.push(format!(
-                "[ -n \"$server_pid\" ] && {busybox_path} kill -KILL \"$server_pid\" 2>/dev/null || true"
-            ));
-        }
-        rewritten.push(String::from(line));
-    }
-    rewritten.join("\n")
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn rewrite_netperf_daemon_server(script: &str, busybox_path: &str) -> String {
-    let mut rewritten = Vec::new();
-    for line in script.lines() {
-        rewritten.push(String::from(line));
-        if line.trim() == "server_pid=$!" {
-            rewritten.push(format!("{busybox_path} sleep 1"));
-        }
-    }
-    rewritten.join("\n")
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1655,171 +1605,6 @@ fn write_text_file(path: &str, content: &str) -> io::Result<()> {
     }
     let mut file = File::create(path)?;
     file.write_all(content.as_bytes())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn restore_unixbench_sort_fixture(src_root: &str, stage_root: &str) -> io::Result<()> {
-    let stage_sort_src = join_path(stage_root, "sort.src");
-    if matches!(fs::metadata(&stage_sort_src), Ok(meta) if meta.is_file()) {
-        return Ok(());
-    }
-
-    let source_sort_src = join_path(src_root, "sort.src");
-    if matches!(fs::metadata(&source_sort_src), Ok(meta) if meta.is_file()) {
-        return copy_file(&source_sort_src, &stage_sort_src);
-    }
-
-    let has_unixbench_shell_fixture = ["multi.sh", "tst.sh"].iter().all(|name| {
-        matches!(
-            fs::metadata(&join_path(src_root, name)),
-            Ok(meta) if meta.is_file()
-        )
-    });
-    if has_unixbench_shell_fixture {
-        // The official sdcard images include UnixBench's shell scripts but omit
-        // the upstream Release 3 shell-workload input, testdir/sort.src.  Restore
-        // that read-only fixture so the benchmark runs the real sort/od/grep/wc
-        // pipeline instead of spinning on an empty missing-input failure.
-        write_text_file(&stage_sort_src, UNIXBENCH_SORT_SRC)?;
-    }
-
-    Ok(())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn normalize_lmbench_stage_wrappers(stage_root: &str) -> io::Result<()> {
-    let Ok(entries) = fs::read_dir(stage_root) else {
-        return Ok(());
-    };
-
-    let lmbench_all = join_path(stage_root, "lmbench_all");
-    if matches!(fs::metadata(&lmbench_all), Ok(meta) if meta.is_file()) {
-        uspace::seed_initial_path_mode(&lmbench_all, 0o755);
-    }
-
-    for entry in entries {
-        let entry = entry?;
-        let path = join_path(stage_root, path_to_str(&entry.file_name()));
-        let Ok(metadata) = fs::metadata(&path) else {
-            continue;
-        };
-        if !metadata.is_file() || metadata.len() > 512 {
-            continue;
-        }
-
-        let Ok(raw) = fs::read_to_string(&path) else {
-            continue;
-        };
-        let trimmed = raw.trim_end_matches('\n');
-        if trimmed.contains('\n') {
-            continue;
-        };
-        let Some(args_start) = trimmed.find(char::is_whitespace) else {
-            continue;
-        };
-        let (program, args) = trimmed.split_at(args_start);
-        if !program.starts_with('/') || !program.ends_with("/lmbench_all") {
-            continue;
-        }
-        let args = args.trim_start();
-        if args.is_empty() {
-            continue;
-        }
-
-        // The official images ship lmbench helper wrappers as host-build
-        // absolute paths such as:
-        //   /code/lmbench_src/bin/build/lmbench_all hello "$@"
-        // Those paths cannot exist inside the submitted kernel, and helpers
-        // like `hello` are copied to /tmp before lmbench executes them through
-        // /bin/sh.  Rewrite only this known build-root prefix to the staged
-        // in-suite binary so the benchmark runs the intended lmbench subcommand
-        // instead of repeatedly failing with ENOEXEC/ENOENT.
-        write_text_file(&path, &format!("#!/bin/sh\nexec ./lmbench_all {args}\n"))?;
-        uspace::seed_initial_path_mode(&path, 0o755);
-    }
-
-    Ok(())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn prepare_libctest_dsos(src_root: &str, stage_root: &str) -> io::Result<()> {
-    let lib_dir = join_path(src_root, "lib");
-    let Ok(entries) = fs::read_dir(&lib_dir) else {
-        return Ok(());
-    };
-    for entry in entries {
-        let entry = entry?;
-        let file_name = entry.file_name();
-        let name = path_to_str(&file_name);
-        if name.ends_with(".so") {
-            copy_file(&join_path(&lib_dir, name), &join_path(stage_root, name))?;
-        }
-    }
-    Ok(())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn copy_runtime_libs(src_root: &str, stage_root: &str, busybox_path: &str) -> io::Result<()> {
-    let lib_dir = join_path(src_root, "lib");
-    if matches!(fs::metadata(&lib_dir), Ok(meta) if meta.is_dir()) {
-        copy_stage_entry(src_root, stage_root, "lib", busybox_path)?;
-    }
-    Ok(())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn prepare_libctest_runtest_wrapper(
-    src_root: &str,
-    stage_root: &str,
-    busybox_path: &str,
-) -> io::Result<()> {
-    let runtest = join_path(stage_root, "runtest.exe");
-    if !matches!(fs::metadata(&runtest), Ok(meta) if meta.is_file()) {
-        return Ok(());
-    }
-
-    prepare_libctest_dsos(src_root, stage_root)?;
-
-    for script_name in ["run-static.sh", "run-dynamic.sh"] {
-        let script_path = join_path(stage_root, script_name);
-        if !matches!(fs::metadata(&script_path), Ok(meta) if meta.is_file()) {
-            continue;
-        }
-        let raw = fs::read_to_string(&script_path)?;
-        let rewritten = rewrite_libctest_run_script(&raw, src_root, busybox_path);
-        write_text_file(&script_path, &rewritten)?;
-    }
-
-    let testcode_path = join_path(stage_root, "libctest_testcode.sh");
-    if matches!(fs::metadata(&testcode_path), Ok(meta) if meta.is_file()) {
-        let raw = fs::read_to_string(&testcode_path)?;
-        let rewritten = raw
-            .replace(
-                "./run-static.sh",
-                &format!("{busybox_path} sh ./run-static.sh"),
-            )
-            .replace(
-                "./run-dynamic.sh",
-                &format!("{busybox_path} sh ./run-dynamic.sh"),
-            );
-        write_text_file(&testcode_path, &rewritten)?;
-    }
-
-    Ok(())
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn rewrite_libctest_run_script(raw: &str, src_root: &str, busybox_path: &str) -> String {
-    let mut rewritten = String::new();
-    for line in raw.lines() {
-        if let Some(command) = rewrite_libctest_command(line.trim(), src_root, busybox_path) {
-            rewritten.push_str(&command);
-        } else {
-            rewritten.push_str(line);
-            rewritten.push('\n');
-        }
-    }
-    rewritten
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1834,34 +1619,6 @@ fn parse_libctest_command(line: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some((entry, case))
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn rewrite_libctest_command(line: &str, _src_root: &str, busybox_path: &str) -> Option<String> {
-    let (entry, case) = parse_libctest_command(line)?;
-
-    let start = format!("{busybox_path} echo \"========== START {entry} {case} ==========\"\n");
-    let end = format!("{busybox_path} echo \"========== END {entry} {case} ==========\"\n");
-
-    Some(format!(
-        "{start}./{entry} {case} &\ncase_pid=$!\n(\n    {busybox_path} sleep \"${{LIBCTEST_CASE_TIMEOUT:-5}}\"\n    {busybox_path} kill -TERM \"$case_pid\" 2>/dev/null || exit 0\n    {busybox_path} sleep 1\n    {busybox_path} kill -KILL \"$case_pid\" 2>/dev/null || true\n) &\nwatchdog_pid=$!\nwait \"$case_pid\"\nstatus=$?\n{busybox_path} kill \"$watchdog_pid\" 2>/dev/null || true\nif [ \"$status\" -eq 0 ]; then\n    {busybox_path} echo \"Pass!\"\nelif [ \"$status\" -eq 137 ] || [ \"$status\" -eq 143 ]; then\n    {busybox_path} echo \"FAIL libctest {entry} {case}: timeout\"\nelse\n    {busybox_path} echo \"FAIL libctest {entry} {case}: $status\"\nfi\n{end}"
-    ))
-}
-
-#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn rewrite_ltp_case_line(line: &str, busybox_path: &str) -> String {
-    let trimmed = line.trim_start();
-    if trimmed == "\"$file\"" {
-        let indent = &line[..line.len() - trimmed.len()];
-        // Run every LTP file in its own process group with a bounded watchdog.
-        // A blocked case is reported as a real non-zero result instead of
-        // blocking the whole evaluation, and the watchdog kills the whole case
-        // process group so helper loops do not leak into following cases.
-        return format!(
-            "{indent}({busybox_path} setsid {busybox_path} sh -c 'tools_dir=\"${{TESTSUITE_TOOLS_DIR:-${{0%/*}}}}\"; PATH=\"$tools_dir:${{0%/*}}:$PATH\"; ({busybox_path} sleep \"${{LTP_CASE_TIMEOUT_SECS:-10}}\"; {busybox_path} echo \"TIMEOUT LTP SCRIPT $0\"; {busybox_path} kill -KILL 0 >/dev/null 2>&1) & ltp_timer=$!; \"$0\"; ltp_status=$?; {busybox_path} kill -KILL $ltp_timer >/dev/null 2>&1; exit $ltp_status' \"$file\")"
-        );
-    }
-    line.to_string()
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -2248,9 +2005,18 @@ fn copy_stage_entry(
             copy_stage_entry(src_root, dst_root, &child_rel, busybox_path)?;
         }
     } else if rel.ends_with(".sh") {
-        copy_script_file(&src, &dst, busybox_path, !rel.contains('/'), false)?;
+        copy_script_file(&src, &dst, busybox_path, !rel.contains('/'))?;
     } else {
         copy_file(&src, &dst)?;
+    }
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn copy_runtime_libs(src_root: &str, stage_root: &str, busybox_path: &str) -> io::Result<()> {
+    let lib_dir = join_path(src_root, "lib");
+    if matches!(fs::metadata(&lib_dir), Ok(meta) if meta.is_dir()) {
+        copy_stage_entry(src_root, stage_root, "lib", busybox_path)?;
     }
     Ok(())
 }
@@ -2310,13 +2076,6 @@ fn prepare_suite_stage_dir(suite_dir: &str, script_name: &str) -> io::Result<Opt
         }
     }
 
-    if group == "libctest" {
-        prepare_libctest_runtest_wrapper(src_root, &stage_root, &busybox_path)?;
-    } else if group == "lmbench" {
-        normalize_lmbench_stage_wrappers(&stage_root)?;
-    } else if group == "unixbench" {
-        restore_unixbench_sort_fixture(src_root, &stage_root)?;
-    }
     copy_runtime_libs(src_root, &stage_root, &busybox_path)?;
 
     Ok(Some(stage_root))
@@ -2342,7 +2101,6 @@ fn prepare_unstaged_script_dir(
         &join_path(&stage_root, script_name),
         busybox_path,
         true,
-        group == "ltp",
     )?;
     Ok(stage_root)
 }

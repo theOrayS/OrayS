@@ -28,11 +28,58 @@ def function_block(text: str, name: str) -> str:
     return text[start:end]
 
 
+
+def rust_function_names(text: str) -> set[str]:
+    return set(
+        re.findall(
+            r"(?:^|\n)\s*(?:pub(?:\([^)]*\))?\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+            text,
+        )
+    )
+
 def scan_cmd_rs(root: Path) -> list[str]:
     text = read(root / "examples/shell/src/cmd.rs")
     findings: list[str] = []
     env_block = function_block(text, "ltp_case_env")
     run_dir_block = function_block(text, "prepare_ltp_case_run_dir")
+    copy_block = function_block(text, "copy_script_file")
+    unstaged_block = function_block(text, "prepare_unstaged_script_dir")
+    forbidden_runner_rewrite_tokens = [
+        "rewrite_iperf_daemon_server",
+        "rewrite_netperf_daemon_server",
+        "restore_unixbench_sort_fixture",
+        "normalize_lmbench_stage_wrappers",
+        "prepare_libctest_runtest_wrapper",
+        "rewrite_libctest_run_script",
+        "rewrite_libctest_command",
+        "rewrite_ltp_case_line",
+        "wrap_ltp_cases",
+        "iperf_testcode.sh",
+        "netperf_testcode.sh",
+        "UNIXBENCH_SORT_SRC",
+    ]
+    function_names = rust_function_names(text)
+    forbidden_functions = {
+        token for token in forbidden_runner_rewrite_tokens if token.startswith(("rewrite_", "restore_", "normalize_", "prepare_"))
+    }
+    for function_name in sorted(function_names & forbidden_functions):
+        findings.append(
+            f"examples/shell/src/cmd.rs: forbidden suite/script-specific helper still defined: {function_name}"
+        )
+    for token in forbidden_runner_rewrite_tokens:
+        if token in text:
+            findings.append(f"examples/shell/src/cmd.rs: suite/script-specific rewrite token is forbidden: {token}")
+    if not copy_block:
+        findings.append("examples/shell/src/cmd.rs: missing copy_script_file")
+    elif (
+        "src.ends_with" in copy_block
+        or '"$file"' in copy_block
+        or "rewrite_ltp_case_line" in copy_block
+        or copy_block.count("rewrite_script_line") != 1
+    ):
+        findings.append("examples/shell/src/cmd.rs: copy_script_file must stay generic and must not branch on script names or LTP $file patterns")
+    if unstaged_block and 'group == "ltp"' in unstaged_block:
+        findings.append("examples/shell/src/cmd.rs: unstaged script preparation must not inject LTP-only rewrites")
     if not env_block:
         findings.append("examples/shell/src/cmd.rs: missing ltp_case_env")
     else:
