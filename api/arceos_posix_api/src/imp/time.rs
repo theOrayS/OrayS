@@ -38,11 +38,11 @@ impl From<Duration> for ctypes::timeval {
 
 unsafe fn read_nanosleep_request(req: *const ctypes::timespec) -> LinuxResult<ctypes::timespec> {
     if req.is_null() {
-        return Err(LinuxError::EINVAL);
+        return Err(LinuxError::EFAULT);
     }
 
-    let req = unsafe { read_user_value(req) }.map_err(|_| LinuxError::EINVAL)?;
-    if req.tv_nsec < 0 || req.tv_nsec > 999_999_999 {
+    let req = unsafe { read_user_value(req) }?;
+    if req.tv_sec < 0 || req.tv_nsec < 0 || req.tv_nsec > 999_999_999 {
         return Err(LinuxError::EINVAL);
     }
     Ok(req)

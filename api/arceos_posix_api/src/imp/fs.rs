@@ -9,7 +9,7 @@ use axfs::fops::OpenOptions;
 use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
-use super::fd_ops::{get_file_like, FileLike};
+use super::fd_ops::{FileLike, get_file_like};
 use crate::{
     ctypes,
     utils::{char_ptr_to_str, writable_user_buffer, write_user_value},
@@ -218,21 +218,31 @@ unsafe fn write_stat_output(buf: *mut ctypes::stat, value: ctypes::stat) -> Linu
 /// Convert open flags to [`OpenOptions`].
 fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> LinuxResult<OpenOptions> {
     let flags = flags as u32;
-    // O_EXEC/O_SEARCH are O_PATH aliases in the libc/Linux flag set we expose.
-    if flags & ctypes::O_PATH != 0 {
+    let supported = ctypes::O_RDONLY
+        | ctypes::O_WRONLY
+        | ctypes::O_RDWR
+        | ctypes::O_CREAT
+        | ctypes::O_EXCL
+        | ctypes::O_TRUNC
+        | ctypes::O_APPEND
+        | ctypes::O_NONBLOCK
+        | ctypes::O_CLOEXEC
+        | ctypes::O_LARGEFILE
+        | ctypes::O_NOCTTY;
+    let unsupported = flags & !supported;
+    if unsupported != 0 {
         return Err(LinuxError::EOPNOTSUPP);
     }
-    if flags & ctypes::O_TMPFILE == ctypes::O_TMPFILE {
-        return Err(LinuxError::EOPNOTSUPP);
-    }
+
     let mut options = OpenOptions::new();
     match flags & 0b11 {
         ctypes::O_RDONLY => options.read(true),
         ctypes::O_WRONLY => options.write(true),
-        _ => {
+        ctypes::O_RDWR => {
             options.read(true);
             options.write(true);
         }
+        _ => return Err(LinuxError::EINVAL),
     };
     if flags & ctypes::O_APPEND != 0 {
         options.append(true);

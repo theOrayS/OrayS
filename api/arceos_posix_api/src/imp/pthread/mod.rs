@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 use core::cell::UnsafeCell;
 use core::ffi::{c_int, c_void};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use axerrno::{LinuxError, LinuxResult};
 use axtask::AxTaskRef;
@@ -20,6 +21,7 @@ lazy_static::lazy_static! {
             retval: Arc::new(Packet {
                 result: UnsafeCell::new(core::ptr::null_mut()),
             }),
+            join_in_progress: AtomicBool::new(false),
         };
         let ptr = Box::into_raw(Box::new(main_thread)) as *mut c_void;
         map.insert(main_tid, ForceSendSync(ptr));
@@ -37,6 +39,7 @@ unsafe impl<T> Sync for Packet<T> {}
 pub struct Pthread {
     inner: AxTaskRef,
     retval: Arc<Packet<*mut c_void>>,
+    join_in_progress: AtomicBool,
 }
 
 impl Pthread {
@@ -64,6 +67,7 @@ impl Pthread {
         let thread = Pthread {
             inner: task_inner,
             retval: my_packet,
+            join_in_progress: AtomicBool::new(false),
         };
         let ptr = Box::into_raw(Box::new(thread)) as *mut c_void;
         TID_TO_PTHREAD.write().insert(tid, ForceSendSync(ptr));
@@ -89,15 +93,30 @@ impl Pthread {
     }
 
     fn join(ptr: ctypes::pthread_t) -> LinuxResult<*mut c_void> {
+        if ptr.is_null() {
+            return Err(LinuxError::ESRCH);
+        }
         if core::ptr::eq(ptr, Self::current_ptr() as _) {
             return Err(LinuxError::EDEADLK);
         }
 
-        let thread = unsafe { Box::from_raw(ptr as *mut Pthread) };
+        let tid = {
+            let threads = TID_TO_PTHREAD.read();
+            let Some((tid, _)) = threads.iter().find(|(_, stored)| stored.0 == ptr) else {
+                return Err(LinuxError::ESRCH);
+            };
+            *tid
+        };
+
+        let thread = unsafe { &*(ptr as *mut Pthread) };
+        if thread.join_in_progress.swap(true, Ordering::AcqRel) {
+            return Err(LinuxError::EINVAL);
+        }
+
         thread.inner.join();
-        let tid = thread.inner.id().as_u64();
         let retval = unsafe { *thread.retval.result.get() };
         TID_TO_PTHREAD.write().remove(&tid);
+        let thread = unsafe { Box::from_raw(ptr as *mut Pthread) };
         drop(thread);
         Ok(retval)
     }

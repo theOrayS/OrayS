@@ -1,9 +1,9 @@
 //! `epoll` implementation.
 //!
-//! TODO: do not support `EPOLLET` flag
+//! Unsupported edge-triggered/one-shot/exclusive modes are rejected visibly.
 
-use alloc::collections::btree_map::Entry;
 use alloc::collections::BTreeMap;
+use alloc::collections::btree_map::Entry;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{ffi::c_int, time::Duration};
@@ -13,7 +13,7 @@ use axhal::time::wall_time;
 use axsync::Mutex;
 
 use crate::ctypes;
-use crate::imp::fd_ops::{add_file_like, get_file_like, FileLike};
+use crate::imp::fd_ops::{FileLike, add_file_like, add_file_like_with_flags, get_file_like};
 use crate::utils::{read_user_value, writable_user_slice};
 
 const EPOLL_STAT_DEV: ctypes::dev_t = 0x6570_6f6c_6c;
@@ -26,9 +26,44 @@ pub struct EpollInstance {
 unsafe impl Send for ctypes::epoll_event {}
 unsafe impl Sync for ctypes::epoll_event {}
 
+fn validate_epoll_event_flags(events: u32) -> LinuxResult {
+    let unsupported = events & (ctypes::EPOLLET | ctypes::EPOLLONESHOT | ctypes::EPOLLEXCLUSIVE);
+    if unsupported != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    let supported = ctypes::EPOLLIN
+        | ctypes::EPOLLPRI
+        | ctypes::EPOLLOUT
+        | ctypes::EPOLLRDNORM
+        | ctypes::EPOLLRDBAND
+        | ctypes::EPOLLWRNORM
+        | ctypes::EPOLLWRBAND
+        | ctypes::EPOLLERR
+        | ctypes::EPOLLHUP
+        | ctypes::EPOLLRDHUP;
+    if events & !supported != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    Ok(())
+}
+
+fn epoll_create_fd_flags(flags: c_int) -> LinuxResult<c_int> {
+    let flags = flags as u32;
+    if flags & !(ctypes::EPOLL_CLOEXEC | ctypes::EPOLL_NONBLOCK) != 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    if flags & ctypes::EPOLL_NONBLOCK != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    Ok(if flags & ctypes::EPOLL_CLOEXEC != 0 {
+        ctypes::FD_CLOEXEC as c_int
+    } else {
+        0
+    })
+}
+
 impl EpollInstance {
-    // TODO: parse flags
-    pub fn new(_flags: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             events: Mutex::new(BTreeMap::new()),
         }
@@ -55,6 +90,7 @@ impl EpollInstance {
         match op as u32 {
             ctypes::EPOLL_CTL_ADD => {
                 let event = event.ok_or(LinuxError::EFAULT)?;
+                validate_epoll_event_flags(event.events)?;
                 if let Entry::Vacant(e) = self.events.lock().entry(fd) {
                     e.insert(*event);
                 } else {
@@ -63,6 +99,7 @@ impl EpollInstance {
             }
             ctypes::EPOLL_CTL_MOD => {
                 let event = event.ok_or(LinuxError::EFAULT)?;
+                validate_epoll_event_flags(event.events)?;
                 let mut events = self.events.lock();
                 if let Entry::Occupied(mut ocp) = events.entry(fd) {
                     ocp.insert(*event);
@@ -92,21 +129,50 @@ impl EpollInstance {
         for (infd, ev) in ready_list.iter() {
             match get_file_like(*infd as c_int)?.poll() {
                 Err(_) => {
-                    if (ev.events & ctypes::EPOLLERR) != 0 {
-                        if !push_ready_event(events, &mut events_num, ctypes::EPOLLERR, ev.data) {
-                            return Ok(events_num);
-                        }
+                    if !push_ready_event(
+                        events,
+                        &mut events_num,
+                        ctypes::EPOLLERR | ctypes::EPOLLHUP,
+                        ev.data,
+                    ) {
+                        return Ok(events_num);
                     }
                 }
                 Ok(state) => {
-                    if state.readable && (ev.events & ctypes::EPOLLIN != 0) {
-                        if !push_ready_event(events, &mut events_num, ctypes::EPOLLIN, ev.data) {
+                    if state.readable
+                        && (ev.events
+                            & (ctypes::EPOLLIN
+                                | ctypes::EPOLLPRI
+                                | ctypes::EPOLLRDNORM
+                                | ctypes::EPOLLRDBAND)
+                            != 0)
+                    {
+                        if !push_ready_event(
+                            events,
+                            &mut events_num,
+                            ev.events
+                                & (ctypes::EPOLLIN
+                                    | ctypes::EPOLLPRI
+                                    | ctypes::EPOLLRDNORM
+                                    | ctypes::EPOLLRDBAND),
+                            ev.data,
+                        ) {
                             return Ok(events_num);
                         }
                     }
 
-                    if state.writable && (ev.events & ctypes::EPOLLOUT != 0) {
-                        if !push_ready_event(events, &mut events_num, ctypes::EPOLLOUT, ev.data) {
+                    if state.writable
+                        && (ev.events
+                            & (ctypes::EPOLLOUT | ctypes::EPOLLWRNORM | ctypes::EPOLLWRBAND)
+                            != 0)
+                    {
+                        if !push_ready_event(
+                            events,
+                            &mut events_num,
+                            ev.events
+                                & (ctypes::EPOLLOUT | ctypes::EPOLLWRNORM | ctypes::EPOLLWRBAND),
+                            ev.data,
+                        ) {
                             return Ok(events_num);
                         }
                     }
@@ -186,8 +252,18 @@ pub fn sys_epoll_create(size: c_int) -> c_int {
         if size <= 0 {
             return Err(LinuxError::EINVAL);
         }
-        let epoll_instance = EpollInstance::new(0);
+        let epoll_instance = EpollInstance::new();
         add_file_like(Arc::new(epoll_instance))
+    })
+}
+
+/// Creates a new epoll instance with Linux `epoll_create1` flags.
+pub fn sys_epoll_create1(flags: c_int) -> c_int {
+    debug!("sys_epoll_create1 <= {:#x}", flags);
+    syscall_body!(sys_epoll_create1, {
+        let fd_flags = epoll_create_fd_flags(flags)?;
+        let epoll_instance = EpollInstance::new();
+        add_file_like_with_flags(Arc::new(epoll_instance), fd_flags)
     })
 }
 
