@@ -1,0 +1,1 @@
+qemu-system-riscv64 -machine virt -kernel /root/oskernel2026-orays/kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=/root/oskernel-eval-runs/g007-official-local-20260619-110459/sdcard-rv.img\,if=none\,format=raw\,id=x0 -device virtio-blk-device\,drive=x0\,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device\,netdev=net -netdev user\,id=net -rtc base=utc

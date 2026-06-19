@@ -1,0 +1,162 @@
+{
+  "current": {
+    "run_root": "/root/oskernel-eval-runs/g007-official-local-20260619-110459",
+    "score_float": 1419.727675405803,
+    "score_int": 1419,
+    "nonzero_rank_entries": {
+      "basic-glibc-rv": 101.0,
+      "basic-musl-rv": 101.0,
+      "busybox-glibc-rv": 53.0,
+      "busybox-musl-rv": 53.0,
+      "cyclictest-glibc-rv": 4.0,
+      "cyclictest-musl-rv": 3.0,
+      "iozone-glibc-rv": 25.7867376869493,
+      "iozone-musl-rv": 24.885347763216288,
+      "libcbench-glibc-rv": 29.54333592599454,
+      "libcbench-musl-rv": 27.461324087097864,
+      "libctest-musl-rv": 215.0,
+      "lmbench-glibc-rv": 41.2986509584364,
+      "lmbench-musl-rv": 41.37115397387201,
+      "ltp-glibc-rv": 4104.0,
+      "ltp-musl-rv": 4101.0,
+      "lua-glibc-rv": 9.0,
+      "lua-musl-rv": 9.0,
+      "netperf-glibc-rv": 5.0,
+      "netperf-musl-rv": 5.0,
+      "rank": 1419.727675405803
+    }
+  },
+  "baseline_path": "/root/oskernel-eval-runs/official-20260618-085217/artifacts/score-summary.json",
+  "baseline": {
+    "run_root": "/root/oskernel-eval-runs/official-20260618-085217",
+    "verdict": "Accpted",
+    "score_int": 1085,
+    "rank_float": 1085.7787803411047,
+    "non_ltp_rank_sum_from_rank_entries": 749.8176520485804,
+    "ltp_raw_rank_entries": {
+      "ltp-glibc-rv": 0.0,
+      "ltp-glibc-la": 0.0,
+      "ltp-musl-rv": 4109.0,
+      "ltp-musl-la": 0.0
+    },
+    "ltp_log_contributions": {
+      "ltp-glibc-rv": 0.0,
+      "ltp-glibc-la": 0.0,
+      "ltp-musl-rv": 335.96112829252456,
+      "ltp-musl-la": 0.0
+    },
+    "nonzero_rank_entries": {
+      "basic-glibc-rv": 101.0,
+      "basic-musl-rv": 101.0,
+      "busybox-glibc-rv": 54.0,
+      "busybox-musl-rv": 54.0,
+      "cyclictest-glibc-rv": 4.0,
+      "cyclictest-musl-rv": 4.0,
+      "iozone-glibc-rv": 20.0,
+      "iozone-musl-rv": 20.0,
+      "iperf-glibc-rv": 6.0,
+      "iperf-musl-rv": 6.0,
+      "libcbench-glibc-rv": 27.978750354425184,
+      "libcbench-musl-rv": 27.0,
+      "libctest-musl-rv": 217.0,
+      "lmbench-glibc-rv": 39.79812384646729,
+      "lmbench-musl-rv": 39.648865515258336,
+      "ltp-musl-rv": 4109.0,
+      "lua-glibc-rv": 9.0,
+      "lua-musl-rv": 9.0,
+      "netperf-glibc-rv": 5.216747365422957,
+      "netperf-musl-rv": 5.175164967006599
+    }
+  },
+  "delta": {
+    "score_float": 333.94889506469826,
+    "score_int": 334,
+    "rank_entries": {
+      "busybox-glibc-rv": {
+        "baseline": 54.0,
+        "current": 53.0,
+        "delta": -1.0
+      },
+      "busybox-musl-rv": {
+        "baseline": 54.0,
+        "current": 53.0,
+        "delta": -1.0
+      },
+      "cyclictest-musl-rv": {
+        "baseline": 4.0,
+        "current": 3.0,
+        "delta": -1.0
+      },
+      "iozone-glibc-rv": {
+        "baseline": 20.0,
+        "current": 25.7867376869493,
+        "delta": 5.7867376869493015
+      },
+      "iozone-musl-rv": {
+        "baseline": 20.0,
+        "current": 24.885347763216288,
+        "delta": 4.885347763216288
+      },
+      "iperf-glibc-rv": {
+        "baseline": 6.0,
+        "current": 0,
+        "delta": -6.0
+      },
+      "iperf-musl-rv": {
+        "baseline": 6.0,
+        "current": 0,
+        "delta": -6.0
+      },
+      "libcbench-glibc-rv": {
+        "baseline": 27.978750354425184,
+        "current": 29.54333592599454,
+        "delta": 1.5645855715693564
+      },
+      "libcbench-musl-rv": {
+        "baseline": 27.0,
+        "current": 27.461324087097864,
+        "delta": 0.4613240870978643
+      },
+      "libctest-musl-rv": {
+        "baseline": 217.0,
+        "current": 215.0,
+        "delta": -2.0
+      },
+      "lmbench-glibc-rv": {
+        "baseline": 39.79812384646729,
+        "current": 41.2986509584364,
+        "delta": 1.500527111969106
+      },
+      "lmbench-musl-rv": {
+        "baseline": 39.648865515258336,
+        "current": 41.37115397387201,
+        "delta": 1.7222884586136757
+      },
+      "ltp-glibc-rv": {
+        "baseline": 0,
+        "current": 4104.0,
+        "delta": 4104.0
+      },
+      "ltp-musl-rv": {
+        "baseline": 4109.0,
+        "current": 4101.0,
+        "delta": -8.0
+      },
+      "netperf-glibc-rv": {
+        "baseline": 5.216747365422957,
+        "current": 5.0,
+        "delta": -0.21674736542295658
+      },
+      "netperf-musl-rv": {
+        "baseline": 5.175164967006599,
+        "current": 5.0,
+        "delta": -0.1751649670065989
+      },
+      "rank": {
+        "baseline": 0,
+        "current": 1419.727675405803,
+        "delta": 1419.727675405803
+      }
+    }
+  }
+}

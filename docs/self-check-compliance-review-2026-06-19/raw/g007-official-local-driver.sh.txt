@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd /root/oskernel2026-orays
+STAMP="20260619-$(date +%H%M%S)"
+RUN="/root/oskernel-eval-runs/g007-official-local-$STAMP"
+RAW="docs/self-check-compliance-review-2026-06-19/raw"
+mkdir -p "$RUN" "$RAW" /mnt/cghook
+ln -sfn "$RUN" /root/oskernel-eval-runs/g007-official-local-latest
+{
+  echo "run_root=$RUN"
+  echo "started_at=$(date -Is)"
+  echo "repo=$(pwd)"
+  echo "branch=$(git branch --show-current || true)"
+  echo "head=$(git rev-parse HEAD)"
+  echo "autotest_head=$(git -C /root/autotest-for-oskernel rev-parse HEAD 2>/dev/null || echo unknown)"
+  echo "docker=$(command -v docker || echo missing)"
+} | tee "$RUN/metadata.txt"
+{
+  echo "# df before $(date -Is)"
+  df -h / /root /tmp
+} | tee "$RUN/df-before.txt"
+# Fresh official submission build path.
+{
+  echo "# make all start $(date -Is)"
+  make all
+  echo "# make all end $(date -Is)"
+} > "$RUN/make-all.log" 2>&1
+ls -lh kernel-rv kernel-la | tee "$RUN/kernel-artifacts.txt"
+# Use independent raw sdcard copies, matching official raw-drive behavior without mutating repo-root images.
+cp --sparse=always sdcard-rv.img "$RUN/sdcard-rv.img"
+cp --sparse=always sdcard-la.img "$RUN/sdcard-la.img"
+{
+  echo "# df after image copies $(date -Is)"
+  df -h / /root /tmp
+  du -h "$RUN"/sdcard-*.img
+} | tee "$RUN/df-after-image-copy.txt"
+RV_CMD=(qemu-system-riscv64 -machine virt -kernel "$(pwd)/kernel-rv" -m 1G -nographic -smp 1 -bios default -drive "file=$RUN/sdcard-rv.img,if=none,format=raw,id=x0" -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc)
+LA_CMD=(qemu-system-loongarch64 -kernel "$(pwd)/kernel-la" -m 1G -nographic -smp 1 -drive "file=$RUN/sdcard-la.img,if=none,format=raw,id=x0" -device virtio-blk-pci,drive=x0 -no-reboot -device virtio-net-pci,netdev=net0 -netdev user,id=net0 -rtc base=utc)
+printf '%q ' "${RV_CMD[@]}" > "$RUN/qemu-rv.cmd"; echo >> "$RUN/qemu-rv.cmd"
+printf '%q ' "${LA_CMD[@]}" > "$RUN/qemu-la.cmd"; echo >> "$RUN/qemu-la.cmd"
+echo "# qemu start $(date -Is)" | tee "$RUN/qemu-start.txt"
+(
+  set +e
+  printf '\n' | timeout -k 30s 9000s "${RV_CMD[@]}" > "$RUN/os_serial_out_rv.txt" 2>&1
+  echo $? > "$RUN/qemu-rv.exit"
+  echo "rv done $(date -Is) exit=$(cat "$RUN/qemu-rv.exit")" > "$RUN/qemu-rv.done"
+) &
+RV_PID=$!
+(
+  set +e
+  # Local LA is known not to be remote-authoritative in this repo; cap it to avoid starving RV/full evaluation.
+  printf '\n' | timeout -k 30s 300s "${LA_CMD[@]}" > "$RUN/os_serial_out_la.txt" 2>&1
+  echo $? > "$RUN/qemu-la.exit"
+  echo "la done $(date -Is) exit=$(cat "$RUN/qemu-la.exit")" > "$RUN/qemu-la.done"
+) &
+LA_PID=$!
+# lightweight monitor
+while kill -0 "$RV_PID" 2>/dev/null || kill -0 "$LA_PID" 2>/dev/null; do
+  date -Is
+  for f in "$RUN/os_serial_out_rv.txt" "$RUN/os_serial_out_la.txt"; do [ -f "$f" ] && printf '%s bytes=%s\n' "$(basename "$f")" "$(wc -c < "$f")"; done
+  sleep 120
+done | tee "$RUN/qemu-monitor.log"
+wait "$RV_PID" || true
+wait "$LA_PID" || true
+echo "# qemu end $(date -Is)" | tee "$RUN/qemu-end.txt"
+# Official judge parse and score calculation using /root/autotest-for-oskernel code.
+python3 - <<'PY' "$RUN"
+import json, math, os, sys
+run=sys.argv[1]
+sys.path.insert(0, '/root/autotest-for-oskernel/kernel')
+from run import parse_serial_out_new
+config={'testcase_dir':'/root/autotest-for-oskernel/kernel/judge'}
+summary={}
+for arch in ('rv','la'):
+    path=os.path.join(run, f'os_serial_out_{arch}.txt')
+    summary[arch]=parse_serial_out_new(config, path)
+rank={}
+score=0.0
+groups=sorted(set().union(*(set(summary[a].keys()) for a in summary)))
+for group in groups:
+    total=0.0
+    for arch in ('rv','la'):
+        raw=sum(float(item.get('score',0) or 0) for item in summary.get(arch,{}).get(group,[]))
+        rank[f'{group}-{arch}']=raw
+        total += raw
+    if 'ltp' in group.lower():
+        raw=max(0.0, min(total, 10000.0))
+        score += 500.0 * math.log10(1 + 9 * raw / 10000.0)
+    else:
+        score += total
+rank['rank']=score
+out={'run_root': run, 'groups': groups, 'rank': rank, 'score_float': score, 'score_int': int(score), 'summary': summary}
+with open(os.path.join(run,'official-judge-summary.json'),'w') as f:
+    json.dump(out, f, ensure_ascii=False, indent=2)
+# compact summary
+compact={k:v for k,v in rank.items() if v or k=='rank'}
+with open(os.path.join(run,'score-summary.json'),'w') as f:
+    json.dump({'run_root':run,'score_float':score,'score_int':int(score),'nonzero_rank_entries':compact}, f, ensure_ascii=False, indent=2)
+print(json.dumps({'score_float':score,'score_int':int(score),'nonzero_rank_entries':compact}, ensure_ascii=False, indent=2))
+PY
+python3 scripts/ltp_summary.py "$RUN/os_serial_out_rv.txt" > "$RUN/ltp_summary_rv.txt" || true
+python3 scripts/ltp_summary.py --json "$RUN/os_serial_out_rv.txt" > "$RUN/ltp_summary_rv.json" || true
+python3 scripts/ltp_summary.py "$RUN/os_serial_out_la.txt" > "$RUN/ltp_summary_la.txt" || true
+# Preserve core evidence in repo docs raw; avoid copying huge serial logs into git-controlled docs.
+cp "$RUN/metadata.txt" "$RAW/g007-official-local-metadata.txt"
+cp "$RUN/df-before.txt" "$RAW/g007-official-local-df-before.txt"
+cp "$RUN/df-after-image-copy.txt" "$RAW/g007-official-local-df-after-image-copy.txt"
+cp "$RUN/kernel-artifacts.txt" "$RAW/g007-official-local-kernel-artifacts.txt"
+cp "$RUN/qemu-rv.cmd" "$RAW/g007-official-local-qemu-rv.cmd"
+cp "$RUN/qemu-la.cmd" "$RAW/g007-official-local-qemu-la.cmd"
+cp "$RUN/qemu-rv.exit" "$RAW/g007-official-local-qemu-rv.exit"
+cp "$RUN/qemu-la.exit" "$RAW/g007-official-local-qemu-la.exit"
+cp "$RUN/qemu-monitor.log" "$RAW/g007-official-local-qemu-monitor.log"
+cp "$RUN/score-summary.json" "$RAW/g007-official-local-score-summary.json"
+cp "$RUN/ltp_summary_rv.txt" "$RAW/g007-official-local-ltp-summary-rv.txt"
+cp "$RUN/ltp_summary_la.txt" "$RAW/g007-official-local-ltp-summary-la.txt"
+# Keep run outputs under /root/oskernel-eval-runs, but remove large copied disk images after qemu to reclaim space.
+rm -f "$RUN/sdcard-rv.img" "$RUN/sdcard-la.img"
+{
+  echo "# df after cleanup $(date -Is)"
+  df -h / /root /tmp
+  du -xh --max-depth=1 "$RUN" | sort -h
+} | tee "$RUN/df-after-cleanup.txt"
+cp "$RUN/df-after-cleanup.txt" "$RAW/g007-official-local-df-after-cleanup.txt"
+echo "$RUN" | tee "$RAW/g007-official-local-run-root.txt"
