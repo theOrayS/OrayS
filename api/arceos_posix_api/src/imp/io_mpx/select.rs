@@ -22,10 +22,17 @@ struct FdSets {
     bits: [[c_ulong; FD_SETSIZE_WORDS]; FD_SET_GROUPS],
 }
 
+fn timeval_to_duration(tv: ctypes::timeval) -> LinuxResult<core::time::Duration> {
+    if tv.tv_sec < 0 || tv.tv_usec < 0 || tv.tv_usec > 999_999 {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok(tv.into())
+}
+
 impl FdSets {
     fn empty(nfds: usize) -> Self {
         Self {
-            nfds: nfds.min(FD_SETSIZE),
+            nfds,
             bits: [[0; FD_SETSIZE_WORDS]; FD_SET_GROUPS],
         }
     }
@@ -157,16 +164,15 @@ pub unsafe fn sys_select(
         nfds, readfds as usize, writefds as usize, exceptfds as usize
     );
     syscall_body!(sys_select, {
-        if nfds < 0 {
+        if nfds < 0 || nfds as usize > FD_SETSIZE {
             return Err(LinuxError::EINVAL);
         }
-        let nfds = (nfds as usize).min(FD_SETSIZE);
+        let nfds = nfds as usize;
         let deadline = if timeout.is_null() {
             None
         } else {
-            Some(
-                wall_time() + unsafe { read_user_value(timeout as *const ctypes::timeval)? }.into(),
-            )
+            let tv = unsafe { read_user_value(timeout as *const ctypes::timeval)? };
+            Some(wall_time() + timeval_to_duration(tv)?)
         };
         let fd_sets = FdSets::from(nfds, readfds, writefds, exceptfds)?;
         let mut result_sets = FdSets::empty(nfds);

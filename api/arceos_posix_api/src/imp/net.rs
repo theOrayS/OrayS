@@ -25,6 +25,9 @@ const SHUT_WR: c_int = 1;
 const SHUT_RDWR: c_int = 2;
 const MSG_OOB: c_int = 0x1;
 const MSG_ERRQUEUE: c_int = 0x2000;
+const MSG_NOSIGNAL: c_int = 0x4000;
+const SUPPORTED_RECV_FLAGS: c_int = MSG_OOB | MSG_ERRQUEUE;
+const SUPPORTED_SEND_FLAGS: c_int = MSG_OOB | MSG_NOSIGNAL;
 const UDP_MAX_PAYLOAD_LEN: usize = 65_507;
 const SOCKET_STAT_DEV: ctypes::dev_t = 1;
 const SOCKET_STAT_BLKSIZE: ctypes::blksize_t = 4096;
@@ -128,6 +131,9 @@ fn copy_canonname_to_aibuf(buf: &mut ctypes::aibuf, canonname: Option<&str>) {
 }
 
 fn check_recv_flags(flag: c_int) -> LinuxResult {
+    if flag & !SUPPORTED_RECV_FLAGS != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
     if flag & MSG_OOB != 0 {
         return Err(LinuxError::EINVAL);
     }
@@ -138,6 +144,9 @@ fn check_recv_flags(flag: c_int) -> LinuxResult {
 }
 
 fn check_send_flags(flag: c_int) -> LinuxResult {
+    if flag & !SUPPORTED_SEND_FLAGS != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
     if flag & MSG_OOB != 0 {
         return Err(LinuxError::EOPNOTSUPP);
     }
@@ -543,11 +552,21 @@ unsafe fn write_sockaddr_output(
     addrlen: *mut ctypes::socklen_t,
     value: SocketAddr,
 ) -> LinuxResult<()> {
-    let (sockaddr, len) = into_sockaddr(value)?;
-    unsafe {
-        write_user_value(addr, sockaddr)?;
-        write_user_value(addrlen, len)?;
+    if addr.is_null() || addrlen.is_null() {
+        return Err(LinuxError::EFAULT);
     }
+    let capacity = unsafe { read_socklen(addrlen)? } as usize;
+    let (sockaddr, len) = into_sockaddr(value)?;
+    let src = unsafe {
+        core::slice::from_raw_parts(
+            (&sockaddr as *const ctypes::sockaddr).cast::<u8>(),
+            size_of::<ctypes::sockaddr>(),
+        )
+    };
+    let copy_len = core::cmp::min(capacity, src.len());
+    let dst = unsafe { writable_user_buffer(addr.cast::<c_void>(), copy_len)? };
+    dst.copy_from_slice(&src[..copy_len]);
+    unsafe { write_user_value(addrlen, len)? };
     Ok(())
 }
 
@@ -593,8 +612,12 @@ pub fn sys_socket(domain: c_int, socktype: c_int, protocol: c_int) -> c_int {
     debug!("sys_socket <= {} {} {}", domain, socktype, protocol);
     let (domain, raw_socktype, protocol) = (domain as u32, socktype as u32, protocol as u32);
     syscall_body!(sys_socket, {
-        let sock_flags = raw_socktype & (ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK);
-        let socktype = raw_socktype & !(ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK);
+        let supported_flags = ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK;
+        let sock_flags = raw_socktype & supported_flags;
+        if raw_socktype & !(supported_flags | 0xf) != 0 {
+            return Err(LinuxError::EINVAL);
+        }
+        let socktype = raw_socktype & !supported_flags;
         let fd_flags = if sock_flags & ctypes::SOCK_CLOEXEC != 0 {
             ctypes::FD_CLOEXEC as c_int
         } else {
@@ -1014,9 +1037,6 @@ pub unsafe fn sys_getsockname(
         if addr.is_null() || addrlen.is_null() {
             return Err(LinuxError::EFAULT);
         }
-        if unsafe { read_socklen(addrlen)? } < size_of::<ctypes::sockaddr>() as u32 {
-            return Err(LinuxError::EINVAL);
-        }
         let sockaddr = Socket::from_fd(sock_fd)?.local_addr()?;
         unsafe { write_sockaddr_output(addr, addrlen, sockaddr)? };
         Ok(0)
@@ -1036,9 +1056,6 @@ pub unsafe fn sys_getpeername(
     syscall_body!(sys_getpeername, {
         if addr.is_null() || addrlen.is_null() {
             return Err(LinuxError::EFAULT);
-        }
-        if unsafe { read_socklen(addrlen)? } < size_of::<ctypes::sockaddr>() as u32 {
-            return Err(LinuxError::EINVAL);
         }
         let sockaddr = Socket::from_fd(sock_fd)?.peer_addr()?;
         unsafe { write_sockaddr_output(addr, addrlen, sockaddr)? };
