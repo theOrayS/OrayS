@@ -8,17 +8,15 @@ use axtask::AxTaskRef;
 use std::sync::Arc;
 
 #[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{FS, Sstatus};
+use riscv::register::sstatus::{Sstatus, FS};
 
-use super::UserProcess;
 use super::linux_abi::neg_errno;
 use super::task_registry::user_thread_entry_by_tid;
-#[cfg(target_arch = "riscv64")]
-use super::user_memory::read_user_value;
 use super::user_memory::write_user_value;
+use super::UserProcess;
 
 // Linux validates set_robust_list(2) against the userspace robust_list_head
-// layout.  Both supported LTP ABIs here are 64-bit, so the header is three
+// layout. Both supported 64-bit userspace ABIs here use a header of three
 // pointer-sized words: list head pointer, futex offset, and pending-list pointer.
 const ROBUST_LIST_HEAD_LEN: usize = size_of::<usize>() * 3;
 const SYNTHETIC_INIT_PID: i32 = 1;
@@ -49,6 +47,7 @@ pub(super) struct UserTaskExt {
     pub(super) signal_wait_mask: AtomicU64,
     pub(super) poll_wait: AtomicBool,
     pub(super) futex_wait: AtomicUsize,
+    pub(super) futex_bitset: AtomicU32,
     pub(super) robust_list_head: AtomicUsize,
     pub(super) robust_list_len: AtomicUsize,
     pub(super) deferred_unmap_start: AtomicUsize,
@@ -91,6 +90,7 @@ impl UserTaskExt {
             signal_wait_mask: AtomicU64::new(0),
             poll_wait: AtomicBool::new(false),
             futex_wait: AtomicUsize::new(0),
+            futex_bitset: AtomicU32::new(0),
             robust_list_head: AtomicUsize::new(0),
             robust_list_len: AtomicUsize::new(0),
             deferred_unmap_start: AtomicUsize::new(0),
@@ -298,108 +298,6 @@ pub(super) fn child_trap_frame(parent: &TrapFrame, child_stack: usize) -> TrapFr
     }
     advance_syscall_pc(&mut child);
     child
-}
-
-#[cfg(target_arch = "riscv64")]
-fn sign_extend(value: usize, bits: usize) -> isize {
-    let shift = usize::BITS as usize - bits;
-    ((value << shift) as isize) >> shift
-}
-
-#[cfg(target_arch = "riscv64")]
-fn riscv_b_type_next_pc(pc: usize, inst: u32, a0: usize) -> Option<usize> {
-    if inst & 0x7f != 0x63 {
-        return None;
-    }
-
-    let funct3 = (inst >> 12) & 0x7;
-    let rs1 = (inst >> 15) & 0x1f;
-    let rs2 = (inst >> 20) & 0x1f;
-    if !((rs1 == 10 && rs2 == 0) || (rs1 == 0 && rs2 == 10)) {
-        return None;
-    }
-
-    let rs1_value = if rs1 == 10 { a0 } else { 0 };
-    let rs2_value = if rs2 == 10 { a0 } else { 0 };
-    let taken = match funct3 {
-        0x0 => rs1_value == rs2_value,
-        0x1 => rs1_value != rs2_value,
-        0x4 => (rs1_value as isize) < (rs2_value as isize),
-        0x5 => (rs1_value as isize) >= (rs2_value as isize),
-        0x6 => rs1_value < rs2_value,
-        0x7 => rs1_value >= rs2_value,
-        _ => return None,
-    };
-
-    let imm = (((inst >> 31) & 0x1) << 12)
-        | (((inst >> 7) & 0x1) << 11)
-        | (((inst >> 25) & 0x3f) << 5)
-        | (((inst >> 8) & 0xf) << 1);
-    let target = pc.wrapping_add(sign_extend(imm as usize, 13) as usize);
-    Some(if taken { target } else { pc + 4 })
-}
-
-#[cfg(target_arch = "riscv64")]
-fn riscv_compressed_branch_next_pc(pc: usize, inst: u16, a0: usize) -> Option<usize> {
-    if inst & 0x3 != 0x1 {
-        return None;
-    }
-
-    let funct3 = (inst >> 13) & 0x7;
-    if funct3 != 0x6 && funct3 != 0x7 {
-        return None;
-    }
-    let rs1 = 8 + ((inst >> 7) & 0x7);
-    if rs1 != 10 {
-        return None;
-    }
-
-    let taken = match funct3 {
-        0x6 => a0 == 0,
-        0x7 => a0 != 0,
-        _ => unreachable!(),
-    };
-
-    let imm = (((inst >> 12) & 0x1) << 8)
-        | (((inst >> 10) & 0x3) << 3)
-        | (((inst >> 2) & 0x1) << 5)
-        | (((inst >> 5) & 0x3) << 6)
-        | (((inst >> 3) & 0x3) << 1);
-    let target = pc.wrapping_add(sign_extend(imm as usize, 9) as usize);
-    Some(if taken { target } else { pc + 2 })
-}
-
-#[cfg(target_arch = "riscv64")]
-fn riscv_branch_next_pc(process: &UserProcess, pc: usize, a0: usize) -> Option<usize> {
-    let Ok(low) = read_user_value::<u16>(process, pc) else {
-        return None;
-    };
-
-    if low & 0x3 == 0x3 {
-        read_user_value::<u32>(process, pc)
-            .ok()
-            .and_then(|inst| riscv_b_type_next_pc(pc, inst, a0))
-    } else {
-        riscv_compressed_branch_next_pc(pc, low, a0)
-    }
-}
-
-#[cfg(target_arch = "riscv64")]
-pub(super) fn fixup_riscv_clone_child_return(process: &UserProcess, tf: &mut TrapFrame) {
-    // The child starts from a freshly built UspaceContext instead of the
-    // original trap-return path. Interpret the clone wrapper's deterministic
-    // a0/zero return dispatch so a0 == 0 reaches the real child-side entry.
-    let mut pc = tf.sepc;
-    for _ in 0..4 {
-        let Some(next_pc) = riscv_branch_next_pc(process, pc, tf.regs.a0) else {
-            break;
-        };
-        if next_pc == pc {
-            break;
-        }
-        pc = next_pc;
-    }
-    tf.sepc = pc;
 }
 
 fn advance_syscall_pc(tf: &mut TrapFrame) {

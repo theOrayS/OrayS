@@ -49,7 +49,7 @@ pub use imp::fs::{sys_fstat, sys_getcwd, sys_lseek, sys_lstat, sys_open, sys_ren
 #[cfg(feature = "select")]
 pub use imp::io_mpx::sys_select;
 #[cfg(feature = "epoll")]
-pub use imp::io_mpx::{sys_epoll_create, sys_epoll_ctl, sys_epoll_wait};
+pub use imp::io_mpx::{sys_epoll_create, sys_epoll_create1, sys_epoll_ctl, sys_epoll_wait};
 #[cfg(feature = "net")]
 pub use imp::net::{
     set_socket_recv_buffer_size, set_socket_recv_timeout, set_socket_send_buffer_size,

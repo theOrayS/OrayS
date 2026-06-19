@@ -53,6 +53,10 @@ pub struct TaskInner {
     /// Mark whether the task is in the wait queue.
     in_wait_queue: AtomicBool,
 
+    /// Scheduler-observed runtime in hardware ticks.
+    runtime_ticks: AtomicU64,
+    runtime_started_at_ticks: AtomicU64,
+
     /// Used to indicate the CPU ID where the task is running or will run.
     cpu_id: AtomicU32,
     /// Used to indicate whether the task is running on a CPU.
@@ -236,6 +240,17 @@ impl TaskInner {
     pub fn set_cpumask(&self, cpumask: AxCpuMask) {
         *self.cpumask.lock() = cpumask
     }
+
+    /// Returns scheduler-observed runtime in hardware ticks.
+    pub fn cpu_runtime_ticks(&self) -> u64 {
+        let accumulated = self.runtime_ticks.load(Ordering::Acquire);
+        let started = self.runtime_started_at_ticks.load(Ordering::Acquire);
+        if started != 0 && self.state() == TaskState::Running {
+            accumulated.saturating_add(axhal::time::current_ticks().saturating_sub(started))
+        } else {
+            accumulated
+        }
+    }
 }
 
 // private methods
@@ -253,6 +268,8 @@ impl TaskInner {
             // By default, the task is allowed to run on all CPUs.
             cpumask: SpinNoIrq::new(cpumask),
             in_wait_queue: AtomicBool::new(false),
+            runtime_ticks: AtomicU64::new(0),
+            runtime_started_at_ticks: AtomicU64::new(0),
             #[cfg(feature = "irq")]
             timer_ticket_id: AtomicU64::new(0),
             cpu_id: AtomicU32::new(0),
@@ -303,6 +320,19 @@ impl TaskInner {
     #[inline]
     pub(crate) fn set_state(&self, state: TaskState) {
         self.state.store(state as u8, Ordering::Release)
+    }
+
+    pub(crate) fn begin_runtime_accounting(&self, now_ticks: u64) {
+        self.runtime_started_at_ticks
+            .store(now_ticks, Ordering::Release);
+    }
+
+    pub(crate) fn finish_runtime_accounting(&self, now_ticks: u64) {
+        let started = self.runtime_started_at_ticks.swap(0, Ordering::AcqRel);
+        if started != 0 {
+            self.runtime_ticks
+                .fetch_add(now_ticks.saturating_sub(started), Ordering::AcqRel);
+        }
     }
 
     /// Transition the task state from `current_state` to `new_state`,
@@ -534,6 +564,7 @@ impl CurrentTask {
         assert!(init_task.is_init());
         #[cfg(feature = "tls")]
         axhal::asm::write_thread_pointer(init_task.tls.tls_ptr() as usize);
+        init_task.begin_runtime_accounting(axhal::time::current_ticks());
         let ptr = Arc::into_raw(init_task);
         unsafe {
             axhal::percpu::set_current_task_ptr(ptr);

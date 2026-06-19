@@ -55,8 +55,37 @@ pub(super) fn live_user_thread_entries() -> Vec<UserThreadEntry> {
         .collect()
 }
 
-pub(super) fn unregister_user_task(tid: i32) {
-    user_thread_table().lock().remove(&tid);
+pub(super) fn unregister_user_task_with_runtime(
+    tid: i32,
+    process: &UserProcess,
+    runtime_ticks: u64,
+) {
+    let mut table = user_thread_table().lock();
+    // Keep the completed-runtime accounting and registry removal under the
+    // same table lock.  Snapshots take this lock before reading both the live
+    // task list and completed total, so they cannot observe a task as removed
+    // before its scheduler-observed runtime has been committed.
+    process
+        .completed_thread_runtime_ticks
+        .fetch_add(runtime_ticks, Ordering::AcqRel);
+    table.remove(&tid);
+}
+
+pub(super) fn process_runtime_ticks_snapshot(process: &UserProcess) -> u64 {
+    let mut table = user_thread_table().lock();
+    prune_exited_user_tasks_locked(&mut table);
+    table
+        .values()
+        .filter(|entry| {
+            entry.process.pid() == process.pid()
+                && entry.process.live_threads.load(Ordering::Acquire) != 0
+        })
+        .fold(
+            process
+                .completed_thread_runtime_ticks
+                .load(Ordering::Acquire),
+            |total, entry| total.saturating_add(entry.task.cpu_runtime_ticks()),
+        )
 }
 
 pub(super) fn user_thread_entry_by_tid(tid: i32) -> Option<UserThreadEntry> {

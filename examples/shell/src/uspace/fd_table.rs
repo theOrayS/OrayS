@@ -7923,6 +7923,9 @@ fn open_fd_entry(
     if path_exceeds_linux_limits(path) {
         return Err(LinuxError::ENAMETOOLONG);
     }
+    if flags & !supported_open_flags() != 0 {
+        return Err(LinuxError::EINVAL);
+    }
 
     let mut opts = OpenOptions::new();
     let access = flags & general::O_ACCMODE;
@@ -9048,6 +9051,26 @@ fn fcntl_setfl_flags(flags: u32) -> u32 {
     flags & (general::O_APPEND | general::O_NONBLOCK | general::O_DIRECT | general::O_NOATIME)
 }
 
+fn supported_open_flags() -> u32 {
+    general::O_ACCMODE
+        | general::O_APPEND
+        | general::O_NONBLOCK
+        | general::O_DSYNC
+        | general::O_SYNC
+        | general::O_DIRECT
+        | general::O_NOATIME
+        | general::O_CREAT
+        | general::O_EXCL
+        | general::O_TRUNC
+        | general::O_CLOEXEC
+        | general::O_DIRECTORY
+        | general::O_TMPFILE
+        | general::O_LARGEFILE
+        | general::O_NOCTTY
+        | O_PATH_FLAG
+        | O_NOFOLLOW_FLAG
+}
+
 fn tmpfile_requested(flags: u32) -> bool {
     flags & general::O_TMPFILE == general::O_TMPFILE
 }
@@ -9653,12 +9676,7 @@ fn is_synthetic_block_device_path(path: &str) -> bool {
 }
 
 fn is_synthetic_virtio_block_name(name: &str) -> bool {
-    let rest = name.strip_prefix("vd").unwrap_or("");
-    let mut chars = rest.chars();
-    let Some(letter) = chars.next() else {
-        return false;
-    };
-    letter.is_ascii_lowercase() && chars.all(|ch| ch.is_ascii_digit())
+    SYNTHETIC_BLOCK_DEVICE_NAMES.contains(&name)
 }
 
 fn synthetic_block_device_names_in_dir(path: &str) -> &'static [&'static str] {

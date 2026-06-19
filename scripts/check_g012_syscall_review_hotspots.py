@@ -187,6 +187,19 @@ def scan_high_hotspots(root: Path) -> list[str]:
     )
     if "Ok(_) => 0" in fsync:
         findings.append("sys_fsync still has a catch-all success arm")
+    open_entry = rust_function_block(fd, "open_fd_entry")
+    require_tokens(
+        findings,
+        fd,
+        "uspace openat/openat2 must reject unknown open flags instead of only validating API/libc wrappers",
+        ("fn supported_open_flags", "general::O_TMPFILE", "O_PATH_FLAG", "O_NOFOLLOW_FLAG"),
+    )
+    require_tokens(
+        findings,
+        open_entry,
+        "open_fd_entry must apply the supported open flag mask before using flags",
+        ("flags & !supported_open_flags() != 0", "LinuxError::EINVAL"),
+    )
     set_flags = rust_function_block(fd, "socket_ioctl_set_ifflags")
     require_tokens(
         findings,
@@ -264,14 +277,19 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     process_times = rust_function_block(time, "process_times")
     if "elapsed / 2" in process_times or "saturating_sub(user_ticks)" in process_times:
         findings.append("process_times still fabricates a half user/system split")
+    if "start_clock_ticks" in process_times or "clock_ticks_now()" in process_times:
+        findings.append("process_times must not use wall-clock lifetime as CPU time")
     require_tokens(
         findings,
         process_times,
-        "process_times must use measured syscall runtime instead of fabricated CPU splits",
+        "process_times must use scheduler runtime as CPU total and only cap system split with measured syscall runtime",
         (
-            "lacks hardware-mode CPU accounting",
+            "process_runtime_duration",
+            "duration_to_user_hz_ticks",
+            "total_runtime_ticks",
             "syscall_runtime_micros",
             "micros_to_ticks",
+            ".min(total_runtime_ticks)",
             "last_reported_user_ticks",
             "last_reported_system_ticks",
         ),
@@ -318,6 +336,142 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     )
     if "scheduled with the normal nice-based priority" in sched:
         findings.append("SCHED_DEADLINE comment still admits normal-priority fake success")
+
+    memory = read(root, "examples/shell/src/uspace/memory_map.rs")
+    require_tokens(
+        findings,
+        memory,
+        "MADV_DONTFORK/DOFORK must fail visibly when fork-policy metadata cannot be tracked",
+        (
+            "fn madvise_range_is_tracked",
+            "general::MADV_DONTFORK | general::MADV_DOFORK",
+            "!madvise_range_is_tracked(process, addr, end)",
+            "process.set_mmap_dont_fork_range",
+        ),
+    )
+    for name in ("mremap_shrink_in_place", "mremap_try_expand_in_place", "mremap_move"):
+        block = rust_function_block(memory, name)
+        require_tokens(
+            findings,
+            block,
+            f"{name} must preserve full mmap metadata including DONTFORK/WIPEONFORK and SIGBUS poison ranges",
+            (
+                "mmap_sigbus_segments",
+                "record_mmap_region_entry(region)",
+                "record_mmap_sigbus_ranges",
+            ),
+        )
+    futex = read(root, "examples/shell/src/uspace/futex.rs")
+    wake_requeue = rust_function_block(futex, "wake_requeue_addr_checked")
+    require_tokens(
+        findings,
+        wake_requeue,
+        "futex requeue helper must return wake and requeue counts separately",
+        (
+            "Result<(usize, usize), LinuxError>",
+            "return Ok((0, 0));",
+            "Ok((woken, requeued))",
+        ),
+    )
+    sys_futex = rust_function_block(futex, "sys_futex")
+    require_tokens(
+        findings,
+        sys_futex,
+        "FUTEX_REQUEUE must return only woken count while CMP_REQUEUE returns woken+requeued",
+        (
+            "general::FUTEX_REQUEUE",
+            "Ok((woken, _requeued)) => woken as isize",
+            "general::FUTEX_CMP_REQUEUE",
+            "Ok((woken, requeued)) => woken.saturating_add(requeued) as isize",
+        ),
+    )
+
+    lifecycle = read(root, "examples/shell/src/uspace/process_lifecycle.rs")
+    require_tokens(
+        findings,
+        lifecycle,
+        "mmap SIGBUS metadata helpers must support preserving poisoned ranges across mremap",
+        (
+            "pub(super) fn mmap_sigbus_segments",
+            "pub(super) fn record_mmap_sigbus_ranges",
+        ),
+    )
+    require_tokens(
+        findings,
+        lifecycle,
+        "wait child reaping must return resource usage for wait4/waitid",
+        (
+            "Result<Option<(i32, i32, general::rusage)>, LinuxError>",
+            "rusage_from_child_usage(child_usage, child_maxrss)",
+            "Ok(Some((child_pid, status, child_rusage)))",
+        ),
+    )
+    registry = read(root, "examples/shell/src/uspace/task_registry.rs")
+    unregister = rust_function_block(registry, "unregister_user_task_with_runtime")
+    require_tokens(
+        findings,
+        unregister,
+        "thread unregister must commit completed runtime under the table lock before removing the live entry",
+        (
+            "let mut table = user_thread_table().lock();",
+            "completed_thread_runtime_ticks",
+            ".fetch_add(runtime_ticks, Ordering::AcqRel)",
+            "table.remove(&tid)",
+        ),
+    )
+    if unregister.find(".fetch_add(runtime_ticks, Ordering::AcqRel)") > unregister.find("table.remove(&tid)"):
+        findings.append(
+            "unregister_user_task_with_runtime removes the live task before committing completed runtime"
+        )
+    wait4 = rust_function_block(lifecycle, "sys_wait4")
+    if "_rusage:" in wait4:
+        findings.append("sys_wait4 must not mark rusage as intentionally ignored")
+    require_tokens(
+        findings,
+        wait4,
+        "sys_wait4 must write caller-visible rusage instead of ignoring the argument",
+        (
+            "rusage: usize",
+            "child_rusage",
+            "write_user_value(process, rusage, &child_rusage)",
+        ),
+    )
+    waitid = rust_function_block(lifecycle, "sys_waitid")
+    if "_rusage:" in waitid:
+        findings.append("sys_waitid must not mark rusage as intentionally ignored")
+    require_tokens(
+        findings,
+        waitid,
+        "sys_waitid must write caller-visible rusage instead of ignoring the argument",
+        (
+            "rusage: usize",
+            "child_rusage",
+            "write_user_value(process, rusage, &child_rusage)",
+        ),
+    )
+
+    pthread = read(root, "api/arceos_posix_api/src/imp/pthread/mod.rs")
+    require_tokens(
+        findings,
+        pthread,
+        "pthread_create must register pthread_t before user start routine can run",
+        (
+            "registration_ready",
+            "while !child_registration_ready.load(Ordering::Acquire)",
+            "axtask::yield_now()",
+            "TID_TO_PTHREAD.write().insert(tid, thread)",
+            "registration_ready.store(true, Ordering::Release)",
+        ),
+    )
+    require_tokens(
+        findings,
+        pthread,
+        "missing pthread registration must be visible rather than a silent null/default path",
+        (
+            "error!(\"pthread_self: missing pthread registration",
+            "error!(\"pthread_exit: missing pthread registration",
+        ),
+    )
     return findings
 
 

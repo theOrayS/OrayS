@@ -560,6 +560,10 @@ impl AxRunQueue {
             return;
         }
 
+        let now_ticks = axhal::time::current_ticks();
+        prev_task.finish_runtime_accounting(now_ticks);
+        next_task.begin_runtime_accounting(now_ticks);
+
         // Claim the task as running, we do this before switching to it
         // such that any running task will have this set.
         #[cfg(feature = "smp")]

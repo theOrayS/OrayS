@@ -557,12 +557,14 @@ unsafe fn write_sockaddr_output(
     }
     let capacity = unsafe { read_socklen(addrlen)? } as usize;
     let (sockaddr, len) = into_sockaddr(value)?;
-    let src = unsafe {
-        core::slice::from_raw_parts(
-            (&sockaddr as *const ctypes::sockaddr).cast::<u8>(),
-            size_of::<ctypes::sockaddr>(),
-        )
-    };
+    let mut src = [0u8; size_of::<ctypes::sockaddr>()];
+    src[..size_of::<ctypes::sa_family_t>()].copy_from_slice(&sockaddr.sa_family.to_ne_bytes());
+    for (dst, byte) in src[size_of::<ctypes::sa_family_t>()..]
+        .iter_mut()
+        .zip(sockaddr.sa_data.iter().copied())
+    {
+        *dst = byte as u8;
+    }
     let copy_len = core::cmp::min(capacity, src.len());
     let dst = unsafe { writable_user_buffer(addr.cast::<c_void>(), copy_len)? };
     dst.copy_from_slice(&src[..copy_len]);

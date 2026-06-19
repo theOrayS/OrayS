@@ -43,8 +43,6 @@ use super::signal_abi::{
     ensure_user_return_hook_registered, thread_waits_for_signal,
 };
 use super::sysv_shm;
-#[cfg(target_arch = "riscv64")]
-use super::task_context::fixup_riscv_clone_child_return;
 use super::task_context::{
     child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
     UserTaskExt,
@@ -52,8 +50,9 @@ use super::task_context::{
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    live_user_thread_count, prune_exited_user_tasks, register_user_task, unregister_user_task,
-    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, UserThreadEntry,
+    live_user_thread_count, prune_exited_user_tasks, register_user_task,
+    unregister_user_task_with_runtime, user_thread_entries_by_process_pid,
+    user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
     read_cstr, read_execve_argv, read_execve_envp, read_user_value, write_user_bytes,
@@ -206,6 +205,40 @@ fn zero_child_wipe_on_fork_ranges(
     Ok(())
 }
 
+fn range_segments_excluding(
+    start: usize,
+    end: usize,
+    excluded: &[(usize, usize)],
+) -> Vec<(usize, usize)> {
+    if end <= start {
+        return Vec::new();
+    }
+    let mut segments = vec![(start, end)];
+    for (excluded_start, excluded_end) in excluded {
+        if excluded_end <= excluded_start {
+            continue;
+        }
+        let mut next = Vec::new();
+        for (segment_start, segment_end) in segments {
+            if segment_end <= *excluded_start || segment_start >= *excluded_end {
+                next.push((segment_start, segment_end));
+                continue;
+            }
+            if segment_start < *excluded_start {
+                next.push((segment_start, (*excluded_start).min(segment_end)));
+            }
+            if segment_end > *excluded_end {
+                next.push(((*excluded_end).max(segment_start), segment_end));
+            }
+        }
+        segments = next;
+        if segments.is_empty() {
+            break;
+        }
+    }
+    segments
+}
+
 fn populate_committed_brk_for_fork(aspace: &mut AddrSpace, brk_start: usize, brk_end: usize) {
     if brk_end <= brk_start {
         return;
@@ -239,12 +272,8 @@ fn initial_path_modes() -> BTreeMap<String, u32> {
     let mut modes = BTreeMap::new();
     // The ramfs mount at /tmp should behave like a normal Linux temporary
     // directory for user programs that switch credentials and then create
-    // scratch subdirectories.  The LTP runner's TMPDIR is a shared scratch root
-    // created by the kernel-side harness before each case; seed it with the
-    // same world-writable sticky mode so forked/setuid test children inherit a
-    // writable view instead of the backing ramfs default directory mode.
+    // scratch subdirectories.
     modes.insert(String::from("/tmp"), 0o1777);
-    modes.insert(String::from("/tmp/ltp-work"), 0o1777);
     #[cfg(feature = "auto-run-tests")]
     {
         for (path, mode) in initial_path_mode_overrides().lock().iter() {
@@ -536,8 +565,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         virtual_timer_interval_us: AtomicU64::new(0),
         prof_timer_deadline_us: AtomicU64::new(0),
         prof_timer_interval_us: AtomicU64::new(0),
-        start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
         syscall_runtime_micros: AtomicU64::new(0),
+        completed_thread_runtime_ticks: AtomicU64::new(0),
         last_reported_user_ticks: AtomicU64::new(0),
         last_reported_system_ticks: AtomicU64::new(0),
         waited_child_user_ticks: AtomicU64::new(0),
@@ -642,7 +671,7 @@ fn existing_busybox_for_exec_root(exec_root: &str) -> Option<String> {
     let mut candidates = Vec::new();
     if exec_root == "/glibc" {
         // The glibc runtime image may contain a minimal busybox without the
-        // shell/applet set used by LTP helpers.  Prefer the packaged musl
+        // shell/applet set used by portable helper scripts. Prefer the packaged musl
         // busybox for generic /bin applet fallback; it is statically linked
         // and is safe to use as a tool runner for glibc payloads.
         candidates.push("/musl/busybox");
@@ -1297,6 +1326,34 @@ impl UserProcess {
         ranges.sort_by_key(|(range_start, _)| *range_start);
     }
 
+    pub(super) fn mmap_sigbus_segments(&self, start: usize, end: usize) -> Vec<(usize, usize)> {
+        if end <= start {
+            return Vec::new();
+        }
+        self.mmap_sigbus_ranges
+            .lock()
+            .iter()
+            .filter_map(|(range_start, range_end)| {
+                let segment_start = (*range_start).max(start);
+                let segment_end = (*range_end).min(end);
+                (segment_end > segment_start).then_some((segment_start, segment_end))
+            })
+            .collect()
+    }
+
+    pub(super) fn record_mmap_sigbus_ranges<I>(&self, ranges: I)
+    where
+        I: IntoIterator<Item = (usize, usize)>,
+    {
+        let mut sigbus_ranges = self.mmap_sigbus_ranges.lock();
+        for (start, end) in ranges {
+            if end > start {
+                sigbus_ranges.push((start, end));
+            }
+        }
+        sigbus_ranges.sort_by_key(|(range_start, _)| *range_start);
+    }
+
     pub(super) fn record_mmap_region(
         &self,
         start: usize,
@@ -1309,24 +1366,36 @@ impl UserProcess {
         may_write: bool,
         file_backing: Option<super::UserMmapFileBacking>,
     ) {
-        let Some(end) = start.checked_add(size) else {
+        if start.checked_add(size).is_none() {
+            return;
+        }
+        self.record_mmap_region_entry(super::UserMmapRegion {
+            start,
+            size,
+            prot,
+            shared,
+            anonymous,
+            locked,
+            dont_fork: false,
+            wipe_on_fork: false,
+            grow_down,
+            may_write,
+            file_backing,
+        });
+    }
+
+    pub(super) fn record_mmap_region_entry(&self, region: super::UserMmapRegion) {
+        let start = region.start;
+        let Some(end) = region.start.checked_add(region.size) else {
             return;
         };
+        if end <= start {
+            return;
+        }
         self.forget_mmap_region(start, end);
         {
             let mut ranges = self.mmap_ranges.lock();
-            ranges.push(super::UserMmapRegion {
-                start,
-                size,
-                prot,
-                shared,
-                anonymous,
-                locked,
-                wipe_on_fork: false,
-                grow_down,
-                may_write,
-                file_backing,
-            });
+            ranges.push(region);
             ranges.sort_by_key(|region| region.start);
         }
     }
@@ -1415,6 +1484,32 @@ impl UserProcess {
         ranges.sort_by_key(|region| region.start);
     }
 
+    pub(super) fn set_mmap_dont_fork_range(&self, start: usize, end: usize, enabled: bool) {
+        let mut ranges = self.mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for region in old {
+            let region_end = region.end();
+            if region_end <= start || region.start >= end {
+                ranges.push(region);
+                continue;
+            }
+            if region.start < start {
+                ranges.push(region.subregion(region.start, start, region.prot));
+            }
+            let selected_start = region.start.max(start);
+            let selected_end = region_end.min(end);
+            if selected_end > selected_start {
+                let mut selected = region.subregion(selected_start, selected_end, region.prot);
+                selected.dont_fork = enabled;
+                ranges.push(selected);
+            }
+            if region_end > end {
+                ranges.push(region.subregion(end, region_end, region.prot));
+            }
+        }
+        ranges.sort_by_key(|region| region.start);
+    }
+
     pub(super) fn protect_mmap_region(&self, start: usize, end: usize, prot: u32) {
         let mut ranges = self.mmap_ranges.lock();
         let old = core::mem::take(&mut *ranges);
@@ -1479,12 +1574,22 @@ impl UserProcess {
     }
 
     pub(super) fn forget_mmap_range(&self, start: usize, end: usize) {
-        self.shared_mmap_ranges
-            .lock()
-            .retain(|(range_start, size, _)| {
-                let range_end = range_start.saturating_add(*size);
-                range_end <= start || *range_start >= end
-            });
+        let mut ranges = self.shared_mmap_ranges.lock();
+        let old = core::mem::take(&mut *ranges);
+        for (range_start, size, flags) in old {
+            let range_end = range_start.saturating_add(size);
+            if range_end <= start || range_start >= end {
+                ranges.push((range_start, size, flags));
+                continue;
+            }
+            if range_start < start {
+                ranges.push((range_start, start - range_start, flags));
+            }
+            if range_end > end {
+                ranges.push((end, range_end - end, flags));
+            }
+        }
+        ranges.sort_by_key(|(range_start, _, _)| *range_start);
     }
 
     fn shared_mmap_ranges(&self) -> Vec<(usize, usize, MappingFlags)> {
@@ -1568,6 +1673,26 @@ impl UserProcess {
         for region in child_mmap_ranges.iter_mut() {
             region.locked = false;
         }
+        let dont_fork_ranges: Vec<(usize, usize)> = if share_vm {
+            Vec::new()
+        } else {
+            child_mmap_ranges
+                .iter()
+                .filter(|region| region.dont_fork)
+                .map(|region| (region.start, region.end()))
+                .collect()
+        };
+        if !dont_fork_ranges.is_empty() {
+            {
+                let mut aspace = child_aspace.lock();
+                for (start, end) in &dont_fork_ranges {
+                    aspace
+                        .unmap(VirtAddr::from(*start), end.saturating_sub(*start))
+                        .map_err(LinuxError::from)?;
+                }
+            }
+            child_mmap_ranges.retain(|region| !region.dont_fork);
+        }
         let wipe_on_fork_ranges: Vec<(usize, usize)> = child_mmap_ranges
             .iter()
             .filter(|region| region.wipe_on_fork)
@@ -1581,12 +1706,30 @@ impl UserProcess {
             ))
         };
 
+        let child_shared_mmap_ranges: Vec<_> = self
+            .shared_mmap_ranges()
+            .into_iter()
+            .flat_map(|(start, size, flags)| {
+                let end = start.saturating_add(size);
+                range_segments_excluding(start, end, &dont_fork_ranges)
+                    .into_iter()
+                    .map(move |(segment_start, segment_end)| {
+                        (segment_start, segment_end - segment_start, flags)
+                    })
+            })
+            .collect();
+        let child_mmap_sigbus_ranges: Vec<_> = self
+            .mmap_sigbus_ranges()
+            .into_iter()
+            .flat_map(|(start, end)| range_segments_excluding(start, end, &dont_fork_ranges))
+            .collect();
+
         let child = Arc::new(UserProcess {
             aspace: child_aspace,
             owns_aspace: !share_vm,
             brk: Mutex::new(*self.brk.lock()),
-            shared_mmap_ranges: Mutex::new(self.shared_mmap_ranges()),
-            mmap_sigbus_ranges: Mutex::new(self.mmap_sigbus_ranges()),
+            shared_mmap_ranges: Mutex::new(child_shared_mmap_ranges),
+            mmap_sigbus_ranges: Mutex::new(child_mmap_sigbus_ranges),
             mmap_ranges: Mutex::new(child_mmap_ranges),
             exec_shared_mmap_cache: Mutex::new(Vec::new()),
             mlock_future: AtomicBool::new(false),
@@ -1652,8 +1795,8 @@ impl UserProcess {
             virtual_timer_interval_us: AtomicU64::new(0),
             prof_timer_deadline_us: AtomicU64::new(0),
             prof_timer_interval_us: AtomicU64::new(0),
-            start_clock_ticks: AtomicU64::new(super::time_abi::clock_ticks_now()),
             syscall_runtime_micros: AtomicU64::new(0),
+            completed_thread_runtime_ticks: AtomicU64::new(0),
             last_reported_user_ticks: AtomicU64::new(0),
             last_reported_system_ticks: AtomicU64::new(0),
             waited_child_user_ticks: AtomicU64::new(0),
@@ -1846,7 +1989,7 @@ impl UserProcess {
         &self,
         pid: i32,
         nohang: bool,
-    ) -> Result<Option<(i32, i32)>, LinuxError> {
+    ) -> Result<Option<(i32, i32, general::rusage)>, LinuxError> {
         fn is_exited(child: &ChildTask) -> bool {
             child.process.live_threads.load(Ordering::Acquire) == 0
         }
@@ -1959,12 +2102,13 @@ impl UserProcess {
             .process
             .self_maxrss_kb()
             .max(child.process.child_maxrss_kb());
+        let child_rusage = rusage_from_child_usage(child_usage, child_maxrss);
         self.record_waited_child_maxrss(child_maxrss);
         let _ = child.task.join();
         child.process.teardown();
         drop(child);
         yield_for_task_gc();
-        Ok(Some((child_pid, status)))
+        Ok(Some((child_pid, status, child_rusage)))
     }
 
     pub(super) fn child_exited(&self, pid: i32) -> Result<bool, LinuxError> {
@@ -1998,6 +2142,29 @@ impl UserProcess {
                 process: child.process.clone(),
             })
     }
+}
+
+fn empty_rusage() -> general::rusage {
+    unsafe { core::mem::zeroed() }
+}
+
+fn rusage_timeval_from_user_ticks(ticks: i64) -> general::__kernel_old_timeval {
+    let ticks = ticks.max(0) as i128;
+    let user_hz = super::time_abi::USER_HZ as i128;
+    general::__kernel_old_timeval {
+        tv_sec: (ticks / user_hz) as _,
+        tv_usec: ((ticks % user_hz) * 1_000_000 / user_hz) as _,
+    }
+}
+
+fn rusage_from_child_usage(usage: super::time_abi::Tms, maxrss_kb: usize) -> general::rusage {
+    let mut rusage = empty_rusage();
+    rusage.ru_utime =
+        rusage_timeval_from_user_ticks(usage.tms_utime.saturating_add(usage.tms_cutime));
+    rusage.ru_stime =
+        rusage_timeval_from_user_ticks(usage.tms_stime.saturating_add(usage.tms_cstime));
+    rusage.ru_maxrss = maxrss_kb as _;
+    rusage
 }
 
 #[cfg(feature = "auto-run-tests")]
@@ -2246,10 +2413,6 @@ pub(super) fn sys_clone(
         if clone_flags & general::CLONE_SETTLS as usize != 0 {
             child_tf.regs.tp = tls;
         }
-        #[cfg(target_arch = "riscv64")]
-        if child_stack != 0 {
-            fixup_riscv_clone_child_return(process.as_ref(), &mut child_tf);
-        }
         let child_context = UspaceContext::from(&child_tf);
         let mut task = TaskInner::new(user_task_entry, "user:fork".into(), USER_TASK_KSTACK_SIZE);
         let pid = task.id().as_u64() as i32;
@@ -2379,8 +2542,6 @@ pub(super) fn sys_clone(
     if clone_flags & general::CLONE_SETTLS as usize != 0 {
         child_tf.regs.tp = tls;
     }
-    #[cfg(target_arch = "riscv64")]
-    fixup_riscv_clone_child_return(process.as_ref(), &mut child_tf);
     let child_context = UspaceContext::from(&child_tf);
     let child_set_tid = if clone_flags & general::CLONE_CHILD_SETTID as usize != 0 {
         ctid
@@ -2430,7 +2591,7 @@ pub(super) fn sys_wait4(
     pid: i32,
     status: usize,
     options: usize,
-    _rusage: usize,
+    rusage: usize,
 ) -> isize {
     const SUPPORTED_WAIT_OPTIONS: u32 = general::WNOHANG
         | general::WUNTRACED
@@ -2445,7 +2606,7 @@ pub(super) fn sys_wait4(
     }
 
     let nohang = options & general::WNOHANG != 0;
-    let Some((child_pid, exit_code)) = (match process.wait_child(pid, nohang) {
+    let Some((child_pid, exit_code, child_rusage)) = (match process.wait_child(pid, nohang) {
         Ok(result) => result,
         Err(err) => return neg_errno(err),
     }) else {
@@ -2455,6 +2616,12 @@ pub(super) fn sys_wait4(
     if status != 0 {
         let wait_status = exit_code;
         let ret = write_user_value(process, status, &wait_status);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    if rusage != 0 {
+        let ret = write_user_value(process, rusage, &child_rusage);
         if ret != 0 {
             return ret;
         }
@@ -2524,7 +2691,7 @@ pub(super) fn sys_waitid(
     id: i32,
     infop: usize,
     options: usize,
-    _rusage: usize,
+    rusage: usize,
 ) -> isize {
     const SUPPORTED_WAITID_OPTIONS: u32 = general::WNOHANG
         | general::WEXITED
@@ -2582,6 +2749,13 @@ pub(super) fn sys_waitid(
                 return neg_errno(err);
             }
         }
+        if rusage != 0 {
+            let usage = empty_rusage();
+            let ret = write_user_value(process, rusage, &usage);
+            if ret != 0 {
+                return ret;
+            }
+        }
         return 0;
     }
 
@@ -2590,14 +2764,20 @@ pub(super) fn sys_waitid(
         Err(err) => return neg_errno(err),
     };
 
-    let info = if let Some((child_pid, status)) = wait_result {
-        waitid_siginfo(child_pid, status)
+    let (info, child_rusage) = if let Some((child_pid, status, usage)) = wait_result {
+        (waitid_siginfo(child_pid, status), usage)
     } else {
-        [0u8; 128]
+        ([0u8; 128], empty_rusage())
     };
     if infop != 0 {
         if let Err(err) = write_user_bytes(process, infop, &info) {
             return neg_errno(err);
+        }
+    }
+    if rusage != 0 {
+        let ret = write_user_value(process, rusage, &child_rusage);
+        if ret != 0 {
+            return ret;
         }
     }
     0
@@ -2640,7 +2820,11 @@ fn terminate_current_thread_inner(process: &UserProcess, code: i32, teardown_now
     release_current_robust_futexes();
     clear_current_tid_and_wake();
     perform_deferred_self_unmap();
-    unregister_user_task(current_tid());
+    unregister_user_task_with_runtime(
+        current_tid(),
+        process,
+        axtask::current().cpu_runtime_ticks(),
+    );
     if teardown_now {
         process.teardown();
     }

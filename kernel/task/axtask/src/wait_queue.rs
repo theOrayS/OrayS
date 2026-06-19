@@ -217,6 +217,133 @@ impl WaitQueue {
         notified.len()
     }
 
+    /// Wakes up to `count` distinct tasks that satisfy `predicate`, invoking
+    /// `on_task` immediately before each selected task is unblocked.
+    pub fn notify_many_where<F, G>(
+        &self,
+        count: usize,
+        resched: bool,
+        mut predicate: F,
+        mut on_task: G,
+    ) -> usize
+    where
+        F: FnMut(&AxTaskRef) -> bool,
+        G: FnMut(&AxTaskRef),
+    {
+        if count == 0 {
+            return 0;
+        }
+
+        let mut notified = Vec::new();
+        let mut wq = self.queue.lock();
+        let mut index = 0;
+        while index < wq.len() && notified.len() < count {
+            let Some(task) = wq.get(index).cloned() else {
+                break;
+            };
+            if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                let _ = wq.remove(index);
+                continue;
+            }
+            if !predicate(&task) {
+                index += 1;
+                continue;
+            }
+            let Some(task) = wq.remove(index) else {
+                break;
+            };
+            on_task(&task);
+            unblock_one_task(task.clone(), resched);
+            notified.push(task);
+        }
+        notified.len()
+    }
+
+    /// Wakes up to `wake_count` distinct source waiters matching `predicate`
+    /// and requeues up to `requeue_count` remaining distinct source waiters to
+    /// `target` while holding every involved queue lock.
+    ///
+    /// Futex requeue users rely on the wake and requeue phases being a single
+    /// handoff: a concurrent wake on the target queue must not run between
+    /// removing waiters from the source and inserting them into the target.
+    pub fn notify_and_requeue_where<F, G, H>(
+        &self,
+        wake_count: usize,
+        requeue_count: usize,
+        target: &WaitQueue,
+        resched: bool,
+        mut predicate: F,
+        mut on_wake: G,
+        mut on_requeue: H,
+    ) -> (usize, usize)
+    where
+        F: FnMut(&AxTaskRef) -> bool,
+        G: FnMut(&AxTaskRef),
+        H: FnMut(&AxTaskRef),
+    {
+        if wake_count == 0 && requeue_count == 0 {
+            return (0, 0);
+        }
+
+        let mut operate = |source: &mut VecDeque<AxTaskRef>,
+                           mut destination: Option<&mut VecDeque<AxTaskRef>>| {
+            let mut notified = Vec::new();
+            let mut index = 0;
+            while index < source.len() && notified.len() < wake_count {
+                let Some(task) = source.get(index).cloned() else {
+                    break;
+                };
+                if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                    let _ = source.remove(index);
+                    continue;
+                }
+                if !predicate(&task) {
+                    index += 1;
+                    continue;
+                }
+                let Some(task) = source.remove(index) else {
+                    break;
+                };
+                on_wake(&task);
+                unblock_one_task(task.clone(), resched);
+                notified.push(task);
+            }
+
+            let mut requeued = Vec::new();
+            if let Some(destination) = destination.as_deref_mut() {
+                while !source.is_empty() && requeued.len() < requeue_count {
+                    let Some(task) = source.pop_front() else {
+                        break;
+                    };
+                    if requeued.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                        continue;
+                    }
+                    on_requeue(&task);
+                    destination.push_back(task.clone());
+                    requeued.push(task);
+                }
+            }
+            (notified.len(), requeued.len())
+        };
+
+        if core::ptr::eq(self, target) {
+            let mut source = self.queue.lock();
+            return operate(&mut source, None);
+        }
+
+        let self_addr = core::ptr::addr_of!(self.queue) as usize;
+        let target_addr = core::ptr::addr_of!(target.queue) as usize;
+        if self_addr < target_addr {
+            let mut source = self.queue.lock();
+            let mut destination = target.queue.lock();
+            operate(&mut source, Some(&mut destination))
+        } else {
+            let mut destination = target.queue.lock();
+            let mut source = self.queue.lock();
+            operate(&mut source, Some(&mut destination))
+        }
+    }
+
     /// Wakes all tasks in the wait queue.
     ///
     /// If `resched` is true, the current task will be preempted when the
@@ -241,6 +368,18 @@ impl WaitQueue {
         }
     }
 
+    /// Removes `task` from this wait queue without waking it.
+    ///
+    /// Higher-level wait protocols use this to clean up after a task was moved
+    /// to a different queue and then timed out or was interrupted before that
+    /// destination queue woke it.
+    pub fn remove_task(&self, task: &AxTaskRef) -> bool {
+        let mut wq = self.queue.lock();
+        let old_len = wq.len();
+        wq.retain(|queued| !Arc::ptr_eq(queued, task));
+        wq.len() != old_len
+    }
+
     /// Transfers up to `count` tasks from this wait queue to another wait queue.
     ///
     /// Note: If the current wait queue contains fewer than `count` tasks, all available tasks will be moved.
@@ -251,17 +390,53 @@ impl WaitQueue {
     ///
     /// ## Returns
     /// The number of tasks actually requeued.  
-    pub fn requeue(&self, mut count: usize, target: &WaitQueue) -> usize {
-        let tasks: Vec<_> = {
-            let mut wq = self.queue.lock();
-            count = count.min(wq.len());
-            wq.drain(..count).collect()
-        };
-        if !tasks.is_empty() {
-            let mut wq = target.queue.lock();
-            wq.extend(tasks);
+    pub fn requeue(&self, count: usize, target: &WaitQueue) -> usize {
+        self.requeue_with(count, target, |_| {})
+    }
+
+    /// Transfers up to `count` tasks from this wait queue to another wait
+    /// queue, invoking `on_task` while each task is still owned by the requeue
+    /// operation.  This lets higher-level wait protocols update per-task wait
+    /// metadata atomically with the queue transfer instead of pretending a
+    /// requeue was just a wake-up.
+    pub fn requeue_with<F>(&self, count: usize, target: &WaitQueue, mut on_task: F) -> usize
+    where
+        F: FnMut(&AxTaskRef),
+    {
+        if core::ptr::eq(self, target) || count == 0 {
+            return 0;
         }
-        count
+
+        let mut transfer = |source: &mut VecDeque<AxTaskRef>,
+                            destination: &mut VecDeque<AxTaskRef>| {
+            let limit = count.min(source.len());
+            let mut moved = 0;
+            for _ in 0..limit {
+                let Some(task) = source.pop_front() else {
+                    break;
+                };
+                on_task(&task);
+                destination.push_back(task);
+                moved += 1;
+            }
+            moved
+        };
+
+        // Hold both queues while moving tasks so a concurrent wake on the
+        // target futex cannot miss waiters between source removal and
+        // destination insertion.  Lock addresses impose a stable order for
+        // simultaneous cross-requeues.
+        let self_addr = core::ptr::addr_of!(self.queue) as usize;
+        let target_addr = core::ptr::addr_of!(target.queue) as usize;
+        if self_addr < target_addr {
+            let mut source = self.queue.lock();
+            let mut destination = target.queue.lock();
+            transfer(&mut source, &mut destination)
+        } else {
+            let mut destination = target.queue.lock();
+            let mut source = self.queue.lock();
+            transfer(&mut source, &mut destination)
+        }
     }
 
     /// Returns the number of tasks in the wait queue.

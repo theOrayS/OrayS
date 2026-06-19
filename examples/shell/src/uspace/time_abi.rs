@@ -14,7 +14,8 @@ use super::signal_abi::{
 };
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{
-    user_thread_entry_by_tid, user_thread_entry_for_process, user_thread_entry_for_process_where,
+    process_runtime_ticks_snapshot, user_thread_entry_by_tid, user_thread_entry_for_process,
+    user_thread_entry_for_process_where,
 };
 use super::user_memory::{read_user_value, write_user_value};
 use super::{neg_errno, UserProcess};
@@ -326,7 +327,7 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 pub(super) fn clock_resolution_timespec() -> general::timespec {
     // Report the user-visible clock granularity, not the raw counter width.
     // The single-vCPU evaluator can delay back-to-back user/kernel round trips
-    // by more than one 10ms tick under full LTP load, so advertising raw or
+    // by more than one 10ms tick under full syscall/test load, so advertising raw or
     // single-tick resolution over-promises what clock_gettime() can
     // consistently expose.
     // Keep this well below the old scheduler-tick-scale 50ms value so POSIX
@@ -341,7 +342,7 @@ pub(super) fn clock_getres_timespec(clockid: u32) -> Result<general::timespec, L
     validate_clock_id(clockid)?;
     Ok(match clockid {
         // Coarse clocks model the USER_HZ/jiffy-scale accounting granularity used
-        // by rusage/times.  Keep them inside Linux/LTP's expected 1ms..10ms
+        // by rusage/times. Keep them inside the Linux coarse-clock 1ms..10ms
         // coarse range instead of inheriting the more conservative precise-clock
         // latency budget above.
         general::CLOCK_REALTIME_COARSE | general::CLOCK_MONOTONIC_COARSE => general::timespec {
@@ -395,6 +396,21 @@ pub(super) fn record_syscall_runtime_since_ticks(process: &UserProcess, start_ti
     }
 }
 
+fn task_runtime_duration(task: &axtask::AxTaskRef) -> core::time::Duration {
+    core::time::Duration::from_nanos(axhal::time::ticks_to_nanos(task.cpu_runtime_ticks()))
+}
+
+fn process_runtime_duration(process: &UserProcess) -> core::time::Duration {
+    let ticks = process_runtime_ticks_snapshot(process);
+    core::time::Duration::from_nanos(axhal::time::ticks_to_nanos(ticks))
+}
+
+fn duration_to_user_hz_ticks(duration: core::time::Duration) -> u64 {
+    let secs = duration.as_secs().saturating_mul(USER_HZ as u64);
+    let subsec = (duration.subsec_nanos() as u64).saturating_mul(USER_HZ as u64) / 1_000_000_000;
+    secs.saturating_add(subsec)
+}
+
 fn monotonic_reported_ticks(slot: &AtomicU64, ticks: u64) -> u64 {
     let mut current = slot.load(Ordering::Acquire);
     while ticks > current {
@@ -407,18 +423,16 @@ fn monotonic_reported_ticks(slot: &AtomicU64, ticks: u64) -> u64 {
 }
 
 pub(super) fn process_times(process: &UserProcess) -> Tms {
-    let elapsed = clock_ticks_now()
-        .saturating_sub(process.start_clock_ticks.load(Ordering::Acquire))
-        .min(c_long::MAX as u64) as c_long;
-    // This userspace kernel still lacks hardware-mode CPU accounting.  Keep the
-    // existing monotonic lifetime total, but split out real elapsed time spent
-    // inside syscall dispatch as observable system time instead of reporting a
-    // permanently-zero tms_stime.
-    let system_ticks = micros_to_ticks(process.syscall_runtime_micros.load(Ordering::Acquire))
-        .min(elapsed.max(0) as u64)
-        .min(c_long::MAX as u64) as c_long;
-    let raw_user_ticks = elapsed.saturating_sub(system_ticks).max(0) as u64;
-    let raw_system_ticks = system_ticks.max(0) as u64;
+    let total_runtime_ticks =
+        duration_to_user_hz_ticks(process_runtime_duration(process)).min(c_long::MAX as u64);
+    // Scheduler runtime is the authoritative CPU-time total.  The syscall
+    // elapsed counter is only used to split that total into user/system buckets
+    // and is capped by the scheduler-observed runtime so blocking wall time is
+    // not exposed as CPU time.
+    let raw_system_ticks = micros_to_ticks(process.syscall_runtime_micros.load(Ordering::Acquire))
+        .min(total_runtime_ticks)
+        .min(c_long::MAX as u64);
+    let raw_user_ticks = total_runtime_ticks.saturating_sub(raw_system_ticks);
     let user_ticks = monotonic_reported_ticks(&process.last_reported_user_ticks, raw_user_ticks)
         .min(c_long::MAX as u64) as c_long;
     let system_ticks =
@@ -493,11 +507,25 @@ pub(super) fn clock_now_duration(clockid: u32) -> Result<core::time::Duration, L
         general::CLOCK_MONOTONIC
         | general::CLOCK_MONOTONIC_RAW
         | general::CLOCK_MONOTONIC_COARSE
-        | general::CLOCK_BOOTTIME
-        | general::CLOCK_PROCESS_CPUTIME_ID
-        | general::CLOCK_THREAD_CPUTIME_ID => Ok(axhal::time::monotonic_time()),
+        | general::CLOCK_BOOTTIME => Ok(axhal::time::monotonic_time()),
+        general::CLOCK_PROCESS_CPUTIME_ID | general::CLOCK_THREAD_CPUTIME_ID => {
+            current_cpu_clock_duration(clockid)
+        }
         general::CLOCK_REALTIME_ALARM => Ok(adjusted_wall_time()),
         general::CLOCK_BOOTTIME_ALARM => Ok(axhal::time::monotonic_time()),
+        _ => Err(LinuxError::EINVAL),
+    }
+}
+
+fn current_cpu_clock_duration(clockid: u32) -> Result<core::time::Duration, LinuxError> {
+    let Some(ext) = current_task_ext() else {
+        return Err(LinuxError::EINVAL);
+    };
+    match clockid {
+        general::CLOCK_PROCESS_CPUTIME_ID => Ok(process_runtime_duration(ext.process.as_ref())),
+        general::CLOCK_THREAD_CPUTIME_ID => {
+            Ok(task_runtime_duration(axtask::current().as_task_ref()))
+        }
         _ => Err(LinuxError::EINVAL),
     }
 }

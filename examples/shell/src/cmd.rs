@@ -1478,6 +1478,13 @@ fn ensure_dir_all(path: &str) -> io::Result<()> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ensure_world_writable_sticky_dir(path: &str) -> io::Result<()> {
+    ensure_dir_all(path)?;
+    uspace::seed_initial_path_mode(path, 0o1777);
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn remove_dir_all(path: &str) -> io::Result<()> {
     if !matches!(fs::metadata(path), Ok(meta) if meta.is_dir()) {
         return Ok(());
@@ -1552,7 +1559,7 @@ fn cleanup_ltp_scratch() {
     // case's required inputs. Removing them keeps the full sweep from consuming
     // all physical frames while still reporting each case's real exit status.
     let _ = remove_dir_contents_except("/tmp", &["testsuite", "ltp-work"]);
-    let _ = ensure_dir_all("/tmp/ltp-work");
+    let _ = ensure_world_writable_sticky_dir("/tmp/ltp-work");
     let _ = remove_dir_contents_except("/tmp/ltp-work", &[]);
     let _ = remove_dir_contents_except("/var", &[]);
 }
@@ -1954,7 +1961,7 @@ fn prepare_ltp_case_run_dir(
     if matches!(fs::metadata(&run_dir), Ok(meta) if meta.is_dir()) {
         remove_dir_all(&run_dir)?;
     }
-    ensure_dir_all(&run_dir)?;
+    ensure_world_writable_sticky_dir(&run_dir)?;
     Ok(run_dir)
 }
 

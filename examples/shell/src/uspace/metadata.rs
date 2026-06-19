@@ -2189,12 +2189,7 @@ fn is_synthetic_virtio_block_path(path: &str) -> bool {
     let Some(name) = path.strip_prefix("/dev/") else {
         return false;
     };
-    let rest = name.strip_prefix("vd").unwrap_or("");
-    let mut chars = rest.chars();
-    let Some(letter) = chars.next() else {
-        return false;
-    };
-    letter.is_ascii_lowercase() && chars.all(|ch| ch.is_ascii_digit())
+    name == "vda"
 }
 
 pub(super) fn dev_null_stat() -> general::stat {

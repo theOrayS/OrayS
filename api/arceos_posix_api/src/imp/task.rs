@@ -16,18 +16,26 @@ pub fn sys_sched_yield() -> c_int {
     0
 }
 
-/// Get current thread ID.
+/// Get the process ID.
+///
+/// This POSIX API layer has pthread-style tasks but no exposed multi-process
+/// object.  Use the scheduler's current task id as the honest native identity
+/// for this API surface instead of returning a fixed value that could disagree
+/// with other process-aware syscall paths.
 pub fn sys_getpid() -> c_int {
-    syscall_body!(sys_getpid,
+    syscall_body!(sys_getpid, {
         #[cfg(feature = "multitask")]
         {
-            Ok(axtask::current().id().as_u64() as c_int)
+            Ok(axtask::current_may_uninit()
+                .map(|task| task.id().as_u64())
+                .unwrap_or(1)
+                .min(c_int::MAX as u64) as c_int)
         }
         #[cfg(not(feature = "multitask"))]
         {
-            Ok(2) // `main` task ID
+            Ok(1)
         }
-    )
+    })
 }
 
 /// Exit current task
