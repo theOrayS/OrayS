@@ -4,6 +4,7 @@ use core::time::Duration;
 
 use crate::ctypes;
 use crate::ctypes::{CLOCK_MONOTONIC, CLOCK_REALTIME};
+use crate::utils::{read_user_value, write_user_value};
 
 impl From<ctypes::timespec> for Duration {
     fn from(ts: ctypes::timespec) -> Self {
@@ -40,21 +41,25 @@ unsafe fn read_nanosleep_request(req: *const ctypes::timespec) -> LinuxResult<ct
         return Err(LinuxError::EINVAL);
     }
 
-    let req = unsafe { core::ptr::read_unaligned(req) };
+    let req = unsafe { read_user_value(req) }.map_err(|_| LinuxError::EINVAL)?;
     if req.tv_nsec < 0 || req.tv_nsec > 999_999_999 {
         return Err(LinuxError::EINVAL);
     }
     Ok(req)
 }
 
-unsafe fn write_timespec(dst: *mut ctypes::timespec, value: ctypes::timespec) {
-    unsafe { core::ptr::write_unaligned(dst, value) };
+unsafe fn write_timespec(dst: *mut ctypes::timespec, value: ctypes::timespec) -> LinuxResult {
+    unsafe { write_user_value(dst, value) }
 }
 
-unsafe fn write_optional_timespec(dst: *mut ctypes::timespec, value: ctypes::timespec) {
+unsafe fn write_optional_timespec(
+    dst: *mut ctypes::timespec,
+    value: ctypes::timespec,
+) -> LinuxResult {
     if !dst.is_null() {
-        unsafe { write_timespec(dst, value) };
+        unsafe { write_timespec(dst, value)? };
     }
+    Ok(())
 }
 
 /// Get clock time since booting
@@ -75,7 +80,7 @@ pub unsafe fn sys_clock_gettime(clk: ctypes::clockid_t, ts: *mut ctypes::timespe
                 return Err(LinuxError::EINVAL);
             }
         };
-        unsafe { write_timespec(ts, now) };
+        unsafe { write_timespec(ts, now)? };
         debug!("sys_clock_gettime: {}.{:09}s", now.tv_sec, now.tv_nsec);
         Ok(0)
     })
@@ -109,7 +114,7 @@ pub unsafe fn sys_nanosleep(req: *const ctypes::timespec, rem: *mut ctypes::time
         let actual = after - now;
 
         if let Some(diff) = dur.checked_sub(actual) {
-            unsafe { write_optional_timespec(rem, diff.into()) };
+            unsafe { write_optional_timespec(rem, diff.into())? };
             return Err(LinuxError::EINTR);
         }
         Ok(0)

@@ -1,5 +1,8 @@
-use crate::ctypes;
-use axerrno::LinuxError;
+use crate::{
+    ctypes,
+    utils::{check_null_ptr, write_user_value},
+};
+use axerrno::{LinuxError, LinuxResult};
 use core::ffi::c_int;
 
 fn current_rlimit(resource: u32) -> Option<ctypes::rlimit> {
@@ -17,8 +20,8 @@ fn current_rlimit(resource: u32) -> Option<ctypes::rlimit> {
     }
 }
 
-unsafe fn write_rlimit_output(rlimits: *mut ctypes::rlimit, value: ctypes::rlimit) {
-    unsafe { core::ptr::write_unaligned(rlimits, value) }
+unsafe fn write_rlimit_output(rlimits: *mut ctypes::rlimit, value: ctypes::rlimit) -> LinuxResult {
+    unsafe { write_user_value(rlimits, value) }
 }
 
 /// Get resource limitations
@@ -40,7 +43,7 @@ pub unsafe fn sys_getrlimit(resource: c_int, rlimits: *mut ctypes::rlimit) -> c_
             return Err(LinuxError::EFAULT);
         }
         if let Some(limit) = current_rlimit(resource as u32) {
-            unsafe { write_rlimit_output(rlimits, limit) };
+            unsafe { write_rlimit_output(rlimits, limit)? };
             Ok(0)
         } else {
             Err(LinuxError::ENOSYS)
@@ -66,6 +69,7 @@ pub unsafe fn sys_setrlimit(resource: c_int, rlimits: *mut crate::ctypes::rlimit
         if rlimits.is_null() {
             return Err(LinuxError::EFAULT);
         }
+        check_null_ptr(rlimits)?;
         // Currently do not support changing resource limits.
         Err::<c_int, LinuxError>(LinuxError::ENOSYS)
     })

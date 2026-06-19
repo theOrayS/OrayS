@@ -7,7 +7,6 @@ use alloc::{
 use core::ffi::{c_char, c_int, c_void};
 use core::mem::size_of;
 use core::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
-use core::ptr::NonNull;
 use core::time::Duration;
 
 use axerrno::{LinuxError, LinuxResult};
@@ -17,7 +16,9 @@ use axsync::Mutex;
 
 use super::fd_ops::FileLike;
 use crate::ctypes;
-use crate::utils::char_ptr_to_str;
+use crate::utils::{
+    char_ptr_to_str, read_user_value, readable_user_buffer, writable_user_buffer, write_user_value,
+};
 
 const SHUT_RD: c_int = 0;
 const SHUT_WR: c_int = 1;
@@ -47,7 +48,7 @@ impl ResolvedAddrInfoHints {
         let raw = if hints.is_null() {
             ctypes::addrinfo::default()
         } else {
-            unsafe { *hints }
+            unsafe { read_user_value(hints) }.map_err(|_| ctypes::EAI_SYSTEM)?
         };
         if raw.ai_flags & !SUPPORTED_AI_FLAGS != 0 {
             return Err(ctypes::EAI_BADFLAGS);
@@ -124,36 +125,6 @@ fn copy_canonname_to_aibuf(buf: &mut ctypes::aibuf, canonname: Option<&str>) {
     }
     buf.canonname[len] = 0;
     buf.ai.ai_canonname = buf.canonname.as_mut_ptr();
-}
-
-unsafe fn readable_socket_buffer<'a>(
-    buf: *const c_void,
-    len: ctypes::size_t,
-) -> LinuxResult<&'a [u8]> {
-    let ptr = if len == 0 {
-        NonNull::<u8>::dangling().as_ptr()
-    } else {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
-        buf as *const u8
-    };
-    Ok(unsafe { core::slice::from_raw_parts(ptr, len) })
-}
-
-unsafe fn writable_socket_buffer<'a>(
-    buf: *mut c_void,
-    len: ctypes::size_t,
-) -> LinuxResult<&'a mut [u8]> {
-    let ptr = if len == 0 {
-        NonNull::<u8>::dangling().as_ptr()
-    } else {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
-        buf as *mut u8
-    };
-    Ok(unsafe { core::slice::from_raw_parts_mut(ptr, len) })
 }
 
 fn check_recv_flags(flag: c_int) -> LinuxResult {
@@ -563,8 +534,8 @@ fn into_sockaddr(addr: SocketAddr) -> LinuxResult<(ctypes::sockaddr, ctypes::soc
     }
 }
 
-unsafe fn read_socklen(addrlen: *const ctypes::socklen_t) -> ctypes::socklen_t {
-    unsafe { core::ptr::read_unaligned(addrlen) }
+unsafe fn read_socklen(addrlen: *const ctypes::socklen_t) -> LinuxResult<ctypes::socklen_t> {
+    unsafe { read_user_value(addrlen) }
 }
 
 unsafe fn write_sockaddr_output(
@@ -574,8 +545,8 @@ unsafe fn write_sockaddr_output(
 ) -> LinuxResult<()> {
     let (sockaddr, len) = into_sockaddr(value)?;
     unsafe {
-        core::ptr::write_unaligned(addr, sockaddr);
-        core::ptr::write_unaligned(addrlen, len);
+        write_user_value(addr, sockaddr)?;
+        write_user_value(addrlen, len)?;
     }
     Ok(())
 }
@@ -605,7 +576,7 @@ fn from_sockaddr(
         return Err(LinuxError::EINVAL);
     }
 
-    let mid = unsafe { core::ptr::read_unaligned(addr as *const ctypes::sockaddr_in) };
+    let mid = unsafe { read_user_value(addr as *const ctypes::sockaddr_in)? };
     if mid.sin_family != ctypes::AF_INET as u16 {
         return Err(LinuxError::EAFNOSUPPORT);
     }
@@ -710,7 +681,7 @@ pub unsafe fn sys_sendto(
     syscall_body!(sys_sendto, {
         check_send_flags(flag)?;
         let socket = Socket::from_fd(socket_fd)?;
-        let buf = unsafe { readable_socket_buffer(buf_ptr, len)? };
+        let buf = unsafe { readable_user_buffer(buf_ptr, len)? };
         if matches!(socket.as_ref(), Socket::Tcp(_)) {
             return socket.send(buf);
         }
@@ -739,7 +710,7 @@ pub unsafe fn sys_send(
     );
     syscall_body!(sys_send, {
         check_send_flags(flag)?;
-        let buf = unsafe { readable_socket_buffer(buf_ptr, len)? };
+        let buf = unsafe { readable_user_buffer(buf_ptr, len)? };
         Socket::from_fd(socket_fd)?.send(buf)
     })
 }
@@ -771,7 +742,7 @@ pub unsafe fn sys_recvfrom(
             return Err(LinuxError::EFAULT);
         }
         let socket = Socket::from_fd(socket_fd)?;
-        let buf = unsafe { writable_socket_buffer(buf_ptr, len)? };
+        let buf = unsafe { writable_user_buffer(buf_ptr, len)? };
 
         let res = socket.recvfrom(buf)?;
         if let Some(addr) = res.1 {
@@ -801,7 +772,7 @@ pub unsafe fn sys_recv(
     );
     syscall_body!(sys_recv, {
         check_recv_flags(flag)?;
-        let buf = unsafe { writable_socket_buffer(buf_ptr, len)? };
+        let buf = unsafe { writable_user_buffer(buf_ptr, len)? };
         Socket::from_fd(socket_fd)?.recv(buf)
     })
 }
@@ -886,7 +857,8 @@ pub unsafe fn sys_getaddrinfo(
         if res.is_null() {
             return Err(ctypes::EAI_SYSTEM);
         }
-        unsafe { write_addrinfo_result(res, core::ptr::null_mut()) };
+        unsafe { write_addrinfo_result(res, core::ptr::null_mut()) }
+            .map_err(|_| ctypes::EAI_SYSTEM)?;
 
         let hints = ResolvedAddrInfoHints::from_ptr(hints)?;
         let name = name?;
@@ -972,7 +944,8 @@ pub unsafe fn sys_getaddrinfo(
         }
         let len = out.len();
         out[0].ref_ = len as i16;
-        unsafe { write_addrinfo_result(res, core::ptr::addr_of_mut!(out[0].ai)) };
+        unsafe { write_addrinfo_result(res, core::ptr::addr_of_mut!(out[0].ai)) }
+            .map_err(|_| ctypes::EAI_SYSTEM)?;
         core::mem::forget(out); // drop in `sys_freeaddrinfo`
         Ok(len as c_int)
     })();
@@ -980,7 +953,7 @@ pub unsafe fn sys_getaddrinfo(
         Ok(count) => count,
         Err(err) => {
             if !res.is_null() {
-                unsafe { write_addrinfo_result(res, core::ptr::null_mut()) };
+                let _ = unsafe { write_addrinfo_result(res, core::ptr::null_mut()) };
             }
             err
         }
@@ -992,8 +965,11 @@ pub unsafe fn sys_getaddrinfo(
 /// # Safety
 ///
 /// `res` must be writable for one `addrinfo` pointer.
-unsafe fn write_addrinfo_result(res: *mut *mut ctypes::addrinfo, value: *mut ctypes::addrinfo) {
-    unsafe { core::ptr::write_unaligned(res, value) };
+unsafe fn write_addrinfo_result(
+    res: *mut *mut ctypes::addrinfo,
+    value: *mut ctypes::addrinfo,
+) -> LinuxResult {
+    unsafe { write_user_value(res, value) }
 }
 
 /// Rebuild the leaked `aibuf` vector returned by `sys_getaddrinfo`.
@@ -1038,7 +1014,7 @@ pub unsafe fn sys_getsockname(
         if addr.is_null() || addrlen.is_null() {
             return Err(LinuxError::EFAULT);
         }
-        if unsafe { read_socklen(addrlen) } < size_of::<ctypes::sockaddr>() as u32 {
+        if unsafe { read_socklen(addrlen)? } < size_of::<ctypes::sockaddr>() as u32 {
             return Err(LinuxError::EINVAL);
         }
         let sockaddr = Socket::from_fd(sock_fd)?.local_addr()?;
@@ -1061,7 +1037,7 @@ pub unsafe fn sys_getpeername(
         if addr.is_null() || addrlen.is_null() {
             return Err(LinuxError::EFAULT);
         }
-        if unsafe { read_socklen(addrlen) } < size_of::<ctypes::sockaddr>() as u32 {
+        if unsafe { read_socklen(addrlen)? } < size_of::<ctypes::sockaddr>() as u32 {
             return Err(LinuxError::EINVAL);
         }
         let sockaddr = Socket::from_fd(sock_fd)?.peer_addr()?;

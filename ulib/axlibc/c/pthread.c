@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+extern int ax_pthread_mutex_trylock(pthread_mutex_t *m);
+
 int pthread_setcancelstate(int new, int *old)
 {
     unimplemented();
@@ -30,11 +32,47 @@ int pthread_cancel(pthread_t t)
     return ENOSYS;
 }
 
-// TODO
 int pthread_mutex_trylock(pthread_mutex_t *m)
 {
-    unimplemented();
-    return ENOSYS;
+    return ax_pthread_mutex_trylock(m);
+}
+
+int pthread_mutexattr_init(pthread_mutexattr_t *a)
+{
+    if (!a)
+        return EINVAL;
+    a->__attr = PTHREAD_MUTEX_DEFAULT;
+    return 0;
+}
+
+int pthread_mutexattr_destroy(pthread_mutexattr_t *a)
+{
+    if (!a)
+        return EINVAL;
+    return 0;
+}
+
+int pthread_mutexattr_gettype(const pthread_mutexattr_t *restrict a, int *restrict type)
+{
+    if (!a || !type)
+        return EINVAL;
+    *type = a->__attr & 0x3;
+    return 0;
+}
+
+int pthread_mutexattr_settype(pthread_mutexattr_t *a, int type)
+{
+    if (!a)
+        return EINVAL;
+    switch (type) {
+    case PTHREAD_MUTEX_NORMAL:
+    case PTHREAD_MUTEX_RECURSIVE:
+    case PTHREAD_MUTEX_ERRORCHECK:
+        a->__attr = (a->__attr & ~0x3u) | (unsigned)type;
+        return 0;
+    default:
+        return EINVAL;
+    }
 }
 
 // TODO

@@ -21,6 +21,11 @@ typedef struct {
     unsigned __attr;
 } pthread_mutexattr_t;
 
+#define PTHREAD_MUTEX_NORMAL     0
+#define PTHREAD_MUTEX_RECURSIVE  1
+#define PTHREAD_MUTEX_ERRORCHECK 2
+#define PTHREAD_MUTEX_DEFAULT    PTHREAD_MUTEX_NORMAL
+
 typedef struct {
     union {
         int __i[sizeof(long) == 8 ? 14 : 9];
@@ -65,6 +70,10 @@ int pthread_mutex_init(pthread_mutex_t *__restrict, const pthread_mutexattr_t *_
 int pthread_mutex_lock(pthread_mutex_t *);
 int pthread_mutex_unlock(pthread_mutex_t *);
 int pthread_mutex_trylock(pthread_mutex_t *);
+int pthread_mutexattr_init(pthread_mutexattr_t *);
+int pthread_mutexattr_destroy(pthread_mutexattr_t *);
+int pthread_mutexattr_gettype(const pthread_mutexattr_t *__restrict, int *__restrict);
+int pthread_mutexattr_settype(pthread_mutexattr_t *, int);
 
 int pthread_setname_np(pthread_t, const char *);
 

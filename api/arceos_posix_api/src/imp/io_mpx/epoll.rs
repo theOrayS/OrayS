@@ -2,8 +2,8 @@
 //!
 //! TODO: do not support `EPOLLET` flag
 
-use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{ffi::c_int, time::Duration};
@@ -13,7 +13,8 @@ use axhal::time::wall_time;
 use axsync::Mutex;
 
 use crate::ctypes;
-use crate::imp::fd_ops::{FileLike, add_file_like, get_file_like};
+use crate::imp::fd_ops::{add_file_like, get_file_like, FileLike};
+use crate::utils::{read_user_value, writable_user_slice};
 
 const EPOLL_STAT_DEV: ctypes::dev_t = 0x6570_6f6c_6c;
 const EPOLL_STAT_BLKSIZE: ctypes::blksize_t = 4096;
@@ -204,15 +205,13 @@ pub unsafe fn sys_epoll_ctl(
 ) -> c_int {
     debug!("sys_epoll_ctl <= epfd: {} op: {} fd: {}", epfd, op, fd);
     syscall_body!(sys_epoll_ctl, {
-        let event = match op as u32 {
+        let event_value = match op as u32 {
             ctypes::EPOLL_CTL_ADD | ctypes::EPOLL_CTL_MOD => {
-                if event.is_null() {
-                    return Err(LinuxError::EFAULT);
-                }
-                Some(unsafe { &*event })
+                Some(unsafe { read_user_value(event as *const ctypes::epoll_event)? })
             }
             _ => None,
         };
+        let event = event_value.as_ref();
         let ret = EpollInstance::from_fd(epfd)?.control(op as usize, fd as usize, event)? as c_int;
         Ok(ret)
     })
@@ -238,10 +237,8 @@ pub unsafe fn sys_epoll_wait(
         if maxevents <= 0 {
             return Err(LinuxError::EINVAL);
         }
-        if events.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
         let maxevents = maxevents as usize;
+        let events = unsafe { writable_user_slice(events, maxevents)? };
         let mut ready_events = Vec::new();
         ready_events
             .try_reserve_exact(maxevents)
@@ -255,9 +252,7 @@ pub unsafe fn sys_epoll_wait(
             axnet::poll_interfaces();
             let events_num = epoll_instance.poll_all(&mut ready_events)?;
             if events_num > 0 {
-                unsafe {
-                    core::ptr::copy_nonoverlapping(ready_events.as_ptr(), events, events_num);
-                }
+                events[..events_num].copy_from_slice(&ready_events[..events_num]);
                 return Ok(events_num as c_int);
             }
 

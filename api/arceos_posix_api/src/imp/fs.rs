@@ -1,6 +1,6 @@
 use alloc::{string::String, sync::Arc};
 use core::{
-    ffi::{c_char, c_int},
+    ffi::{c_char, c_int, c_void},
     sync::atomic::{AtomicI32, Ordering},
 };
 
@@ -10,7 +10,10 @@ use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
 use super::fd_ops::{get_file_like, FileLike};
-use crate::{ctypes, utils::char_ptr_to_str};
+use crate::{
+    ctypes,
+    utils::{char_ptr_to_str, writable_user_buffer, write_user_value},
+};
 
 pub struct File {
     inner: Mutex<axfs::fops::File>,
@@ -208,8 +211,8 @@ impl FileLike for File {
     }
 }
 
-unsafe fn write_stat_output(buf: *mut ctypes::stat, value: ctypes::stat) {
-    unsafe { core::ptr::write_unaligned(buf, value) };
+unsafe fn write_stat_output(buf: *mut ctypes::stat, value: ctypes::stat) -> LinuxResult {
+    unsafe { write_user_value(buf, value) }
 }
 
 /// Convert open flags to [`OpenOptions`].
@@ -309,11 +312,8 @@ pub unsafe fn sys_stat(path: *const c_char, buf: *mut ctypes::stat) -> c_int {
     let path = char_ptr_to_str(path);
     debug!("sys_stat <= {:?} {:#x}", path, buf as usize);
     syscall_body!(sys_stat, {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
         let st = stat_path(path?)?;
-        unsafe { write_stat_output(buf, st) };
+        unsafe { write_stat_output(buf, st)? };
         Ok(0)
     })
 }
@@ -328,12 +328,8 @@ pub unsafe fn sys_stat(path: *const c_char, buf: *mut ctypes::stat) -> c_int {
 pub unsafe fn sys_fstat(fd: c_int, buf: *mut ctypes::stat) -> c_int {
     debug!("sys_fstat <= {} {:#x}", fd, buf as usize);
     syscall_body!(sys_fstat, {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
-
         let st = get_file_like(fd)?.stat()?;
-        unsafe { write_stat_output(buf, st) };
+        unsafe { write_stat_output(buf, st)? };
         Ok(0)
     })
 }
@@ -350,11 +346,8 @@ pub unsafe fn sys_lstat(path: *const c_char, buf: *mut ctypes::stat) -> ctypes::
     let path = char_ptr_to_str(path);
     debug!("sys_lstat <= {:?} {:#x}", path, buf as usize);
     syscall_body!(sys_lstat, {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
         let st = lstat_path(path?)?;
-        unsafe { write_stat_output(buf, st) };
+        unsafe { write_stat_output(buf, st)? };
         Ok(0)
     })
 }
@@ -373,11 +366,10 @@ pub unsafe fn sys_getcwd(buf: *mut c_char, size: usize) -> *mut c_char {
         }
         let cwd = axfs::api::current_dir()?;
         let cwd = cwd.as_bytes();
-        if cwd.len() < size {
-            unsafe {
-                core::ptr::copy_nonoverlapping(cwd.as_ptr(), buf as *mut u8, cwd.len());
-                core::ptr::write((buf as *mut u8).add(cwd.len()), 0);
-            }
+        let dst = unsafe { writable_user_buffer(buf.cast::<c_void>(), size)? };
+        if cwd.len() < dst.len() {
+            dst[..cwd.len()].copy_from_slice(cwd);
+            dst[cwd.len()] = 0;
             Ok(buf)
         } else {
             Err(LinuxError::ERANGE)

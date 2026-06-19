@@ -3,7 +3,11 @@ use core::ffi::{c_int, c_ulong};
 use axerrno::{LinuxError, LinuxResult};
 use axhal::time::wall_time;
 
-use crate::{ctypes, imp::fd_ops::get_file_like};
+use crate::{
+    ctypes,
+    imp::fd_ops::get_file_like,
+    utils::{read_user_value, write_user_value},
+};
 
 const FD_SETSIZE: usize = 1024;
 const BITS_PER_WORD: usize = c_ulong::BITS as usize;
@@ -31,12 +35,12 @@ impl FdSets {
         read_fds: *const ctypes::fd_set,
         write_fds: *const ctypes::fd_set,
         except_fds: *const ctypes::fd_set,
-    ) -> Self {
+    ) -> LinuxResult<Self> {
         let mut sets = Self::empty(nfds);
-        sets.copy_from_fd_set(READ_SET, read_fds);
-        sets.copy_from_fd_set(WRITE_SET, write_fds);
-        sets.copy_from_fd_set(EXCEPT_SET, except_fds);
-        sets
+        sets.copy_from_fd_set(READ_SET, read_fds)?;
+        sets.copy_from_fd_set(WRITE_SET, write_fds)?;
+        sets.copy_from_fd_set(EXCEPT_SET, except_fds)?;
+        Ok(sets)
     }
 
     fn nfds_words(&self) -> usize {
@@ -50,13 +54,14 @@ impl FdSets {
         }
     }
 
-    fn copy_from_fd_set(&mut self, set_idx: usize, fds: *const ctypes::fd_set) {
+    fn copy_from_fd_set(&mut self, set_idx: usize, fds: *const ctypes::fd_set) -> LinuxResult {
         if fds.is_null() {
-            return;
+            return Ok(());
         }
         let words = self.nfds_words();
-        let src = unsafe { &(*fds).fds_bits[..words] };
-        self.bits[set_idx][..words].copy_from_slice(src);
+        let src = unsafe { read_user_value(fds)? };
+        self.bits[set_idx][..words].copy_from_slice(&src.fds_bits[..words]);
+        Ok(())
     }
 
     fn set_fd(&mut self, set_idx: usize, fd: usize) {
@@ -68,22 +73,22 @@ impl FdSets {
         read_fds: *mut ctypes::fd_set,
         write_fds: *mut ctypes::fd_set,
         except_fds: *mut ctypes::fd_set,
-    ) {
-        unsafe {
-            self.copy_to_fd_set(READ_SET, read_fds);
-            self.copy_to_fd_set(WRITE_SET, write_fds);
-            self.copy_to_fd_set(EXCEPT_SET, except_fds);
-        }
+    ) -> LinuxResult {
+        unsafe { self.copy_to_fd_set(READ_SET, read_fds)? };
+        unsafe { self.copy_to_fd_set(WRITE_SET, write_fds)? };
+        unsafe { self.copy_to_fd_set(EXCEPT_SET, except_fds)? };
+        Ok(())
     }
 
-    unsafe fn copy_to_fd_set(&self, set_idx: usize, fds: *mut ctypes::fd_set) {
+    unsafe fn copy_to_fd_set(&self, set_idx: usize, fds: *mut ctypes::fd_set) -> LinuxResult {
         if fds.is_null() {
-            return;
+            return Ok(());
         }
         let words = self.nfds_words();
-        unsafe {
-            (*fds).fds_bits[..words].copy_from_slice(&self.bits[set_idx][..words]);
-        }
+        let mut dst = unsafe { read_user_value(fds as *const ctypes::fd_set)? };
+        dst.fds_bits[..words].copy_from_slice(&self.bits[set_idx][..words]);
+        unsafe { write_user_value(fds, dst)? };
+        Ok(())
     }
 
     fn poll_all(&self, result_sets: &mut FdSets) -> LinuxResult<usize> {
@@ -156,8 +161,14 @@ pub unsafe fn sys_select(
             return Err(LinuxError::EINVAL);
         }
         let nfds = (nfds as usize).min(FD_SETSIZE);
-        let deadline = unsafe { timeout.as_ref().map(|t| wall_time() + (*t).into()) };
-        let fd_sets = FdSets::from(nfds, readfds, writefds, exceptfds);
+        let deadline = if timeout.is_null() {
+            None
+        } else {
+            Some(
+                wall_time() + unsafe { read_user_value(timeout as *const ctypes::timeval)? }.into(),
+            )
+        };
+        let fd_sets = FdSets::from(nfds, readfds, writefds, exceptfds)?;
         let mut result_sets = FdSets::empty(nfds);
 
         loop {
@@ -166,18 +177,18 @@ pub unsafe fn sys_select(
             let res = match fd_sets.poll_all(&mut result_sets) {
                 Ok(res) => res,
                 Err(err) => {
-                    unsafe { result_sets.write_back_to(readfds, writefds, exceptfds) };
+                    unsafe { result_sets.write_back_to(readfds, writefds, exceptfds)? };
                     return Err(err);
                 }
             };
             if res > 0 {
-                unsafe { result_sets.write_back_to(readfds, writefds, exceptfds) };
+                unsafe { result_sets.write_back_to(readfds, writefds, exceptfds)? };
                 return Ok(res);
             }
 
             if deadline.is_some_and(|ddl| wall_time() >= ddl) {
                 debug!("    timeout!");
-                unsafe { result_sets.write_back_to(readfds, writefds, exceptfds) };
+                unsafe { result_sets.write_back_to(readfds, writefds, exceptfds)? };
                 return Ok(0);
             }
             crate::sys_sched_yield();
