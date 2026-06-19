@@ -5,7 +5,7 @@ use core::ffi::c_int;
 #[cfg(feature = "select")]
 use arceos_posix_api::sys_select;
 #[cfg(feature = "epoll")]
-use arceos_posix_api::{sys_epoll_create, sys_epoll_ctl, sys_epoll_wait};
+use arceos_posix_api::{sys_epoll_create, sys_epoll_create1, sys_epoll_ctl, sys_epoll_wait};
 
 /// Creates a new epoll instance.
 ///
@@ -14,6 +14,13 @@ use arceos_posix_api::{sys_epoll_create, sys_epoll_ctl, sys_epoll_wait};
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn epoll_create(size: c_int) -> c_int {
     e(sys_epoll_create(size))
+}
+
+/// Creates a new epoll instance with Linux `epoll_create1` flags.
+#[cfg(feature = "epoll")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn epoll_create1(flags: c_int) -> c_int {
+    e(sys_epoll_create1(flags))
 }
 
 /// Control interface for an epoll file descriptor

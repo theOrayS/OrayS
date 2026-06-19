@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
+use alloc::{collections::BTreeMap, sync::Arc};
 use core::cell::UnsafeCell;
 use core::ffi::{c_int, c_void};
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -12,19 +12,18 @@ use crate::{ctypes, utils::write_user_value};
 pub mod mutex;
 
 lazy_static::lazy_static! {
-    static ref TID_TO_PTHREAD: RwLock<BTreeMap<u64, ForceSendSync<ctypes::pthread_t>>> = {
+    static ref TID_TO_PTHREAD: RwLock<BTreeMap<u64, Arc<Pthread>>> = {
         let mut map = BTreeMap::new();
         let main_task = axtask::current();
         let main_tid = main_task.id().as_u64();
-        let main_thread = Pthread {
+        let main_thread = Arc::new(Pthread {
             inner: main_task.as_task_ref().clone(),
             retval: Arc::new(Packet {
                 result: UnsafeCell::new(core::ptr::null_mut()),
             }),
             join_in_progress: AtomicBool::new(false),
-        };
-        let ptr = Box::into_raw(Box::new(main_thread)) as *mut c_void;
-        map.insert(main_tid, ForceSendSync(ptr));
+        });
+        map.insert(main_tid, main_thread);
         RwLock::new(map)
     };
 }
@@ -54,8 +53,13 @@ impl Pthread {
             result: UnsafeCell::new(core::ptr::null_mut()),
         });
         let their_packet = my_packet.clone();
+        let registration_ready = Arc::new(AtomicBool::new(false));
+        let child_registration_ready = registration_ready.clone();
 
         let main = move || {
+            while !child_registration_ready.load(Ordering::Acquire) {
+                axtask::yield_now();
+            }
             let arg = arg_wrapper;
             let ret = start_routine(arg.0);
             unsafe { *their_packet.result.get() = ret };
@@ -69,26 +73,34 @@ impl Pthread {
             retval: my_packet,
             join_in_progress: AtomicBool::new(false),
         };
-        let ptr = Box::into_raw(Box::new(thread)) as *mut c_void;
-        TID_TO_PTHREAD.write().insert(tid, ForceSendSync(ptr));
+        let thread = Arc::new(thread);
+        let ptr = Arc::as_ptr(&thread) as *mut c_void;
+        TID_TO_PTHREAD.write().insert(tid, thread);
+        registration_ready.store(true, Ordering::Release);
         Ok(ptr)
     }
 
     fn current_ptr() -> *mut Pthread {
         let tid = axtask::current().id().as_u64();
         match TID_TO_PTHREAD.read().get(&tid) {
-            None => core::ptr::null_mut(),
-            Some(ptr) => ptr.0 as *mut Pthread,
+            None => {
+                error!("pthread_self: missing pthread registration for tid={tid}");
+                core::ptr::null_mut()
+            }
+            Some(thread) => Arc::as_ptr(thread) as *mut Pthread,
         }
     }
 
-    fn current() -> Option<&'static Pthread> {
-        unsafe { core::ptr::NonNull::new(Self::current_ptr()).map(|ptr| ptr.as_ref()) }
-    }
-
     fn exit_current(retval: *mut c_void) -> ! {
-        let thread = Self::current().expect("fail to get current thread");
-        unsafe { *thread.retval.result.get() = retval };
+        let tid = axtask::current().id().as_u64();
+        {
+            let threads = TID_TO_PTHREAD.read();
+            if let Some(thread) = threads.get(&tid) {
+                unsafe { *thread.retval.result.get() = retval };
+            } else {
+                error!("pthread_exit: missing pthread registration for tid={tid}");
+            }
+        }
         axtask::exit(0);
     }
 
@@ -96,28 +108,34 @@ impl Pthread {
         if ptr.is_null() {
             return Err(LinuxError::ESRCH);
         }
-        if core::ptr::eq(ptr, Self::current_ptr() as _) {
-            return Err(LinuxError::EDEADLK);
-        }
+        let current_tid = axtask::current().id().as_u64();
 
-        let tid = {
+        let (tid, thread) = {
             let threads = TID_TO_PTHREAD.read();
-            let Some((tid, _)) = threads.iter().find(|(_, stored)| stored.0 == ptr) else {
+            let Some((tid, thread)) = threads
+                .iter()
+                .find(|(_, stored)| Arc::as_ptr(stored) as ctypes::pthread_t == ptr)
+            else {
                 return Err(LinuxError::ESRCH);
             };
-            *tid
+            if *tid == current_tid {
+                return Err(LinuxError::EDEADLK);
+            }
+            if thread.join_in_progress.swap(true, Ordering::AcqRel) {
+                return Err(LinuxError::EINVAL);
+            }
+            (*tid, thread.clone())
         };
-
-        let thread = unsafe { &*(ptr as *mut Pthread) };
-        if thread.join_in_progress.swap(true, Ordering::AcqRel) {
-            return Err(LinuxError::EINVAL);
-        }
 
         thread.inner.join();
         let retval = unsafe { *thread.retval.result.get() };
-        TID_TO_PTHREAD.write().remove(&tid);
-        let thread = unsafe { Box::from_raw(ptr as *mut Pthread) };
-        drop(thread);
+        let mut threads = TID_TO_PTHREAD.write();
+        if threads
+            .get(&tid)
+            .is_some_and(|stored| Arc::ptr_eq(stored, &thread))
+        {
+            threads.remove(&tid);
+        }
         Ok(retval)
     }
 }
@@ -128,7 +146,7 @@ unsafe fn write_pthread_output<T>(dst: *mut T, value: T) -> LinuxResult {
 
 /// Returns the `pthread` struct of current thread.
 pub fn sys_pthread_self() -> ctypes::pthread_t {
-    Pthread::current().expect("fail to get current thread") as *const Pthread as _
+    Pthread::current_ptr() as _
 }
 
 /// Create a new thread with the given entry point and argument.

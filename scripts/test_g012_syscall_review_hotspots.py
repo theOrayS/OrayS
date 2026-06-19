@@ -18,6 +18,7 @@ TARGETS = [
     Path("examples/shell/src/uspace/signal_abi.rs"),
     Path("examples/shell/src/uspace/memory_map.rs"),
     Path("examples/shell/src/uspace/process_lifecycle.rs"),
+    Path("examples/shell/src/uspace/task_registry.rs"),
     Path("examples/shell/src/uspace/task_context.rs"),
     Path("examples/shell/src/uspace/user_memory.rs"),
     Path("examples/shell/src/uspace/mount_abi.rs"),
@@ -25,6 +26,7 @@ TARGETS = [
     Path("examples/shell/src/uspace/system_info.rs"),
     Path("examples/shell/src/uspace/time_abi.rs"),
     Path("examples/shell/src/uspace/resource_sched.rs"),
+    Path("api/arceos_posix_api/src/imp/pthread/mod.rs"),
 ]
 
 
@@ -112,6 +114,20 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sys_fsync", result.stdout)
+
+    def test_detects_openat_unknown_flag_acceptance(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "    if flags & !supported_open_flags() != 0 {\n        return Err(LinuxError::EINVAL);\n    }\n",
+            "",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("open_fd_entry", result.stdout)
 
     def test_detects_siocsifflags_validate_success(self) -> None:
         tree = self.make_tree()
@@ -226,6 +242,106 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("process_times", result.stdout)
+
+    def test_detects_madvise_dontfork_without_tracked_metadata_gate(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/memory_map.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "            if !madvise_range_is_tracked(process, addr, end) {\n                return neg_errno(LinuxError::ENOMEM);\n            }\n",
+                "",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("MADV_DONTFORK", result.stdout)
+
+    def test_detects_mremap_metadata_reset(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/memory_map.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "process.record_mmap_region_entry(region);",
+                "process.record_mmap_region(region.start, region.size, region.prot, region.shared, region.anonymous, region.locked, region.grow_down, region.may_write, region.file_backing);",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("mremap_shrink_in_place", result.stdout)
+
+    def test_detects_mremap_sigbus_metadata_drop(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/memory_map.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace("    process.record_mmap_sigbus_ranges(preserved_sigbus);\n", "", 1),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SIGBUS", result.stdout)
+
+    def test_detects_futex_requeue_total_return(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "Ok((woken, _requeued)) => woken as isize",
+                "Ok((woken, requeued)) => woken.saturating_add(requeued) as isize",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("FUTEX_REQUEUE", result.stdout)
+
+    def test_detects_wait4_ignored_rusage(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/process_lifecycle.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("    rusage: usize,\n) -> isize {\n", "    _rusage: usize,\n) -> isize {\n", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sys_wait4", result.stdout)
+
+    def test_detects_pthread_registration_barrier_removal(self) -> None:
+        tree = self.make_tree()
+        path = tree / "api/arceos_posix_api/src/imp/pthread/mod.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace("        registration_ready.store(true, Ordering::Release);\n", "", 1),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("pthread_create", result.stdout)
+
+    def test_detects_runtime_unregister_before_accounting(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/task_registry.rs"
+        text = path.read_text(encoding="utf-8")
+        old = """    process
+        .completed_thread_runtime_ticks
+        .fetch_add(runtime_ticks, Ordering::AcqRel);
+    table.remove(&tid);
+"""
+        new = """    table.remove(&tid);
+    process
+        .completed_thread_runtime_ticks
+        .fetch_add(runtime_ticks, Ordering::AcqRel);
+"""
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unregister_user_task_with_runtime", result.stdout)
 
     def test_detects_sched_deadline_attribute_drop(self) -> None:
         tree = self.make_tree()

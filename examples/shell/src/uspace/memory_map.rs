@@ -3,23 +3,23 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
+use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
+use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
 use super::linux_abi::{
-    SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
+    neg_errno, SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP,
 };
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
+    read_user_bytes, validate_user_write, write_user_bytes, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 pub(super) fn sys_brk(process: &UserProcess, addr: usize) -> isize {
     let mut brk = process.brk.lock();
@@ -220,7 +220,7 @@ pub(super) fn sys_mmap(
     // Linux's vm.max_map_count limits the number of visible VMA entries.
     // Our synthetic /proc/<pid>/maps always exposes text/heap/stack plus
     // recorded mmap regions.  Allow the mapping that crosses the limit, then
-    // fail the next one, matching the LTP-visible Linux boundary where the
+    // fail the next one, matching the Linux boundary where the
     // stopped child has max_map_count + 1 map lines.
     let visible_map_count = process.mmap_regions().len().saturating_add(3);
     if visible_map_count > super::synthetic_fs::proc_sys_vm_max_map_count() {
@@ -557,6 +557,8 @@ fn mremap_shrink_in_place(
     old_size: usize,
     new_size: usize,
 ) -> isize {
+    let new_end = old_addr + new_size;
+    let preserved_sigbus = process.mmap_sigbus_segments(old_addr, new_end);
     if new_size < old_size {
         let tail_start = old_addr + new_size;
         let tail_size = old_size - new_size;
@@ -573,18 +575,10 @@ fn mremap_shrink_in_place(
     let mut region = source.subregion(old_addr, old_addr + new_size, source.prot);
     region.start = old_addr;
     region.size = new_size;
-    process.record_mmap_region(
-        region.start,
-        region.size,
-        region.prot,
-        region.shared,
-        region.anonymous,
-        region.locked,
-        region.grow_down,
-        region.may_write,
-        region.file_backing,
-    );
-    process.record_self_maxrss_kb(rss_kb_from_bytes(region.size));
+    let region_size = region.size;
+    process.record_mmap_region_entry(region);
+    process.record_mmap_sigbus_ranges(preserved_sigbus);
+    process.record_self_maxrss_kb(rss_kb_from_bytes(region_size));
     old_addr as isize
 }
 
@@ -604,6 +598,7 @@ fn mremap_try_expand_in_place(
     if extension == 0 {
         return Some(Ok(old_addr));
     }
+    let preserved_sigbus = process.mmap_sigbus_segments(old_addr, old_end);
     let map_flags = mmap_prot_to_flags(source.prot);
     let populate = source.file_backing.is_some() || source.shared || source.locked;
     let mut aspace = process.aspace.lock();
@@ -621,18 +616,10 @@ fn mremap_try_expand_in_place(
     if let Some(backing) = region.file_backing.as_mut() {
         backing.valid_len = backing.valid_len.max(new_size);
     }
-    process.record_mmap_region(
-        region.start,
-        region.size,
-        region.prot,
-        region.shared,
-        region.anonymous,
-        region.locked,
-        region.grow_down,
-        region.may_write,
-        region.file_backing,
-    );
-    process.record_self_maxrss_kb(rss_kb_from_bytes(region.size));
+    let region_size = region.size;
+    process.record_mmap_region_entry(region);
+    process.record_mmap_sigbus_ranges(preserved_sigbus);
+    process.record_self_maxrss_kb(rss_kb_from_bytes(region_size));
     if source.shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(old_end, extension, map_flags);
     }
@@ -674,6 +661,15 @@ fn mremap_move(
     let copy_size = old_size.min(new_size);
     let map_flags = mmap_prot_to_flags(source.prot);
     let populate = source.file_backing.is_some() || source.shared || source.locked;
+    let moved_sigbus: Vec<(usize, usize)> = process
+        .mmap_sigbus_segments(old_addr, old_addr + copy_size)
+        .into_iter()
+        .filter_map(|(start, end)| {
+            let mapped_start = target.checked_add(start.checked_sub(old_addr)?)?;
+            let mapped_end = target.checked_add(end.checked_sub(old_addr)?)?;
+            (mapped_end > mapped_start).then_some((mapped_start, mapped_end))
+        })
+        .collect();
 
     process.forget_mmap_region(target, target_end);
     process.forget_mmap_range(target, target_end);
@@ -707,18 +703,10 @@ fn mremap_move(
     if let Some(backing) = region.file_backing.as_mut() {
         backing.valid_len = backing.valid_len.max(new_size);
     }
-    process.record_mmap_region(
-        region.start,
-        region.size,
-        region.prot,
-        region.shared,
-        region.anonymous,
-        region.locked,
-        region.grow_down,
-        region.may_write,
-        region.file_backing,
-    );
-    process.record_self_maxrss_kb(rss_kb_from_bytes(region.size));
+    let region_size = region.size;
+    process.record_mmap_region_entry(region);
+    process.record_mmap_sigbus_ranges(moved_sigbus);
+    process.record_self_maxrss_kb(rss_kb_from_bytes(region_size));
     if source.shared && map_flags.contains(MappingFlags::WRITE) {
         process.record_shared_mmap(target, new_size, map_flags);
     }
@@ -934,6 +922,20 @@ pub(super) fn sys_madvise(process: &UserProcess, addr: usize, len: usize, advice
                 Some(err) => neg_errno(err),
             }
         }
+        general::MADV_DONTFORK | general::MADV_DOFORK => {
+            if !madvise_mapped_range(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            if !madvise_range_is_tracked(process, addr, end) {
+                return neg_errno(LinuxError::ENOMEM);
+            }
+            process.set_mmap_dont_fork_range(addr, end, advice == general::MADV_DONTFORK);
+            0
+        }
+        general::MADV_POPULATE_READ | general::MADV_POPULATE_WRITE => {
+            let write = advice == general::MADV_POPULATE_WRITE;
+            madvise_populate_range(process, addr, end, write).map_or_else(neg_errno, |_| 0)
+        }
         general::MADV_MERGEABLE | general::MADV_UNMERGEABLE => {
             if !madvise_mapped_range(process, addr, end) {
                 return neg_errno(LinuxError::ENOMEM);
@@ -990,6 +992,10 @@ fn madvise_range_is_private_anonymous(process: &UserProcess, start: usize, end: 
     })
 }
 
+fn madvise_range_is_tracked(process: &UserProcess, start: usize, end: usize) -> bool {
+    madvise_range_satisfies(process, start, end, |_| true)
+}
+
 fn madvise_private_anonymous_error(
     process: &UserProcess,
     start: usize,
@@ -1015,6 +1021,47 @@ fn madvise_private_anonymous_error(
         }
     }
     Some(LinuxError::ENOMEM)
+}
+
+fn madvise_populate_range(
+    process: &UserProcess,
+    start: usize,
+    end: usize,
+    write: bool,
+) -> Result<(), LinuxError> {
+    let size = end - start;
+    let access = if write {
+        MappingFlags::WRITE
+    } else {
+        MappingFlags::READ
+    };
+    let fault = if write {
+        PageFaultFlags::WRITE
+    } else {
+        PageFaultFlags::READ
+    };
+    let mut aspace = process.aspace.lock();
+    if !aspace.contains_range(VirtAddr::from(start), size)
+        || !aspace.can_access_range(VirtAddr::from(start), size, access)
+    {
+        return Err(LinuxError::ENOMEM);
+    }
+    let Some(pages) = PageIter4K::new(VirtAddr::from(start), VirtAddr::from(end)) else {
+        return Err(LinuxError::ENOMEM);
+    };
+    for page in pages {
+        let needs_fault = aspace.page_table().query(page).is_err()
+            || (write
+                && !aspace
+                    .page_table()
+                    .query(page)
+                    .map(|(_, flags, _)| flags.contains(MappingFlags::WRITE))
+                    .unwrap_or(false));
+        if needs_fault && !aspace.handle_page_fault(page, fault) {
+            return Err(LinuxError::ENOMEM);
+        }
+    }
+    Ok(())
 }
 
 fn madvise_mapped_range(process: &UserProcess, start: usize, end: usize) -> bool {
