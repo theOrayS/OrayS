@@ -1,6 +1,14 @@
-use crate::{ctypes, utils::e};
+use crate::ctypes;
 use arceos_posix_api as api;
 use core::ffi::{c_int, c_void};
+
+fn pthread_ret(ret: c_int) -> c_int {
+    if ret < 0 {
+        -ret
+    } else {
+        ret
+    }
+}
 
 /// Returns the `pthread` struct of current thread.
 #[unsafe(no_mangle)]
@@ -19,7 +27,7 @@ pub unsafe extern "C" fn pthread_create(
     start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,
     arg: *mut c_void,
 ) -> c_int {
-    e(unsafe { api::sys_pthread_create(res, attr, start_routine, arg) })
+    pthread_ret(unsafe { api::sys_pthread_create(res, attr, start_routine, arg) })
 }
 
 /// Exits the current thread. The value `retval` will be returned to the joiner.
@@ -34,7 +42,7 @@ pub unsafe extern "C" fn pthread_join(
     thread: ctypes::pthread_t,
     retval: *mut *mut c_void,
 ) -> c_int {
-    e(unsafe { api::sys_pthread_join(thread, retval) })
+    pthread_ret(unsafe { api::sys_pthread_join(thread, retval) })
 }
 
 /// Initialize a mutex.
@@ -43,17 +51,23 @@ pub unsafe extern "C" fn pthread_mutex_init(
     mutex: *mut ctypes::pthread_mutex_t,
     attr: *const ctypes::pthread_mutexattr_t,
 ) -> c_int {
-    e(unsafe { api::sys_pthread_mutex_init(mutex, attr) })
+    pthread_ret(unsafe { api::sys_pthread_mutex_init(mutex, attr) })
 }
 
 /// Lock the given mutex.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut ctypes::pthread_mutex_t) -> c_int {
-    e(unsafe { api::sys_pthread_mutex_lock(mutex) })
+    pthread_ret(unsafe { api::sys_pthread_mutex_lock(mutex) })
 }
 
 /// Unlock the given mutex.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut ctypes::pthread_mutex_t) -> c_int {
-    e(unsafe { api::sys_pthread_mutex_unlock(mutex) })
+    pthread_ret(unsafe { api::sys_pthread_mutex_unlock(mutex) })
+}
+
+/// Try to lock the given mutex without blocking.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ax_pthread_mutex_trylock(mutex: *mut ctypes::pthread_mutex_t) -> c_int {
+    pthread_ret(unsafe { api::sys_pthread_mutex_trylock(mutex) })
 }

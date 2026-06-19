@@ -6,7 +6,7 @@ use axerrno::{LinuxError, LinuxResult};
 use axtask::AxTaskRef;
 use spin::RwLock;
 
-use crate::ctypes;
+use crate::{ctypes, utils::write_user_value};
 
 pub mod mutex;
 
@@ -103,8 +103,8 @@ impl Pthread {
     }
 }
 
-unsafe fn write_pthread_output<T>(dst: *mut T, value: T) {
-    unsafe { core::ptr::write_unaligned(dst, value) };
+unsafe fn write_pthread_output<T>(dst: *mut T, value: T) -> LinuxResult {
+    unsafe { write_user_value(dst, value) }
 }
 
 /// Returns the `pthread` struct of current thread.
@@ -136,7 +136,7 @@ pub unsafe fn sys_pthread_create(
             return Err(LinuxError::EFAULT);
         }
         let ptr = Pthread::create(attr, start_routine, arg)?;
-        unsafe { write_pthread_output(res, ptr) };
+        unsafe { write_pthread_output(res, ptr)? };
         Ok(0)
     })
 }
@@ -158,7 +158,7 @@ pub unsafe fn sys_pthread_join(thread: ctypes::pthread_t, retval: *mut *mut c_vo
     syscall_body!(sys_pthread_join, {
         let ret = Pthread::join(thread)?;
         if !retval.is_null() {
-            unsafe { write_pthread_output(retval, ret) };
+            unsafe { write_pthread_output(retval, ret)? };
         }
         Ok(0)
     })

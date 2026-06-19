@@ -1,7 +1,7 @@
 use crate::ctypes;
+use crate::utils::{readable_user_buffer, readable_user_slice, writable_user_buffer};
 use axerrno::{LinuxError, LinuxResult};
 use core::ffi::{c_int, c_void};
-use core::ptr::NonNull;
 
 #[cfg(feature = "fd")]
 use crate::imp::fd_ops::get_file_like;
@@ -31,30 +31,6 @@ pub unsafe fn sys_read(fd: c_int, buf: *mut c_void, count: usize) -> ctypes::ssi
             _ => Err(LinuxError::EBADF),
         }
     })
-}
-
-unsafe fn writable_user_buffer<'a>(buf: *mut c_void, count: usize) -> LinuxResult<&'a mut [u8]> {
-    let ptr = if count == 0 {
-        NonNull::<u8>::dangling().as_ptr()
-    } else {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
-        buf as *mut u8
-    };
-    Ok(unsafe { core::slice::from_raw_parts_mut(ptr, count) })
-}
-
-unsafe fn readable_user_buffer<'a>(buf: *const c_void, count: usize) -> LinuxResult<&'a [u8]> {
-    let ptr = if count == 0 {
-        NonNull::<u8>::dangling().as_ptr()
-    } else {
-        if buf.is_null() {
-            return Err(LinuxError::EFAULT);
-        }
-        buf as *const u8
-    };
-    Ok(unsafe { core::slice::from_raw_parts(ptr, count) })
 }
 
 unsafe fn write_impl(fd: c_int, buf: *const c_void, count: usize) -> LinuxResult<ctypes::ssize_t> {
@@ -103,7 +79,7 @@ pub unsafe fn sys_writev(fd: c_int, iov: *const ctypes::iovec, iocnt: c_int) -> 
             return Err(LinuxError::EFAULT);
         }
 
-        let iovs = unsafe { core::slice::from_raw_parts(iov, iocnt as usize) };
+        let iovs = unsafe { readable_user_slice(iov, iocnt as usize)? };
         let mut ret = 0;
         for iov in iovs.iter() {
             if iov.iov_len == 0 {
