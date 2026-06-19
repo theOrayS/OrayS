@@ -71,6 +71,55 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("literal command lines", result.stdout)
 
+    def test_detects_score_aware_libctest_skip(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            'if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {\n'
+            '            println!("autorun: skip disabled test group {suite_dir}/{script}");\n'
+            "            continue;\n"
+            "        }\n",
+            'if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {\n'
+            '            println!("autorun: skip disabled test group {suite_dir}/{script}");\n'
+            "            continue;\n"
+            "        }\n"
+            '        if group == "libctest" && suite_dir != "/musl" {\n'
+            '            println!("autorun: skip unscored test group {suite_dir}/{script}: official libctest score is musl-only");\n'
+            "            continue;\n"
+            "        }\n",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("libctest", result.stdout)
+
+    def test_detects_structural_libctest_suite_dir_skip(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            'if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {\n'
+            '            println!("autorun: skip disabled test group {suite_dir}/{script}");\n'
+            "            continue;\n"
+            "        }\n",
+            'if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {\n'
+            '            println!("autorun: skip disabled test group {suite_dir}/{script}");\n'
+            "            continue;\n"
+            "        }\n"
+            '        if group == "libctest" {\n'
+            '            if suite_dir.as_str() != "/musl" {\n'
+            "                continue;\n"
+            "            }\n"
+            "        }\n",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("conditionally continue", result.stdout)
+
     def test_detects_suite_specific_script_rewrite_function(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
