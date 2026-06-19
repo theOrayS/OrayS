@@ -58,6 +58,10 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
             text=True,
         )
 
+    def replace_once(self, text: str, old: str, new: str) -> str:
+        self.assertIn(old, text, f"test fixture drifted; missing mutation target: {old!r}")
+        return text.replace(old, new, 1)
+
     def test_current_tree_passes(self) -> None:
         result = self.run_guard(ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -84,10 +88,10 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
     def test_detects_regular_file_open_flags_dropped(self) -> None:
         tree = self.make_tree()
         path = tree / "api/arceos_posix_api/src/imp/fs.rs"
-        text = path.read_text(encoding="utf-8").replace(
-            "File::new(file, filename, flags).add_to_fd_table()",
-            "File::new(file, filename, 0).add_to_fd_table()",
-            1,
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "File::new(file, filename, flags).add_to_fd_table(open_fd_flags(flags))",
+            "File::new(file, filename, 0).add_to_fd_table(open_fd_flags(flags))",
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
