@@ -1,0 +1,126 @@
+{
+  "ltp_stable_count": 1000,
+  "ltp_unique_count": 1000,
+  "ltp_array_line_ranges": [
+    [
+      44,
+      47,
+      "LTP_CORE_CASES"
+    ],
+    [
+      50,
+      619,
+      "LTP_STABLE_CASES"
+    ],
+    [
+      621,
+      642,
+      "LTP_SYSCALLS_BASIC_PLUS_CASES"
+    ],
+    [
+      644,
+      662,
+      "LTP_FS_BASIC_CASES"
+    ],
+    [
+      664,
+      664,
+      "LTP_PROC_BASIC_CASES"
+    ],
+    [
+      666,
+      685,
+      "LTP_TIME_SIGNAL_BASIC_CASES"
+    ],
+    [
+      716,
+      759,
+      "LTP_SWEEP_DEFAULT_BLACKLIST_CASES"
+    ],
+    [
+      687,
+      694,
+      "LTP_CASE_BATCHES"
+    ]
+  ],
+  "matrix_rows": 1044,
+  "non_ltp_runner_rows": 44,
+  "risk_counts": {
+    "OK_SELECTION_GUARD_COMMENT_ONLY": 5,
+    "OK_SELECTION_LIST_ONLY": 71,
+    "OK_NO_CASE_SPECIFIC_CODE": 913,
+    "WATCH_COMMENT_ONLY": 3,
+    "OK_GUARD_TEST_ONLY": 8,
+    "REVIEW_RUNNER_SEMANTICS": 44
+  },
+  "family_counts": {
+    "fs_path_metadata": 132,
+    "memory": 96,
+    "process": 150,
+    "fd": 219,
+    "misc": 263,
+    "signal": 44,
+    "time_clock": 18,
+    "net_socket": 37,
+    "thread_futex": 8,
+    "ipc": 32,
+    "namespace": 1,
+    "official_non_ltp_or_runner": 44
+  },
+  "case_name_occurrences_outside_stable_list": 87,
+  "runtime_case_name_risks": 0,
+  "csv_path": "/root/oskernel2026-orays/docs/self-check-recheck-2026-06-19/fresh-testcase-audit-matrix.csv"
+}
+
+## REVIEW_RUNTIME_CASE_NAME_OCCURRENCE
+
+## WATCH_COMMENT_ONLY
+ltp_stable ftest03 fs_path_metadata [] []
+ltp_stable ftest07 fs_path_metadata [] []
+ltp_stable dirty misc [] []
+
+## REVIEW_RUNNER_SEMANTICS
+suite_group basic official_non_ltp_or_runner [] []
+suite_group busybox official_non_ltp_or_runner [] []
+suite_group cyclictest official_non_ltp_or_runner [] []
+suite_group iozone official_non_ltp_or_runner [] []
+suite_group iperf official_non_ltp_or_runner [] []
+suite_group libcbench official_non_ltp_or_runner [] []
+suite_group libctest official_non_ltp_or_runner [] []
+suite_group lmbench official_non_ltp_or_runner [] []
+suite_group ltp official_non_ltp_or_runner [] []
+suite_group lua official_non_ltp_or_runner [] []
+suite_group netperf official_non_ltp_or_runner [] []
+suite_group unixbench official_non_ltp_or_runner [] []
+official_runner_or_target all official_non_ltp_or_runner [] []
+official_runner_or_target docker official_non_ltp_or_runner [] []
+official_runner_or_target kernel-la official_non_ltp_or_runner [] []
+official_runner_or_target kernel-rv official_non_ltp_or_runner [] []
+official_runner_or_target lua official_non_ltp_or_runner [] []
+official_runner_or_target run-la official_non_ltp_or_runner [] []
+official_runner_or_target run-rv official_non_ltp_or_runner [] []
+official_runner_or_target score official_non_ltp_or_runner [] []
+official_runner_or_target submit official_non_ltp_or_runner [] []
+official_judge basic-glibc official_non_ltp_or_runner [] []
+official_judge basic-musl official_non_ltp_or_runner [] []
+official_judge busybox-glibc official_non_ltp_or_runner [] []
+official_judge busybox-musl official_non_ltp_or_runner [] []
+official_judge cyclictest-glibc official_non_ltp_or_runner [] []
+official_judge cyclictest-musl official_non_ltp_or_runner [] []
+official_judge iozone-glibc official_non_ltp_or_runner [] []
+official_judge iozone-musl official_non_ltp_or_runner [] []
+official_judge iperf-glibc official_non_ltp_or_runner [] []
+official_judge iperf-musl official_non_ltp_or_runner [] []
+official_judge libcbench-glibc official_non_ltp_or_runner [] []
+official_judge libcbench-musl official_non_ltp_or_runner [] []
+official_judge libctest-glibc official_non_ltp_or_runner [] []
+official_judge libctest-musl official_non_ltp_or_runner [] []
+official_judge lmbench-glibc official_non_ltp_or_runner [] []
+official_judge lmbench-musl official_non_ltp_or_runner [] []
+official_judge ltp-glibc official_non_ltp_or_runner [] []
+official_judge ltp-musl official_non_ltp_or_runner [] []
+official_judge lua-glibc official_non_ltp_or_runner [] []
+official_judge lua-musl official_non_ltp_or_runner [] []
+official_judge netperf-glibc official_non_ltp_or_runner [] []
+official_judge netperf-musl official_non_ltp_or_runner [] []
+official_judge postwork official_non_ltp_or_runner [] []

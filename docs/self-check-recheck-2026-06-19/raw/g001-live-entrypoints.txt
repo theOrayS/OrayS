@@ -1,0 +1,654 @@
+## self-check.md
+     1	禁止行为1：
+     2	1.对某些测试程序名称或二进制特征进行特殊判断；
+     3
+     4	2.对特定syscall参数组合、输入数据、目录结构进行硬编码；
+     5
+     6	3.仅针对高分测试集合实现局部功能，而故意忽略通用语义；
+     7
+     8	4.利用测评系统环境差异、固定路径、固定时间、固定顺序进行投机；
+     9
+    10	5.为通过测试破坏 Linux syscall 兼容语义或内核基本安全边界；
+    11
+    12	6.通过非通用方式绕过真实的进程、内存、文件系统或同步机制。
+    13
+    14	7.其他以猜测测例、适配测例、硬编码测例为目标的投机性实现或评审委员会认定的违规测试行为。
+    15
+    16
+    17	禁止行为2：
+    18	1.牺牲Linux syscall主要功能的兼容语义换取速度；
+    19
+    20	2.对特定测试输入硬编码结果；
+    21
+    22	3.跳过必要的权限检查、资源检查或错误处理；
+    23
+    24	4.在隐藏条件下可能导致内核崩溃或数据错误；
+    25
+    26	5.只对固定测例有效、对一般程序无效的优化；
+    27
+    28	6.其他不符合正确性、通用性和可解释性的优化。
+## Makefile all/run targets
+     1	# Available arguments:
+     2	# * General options:
+     3	#     - `ARCH`: Target architecture: x86_64, riscv64, aarch64, loongarch64
+     4	#     - `MYPLAT`: Package name of the target platform crate.
+     5	#     - `PLAT_CONFIG`: Path to the platform configuration file.
+     6	#     - `SMP`: Override maximum CPU number specified in the platform config. For
+     7	#       statically configured platforms, this is also the number of CPUs to boot
+     8	#       and for platforms with runtime CPU detection, this is the upper limit of
+     9	#       CPUs.
+    10	#     - `MODE`: Build mode: release, debug
+    11	#     - `LOG:` Logging level: warn, error, info, debug, trace
+    12	#     - `V`: Verbose level: (empty), 1, 2
+    13	#     - `TARGET_DIR`: Artifact output directory (cargo target directory)
+    14	#     - `EXTRA_CONFIG`: Extra config specification file
+    15	#     - `OUT_CONFIG`: Final config file that takes effect
+    16	#     - `UIMAGE`: To generate U-Boot image
+    17	#     - `LD_SCRIPT`: Use a custom linker script file.
+    18	# * App options:
+    19	#     - `A` or `APP`: Path to the application
+    20	#     - `FEATURES`: Features os ArceOS modules to be enabled.
+    21	#     - `APP_FEATURES`: Features of (rust) apps to be enabled.
+    22	# * QEMU options:
+    23	#     - `BLK`: Enable storage devices (virtio-blk)
+    24	#     - `NET`: Enable network devices (virtio-net)
+    25	#     - `GRAPHIC`: Enable display devices and graphic output (virtio-gpu)
+    26	#     - `BUS`: Device bus type: mmio, pci
+    27	#     - `MEM`: Memory size (default is 128M)
+    28	#     - `DISK_IMG`: Path to the virtual disk image
+    29	#     - `ACCEL`: Enable hardware acceleration (KVM on linux)
+    30	#     - `QEMU_LOG`: Enable QEMU logging (log file is "qemu.log")
+    31	#     - `NET_DUMP`: Enable network packet dump (log file is "netdump.pcap")
+    32	#     - `NET_DEV`: QEMU netdev backend types: user, tap, bridge
+    33	#     - `VFIO_PCI`: PCI device address in the format "bus:dev.func" to passthrough
+    34	#     - `VHOST`: Enable vhost-net for tap backend (only for `NET_DEV=tap`)
+    35	# * Network options:
+    36	#     - `IP`: ArceOS IPv4 address (default is 10.0.2.15 for QEMU user netdev)
+    37	#     - `GW`: Gateway IPv4 address (default is 10.0.2.2 for QEMU user netdev)
+    38
+    39	# General options
+    40	ARCH ?= x86_64
+    41	MYPLAT ?=
+    42	PLAT_CONFIG ?=
+    43	PLATFORM_CONFIG_DIR ?= $(CURDIR)/configs/platforms
+    44	# Remote official evaluation invokes `make all` without extra arguments.
+    45	# Keep local QEMU targets (`kernel-la`, `run-la`, `./run-eval.sh la`) on the
+    46	# package default platform config, but build the submission `kernel-la` with the
+    47	# remote LoongArch address map that matches the official evaluator.
+    48	REMOTE_LA_PLAT_CONFIG ?= $(CURDIR)/configs/remote-eval/axplat-loongarch64-qemu-virt.toml
+    49	SMP ?=
+    50	MODE ?= release
+    51	LOG ?= warn
+    52	V ?=
+    53	TARGET_DIR ?= $(PWD)/target
+    54	EXTRA_CONFIG ?=
+    55	OUT_CONFIG ?= $(PWD)/.axconfig.toml
+    56	UIMAGE ?= n
+    57
+    58	# Kernel build options
+    59	KERNEL_APP ?= examples/shell
+    60	KERNEL_FEATURES ?= alloc,paging,irq,multitask,fs,net,rtc
+    61	KERNEL_RV_FEATURES ?= $(KERNEL_FEATURES)
+    62	KERNEL_LA_FEATURES ?= $(KERNEL_FEATURES)
+    63	KERNEL_APP_FEATURES ?= auto-run-tests,uspace
+    64	KERNEL_RV_APP_FEATURES ?= $(KERNEL_APP_FEATURES)
+    65	KERNEL_LA_APP_FEATURES ?= $(KERNEL_APP_FEATURES)
+    66	KERNEL_MODE ?= release
+    67	KERNEL_LOG ?= info
+    68	KERNEL_SMP ?= 1
+    69	KERNEL_BUILD_DIR ?= $(CURDIR)/build/kernels
+    70	KERNEL_TARGET_DIR ?= $(KERNEL_BUILD_DIR)/target
+    71	KERNEL_RV_OUT_DIR ?= $(KERNEL_BUILD_DIR)/riscv64
+    72	KERNEL_LA_OUT_DIR ?= $(KERNEL_BUILD_DIR)/loongarch64
+    73	KERNEL_RV_CONFIG ?= $(KERNEL_BUILD_DIR)/riscv64.axconfig.toml
+    74	KERNEL_LA_CONFIG ?= $(KERNEL_BUILD_DIR)/loongarch64.axconfig.toml
+    75	KERNEL_RV_TARGET_DIR ?= $(KERNEL_TARGET_DIR)/riscv64
+    76	KERNEL_LA_TARGET_DIR ?= $(KERNEL_TARGET_DIR)/loongarch64
+    77	KERNEL_RV_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
+    78	# QEMU loongarch64 virt splits 1G RAM into lowram [0, 0x1000_0000)
+    79	# and highram [0x8000_0000, 0xb000_0000). ArceOS uses highram as the
+    80	# contiguous RAM window, so do not advertise the hole above 0xb000_0000.
+    81	KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
+    82	KERNEL_RV ?= $(CURDIR)/kernel-rv
+    83	KERNEL_LA ?= $(CURDIR)/kernel-la
+    84	# Remote official evaluation invokes `make` / `make all` with no extra args.
+    85	# Default to the trusted stable LTP list so the full non-LTP surface plus both
+    86	# libc LTP passes can finish inside the remote scorer.  Broader sweep modes stay
+    87	# available for explicit scouting only; skipped/timeout/TCONF/TBROK/TFAIL/ENOSYS
+    88	# rows from those modes must not be promoted as PASS.
+    89	# Explicit broader / scouting modes remain available:
+    90	#   make all REMOTE_LTP_CASES=stable-plus-blacklist
+    91	#   make all REMOTE_LTP_CASES=blacklist
+    92	REMOTE_LTP_CASES ?= stable
+    93	REMOTE_LTP_BLACKLIST_DIR ?= $(CURDIR)/docs/ltp-full-sweep-blacklist-2026-05-30-arch
+    94	REMOTE_LTP_BLACKLIST_COMMON_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-common.txt
+    95	REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
+    96	REMOTE_LTP_BLACKLIST_LA_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-la.txt
+    97	REMOTE_LTP_BLACKLIST_MODES := blacklist all-minus-blacklist sweep:blacklist score-blacklist stable-plus-blacklist stable-plus-all-minus-blacklist
+    98	REMOTE_LTP_USES_BLACKLIST := $(filter $(REMOTE_LTP_BLACKLIST_MODES),$(REMOTE_LTP_CASES))
+    99	TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
+   100	RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
+   101	LA_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-la.img
+   102	RV_TESTSUITE_RUN_IMG ?= /tmp/arceos-sdcard-rv.run.qcow2
+   103	LA_TESTSUITE_RUN_IMG ?= /tmp/arceos-sdcard-la.run.qcow2
+   104	RV_AUX_DISK ?= $(CURDIR)/disk.img
+   105	LA_AUX_DISK ?= $(CURDIR)/disk-la.img
+   106	RV_MEM ?= 1G
+   107	LA_MEM ?= 1G
+   108	RV_NETDEV_ARGS ?= user,id=net
+   109	# Keep LA default consistent with RV: no host port binding by default.
+   110	# If you need forwarding, append for example:
+   111	#   make run-la LA_HOSTFWD_ARGS='hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555'
+   112	LA_HOSTFWD_ARGS ?=
+   113	ifeq ($(strip $(LA_HOSTFWD_ARGS)),)
+   114	LA_NETDEV_ARGS ?= user,id=net0
+   115	else
+   116	LA_NETDEV_ARGS ?= user,id=net0,$(LA_HOSTFWD_ARGS)
+   117	endif
+   118	DOCKER_IMAGE ?= orays-arceos-dev
+   119
+   120	# Remote evaluators may have no network/DNS, so prefer repo-provided helper
+   121	# shims before falling back to user-installed Cargo helpers. Keep the primary
+   122	# submission helpers under vendor/ because the grader expects dependencies to be
+   123	# submitted with the project source.
+   124	VENDOR_BIN := $(CURDIR)/vendor/bin
+   125	export PATH := $(VENDOR_BIN):$(CURDIR)/tools/bin:$(PATH)
+   126
+   127	SCRIPT_AXCONFIG_GEN := $(CURDIR)/scripts/axconfig-gen.py
+   128	SCRIPT_RUST_OBJCOPY := $(CURDIR)/scripts/rust-objcopy.sh
+   129	SCRIPT_CARGO_AXPLAT := $(CURDIR)/scripts/cargo-axplat.sh
+   130
+   131	ifneq ($(wildcard $(SCRIPT_AXCONFIG_GEN)),)
+   132	  AXCONFIG_GEN ?= python3 $(SCRIPT_AXCONFIG_GEN)
+   133	else ifneq ($(wildcard $(VENDOR_BIN)/axconfig-gen),)
+   134	  AXCONFIG_GEN ?= python3 $(VENDOR_BIN)/axconfig-gen
+   135	else
+   136	  AXCONFIG_GEN ?= axconfig-gen
+   137	endif
+   138
+   139	ifneq ($(wildcard $(SCRIPT_RUST_OBJCOPY)),)
+   140	  RUST_OBJCOPY ?= sh $(SCRIPT_RUST_OBJCOPY)
+   141	else ifneq ($(wildcard $(VENDOR_BIN)/rust-objcopy),)
+   142	  RUST_OBJCOPY ?= sh $(VENDOR_BIN)/rust-objcopy
+   143	else
+   144	  RUST_OBJCOPY ?= rust-objcopy
+   145	endif
+   146
+   147	ifneq ($(wildcard $(SCRIPT_CARGO_AXPLAT)),)
+   148	  CARGO_AXPLAT ?= sh $(SCRIPT_CARGO_AXPLAT)
+   149	else ifneq ($(wildcard $(VENDOR_BIN)/cargo-axplat),)
+   150	  CARGO_AXPLAT ?= sh $(VENDOR_BIN)/cargo-axplat
+   151	else
+   152	  CARGO_AXPLAT ?= cargo axplat
+   153	endif
+   154
+   155	ifneq ($(wildcard $(CURDIR)/cargo-home/config.toml),)
+   156	  # The official grader filters hidden directories and may have no network.
+   157	  # Use a non-hidden Cargo home with vendored sources for submission builds.
+   158	  CARGO_HOME ?= $(CURDIR)/cargo-home
+   159	  export CARGO_HOME
+   160	  ifneq ($(wildcard $(CURDIR)/scripts/ensure-cargo-vendor.sh),)
+   161	    _CARGO_VENDOR_READY := $(shell "$(CURDIR)/scripts/ensure-cargo-vendor.sh" >/dev/null && echo ok || echo fail)
+   162	    ifneq ($(_CARGO_VENDOR_READY),ok)
+   163	      $(error unable to restore vendor/cargo from vendor/cargo-vendor.tar.gz)
+   164	    endif
+   165	  endif
+   166	endif
+   167
+   168	# App options
+   169	A ?= examples/helloworld
+   170	APP ?= $(A)
+   171	FEATURES ?=
+   172	APP_FEATURES ?=
+   173
+   174	# QEMU options
+   175	BLK ?= n
+   176	NET ?= n
+   177	GRAPHIC ?= n
+   178	BUS ?= pci
+   179	MEM ?= 128M
+   180	ACCEL ?=
+   181	QEMU_ARGS ?=
+   182
+   183	DISK_IMG ?= disk.img
+   184	QEMU_LOG ?= n
+   185	NET_DUMP ?= n
+   186	NET_DEV ?= user
+   187	VFIO_PCI ?=
+   188	VHOST ?= n
+   189
+   190	# Network options
+   191	IP ?= 10.0.2.15
+   192	GW ?= 10.0.2.2
+   193
+   194	# App type
+   195	ifeq ($(wildcard $(APP)),)
+   196	  $(error Application path "$(APP)" is not valid)
+   197	endif
+   198
+   199	ifneq ($(wildcard $(APP)/Cargo.toml),)
+   200	  APP_TYPE := rust
+   201	else
+   202	  APP_TYPE := c
+   203	endif
+   204
+   205	.DEFAULT_GOAL := all
+   206
+   207	ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), build disasm run justrun debug defconfig oldconfig),)
+   208	# Install dependencies
+   209	include scripts/make/deps.mk
+   210	# Platform resolving
+   211	include scripts/make/platform.mk
+   212	# Configuration generation
+   213	include scripts/make/config.mk
+   214	# Feature parsing
+   215	include scripts/make/features.mk
+   216	endif
+   217
+   218	# Target
+   219	ifeq ($(ARCH), x86_64)
+   220	  TARGET := x86_64-unknown-none
+   221	else ifeq ($(ARCH), aarch64)
+   222	  TARGET := aarch64-unknown-none-softfloat
+   223	else ifeq ($(ARCH), riscv64)
+   224	  TARGET := riscv64gc-unknown-none-elf
+   225	else ifeq ($(ARCH), loongarch64)
+   226	  TARGET := loongarch64-unknown-none-softfloat
+   227	else
+   228	  $(error "ARCH" must be one of "x86_64", "riscv64", "aarch64" or "loongarch64")
+   229	endif
+   230
+   231	export AX_ARCH=$(ARCH)
+   232	export AX_PLATFORM=$(PLAT_NAME)
+   233	export AX_MODE=$(MODE)
+   234	export AX_LOG=$(LOG)
+   235	export AX_TARGET=$(TARGET)
+   236	export AX_IP=$(IP)
+   237	export AX_GW=$(GW)
+   238
+   239	ifneq ($(filter $(MAKECMDGOALS),unittest unittest_no_fail_fast clippy doc doc_check_missing),)
+   240	  # When running unit tests or other tests unrelated to a specific platform,
+   241	  # set `AX_CONFIG_PATH` to empty for dummy config
+   242	  unexport AX_CONFIG_PATH
+   243	else
+   244	  export AX_CONFIG_PATH=$(OUT_CONFIG)
+   245	endif
+   246
+   247	# Binutils
+   248	CROSS_COMPILE ?= $(ARCH)-linux-musl-
+   249	CC := $(CROSS_COMPILE)gcc
+   250	AR := $(CROSS_COMPILE)ar
+   251	RANLIB := $(CROSS_COMPILE)ranlib
+   252	LD := rust-lld -flavor gnu
+   253
+   254	OBJDUMP ?= rust-objdump -d --print-imm-hex --x86-asm-syntax=intel
+   255	OBJCOPY ?= $(RUST_OBJCOPY) --binary-architecture=$(ARCH)
+   256	GDB ?= gdb-multiarch
+   257
+   258	# Paths
+   259	OUT_DIR ?= $(APP)
+   260	LD_SCRIPT ?= $(TARGET_DIR)/$(TARGET)/$(MODE)/linker_$(PLAT_NAME).lds
+## run-eval.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3
+     4	ARCH="${1:-rv}"
+     5	SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+     6	TESTSUITE_DIR="${TESTSUITE_DIR:-$SCRIPT_DIR/../testsuits-for-oskernel}"
+     7	RV_IMG="${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}"
+     8	LA_IMG="${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}"
+     9	export PATH="$HOME/.cargo/bin:$PATH"
+    10
+    11	require_img() {
+    12	    if [ ! -f "$1" ]; then
+    13	        echo "缺少评测镜像: $1"
+    14	        echo "可通过 TESTSUITE_DIR 或 RV_TESTSUITE_IMG/LA_TESTSUITE_IMG 指定路径"
+    15	        exit 1
+    16	    fi
+    17	}
+    18
+    19	usage() {
+    20	    printf '用法: %s [rv|la]\n' "$0" >&2
+    21	    printf '可选环境变量: RV_TESTSUITE_IMG=/path/sdcard-rv.img LA_TESTSUITE_IMG=/path/sdcard-la.img\n' >&2
+    22	    printf 'blacklist sweep 可选: LTP_BLACKLIST_FILE/LTP_BLACKLIST_COMMON_FILE + LTP_BLACKLIST_RV_FILE 或 LTP_BLACKLIST_LA_FILE\n' >&2
+    23	}
+    24
+    25	need_cmd() {
+    26	    if ! command -v "$1" >/dev/null 2>&1; then
+    27	        printf '错误: 未找到 %s。请先安装依赖后再运行评测。\n' "$1" >&2
+    28	        return 1
+    29	    fi
+    30	}
+    31
+    32	need_file() {
+    33	    if [ ! -f "$1" ]; then
+    34	        printf '错误: 未找到评测镜像: %s\n' "$1" >&2
+    35	        printf '提示: 请先生成/复制对应 sdcard 镜像，或通过 %s 指定路径。\n' "$2" >&2
+    36	        return 1
+    37	    fi
+    38	}
+    39
+    40	# Make the Rust tools installed by rustup visible when this script is launched
+    41	# from a non-login shell whose PATH does not include ~/.cargo/bin.
+    42	if ! command -v cargo >/dev/null 2>&1; then
+    43	    if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    44	        # shellcheck disable=SC1091
+    45	        . "${CARGO_HOME:-$HOME/.cargo}/env"
+    46	    fi
+    47	fi
+    48
+    49	if ! command -v cargo >/dev/null 2>&1; then
+    50	    printf '错误: 未找到 cargo。请先安装 Rust 工具链，或执行: source "%s/env"\n' "${CARGO_HOME:-$HOME/.cargo}" >&2
+    51	    exit 1
+    52	fi
+    53
+    54
+    55	append_ltp_blacklist_files() {
+    56	    local var_name="$1"
+    57	    local value="${!var_name:-}"
+    58	    local file
+    59	    [ -n "$value" ] || return 0
+    60	    for file in $value; do
+    61	        if [ ! -f "$file" ]; then
+    62	            printf '错误: %s 指定的 blacklist 文件不存在: %s\n' "$var_name" "$file" >&2
+    63	            exit 1
+    64	        fi
+    65	        LTP_BLACKLIST="${LTP_BLACKLIST:+$LTP_BLACKLIST$'\n'}$(cat "$file")"
+    66	    done
+    67	    export LTP_BLACKLIST
+    68	}
+    69
+    70	compose_ltp_blacklist_files() {
+    71	    local arch="$1"
+    72	    append_ltp_blacklist_files LTP_BLACKLIST_FILE
+    73	    append_ltp_blacklist_files LTP_BLACKLIST_COMMON_FILE
+    74	    if [ "$arch" = "rv" ]; then
+    75	        append_ltp_blacklist_files LTP_BLACKLIST_RV_FILE
+    76	    elif [ "$arch" = "la" ]; then
+    77	        append_ltp_blacklist_files LTP_BLACKLIST_LA_FILE
+    78	    fi
+    79	}
+    80
+    81	if [ "$ARCH" = "rv" ]; then
+    82	    RV_IMG="${RV_TESTSUITE_IMG:-$SCRIPT_DIR/sdcard-rv.img}"
+    83	    missing=0
+    84	    need_cmd qemu-img || missing=1
+    85	    need_cmd qemu-system-riscv64 || missing=1
+    86	    need_file "$RV_IMG" RV_TESTSUITE_IMG || missing=1
+    87	    [ "$missing" -eq 0 ] || exit 1
+    88	    compose_ltp_blacklist_files rv
+    89	    make run-rv ARCH=riscv64 SMP=1 MEM=1G RV_TESTSUITE_IMG="$RV_IMG"
+    90	elif [ "$ARCH" = "la" ]; then
+    91	    LA_IMG="${LA_TESTSUITE_IMG:-$SCRIPT_DIR/sdcard-la.img}"
+    92	    missing=0
+    93	    need_cmd qemu-img || missing=1
+    94	    need_cmd qemu-system-loongarch64 || missing=1
+    95	    need_file "$LA_IMG" LA_TESTSUITE_IMG || missing=1
+    96	    [ "$missing" -eq 0 ] || exit 1
+    97	    compose_ltp_blacklist_files la
+    98	    make run-la ARCH=loongarch64 SMP=1 MEM=1G LA_TESTSUITE_IMG="$LA_IMG"
+    99	else
+   100	    usage
+   101	    exit 1
+   102	fi
+## cmd.rs relevant
+     1	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+     2	use axalloc::{allocation_bucket_stats, frame_allocator_stats, global_allocator};
+     3	use core::str;
+     4	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+     5	use std::collections::BTreeSet;
+     6	use std::fs::{self, File, FileType};
+     7	use std::io::{self, prelude::*};
+     8	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+     9	use std::string::ToString;
+    10	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    11	use std::time::Instant;
+    12	use std::{string::String, vec::Vec};
+    13
+    14	#[cfg(all(not(feature = "axstd"), unix))]
+    15	use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+    16
+    17	use crate::path_to_str;
+    18	#[cfg(feature = "uspace")]
+    19	use crate::uspace;
+    20	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    21	const SUITE_DIRS: &[&str] = &["/musl", "/glibc"];
+    22	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    23	const SCRIPT_SUFFIX: &str = "_testcode.sh";
+    24	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    25	const TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
+    26	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    27	const SCRIPT_BUSYBOX_APPLETS: &[&str] = &["basename", "dirname", "kill", "sleep"];
+    28	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    29	const PATH_BUSYBOX_APPLETS: &[&str] = &[
+    30	    "awk", "basename", "cat", "chmod", "cp", "cut", "date", "dirname", "echo", "expr", "find",
+    31	    "grep", "head", "kill", "ln", "ls", "mkdir", "mktemp", "mv", "printf", "ps", "pwd", "readlink",
+    32	    "rm", "rmdir", "sed", "seq", "setsid", "sh", "sleep", "sort", "tail", "tee", "timeout",
+    33	    "touch", "tr", "true", "uname", "wc", "xargs",
+    34	];
+    35	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    36	const LTP_BUSYBOX_APPLETS: &[&str] = &[
+    37	    "awk", "basename", "cat", "chmod", "chown", "cp", "cut", "date", "dd", "dirname", "dmesg",
+    38	    "echo", "env", "expr", "false", "find", "grep", "head", "hostname", "id", "ip", "kill", "ln",
+    39	    "ls", "mkdir", "mktemp", "mv", "printf", "ps", "pwd", "readlink", "rm", "rmdir", "sed", "seq",
+    40	    "sh", "sleep", "sort", "stat", "sync", "tail", "tar", "test", "touch", "tr", "true", "umount",
+    41	    "uname", "uniq", "wc", "which", "xargs",
+    42	];
+    43	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    44	const LTP_CORE_CASES: &[&str] = &[
+    45	    "access01", "brk01", "chdir01", "clone01", "close01", "dup01", "fcntl02", "fork01", "getpid01",
+    46	    "mmap01", "open01", "pipe01", "read01", "stat01", "wait401", "write01",
+    47	];
+    48	#[rustfmt::skip]
+    49	#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+    50	const LTP_STABLE_CASES: &[&str] = &[
+    51	    "access01", "brk01", "chdir01", "clone01",
+    52	    "close01", "dup01", "fcntl01", "fcntl02",
+    53	    "fork01", "getpid01", "mmap01", "open01",
+    54	    "pipe01", "read01", "stat01", "wait401",
+    55	    "write01", "access03", "close02", "dup02",
+    56	    "fcntl03", "getcwd01", "getpid02", "getppid01",
+    57	    "getuid01", "geteuid01", "getgid01", "getegid01",
+    58	    "getresuid01", "getresuid02", "getresuid03", "getresgid01",
+    59	    "getresgid02", "getresgid03", "lseek01", "lseek02",
+    60	    "read02",
+    61	    "write02", "creat01", "creat03", "open02",
+    62	    "open03", "stat02", "lstat01", "chmod01",
+    63	    "fchmod01", "rmdir01", "symlink01", "readlink01",
+    64	    "ftruncate01", "umask01", "alarm02", "alarm03",
+    65	    "clock_gettime02", "gettimeofday01", "time01", "times01",
+    66	    "kill03", "rt_sigaction01", "rt_sigaction02", "sigaction01",
+    67	    "proc01", "exit01", "exit02", "exit_group01",
+    68	    "getpgrp01", "getsid01", "gettid01", "uname01",
+    69	    "uname04", "getrlimit01", "getrusage01", "sched_getscheduler01",
+    70	    "sched_yield01", "getpgid02", "getsid02", "getppid02",
+    71	    "getuid03", "geteuid02", "getgid03", "getegid02",
+    72	    "getgroups03", "uname02", "wait01", "wait02",
+    73	    "getrlimit02", "getgroups01", "setrlimit02", "sched_getparam01",
+    74	    "sched_get_priority_max01", "sched_get_priority_min01", "sched_rr_get_interval01", "getpriority01",
+    75	    "getpriority02", "waitpid03", "rt_sigprocmask01", "rt_sigprocmask02",
+    76	    "sigaction02", "sigprocmask01", "sigsuspend01", "dup04",
+    77	    "dup202", "faccessat01", "fchmod03", "mkdirat01",
+    78	    "openat01", "pipe03", "pipe04", "pipe05",
+    79	    "pread01", "pwrite01", "sysinfo01", "waitpid06",
+    80	    "waitpid07", "waitpid08", "waitpid09", "brk02",
+    81	    "chmod03", "dup3_01", "dup3_02", "faccessat02",
+    82	    "fchmodat01", "getdomainname01", "gethostname01", "getpagesize01",
+    83	    "getrandom01", "getrandom02", "getrandom03", "getrandom04",
+    84	    "getrandom05", "getrlimit03", "read04", "sched_get_priority_max02",
+    85	    "sched_get_priority_min02", "sched_rr_get_interval02", "sysinfo02", "truncate02",
+    86	    "unlinkat01", "wait402", "dup201", "pipe06",
+    87	    "alarm06", "dup06", "dup07", "dup203",
+    88	    "dup204", "dup205", "dup206", "faccessat201",
+    89	    "faccessat202", "fchmod04", "fcntl04", "fcntl08",
+    90	    "fcntl09", "fcntl10", "fcntl16", "waitpid10",
+    91	    "waitpid04", "fcntl29", "fstatat01", "pipe09",
+    92	    "pipe10", "pipe14", "readv01", "write03",
+    93	    "write06", "writev02", "personality01", "personality02",
+    94	    "setegid01", "setfsgid01", "setfsuid01", "setgid01",
+    95	    "setgid03", "setpgid01", "setpgid02", "setpgrp01",
+    96	    "setpgrp02", "setregid01", "setresgid01", "setresuid01",
+    97	    "open04", "setgroups01", "setgroups02", "setreuid01",
+    98	    "setuid01", "statx02", "kill06", "mlock01",
+    99	    "mmap02", "mmap03", "munlock01", "pwrite03",
+   100	    "wait403", "waitpid11", "waitpid12", "waitpid13",
+   101	    "setpriority02", "setrlimit01", "setrlimit03", "pipe11",
+   102	    "fcntl01_64", "fcntl02_64", "fcntl03_64", "fcntl04_64",
+   103	    "fcntl08_64", "fcntl09_64", "fcntl10_64", "fcntl16_64",
+   104	    "fcntl29_64", "ftruncate01_64", "lstat01_64", "pread01_64",
+   105	    "pwrite01_64", "pwrite03_64", "stat01_64", "stat02_64",
+   106	    "truncate02_64", "getegid01_16", "getegid02_16", "dup03",
+   107	    "setegid02", "setfsgid02", "setfsuid02", "setfsuid03",
+   108	    "setfsuid04", "setgid02", "setregid02", "setregid03",
+   109	    "setregid04", "setresgid02", "setresgid03", "setresuid02",
+   110	    "setresuid03", "setreuid02", "setreuid03", "setreuid04",
+   111	    "setuid04", "rt_sigsuspend01", "signal02", "signal03",
+   112	    "signal04", "sighold02", "sched_getaffinity01", "sched_setparam01",
+   113	    "sched_setparam02", "sched_setparam03", "mlock03", "mlock04",
+   114	    "sched_setscheduler03", "set_tid_address01", "writev05", "writev06",
+   115	    "writev07", "readv02", "writev01", "waitid01",
+   116	    "waitid02", "waitid03", "waitid04", "waitid05",
+   117	    "waitid06", "waitid09", "waitid11", "kill07",
+   118	    "kill08", "kill09", "preadv01_64", "preadv02_64",
+   119	    "pwritev01_64", "pwritev02_64", "open08", "open13",
+   120	    "pipe12", "pipe13", "pipe2_01", "pipe2_04",
+   121	    "dup207", "getcwd02", "fchdir02", "fcntl23",
+   122	    "open09", "sched_getattr02", "statvfs02", "symlink02",
+   123	    "symlink04", "nice01", "nice02", "prctl01",
+   124	    "sethostname01", "sethostname02", "sethostname03", "clock_nanosleep04",
+   125	    "nanosleep04", "nice03", "fcntl23_64", "setuid03",
+   126	    "prctl05", "ftruncate03", "truncate03", "lseek07",
+   127	    "alarm05", "alarm07", "write05", "gettimeofday02",
+   128	    "waitpid01", "pipe2_02", "sched_getscheduler02", "fstat03",
+   129	    "fstat03_64", "statfs02", "fstatfs02", "fstatfs02_64",
+   130	    "sched_getparam03", "sched_setparam04", "sched_setparam05", "fchdir01",
+   131	    "fchdir03", "fcntl05", "fcntl05_64", "fcntl12",
+   132	    "fcntl12_64", "fcntl13", "fcntl13_64", "fdatasync01",
+   133	    "fdatasync02", "readlinkat01", "sched_setscheduler01", "sched_setscheduler02",
+   134	    "symlinkat01", "ftruncate03_64", "chdir04", "chown01",
+   135	    "chown02", "chown03", "chown05", "creat05",
+   136	    "abs01", "mkdir05", "statfs02_64", "truncate03_64",
+   137	    "fork03", "fork04", "fork07", "fork08",
+   138	    "fork09", "signal05", "string01", "memcmp01",
+   139	    "memcpy01", "memset01", "access02", "fchmodat02",
+   140	    "inode01", "mmap06", "ftest01", "ftest02",
+   141	    "ftest03", "ftest04", "mmap10", "stream01",
+   142	    "ftest05", "ftest07", "ftest08", "mmap09",
+   143	    "mmap11", "stream03", "stream04", "stream05",
+   144	    "abort01", "poll01", "fork05", "fork10",
+   145	    "kill11", "kill12", "mem02", "clock_settime01",
+   146	    "clock_settime02", "clone03", "confstr01",
+   147	    "chmod05", "fchmod05", "pipe08",
+   148	    "preadv01",
+   149	    "preadv02",
+   150	    "pwritev01",
+   151	    "pwritev02",
+   152	    "pread02",
+   153	    "pread02_64",
+   154	    "pwrite02",
+   155	    "pwrite02_64",
+   156	    "pwrite04",
+   157	    "pwrite04_64",
+   158	    "sendfile02",
+   159	    "sendfile02_64",
+   160	    "sendfile03",
+   161	    "sendfile03_64",
+   162	    "sendfile04",
+   163	    "sendfile04_64",
+   164	    "sendfile05",
+   165	    "sendfile05_64",
+   166	    "sendfile06",
+   167	    "sendfile06_64",
+   168	    "sendfile08",
+   169	    "sendfile08_64",
+   170	    "preadv201",
+   171	    "preadv201_64",
+   172	    "preadv202",
+   173	    "preadv202_64",
+   174	    "pwritev201",
+   175	    "pwritev201_64",
+   176	    "pwritev202",
+   177	    "pwritev202_64",
+   178	    "fcntl07",
+   179	    "fcntl07_64",
+   180	    "open06",
+   181	    "creat04",
+   182	    "mkdir04",
+   183	    "rmdir03",
+   184	    "unlink08",
+   185	    "unlink07",
+   186	    "statfs03",
+   187	    "statfs03_64",
+   188	    "pselect03",
+   189	    "setrlimit05",
+   190	    "unlink05",
+   191	    "pipe02",
+   192	    "dup05",
+   193	    "sendfile07",
+   194	    "sendfile07_64",
+   195	    "stream02",
+   196	    "flock01",
+   197	    "flock02",
+   198	    "flock03",
+   199	    "flock04",
+   200	    "clone06",
+   201	    "clone07",
+   202	    "pselect03_64",
+   203	    "pselect02",
+   204	    "pselect02_64",
+   205	    "flock06",
+   206	    "llseek02",
+   207	    "llseek03",
+   208	    "setresgid04",
+   209	    "setresuid04",
+   210	    "setresuid05",
+   211	    "setreuid05",
+   212	    "setreuid06",
+   213	    "setreuid07",
+   214	    "fchown01",
+   215	    "fchown02",
+   216	    "fchown03",
+   217	    "fchown05",
+   218	    "fchownat01",
+   219	    "fcntl18",
+   220	    "fcntl18_64",
+   221	    "fcntl11",
+   222	    "fcntl14",
+   223	    "fcntl19",
+   224	    "fcntl22",
+   225	    "syscall01",
+   226	    "mknod06",
+   227	    "mknod02",
+   228	    "mknod05",
+   229	    "getitimer01",
+   230	    "ppoll01",
+   231	    "fpathconf01",
+   232	    "pathconf01",
+   233	    "rename14",
+   234	    "mknod08",
+   235	    "mknodat01",
+   236	    "getxattr01",
+   237	    "listxattr01",
+   238	    "statx03",
+   239	    "diotest1",
+   240	    "diotest2",
+   241	    "diotest3",
+   242	    "diotest5",
+   243	    "diotest6",
+   244	    "mprotect05",
+   245	    "mmap001",
+   246	    "mmap15",
+   247	    "mmap17",
+   248	    "mmap19",
+   249	    "mincore01",
+   250	    "futex_wait02",
+   251	    "futex_wait04",
+   252	    "futex_wake01",
+   253	    "kill02",
+   254	    "sched_tc2",
+   255	    "sched_tc3",
+   256	    "sched_tc4",
+   257	    "sched_tc5",
+   258	    "shmdt02",
+   259	    "shmem_2nstest",
+   260	    "shmnstest",

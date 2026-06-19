@@ -1,0 +1,42 @@
+{
+    "aiSlopCleaner": {
+        "status": "passed",
+        "evidence": "docs/self-check-recheck-2026-06-19/ai-slop-cleaner-report.md"
+    },
+    "verification": {
+        "status": "passed",
+        "commands": [
+            "make all",
+            "./run-eval.sh rv (partial local official entrypoint; intentionally stopped after non-LTP groups and 18 LTP cases)",
+            "python3 -m py_compile scripts/check_g005_runner_parser.py scripts/test_g005_runner_parser.py",
+            "rustfmt --check examples/shell/src/cmd.rs",
+            "python3 scripts/check_g005_runner_parser.py --root .",
+            "python3 -m unittest scripts/test_g005_runner_parser.py",
+            "for f in scripts/check_g*.py; do python3 \"$f\" --root .; done",
+            "python3 -m unittest discover -s scripts -p 'test_g*.py'",
+            "git diff --check (scoped changed files)"
+        ],
+        "evidence": "make all returned 0; final verification log shows py_compile/rustfmt/G005/all G002-G013 guards/146 tests PASS; partial RV run exposes libctest-glibc failures instead of hiding them. See docs/self-check-recheck-2026-06-19/raw/g005-make-all.status, raw/g005-final-verification.txt, raw/g005-run-eval-rv-summary.txt, raw/final-diff-check-quality-gate.txt."
+    },
+    "codeReview": {
+        "recommendation": "APPROVE",
+        "architectStatus": "CLEAR",
+        "evidence": "Independent code-reviewer final recommendation APPROVE; independent architect final status CLEAR after structural libctest guard reinforcement.",
+        "independentReview": {
+            "codeReviewer": {
+                "agentRole": "code-reviewer",
+                "evidence": "docs/self-check-recheck-2026-06-19/raw/final-code-reviewer.md"
+            },
+            "architect": {
+                "agentRole": "architect",
+                "evidence": "docs/self-check-recheck-2026-06-19/raw/final-architect-review.md"
+            }
+        }
+    },
+    "limits": {
+        "fullOfficialScoreProven": false,
+        "dockerAvailable": false,
+        "laRuntimeFullRun": false,
+        "note": "Compliance fix intentionally exposes /glibc/libctest failures that were previously hidden; full RV/LA score equality remains unproven without full official run."
+    }
+}

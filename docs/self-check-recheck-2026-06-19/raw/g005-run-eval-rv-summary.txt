@@ -1,0 +1,134 @@
+--- status ---
+0
+--- groups observed ---
+#### OS COMP TEST GROUP START libctest-musl ####
+#### OS COMP TEST GROUP END libctest-musl ####
+#### OS COMP TEST GROUP START libctest-glibc ####
+#### OS COMP TEST GROUP END libctest-glibc ####
+#### OS COMP TEST GROUP START basic-musl ####
+#### OS COMP TEST GROUP END basic-musl ####
+#### OS COMP TEST GROUP START basic-glibc ####
+#### OS COMP TEST GROUP END basic-glibc ####
+#### OS COMP TEST GROUP START busybox-musl ####
+#### OS COMP TEST GROUP END busybox-musl ####
+#### OS COMP TEST GROUP START busybox-glibc ####
+#### OS COMP TEST GROUP END busybox-glibc ####
+#### OS COMP TEST GROUP START lua-musl ####
+#### OS COMP TEST GROUP END lua-musl ####
+#### OS COMP TEST GROUP START lua-glibc ####
+#### OS COMP TEST GROUP END lua-glibc ####
+#### OS COMP TEST GROUP START iperf-musl ####
+#### OS COMP TEST GROUP END iperf-musl ####
+#### OS COMP TEST GROUP START iperf-glibc ####
+#### OS COMP TEST GROUP END iperf-glibc ####
+#### OS COMP TEST GROUP START netperf-musl ####
+#### OS COMP TEST GROUP END netperf-musl ####
+#### OS COMP TEST GROUP START netperf-glibc ####
+#### OS COMP TEST GROUP END netperf-glibc ####
+#### OS COMP TEST GROUP START unixbench-musl ####
+#### OS COMP TEST GROUP END unixbench-musl ####
+#### OS COMP TEST GROUP START unixbench-glibc ####
+#### OS COMP TEST GROUP END unixbench-glibc ####
+#### OS COMP TEST GROUP START libcbench-musl ####
+#### OS COMP TEST GROUP END libcbench-musl ####
+#### OS COMP TEST GROUP START libcbench-glibc ####
+#### OS COMP TEST GROUP END libcbench-glibc ####
+#### OS COMP TEST GROUP START lmbench-musl ####
+#### OS COMP TEST GROUP END lmbench-musl ####
+#### OS COMP TEST GROUP START lmbench-glibc ####
+#### OS COMP TEST GROUP END lmbench-glibc ####
+#### OS COMP TEST GROUP START cyclictest-musl ####
+#### OS COMP TEST GROUP END cyclictest-musl ####
+#### OS COMP TEST GROUP START cyclictest-glibc ####
+#### OS COMP TEST GROUP END cyclictest-glibc ####
+#### OS COMP TEST GROUP START iozone-musl ####
+#### OS COMP TEST GROUP END iozone-musl ####
+#### OS COMP TEST GROUP START iozone-glibc ####
+#### OS COMP TEST GROUP END iozone-glibc ####
+#### OS COMP TEST GROUP START ltp-musl ####
+--- ltp cases started/completed counts ---
+START count: 19
+END count: 18
+--- completed ltp cases ---
+access01 brk01 chdir01 clone01 close01 dup01 fcntl01 fcntl02 fork01 getpid01 mmap01 open01 pipe01 read01 stat01 wait401 write01 access03
+--- tail ---
+LTP MEMORY stat01 after_cleanup: free_frames=239979 allocated_frames=21106 heap_used_bytes=1579092 heap_available_bytes=69724076 live_user_tasks=0 user_process_objects=0 user_process_created=5921 user_process_dropped=5921 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21165 user_task_ext_dropped=21165 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP CASE RUNTIME stat01: 7412 ms
+========== END ltp stat01 ==========
+========== START ltp wait401 ==========
+RUN LTP CASE wait401
+LTP MEMORY wait401 before: free_frames=239979 allocated_frames=21106 heap_used_bytes=1578500 heap_available_bytes=69724668 live_user_tasks=0 user_process_objects=0 user_process_created=5921 user_process_dropped=5921 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21165 user_task_ext_dropped=21165 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+wait401.c:40: [1;32mTPASS: [0mwait4() returned correct pid 21495
+wait401.c:49: [1;32mTPASS: [0mWIFEXITED() is set in status
+wait401.c:54: [1;32mTPASS: [0mWEXITSTATUS() == 0
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE wait401 : 0
+Pass!
+LTP MEMORY wait401 after_run: free_frames=239979 allocated_frames=21106 heap_used_bytes=1579793 heap_available_bytes=69723375 live_user_tasks=0 user_process_objects=0 user_process_created=5924 user_process_dropped=5924 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21168 user_task_ext_dropped=21168 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP MEMORY wait401 after_cleanup: free_frames=239979 allocated_frames=21106 heap_used_bytes=1579702 heap_available_bytes=69723466 live_user_tasks=0 user_process_objects=0 user_process_created=5924 user_process_dropped=5924 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21168 user_task_ext_dropped=21168 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP CASE RUNTIME wait401: 7534 ms
+========== END ltp wait401 ==========
+========== START ltp write01 ==========
+RUN LTP CASE write01
+LTP MEMORY write01 before: free_frames=239979 allocated_frames=21106 heap_used_bytes=1579303 heap_available_bytes=69723865 live_user_tasks=0 user_process_objects=0 user_process_created=5924 user_process_dropped=5924 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21168 user_task_ext_dropped=21168 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+write01.c:40: [1;32mTPASS: [0mwrite() passed
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE write01 : 0
+Pass!
+LTP MEMORY write01 after_run: free_frames=239979 allocated_frames=21106 heap_used_bytes=1580596 heap_available_bytes=69722572 live_user_tasks=0 user_process_objects=0 user_process_created=5926 user_process_dropped=5926 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21170 user_task_ext_dropped=21170 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP MEMORY write01 after_cleanup: free_frames=239979 allocated_frames=21106 heap_used_bytes=1580505 heap_available_bytes=69722663 live_user_tasks=0 user_process_objects=0 user_process_created=5926 user_process_dropped=5926 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21170 user_task_ext_dropped=21170 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP CASE RUNTIME write01: 7456 ms
+========== END ltp write01 ==========
+========== START ltp access03 ==========
+RUN LTP CASE access03
+LTP MEMORY access03 before: free_frames=239979 allocated_frames=21106 heap_used_bytes=1580106 heap_available_bytes=69723062 live_user_tasks=0 user_process_objects=0 user_process_created=5926 user_process_dropped=5926 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21170 user_task_ext_dropped=21170 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+access03.c:37: [1;32mTPASS: [0minvalid address as root : EFAULT (14)
+access03.c:46: [1;32mTPASS: [0minvalid address as nobody : EFAULT (14)
+
+Summary:
+passed   8
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE access03 : 0
+Pass!
+LTP MEMORY access03 after_run: free_frames=239979 allocated_frames=21106 heap_used_bytes=1581405 heap_available_bytes=69721763 live_user_tasks=0 user_process_objects=0 user_process_created=5932 user_process_dropped=5932 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21176 user_task_ext_dropped=21176 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP MEMORY access03 after_cleanup: free_frames=239979 allocated_frames=21106 heap_used_bytes=1581313 heap_available_bytes=69721855 live_user_tasks=0 user_process_objects=0 user_process_created=5932 user_process_dropped=5932 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21176 user_task_ext_dropped=21176 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+LTP CASE RUNTIME access03: 8611 ms
+========== END ltp access03 ==========
+========== START ltp close02 ==========
+RUN LTP CASE close02
+LTP MEMORY close02 before: free_frames=239979 allocated_frames=21106 heap_used_bytes=1580912 heap_available_bytes=69722256 live_user_tasks=0 user_process_objects=0 user_process_created=5932 user_process_dropped=5932 user_process_retained=0 user_process_live=0 user_process_teardown_done=0 user_process_exit_pending=0 user_process_child_edges=0 user_process_max_child_edges=0 user_process_max_strong=0 user_task_ext_live=0 user_task_ext_created=21176 user_task_ext_dropped=21176 exited_task_queue=0 exited_task_retained=0 exited_task_max_strong=0 posix_fds=3 futex_entries=0 futex_waiters=0 axmm_shared_entries=12 axmm_shared_refs=12 axmm_shared_max_ref=1 exec_main_len=0 exec_main_cap=1914080 exec_interp_len=0 exec_interp_cap=935440
+qemu-system-riscv64: terminating on signal 15 from pid 194848 (/bin/bash)
+END 2026-06-19T20:28:24+08:00 rc=0

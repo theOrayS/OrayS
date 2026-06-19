@@ -28,6 +28,30 @@ def function_block(text: str, name: str) -> str:
     return text[start:end]
 
 
+def braced_block(text: str, brace_pos: int) -> tuple[str, int]:
+    if brace_pos < 0 or brace_pos >= len(text) or text[brace_pos] != "{":
+        return "", brace_pos
+    depth = 0
+    for pos in range(brace_pos, len(text)):
+        ch = text[pos]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[brace_pos + 1 : pos], pos + 1
+    return text[brace_pos + 1 :], len(text)
+
+
+def function_body(text: str, name: str) -> str:
+    marker = f"fn {name}"
+    start = text.find(marker)
+    if start < 0:
+        return ""
+    brace = text.find("{", start)
+    body, _ = braced_block(text, brace)
+    return body
+
 
 def rust_function_names(text: str) -> set[str]:
     return set(
@@ -41,6 +65,7 @@ def scan_cmd_rs(root: Path) -> list[str]:
     text = read(root / "examples/shell/src/cmd.rs")
     findings: list[str] = []
     env_block = function_block(text, "ltp_case_env")
+    autorun_body = function_body(text, "maybe_run_official_tests")
     run_dir_block = function_block(text, "prepare_ltp_case_run_dir")
     copy_block = function_block(text, "copy_script_file")
     unstaged_block = function_block(text, "prepare_unstaged_script_dir")
@@ -71,6 +96,31 @@ def scan_cmd_rs(root: Path) -> list[str]:
             findings.append(f"examples/shell/src/cmd.rs: suite/script-specific rewrite token is forbidden: {token}")
     if re.search(r"\|\|\s*line\s*==\s*\"", text) or re.search(r"line\s*==\s*\"[^\"]+\"", text):
         findings.append("examples/shell/src/cmd.rs: runner success must not special-case literal command lines")
+    if "skip unscored test group" in text or "musl-only" in text:
+        findings.append("examples/shell/src/cmd.rs: runner must not skip official groups based on score-only/musl-only policy")
+    if re.search(r'group\s*==\s*"libctest"\s*&&\s*suite_dir\s*!=\s*"/musl"', text):
+        findings.append("examples/shell/src/cmd.rs: libctest must run for every discovered libc suite instead of score-aware skipping")
+    if not autorun_body:
+        findings.append("examples/shell/src/cmd.rs: missing maybe_run_official_tests")
+    else:
+        if 'if group == "libctest"' not in autorun_body or "run_libctest_suite(&suite_dir, &cwd)" not in autorun_body:
+            findings.append("examples/shell/src/cmd.rs: libctest dispatch must run the generic libctest suite for each discovered suite directory")
+        suite_dir_policy = re.compile(
+            r'(?:suite_dir(?:\.as_str\(\))?\s*(?:==|!=)\s*"/(?:musl|glibc)")|'
+            r'(?:"/(?:musl|glibc)"\s*(?:==|!=)\s*suite_dir(?:\.as_str\(\))?)'
+        )
+        score_policy = re.compile(r"\b(?:unscored|score-aware|score-only|musl-only)\b", re.IGNORECASE)
+        autorun_lines = autorun_body.splitlines()
+        for idx, line in enumerate(autorun_lines):
+            if "if " not in line or "libctest" not in line:
+                continue
+            window = "\n".join(autorun_lines[idx : idx + 10])
+            if "continue;" in window and "run_libctest_suite" not in window:
+                findings.append("examples/shell/src/cmd.rs: libctest dispatch must not conditionally continue/skip discovered suites")
+            if suite_dir_policy.search(window):
+                findings.append("examples/shell/src/cmd.rs: libctest dispatch must not branch on fixed musl/glibc suite directory policy")
+            if score_policy.search(window):
+                findings.append("examples/shell/src/cmd.rs: libctest dispatch must not encode score-only or musl-only policy")
     if not copy_block:
         findings.append("examples/shell/src/cmd.rs: missing copy_script_file")
     elif (

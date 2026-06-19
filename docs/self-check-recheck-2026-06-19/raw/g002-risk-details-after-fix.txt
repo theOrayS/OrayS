@@ -1,0 +1,75 @@
+{
+  "ltp_stable_count": 1000,
+  "ltp_unique_count": 1000,
+  "ltp_array_line_ranges": [
+    [
+      44,
+      47,
+      "LTP_CORE_CASES"
+    ],
+    [
+      50,
+      619,
+      "LTP_STABLE_CASES"
+    ],
+    [
+      621,
+      642,
+      "LTP_SYSCALLS_BASIC_PLUS_CASES"
+    ],
+    [
+      644,
+      662,
+      "LTP_FS_BASIC_CASES"
+    ],
+    [
+      664,
+      664,
+      "LTP_PROC_BASIC_CASES"
+    ],
+    [
+      666,
+      685,
+      "LTP_TIME_SIGNAL_BASIC_CASES"
+    ],
+    [
+      716,
+      759,
+      "LTP_SWEEP_DEFAULT_BLACKLIST_CASES"
+    ],
+    [
+      687,
+      694,
+      "LTP_CASE_BATCHES"
+    ]
+  ],
+  "matrix_rows": 1044,
+  "non_ltp_runner_rows": 44,
+  "risk_counts": {
+    "OK_SELECTION_GUARD_COMMENT_ONLY": 5,
+    "OK_SELECTION_LIST_ONLY": 71,
+    "OK_NO_CASE_SPECIFIC_CODE": 913,
+    "WATCH_COMMENT_ONLY": 3,
+    "OK_GUARD_TEST_ONLY": 8,
+    "REVIEW_RUNNER_SEMANTICS": 44
+  },
+  "family_counts": {
+    "fs_path_metadata": 132,
+    "memory": 96,
+    "process": 150,
+    "fd": 219,
+    "misc": 263,
+    "signal": 44,
+    "time_clock": 18,
+    "net_socket": 37,
+    "thread_futex": 8,
+    "ipc": 32,
+    "namespace": 1,
+    "official_non_ltp_or_runner": 44
+  },
+  "case_name_occurrences_outside_stable_list": 87,
+  "runtime_case_name_risks": 0,
+  "csv_path": "/root/oskernel2026-orays/docs/self-check-recheck-2026-06-19/fresh-testcase-audit-matrix.csv"
+}
+runtime risk rows []
+watch rows [('ftest03', '[{"file": "examples/shell/src/cmd.rs", "line": 1107, "class": "comment", "text": "// Stable LTP contains real file-stress cases (for example ftest03/ftest07)"}]'), ('ftest07', '[{"file": "examples/shell/src/cmd.rs", "line": 1107, "class": "comment", "text": "// Stable LTP contains real file-stress cases (for example ftest03/ftest07)"}]'), ('dirty', '[{"file": "examples/shell/src/uspace/mod.rs", "line": 227, "class": "comment", "text": "/// MAP_SHARED, but dirty bytes past EOF must not be written back to the file."}]')]

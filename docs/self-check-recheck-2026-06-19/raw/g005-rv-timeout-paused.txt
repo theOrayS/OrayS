@@ -1,0 +1,3 @@
+STOPPED timeout pid=171032 at 2026-06-19T20:27:02+08:00
+    PID    PPID    PGID STAT     ELAPSED CMD
+ 171032 3433682  171032 Ts         33:57 /bin/bash -c set -o pipefail OUT=docs/self-check-recheck-2026-06-19/raw {   echo "START $(date -Is)"   timeout 2400 ./run-eval.sh rv   rc=$?   echo "END $(date -Is) rc=$rc"   exit $rc } 2>&1 | tee "$OUT/g005-run-eval-rv.log" printf '%s\n' "${PIPESTATUS[0]}" > "$OUT/g005-run-eval-rv.status"

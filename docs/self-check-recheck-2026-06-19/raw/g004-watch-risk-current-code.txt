@@ -1,0 +1,841 @@
+## api user-copy utils
+     1	#![allow(dead_code)]
+     2	#![allow(unused_macros)]
+     3
+     4	use axerrno::{LinuxError, LinuxResult};
+     5	use core::ffi::{c_char, c_void, CStr};
+     6	use core::ptr::NonNull;
+     7
+     8	pub fn char_ptr_to_str<'a>(str: *const c_char) -> LinuxResult<&'a str> {
+     9	    if str.is_null() {
+    10	        Err(LinuxError::EFAULT)
+    11	    } else {
+    12	        unsafe { CStr::from_ptr(str) }
+    13	            .to_str()
+    14	            .map_err(|_| LinuxError::EINVAL)
+    15	    }
+    16	}
+    17
+    18	pub fn check_null_ptr<T>(ptr: *const T) -> LinuxResult {
+    19	    if ptr.is_null() {
+    20	        Err(LinuxError::EFAULT)
+    21	    } else {
+    22	        Ok(())
+    23	    }
+    24	}
+    25
+    26	pub fn check_null_mut_ptr<T>(ptr: *mut T) -> LinuxResult {
+    27	    if ptr.is_null() {
+    28	        Err(LinuxError::EFAULT)
+    29	    } else {
+    30	        Ok(())
+    31	    }
+    32	}
+    33
+    34	/// Read one ABI value from a user-provided pointer after the shared null check.
+    35	///
+    36	/// This helper does not make arbitrary user memory trusted; it only centralizes
+    37	/// the syscall boundary contract used by the current single-address-space
+    38	/// runtime. Callers still need to validate lengths and semantic ranges before
+    39	/// acting on the copied value.
+    40	///
+    41	/// # Safety
+    42	///
+    43	/// `ptr` must be readable for one `T` when non-null.
+    44	pub unsafe fn read_user_value<T: Copy>(ptr: *const T) -> LinuxResult<T> {
+    45	    check_null_ptr(ptr)?;
+    46	    Ok(unsafe { core::ptr::read_unaligned(ptr) })
+    47	}
+    48
+    49	/// Write one ABI value to a user-provided pointer after the shared null check.
+    50	///
+    51	/// # Safety
+    52	///
+    53	/// `ptr` must be writable for one `T` when non-null.
+    54	pub unsafe fn write_user_value<T>(ptr: *mut T, value: T) -> LinuxResult {
+    55	    check_null_mut_ptr(ptr)?;
+    56	    unsafe { core::ptr::write_unaligned(ptr, value) };
+    57	    Ok(())
+    58	}
+    59
+    60	/// Borrow a readable user buffer, accepting `NULL` only for zero-length I/O.
+    61	///
+    62	/// # Safety
+    63	///
+    64	/// `buf` must either be null with `len == 0`, or readable for `len` bytes.
+    65	pub unsafe fn readable_user_buffer<'a>(buf: *const c_void, len: usize) -> LinuxResult<&'a [u8]> {
+    66	    unsafe { readable_user_slice(buf.cast::<u8>(), len) }
+    67	}
+    68
+    69	/// Borrow a readable user array, accepting `NULL` only for zero-length arrays.
+    70	///
+    71	/// # Safety
+    72	///
+    73	/// `ptr` must either be null with `len == 0`, or readable for `len` elements
+    74	/// of `T` and satisfy `T` alignment.
+    75	pub unsafe fn readable_user_slice<'a, T>(ptr: *const T, len: usize) -> LinuxResult<&'a [T]> {
+    76	    let ptr = if len == 0 {
+    77	        NonNull::<T>::dangling().as_ptr()
+    78	    } else {
+    79	        if ptr.is_null() {
+    80	            return Err(LinuxError::EFAULT);
+    81	        }
+    82	        ptr
+    83	    };
+    84	    Ok(unsafe { core::slice::from_raw_parts(ptr, len) })
+    85	}
+    86
+    87	/// Borrow a writable user buffer, accepting `NULL` only for zero-length I/O.
+    88	///
+    89	/// # Safety
+    90	///
+    91	/// `buf` must either be null with `len == 0`, or writable for `len` bytes.
+    92	pub unsafe fn writable_user_buffer<'a>(buf: *mut c_void, len: usize) -> LinuxResult<&'a mut [u8]> {
+    93	    unsafe { writable_user_slice(buf.cast::<u8>(), len) }
+    94	}
+    95
+    96	/// Borrow a writable user array, accepting `NULL` only for zero-length arrays.
+    97	///
+    98	/// # Safety
+    99	///
+   100	/// `ptr` must either be null with `len == 0`, or writable for `len` elements
+   101	/// of `T` and satisfy `T` alignment.
+   102	pub unsafe fn writable_user_slice<'a, T>(ptr: *mut T, len: usize) -> LinuxResult<&'a mut [T]> {
+   103	    let ptr = if len == 0 {
+   104	        NonNull::<T>::dangling().as_ptr()
+   105	    } else {
+   106	        if ptr.is_null() {
+   107	            return Err(LinuxError::EFAULT);
+   108	        }
+   109	        ptr
+   110	    };
+   111	    Ok(unsafe { core::slice::from_raw_parts_mut(ptr, len) })
+   112	}
+   113
+   114	macro_rules! syscall_body {
+   115	    ($fn: ident, debug_errors: [$($debug_err:path),+ $(,)?], $($stmt: tt)*) => {{
+   116	        #[allow(clippy::redundant_closure_call)]
+   117	        let res = (|| -> axerrno::LinuxResult<_> { $($stmt)* })();
+   118	        match res {
+   119	            Ok(_) | Err(axerrno::LinuxError::EAGAIN $(| $debug_err)+) => {
+   120	                debug!(concat!(stringify!($fn), " => {:?}"),  res)
+   121	            }
+   122	            Err(_) => info!(concat!(stringify!($fn), " => {:?}"), res),
+   123	        }
+   124	        match res {
+   125	            Ok(v) => v as _,
+   126	            Err(e) => {
+   127	                -e.code() as _
+   128	            }
+   129	        }
+   130	    }};
+   131	    ($fn: ident, $($stmt: tt)*) => {{
+   132	        #[allow(clippy::redundant_closure_call)]
+   133	        let res = (|| -> axerrno::LinuxResult<_> { $($stmt)* })();
+   134	        match res {
+   135	            Ok(_) | Err(axerrno::LinuxError::EAGAIN) => debug!(concat!(stringify!($fn), " => {:?}"),  res),
+   136	            Err(_) => info!(concat!(stringify!($fn), " => {:?}"), res),
+   137	        }
+   138	        match res {
+   139	            Ok(v) => v as _,
+   140	            Err(e) => {
+   141	                -e.code() as _
+   142	            }
+   143	        }
+   144	    }};
+   145	}
+   146
+   147	macro_rules! syscall_body_no_debug {
+   148	    ($($stmt: tt)*) => {{
+   149	        #[allow(clippy::redundant_closure_call)]
+   150	        let res = (|| -> axerrno::LinuxResult<_> { $($stmt)* })();
+   151	        match res {
+   152	            Ok(v) => v as _,
+   153	            Err(e) => {
+   154	                -e.code() as _
+   155	            }
+   156	        }
+   157	    }};
+   158	}
+## G013 guard
+     1	#!/usr/bin/env python3
+     2	"""Static guard for keeping POSIX syscall user copy-in/out behind shared helpers.
+     3
+     4	This guard is intentionally source-policy oriented: it does not claim MMU-backed
+     5	fault isolation, but it prevents reviewed syscall implementations from
+     6	re-introducing scattered raw pointer copy/read/write primitives that self-check
+     7	review already identified as a risk.
+     8	"""
+     9
+    10	from __future__ import annotations
+    11
+    12	import argparse
+    13	import re
+    14	from pathlib import Path
+    15
+    16	ROOT_REL = Path("api/arceos_posix_api/src")
+    17	UTILS_REL = ROOT_REL / "utils.rs"
+    18	IMP_REL = ROOT_REL / "imp"
+    19
+    20	HELPER_TOKENS = (
+    21	    "pub unsafe fn read_user_value",
+    22	    "pub unsafe fn write_user_value",
+    23	    "pub unsafe fn readable_user_buffer",
+    24	    "pub unsafe fn writable_user_buffer",
+    25	    "pub unsafe fn readable_user_slice",
+    26	    "pub unsafe fn writable_user_slice",
+    27	    "check_null_ptr(ptr)?;",
+    28	    "check_null_mut_ptr(ptr)?;",
+    29	)
+    30
+    31	RAW_MEMORY_PRIMITIVE_RE = re.compile(
+    32	    r"\b(?:(?:core::)?ptr::(?:read|write)(?:_unaligned|_volatile)?|"
+    33	    r"(?:core::)?ptr::copy(?:_nonoverlapping)?|"
+    34	    r"(?:read|write)(?:_unaligned|_volatile)|copy_nonoverlapping)"
+    35	    r"\s*(?:::<[^>]+>)?\s*\("
+    36	)
+    37
+    38	RAW_SLICE_PRIMITIVE_RE = re.compile(r"\b(?:core::slice|Vec)::from_raw_parts(?:_mut)?\s*\(")
+    39	UNSAFE_DEREF_RE = re.compile(r"unsafe\s*\{\s*(?:&\s*)?\*")
+    40	UNSAFE_DEREF_MULTILINE_RE = re.compile(r"unsafe\s*\{\s*\n\s*(?:&\s*)?\*")
+    41	UNSAFE_PTR_METHOD_RE = re.compile(
+    42	    r"unsafe\s*\{[^\n{}]*(?:\b\w*ptr\b|\b\w+_ptr\b)\s*\.\s*"
+    43	    r"(?:read|write)(?:_unaligned|_volatile)?\s*\("
+    44	)
+    45
+    46
+    47	def read(path: Path) -> str:
+    48	    return path.read_text(encoding="utf-8", errors="ignore")
+    49
+    50
+    51	def is_allowed_raw_copy(rel: Path, line: str) -> bool:
+    52	    rel_s = rel.as_posix()
+    53	    if rel == UTILS_REL:
+    54	        return True
+    55	    # freeaddrinfo reclaims an addrinfo buffer allocated by sys_getaddrinfo.
+    56	    if rel_s == "api/arceos_posix_api/src/imp/net.rs" and "Vec::from_raw_parts(aibuf_ptr" in line:
+    57	        return True
+    58	    return False
+    59
+    60
+    61	def is_allowed_unsafe_deref(rel: Path, line: str) -> bool:
+    62	    rel_s = rel.as_posix()
+    63	    if rel_s == "api/arceos_posix_api/src/imp/pthread/mutex.rs" and "mutex.cast::<Self>()" in line:
+    64	        return True
+    65	    if rel_s == "api/arceos_posix_api/src/imp/pthread/mod.rs" and "result.get()" in line:
+    66	        return True
+    67	    if rel_s == "api/arceos_posix_api/src/imp/net.rs" and "(*aibuf_ptr)" in line:
+    68	        return True
+    69	    return False
+    70
+    71
+    72	def has_raw_memory_primitive(line: str) -> bool:
+    73	    return bool(RAW_MEMORY_PRIMITIVE_RE.search(line) or RAW_SLICE_PRIMITIVE_RE.search(line))
+    74
+    75
+    76	def rust_function_block(text: str, name: str) -> str:
+    77	    match = re.search(
+    78	        rf"(?:^|\n)\s*(?:pub\s+)?(?:unsafe\s+)?fn\s+{re.escape(name)}\s*\([^{{]*\)\s*(?:->[^{{]+)?\{{",
+    79	        text,
+    80	    )
+    81	    if not match:
+    82	        return ""
+    83	    brace = text.find("{", match.start())
+    84	    depth = 0
+    85	    for idx in range(brace, len(text)):
+    86	        ch = text[idx]
+    87	        if ch == "{":
+    88	            depth += 1
+    89	        elif ch == "}":
+    90	            depth -= 1
+    91	            if depth == 0:
+    92	                return text[match.start() : idx + 1]
+    93	    return text[match.start() :]
+    94
+    95
+    96	def scan(root: Path) -> list[str]:
+    97	    findings: list[str] = []
+    98	    utils_path = root / UTILS_REL
+    99	    if not utils_path.exists():
+   100	        findings.append(f"{UTILS_REL}: missing shared user-copy helper module")
+   101	        return findings
+   102
+   103	    utils = read(utils_path)
+   104	    for token in HELPER_TOKENS:
+   105	        if token not in utils:
+   106	            findings.append(f"{UTILS_REL}: missing helper contract token {token!r}")
+   107
+   108	    imp_root = root / IMP_REL
+   109	    if not imp_root.exists():
+   110	        findings.append(f"{IMP_REL}: missing syscall implementation tree")
+   111	        return findings
+   112
+   113	    for path in sorted(imp_root.rglob("*.rs")):
+   114	        rel = path.relative_to(root)
+   115	        text = read(path)
+   116	        for lineno, line in enumerate(text.splitlines(), 1):
+   117	            if has_raw_memory_primitive(line) and not is_allowed_raw_copy(rel, line):
+   118	                findings.append(f"{rel}:{lineno}: raw memory copy/slice primitive must use utils user-copy helpers")
+   119	            if UNSAFE_DEREF_RE.search(line) and not is_allowed_unsafe_deref(rel, line):
+   120	                findings.append(f"{rel}:{lineno}: unsafe raw deref in syscall impl must be copied through utils or documented as kernel-owned")
+   121	            if UNSAFE_PTR_METHOD_RE.search(line) and not is_allowed_unsafe_deref(rel, line):
+   122	                findings.append(f"{rel}:{lineno}: unsafe raw pointer method read/write must use utils user-copy helpers")
+   123	        for match in UNSAFE_DEREF_MULTILINE_RE.finditer(text):
+   124	            lineno = text.count("\n", 0, match.start()) + 1
+   125	            snippet = text[match.start() : match.start() + 120].replace("\n", " ")
+   126	            if not is_allowed_unsafe_deref(rel, snippet):
+   127	                findings.append(f"{rel}:{lineno}: multiline unsafe raw deref must use utils user-copy helpers")
+   128
+   129	    epoll = read(root / IMP_REL / "io_mpx" / "epoll.rs")
+   130	    epoll_ctl = rust_function_block(epoll, "sys_epoll_ctl")
+   131	    if "read_user_value(event as *const ctypes::epoll_event)?" not in epoll_ctl:
+   132	        findings.append("sys_epoll_ctl: EPOLL_CTL_ADD/MOD event copy-in must use read_user_value")
+   133
+   134	    net = read(root / IMP_REL / "net.rs")
+   135	    hints = rust_function_block(net, "from_ptr")
+   136	    if "read_user_value(hints)" not in hints or "ctypes::EAI_SYSTEM" not in hints:
+   137	        findings.append("ResolvedAddrInfoHints::from_ptr: hints copy-in must use read_user_value and map pointer faults visibly")
+   138
+   139	    return findings
+   140
+   141
+   142	def main() -> int:
+   143	    parser = argparse.ArgumentParser()
+   144	    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+   145	    args = parser.parse_args()
+   146	    findings = scan(args.root.resolve())
+   147	    if findings:
+   148	        print("G013 user-copy boundary static check: FAIL")
+   149	        for finding in findings:
+   150	            print(f"- {finding}")
+   151	        return 1
+   152	    print("G013 user-copy boundary static check: PASS (0 findings)")
+   153	    return 0
+   154
+   155
+   156	if __name__ == "__main__":
+   157	    raise SystemExit(main())
+## shell user memory
+     1	use core::mem::{size_of, MaybeUninit};
+     2	use core::ptr;
+     3	use core::sync::atomic::{AtomicU64, Ordering};
+     4
+     5	use axerrno::LinuxError;
+     6	use axhal::paging::MappingFlags;
+     7	use axhal::trap::PageFaultFlags;
+     8	use linux_raw_sys::general;
+     9	use memory_addr::{MemoryAddr, PageIter4K, VirtAddr, PAGE_SIZE_4K};
+    10	use std::string::String;
+    11	use std::vec::Vec;
+    12
+    13	use super::linux_abi::IOV_MAX;
+    14	use super::{neg_errno, UserProcess};
+    15
+    16	pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
+    17
+    18	static PSEUDO_RANDOM_STATE: AtomicU64 = AtomicU64::new(0x9e37_79b9_7f4a_7c15);
+    19
+    20	fn next_pseudo_random_u64() -> u64 {
+    21	    loop {
+    22	        let current = PSEUDO_RANDOM_STATE.load(Ordering::Acquire);
+    23	        let time_mix =
+    24	            axhal::time::wall_time_nanos() ^ axhal::time::monotonic_time_nanos().rotate_left(17);
+    25	        let mut next = current ^ time_mix ^ 0xbf58_476d_1ce4_e5b9;
+    26	        next ^= next << 13;
+    27	        next ^= next >> 7;
+    28	        next ^= next << 17;
+    29	        if next == 0 {
+    30	            next = 0x94d0_49bb_1331_11eb;
+    31	        }
+    32	        if PSEUDO_RANDOM_STATE
+    33	            .compare_exchange(current, next, Ordering::AcqRel, Ordering::Acquire)
+    34	            .is_ok()
+    35	        {
+    36	            return next;
+    37	        }
+    38	    }
+    39	}
+    40
+    41	pub(super) fn fill_pseudo_random_bytes(dst: &mut [u8]) {
+    42	    let mut offset = 0;
+    43	    while offset < dst.len() {
+    44	        let bytes = next_pseudo_random_u64().to_ne_bytes();
+    45	        let len = (dst.len() - offset).min(bytes.len());
+    46	        dst[offset..offset + len].copy_from_slice(&bytes[..len]);
+    47	        offset += len;
+    48	    }
+    49	}
+    50
+    51	pub(super) fn validate_user_read(
+    52	    process: &UserProcess,
+    53	    ptr: usize,
+    54	    len: usize,
+    55	) -> Result<(), LinuxError> {
+    56	    validate_user_access(process, ptr, len, false)
+    57	}
+    58
+    59	pub(super) fn validate_user_write(
+    60	    process: &UserProcess,
+    61	    ptr: usize,
+    62	    len: usize,
+    63	) -> Result<(), LinuxError> {
+    64	    validate_user_access(process, ptr, len, true)
+    65	}
+    66
+    67	pub(super) fn fault_in_user_read(
+    68	    process: &UserProcess,
+    69	    ptr: usize,
+    70	    len: usize,
+    71	) -> Result<(), LinuxError> {
+    72	    fault_in_user_range(process, ptr, len, false)
+    73	}
+    74
+    75	pub(super) fn fault_in_user_write(
+    76	    process: &UserProcess,
+    77	    ptr: usize,
+    78	    len: usize,
+    79	) -> Result<(), LinuxError> {
+    80	    fault_in_user_range(process, ptr, len, true)
+    81	}
+    82
+    83	pub(super) fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags: usize) -> isize {
+    84	    const GRND_NONBLOCK: usize = 0x0001;
+    85	    const GRND_RANDOM: usize = 0x0002;
+    86	    const GRND_INSECURE: usize = 0x0004;
+    87	    if flags & !(GRND_NONBLOCK | GRND_RANDOM | GRND_INSECURE) != 0 {
+    88	        return neg_errno(LinuxError::EINVAL);
+    89	    }
+    90	    if let Err(err) = validate_user_write(process, buf, len) {
+    91	        return neg_errno(err);
+    92	    }
+    93
+    94	    let mut filled = 0usize;
+    95	    let mut chunk = [0u8; 256];
+    96	    while filled < len {
+    97	        let chunk_len = (len - filled).min(chunk.len());
+    98	        fill_pseudo_random_bytes(&mut chunk[..chunk_len]);
+    99	        let dst = match buf.checked_add(filled) {
+   100	            Some(dst) => dst,
+   101	            None => return neg_errno(LinuxError::EFAULT),
+   102	        };
+   103	        if let Err(err) = write_user_bytes(process, dst, &chunk[..chunk_len]) {
+   104	            return neg_errno(err);
+   105	        }
+   106	        filled += chunk_len;
+   107	    }
+   108	    filled as isize
+   109	}
+   110
+   111	fn validate_user_access(
+   112	    process: &UserProcess,
+   113	    ptr: usize,
+   114	    len: usize,
+   115	    write: bool,
+   116	) -> Result<(), LinuxError> {
+   117	    fault_in_user_range(process, ptr, len, write)
+   118	}
+   119
+   120	fn user_range_fits(ptr: usize, len: usize) -> bool {
+   121	    len == 0 || ptr.checked_add(len).is_some()
+   122	}
+   123
+   124	fn fault_in_user_range(
+   125	    process: &UserProcess,
+   126	    ptr: usize,
+   127	    len: usize,
+   128	    write: bool,
+   129	) -> Result<(), LinuxError> {
+   130	    if len == 0 {
+   131	        return Ok(());
+   132	    }
+   133	    if ptr == 0
+   134	        || !user_range_fits(ptr, len)
+   135	        || user_range_crosses_uncommitted_brk(process, ptr, len)
+   136	    {
+   137	        return Err(LinuxError::EFAULT);
+   138	    }
+   139	    let end = ptr.checked_add(len).ok_or(LinuxError::EFAULT)?;
+   140	    let access_flags = if write {
+   141	        MappingFlags::READ | MappingFlags::WRITE
+   142	    } else {
+   143	        MappingFlags::READ
+   144	    };
+   145	    let fault_flags = if write {
+   146	        PageFaultFlags::WRITE
+   147	    } else {
+   148	        PageFaultFlags::READ
+   149	    };
+   150
+   151	    // Real Linux copy_to/from_user can fault in legal lazy user pages while it
+   152	    // copies.  Our copy helpers run in kernel context, so they must explicitly
+   153	    // apply MAP_GROWSDOWN and lazy mmap population before calling
+   154	    // AddrSpace::read/write; otherwise a valid stack/TLS/futex pointer can be
+   155	    // misreported as EFAULT and produce an axmm BadAddress warning storm under
+   156	    // thread-heavy glibc workloads.
+   157	    let start_page = VirtAddr::from(ptr.align_down_4k());
+   158	    let end_page = if end.is_aligned_4k() {
+   159	        end
+   160	    } else {
+   161	        end.checked_add(PAGE_SIZE_4K - 1)
+   162	            .ok_or(LinuxError::EFAULT)?
+   163	            .align_down_4k()
+   164	    };
+   165	    let end_page = VirtAddr::from(end_page);
+   166	    if let Some(pages) = PageIter4K::new(start_page, end_page) {
+   167	        for page in pages {
+   168	            let _ = process.handle_mmap_grow_down_fault(page.as_usize(), fault_flags);
+   169	        }
+   170	    }
+   171
+   172	    let mut aspace = process.aspace.lock();
+   173	    if !aspace.can_access_range(VirtAddr::from(ptr), len, access_flags) {
+   174	        return Err(LinuxError::EFAULT);
+   175	    }
+   176	    aspace
+   177	        .populate_range(VirtAddr::from(ptr), len, fault_flags)
+   178	        .map_err(|_| LinuxError::EFAULT)
+   179	}
+   180
+   181	fn user_range_crosses_uncommitted_brk(process: &UserProcess, ptr: usize, len: usize) -> bool {
+   182	    if len == 0 {
+   183	        return false;
+   184	    }
+   185	    let Some(end) = ptr.checked_add(len) else {
+   186	        return true;
+   187	    };
+   188	    let brk = process.brk.lock();
+   189	    ptr < brk.limit && end > brk.end
+   190	}
+   191
+   192	pub(super) fn read_user_bytes(
+   193	    process: &UserProcess,
+   194	    ptr: usize,
+   195	    len: usize,
+   196	) -> Result<Vec<u8>, LinuxError> {
+   197	    if len == 0 {
+   198	        return Ok(Vec::new());
+   199	    }
+   200	    fault_in_user_read(process, ptr, len)?;
+   201
+   202	    let mut bytes = Vec::new();
+   203	    bytes
+   204	        .try_reserve_exact(len)
+   205	        .map_err(|_| LinuxError::ENOMEM)?;
+   206	    bytes.resize(len, 0);
+   207	    process
+   208	        .aspace
+   209	        .lock()
+   210	        .read(VirtAddr::from(ptr), &mut bytes)
+   211	        .map_err(|_| LinuxError::EFAULT)?;
+   212	    Ok(bytes)
+   213	}
+   214
+   215	pub(super) fn read_iovec_entries(
+   216	    process: &UserProcess,
+   217	    iov: usize,
+   218	    iovcnt: usize,
+   219	) -> Result<Vec<general::iovec>, LinuxError> {
+   220	    if iovcnt > IOV_MAX {
+   221	        return Err(LinuxError::EINVAL);
+   222	    }
+   223	    let iov_bytes_len = iovcnt
+   224	        .checked_mul(size_of::<general::iovec>())
+   225	        .ok_or(LinuxError::EINVAL)?;
+   226	    let iov_bytes = read_user_bytes(process, iov, iov_bytes_len)?;
+   227	    let entries: Vec<general::iovec> = iov_bytes
+   228	        .chunks_exact(size_of::<general::iovec>())
+   229	        .map(|chunk| unsafe { ptr::read_unaligned(chunk.as_ptr() as *const general::iovec) })
+   230	        .collect();
+   231	    let mut total_len = 0usize;
+   232	    for entry in &entries {
+   233	        total_len = total_len
+   234	            .checked_add(entry.iov_len as usize)
+   235	            .ok_or(LinuxError::EINVAL)?;
+   236	        if total_len > isize::MAX as usize {
+   237	            return Err(LinuxError::EINVAL);
+   238	        }
+   239	    }
+   240	    Ok(entries)
+## futex requeue
+    90
+    91	fn wake_addr_checked(
+    92	    process: &UserProcess,
+    93	    uaddr: usize,
+    94	    count: usize,
+    95	) -> Result<usize, LinuxError> {
+    96	    let key = futex_key(process, uaddr)?;
+    97	    let Some(state) = table().lock().get(&key).cloned() else {
+    98	        return Ok(0);
+    99	    };
+   100	    state.seq.fetch_add(1, Ordering::Release);
+   101	    let woken = state.queue.notify_many_unique(count, true);
+   102	    drop(state);
+   103	    prune_empty_key(key);
+   104	    Ok(woken)
+   105	}
+   106
+   107	fn wake_requeue_addr_checked(
+   108	    process: &UserProcess,
+   109	    uaddr: usize,
+   110	    wake_count: usize,
+   111	    requeue_count: usize,
+   112	    uaddr2: usize,
+   113	    cmp: Option<u32>,
+   114	) -> Result<usize, LinuxError> {
+   115	    if uaddr2 == 0 || uaddr2 % size_of::<u32>() != 0 {
+   116	        return Err(LinuxError::EINVAL);
+   117	    }
+   118	    if let Some(expected) = cmp {
+   119	        let current = read_user_value::<u32>(process, uaddr)?;
+   120	        if current != expected {
+   121	            return Err(LinuxError::EAGAIN);
+   122	        }
+   123	    }
+   124	    // Validate the destination futex even though this implementation wakes the
+   125	    // source waiters directly. For non-PI condition-variable requeue users this
+   126	    // is a correctness-preserving fallback: awakened waiters return to libc and
+   127	    // contend on the mutex futex in userspace instead of being moved by the
+   128	    // kernel as an optimization.
+   129	    let _ = futex_key(process, uaddr2)?;
+   130	    wake_addr_checked(process, uaddr, wake_count.saturating_add(requeue_count))
+   131	}
+   132
+   133	fn read_futex_timeout(
+   134	    process: &UserProcess,
+   135	    timeout: usize,
+   136	    absolute: bool,
+   137	    realtime: bool,
+   138	) -> Result<Option<core::time::Duration>, LinuxError> {
+   139	    if timeout == 0 {
+   140	        return Ok(None);
+   141	    }
+   142
+   143	    let ts = read_user_value::<general::timespec>(process, timeout)?;
+   144	    let mut dur = timespec_to_duration(ts)?;
+   145	    if absolute {
+   146	        let clockid = if realtime {
+   147	            general::CLOCK_REALTIME
+   148	        } else {
+   149	            general::CLOCK_MONOTONIC
+   150	        };
+   250	pub(super) fn futex_waiter_is_queued(process: &UserProcess, uaddr: usize) -> bool {
+   251	    mapped_futex_state(process, uaddr)
+   252	        .map(|(_, state)| !state.queue.is_empty())
+   253	        .unwrap_or(false)
+   254	}
+   255
+   256	pub(super) fn wake_task(process: &UserProcess, uaddr: usize, task: &AxTaskRef) {
+   257	    let Some((_, state)) = mapped_futex_state(process, uaddr) else {
+   258	        return;
+   259	    };
+   260	    state.seq.fetch_add(1, Ordering::Release);
+   261	    let _ = state.queue.notify_task(true, task);
+   262	}
+   263
+   264	pub(super) fn sys_futex(
+   265	    process: &UserProcess,
+   266	    tf: &TrapFrame,
+   267	    uaddr: usize,
+   268	    futex_op: usize,
+   269	    val: usize,
+   270	    timeout: usize,
+   271	    _uaddr2: usize,
+   272	    _val3: usize,
+   273	) -> isize {
+   274	    if uaddr == 0 || uaddr % size_of::<u32>() != 0 {
+   275	        return neg_errno(LinuxError::EINVAL);
+   276	    }
+   277	    let op = futex_op as u32;
+   278	    let cmd = op & general::FUTEX_CMD_MASK as u32;
+   279	    if uaddr < USER_MMAP_BASE || (uaddr >= USER_MMAP_BASE && val <= 8) {
+   280	        user_trace!(
+   281	            "user-futex: tid={} cmd={cmd:#x} op={op:#x} uaddr={uaddr:#x} val={val:#x} timeout={timeout:#x} sp={:#x} tp={:#x} ra={:#x} pc={:#x}",
+   282	            current_tid(),
+   283	            tf.regs.sp,
+   284	            tf.regs.tp,
+   285	            tf.regs.ra,
+   286	            user_pc(tf),
+   287	        );
+   288	    }
+   289	    match cmd {
+   290	        general::FUTEX_WAIT => wait_addr(process, uaddr, val, timeout, false, false),
+   291	        general::FUTEX_WAIT_BITSET => {
+   292	            if _val3 == 0 {
+   293	                return neg_errno(LinuxError::EINVAL);
+   294	            }
+   295	            wait_addr(
+   296	                process,
+   297	                uaddr,
+   298	                val,
+   299	                timeout,
+   300	                true,
+   301	                op & general::FUTEX_CLOCK_REALTIME != 0,
+   302	            )
+   303	        }
+   304	        general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val) {
+   305	            Ok(woken) => woken as isize,
+   306	            Err(err) => neg_errno(err),
+   307	        },
+   308	        general::FUTEX_REQUEUE => {
+   309	            match wake_requeue_addr_checked(process, uaddr, val, timeout, _uaddr2, None) {
+   310	                Ok(woken) => woken as isize,
+   311	                Err(err) => neg_errno(err),
+   312	            }
+   313	        }
+   314	        general::FUTEX_CMP_REQUEUE => match wake_requeue_addr_checked(
+   315	            process,
+   316	            uaddr,
+   317	            val,
+   318	            timeout,
+   319	            _uaddr2,
+   320	            Some(_val3 as u32),
+   321	        ) {
+   322	            Ok(woken) => woken as isize,
+   323	            Err(err) => neg_errno(err),
+   324	        },
+   325	        general::FUTEX_WAKE_BITSET => {
+   326	            if _val3 == 0 {
+   327	                return neg_errno(LinuxError::EINVAL);
+   328	            }
+   329	            match wake_addr_checked(process, uaddr, val) {
+   330	                Ok(woken) => woken as isize,
+   331	                Err(err) => neg_errno(err),
+   332	            }
+   333	        }
+   334	        _ => neg_errno(LinuxError::ENOSYS),
+   335	    }
+   336	}
+## evaluator path shims
+   220	}
+   221
+   222	fn prefault_clone_child_stack_for_fork(aspace: &mut AddrSpace, child_stack: Option<usize>) {
+   223	    let Some(child_stack) = child_stack.filter(|stack| *stack != 0) else {
+   224	        return;
+   225	    };
+   226	    let start = child_stack.saturating_sub(PAGE_SIZE_4K * 2) / PAGE_SIZE_4K * PAGE_SIZE_4K;
+   227	    let end = child_stack.saturating_add(PAGE_SIZE_4K - 1) / PAGE_SIZE_4K * PAGE_SIZE_4K;
+   228	    if end <= start {
+   229	        return;
+   230	    }
+   231	    let mut page = start;
+   232	    while page < end {
+   233	        let _ = aspace.handle_page_fault(VirtAddr::from(page), PageFaultFlags::WRITE);
+   234	        page = page.saturating_add(PAGE_SIZE_4K);
+   235	    }
+   236	}
+   237
+   238	fn initial_path_modes() -> BTreeMap<String, u32> {
+   239	    let mut modes = BTreeMap::new();
+   240	    // The ramfs mount at /tmp should behave like a normal Linux temporary
+   241	    // directory for user programs that switch credentials and then create
+   242	    // scratch subdirectories.  The LTP runner's TMPDIR is a shared scratch root
+   243	    // created by the kernel-side harness before each case; seed it with the
+   244	    // same world-writable sticky mode so forked/setuid test children inherit a
+   245	    // writable view instead of the backing ramfs default directory mode.
+   246	    modes.insert(String::from("/tmp"), 0o1777);
+   247	    modes.insert(String::from("/tmp/ltp-work"), 0o1777);
+   248	    #[cfg(feature = "auto-run-tests")]
+   249	    {
+   250	        for (path, mode) in initial_path_mode_overrides().lock().iter() {
+   251	            modes.insert(path.clone(), *mode);
+   252	        }
+   253	    }
+   254	    modes
+   255	}
+   256
+   257	#[cfg(feature = "auto-run-tests")]
+   258	static INITIAL_PATH_MODE_OVERRIDES: LazyInit<Mutex<BTreeMap<String, u32>>> = LazyInit::new();
+   259
+   260	#[cfg(feature = "auto-run-tests")]
+   261	fn initial_path_mode_overrides() -> &'static Mutex<BTreeMap<String, u32>> {
+   262	    let _ = INITIAL_PATH_MODE_OVERRIDES.call_once(|| Mutex::new(BTreeMap::new()));
+   263	    &INITIAL_PATH_MODE_OVERRIDES
+   264	}
+   265
+   266	#[cfg(feature = "auto-run-tests")]
+   267	pub fn seed_initial_path_mode(path: &str, mode: u32) {
+   268	    let normalized = normalize_path("/", path).unwrap_or_else(|| String::from(path));
+   269	    initial_path_mode_overrides()
+   270	        .lock()
+   271	        .insert(normalized, mode & 0o7777);
+   272	}
+   273
+   274	pub(super) struct ProcessTeardown {
+   275	    done: AtomicBool,
+   276	}
+   277
+   278	impl ProcessTeardown {
+   279	    pub(super) fn new() -> Self {
+   280	        Self {
+   281	            done: AtomicBool::new(false),
+   282	        }
+   283	    }
+   284
+   285	    pub(super) fn is_done(&self) -> bool {
+    60	    entry: usize,
+    61	    phdr: usize,
+    62	    max_segment_end: usize,
+    63	    base: usize,
+    64	    interpreter: Option<String>,
+    65	}
+    66
+    67	#[repr(C)]
+    68	#[derive(Clone, Copy)]
+    69	struct AuxEntry {
+    70	    key: usize,
+    71	    value: usize,
+    72	}
+    73
+    74	fn default_exec_env(exec_root: &str, cwd: &str) -> Vec<String> {
+    75	    let path = if exec_root == "/glibc" {
+    76	        "PATH=/glibc:/musl"
+    77	    } else {
+    78	        "PATH=/musl:/glibc"
+    79	    };
+    80	    let pwd = if cwd.is_empty() { "/" } else { cwd };
+    81	    vec![path.into(), "HOME=/".into(), format!("PWD={pwd}")]
+    82	}
+    83
+    84	fn main_exec_image_buffer() -> &'static Mutex<Vec<u8>> {
+    85	    static BUFFER: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+    86	    let _ = BUFFER.call_once(|| Mutex::new(Vec::new()));
+    87	    &BUFFER
+    88	}
+    89
+    90	fn interp_exec_image_buffer() -> &'static Mutex<Vec<u8>> {
+    91	    static BUFFER: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+    92	    let _ = BUFFER.call_once(|| Mutex::new(Vec::new()));
+    93	    &BUFFER
+    94	}
+    95
+   820	}
+   821
+   822	pub(super) fn proc_comm_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+   823	    let (path, data) = proc_comm_target_process(process, path)?;
+   824	    Some(FdEntry::Path(PathEntry::synthetic_file(
+   825	        path.as_str(),
+   826	        data.len(),
+   827	    )))
+   828	}
+   829
+   830	pub(super) fn proc_exe_link_target(process: &UserProcess, path: &str) -> Option<String> {
+   831	    let pid_path = format!("/proc/{}/exe", process.pid());
+   832	    (path == "/proc/self/exe" || path == pid_path).then(|| process.exec_path())
+   833	}
+   834
+   835	const SYNTHETIC_PROC_VERSION_CONTENT: &[u8] =
+   836	    b"Linux version 6.0.0 (ArceOS compatibility kernel) #1 SMP PREEMPT\n";
+   837	const SYNTHETIC_PROC_CMDLINE_CONTENT: &[u8] = b"root=/dev/vda rw console=ttyS0\n";
+   838
+   839	pub(super) fn synthetic_proc_version_content(path: &str) -> Option<(&'static str, &'static [u8])> {
+   840	    match normalize_path("/", path).as_deref() {
+   841	        Some(PROC_VERSION_PATH) => Some((PROC_VERSION_PATH, SYNTHETIC_PROC_VERSION_CONTENT)),
+   842	        Some(PROC_CMDLINE_PATH) => Some((PROC_CMDLINE_PATH, SYNTHETIC_PROC_CMDLINE_CONTENT)),
+   843	        _ => None,
+   844	    }
+   845	}
+   846
+   847	pub(super) fn synthetic_proc_version_fd_entry(path: &'static str, data: &'static [u8]) -> FdEntry {
+   848	    FdEntry::MemoryFile(MemoryFileEntry {
+   849	        path: path.into(),
+   850	        data: Arc::new(data.to_vec()),
