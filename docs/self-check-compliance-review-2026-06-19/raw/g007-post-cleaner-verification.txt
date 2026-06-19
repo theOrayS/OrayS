@@ -1,0 +1,57 @@
+# G007 post-cleaner verification 2026-06-19T12:59:19+08:00
+## static guards
++ python3 scripts/check_g002_fake_success.py
+G002 fake-success static check: PASS (0 findings)
++ python3 scripts/check_g003_stat_metadata.py
+G003 stat metadata static check: PASS (0 findings)
++ python3 scripts/check_g004_rlimit_fd.py
+G004 rlimit/sysconf/fcntl/FD static check: PASS (0 findings)
++ python3 scripts/check_g005_runner_parser.py
+G005 runner/parser static check: PASS (0 findings)
++ python3 scripts/check_g006_synthetic_capabilities.py
+G006 synthetic capability static check: PASS (0 findings)
++ python3 scripts/check_g007_socket_time_mempolicy.py
+G007 socket/time/mempolicy static check: PASS (0 findings)
++ python3 scripts/check_g008_musl_patch_stable.py
+G008 musl runtime patch retirement static check: PASS (0 findings)
++ python3 scripts/check_g009_post_review_semantics.py
+G009 post-review real-semantics static check: PASS (0 findings)
++ python3 scripts/check_g010_real_kernel_semantics.py
+G010 real-kernel-semantics static check: PASS (0 findings)
++ python3 scripts/check_g011_empty_shells.py
+PASS: G011 empty-shell guard found no success-without-state shells in scoped libc surfaces
++ python3 scripts/check_g012_syscall_review_hotspots.py
+G012 syscall review hotspot guard: PASS (0 findings)
++ python3 scripts/check_g013_user_copy_boundary.py
+G013 user-copy boundary static check: PASS (0 findings)
+## unittest guards
+...........................................................................
+----------------------------------------------------------------------
+Ran 75 tests in 2.465s
+
+OK
+## ltp summary tests
+............
+----------------------------------------------------------------------
+Ran 12 tests in 0.112s
+
+OK
+## new json artifacts
++ python3 -m json.tool docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-score-summary.json
++ python3 -m json.tool docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-official-judge-summary.json
++ python3 -m json.tool docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-score-comparison.json
+## report evidence sanity
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:12:当前本地官方等价评测总分：**1419.727675405803（int 1419）**。已有本地官方基线 `/root/oskernel-eval-runs/official-20260618-085217/artifacts/score-summary.json` 为 **1085.7787803411047（int 1085）**，当前可比总分 **+333.9488950646984**。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:73:| rank | 1419.727675405803 |
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:77:- 总分：1085.7787803411047 → 1419.727675405803（+333.9488950646984）。
+docs/self-check-compliance-review-2026-06-19/report.md:203:   - G007 已补跑 RV 本地官方等价评测：官方 `make all` + 官方 QEMU 参数 + 官方 judge/parser + 官方计分公式；当前总分 `1419.727675405803`（int `1419`）。
+docs/self-check-compliance-review-2026-06-19/report.md:233:- 当前本地官方等价总分：`1419.727675405803`（int `1419`）。
+26:- `docker=missing`，见 `raw/g007-official-local-metadata.txt`；因此不是官方 Docker/OJ 完整复现。
+27:- 本地 LA QEMU 串口只有 77 bytes，`qemu-la.exit=124`；根据仓库既有约束，本地 LA 无输出/超时不作为远程 LA 回归结论。
+28:- RV QEMU 完整执行结束，`qemu-rv.exit=0`，当前分数主要来自 RV 侧官方 judge 输出。
+112:- 本地 LA 不权威：`qemu-la.exit=124` 仅记录本地现象，不推导远程 LA 分数。
+42:- Official Docker/OJ remote run still not possible on this host because `docker` is missing.
+## whitespace for g007 docs/evidence text
+checked 18 text artifacts
+## tracked diff whitespace
+POST-CLEANER VERIFICATION PASS
