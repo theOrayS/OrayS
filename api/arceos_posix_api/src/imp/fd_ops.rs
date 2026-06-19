@@ -3,7 +3,7 @@ use core::ffi::c_int;
 
 use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
-use axns::{ResArc, def_resource};
+use axns::{def_resource, ResArc};
 use flatten_objects::FlattenObjects;
 use spin::RwLock;
 
@@ -72,6 +72,16 @@ pub fn add_file_like(f: Arc<dyn FileLike>) -> LinuxResult<c_int> {
     Ok(FD_TABLE
         .write()
         .add(FdEntry::new(f))
+        .map_err(|_| LinuxError::EMFILE)? as c_int)
+}
+
+pub(crate) fn add_file_like_with_flags(
+    f: Arc<dyn FileLike>,
+    fd_flags: c_int,
+) -> LinuxResult<c_int> {
+    Ok(FD_TABLE
+        .write()
+        .add(FdEntry::with_flags(f, fd_flags))
         .map_err(|_| LinuxError::EMFILE)? as c_int)
 }
 

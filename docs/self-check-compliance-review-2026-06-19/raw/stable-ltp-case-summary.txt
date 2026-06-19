@@ -1,0 +1,7 @@
+source=examples/shell/src/cmd.rs:50-619
+total=1000
+unique=1000
+duplicates=0
+families=Counter({'other': 257, 'fd_pipe_fcntl': 124, 'file_io': 117, 'process_wait_signal': 101, 'mmap_memory': 85, 'permissions_creds': 75, 'sched_resource': 50, 'time_clock': 45, 'dir_link_rename': 40, 'stat_metadata': 31, 'socket_net': 25, 'futex_sync': 18, 'sysinfo_proc': 12, 'access': 8, 'chdir_getcwd': 8, 'brk': 4})
+static_result=Counter({'OK_STATIC': 996, 'REVIEW': 4})
+review_cases=ftest03,ftest07,dirty,stress

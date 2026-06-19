@@ -2160,7 +2160,7 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
             format!("{busybox_path} chmod 755 {chmod_args}; PATH={cwd}:. {busybox_path} {line}")
         };
         match run_user_program_argv_in(cwd, &[&busybox_path, "sh", "-c", &command]) {
-            Ok(status) if status == 0 || line == "false" => {
+            Ok(0) => {
                 println!("testcase busybox {line} success");
             }
             Ok(status) => {

@@ -69,6 +69,8 @@ def scan_cmd_rs(root: Path) -> list[str]:
     for token in forbidden_runner_rewrite_tokens:
         if token in text:
             findings.append(f"examples/shell/src/cmd.rs: suite/script-specific rewrite token is forbidden: {token}")
+    if re.search(r"\|\|\s*line\s*==\s*\"", text) or re.search(r"line\s*==\s*\"[^\"]+\"", text):
+        findings.append("examples/shell/src/cmd.rs: runner success must not special-case literal command lines")
     if not copy_block:
         findings.append("examples/shell/src/cmd.rs: missing copy_script_file")
     elif (

@@ -1,0 +1,443 @@
+diff --git a/api/arceos_posix_api/src/imp/fd_ops.rs b/api/arceos_posix_api/src/imp/fd_ops.rs
+index 573a2f23..ec22b4c3 100644
+--- a/api/arceos_posix_api/src/imp/fd_ops.rs
++++ b/api/arceos_posix_api/src/imp/fd_ops.rs
+@@ -3,7 +3,7 @@ use core::ffi::c_int;
+
+ use axerrno::{LinuxError, LinuxResult};
+ use axio::PollState;
+-use axns::{ResArc, def_resource};
++use axns::{def_resource, ResArc};
+ use flatten_objects::FlattenObjects;
+ use spin::RwLock;
+
+@@ -75,6 +75,16 @@ pub fn add_file_like(f: Arc<dyn FileLike>) -> LinuxResult<c_int> {
+         .map_err(|_| LinuxError::EMFILE)? as c_int)
+ }
+
++pub(crate) fn add_file_like_with_flags(
++    f: Arc<dyn FileLike>,
++    fd_flags: c_int,
++) -> LinuxResult<c_int> {
++    Ok(FD_TABLE
++        .write()
++        .add(FdEntry::with_flags(f, fd_flags))
++        .map_err(|_| LinuxError::EMFILE)? as c_int)
++}
++
+ pub fn close_file_like(fd: c_int) -> LinuxResult {
+     let entry = FD_TABLE
+         .write()
+diff --git a/api/arceos_posix_api/src/imp/fs.rs b/api/arceos_posix_api/src/imp/fs.rs
+index 919d077f..83b8c8cf 100644
+--- a/api/arceos_posix_api/src/imp/fs.rs
++++ b/api/arceos_posix_api/src/imp/fs.rs
+@@ -9,7 +9,7 @@ use axfs::fops::OpenOptions;
+ use axio::{PollState, SeekFrom};
+ use axsync::Mutex;
+
+-use super::fd_ops::{FileLike, get_file_like};
++use super::fd_ops::{get_file_like, FileLike};
+ use crate::{ctypes, utils::char_ptr_to_str};
+
+ pub struct File {
+@@ -27,8 +27,8 @@ impl File {
+         }
+     }
+
+-    fn add_to_fd_table(self) -> LinuxResult<c_int> {
+-        super::fd_ops::add_file_like(Arc::new(self))
++    fn add_to_fd_table(self, fd_flags: c_int) -> LinuxResult<c_int> {
++        super::fd_ops::add_file_like_with_flags(Arc::new(self), fd_flags)
+     }
+
+     fn from_fd(fd: c_int) -> LinuxResult<Arc<Self>> {
+@@ -213,8 +213,15 @@ unsafe fn write_stat_output(buf: *mut ctypes::stat, value: ctypes::stat) {
+ }
+
+ /// Convert open flags to [`OpenOptions`].
+-fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> OpenOptions {
++fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> LinuxResult<OpenOptions> {
+     let flags = flags as u32;
++    // O_EXEC/O_SEARCH are O_PATH aliases in the libc/Linux flag set we expose.
++    if flags & ctypes::O_PATH != 0 {
++        return Err(LinuxError::EOPNOTSUPP);
++    }
++    if flags & ctypes::O_TMPFILE == ctypes::O_TMPFILE {
++        return Err(LinuxError::EOPNOTSUPP);
++    }
+     let mut options = OpenOptions::new();
+     match flags & 0b11 {
+         ctypes::O_RDONLY => options.read(true),
+@@ -231,12 +238,22 @@ fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> OpenOptions {
+         options.truncate(true);
+     }
+     if flags & ctypes::O_CREAT != 0 {
+-        options.create(true);
++        if flags & ctypes::O_EXCL != 0 {
++            options.create_new(true);
++        } else {
++            options.create(true);
++        }
+     }
+-    if flags & ctypes::O_EXEC != 0 {
+-        options.create_new(true);
++    Ok(options)
++}
++
++fn open_fd_flags(flags: c_int) -> c_int {
++    let flags = flags as u32;
++    if flags & ctypes::O_CLOEXEC != 0 {
++        ctypes::FD_CLOEXEC as c_int
++    } else {
++        0
+     }
+-    options
+ }
+
+ fn open_status_flags(flags: c_int) -> c_int {
+@@ -256,10 +273,10 @@ pub unsafe fn sys_open(filename: *const c_char, flags: c_int, mode: ctypes::mode
+     let filename = char_ptr_to_str(filename);
+     debug!("sys_open <= {:?} {:#o} {:#o}", filename, flags, mode);
+     syscall_body!(sys_open, {
+-        let options = flags_to_options(flags, mode);
++        let options = flags_to_options(flags, mode)?;
+         let filename = filename?;
+         let file = axfs::fops::File::open(filename, &options)?;
+-        File::new(file, filename, flags).add_to_fd_table()
++        File::new(file, filename, flags).add_to_fd_table(open_fd_flags(flags))
+     })
+ }
+
+diff --git a/api/arceos_posix_api/src/imp/net.rs b/api/arceos_posix_api/src/imp/net.rs
+index 365c03a5..f5059a92 100644
+--- a/api/arceos_posix_api/src/imp/net.rs
++++ b/api/arceos_posix_api/src/imp/net.rs
+@@ -186,8 +186,8 @@ pub enum Socket {
+ }
+
+ impl Socket {
+-    fn add_to_fd_table(self) -> LinuxResult<c_int> {
+-        super::fd_ops::add_file_like(Arc::new(self))
++    fn add_to_fd_table(self, fd_flags: c_int) -> LinuxResult<c_int> {
++        super::fd_ops::add_file_like_with_flags(Arc::new(self), fd_flags)
+     }
+
+     fn from_fd(fd: c_int) -> LinuxResult<Arc<Self>> {
+@@ -580,6 +580,20 @@ unsafe fn write_sockaddr_output(
+     Ok(())
+ }
+
++unsafe fn maybe_write_sockaddr_output(
++    addr: *mut ctypes::sockaddr,
++    addrlen: *mut ctypes::socklen_t,
++    value: SocketAddr,
++) -> LinuxResult<()> {
++    if addr.is_null() {
++        return Ok(());
++    }
++    if addrlen.is_null() {
++        return Err(LinuxError::EFAULT);
++    }
++    unsafe { write_sockaddr_output(addr, addrlen, value) }
++}
++
+ fn from_sockaddr(
+     addr: *const ctypes::sockaddr,
+     addrlen: ctypes::socklen_t,
+@@ -606,19 +620,28 @@ fn from_sockaddr(
+ /// Return the socket file descriptor.
+ pub fn sys_socket(domain: c_int, socktype: c_int, protocol: c_int) -> c_int {
+     debug!("sys_socket <= {} {} {}", domain, socktype, protocol);
+-    let (domain, socktype, protocol) = (domain as u32, socktype as u32, protocol as u32);
++    let (domain, raw_socktype, protocol) = (domain as u32, socktype as u32, protocol as u32);
+     syscall_body!(sys_socket, {
+-        match (domain, socktype, protocol) {
++        let sock_flags = raw_socktype & (ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK);
++        let socktype = raw_socktype & !(ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK);
++        let fd_flags = if sock_flags & ctypes::SOCK_CLOEXEC != 0 {
++            ctypes::FD_CLOEXEC as c_int
++        } else {
++            0
++        };
++        let socket = match (domain, socktype, protocol) {
+             (ctypes::AF_INET, ctypes::SOCK_STREAM, ctypes::IPPROTO_TCP)
+             | (ctypes::AF_INET, ctypes::SOCK_STREAM, 0) => {
+-                Socket::Tcp(Mutex::new(TcpSocket::new())).add_to_fd_table()
++                Socket::Tcp(Mutex::new(TcpSocket::new()))
+             }
+             (ctypes::AF_INET, ctypes::SOCK_DGRAM, ctypes::IPPROTO_UDP)
+-            | (ctypes::AF_INET, ctypes::SOCK_DGRAM, 0) => {
+-                Socket::Udp(Mutex::new(UdpSocket::new())).add_to_fd_table()
+-            }
+-            _ => Err(LinuxError::EINVAL),
++            | (ctypes::AF_INET, ctypes::SOCK_DGRAM, 0) => Socket::Udp(Mutex::new(UdpSocket::new())),
++            _ => return Err(LinuxError::EINVAL),
++        };
++        if sock_flags & ctypes::SOCK_NONBLOCK != 0 {
++            socket.set_nonblocking(true)?;
+         }
++        socket.add_to_fd_table(fd_flags)
+     })
+ }
+
+@@ -728,8 +751,8 @@ pub unsafe fn sys_send(
+ /// # Safety
+ ///
+ /// `buf_ptr` must either be null with `len == 0`, or point to a writable buffer
+-/// of `len` bytes. `socket_addr` and `addrlen` must point to writable storage
+-/// for the returned peer address.
++/// of `len` bytes. If `socket_addr` is non-null, `addrlen` must point to
++/// writable storage for the returned peer address.
+ pub unsafe fn sys_recvfrom(
+     socket_fd: c_int,
+     buf_ptr: *mut c_void,
+@@ -744,7 +767,7 @@ pub unsafe fn sys_recvfrom(
+     );
+     syscall_body!(sys_recvfrom, {
+         check_recv_flags(flag)?;
+-        if socket_addr.is_null() || addrlen.is_null() {
++        if !socket_addr.is_null() && addrlen.is_null() {
+             return Err(LinuxError::EFAULT);
+         }
+         let socket = Socket::from_fd(socket_fd)?;
+@@ -752,7 +775,7 @@ pub unsafe fn sys_recvfrom(
+
+         let res = socket.recvfrom(buf)?;
+         if let Some(addr) = res.1 {
+-            unsafe { write_sockaddr_output(socket_addr, addrlen, addr)? };
++            unsafe { maybe_write_sockaddr_output(socket_addr, addrlen, addr)? };
+         }
+         Ok(res.0)
+     })
+@@ -810,14 +833,20 @@ pub unsafe fn sys_accept(
+         socket_fd, socket_addr as usize, socket_len as usize
+     );
+     syscall_body!(sys_accept, {
+-        if socket_addr.is_null() || socket_len.is_null() {
++        if !socket_addr.is_null() && socket_len.is_null() {
+             return Err(LinuxError::EFAULT);
+         }
+         let socket = Socket::from_fd(socket_fd)?;
+         let new_socket = socket.accept()?;
+-        let addr = new_socket.peer_addr()?;
+-        let new_fd = Socket::add_to_fd_table(Socket::Tcp(Mutex::new(new_socket)))?;
+-        unsafe { write_sockaddr_output(socket_addr, socket_len, addr)? };
++        let addr = if socket_addr.is_null() {
++            None
++        } else {
++            Some(new_socket.peer_addr()?)
++        };
++        let new_fd = Socket::add_to_fd_table(Socket::Tcp(Mutex::new(new_socket)), 0)?;
++        if let Some(addr) = addr {
++            unsafe { write_sockaddr_output(socket_addr, socket_len, addr)? };
++        }
+         Ok(new_fd)
+     })
+ }
+diff --git a/api/arceos_posix_api/src/imp/pthread/mutex.rs b/api/arceos_posix_api/src/imp/pthread/mutex.rs
+index 1082e1a8..b2359ee2 100644
+--- a/api/arceos_posix_api/src/imp/pthread/mutex.rs
++++ b/api/arceos_posix_api/src/imp/pthread/mutex.rs
+@@ -1,6 +1,6 @@
+ use crate::{ctypes, utils::check_null_mut_ptr};
+
+-use axerrno::LinuxResult;
++use axerrno::{LinuxError, LinuxResult};
+
+ use core::ffi::c_int;
+ use core::mem::size_of;
+@@ -36,10 +36,9 @@ impl PthreadMutex {
+             ) {
+                 Ok(_) => return Ok(()),
+                 Err(owner_id) => {
+-                    assert_ne!(
+-                        owner_id, current_id,
+-                        "pthread mutex already owned by current task"
+-                    );
++                    if owner_id == current_id {
++                        return Err(LinuxError::EDEADLK);
++                    }
+                     axtask::yield_now();
+                 }
+             }
+@@ -48,12 +47,16 @@ impl PthreadMutex {
+
+     fn unlock(&self) -> LinuxResult {
+         let current_id = axtask::current().id().as_u64();
+-        let owner_id = self.owner.swap(0, Ordering::Release);
+-        assert_eq!(
+-            owner_id, current_id,
+-            "pthread mutex released by non-owner task"
+-        );
+-        Ok(())
++        self.owner
++            .compare_exchange(current_id, 0, Ordering::Release, Ordering::Relaxed)
++            .map(|_| ())
++            .map_err(|owner_id| {
++                if owner_id == 0 {
++                    LinuxError::EINVAL
++                } else {
++                    LinuxError::EPERM
++                }
++            })
+     }
+ }
+
+diff --git a/examples/shell/src/cmd.rs b/examples/shell/src/cmd.rs
+index 38d16284..0d3f656a 100644
+--- a/examples/shell/src/cmd.rs
++++ b/examples/shell/src/cmd.rs
+@@ -2160,7 +2160,7 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
+             format!("{busybox_path} chmod 755 {chmod_args}; PATH={cwd}:. {busybox_path} {line}")
+         };
+         match run_user_program_argv_in(cwd, &[&busybox_path, "sh", "-c", &command]) {
+-            Ok(status) if status == 0 || line == "false" => {
++            Ok(0) => {
+                 println!("testcase busybox {line} success");
+             }
+             Ok(status) => {
+diff --git a/scripts/check_g005_runner_parser.py b/scripts/check_g005_runner_parser.py
+index 99550cb3..a68b28d7 100755
+--- a/scripts/check_g005_runner_parser.py
++++ b/scripts/check_g005_runner_parser.py
+@@ -69,6 +69,8 @@ def scan_cmd_rs(root: Path) -> list[str]:
+     for token in forbidden_runner_rewrite_tokens:
+         if token in text:
+             findings.append(f"examples/shell/src/cmd.rs: suite/script-specific rewrite token is forbidden: {token}")
++    if re.search(r"\|\|\s*line\s*==\s*\"", text) or re.search(r"line\s*==\s*\"[^\"]+\"", text):
++        findings.append("examples/shell/src/cmd.rs: runner success must not special-case literal command lines")
+     if not copy_block:
+         findings.append("examples/shell/src/cmd.rs: missing copy_script_file")
+     elif (
+diff --git a/scripts/test_g002_fake_success.py b/scripts/test_g002_fake_success.py
+index 45d508bc..4e26094e 100755
+--- a/scripts/test_g002_fake_success.py
++++ b/scripts/test_g002_fake_success.py
+@@ -5,6 +5,9 @@ from __future__ import annotations
+
+ import unittest
+ from pathlib import Path
++import sys
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+ import check_g002_fake_success as guard
+
+diff --git a/scripts/test_g003_stat_metadata.py b/scripts/test_g003_stat_metadata.py
+index 53011304..93d2ddc8 100755
+--- a/scripts/test_g003_stat_metadata.py
++++ b/scripts/test_g003_stat_metadata.py
+@@ -4,8 +4,11 @@
+ from __future__ import annotations
+
+ from pathlib import Path
++import sys
+ import unittest
+
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++
+ import check_g003_stat_metadata as guard
+
+
+diff --git a/scripts/test_g004_rlimit_fd.py b/scripts/test_g004_rlimit_fd.py
+index 7c1ab603..1e38b740 100755
+--- a/scripts/test_g004_rlimit_fd.py
++++ b/scripts/test_g004_rlimit_fd.py
+@@ -4,8 +4,11 @@
+ from __future__ import annotations
+
+ from pathlib import Path
++import sys
+ import unittest
+
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++
+ import check_g004_rlimit_fd as guard
+
+
+diff --git a/scripts/test_g005_runner_parser.py b/scripts/test_g005_runner_parser.py
+index 7b38ae3f..4a27dd5c 100755
+--- a/scripts/test_g005_runner_parser.py
++++ b/scripts/test_g005_runner_parser.py
+@@ -57,6 +57,19 @@ class G005RunnerParserGuardTest(unittest.TestCase):
+         self.assertNotEqual(result.returncode, 0)
+         self.assertIn("chdir01", result.stdout)
+
++    def test_detects_literal_command_success_override(self) -> None:
++        tree = self.make_tree()
++        path = tree / "examples/shell/src/cmd.rs"
++        text = path.read_text(encoding="utf-8")
++        text = text.replace(
++            "Ok(0) => {\n                println!(\"testcase busybox {line} success\");",
++            "Ok(status) if status == 0 || line == \"false\" => {\n                println!(\"testcase busybox {line} success\");",
++            1,
++        )
++        path.write_text(text, encoding="utf-8")
++        result = self.run_guard(tree)
++        self.assertNotEqual(result.returncode, 0)
++        self.assertIn("literal command lines", result.stdout)
+
+     def test_detects_suite_specific_script_rewrite_function(self) -> None:
+         tree = self.make_tree()
+diff --git a/ulib/axlibc/c/fcntl.c b/ulib/axlibc/c/fcntl.c
+index 69a32b9c..49a159a0 100644
+--- a/ulib/axlibc/c/fcntl.c
++++ b/ulib/axlibc/c/fcntl.c
+@@ -8,13 +8,34 @@
+ // TODO: remove this function in future work
+ int ax_fcntl(int fd, int cmd, size_t arg);
+
++static int fcntl_cmd_needs_arg(int cmd)
++{
++    switch (cmd) {
++    case F_DUPFD:
++    case F_SETFD:
++    case F_SETFL:
++    case F_GETLK:
++    case F_SETLK:
++    case F_SETLKW:
++    case F_SETOWN:
++    case F_SETSIG:
++    case F_DUPFD_CLOEXEC:
++        return 1;
++    default:
++        return 0;
++    }
++}
++
+ int fcntl(int fd, int cmd, ... /* arg */)
+ {
+-    unsigned long arg;
+-    va_list ap;
+-    va_start(ap, cmd);
+-    arg = va_arg(ap, unsigned long);
+-    va_end(ap);
++    unsigned long arg = 0;
++
++    if (fcntl_cmd_needs_arg(cmd)) {
++        va_list ap;
++        va_start(ap, cmd);
++        arg = va_arg(ap, unsigned long);
++        va_end(ap);
++    }
+
+     return ax_fcntl(fd, cmd, arg);
+ }
+diff --git a/ulib/axlibc/src/sys.rs b/ulib/axlibc/src/sys.rs
+index 61f54ee6..bca59b85 100644
+--- a/ulib/axlibc/src/sys.rs
++++ b/ulib/axlibc/src/sys.rs
+@@ -6,5 +6,11 @@ use core::ffi::{c_int, c_long};
+ /// Notice: currently only support what unikraft covers
+ #[unsafe(no_mangle)]
+ pub unsafe extern "C" fn sysconf(name: c_int) -> c_long {
+-    sys_sysconf(name)
++    let ret = sys_sysconf(name);
++    if ret < 0 {
++        crate::errno::set_errno((-ret) as i32);
++        -1
++    } else {
++        ret
++    }
+ }

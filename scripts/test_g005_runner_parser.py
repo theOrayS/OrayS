@@ -57,6 +57,19 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("chdir01", result.stdout)
 
+    def test_detects_literal_command_success_override(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "Ok(0) => {\n                println!(\"testcase busybox {line} success\");",
+            "Ok(status) if status == 0 || line == \"false\" => {\n                println!(\"testcase busybox {line} success\");",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("literal command lines", result.stdout)
 
     def test_detects_suite_specific_script_rewrite_function(self) -> None:
         tree = self.make_tree()
