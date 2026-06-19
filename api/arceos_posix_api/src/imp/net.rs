@@ -186,8 +186,8 @@ pub enum Socket {
 }
 
 impl Socket {
-    fn add_to_fd_table(self) -> LinuxResult<c_int> {
-        super::fd_ops::add_file_like(Arc::new(self))
+    fn add_to_fd_table(self, fd_flags: c_int) -> LinuxResult<c_int> {
+        super::fd_ops::add_file_like_with_flags(Arc::new(self), fd_flags)
     }
 
     fn from_fd(fd: c_int) -> LinuxResult<Arc<Self>> {
@@ -580,6 +580,20 @@ unsafe fn write_sockaddr_output(
     Ok(())
 }
 
+unsafe fn maybe_write_sockaddr_output(
+    addr: *mut ctypes::sockaddr,
+    addrlen: *mut ctypes::socklen_t,
+    value: SocketAddr,
+) -> LinuxResult<()> {
+    if addr.is_null() {
+        return Ok(());
+    }
+    if addrlen.is_null() {
+        return Err(LinuxError::EFAULT);
+    }
+    unsafe { write_sockaddr_output(addr, addrlen, value) }
+}
+
 fn from_sockaddr(
     addr: *const ctypes::sockaddr,
     addrlen: ctypes::socklen_t,
@@ -606,19 +620,28 @@ fn from_sockaddr(
 /// Return the socket file descriptor.
 pub fn sys_socket(domain: c_int, socktype: c_int, protocol: c_int) -> c_int {
     debug!("sys_socket <= {} {} {}", domain, socktype, protocol);
-    let (domain, socktype, protocol) = (domain as u32, socktype as u32, protocol as u32);
+    let (domain, raw_socktype, protocol) = (domain as u32, socktype as u32, protocol as u32);
     syscall_body!(sys_socket, {
-        match (domain, socktype, protocol) {
+        let sock_flags = raw_socktype & (ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK);
+        let socktype = raw_socktype & !(ctypes::SOCK_CLOEXEC | ctypes::SOCK_NONBLOCK);
+        let fd_flags = if sock_flags & ctypes::SOCK_CLOEXEC != 0 {
+            ctypes::FD_CLOEXEC as c_int
+        } else {
+            0
+        };
+        let socket = match (domain, socktype, protocol) {
             (ctypes::AF_INET, ctypes::SOCK_STREAM, ctypes::IPPROTO_TCP)
             | (ctypes::AF_INET, ctypes::SOCK_STREAM, 0) => {
-                Socket::Tcp(Mutex::new(TcpSocket::new())).add_to_fd_table()
+                Socket::Tcp(Mutex::new(TcpSocket::new()))
             }
             (ctypes::AF_INET, ctypes::SOCK_DGRAM, ctypes::IPPROTO_UDP)
-            | (ctypes::AF_INET, ctypes::SOCK_DGRAM, 0) => {
-                Socket::Udp(Mutex::new(UdpSocket::new())).add_to_fd_table()
-            }
-            _ => Err(LinuxError::EINVAL),
+            | (ctypes::AF_INET, ctypes::SOCK_DGRAM, 0) => Socket::Udp(Mutex::new(UdpSocket::new())),
+            _ => return Err(LinuxError::EINVAL),
+        };
+        if sock_flags & ctypes::SOCK_NONBLOCK != 0 {
+            socket.set_nonblocking(true)?;
         }
+        socket.add_to_fd_table(fd_flags)
     })
 }
 
@@ -728,8 +751,8 @@ pub unsafe fn sys_send(
 /// # Safety
 ///
 /// `buf_ptr` must either be null with `len == 0`, or point to a writable buffer
-/// of `len` bytes. `socket_addr` and `addrlen` must point to writable storage
-/// for the returned peer address.
+/// of `len` bytes. If `socket_addr` is non-null, `addrlen` must point to
+/// writable storage for the returned peer address.
 pub unsafe fn sys_recvfrom(
     socket_fd: c_int,
     buf_ptr: *mut c_void,
@@ -744,7 +767,7 @@ pub unsafe fn sys_recvfrom(
     );
     syscall_body!(sys_recvfrom, {
         check_recv_flags(flag)?;
-        if socket_addr.is_null() || addrlen.is_null() {
+        if !socket_addr.is_null() && addrlen.is_null() {
             return Err(LinuxError::EFAULT);
         }
         let socket = Socket::from_fd(socket_fd)?;
@@ -752,7 +775,7 @@ pub unsafe fn sys_recvfrom(
 
         let res = socket.recvfrom(buf)?;
         if let Some(addr) = res.1 {
-            unsafe { write_sockaddr_output(socket_addr, addrlen, addr)? };
+            unsafe { maybe_write_sockaddr_output(socket_addr, addrlen, addr)? };
         }
         Ok(res.0)
     })
@@ -810,14 +833,20 @@ pub unsafe fn sys_accept(
         socket_fd, socket_addr as usize, socket_len as usize
     );
     syscall_body!(sys_accept, {
-        if socket_addr.is_null() || socket_len.is_null() {
+        if !socket_addr.is_null() && socket_len.is_null() {
             return Err(LinuxError::EFAULT);
         }
         let socket = Socket::from_fd(socket_fd)?;
         let new_socket = socket.accept()?;
-        let addr = new_socket.peer_addr()?;
-        let new_fd = Socket::add_to_fd_table(Socket::Tcp(Mutex::new(new_socket)))?;
-        unsafe { write_sockaddr_output(socket_addr, socket_len, addr)? };
+        let addr = if socket_addr.is_null() {
+            None
+        } else {
+            Some(new_socket.peer_addr()?)
+        };
+        let new_fd = Socket::add_to_fd_table(Socket::Tcp(Mutex::new(new_socket)), 0)?;
+        if let Some(addr) = addr {
+            unsafe { write_sockaddr_output(socket_addr, socket_len, addr)? };
+        }
         Ok(new_fd)
     })
 }

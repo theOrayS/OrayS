@@ -6,5 +6,11 @@ use core::ffi::{c_int, c_long};
 /// Notice: currently only support what unikraft covers
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sysconf(name: c_int) -> c_long {
-    sys_sysconf(name)
+    let ret = sys_sysconf(name);
+    if ret < 0 {
+        crate::errno::set_errno((-ret) as i32);
+        -1
+    } else {
+        ret
+    }
 }

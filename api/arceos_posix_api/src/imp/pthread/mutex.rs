@@ -1,6 +1,6 @@
 use crate::{ctypes, utils::check_null_mut_ptr};
 
-use axerrno::LinuxResult;
+use axerrno::{LinuxError, LinuxResult};
 
 use core::ffi::c_int;
 use core::mem::size_of;
@@ -36,10 +36,9 @@ impl PthreadMutex {
             ) {
                 Ok(_) => return Ok(()),
                 Err(owner_id) => {
-                    assert_ne!(
-                        owner_id, current_id,
-                        "pthread mutex already owned by current task"
-                    );
+                    if owner_id == current_id {
+                        return Err(LinuxError::EDEADLK);
+                    }
                     axtask::yield_now();
                 }
             }
@@ -48,12 +47,16 @@ impl PthreadMutex {
 
     fn unlock(&self) -> LinuxResult {
         let current_id = axtask::current().id().as_u64();
-        let owner_id = self.owner.swap(0, Ordering::Release);
-        assert_eq!(
-            owner_id, current_id,
-            "pthread mutex released by non-owner task"
-        );
-        Ok(())
+        self.owner
+            .compare_exchange(current_id, 0, Ordering::Release, Ordering::Relaxed)
+            .map(|_| ())
+            .map_err(|owner_id| {
+                if owner_id == 0 {
+                    LinuxError::EINVAL
+                } else {
+                    LinuxError::EPERM
+                }
+            })
     }
 }
 

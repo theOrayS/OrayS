@@ -1,0 +1,28 @@
+api/arceos_posix_api/src/imp/fd_ops.rs:156:/// TODO: `dup2` should forcibly close new_fd if it is already opened.
+api/arceos_posix_api/src/imp/net.rs:1014:    Some(unsafe { Vec::from_raw_parts(aibuf_ptr, len, len) }) // TODO: lock
+scripts/test_g002_fake_success.py:2:"""Unit tests for the G002 fake-success static guard."""
+scripts/test_g002_fake_success.py:12:import check_g002_fake_success as guard
+scripts/test_g002_fake_success.py:15:class G002FakeSuccessGuardTest(unittest.TestCase):
+scripts/test_g002_fake_success.py:16:    def test_c_unimplemented_return_zero_is_flagged(self) -> None:
+scripts/test_g002_fake_success.py:17:        findings = guard.scan_c_unimplemented_return_success(
+scripts/test_g002_fake_success.py:22:    unimplemented();
+scripts/test_g002_fake_success.py:30:        self.assertEqual(findings[0].kind, "axlibc-unimplemented-return-zero")
+scripts/test_g002_fake_success.py:32:    def test_c_unimplemented_errno_failure_is_allowed(self) -> None:
+scripts/test_g002_fake_success.py:33:        findings = guard.scan_c_unimplemented_return_success(
+scripts/test_g002_fake_success.py:39:    unimplemented();
+scripts/test_g002_fake_success.py:49:        findings = guard.scan_api_fake_success(
+scripts/test_g002_fake_success.py:64:        findings = guard.scan_api_fake_success(
+scripts/test_g002_fake_success.py:77:        findings = guard.scan_api_fake_success(
+scripts/test_g002_fake_success.py:92:        findings = guard.scan_fd_table_fake_success(
+scripts/test_g002_fake_success.py:109:        findings = guard.scan_fd_table_fake_success(
+scripts/test_g004_rlimit_fd.py:176:                // TODO: Change fd flags
+ulib/axlibc/c/fcntl.c:8:// TODO: remove this function in future work
+ulib/axlibc/c/fcntl.c:47:// TODO: remove this function in future work
+ulib/axlibc/c/fcntl.c:64:// TODO
+ulib/axlibc/c/fcntl.c:67:    unimplemented();
+ulib/axlibc/c/fcntl.c:71:// TODO
+ulib/axlibc/c/fcntl.c:74:    unimplemented();
+scripts/test_g005_runner_parser.py:52:            "if case == \"chdir01\" {",
+scripts/test_g005_runner_parser.py:66:            "Ok(status) if status == 0 || line == \"false\" => {\n                println!(\"testcase busybox {line} success\");",
+scripts/check_g005_runner_parser.py:73:        findings.append("examples/shell/src/cmd.rs: runner success must not special-case literal command lines")
+scripts/check_g005_runner_parser.py:89:            findings.append("examples/shell/src/cmd.rs: ltp_case_env must not special-case chdir01")

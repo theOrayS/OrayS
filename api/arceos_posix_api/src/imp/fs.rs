@@ -9,7 +9,7 @@ use axfs::fops::OpenOptions;
 use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
-use super::fd_ops::{FileLike, get_file_like};
+use super::fd_ops::{get_file_like, FileLike};
 use crate::{ctypes, utils::char_ptr_to_str};
 
 pub struct File {
@@ -27,8 +27,8 @@ impl File {
         }
     }
 
-    fn add_to_fd_table(self) -> LinuxResult<c_int> {
-        super::fd_ops::add_file_like(Arc::new(self))
+    fn add_to_fd_table(self, fd_flags: c_int) -> LinuxResult<c_int> {
+        super::fd_ops::add_file_like_with_flags(Arc::new(self), fd_flags)
     }
 
     fn from_fd(fd: c_int) -> LinuxResult<Arc<Self>> {
@@ -213,8 +213,15 @@ unsafe fn write_stat_output(buf: *mut ctypes::stat, value: ctypes::stat) {
 }
 
 /// Convert open flags to [`OpenOptions`].
-fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> OpenOptions {
+fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> LinuxResult<OpenOptions> {
     let flags = flags as u32;
+    // O_EXEC/O_SEARCH are O_PATH aliases in the libc/Linux flag set we expose.
+    if flags & ctypes::O_PATH != 0 {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
+    if flags & ctypes::O_TMPFILE == ctypes::O_TMPFILE {
+        return Err(LinuxError::EOPNOTSUPP);
+    }
     let mut options = OpenOptions::new();
     match flags & 0b11 {
         ctypes::O_RDONLY => options.read(true),
@@ -231,12 +238,22 @@ fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> OpenOptions {
         options.truncate(true);
     }
     if flags & ctypes::O_CREAT != 0 {
-        options.create(true);
+        if flags & ctypes::O_EXCL != 0 {
+            options.create_new(true);
+        } else {
+            options.create(true);
+        }
     }
-    if flags & ctypes::O_EXEC != 0 {
-        options.create_new(true);
+    Ok(options)
+}
+
+fn open_fd_flags(flags: c_int) -> c_int {
+    let flags = flags as u32;
+    if flags & ctypes::O_CLOEXEC != 0 {
+        ctypes::FD_CLOEXEC as c_int
+    } else {
+        0
     }
-    options
 }
 
 fn open_status_flags(flags: c_int) -> c_int {
@@ -256,10 +273,10 @@ pub unsafe fn sys_open(filename: *const c_char, flags: c_int, mode: ctypes::mode
     let filename = char_ptr_to_str(filename);
     debug!("sys_open <= {:?} {:#o} {:#o}", filename, flags, mode);
     syscall_body!(sys_open, {
-        let options = flags_to_options(flags, mode);
+        let options = flags_to_options(flags, mode)?;
         let filename = filename?;
         let file = axfs::fops::File::open(filename, &options)?;
-        File::new(file, filename, flags).add_to_fd_table()
+        File::new(file, filename, flags).add_to_fd_table(open_fd_flags(flags))
     })
 }
 

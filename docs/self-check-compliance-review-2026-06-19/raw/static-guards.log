@@ -1,0 +1,29 @@
+2026-06-19T08:49:14+08:00
+===== scripts/check_g002_fake_success.py =====
+G002 fake-success static check: PASS (0 findings)
+===== scripts/check_g003_stat_metadata.py =====
+G003 stat metadata static check: PASS (0 findings)
+===== scripts/check_g004_rlimit_fd.py =====
+G004 rlimit/sysconf/fcntl/FD static check: PASS (0 findings)
+===== scripts/check_g005_runner_parser.py =====
+G005 runner/parser static check: PASS (0 findings)
+===== scripts/check_g006_synthetic_capabilities.py =====
+G006 synthetic capability static check: PASS (0 findings)
+===== scripts/check_g007_socket_time_mempolicy.py =====
+G007 socket/time/mempolicy static check: PASS (0 findings)
+===== scripts/check_g008_musl_patch_stable.py =====
+G008 musl runtime patch retirement static check: PASS (0 findings)
+===== scripts/check_g009_post_review_semantics.py =====
+G009 post-review real-semantics static check: PASS (0 findings)
+===== unittest g00 =====
+===== unittest ltp_summary =====
+===== py_compile audit scripts =====
+===== git diff --check =====
+2026-06-19T08:49:36+08:00
+===== scripts/check_g010_real_kernel_semantics.py =====
+G010 real-kernel-semantics static check: PASS (0 findings)
+===== scripts/check_g011_empty_shells.py =====
+PASS: G011 empty-shell guard found no success-without-state shells in scoped libc surfaces
+===== scripts/check_g012_syscall_review_hotspots.py =====
+G012 syscall review hotspot guard: PASS (0 findings)
+===== unittest g010-g012 =====

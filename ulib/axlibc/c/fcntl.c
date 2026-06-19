@@ -8,13 +8,34 @@
 // TODO: remove this function in future work
 int ax_fcntl(int fd, int cmd, size_t arg);
 
+static int fcntl_cmd_needs_arg(int cmd)
+{
+    switch (cmd) {
+    case F_DUPFD:
+    case F_SETFD:
+    case F_SETFL:
+    case F_GETLK:
+    case F_SETLK:
+    case F_SETLKW:
+    case F_SETOWN:
+    case F_SETSIG:
+    case F_DUPFD_CLOEXEC:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 int fcntl(int fd, int cmd, ... /* arg */)
 {
-    unsigned long arg;
-    va_list ap;
-    va_start(ap, cmd);
-    arg = va_arg(ap, unsigned long);
-    va_end(ap);
+    unsigned long arg = 0;
+
+    if (fcntl_cmd_needs_arg(cmd)) {
+        va_list ap;
+        va_start(ap, cmd);
+        arg = va_arg(ap, unsigned long);
+        va_end(ap);
+    }
 
     return ax_fcntl(fd, cmd, arg);
 }
