@@ -174,7 +174,7 @@ pub(super) const LINUX_EOPNOTSUPP: u32 = 95;
 pub(super) const LINUX_EAFNOSUPPORT: u32 = 97;
 
 pub(super) const LINUX_PERSONALITY_QUERY: usize = 0xffff_ffff;
-pub(super) const LINUX_PERSONALITY_MASK: usize = 0xffff_ffff;
+pub(super) const PER_LINUX: usize = 0;
 
 #[cfg(target_arch = "riscv64")]
 pub(super) const AUX_PLATFORM: &str = "riscv64";

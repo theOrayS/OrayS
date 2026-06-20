@@ -220,10 +220,133 @@ pub(super) fn sys_prlimit64(process: &UserProcess, pid: i32, resource: u32, new_
 
         self.assertEqual(findings, [])
 
+    def test_shell_fd_table_capacity_capped_at_default_nofile_is_flagged(self) -> None:
+        findings = guard.scan_shell_fd_table(
+            Path("examples/shell/src/uspace/fd_table.rs"),
+            r'''
+use super::linux_abi::{DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE};
+const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
+fn current_fd_table_limit() -> usize {
+    FD_TABLE_LIMIT
+}
+pub(super) enum FdEntry {
+    Stdin(u32),
+    Stdout(u32),
+    Stderr(u32),
+}
+pub(super) struct FdTable {
+    fd_flags: Vec<u32>,
+}
+impl FdTable {
+    pub(super) fn insert_with_flags(&mut self, entry: FdEntry, fd_flags: u32) -> Result<i32, LinuxError> { Ok(0) }
+    pub(super) fn get_fd_flags(&self, fd: i32) -> Result<i32, LinuxError> { Ok(0) }
+    pub(super) fn set_fd_flags(&mut self, fd: i32, flags: u32) -> Result<i32, LinuxError> { Ok(0) }
+    pub(super) fn fcntl(&mut self, process: &UserProcess, fd: i32, cmd: u32, arg: usize) -> Result<i32, LinuxError> {
+        match cmd {
+            general::F_GETFD => self.get_fd_flags(fd),
+            general::F_SETFD => self.set_fd_flags(fd, arg as u32),
+            general::F_GETFL => match self.entry(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => Ok(*status_flags as i32),
+                _ => Err(LinuxError::EINVAL),
+            },
+            general::F_SETFL => match self.entry_mut(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => {
+                    *status_flags =
+                        (*status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
+                _ => Err(LinuxError::EINVAL),
+            },
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+}
+''',
+            root=Path("."),
+        )
+
+        kinds = {f.kind for f in findings}
+        self.assertIn("g004-fd-table-limit-default-nofile", kinds)
+        self.assertIn("g004-fd-table-imports-default-nofile", kinds)
+
+    def test_shell_fd_table_nr_open_capacity_and_soft_clamp_are_allowed(self) -> None:
+        findings = guard.scan_shell_fd_table(
+            Path("examples/shell/src/uspace/fd_table.rs"),
+            r'''
+use super::linux_abi::{NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE};
+const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;
+fn current_fd_table_limit() -> usize {
+    let Some(task) = current_task_ext() else {
+        return FD_TABLE_LIMIT;
+    };
+    let soft_limit = task.process.get_rlimit(RLIMIT_NOFILE_RESOURCE).current();
+    cmp::min(
+        FD_TABLE_LIMIT,
+        soft_limit.min(FD_TABLE_LIMIT as u64) as usize,
+    )
+}
+pub(super) enum FdEntry {
+    Stdin(u32),
+    Stdout(u32),
+    Stderr(u32),
+}
+pub(super) struct FdTable {
+    fd_flags: Vec<u32>,
+}
+impl FdTable {
+    pub(super) fn insert_with_flags(&mut self, entry: FdEntry, fd_flags: u32) -> Result<i32, LinuxError> { Ok(0) }
+    pub(super) fn get_fd_flags(&self, fd: i32) -> Result<i32, LinuxError> { Ok(0) }
+    pub(super) fn set_fd_flags(&mut self, fd: i32, flags: u32) -> Result<i32, LinuxError> { Ok(0) }
+    pub(super) fn fcntl(&mut self, process: &UserProcess, fd: i32, cmd: u32, arg: usize) -> Result<i32, LinuxError> {
+        match cmd {
+            general::F_GETFD => self.get_fd_flags(fd),
+            general::F_SETFD => self.set_fd_flags(fd, arg as u32),
+            general::F_GETFL => match self.entry(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => Ok(*status_flags as i32),
+                _ => Err(LinuxError::EINVAL),
+            },
+            general::F_SETFL => match self.entry_mut(fd)? {
+                FdEntry::Stdin(status_flags)
+                | FdEntry::Stdout(status_flags)
+                | FdEntry::Stderr(status_flags) => {
+                    *status_flags =
+                        (*status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
+                    Ok(0)
+                }
+                _ => Err(LinuxError::EINVAL),
+            },
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+}
+''',
+            root=Path("."),
+        )
+
+        self.assertEqual(findings, [])
+
     def test_shell_fcntl_ok_zero_fallback_is_flagged(self) -> None:
         findings = guard.scan_shell_fd_table(
             Path("examples/shell/src/uspace/fd_table.rs"),
             r'''
+use super::linux_abi::{NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE};
+const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;
+fn current_fd_table_limit() -> usize {
+    let Some(task) = current_task_ext() else {
+        return FD_TABLE_LIMIT;
+    };
+    let soft_limit = task.process.get_rlimit(RLIMIT_NOFILE_RESOURCE).current();
+    cmp::min(
+        FD_TABLE_LIMIT,
+        soft_limit.min(FD_TABLE_LIMIT as u64) as usize,
+    )
+}
 pub(super) enum FdEntry {
     Stdin(u32),
     Stdout(u32),
@@ -254,6 +377,18 @@ impl FdTable {
         findings = guard.scan_shell_fd_table(
             Path("examples/shell/src/uspace/fd_table.rs"),
             r'''
+use super::linux_abi::{NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE};
+const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;
+fn current_fd_table_limit() -> usize {
+    let Some(task) = current_task_ext() else {
+        return FD_TABLE_LIMIT;
+    };
+    let soft_limit = task.process.get_rlimit(RLIMIT_NOFILE_RESOURCE).current();
+    cmp::min(
+        FD_TABLE_LIMIT,
+        soft_limit.min(FD_TABLE_LIMIT as u64) as usize,
+    )
+}
 pub(super) enum FdEntry {
     Stdin(u32),
     Stdout(u32),

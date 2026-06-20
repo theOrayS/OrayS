@@ -35,9 +35,7 @@ use super::program_loader::{load_program_image, LoadedMapping};
 use super::resource_sched::{
     apply_process_scheduler_state_to_task, child_sched_state_from_parent, default_sched_state,
 };
-use super::runtime_paths::{
-    busybox_applet_target_path, current_cwd, is_busybox_applet_name, normalize_path,
-};
+use super::runtime_paths::{current_cwd, normalize_path};
 use super::signal_abi::{
     all_application_signal_mask, current_unblocked_signal_pending, deliver_user_signal,
     ensure_user_return_hook_registered, thread_waits_for_signal,
@@ -665,79 +663,6 @@ fn record_loaded_image_mappings(process: &UserProcess, mappings: &[LoadedMapping
             None,
         );
     }
-}
-
-fn existing_busybox_for_exec_root(exec_root: &str) -> Option<String> {
-    let mut candidates = Vec::new();
-    if exec_root == "/glibc" {
-        // The glibc runtime image may contain a minimal busybox without the
-        // shell/applet set used by portable helper scripts. Prefer the packaged musl
-        // busybox for generic /bin applet fallback; it is statically linked
-        // and is safe to use as a tool runner for glibc payloads.
-        candidates.push("/musl/busybox");
-        candidates.push("/glibc/busybox");
-    } else {
-        candidates.push("/musl/busybox");
-        candidates.push("/glibc/busybox");
-    }
-    candidates.into_iter().find_map(|path| {
-        matches!(std::fs::metadata(path), Ok(meta) if meta.is_file()).then(|| path.into())
-    })
-}
-
-fn standard_bin_busybox_applet_name(path: &str) -> Option<&str> {
-    let applet = path
-        .strip_prefix("/bin/")
-        .or_else(|| path.strip_prefix("/usr/bin/"))?;
-    if applet.is_empty() || applet.contains('/') || !is_busybox_applet_name(applet) {
-        None
-    } else {
-        Some(applet)
-    }
-}
-
-fn rooted_busybox_applet_name(path: &str) -> Option<&str> {
-    let applet = path
-        .strip_prefix("/musl/")
-        .or_else(|| path.strip_prefix("/glibc/"))?;
-    if applet.is_empty()
-        || applet.contains('/')
-        || applet == "busybox"
-        || !is_busybox_applet_name(applet)
-    {
-        None
-    } else {
-        Some(applet)
-    }
-}
-
-fn busybox_exec_alias_target(process: &UserProcess, path: &str) -> Option<String> {
-    busybox_applet_target_path(path)
-        .filter(|target| matches!(std::fs::metadata(target), Ok(meta) if meta.is_file()))
-        .or_else(|| existing_busybox_for_exec_root(process.exec_root().as_str()))
-}
-
-fn resolve_execve_compat_path(process: &UserProcess, path: String, argv: &mut [String]) -> String {
-    let applet_name = standard_bin_busybox_applet_name(path.as_str())
-        .or_else(|| rooted_busybox_applet_name(path.as_str()));
-    let needs_busybox = (matches!(path.as_str(), "/busybox" | "/bin/busybox")
-        || applet_name.is_some())
-        && !matches!(std::fs::metadata(path.as_str()), Ok(meta) if meta.is_file());
-    if !needs_busybox {
-        return path;
-    }
-
-    let Some(busybox) = busybox_exec_alias_target(process, path.as_str()) else {
-        return path;
-    };
-    if let Some(applet) = applet_name {
-        if let Some(argv0) = argv.first_mut() {
-            if argv0 == path.as_str() || argv0.rsplit('/').next() == Some(applet) {
-                *argv0 = applet.into();
-            }
-        }
-    }
-    busybox
 }
 
 impl UserProcess {
@@ -2289,24 +2214,23 @@ pub(super) fn sys_execve(
         Ok(path) => path,
         Err(err) => return neg_errno(err),
     };
-    let mut argv = match read_execve_argv(process, argv, raw_path.as_str()) {
+    let argv = match read_execve_argv(process, argv, raw_path.as_str()) {
         Ok(argv) => argv,
         Err(err) => return neg_errno(err),
     };
-    let path = resolve_execve_compat_path(process, raw_path.clone(), &mut argv);
     let env = match read_execve_envp(process, _envp) {
         Ok(env) => env,
         Err(err) => return neg_errno(err),
     };
     let cwd = process.cwd();
-    if let Err(err) = validate_execve_target(process, cwd.as_str(), path.as_str()) {
+    if let Err(err) = validate_execve_target(process, cwd.as_str(), raw_path.as_str()) {
         return neg_errno(err);
     }
     if !process.owns_aspace {
         return neg_errno(LinuxError::EAGAIN);
     }
     let (entry, stack_ptr, argc) =
-        match exec_program(process, cwd.as_str(), path.as_str(), &argv, &env) {
+        match exec_program(process, cwd.as_str(), raw_path.as_str(), &argv, &env) {
             Ok(image) => image,
             Err(err) => {
                 let errno = if err.contains("Entity not found") {

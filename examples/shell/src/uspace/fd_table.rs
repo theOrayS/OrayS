@@ -24,8 +24,8 @@ use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
     fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
-    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEFAULT_NOFILE_LIMIT, FILE_MODE_SET_GID,
-    FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, FILE_MODE_SET_GID, FILE_MODE_STICKY,
+    MAX_IN_MEMORY_FILE_SIZE, NR_OPEN_LIMIT, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
     RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK,
     ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
     ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE,
@@ -42,8 +42,8 @@ use super::posix_mq::{
     ProcMqQueuesMaxEntry,
 };
 use super::runtime_paths::{
-    busybox_applet_target_path, normalize_path, push_runtime_candidate,
-    runtime_absolute_path_candidates, runtime_library_name_candidates,
+    normalize_path, push_runtime_candidate, runtime_absolute_path_candidates,
+    runtime_library_name_candidates,
 };
 use super::select_fdset::{
     yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until, SelectMode,
@@ -104,7 +104,7 @@ pub(super) struct ProcessFdTableGuard<'a> {
     pid: i32,
 }
 
-const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
+const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;
 const LINUX_PATH_MAX: usize = 4096;
 // axfs_vfs::VfsDirEntry stores 63 bytes of d_name.  Enforce and report that
 // real backing limit at the POSIX boundary instead of accepting longer names
@@ -7955,7 +7955,6 @@ fn open_fd_entry(
 
     let absolute = path.starts_with('/');
     let exec_root = process.exec_root();
-    let add_busybox_aliases = busybox_applet_alias_allowed(flags, access);
 
     if absolute || dirfd == general::AT_FDCWD {
         let mut candidates = if absolute {
@@ -7977,9 +7976,6 @@ fn open_fd_entry(
             }
             candidates
         };
-        if add_busybox_aliases {
-            append_busybox_applet_alias_candidates(&mut candidates);
-        }
         translate_mount_candidates(process, &mut candidates);
         if candidates.is_empty() {
             return Err(LinuxError::EINVAL);
@@ -7993,9 +7989,6 @@ fn open_fd_entry(
         let mut candidates = vec![primary];
         for extra in runtime_library_name_candidates(exec_root.as_str(), path) {
             push_runtime_candidate(&mut candidates, Some(extra));
-        }
-        if add_busybox_aliases {
-            append_busybox_applet_alias_candidates(&mut candidates);
         }
         translate_mount_candidates(process, &mut candidates);
         open_candidates(process, table, &candidates, &opts, flags, mode)
@@ -8011,12 +8004,6 @@ fn translate_mount_candidates(process: &UserProcess, candidates: &mut Vec<String
         push_runtime_candidate(&mut deduped, Some(candidate));
     }
     *candidates = deduped;
-}
-
-fn busybox_applet_alias_allowed(flags: u32, access: u32) -> bool {
-    access != general::O_WRONLY
-        && access != general::O_RDWR
-        && flags & (general::O_CREAT | general::O_TRUNC | general::O_APPEND) == 0
 }
 
 fn file_is_readable(status_flags: u32) -> bool {
@@ -8986,12 +8973,6 @@ fn check_inode_flags_allow_unlink(process: &UserProcess, path: &str) -> Result<(
         Err(LinuxError::EPERM)
     } else {
         Ok(())
-    }
-}
-
-fn append_busybox_applet_alias_candidates(candidates: &mut Vec<String>) {
-    for candidate in candidates.clone() {
-        push_runtime_candidate(candidates, busybox_applet_target_path(candidate.as_str()));
     }
 }
 

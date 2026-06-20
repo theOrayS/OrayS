@@ -308,6 +308,24 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     )
 
     sched = read(root, "examples/shell/src/uspace/resource_sched.rs")
+    sched_param_accepts = rust_function_block(sched, "sched_param_accepts_policy")
+    require_tokens(
+        findings,
+        sched_param_accepts,
+        "sched_setscheduler must validate policy-specific sched_param without accepting deadline-only policy tuples",
+        ("SCHED_FIFO", "SCHED_RR", "SCHED_BATCH", "SCHED_IDLE", "_ => false"),
+    )
+    if "SCHED_DEADLINE" in sched_param_accepts:
+        findings.append(
+            "sys_sched_setscheduler must not accept SCHED_DEADLINE through sched_param-only validation; use sched_setattr for deadline tuples"
+        )
+    sched_setscheduler = rust_function_block(sched, "sys_sched_setscheduler")
+    require_tokens(
+        findings,
+        sched_setscheduler,
+        "sys_sched_setscheduler must reject policy/param mismatch visibly",
+        ("!sched_param_accepts_policy(base_policy, param)", "LinuxError::EINVAL"),
+    )
     sched_attr = rust_function_block(sched, "sched_state_from_attr")
     require_tokens(
         findings,
@@ -423,6 +441,39 @@ def scan_medium_hotspots(root: Path) -> list[str]:
         findings.append(
             "unregister_user_task_with_runtime removes the live task before committing completed runtime"
         )
+
+    linux_abi = read(root, "examples/shell/src/uspace/linux_abi.rs")
+    process_abi = read(root, "examples/shell/src/uspace/process_abi.rs")
+    if "LINUX_PERSONALITY_MASK" in linux_abi or "LINUX_PERSONALITY_MASK" in process_abi:
+        findings.append("personality must not silently mask/accept arbitrary persona values")
+    require_tokens(
+        findings,
+        linux_abi,
+        "personality ABI should name only the supported Linux persona instead of a broad accept mask",
+        ("LINUX_PERSONALITY_QUERY", "PER_LINUX"),
+    )
+    sys_personality = rust_function_block(process_abi, "sys_personality")
+    require_tokens(
+        findings,
+        sys_personality,
+        "sys_personality must return errno for unsupported persona requests",
+        ("apply_personality_request", "Err(err) => neg_errno(err)"),
+    )
+    apply_personality = rust_function_block(process_abi, "apply_personality_request")
+    require_tokens(
+        findings,
+        apply_personality,
+        "personality changes must be validated before updating process state",
+        ("persona != LINUX_PERSONALITY_QUERY", "validate_personality(persona)?", "process.set_personality(persona)"),
+    )
+    validate_personality = rust_function_block(process_abi, "validate_personality")
+    require_tokens(
+        findings,
+        validate_personality,
+        "unsupported personalities must fail with EINVAL instead of being recorded as fake success",
+        ("PER_LINUX => Ok(PER_LINUX)", "_ => Err(LinuxError::EINVAL)"),
+    )
+
     wait4 = rust_function_block(lifecycle, "sys_wait4")
     if "_rusage:" in wait4:
         findings.append("sys_wait4 must not mark rusage as intentionally ignored")

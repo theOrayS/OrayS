@@ -395,32 +395,7 @@ fn resolve_script_interpreter(
         return Ok(vec![resolved]);
     }
 
-    if raw_interpreter == "/bin/sh" || raw_interpreter == "/busybox" {
-        if let Some(busybox) = find_busybox_for_script(script_path) {
-            return Ok(vec![busybox, "sh".into()]);
-        }
-    } else if raw_interpreter == "/bin/busybox" {
-        if let Some(busybox) = find_busybox_for_script(script_path) {
-            return Ok(vec![busybox]);
-        }
-    }
-
     Err(format!("script interpreter not found: {raw_interpreter}"))
-}
-
-fn find_busybox_for_script(script_path: &str) -> Option<String> {
-    let mut candidates = Vec::new();
-    match derive_exec_root_from_path(script_path).as_str() {
-        "/musl" => candidates.push("/musl/busybox"),
-        "/glibc" => candidates.push("/glibc/busybox"),
-        _ => {}
-    }
-    candidates.push("/musl/busybox");
-    candidates.push("/glibc/busybox");
-
-    candidates.into_iter().find_map(|path| {
-        matches!(std::fs::metadata(path), Ok(meta) if meta.is_file()).then(|| path.to_string())
-    })
 }
 
 fn script_dir(path: &str) -> String {

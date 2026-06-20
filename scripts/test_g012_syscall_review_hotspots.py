@@ -26,6 +26,8 @@ TARGETS = [
     Path("examples/shell/src/uspace/system_info.rs"),
     Path("examples/shell/src/uspace/time_abi.rs"),
     Path("examples/shell/src/uspace/resource_sched.rs"),
+    Path("examples/shell/src/uspace/linux_abi.rs"),
+    Path("examples/shell/src/uspace/process_abi.rs"),
     Path("api/arceos_posix_api/src/imp/pthread/mod.rs"),
 ]
 
@@ -371,6 +373,44 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SCHED_DEADLINE", result.stdout)
+
+    def test_detects_sched_setscheduler_deadline_param_acceptance(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/resource_sched.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "general::SCHED_BATCH | general::SCHED_IDLE if param.sched_priority == 0 => true,",
+            "general::SCHED_BATCH | general::SCHED_IDLE | general::SCHED_DEADLINE if param.sched_priority == 0 => true,",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sched_param-only", result.stdout)
+
+    def test_detects_personality_mask_acceptance(self) -> None:
+        tree = self.make_tree()
+        linux_abi = tree / "examples/shell/src/uspace/linux_abi.rs"
+        process_abi = tree / "examples/shell/src/uspace/process_abi.rs"
+        linux_abi.write_text(
+            linux_abi.read_text(encoding="utf-8").replace(
+                "pub(super) const PER_LINUX: usize = 0;",
+                "pub(super) const LINUX_PERSONALITY_MASK: usize = 0xffff_ffff;",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        process_abi.write_text(
+            process_abi.read_text(encoding="utf-8").replace(
+                "let persona = validate_personality(persona)?;\n        process.set_personality(persona);",
+                "process.set_personality(persona & LINUX_PERSONALITY_MASK);",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("personality", result.stdout)
 
     def test_detects_adjtimex_field_only_discipline(self) -> None:
         tree = self.make_tree()

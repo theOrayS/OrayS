@@ -61,6 +61,79 @@ def rust_function_names(text: str) -> set[str]:
         )
     )
 
+
+def scan_busybox_runtime_boundary(root: Path) -> list[str]:
+    findings: list[str] = []
+    cmd = read(root / "examples/shell/src/cmd.rs")
+    runtime_wrappers = function_block(cmd, "ensure_runtime_busybox_wrappers")
+    suite_runtime_wrappers = function_block(cmd, "prepare_suite_runtime_busybox_wrappers")
+    autorun_body = function_body(cmd, "maybe_run_official_tests")
+    busybox_runner = function_body(cmd, "run_busybox_suite")
+    ltp_runner = function_body(cmd, "run_ltp_suite")
+    for token in (
+        "ensure_busybox_applet_wrappers",
+        "ensure_runtime_busybox_wrappers",
+        "prepare_suite_runtime_busybox_wrappers",
+        "PATH_BUSYBOX_APPLETS",
+        "LTP_BUSYBOX_APPLETS",
+    ):
+        if token not in cmd:
+            findings.append(f"examples/shell/src/cmd.rs: missing filesystem-visible busybox wrapper support token {token}")
+    if not runtime_wrappers:
+        findings.append("examples/shell/src/cmd.rs: missing ensure_runtime_busybox_wrappers")
+    else:
+        for token in ('for dir in [suite_dir, "/bin", "/usr/bin"]', "ensure_busybox_applet_wrappers", "LTP_BUSYBOX_APPLETS"):
+            if token not in runtime_wrappers:
+                findings.append(
+                    "examples/shell/src/cmd.rs: runtime busybox support must create real wrapper files for suite/bin/usr-bin paths"
+                )
+                break
+    if not suite_runtime_wrappers:
+        findings.append("examples/shell/src/cmd.rs: missing suite-level runtime busybox wrapper preparation helper")
+    elif (
+        'let suite_busybox = join_path(suite_dir, "busybox")' not in suite_runtime_wrappers
+        or "ltp_helper_busybox_path(suite_dir, &suite_busybox)" not in suite_runtime_wrappers
+        or "ensure_runtime_busybox_wrappers(suite_dir, &wrapper_busybox)" not in suite_runtime_wrappers
+    ):
+        findings.append(
+            "examples/shell/src/cmd.rs: suite-level wrapper preparation must derive the suite busybox and create real runtime wrapper files"
+        )
+    if not autorun_body or "ensure_runtime_busybox_wrappers(suite_dir, &wrapper_busybox)" not in autorun_body:
+        if "prepare_suite_runtime_busybox_wrappers(suite_dir)" not in autorun_body:
+            findings.append("examples/shell/src/cmd.rs: official autorun must prepare real busybox wrapper files before executing suites")
+    for runner_name, runner_body in (("run_busybox_suite", busybox_runner), ("run_ltp_suite", ltp_runner)):
+        if not runner_body:
+            findings.append(f"examples/shell/src/cmd.rs: missing {runner_name}")
+        elif "prepare_suite_runtime_busybox_wrappers(suite_dir)" not in runner_body:
+            findings.append(
+                f"examples/shell/src/cmd.rs: {runner_name} must enforce real busybox wrapper preparation instead of relying on outer autorun order"
+            )
+
+    forbidden_uspace_tokens = {
+        "busybox_applet_target_path": "runtime path/VFS layer must not rewrite applet paths to busybox",
+        "is_busybox_applet_name": "kernel runtime must not classify applet names for hidden fallback",
+        "append_busybox_applet_alias_candidates": "openat path candidate generation must not add busybox alias fallbacks",
+        "busybox_applet_alias_allowed": "openat path candidate generation must not special-case busybox applets",
+        "resolve_execve_compat_path": "execve must not rewrite missing /bin or suite applets to busybox",
+        "busybox_exec_alias_target": "execve must not synthesize busybox targets for missing paths",
+        "existing_busybox_for_exec_root": "execve must not fall back to suite-root busybox invisibly",
+        "standard_bin_busybox_applet_name": "execve must not special-case /bin or /usr/bin applet names",
+        "rooted_busybox_applet_name": "execve must not special-case /musl or /glibc applet names",
+        "find_busybox_for_script": "script loader must not replace missing interpreters with busybox",
+    }
+    for rel in (
+        Path("examples/shell/src/uspace/runtime_paths.rs"),
+        Path("examples/shell/src/uspace/process_lifecycle.rs"),
+        Path("examples/shell/src/uspace/fd_table.rs"),
+        Path("examples/shell/src/uspace/program_loader.rs"),
+    ):
+        text = read(root / rel)
+        for token, detail in forbidden_uspace_tokens.items():
+            if token in text:
+                findings.append(f"{rel}: forbidden busybox magic token {token}: {detail}")
+    return findings
+
+
 def scan_cmd_rs(root: Path) -> list[str]:
     text = read(root / "examples/shell/src/cmd.rs")
     findings: list[str] = []
@@ -194,6 +267,7 @@ def main() -> int:
     root = args.root.resolve()
     findings: list[str] = []
     findings.extend(scan_cmd_rs(root))
+    findings.extend(scan_busybox_runtime_boundary(root))
     findings.extend(scan_makefile(root))
     findings.extend(scan_ltp_summary(root))
     if findings:

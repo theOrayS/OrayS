@@ -2,7 +2,7 @@ use core::sync::atomic::Ordering;
 
 use axerrno::LinuxError;
 
-use super::linux_abi::{LINUX_PERSONALITY_MASK, LINUX_PERSONALITY_QUERY};
+use super::linux_abi::{LINUX_PERSONALITY_QUERY, PER_LINUX};
 use super::task_registry::{live_user_process_entries, user_thread_entry_by_process_pid};
 use super::{neg_errno, UserProcess};
 
@@ -14,8 +14,7 @@ impl UserProcess {
     }
 
     pub(super) fn set_personality(&self, persona: usize) {
-        self.personality
-            .store(persona & LINUX_PERSONALITY_MASK, Ordering::Release);
+        self.personality.store(persona, Ordering::Release);
     }
 }
 
@@ -113,13 +112,27 @@ pub(super) fn sys_setsid(process: &UserProcess) -> isize {
 }
 
 pub(super) fn sys_personality(process: &UserProcess, persona: usize) -> isize {
-    apply_personality_request(process, persona) as isize
+    match apply_personality_request(process, persona) {
+        Ok(old) => old as isize,
+        Err(err) => neg_errno(err),
+    }
 }
 
-pub(super) fn apply_personality_request(process: &UserProcess, persona: usize) -> usize {
+pub(super) fn apply_personality_request(
+    process: &UserProcess,
+    persona: usize,
+) -> Result<usize, LinuxError> {
     let old = process.personality();
     if persona != LINUX_PERSONALITY_QUERY {
+        let persona = validate_personality(persona)?;
         process.set_personality(persona);
     }
-    old
+    Ok(old)
+}
+
+fn validate_personality(persona: usize) -> Result<usize, LinuxError> {
+    match persona {
+        PER_LINUX => Ok(PER_LINUX),
+        _ => Err(LinuxError::EINVAL),
+    }
 }

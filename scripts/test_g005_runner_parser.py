@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g005_runner_parser.py"
 TARGETS = [
     Path("examples/shell/src/cmd.rs"),
+    Path("examples/shell/src/uspace/runtime_paths.rs"),
+    Path("examples/shell/src/uspace/process_lifecycle.rs"),
+    Path("examples/shell/src/uspace/fd_table.rs"),
+    Path("examples/shell/src/uspace/program_loader.rs"),
     Path("Makefile"),
     Path("scripts/ltp_summary.py"),
     Path("scripts/test_ltp_summary.py"),
@@ -170,6 +174,65 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("PASS LTP CASE", result.stdout)
+
+    def test_detects_busybox_execve_magic_fallback(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/process_lifecycle.rs"
+        text = path.read_text(encoding="utf-8") + "\nfn resolve_execve_compat_path() {}\n"
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("resolve_execve_compat_path", result.stdout)
+
+    def test_detects_busybox_open_alias_magic(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        text = path.read_text(encoding="utf-8") + "\nfn append_busybox_applet_alias_candidates() {}\n"
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("append_busybox_applet_alias_candidates", result.stdout)
+
+    def test_detects_missing_runtime_busybox_wrapper_preparation(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "        if let Err(err) = prepare_suite_runtime_busybox_wrappers(suite_dir) {\n",
+            "        if let Err(err) = ensure_busybox_path_wrappers(suite_dir, shell) {\n",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("real busybox wrapper files", result.stdout)
+
+    def test_detects_runner_layer_missing_runtime_busybox_wrapper_preparation(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "    prepare_suite_runtime_busybox_wrappers(suite_dir)\n"
+            '        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;\n',
+            "",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("run_busybox_suite", result.stdout)
+
+    def test_detects_ltp_runner_missing_runtime_busybox_wrapper_preparation(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "    prepare_suite_runtime_busybox_wrappers(suite_dir)\n"
+            '        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;\n',
+            "",
+            2,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("run_ltp_suite", result.stdout)
 
     def test_detects_blacklist_default(self) -> None:
         tree = self.make_tree()
