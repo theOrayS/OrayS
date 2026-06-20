@@ -88,8 +88,6 @@ pub unsafe fn sys_clock_gettime(clk: ctypes::clockid_t, ts: *mut ctypes::timespe
 
 /// Sleep some nanoseconds
 ///
-/// TODO: should be woken by signals, and set errno
-///
 /// # Safety
 ///
 /// `req` must point to a readable `timespec`. `rem` must be writable for one
@@ -103,20 +101,33 @@ pub unsafe fn sys_nanosleep(req: *const ctypes::timespec, rem: *mut ctypes::time
             Duration::from(req)
         };
 
-        let now = axhal::time::monotonic_time();
-
-        #[cfg(feature = "multitask")]
-        axtask::sleep(dur);
-        #[cfg(not(feature = "multitask"))]
-        axhal::time::busy_wait(dur);
-
-        let after = axhal::time::monotonic_time();
-        let actual = after - now;
-
-        if let Some(diff) = dur.checked_sub(actual) {
-            unsafe { write_optional_timespec(rem, diff.into())? };
+        if crate::signal::has_interrupting_signal() {
+            unsafe { write_optional_timespec(rem, dur.into())? };
             return Err(LinuxError::EINTR);
         }
+
+        let started = axhal::time::monotonic_time();
+        let poll_quantum = Duration::from_millis(10);
+        let mut remaining = dur;
+        while remaining > Duration::ZERO {
+            let step = remaining.min(poll_quantum);
+            #[cfg(feature = "multitask")]
+            axtask::sleep(step);
+            #[cfg(not(feature = "multitask"))]
+            axhal::time::busy_wait(step);
+
+            let elapsed = axhal::time::monotonic_time() - started;
+            remaining = match dur.checked_sub(elapsed) {
+                Some(diff) => diff,
+                None => Duration::ZERO,
+            };
+
+            if remaining > Duration::ZERO && crate::signal::has_interrupting_signal() {
+                unsafe { write_optional_timespec(rem, remaining.into())? };
+                return Err(LinuxError::EINTR);
+            }
+        }
+        unsafe { write_optional_timespec(rem, Duration::ZERO.into())? };
         Ok(0)
     })
 }

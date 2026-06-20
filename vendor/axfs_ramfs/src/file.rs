@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
-use axfs_vfs::{impl_vfs_non_dir_default, VfsError, VfsNodeAttr, VfsNodeOps, VfsResult};
+use axfs_vfs::{
+    impl_vfs_non_dir_default, VfsError, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeType,
+    VfsResult,
+};
 use spin::RwLock;
 
 // The evaluator mounts /tmp and /var as ramfs. Keep a per-file ceiling so
@@ -12,19 +15,35 @@ const MAX_RAMFS_FILE_SIZE: usize = 64 * 1024 * 1024;
 /// It implements [`axfs_vfs::VfsNodeOps`].
 pub struct FileNode {
     content: RwLock<Vec<u8>>,
+    perm: RwLock<VfsNodePerm>,
 }
 
 impl FileNode {
     pub(super) const fn new() -> Self {
+        Self::new_with_perm(VfsNodePerm::default_file())
+    }
+
+    pub(super) const fn new_with_perm(perm: VfsNodePerm) -> Self {
         Self {
             content: RwLock::new(Vec::new()),
+            perm: RwLock::new(perm),
         }
     }
 }
 
 impl VfsNodeOps for FileNode {
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
-        Ok(VfsNodeAttr::new_file(self.content.read().len() as _, 0))
+        Ok(VfsNodeAttr::new(
+            *self.perm.read(),
+            VfsNodeType::File,
+            self.content.read().len() as _,
+            0,
+        ))
+    }
+
+    fn set_perm(&self, perm: VfsNodePerm) -> VfsResult {
+        *self.perm.write() = perm;
+        Ok(())
     }
 
     fn truncate(&self, size: u64) -> VfsResult {

@@ -1272,12 +1272,24 @@ fn selected_ltp_cases(target_dir: &str) -> Result<(String, Vec<String>), String>
         .iter()
         .find(|path| matches!(fs::metadata(path), Ok(meta) if meta.is_file()))
         .map(|path| format!("file:{path}"));
+    let explicit_spec = file_spec.is_some() || option_env!("LTP_CASES").is_some();
     let spec = file_spec
         .as_deref()
         .or(option_env!("LTP_CASES"))
         .unwrap_or("stable")
         .trim();
-    if spec.is_empty() || spec == "stable" {
+    if spec.is_empty() {
+        if explicit_spec {
+            return Err(String::from(
+                "LTP_CASES selection did not contain any cases",
+            ));
+        }
+        return Ok((
+            String::from("stable"),
+            ltp_cases_from_slice(LTP_STABLE_CASES)?,
+        ));
+    }
+    if spec == "stable" {
         return Ok((
             String::from("stable"),
             ltp_cases_from_slice(LTP_STABLE_CASES)?,
@@ -1360,7 +1372,9 @@ fn selected_ltp_cases(target_dir: &str) -> Result<(String, Vec<String>), String>
         }
     }
 
-    Ok((String::from("core"), ltp_cases_from_slice(LTP_CORE_CASES)?))
+    Err(format!(
+        "invalid LTP_CASES selection '{spec}': no valid cases parsed"
+    ))
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1374,20 +1388,31 @@ fn ltp_case_timeout_secs() -> u64 {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn selected_official_test_groups() -> Option<Vec<String>> {
+fn selected_official_test_groups() -> Result<Option<Vec<String>>, String> {
     let file_spec = ["/test_groups.txt", "/tmp/test_groups.txt"]
         .iter()
         .find_map(|path| fs::read_to_string(path).ok());
-    let raw = file_spec.or_else(|| option_env!("OSCOMP_TEST_GROUPS").map(str::to_string))?;
+    let Some(raw) = file_spec.or_else(|| option_env!("OSCOMP_TEST_GROUPS").map(str::to_string))
+    else {
+        return Ok(None);
+    };
 
     let raw = raw.trim();
+    if raw.is_empty() {
+        return Err(String::from(
+            "official test group filter did not contain any groups",
+        ));
+    }
     if raw.eq_ignore_ascii_case("all") {
-        return None;
+        return Ok(None);
     }
 
     match split_ltp_case_list(raw) {
-        Ok(groups) if !groups.is_empty() => Some(groups),
-        _ => None,
+        Ok(groups) if !groups.is_empty() => Ok(Some(groups)),
+        Ok(_) => Err(String::from(
+            "official test group filter did not contain any groups",
+        )),
+        Err(err) => Err(format!("invalid official test group filter: {err}")),
     }
 }
 
@@ -2227,13 +2252,25 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
     let label = suite_label(suite_dir, "ltp");
     let target_dir = join_path(suite_dir, "ltp/testcases/bin");
     let busybox_path = join_path(suite_dir, "busybox");
-    prepare_suite_runtime_busybox_wrappers(suite_dir)
-        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;
-    let _helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
-        .map_err(|err| format!("prepare ltp helper bin failed: {err}"))?;
-    let (case_list_name, cases) = selected_ltp_cases(&target_dir)?;
-    let timeout_secs = ltp_case_timeout_secs();
     println!("#### OS COMP TEST GROUP START {label} ####");
+    let setup_result = (|| -> Result<(String, Vec<String>), String> {
+        prepare_suite_runtime_busybox_wrappers(suite_dir)
+            .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;
+        let _helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
+            .map_err(|err| format!("prepare ltp helper bin failed: {err}"))?;
+        selected_ltp_cases(&target_dir)
+    })();
+    let (case_list_name, cases) = match setup_result {
+        Ok(selection) => selection,
+        Err(err) => {
+            println!("FAIL LTP SETUP {label} : -1");
+            println!("ltp setup failed: {err}");
+            println!("ltp cases: 0 passed, 1 failed, 0 timed out");
+            println!("#### OS COMP TEST GROUP END {label} ####");
+            return Err(err);
+        }
+    };
+    let timeout_secs = ltp_case_timeout_secs();
     println!(
         "ltp case list: {case_list_name} ({} cases, timeout {timeout_secs}s)",
         cases.len()
@@ -2415,7 +2452,16 @@ fn run_libctest_suite(suite_dir: &str, cwd: &str) -> Result<(), String> {
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 pub fn maybe_run_official_tests() {
-    let selected_groups = selected_official_test_groups();
+    let selected_groups = match selected_official_test_groups() {
+        Ok(groups) => groups,
+        Err(err) => {
+            println!("#### OS COMP TEST GROUP START official-selection ####");
+            println!("FAIL OFFICIAL TEST GROUP FILTER : -1");
+            println!("{err}");
+            println!("#### OS COMP TEST GROUP END official-selection ####");
+            std::process::exit(1);
+        }
+    };
     let mut scripts = Vec::new();
     for suite_dir in SUITE_DIRS {
         let Ok(entries) = fs::read_dir(suite_dir) else {
@@ -2431,7 +2477,48 @@ pub fn maybe_run_official_tests() {
     }
 
     if scripts.is_empty() {
+        if selected_groups.is_some() {
+            println!("#### OS COMP TEST GROUP START official-selection ####");
+            println!("FAIL OFFICIAL TEST GROUP FILTER : -1");
+            println!("official test group filter matched no available groups");
+            println!("#### OS COMP TEST GROUP END official-selection ####");
+            std::process::exit(1);
+        }
         return;
+    }
+
+    if let Some(groups) = selected_groups.as_ref() {
+        let available_groups: BTreeSet<String> = scripts
+            .iter()
+            .map(|(_, script_name)| {
+                let script = path_to_str(script_name);
+                script
+                    .strip_suffix(SCRIPT_SUFFIX)
+                    .unwrap_or(script)
+                    .to_string()
+            })
+            .collect();
+        let missing_groups: Vec<&String> = groups
+            .iter()
+            .filter(|group| !available_groups.contains(group.as_str()))
+            .collect();
+        let disabled_groups: Vec<&String> = groups
+            .iter()
+            .filter(|group| DISABLED_OFFICIAL_TEST_GROUPS.contains(&group.as_str()))
+            .collect();
+        if !missing_groups.is_empty() || !disabled_groups.is_empty() {
+            println!("#### OS COMP TEST GROUP START official-selection ####");
+            println!("FAIL OFFICIAL TEST GROUP FILTER : -1");
+            if !missing_groups.is_empty() {
+                println!("unknown official test groups: {missing_groups:?}");
+            }
+            if !disabled_groups.is_empty() {
+                println!("disabled official test groups selected: {disabled_groups:?}");
+            }
+            println!("available official test groups: {available_groups:?}");
+            println!("#### OS COMP TEST GROUP END official-selection ####");
+            std::process::exit(1);
+        }
     }
 
     scripts.sort_by_key(|(suite_dir, script_name)| {

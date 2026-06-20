@@ -1,5 +1,5 @@
 use axerrno::AxResult;
-use axio::{BufReader, prelude::*};
+use axio::{prelude::*, BufReader};
 use axsync::Mutex;
 
 #[cfg(feature = "fd")]
@@ -144,8 +144,9 @@ impl super::fd_ops::FileLike for Stdin {
     }
 
     fn poll(&self) -> LinuxResult<PollState> {
+        let readable = !self.inner.lock().fill_buf()?.is_empty();
         Ok(PollState {
-            readable: true,
+            readable,
             writable: false,
         })
     }

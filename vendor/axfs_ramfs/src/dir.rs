@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
 use alloc::{string::String, vec::Vec};
 
-use axfs_vfs::{VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType};
+use axfs_vfs::{VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeRef, VfsNodeType};
 use axfs_vfs::{VfsError, VfsResult};
 use spin::RwLock;
 
@@ -15,6 +15,7 @@ pub struct DirNode {
     this: Weak<DirNode>,
     parent: RwLock<Weak<dyn VfsNodeOps>>,
     children: RwLock<BTreeMap<String, VfsNodeRef>>,
+    perm: RwLock<VfsNodePerm>,
 }
 
 impl DirNode {
@@ -23,6 +24,7 @@ impl DirNode {
             this: this.clone(),
             parent: RwLock::new(parent.unwrap_or_else(|| Weak::<Self>::new())),
             children: RwLock::new(BTreeMap::new()),
+            perm: RwLock::new(VfsNodePerm::default_dir()),
         })
     }
 
@@ -138,32 +140,67 @@ impl DirNode {
         if Arc::ptr_eq(self, dst_dir) && src_name == dst_name {
             return Ok(());
         }
-        if dst_dir.children.read().contains_key(dst_name) {
-            return Err(VfsError::AlreadyExists);
-        }
-
         let node = self
             .children
-            .write()
-            .remove(src_name)
+            .read()
+            .get(src_name)
+            .cloned()
             .ok_or(VfsError::NotFound)?;
+        let src_is_dir = node.get_attr()?.is_dir();
+        if let Some(dst_node) = dst_dir.children.read().get(dst_name).cloned() {
+            let dst_is_dir = dst_node.get_attr()?.is_dir();
+            match (src_is_dir, dst_is_dir) {
+                (true, true) => {
+                    let dst = dst_node
+                        .as_any()
+                        .downcast_ref::<DirNode>()
+                        .ok_or(VfsError::NotADirectory)?;
+                    if !dst.children.read().is_empty() {
+                        return Err(VfsError::DirectoryNotEmpty);
+                    }
+                }
+                (true, false) => return Err(VfsError::NotADirectory),
+                (false, true) => return Err(VfsError::IsADirectory),
+                (false, false) => {}
+            }
+        }
         if let Some(dir) = node.as_any().downcast_ref::<DirNode>() {
             let moved_dir = dir.this.upgrade().ok_or(VfsError::NotFound)?;
             if moved_dir.is_ancestor_of(dst_dir) {
-                self.children.write().insert(src_name.into(), node);
                 return Err(VfsError::InvalidInput);
             }
             dir.set_parent(Some(&(dst_dir.clone() as VfsNodeRef)));
         }
 
-        dst_dir.children.write().insert(dst_name.into(), node);
+        if Arc::ptr_eq(self, dst_dir) {
+            let mut children = self.children.write();
+            let node = children.remove(src_name).ok_or(VfsError::NotFound)?;
+            children.insert(dst_name.into(), node);
+        } else {
+            let node = self
+                .children
+                .write()
+                .remove(src_name)
+                .ok_or(VfsError::NotFound)?;
+            dst_dir.children.write().insert(dst_name.into(), node);
+        }
         Ok(())
     }
 }
 
 impl VfsNodeOps for DirNode {
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
-        Ok(VfsNodeAttr::new_dir(4096, 0))
+        Ok(VfsNodeAttr::new(
+            *self.perm.read(),
+            VfsNodeType::Dir,
+            4096,
+            0,
+        ))
+    }
+
+    fn set_perm(&self, perm: VfsNodePerm) -> VfsResult {
+        *self.perm.write() = perm;
+        Ok(())
     }
 
     fn parent(&self) -> Option<VfsNodeRef> {

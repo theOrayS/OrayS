@@ -4,7 +4,9 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 use axerrno::{ax_err, AxError, AxResult};
-use axfs_vfs::{VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType, VfsOps, VfsResult};
+use axfs_vfs::{
+    VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeRef, VfsNodeType, VfsOps, VfsResult,
+};
 use axns::{def_resource, ResArc};
 use axsync::Mutex;
 use core::array;
@@ -449,6 +451,14 @@ pub(crate) fn lookup(dir: Option<&VfsNodeRef>, path: &str) -> AxResult<VfsNodeRe
 }
 
 pub(crate) fn create_file(dir: Option<&VfsNodeRef>, path: &str) -> AxResult<VfsNodeRef> {
+    create_file_with_perm(dir, path, VfsNodePerm::default_file())
+}
+
+pub(crate) fn create_file_with_perm(
+    dir: Option<&VfsNodeRef>,
+    path: &str,
+    perm: VfsNodePerm,
+) -> AxResult<VfsNodeRef> {
     if path.is_empty() {
         return ax_err!(NotFound);
     } else if path.ends_with('/') {
@@ -456,7 +466,12 @@ pub(crate) fn create_file(dir: Option<&VfsNodeRef>, path: &str) -> AxResult<VfsN
     }
     let parent = parent_node_of(dir, path);
     parent.create(path, VfsNodeType::File)?;
-    parent.lookup(path)
+    let node = parent.lookup(path)?;
+    match node.set_perm(perm) {
+        Ok(()) | Err(AxError::Unsupported) => {}
+        Err(err) => return Err(err),
+    }
+    Ok(node)
 }
 
 pub(crate) fn create_dir(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
@@ -539,25 +554,6 @@ pub(crate) fn set_current_dir(path: &str) -> AxResult {
 pub(crate) fn rename(old: &str, new: &str) -> AxResult {
     if old == new {
         return Ok(());
-    }
-
-    let old_node = lookup(None, old)?;
-    let old_is_dir = old_node.get_attr()?.is_dir();
-
-    if let Ok(new_node) = parent_node_of(None, new).lookup(new) {
-        let new_is_dir = new_node.get_attr()?.is_dir();
-        match (old_is_dir, new_is_dir) {
-            (true, true) => {
-                warn!("dst dir already exist, now remove it");
-                remove_dir(None, new)?;
-            }
-            (true, false) => return Err(AxError::NotADirectory),
-            (false, true) => return Err(AxError::IsADirectory),
-            (false, false) => {
-                warn!("dst file already exist, now remove it");
-                remove_file(None, new)?;
-            }
-        }
     }
     parent_node_of(None, old).rename(old, new)
 }

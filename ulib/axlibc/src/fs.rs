@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 
 use arceos_posix_api::{
-    sys_fstat, sys_getcwd, sys_lseek, sys_lstat, sys_open, sys_rename, sys_stat,
+    sys_fstat, sys_getcwd, sys_lseek, sys_lstat, sys_open, sys_rename, sys_stat, sys_umask,
 };
 
 use crate::{ctypes, utils::e};
@@ -54,7 +54,14 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut ctypes::stat) -> c
 /// Get the path of the current directory.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getcwd(buf: *mut c_char, size: usize) -> *mut c_char {
-    unsafe { sys_getcwd(buf, size) }
+    let ret = unsafe { sys_getcwd(buf, size) };
+    let err = ret as isize;
+    if (-4095..0).contains(&err) {
+        crate::errno::set_errno((-err) as i32);
+        core::ptr::null_mut()
+    } else {
+        ret
+    }
 }
 
 /// Rename `old` to `new`
@@ -64,4 +71,10 @@ pub unsafe extern "C" fn getcwd(buf: *mut c_char, size: usize) -> *mut c_char {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rename(old: *const c_char, new: *const c_char) -> c_int {
     e(unsafe { sys_rename(old, new) })
+}
+
+/// Set and return the process file mode creation mask.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ax_umask(mask: ctypes::mode_t) -> ctypes::mode_t {
+    sys_umask(mask)
 }

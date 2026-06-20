@@ -10,9 +10,18 @@ pub trait PosixSignalIf {
     fn raise_sigpipe() -> bool {
         false
     }
+
+    fn has_interrupting_signal() -> bool {
+        false
+    }
 }
 
 #[allow(dead_code)]
 pub(crate) fn raise_sigpipe() -> bool {
     crate_interface::call_interface!(PosixSignalIf::raise_sigpipe)
+}
+
+#[allow(dead_code)]
+pub(crate) fn has_interrupting_signal() -> bool {
+    crate_interface::call_interface!(PosixSignalIf::has_interrupting_signal)
 }

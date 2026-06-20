@@ -93,6 +93,12 @@ impl arceos_posix_api::PosixSignalIf for PosixSignalIfImpl {
         };
         signal_abi::deliver_user_signal(&entry, linux_abi::SIGPIPE_NUM, ext.process.pid()).is_ok()
     }
+
+    fn has_interrupting_signal() -> bool {
+        signal_abi::current_unblocked_signal_pending()
+            || task_context::current_task_ext()
+                .is_some_and(|ext| ext.process.pending_exit_group().is_some())
+    }
 }
 
 const DEFAULT_TIMER_SLACK_NS: u64 = 50_000;
