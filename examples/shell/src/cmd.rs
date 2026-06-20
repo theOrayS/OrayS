@@ -1764,14 +1764,48 @@ fn create_busybox_applet_wrapper(dir: &str, busybox_path: &str, applet: &str) ->
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ensure_busybox_path_wrappers(dir: &str, busybox_path: &str) -> io::Result<()> {
+fn ensure_busybox_applet_wrappers(
+    dir: &str,
+    busybox_path: &str,
+    applets: &[&str],
+) -> io::Result<()> {
     if !matches!(fs::metadata(busybox_path), Ok(meta) if meta.is_file()) {
         return Ok(());
     }
-    for applet in PATH_BUSYBOX_APPLETS {
+    ensure_dir_all(dir)?;
+    for applet in applets {
         create_busybox_applet_wrapper(dir, busybox_path, applet)?;
     }
     Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ensure_busybox_path_wrappers(dir: &str, busybox_path: &str) -> io::Result<()> {
+    ensure_busybox_applet_wrappers(dir, busybox_path, PATH_BUSYBOX_APPLETS)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ensure_runtime_busybox_wrappers(suite_dir: &str, busybox_path: &str) -> io::Result<()> {
+    if !matches!(fs::metadata(busybox_path), Ok(meta) if meta.is_file()) {
+        return Ok(());
+    }
+
+    // Preserve the portable helper/applet ability with ordinary filesystem-visible
+    // wrapper files.  The syscall/VFS/exec layers then see `/bin/sh`,
+    // `/usr/bin/<applet>`, `/musl/<applet>`, and `/glibc/<applet>` as real paths
+    // instead of silently rewriting missing paths to busybox.
+    for dir in [suite_dir, "/bin", "/usr/bin"] {
+        ensure_busybox_applet_wrappers(dir, busybox_path, PATH_BUSYBOX_APPLETS)?;
+        ensure_busybox_applet_wrappers(dir, busybox_path, LTP_BUSYBOX_APPLETS)?;
+    }
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn prepare_suite_runtime_busybox_wrappers(suite_dir: &str) -> io::Result<()> {
+    let suite_busybox = join_path(suite_dir, "busybox");
+    let wrapper_busybox = ltp_helper_busybox_path(suite_dir, &suite_busybox);
+    ensure_runtime_busybox_wrappers(suite_dir, &wrapper_busybox)
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1822,8 +1856,9 @@ fn ltp_case_env(
     let mut env = vec![
         // Keep the current run directory and testsuite bin directory first for
         // resource helpers, then rely on the runtime's /musl and /glibc
-        // busybox-applet aliases for shell tools such as cp/chmod/awk.  Avoid
-        // putting /tmp helper scripts ahead of those aliases: ramfs-created
+        // filesystem-visible busybox wrapper files for shell tools such as
+        // cp/chmod/awk. Avoid putting /tmp helper scripts ahead of those wrappers:
+        // ramfs-created
         // files default to 0666, and chmod metadata is per-process in this
         // userspace model, so those wrappers can shadow working applet aliases
         // with EACCES inside LTP's system("cp ...") helpers.
@@ -2150,6 +2185,8 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
     let label = suite_label(suite_dir, "busybox");
     let busybox_path = join_path(suite_dir, "busybox");
     println!("#### OS COMP TEST GROUP START {label} ####");
+    prepare_suite_runtime_busybox_wrappers(suite_dir)
+        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;
     ensure_busybox_path_wrappers(cwd, &busybox_path)
         .map_err(|err| format!("prepare busybox path wrappers failed: {err}"))?;
     let chmod_args = busybox_path_wrapper_chmod_args(cwd);
@@ -2190,6 +2227,8 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
     let label = suite_label(suite_dir, "ltp");
     let target_dir = join_path(suite_dir, "ltp/testcases/bin");
     let busybox_path = join_path(suite_dir, "busybox");
+    prepare_suite_runtime_busybox_wrappers(suite_dir)
+        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;
     let _helper_dir = prepare_ltp_helper_bin(suite_dir, &busybox_path)
         .map_err(|err| format!("prepare ltp helper bin failed: {err}"))?;
     let (case_list_name, cases) = selected_ltp_cases(&target_dir)?;
@@ -2412,6 +2451,12 @@ pub fn maybe_run_official_tests() {
         println!("autorun: busybox shell not found");
         std::process::exit(0);
     };
+
+    for suite_dir in SUITE_DIRS {
+        if let Err(err) = prepare_suite_runtime_busybox_wrappers(suite_dir) {
+            println!("autorun: prepare runtime busybox wrappers for {suite_dir} failed: {err}");
+        }
+    }
 
     for (suite_dir, script_name) in scripts {
         let script = path_to_str(&script_name);

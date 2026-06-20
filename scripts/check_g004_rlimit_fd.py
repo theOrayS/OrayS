@@ -362,6 +362,46 @@ def scan_shell_fd_table(path: Path, text: str, root: Path = REPO_ROOT) -> list[F
     rel = repo_relative(path, root)
     findings: list[Finding] = []
 
+    if re.search(r"const\s+FD_TABLE_LIMIT\s*:\s*usize\s*=\s*DEFAULT_NOFILE_LIMIT\s+as\s+usize", text):
+        findings.append(
+            Finding(
+                rel,
+                1,
+                "g004-fd-table-limit-default-nofile",
+                "FdTable capacity must not be capped at the default soft RLIMIT_NOFILE value",
+            )
+        )
+    if "DEFAULT_NOFILE_LIMIT" in text:
+        findings.append(
+            Finding(
+                rel,
+                1,
+                "g004-fd-table-imports-default-nofile",
+                "FdTable should use NR_OPEN_LIMIT for physical capacity and enforce RLIMIT_NOFILE separately",
+            )
+        )
+    if "const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize" not in text:
+        findings.append(
+            Finding(
+                rel,
+                1,
+                "g004-fd-table-limit-missing-nr-open",
+                "FdTable capacity should be backed by NR_OPEN_LIMIT, not the default soft limit",
+            )
+        )
+
+    limit_block = extract_function(text, "current_fd_table_limit")
+    if limit_block is None:
+        findings.append(missing_function_finding(rel, "current_fd_table_limit"))
+    else:
+        for token, detail in (
+            ("RLIMIT_NOFILE_RESOURCE", "current_fd_table_limit must read the per-process soft RLIMIT_NOFILE"),
+            ("soft_limit.min(FD_TABLE_LIMIT as u64)", "current_fd_table_limit must clamp the soft limit to NR_OPEN capacity"),
+            ("cmp::min(", "current_fd_table_limit must enforce both soft and physical limits"),
+        ):
+            if token not in limit_block.text:
+                findings.append(Finding(rel, limit_block.start_line, "g004-fd-soft-limit-clamp-missing", detail))
+
     required_terms = {
         "fd_flags": "FdTable should carry per-descriptor FD_CLOEXEC state",
         "get_fd_flags": "F_GETFD should read per-descriptor FD flags",
