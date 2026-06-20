@@ -1,0 +1,40 @@
+{
+  "stable_case_count": 1000,
+  "stable_case_duplicates": 0,
+  "stable_case_occurrences_outside_allowed_lists": 8,
+  "stable_case_production_logic_occurrences_outside_allowed_lists": 0,
+  "round1_files_scanned": 384,
+  "round1_findings_by_severity": {
+    "HIGH": 158,
+    "MEDIUM": 325,
+    "LOW": 928
+  },
+  "round1_findings_by_category": {
+    "case-conditional": 116,
+    "unsupported-near-success-window": 30,
+    "ltp-env-compiletime": 8,
+    "match-default-ok0": 5,
+    "test-aware-kernel-code": 755,
+    "success-fallback": 12,
+    "wrapper-pass-output": 16,
+    "hardcoded-time-order": 245,
+    "errno-hidden": 5,
+    "case-name-literal": 140,
+    "zero-status-fail-record": 9,
+    "suspicious-path-hardcode": 70
+  },
+  "round2_high_signal_count": 436,
+  "round2_by_check": {
+    "binary-libc-loader-branch": 198,
+    "env-file-control": 83,
+    "fixed-result-values": 51,
+    "proc-dev-synthetic-fixed": 58,
+    "raw-user-pointer": 23,
+    "stdout-test-marker": 23
+  },
+  "scripts_sha256": {
+    "selfcheck_audit_20260620_round1.py": "988a2c0ffc7e375bdcf08eb58d577af998d5425374e6fc35f02afa92374ba7eb",
+    "selfcheck_audit_20260620_case_literals.py": "1d9cbba718e00b3c89f476e91492392a0915f98489fc318c1215e15a94b8130f",
+    "selfcheck_audit_20260620_round2.py": "4e5e98d4d97d62574d7a943e62b3c143db6e0ee24f07e3a32e078d27df32782d"
+  }
+}
