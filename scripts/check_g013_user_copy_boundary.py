@@ -20,14 +20,18 @@ SHELL_USPACE_REL = Path("examples/shell/src/uspace")
 SHELL_SYSCALL_DISPATCH_REL = SHELL_USPACE_REL / "syscall_dispatch.rs"
 
 HELPER_TOKENS = (
+    "fn validate_user_range",
+    "checked_mul",
+    "checked_add",
+    "align_of",
     "pub unsafe fn read_user_value",
     "pub unsafe fn write_user_value",
+    "pub unsafe fn user_ref",
+    "pub unsafe fn user_mut_ref",
     "pub unsafe fn readable_user_buffer",
     "pub unsafe fn writable_user_buffer",
     "pub unsafe fn readable_user_slice",
     "pub unsafe fn writable_user_slice",
-    "check_null_ptr(ptr)?;",
-    "check_null_mut_ptr(ptr)?;",
 )
 
 RAW_MEMORY_PRIMITIVE_RE = re.compile(
@@ -62,8 +66,6 @@ def is_allowed_raw_copy(rel: Path, line: str) -> bool:
 
 def is_allowed_unsafe_deref(rel: Path, line: str) -> bool:
     rel_s = rel.as_posix()
-    if rel_s == "api/arceos_posix_api/src/imp/pthread/mutex.rs" and "mutex.cast::<Self>()" in line:
-        return True
     if rel_s == "api/arceos_posix_api/src/imp/pthread/mod.rs" and "result.get()" in line:
         return True
     if rel_s == "api/arceos_posix_api/src/imp/net.rs" and "(*aibuf_ptr)" in line:

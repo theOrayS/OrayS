@@ -1,7 +1,7 @@
 use alloc::{string::String, sync::Arc};
 use core::{
     ffi::{c_char, c_int, c_void},
-    sync::atomic::{AtomicI32, Ordering},
+    sync::atomic::{AtomicI32, AtomicU32, Ordering},
 };
 
 use axerrno::{LinuxError, LinuxResult};
@@ -9,7 +9,7 @@ use axfs::fops::OpenOptions;
 use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
-use super::fd_ops::{FileLike, get_file_like};
+use super::fd_ops::{get_file_like, FileLike};
 use crate::{
     ctypes,
     utils::{char_ptr_to_str, writable_user_buffer, write_user_value},
@@ -20,6 +20,8 @@ pub struct File {
     path: String,
     status_flags: AtomicI32,
 }
+
+static FILE_MODE_UMASK: AtomicU32 = AtomicU32::new(0o022);
 
 impl File {
     fn new(inner: axfs::fops::File, path: &str, flags: c_int) -> Self {
@@ -216,7 +218,7 @@ unsafe fn write_stat_output(buf: *mut ctypes::stat, value: ctypes::stat) -> Linu
 }
 
 /// Convert open flags to [`OpenOptions`].
-fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> LinuxResult<OpenOptions> {
+fn flags_to_options(flags: c_int, mode: ctypes::mode_t) -> LinuxResult<OpenOptions> {
     let flags = flags as u32;
     let supported = ctypes::O_RDONLY
         | ctypes::O_WRONLY
@@ -235,6 +237,8 @@ fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> LinuxResult<OpenOpti
     }
 
     let mut options = OpenOptions::new();
+    let create_mode = (mode as u32) & !FILE_MODE_UMASK.load(Ordering::Acquire) & 0o7777;
+    options.mode(create_mode);
     match flags & 0b11 {
         ctypes::O_RDONLY => options.read(true),
         ctypes::O_WRONLY => options.write(true),
@@ -258,6 +262,10 @@ fn flags_to_options(flags: c_int, _mode: ctypes::mode_t) -> LinuxResult<OpenOpti
         }
     }
     Ok(options)
+}
+
+pub fn sys_umask(mask: ctypes::mode_t) -> ctypes::mode_t {
+    FILE_MODE_UMASK.swap((mask as u32) & 0o777, Ordering::AcqRel) as ctypes::mode_t
 }
 
 fn open_fd_flags(flags: c_int) -> c_int {
@@ -372,7 +380,10 @@ pub unsafe fn sys_getcwd(buf: *mut c_char, size: usize) -> *mut c_char {
     debug!("sys_getcwd <= {:#x} {}", buf as usize, size);
     syscall_body!(sys_getcwd, {
         if buf.is_null() {
-            return Ok(core::ptr::null::<c_char>() as _);
+            return Err(LinuxError::EFAULT);
+        }
+        if size == 0 {
+            return Err(LinuxError::EINVAL);
         }
         let cwd = axfs::api::current_dir()?;
         let cwd = cwd.as_bytes();

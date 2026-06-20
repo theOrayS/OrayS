@@ -175,6 +175,28 @@ class G013UserCopyBoundaryGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing helper contract", result.stdout)
 
+    def test_detects_range_validator_regression(self) -> None:
+        tree = self.make_tree()
+        path = tree / "api/arceos_posix_api/src/utils.rs"
+        text = path.read_text(encoding="utf-8").replace("checked_mul", "wrapping_mul", 1)
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing helper contract", result.stdout)
+
+    def test_detects_pthread_mutex_raw_user_deref(self) -> None:
+        tree = self.make_tree()
+        path = tree / "api/arceos_posix_api/src/imp/pthread/mutex.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "unsafe { user_ref(mutex.cast::<Self>()) }",
+            "unsafe { &*mutex.cast::<Self>() }",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe raw deref", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

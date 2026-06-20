@@ -708,6 +708,9 @@ pub unsafe fn sys_sendto(
         let socket = Socket::from_fd(socket_fd)?;
         let buf = unsafe { readable_user_buffer(buf_ptr, len)? };
         if matches!(socket.as_ref(), Socket::Tcp(_)) {
+            if !socket_addr.is_null() || addrlen != 0 {
+                let _ = from_sockaddr(socket_addr, addrlen)?;
+            }
             return socket.send(buf);
         }
         let addr = from_sockaddr(socket_addr, addrlen)?;

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 int accept4(int fd, struct sockaddr *restrict addr, socklen_t *restrict len, int flg)
 {
@@ -17,10 +18,21 @@ int accept4(int fd, struct sockaddr *restrict addr, socklen_t *restrict len, int
     int ret = accept(fd, addr, len);
     if (ret < 0)
         return ret;
-    if (flg & SOCK_CLOEXEC)
-        fcntl(ret, F_SETFD, FD_CLOEXEC);
-    if (flg & SOCK_NONBLOCK)
-        fcntl(ret, F_SETFL, O_NONBLOCK);
+    if ((flg & SOCK_CLOEXEC) && fcntl(ret, F_SETFD, FD_CLOEXEC) < 0) {
+        int saved_errno = errno;
+        close(ret);
+        errno = saved_errno;
+        return -1;
+    }
+    if (flg & SOCK_NONBLOCK) {
+        int current_flags = fcntl(ret, F_GETFL);
+        if (current_flags < 0 || fcntl(ret, F_SETFL, current_flags | O_NONBLOCK) < 0) {
+            int saved_errno = errno;
+            close(ret);
+            errno = saved_errno;
+            return -1;
+        }
+    }
     return ret;
 }
 

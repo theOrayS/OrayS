@@ -3,6 +3,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+mode_t ax_umask(mode_t mask);
+
 // TODO:
 int fchmod(int fd, mode_t mode)
 {
@@ -27,12 +29,9 @@ int chmod(const char *path, mode_t mode)
     return -1;
 }
 
-// TODO
 mode_t umask(mode_t mask)
 {
-    unimplemented("mask: %d", mask);
-    errno = ENOSYS;
-    return (mode_t)-1;
+    return ax_umask(mask);
 }
 
 // TODO

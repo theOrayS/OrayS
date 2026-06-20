@@ -30,16 +30,23 @@ pub unsafe extern "C" fn dup3(old_fd: c_int, new_fd: c_int, flags: c_int) -> c_i
     if old_fd == new_fd {
         return e((LinuxError::EINVAL as c_int).wrapping_neg());
     }
+    if flags as u32 & !ctypes::O_CLOEXEC != 0 {
+        return e((LinuxError::EINVAL as c_int).wrapping_neg());
+    }
     let r = e(sys_dup2(old_fd, new_fd));
     if r < 0 {
         r
     } else {
         if flags as u32 & ctypes::O_CLOEXEC != 0 {
-            e(sys_fcntl(
+            let setfd = e(sys_fcntl(
                 new_fd,
                 ctypes::F_SETFD as c_int,
                 ctypes::FD_CLOEXEC as usize,
             ));
+            if setfd < 0 {
+                let _ = sys_close(new_fd);
+                return setfd;
+            }
         }
         new_fd
     }

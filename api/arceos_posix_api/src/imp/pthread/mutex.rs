@@ -1,6 +1,6 @@
 use crate::{
     ctypes,
-    utils::{check_null_mut_ptr, read_user_value, write_user_value},
+    utils::{read_user_value, user_ref, write_user_value},
 };
 
 use axerrno::{LinuxError, LinuxResult};
@@ -54,8 +54,7 @@ impl PthreadMutex {
     }
 
     unsafe fn from_user<'a>(mutex: *mut ctypes::pthread_mutex_t) -> LinuxResult<&'a Self> {
-        check_null_mut_ptr(mutex)?;
-        Ok(unsafe { &*mutex.cast::<Self>() })
+        unsafe { user_ref(mutex.cast::<Self>()) }
     }
 
     fn lock_recursive(&self) -> LinuxResult {

@@ -2,8 +2,8 @@
 //!
 //! Unsupported edge-triggered/one-shot/exclusive modes are rejected visibly.
 
-use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{ffi::c_int, time::Duration};
@@ -13,7 +13,7 @@ use axhal::time::wall_time;
 use axsync::Mutex;
 
 use crate::ctypes;
-use crate::imp::fd_ops::{FileLike, add_file_like, add_file_like_with_flags, get_file_like};
+use crate::imp::fd_ops::{add_file_like, add_file_like_with_flags, get_file_like, FileLike};
 use crate::utils::{read_user_value, writable_user_slice};
 
 const EPOLL_STAT_DEV: ctypes::dev_t = 0x6570_6f6c_6c;

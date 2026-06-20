@@ -45,7 +45,9 @@ pub use imp::fd_ops::{
     fd_table_assigned_count, poll_file_like, sys_close, sys_dup, sys_dup2, sys_fcntl,
 };
 #[cfg(feature = "fs")]
-pub use imp::fs::{sys_fstat, sys_getcwd, sys_lseek, sys_lstat, sys_open, sys_rename, sys_stat};
+pub use imp::fs::{
+    sys_fstat, sys_getcwd, sys_lseek, sys_lstat, sys_open, sys_rename, sys_stat, sys_umask,
+};
 #[cfg(feature = "select")]
 pub use imp::io_mpx::sys_select;
 #[cfg(feature = "epoll")]

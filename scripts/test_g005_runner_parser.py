@@ -124,6 +124,20 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("conditionally continue", result.stdout)
 
+
+    def test_detects_unknown_official_group_silent_skip(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "if !missing_groups.is_empty() || !disabled_groups.is_empty() {",
+            "if false && (!missing_groups.is_empty() || !disabled_groups.is_empty()) {",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown or disabled selected official groups", result.stdout)
+
     def test_detects_suite_specific_script_rewrite_function(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
@@ -224,10 +238,10 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8").replace(
-            "    prepare_suite_runtime_busybox_wrappers(suite_dir)\n"
-            '        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;\n',
+            "        prepare_suite_runtime_busybox_wrappers(suite_dir)\n"
+            '            .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;\n',
             "",
-            2,
+            1,
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)

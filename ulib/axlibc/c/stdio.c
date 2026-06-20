@@ -121,6 +121,14 @@ int getc(FILE *f)
 
 int fflush(FILE *f)
 {
+    if (!f) {
+        int ret = 0;
+        if (__fflush(stdout) < 0)
+            ret = EOF;
+        if (__fflush(stderr) < 0)
+            ret = EOF;
+        return ret;
+    }
     return __fflush(f);
 }
 
@@ -147,19 +155,34 @@ int putchar(int c)
 
 int puts(const char *s)
 {
+    if (!s) {
+        errno = EINVAL;
+        return EOF;
+    }
 #ifdef AX_CONFIG_MULTITASK
     pthread_mutex_lock(&lock);
 #endif
 
-    int r = write(1, (const void *)s, strlen(s));
-    char brk[1] = {'\n'};
-    write(1, (const void *)brk, 1);
+    size_t len = strlen(s);
+    int r = out(stdout, s, len);
+    int ret = 0;
+    if (r < 0) {
+        ret = EOF;
+        goto out;
+    }
+    r = out(stdout, "\n", 1);
+    if (r < 0) {
+        ret = EOF;
+        goto out;
+    }
+    ret = (int)len + 1;
 
+out:
 #ifdef AX_CONFIG_MULTITASK
     pthread_mutex_unlock(&lock);
 #endif
 
-    return r;
+    return ret;
 }
 
 void perror(const char *msg)

@@ -551,8 +551,6 @@ dependencies = [
 [[package]]
 name = "axfs_vfs"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcba2006898d7879d456a9c34b9c9460cb536f5bf69d1d5d7d0e0f19f073368d"
 dependencies = [
  "axerrno 0.1.2",
  "bitflags 2.11.0",

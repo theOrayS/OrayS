@@ -178,6 +178,12 @@ def scan_cmd_rs(root: Path) -> list[str]:
     else:
         if 'if group == "libctest"' not in autorun_body or "run_libctest_suite(&suite_dir, &cwd)" not in autorun_body:
             findings.append("examples/shell/src/cmd.rs: libctest dispatch must run the generic libctest suite for each discovered suite directory")
+        if "available_groups: BTreeSet<String>" not in autorun_body or "missing_groups" not in autorun_body:
+            findings.append("examples/shell/src/cmd.rs: selected official groups must be checked against discovered scripts")
+        if "if !missing_groups.is_empty() || !disabled_groups.is_empty()" not in autorun_body:
+            findings.append("examples/shell/src/cmd.rs: unknown or disabled selected official groups must fail visibly")
+        if "official test group filter matched no available groups" not in autorun_body:
+            findings.append("examples/shell/src/cmd.rs: selected official groups must fail if no scripts are available")
         suite_dir_policy = re.compile(
             r'(?:suite_dir(?:\.as_str\(\))?\s*(?:==|!=)\s*"/(?:musl|glibc)")|'
             r'(?:"/(?:musl|glibc)"\s*(?:==|!=)\s*suite_dir(?:\.as_str\(\))?)'

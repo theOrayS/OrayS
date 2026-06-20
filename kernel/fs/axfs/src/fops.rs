@@ -1,6 +1,6 @@
 //! Low-level filesystem operations.
 
-use axerrno::{AxError, AxResult, ax_err, ax_err_type};
+use axerrno::{ax_err, ax_err_type, AxError, AxResult};
 use axfs_vfs::{VfsError, VfsNodeRef};
 use axio::SeekFrom;
 use cap_access::{Cap, WithCap};
@@ -69,7 +69,7 @@ pub struct OpenOptions {
     create_new: bool,
     // system-specific
     _custom_flags: i32,
-    _mode: u32,
+    mode: u32,
 }
 
 impl Default for OpenOptions {
@@ -91,7 +91,7 @@ impl OpenOptions {
             create_new: false,
             // system-specific
             _custom_flags: 0,
-            _mode: 0o666,
+            mode: 0o666,
         }
     }
     /// Sets the option for read access.
@@ -117,6 +117,10 @@ impl OpenOptions {
     /// Sets the option to create a new file, failing if it already exists.
     pub fn create_new(&mut self, create_new: bool) {
         self.create_new = create_new;
+    }
+    /// Sets POSIX permission bits used when a new file is created.
+    pub fn mode(&mut self, mode: u32) {
+        self.mode = mode & 0o7777;
     }
 
     const fn is_valid(&self) -> bool {
@@ -152,22 +156,29 @@ impl File {
         }
 
         let node_option = crate::root::lookup(dir, path);
-        let node = if opts.create || opts.create_new {
+        let (node, created_new) = if opts.create || opts.create_new {
             match node_option {
                 Ok(node) => {
                     // already exists
                     if opts.create_new {
                         return Err(AxError::AlreadyExists);
                     }
-                    node
+                    (node, false)
                 }
                 // not exists, create new
-                Err(VfsError::NotFound) => crate::root::create_file(dir, path)?,
+                Err(VfsError::NotFound) => (
+                    crate::root::create_file_with_perm(
+                        dir,
+                        path,
+                        FilePerm::from_bits_truncate(opts.mode as u16),
+                    )?,
+                    true,
+                ),
                 Err(e) => return Err(e),
             }
         } else {
             // just open the existing
-            node_option?
+            (node_option?, false)
         };
 
         let attr = node.get_attr()?;
@@ -177,7 +188,10 @@ impl File {
             return Err(AxError::IsADirectory);
         }
         let access_cap = opts.into();
-        if !perm_to_cap(attr.perm()).contains(access_cap) {
+        // A freshly created file's mode is its future access policy, not a
+        // reason to reject the file descriptor returned by this successful
+        // O_CREAT open. Existing files still enforce their stored mode.
+        if !created_new && !perm_to_cap(attr.perm()).contains(access_cap) {
             return ax_err!(PermissionDenied);
         }
 
