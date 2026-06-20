@@ -144,6 +144,32 @@ class LtpSummarySemanticsTest(unittest.TestCase):
         row = data["case_matrix"]["access01"]["rv"]["musl"]
         self.assertEqual(row["case_list"]["name"], "stable")
 
+
+    def test_promotion_mode_boundary_allows_stable_file_inline_batch_core_and_blocks_sweep(self) -> None:
+        allowed_modes = [
+            "stable",
+            "file:/tmp/ltp_cases.txt",
+            "inline",
+            "batch:smoke",
+            "core",
+        ]
+        for mode in allowed_modes:
+            with self.subTest(mode=mode):
+                self.assertIsNone(ltp_summary.promotion_mode_blocker({"name": mode}))
+
+        blocked_modes = [
+            "all",
+            "sweep:all",
+            "all-minus-blacklist skipped=3",
+            "stable-plus-all-minus-blacklist stable=1000 extra=2 deduped=0 skipped=1",
+        ]
+        for mode in blocked_modes:
+            with self.subTest(mode=mode):
+                self.assertEqual(
+                    ltp_summary.promotion_mode_blocker({"name": mode}),
+                    f"selection-mode={mode}",
+                )
+
     def test_promotion_candidate_requires_four_way_clean_matrix(self) -> None:
         report = self.promotion_report(
             rv_log=self.two_libc_pass_log("openat02"),

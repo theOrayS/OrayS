@@ -94,6 +94,20 @@ def scan_block_devices(root: Path) -> list[str]:
     return findings
 
 
+def scan_linux_abi_markers(root: Path) -> list[str]:
+    text = read(root / "examples/shell/src/uspace/linux_abi.rs")
+    findings: list[str] = []
+    lowered = text.lower()
+    for token in ("ltp", "oskernel2026"):
+        if token in lowered:
+            findings.append(
+                f"examples/shell/src/uspace/linux_abi.rs: Linux ABI constants must not carry {token.upper()}-aware markers"
+            )
+    if "SYNTHETIC_BLOCK_DEVICE_SIZE" not in text:
+        findings.append("examples/shell/src/uspace/linux_abi.rs: missing synthetic block device size ABI constant")
+    return findings
+
+
 def scan_backing_evidence(root: Path) -> list[str]:
     synthetic_fs = read(root / "examples/shell/src/uspace/synthetic_fs.rs")
     fd_table = read(root / "examples/shell/src/uspace/fd_table.rs")
@@ -114,6 +128,7 @@ def main() -> int:
     findings: list[str] = []
     findings.extend(scan_synthetic_fs(root))
     findings.extend(scan_block_devices(root))
+    findings.extend(scan_linux_abi_markers(root))
     findings.extend(scan_backing_evidence(root))
     if findings:
         print("G006 synthetic capability static check: FAIL")

@@ -145,6 +145,8 @@ def scan_cmd_rs(root: Path) -> list[str]:
         findings.append("examples/shell/src/cmd.rs: missing prepare_ltp_case_run_dir")
     elif "needs_case_resource_helper" not in run_dir_block:
         findings.append("examples/shell/src/cmd.rs: run-dir selection must reuse generic helper detection")
+    if "PASS LTP CASE" in text:
+        findings.append("examples/shell/src/cmd.rs: runner must not emit PASS LTP CASE wrapper records that can hide later TCONF/TBROK/TFAIL/timeout evidence")
     if re.search(r"if\s+case\s*==\s*\"chdir01\"", text):
         findings.append("examples/shell/src/cmd.rs: case-name branch for chdir01 is forbidden")
     return findings
@@ -178,6 +180,7 @@ def scan_ltp_summary(root: Path) -> list[str]:
     for test_name in (
         "test_case_list_manifest_is_reported",
         "test_promotion_candidate_blocks_blacklist_selection_mode",
+        "test_promotion_mode_boundary_allows_stable_file_inline_batch_core_and_blocks_sweep",
     ):
         if test_name not in tests:
             findings.append(f"scripts/test_ltp_summary.py: missing {test_name}")

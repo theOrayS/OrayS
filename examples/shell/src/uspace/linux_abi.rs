@@ -11,7 +11,7 @@ pub(super) const USER_MMAP_BASE: usize = 0x10_0000_0000;
 pub(super) const USER_BRK_GROW_SIZE: usize = 64 * 1024 * 1024;
 pub(super) const MAX_IN_MEMORY_FILE_SIZE: u64 = 128 * 1024 * 1024;
 // The synthetic virtio block devices are sparse-backed, but they must report a
-// realistic capacity: LTP's block-device helpers reject devices below 300 MiB.
+// realistic capacity: Linux block-device helper code rejects very small devices.
 pub(super) const SYNTHETIC_BLOCK_DEVICE_SIZE: u64 = 512 * 1024 * 1024;
 pub(super) const USER_PIE_LOAD_BASE: usize = USER_ASPACE_BASE;
 pub(super) const MAX_SCRIPT_INTERPRETER_DEPTH: usize = 4;

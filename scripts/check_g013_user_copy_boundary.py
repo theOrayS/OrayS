@@ -16,6 +16,8 @@ from pathlib import Path
 ROOT_REL = Path("api/arceos_posix_api/src")
 UTILS_REL = ROOT_REL / "utils.rs"
 IMP_REL = ROOT_REL / "imp"
+SHELL_USPACE_REL = Path("examples/shell/src/uspace")
+SHELL_SYSCALL_DISPATCH_REL = SHELL_USPACE_REL / "syscall_dispatch.rs"
 
 HELPER_TOKENS = (
     "pub unsafe fn read_user_value",
@@ -93,6 +95,43 @@ def rust_function_block(text: str, name: str) -> str:
     return text[match.start() :]
 
 
+def scan_shell_syscall_dispatch(root: Path) -> list[str]:
+    path = root / SHELL_SYSCALL_DISPATCH_REL
+    findings: list[str] = []
+    if not path.exists():
+        return [f"{SHELL_SYSCALL_DISPATCH_REL}: missing shell uspace syscall dispatch"]
+    text = read(path)
+    block = rust_function_block(text, "user_syscall")
+    if not block:
+        return ["user_syscall: missing main shell syscall dispatch"]
+
+    lowered = block.lower()
+    for token in ("ltp", "oskernel2026", "testcase", "chdir01"):
+        if token in lowered:
+            findings.append(
+                f"{SHELL_SYSCALL_DISPATCH_REL}: user_syscall must not branch on {token.upper()} markers"
+            )
+    if "read_cstr" in block or "normalize_path" in block or "busybox" in block:
+        findings.append(
+            f"{SHELL_SYSCALL_DISPATCH_REL}: user_syscall must route raw syscall args to syscall implementations instead of doing path/user-copy shims"
+        )
+    if re.search(r'"/(?:tmp|ltp|musl|glibc|bin|dev|proc)[^"\n]*"', block):
+        findings.append(
+            f"{SHELL_SYSCALL_DISPATCH_REL}: user_syscall contains hard-coded path literal in the dispatch layer"
+        )
+    required_routes = (
+        ("general::__NR_execve", "sys_execve(process, tf, tf.arg0(), tf.arg1(), tf.arg2())"),
+        ("general::__NR_openat", "sys_openat(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())"),
+        ("general::__NR_openat2", "sys_openat2(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())"),
+        ("general::__NR_newfstatat", "sys_newfstatat(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())"),
+        ("general::__NR_readlinkat", "sys_readlinkat(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())"),
+    )
+    for syscall, call in required_routes:
+        if syscall not in block or call not in block:
+            findings.append(f"{SHELL_SYSCALL_DISPATCH_REL}: user_syscall route changed or missing: {syscall} => {call}")
+    return findings
+
+
 def scan(root: Path) -> list[str]:
     findings: list[str] = []
     utils_path = root / UTILS_REL
@@ -125,6 +164,8 @@ def scan(root: Path) -> list[str]:
             snippet = text[match.start() : match.start() + 120].replace("\n", " ")
             if not is_allowed_unsafe_deref(rel, snippet):
                 findings.append(f"{rel}:{lineno}: multiline unsafe raw deref must use utils user-copy helpers")
+
+    findings.extend(scan_shell_syscall_dispatch(root))
 
     epoll = read(root / IMP_REL / "io_mpx" / "epoll.rs")
     epoll_ctl = rust_function_block(epoll, "sys_epoll_ctl")
