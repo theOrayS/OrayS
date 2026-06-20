@@ -158,6 +158,19 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("iperf_testcode.sh", result.stdout)
 
+    def test_detects_pass_ltp_case_wrapper_record(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "FAIL LTP CASE {case} : 0",
+            "PASS LTP CASE {case} : 0",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("PASS LTP CASE", result.stdout)
+
     def test_detects_blacklist_default(self) -> None:
         tree = self.make_tree()
         path = tree / "Makefile"

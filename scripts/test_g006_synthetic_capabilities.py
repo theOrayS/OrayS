@@ -16,6 +16,7 @@ TARGETS = [
     Path("examples/shell/src/uspace/synthetic_fs.rs"),
     Path("examples/shell/src/uspace/fd_table.rs"),
     Path("examples/shell/src/uspace/metadata.rs"),
+    Path("examples/shell/src/uspace/linux_abi.rs"),
 ]
 
 
@@ -54,6 +55,17 @@ class G006SyntheticCapabilityGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("LTP", result.stdout)
+
+    def test_detects_linux_abi_ltp_marker(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/linux_abi.rs"
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\n// LTP-aware sizing marker must not be reintroduced.\n",
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("linux_abi.rs", result.stdout)
 
     def test_detects_extra_block_device_alias(self) -> None:
         tree = self.make_tree()

@@ -15,6 +15,7 @@ GUARD = ROOT / "scripts/check_g013_user_copy_boundary.py"
 TARGETS = [
     Path("api/arceos_posix_api/src/utils.rs"),
     Path("api/arceos_posix_api/src/imp"),
+    Path("examples/shell/src/uspace/syscall_dispatch.rs"),
 ]
 
 
@@ -120,6 +121,48 @@ class G013UserCopyBoundaryGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ResolvedAddrInfoHints", result.stdout)
+
+
+    def test_detects_shell_syscall_dispatch_path_shim(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "let ret = match syscall_num {",
+            "if syscall_num == general::__NR_openat && false { let _ = \"/tmp/ltp-work\"; }\n    let ret = match syscall_num {",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("hard-coded path literal", result.stdout)
+
+    def test_detects_shell_syscall_dispatch_user_copy_shim(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "let ret = match syscall_num {",
+            "let _dispatch_must_not_copy_paths = read_cstr(process, tf.arg1());\n    let ret = match syscall_num {",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("path/user-copy shims", result.stdout)
+
+    def test_detects_shell_syscall_dispatch_route_rewrite(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "general::__NR_openat => sys_openat(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())",
+            "general::__NR_openat => sys_openat(process, tf.arg0(), 0, tf.arg2(), tf.arg3())",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("user_syscall route changed", result.stdout)
 
     def test_detects_missing_shared_helper_contract(self) -> None:
         tree = self.make_tree()
