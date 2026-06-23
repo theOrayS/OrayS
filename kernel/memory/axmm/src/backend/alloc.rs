@@ -7,9 +7,9 @@ use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
-use memory_addr::{MemoryAddr, PageIter4K, PhysAddr, VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr};
 
-use super::{pte_flags_for_mapping, Backend, SharedPages};
+use super::{Backend, SharedPages, pte_flags_for_mapping};
 
 static SHARED_FRAMES: LazyInit<SpinNoIrq<BTreeMap<usize, usize>>> = LazyInit::new();
 

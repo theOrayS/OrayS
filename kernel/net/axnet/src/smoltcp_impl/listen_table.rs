@@ -1,13 +1,13 @@
 use alloc::collections::{BTreeMap, VecDeque};
 
-use axerrno::{ax_err, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err};
 use axsync::Mutex;
 use smoltcp::iface::{SocketHandle, SocketSet};
 use smoltcp::socket::tcp::{self, State};
 use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
 
 use super::loopback::LoopbackTcpEndpoint;
-use super::{SocketSetWrapper, LISTEN_QUEUE_SIZE, SOCKET_SET};
+use super::{LISTEN_QUEUE_SIZE, SOCKET_SET, SocketSetWrapper};
 
 struct ListenTableEntry {
     listen_endpoint: IpListenEndpoint,

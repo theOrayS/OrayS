@@ -2,7 +2,7 @@
 #![allow(unused_macros)]
 
 use axerrno::{LinuxError, LinuxResult};
-use core::ffi::{c_char, c_void, CStr};
+use core::ffi::{CStr, c_char, c_void};
 use core::mem::{align_of, size_of};
 use core::ptr::NonNull;
 

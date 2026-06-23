@@ -2,7 +2,7 @@ use core::net::SocketAddr;
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::time::Duration;
 
-use axerrno::{ax_err, ax_err_type, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err, ax_err_type};
 use axio::PollState;
 use axsync::Mutex;
 use spin::RwLock;
@@ -13,11 +13,11 @@ use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
 
 use super::addr::UNSPECIFIED_ENDPOINT;
 use super::udp_loopback::{
-    is_loopback_endpoint, register_udp_loopback, send_udp_loopback, unregister_udp_loopback,
-    update_udp_loopback_peer, UdpLoopbackQueue,
+    UdpLoopbackQueue, is_loopback_endpoint, register_udp_loopback, send_udp_loopback,
+    unregister_udp_loopback, update_udp_loopback_peer,
 };
 use super::{
-    normalize_socket_buffer_len, SocketSetWrapper, SOCKET_SET, UDP_RX_BUF_LEN, UDP_TX_BUF_LEN,
+    SOCKET_SET, SocketSetWrapper, UDP_RX_BUF_LEN, UDP_TX_BUF_LEN, normalize_socket_buffer_len,
 };
 
 /// A UDP socket that provides POSIX-like APIs.
@@ -27,6 +27,7 @@ pub struct UdpSocket {
     peer_addr: RwLock<Option<IpEndpoint>>,
     loopback_queue: UdpLoopbackQueue,
     nonblock: AtomicBool,
+    reuse_addr: AtomicBool,
     recv_timeout: Mutex<Option<Duration>>,
     send_timeout: Mutex<Option<Duration>>,
     recv_buffer_size: usize,
@@ -45,6 +46,7 @@ impl UdpSocket {
             peer_addr: RwLock::new(None),
             loopback_queue: UdpLoopbackQueue::new(UDP_RX_BUF_LEN),
             nonblock: AtomicBool::new(false),
+            reuse_addr: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
             send_timeout: Mutex::new(None),
             recv_buffer_size: UDP_RX_BUF_LEN,
@@ -84,6 +86,18 @@ impl UdpSocket {
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) {
         self.nonblock.store(nonblocking, Ordering::Release);
+    }
+
+    /// Sets the POSIX `SO_REUSEADDR` state for this datagram socket.
+    #[inline]
+    pub fn set_reuse_addr(&self, enabled: bool) {
+        self.reuse_addr.store(enabled, Ordering::Release);
+    }
+
+    /// Returns the POSIX `SO_REUSEADDR` state for this datagram socket.
+    #[inline]
+    pub fn reuse_addr(&self) -> bool {
+        self.reuse_addr.load(Ordering::Acquire)
     }
 
     /// Sets the timeout used by blocking receive operations.

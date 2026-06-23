@@ -368,6 +368,44 @@ impl Socket {
             Socket::Tcp(tcpsocket) => tcpsocket.lock().send_buffer_size(),
         }
     }
+
+    fn set_reuse_addr(&self, enabled: bool) {
+        match self {
+            Socket::Udp(udpsocket) => udpsocket.lock().set_reuse_addr(enabled),
+            Socket::Tcp(tcpsocket) => tcpsocket.lock().set_reuse_addr(enabled),
+        }
+    }
+
+    fn reuse_addr(&self) -> bool {
+        match self {
+            Socket::Udp(udpsocket) => udpsocket.lock().reuse_addr(),
+            Socket::Tcp(tcpsocket) => tcpsocket.lock().reuse_addr(),
+        }
+    }
+
+    fn set_tcp_nodelay(&self, enabled: bool) -> LinuxResult {
+        match self {
+            Socket::Tcp(tcpsocket) => {
+                tcpsocket.lock().set_nodelay(enabled);
+                Ok(())
+            }
+            Socket::Udp(_) => Err(LinuxError::ENOPROTOOPT),
+        }
+    }
+
+    fn tcp_nodelay(&self) -> LinuxResult<bool> {
+        match self {
+            Socket::Tcp(tcpsocket) => Ok(tcpsocket.lock().nodelay()),
+            Socket::Udp(_) => Err(LinuxError::ENOPROTOOPT),
+        }
+    }
+
+    fn tcp_max_segment_size(&self) -> LinuxResult<usize> {
+        match self {
+            Socket::Tcp(tcpsocket) => Ok(tcpsocket.lock().max_segment_size()),
+            Socket::Udp(_) => Err(LinuxError::ENOPROTOOPT),
+        }
+    }
 }
 
 pub fn set_socket_recv_timeout(sockfd: c_int, timeout: Option<Duration>) -> LinuxResult {
@@ -396,6 +434,15 @@ fn validate_socket_buffer_size(size: c_int) -> LinuxResult<usize> {
     }
 }
 
+fn validate_forced_socket_buffer_size(size: u32) -> usize {
+    // Linux treats SO_*BUFFORCE as a privileged override of the normal
+    // sysctl cap, but the value is still copied as an unsigned userspace
+    // quantity for CVE-2016-9793-style large inputs.  Keep the socket state
+    // real by storing the normalized request while ensuring getsockopt() can
+    // never report a negative signed buffer length.
+    core::cmp::min(size as usize, c_int::MAX as usize)
+}
+
 fn socket_buffer_option_error(err: impl Into<LinuxError>) -> LinuxError {
     match err.into() {
         LinuxError::EOPNOTSUPP | LinuxError::ENOSYS => LinuxError::ENOPROTOOPT,
@@ -405,6 +452,10 @@ fn socket_buffer_option_error(err: impl Into<LinuxError>) -> LinuxError {
 
 pub fn set_socket_recv_buffer_size(sockfd: c_int, size: c_int) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_recv_buffer_size(validate_socket_buffer_size(size)?)
+}
+
+pub fn force_socket_recv_buffer_size(sockfd: c_int, size: u32) -> LinuxResult {
+    Socket::from_fd(sockfd)?.set_recv_buffer_size(validate_forced_socket_buffer_size(size))
 }
 
 pub fn socket_recv_buffer_size(sockfd: c_int) -> LinuxResult<c_int> {
@@ -417,9 +468,36 @@ pub fn set_socket_send_buffer_size(sockfd: c_int, size: c_int) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_send_buffer_size(validate_socket_buffer_size(size)?)
 }
 
+pub fn force_socket_send_buffer_size(sockfd: c_int, size: u32) -> LinuxResult {
+    Socket::from_fd(sockfd)?.set_send_buffer_size(validate_forced_socket_buffer_size(size))
+}
+
 pub fn socket_send_buffer_size(sockfd: c_int) -> LinuxResult<c_int> {
     Ok(Socket::from_fd(sockfd)?
         .send_buffer_size()
+        .min(c_int::MAX as usize) as c_int)
+}
+
+pub fn set_socket_reuse_addr(sockfd: c_int, enabled: bool) -> LinuxResult {
+    Socket::from_fd(sockfd)?.set_reuse_addr(enabled);
+    Ok(())
+}
+
+pub fn socket_reuse_addr(sockfd: c_int) -> LinuxResult<bool> {
+    Ok(Socket::from_fd(sockfd)?.reuse_addr())
+}
+
+pub fn set_socket_tcp_nodelay(sockfd: c_int, enabled: bool) -> LinuxResult {
+    Socket::from_fd(sockfd)?.set_tcp_nodelay(enabled)
+}
+
+pub fn socket_tcp_nodelay(sockfd: c_int) -> LinuxResult<bool> {
+    Socket::from_fd(sockfd)?.tcp_nodelay()
+}
+
+pub fn socket_tcp_max_segment_size(sockfd: c_int) -> LinuxResult<c_int> {
+    Ok(Socket::from_fd(sockfd)?
+        .tcp_max_segment_size()?
         .min(c_int::MAX as usize) as c_int)
 }
 

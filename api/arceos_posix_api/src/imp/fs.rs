@@ -9,7 +9,7 @@ use axfs::fops::OpenOptions;
 use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
-use super::fd_ops::{get_file_like, FileLike};
+use super::fd_ops::{FileLike, get_file_like};
 use crate::{
     ctypes,
     utils::{char_ptr_to_str, writable_user_buffer, write_user_value},

@@ -6,12 +6,12 @@ use lazyinit::LazyInit;
 use linux_raw_sys::general;
 use std::collections::BTreeMap;
 use std::string::String;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::vec::Vec;
 
 use super::fd_table::FdEntry;
-use super::linux_abi::{fd_cloexec_flag, SIGPIPE_NUM};
+use super::linux_abi::{SIGPIPE_NUM, fd_cloexec_flag};
 use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal};
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{
@@ -19,7 +19,7 @@ use super::task_registry::{
     user_thread_entry_by_tid,
 };
 use super::user_memory::{read_user_value, validate_user_write, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum RingBufferStatus {

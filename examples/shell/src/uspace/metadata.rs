@@ -10,14 +10,14 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{check_parent_write_search_permission, resolve_dirfd_path, FdEntry};
+use super::fd_table::{FdEntry, check_parent_write_search_permission, resolve_dirfd_path};
 use super::linux_abi::{
-    neg_errno, neg_errno_code, ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, EXT4_SUPER_MAGIC,
-    FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID,
-    LINUX_EACCES, MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RAMFS_MAGIC,
-    RLIMIT_FSIZE_RESOURCE, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, ST_MODE_BLK, ST_MODE_CHR,
-    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
-    SYNTHETIC_BLOCK_DEVICE_SIZE, SYSFS_MAGIC, TMPFS_MAGIC,
+    ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, EXT4_SUPER_MAGIC, FILE_MODE_GROUP_EXECUTE,
+    FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
+    MAX_IN_MEMORY_FILE_SIZE, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RAMFS_MAGIC, RLIMIT_FSIZE_RESOURCE,
+    ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
+    ST_MODE_TYPE_MASK, STATFS_BLOCK_SIZE, STATFS_NAME_MAX, SYNTHETIC_BLOCK_DEVICE_SIZE,
+    SYSFS_MAGIC, TMPFS_MAGIC, neg_errno, neg_errno_code,
 };
 use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
@@ -913,11 +913,7 @@ impl UserProcess {
         let mut all_data = self.path_sparse_data.lock();
         let remove_empty = if let Some(extents) = all_data.get_mut(path.as_str()) {
             Self::clear_sparse_byte_extents(extents, offset, clear_end);
-            if extents.is_empty() {
-                true
-            } else {
-                false
-            }
+            if extents.is_empty() { true } else { false }
         } else {
             false
         };

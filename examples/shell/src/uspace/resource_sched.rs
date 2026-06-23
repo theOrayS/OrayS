@@ -8,18 +8,18 @@ use linux_raw_sys::general;
 use std::vec::Vec;
 
 use super::linux_abi::{
-    neg_errno, DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
-    USER_STACK_SIZE,
+    DEFAULT_NOFILE_LIMIT, NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE,
+    USER_STACK_SIZE, neg_errno,
 };
 use super::task_registry::{
-    live_user_process_entries, user_thread_entries_by_process_group,
-    user_thread_entry_by_process_pid, UserThreadEntry,
+    UserThreadEntry, live_user_process_entries, user_thread_entries_by_process_group,
+    user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::{task_context::current_tid, UserProcess};
+use super::{UserProcess, task_context::current_tid};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -220,6 +220,22 @@ fn clamp_nice(nice: i32) -> i32 {
     nice.clamp(MIN_NICE, MAX_NICE)
 }
 
+fn scheduler_backend_nice(nice: i32) -> isize {
+    // Linux-visible nice remains exact through getpriority()/setpriority().
+    // The active ArceOS test kernel uses a strict-priority RR backend, not CFS
+    // weights.  Mapping positive SCHED_OTHER nice values directly to backend
+    // priorities turns nice(19) into possible starvation on one vCPU, which is
+    // not Linux behaviour: low-weight normal tasks must still make timely
+    // forward progress.  Therefore non-negative SCHED_OTHER tasks share the
+    // normal RR bucket; negative nice values still get a small real boost.
+    let nice = clamp_nice(nice);
+    if nice < 0 {
+        (nice / 10).clamp(-2, 0) as isize
+    } else {
+        0
+    }
+}
+
 fn linux_priority_from_nice(nice: i32) -> isize {
     (20 - clamp_nice(nice)) as isize
 }
@@ -355,11 +371,17 @@ impl UserProcessRef<'_> {
         match self {
             UserProcessRef::Borrowed(process) => {
                 process.set_nice(nice);
-                let _ = axtask::set_priority(nice as isize);
+                let _ = axtask::set_priority(scheduler_backend_priority(
+                    process,
+                    process.get_sched_state(),
+                ));
             }
             UserProcessRef::Owned(entry) => {
                 entry.process.set_nice(nice);
-                let _ = axtask::set_task_priority(&entry.task, nice as isize);
+                let _ = axtask::set_task_priority(
+                    &entry.task,
+                    scheduler_backend_priority(&entry.process, entry.process.get_sched_state()),
+                );
             }
             UserProcessRef::InitProcess => {
                 SYNTHETIC_INIT_NICE.store(clamp_nice(nice), Ordering::Release)
@@ -489,31 +511,44 @@ fn split_sched_policy(policy: i32) -> Result<(i32, bool), LinuxError> {
     Ok((base_policy, reset_on_fork))
 }
 
+const BACKEND_DEADLINE_BASE_PRIORITY: isize = -140;
+const BACKEND_DEADLINE_PRIORITY_SPAN: isize = 19;
+const BACKEND_RT_BASE_PRIORITY: isize = -21;
+const BACKEND_IDLE_PRIORITY: isize = 20;
+
 fn scheduler_backend_priority(process: &UserProcess, state: UserSchedState) -> isize {
     match state.policy as u32 {
         general::SCHED_FIFO | general::SCHED_RR => {
             let linux_rt_prio = state.param.sched_priority.clamp(1, 99);
-            -1 - (((linux_rt_prio - 1) * 19) / 98) as isize
+            // Preserve Linux's scheduling-class ordering in the simple ArceOS
+            // backend: every accepted SCHED_FIFO/RR priority is strictly above
+            // all SCHED_OTHER nice levels.  The RR scheduler still rotates
+            // equal-priority tasks, while normal-class aging cannot cross into
+            // this RT range.
+            BACKEND_RT_BASE_PRIORITY - linux_rt_prio as isize
         }
         general::SCHED_DEADLINE => deadline_scheduler_backend_priority(state),
-        general::SCHED_IDLE => 19,
-        _ => process.nice() as isize,
+        // SCHED_IDLE is below all normal nice levels; it runs when there is no
+        // ready normal/RT work rather than competing as a regular nice value.
+        general::SCHED_IDLE => BACKEND_IDLE_PRIORITY,
+        _ => scheduler_backend_nice(process.nice()),
     }
 }
 
 fn deadline_scheduler_backend_priority(state: UserSchedState) -> isize {
-    // ArceOS currently exposes a priority/nice backend rather than a full EDF
+    // ArceOS currently exposes a priority backend rather than a full EDF
     // scheduler.  Do not claim deadline attributes as a pure bookkeeping no-op:
-    // accepted SCHED_DEADLINE reservations affect the runnable priority in
-    // proportion to their runtime/period utilization, while the ABI-visible
-    // reservation tuple remains available through sched_getattr().
+    // accepted SCHED_DEADLINE reservations enter a class above RT, with higher
+    // runtime/period utilization receiving the stronger backend priority.
     let runtime = state.sched_runtime.min(state.sched_period);
     let utilization_percent = if state.sched_period == 0 {
         100
     } else {
         ((runtime as u128).saturating_mul(100) / state.sched_period as u128) as i32
     };
-    -1 - ((utilization_percent.clamp(1, 100) - 1) * 19 / 99) as isize
+    let utilization_percent = utilization_percent.clamp(1, 100);
+    BACKEND_DEADLINE_BASE_PRIORITY
+        + (((100 - utilization_percent) * BACKEND_DEADLINE_PRIORITY_SPAN as i32) / 99) as isize
 }
 
 fn apply_task_scheduler_state(

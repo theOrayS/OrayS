@@ -2,9 +2,12 @@ use core::sync::atomic::Ordering;
 
 use axerrno::LinuxError;
 
-use super::linux_abi::{LINUX_PERSONALITY_QUERY, PER_LINUX};
+use super::linux_abi::{
+    LINUX_PERSONALITY_QUERY, PERSONALITY_KNOWN_FLAGS, PERSONALITY_MAX_KNOWN_DOMAIN,
+    PERSONALITY_PER_MASK,
+};
 use super::task_registry::{live_user_process_entries, user_thread_entry_by_process_pid};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 const SYNTHETIC_INIT_PID: i32 = 1;
 
@@ -131,8 +134,11 @@ pub(super) fn apply_personality_request(
 }
 
 fn validate_personality(persona: usize) -> Result<usize, LinuxError> {
-    match persona {
-        PER_LINUX => Ok(PER_LINUX),
-        _ => Err(LinuxError::EINVAL),
+    let domain = persona & PERSONALITY_PER_MASK;
+    let flags = persona & !PERSONALITY_PER_MASK;
+    if domain > PERSONALITY_MAX_KNOWN_DOMAIN || flags & !PERSONALITY_KNOWN_FLAGS != 0 {
+        Err(LinuxError::EINVAL)
+    } else {
+        Ok(persona)
     }
 }

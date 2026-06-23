@@ -15,7 +15,8 @@ pub(super) const MAX_IN_MEMORY_FILE_SIZE: u64 = 128 * 1024 * 1024;
 pub(super) const SYNTHETIC_BLOCK_DEVICE_SIZE: u64 = 512 * 1024 * 1024;
 pub(super) const USER_PIE_LOAD_BASE: usize = USER_ASPACE_BASE;
 pub(super) const MAX_SCRIPT_INTERPRETER_DEPTH: usize = 4;
-pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
+pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp/t";
+pub(super) const LEGACY_TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
 pub(super) const AUX_CLOCK_TICKS: usize = 100;
 pub(super) const SEEK_DATA_WHENCE: u32 = 3;
 pub(super) const SEEK_HOLE_WHENCE: u32 = 4;
@@ -149,6 +150,8 @@ pub(super) const SO_PASSCRED_OPT: i32 = 16;
 pub(super) const SO_RCVTIMEO_OPT: i32 = 20;
 pub(super) const SO_SNDTIMEO_OPT: i32 = 21;
 pub(super) const SO_ACCEPTCONN_OPT: i32 = 30;
+pub(super) const SO_SNDBUFFORCE_OPT: i32 = 32;
+pub(super) const SO_RCVBUFFORCE_OPT: i32 = 33;
 pub(super) const SO_PEERCRED_OPT: i32 = 17;
 pub(super) const SO_PROTOCOL_OPT: i32 = 38;
 pub(super) const SO_DOMAIN_OPT: i32 = 39;
@@ -157,6 +160,8 @@ pub(super) const IP_TOS_OPT: i32 = 1;
 pub(super) const IP_TTL_OPT: i32 = 2;
 pub(super) const IP_MULTICAST_TTL_OPT: i32 = 33;
 pub(super) const IP_MULTICAST_LOOP_OPT: i32 = 34;
+pub(super) const IP_MCAST_JOIN_GROUP_OPT: i32 = 42;
+pub(super) const IP_MCAST_LEAVE_GROUP_OPT: i32 = 45;
 pub(super) const IP_RECVERR_OPT: i32 = 11;
 pub(super) const TCP_NODELAY_OPT: i32 = 1;
 pub(super) const TCP_MAXSEG_OPT: i32 = 2;
@@ -175,6 +180,30 @@ pub(super) const LINUX_EAFNOSUPPORT: u32 = 97;
 
 pub(super) const LINUX_PERSONALITY_QUERY: usize = 0xffff_ffff;
 pub(super) const PER_LINUX: usize = 0;
+pub(super) const PERSONALITY_PER_MASK: usize = 0x00ff;
+pub(super) const PERSONALITY_MAX_KNOWN_DOMAIN: usize = 0x0010;
+pub(super) const PERSONALITY_UNAME26: usize = 0x002_0000;
+pub(super) const PERSONALITY_ADDR_NO_RANDOMIZE: usize = 0x004_0000;
+pub(super) const PERSONALITY_FDPIC_FUNCPTRS: usize = 0x008_0000;
+pub(super) const PERSONALITY_MMAP_PAGE_ZERO: usize = 0x010_0000;
+pub(super) const PERSONALITY_ADDR_COMPAT_LAYOUT: usize = 0x020_0000;
+pub(super) const PERSONALITY_READ_IMPLIES_EXEC: usize = 0x040_0000;
+pub(super) const PERSONALITY_ADDR_LIMIT_32BIT: usize = 0x080_0000;
+pub(super) const PERSONALITY_SHORT_INODE: usize = 0x100_0000;
+pub(super) const PERSONALITY_WHOLE_SECONDS: usize = 0x200_0000;
+pub(super) const PERSONALITY_STICKY_TIMEOUTS: usize = 0x400_0000;
+pub(super) const PERSONALITY_ADDR_LIMIT_3GB: usize = 0x800_0000;
+pub(super) const PERSONALITY_KNOWN_FLAGS: usize = PERSONALITY_UNAME26
+    | PERSONALITY_ADDR_NO_RANDOMIZE
+    | PERSONALITY_FDPIC_FUNCPTRS
+    | PERSONALITY_MMAP_PAGE_ZERO
+    | PERSONALITY_ADDR_COMPAT_LAYOUT
+    | PERSONALITY_READ_IMPLIES_EXEC
+    | PERSONALITY_ADDR_LIMIT_32BIT
+    | PERSONALITY_SHORT_INODE
+    | PERSONALITY_WHOLE_SECONDS
+    | PERSONALITY_STICKY_TIMEOUTS
+    | PERSONALITY_ADDR_LIMIT_3GB;
 
 #[cfg(target_arch = "riscv64")]
 pub(super) const AUX_PLATFORM: &str = "riscv64";
@@ -210,11 +239,7 @@ pub(super) fn neg_errno_code(code: u32) -> isize {
 }
 
 pub(super) fn fd_cloexec_flag(enabled: bool) -> u32 {
-    if enabled {
-        general::FD_CLOEXEC
-    } else {
-        0
-    }
+    if enabled { general::FD_CLOEXEC } else { 0 }
 }
 
 pub(super) fn str_err(err: &'static str) -> String {

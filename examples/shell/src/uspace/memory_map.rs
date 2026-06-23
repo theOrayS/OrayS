@@ -3,23 +3,23 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
+use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
 use linux_raw_sys::general;
-use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
 use std::collections::BTreeMap;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
 use super::linux_abi::{
-    neg_errno, SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP,
+    SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
 };
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::user_memory::{
-    read_user_bytes, validate_user_write, write_user_bytes, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
 };
-use super::UserProcess;
 
 pub(super) fn sys_brk(process: &UserProcess, addr: usize) -> isize {
     let mut brk = process.brk.lock();
@@ -291,7 +291,7 @@ pub(super) fn sys_mmap(
     } else {
         None
     };
-    if let Some(cache) = file_backing
+    if let Some(mut cache) = file_backing
         .as_ref()
         .and_then(|backing| process.take_exec_shared_mmap_cache(&backing.file, offset as u64, size))
     {
@@ -320,6 +320,7 @@ pub(super) fn sys_mmap(
                 return neg_errno(LinuxError::from(err));
             }
         }
+        cache.disarm_retained_frames();
         if let Some(backing) = file_backing.as_mut() {
             backing.valid_len = cache.valid_len.min(len);
         }

@@ -3,7 +3,7 @@ use core::ffi::c_int;
 
 use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
-use axns::{def_resource, ResArc};
+use axns::{ResArc, def_resource};
 use flatten_objects::FlattenObjects;
 use spin::RwLock;
 

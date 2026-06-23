@@ -9,7 +9,7 @@ use std::vec::Vec;
 use super::linux_abi::{ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CHOWN_ID_UNCHANGED};
 use super::task_context::current_tid;
 use super::user_memory::{read_user_value, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 const NGROUPS_MAX: usize = 65_536;
 const CAPABILITY_VERSION_1: u32 = general::_LINUX_CAPABILITY_VERSION_1;

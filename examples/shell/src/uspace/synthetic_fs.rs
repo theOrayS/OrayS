@@ -5,11 +5,12 @@ use axerrno::LinuxError;
 use axtask::AxTaskRef;
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::string::{String, ToString};
 use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::fd_table::{
     FdEntry, MemoryFileEntry, PathEntry, ProcPagemapEntry, ProcTimerSlackEntry, SyntheticDirEntry,
     SyntheticDirent,
@@ -17,7 +18,8 @@ use super::fd_table::{
 use super::futex::futex_waiter_is_queued;
 use super::linux_abi::{
     DEFAULT_GROUP_CONTENT, DEFAULT_PASSWD_CONTENT, ETC_GROUP_PATH, ETC_PASSWD_PATH,
-    PROC_SELF_MAPS_PATH, USER_ASPACE_BASE, USER_STACK_SIZE, USER_STACK_TOP,
+    PROC_SELF_MAPS_PATH, SYSV_SHM_MAX_SEGMENTS, SYSV_SHM_MAX_SIZE, USER_ASPACE_BASE,
+    USER_STACK_SIZE, USER_STACK_TOP,
 };
 use super::memory_map::{align_down, align_up};
 use super::runtime_paths::normalize_path;
@@ -28,7 +30,6 @@ use super::task_context::task_ext;
 use super::task_registry::{
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid, user_thread_entry_by_tid,
 };
-use super::UserProcess;
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 const PROC_SELF_SMAPS_PATH: &str = "/proc/self/smaps";
@@ -1065,7 +1066,16 @@ const PROC_SYS_KERNEL_CORE_PATTERN_PATH: &str = "/proc/sys/kernel/core_pattern";
 const PROC_SYS_KERNEL_CORE_PATTERN_CONTENT: &[u8] = b"core\n";
 const PROC_SYS_KERNEL_DOMAINNAME_PATH: &str = "/proc/sys/kernel/domainname";
 const PROC_SYS_KERNEL_HOSTNAME_PATH: &str = "/proc/sys/kernel/hostname";
+const PROC_SYS_KERNEL_PID_MAX_PATH: &str = "/proc/sys/kernel/pid_max";
+const PROC_SYS_KERNEL_PID_MAX_CONTENT: &[u8] = b"4194304\n";
+const PROC_SYS_KERNEL_PRINTK_PATH: &str = "/proc/sys/kernel/printk";
+const PROC_SYS_KERNEL_SHMALL_PATH: &str = "/proc/sys/kernel/shmall";
+const PROC_SYS_KERNEL_SHMMAX_PATH: &str = "/proc/sys/kernel/shmmax";
+const PROC_SYS_KERNEL_SHMMNI_PATH: &str = "/proc/sys/kernel/shmmni";
+const PROC_SYS_KERNEL_TAINTED_PATH: &str = "/proc/sys/kernel/tainted";
 const PROC_SYS_FS_PIPE_MAX_SIZE_PATH: &str = "/proc/sys/fs/pipe-max-size";
+const PROC_SYS_FS_PIPE_USER_PAGES_HARD_PATH: &str = "/proc/sys/fs/pipe-user-pages-hard";
+const PROC_SYS_FS_PIPE_USER_PAGES_SOFT_PATH: &str = "/proc/sys/fs/pipe-user-pages-soft";
 const PROC_SYS_VM_MAX_MAP_COUNT_PATH: &str = "/proc/sys/vm/max_map_count";
 const PROC_SYS_VM_MIN_FREE_KBYTES_PATH: &str = "/proc/sys/vm/min_free_kbytes";
 const PROC_SYS_VM_OVERCOMMIT_MEMORY_PATH: &str = "/proc/sys/vm/overcommit_memory";
@@ -1076,12 +1086,23 @@ const PROC_SYS_DEFAULT_DOMAINNAME: &[u8] = b"localdomain";
 const PROC_SYS_DEFAULT_HOSTNAME: &[u8] = b"arceos";
 const PROC_SYS_KERNEL_NGROUPS_MAX_CONTENT: &[u8] = b"65536\n";
 const PROC_SYS_DEFAULT_PIPE_MAX_SIZE: usize = 65_536;
+const PROC_SYS_DEFAULT_PIPE_USER_PAGES_HARD: usize = 0;
+const PROC_SYS_DEFAULT_PIPE_USER_PAGES_SOFT: usize = 512;
 const PROC_SYS_DEFAULT_MAX_MAP_COUNT: usize = 65_530;
 const PROC_SYS_DEFAULT_MIN_FREE_KBYTES: usize = 4_096;
 const PROC_SYS_DEFAULT_OVERCOMMIT_RATIO: usize = 50;
+const PROC_SYS_DEFAULT_SHMALL: usize = SYSV_SHM_MAX_SIZE / PAGE_SIZE_4K;
 const PROC_SYS_MAX_STRING_LEN: usize = 64;
 
 static PROC_SYS_PIPE_MAX_SIZE: AtomicUsize = AtomicUsize::new(PROC_SYS_DEFAULT_PIPE_MAX_SIZE);
+static PROC_SYS_PIPE_USER_PAGES_HARD: AtomicUsize =
+    AtomicUsize::new(PROC_SYS_DEFAULT_PIPE_USER_PAGES_HARD);
+static PROC_SYS_PIPE_USER_PAGES_SOFT: AtomicUsize =
+    AtomicUsize::new(PROC_SYS_DEFAULT_PIPE_USER_PAGES_SOFT);
+static PROC_SYS_KERNEL_SHMALL: AtomicUsize = AtomicUsize::new(PROC_SYS_DEFAULT_SHMALL);
+static PROC_SYS_KERNEL_SHMMAX: AtomicUsize = AtomicUsize::new(SYSV_SHM_MAX_SIZE);
+static PROC_SYS_KERNEL_SHMMNI: AtomicUsize = AtomicUsize::new(SYSV_SHM_MAX_SEGMENTS);
+static PROC_SYS_KERNEL_TAINTED: AtomicUsize = AtomicUsize::new(0);
 static PROC_SYS_VM_MAX_MAP_COUNT: AtomicUsize = AtomicUsize::new(PROC_SYS_DEFAULT_MAX_MAP_COUNT);
 static PROC_SYS_VM_MIN_FREE_KBYTES: AtomicUsize =
     AtomicUsize::new(PROC_SYS_DEFAULT_MIN_FREE_KBYTES);
@@ -1094,7 +1115,14 @@ static PROC_SYS_VM_PANIC_ON_OOM: AtomicUsize = AtomicUsize::new(0);
 pub(super) enum ProcSysFileKind {
     Domainname,
     Hostname,
+    KernelPrintk,
+    KernelShmall,
+    KernelShmmax,
+    KernelShmmni,
+    KernelTainted,
     PipeMaxSize,
+    PipeUserPagesHard,
+    PipeUserPagesSoft,
     VmMaxMapCount,
     VmMinFreeKbytes,
     VmOvercommitMemory,
@@ -1115,7 +1143,14 @@ fn proc_sys_file_kind(path: &str) -> Option<(String, ProcSysFileKind)> {
     let kind = match normalized.as_str() {
         PROC_SYS_KERNEL_DOMAINNAME_PATH => ProcSysFileKind::Domainname,
         PROC_SYS_KERNEL_HOSTNAME_PATH => ProcSysFileKind::Hostname,
+        PROC_SYS_KERNEL_PRINTK_PATH => ProcSysFileKind::KernelPrintk,
+        PROC_SYS_KERNEL_SHMALL_PATH => ProcSysFileKind::KernelShmall,
+        PROC_SYS_KERNEL_SHMMAX_PATH => ProcSysFileKind::KernelShmmax,
+        PROC_SYS_KERNEL_SHMMNI_PATH => ProcSysFileKind::KernelShmmni,
+        PROC_SYS_KERNEL_TAINTED_PATH => ProcSysFileKind::KernelTainted,
         PROC_SYS_FS_PIPE_MAX_SIZE_PATH => ProcSysFileKind::PipeMaxSize,
+        PROC_SYS_FS_PIPE_USER_PAGES_HARD_PATH => ProcSysFileKind::PipeUserPagesHard,
+        PROC_SYS_FS_PIPE_USER_PAGES_SOFT_PATH => ProcSysFileKind::PipeUserPagesSoft,
         PROC_SYS_VM_MAX_MAP_COUNT_PATH => ProcSysFileKind::VmMaxMapCount,
         PROC_SYS_VM_MIN_FREE_KBYTES_PATH => ProcSysFileKind::VmMinFreeKbytes,
         PROC_SYS_VM_OVERCOMMIT_MEMORY_PATH => ProcSysFileKind::VmOvercommitMemory,
@@ -1129,6 +1164,7 @@ fn proc_sys_file_kind(path: &str) -> Option<(String, ProcSysFileKind)> {
 fn proc_sys_string_state(kind: ProcSysFileKind) -> &'static Mutex<Vec<u8>> {
     static DOMAINNAME: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
     static HOSTNAME: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
+    static PRINTK: LazyInit<Mutex<Vec<u8>>> = LazyInit::new();
 
     match kind {
         ProcSysFileKind::Domainname => {
@@ -1139,7 +1175,17 @@ fn proc_sys_string_state(kind: ProcSysFileKind) -> &'static Mutex<Vec<u8>> {
             let _ = HOSTNAME.call_once(|| Mutex::new(PROC_SYS_DEFAULT_HOSTNAME.to_vec()));
             &HOSTNAME
         }
-        ProcSysFileKind::PipeMaxSize
+        ProcSysFileKind::KernelPrintk => {
+            let _ = PRINTK.call_once(|| Mutex::new(b"7 4 1 7".to_vec()));
+            &PRINTK
+        }
+        ProcSysFileKind::KernelShmall
+        | ProcSysFileKind::KernelShmmax
+        | ProcSysFileKind::KernelShmmni
+        | ProcSysFileKind::KernelTainted
+        | ProcSysFileKind::PipeUserPagesHard
+        | ProcSysFileKind::PipeUserPagesSoft
+        | ProcSysFileKind::PipeMaxSize
         | ProcSysFileKind::VmMaxMapCount
         | ProcSysFileKind::VmMinFreeKbytes
         | ProcSysFileKind::VmOvercommitMemory
@@ -1152,15 +1198,37 @@ fn proc_sys_string_state(kind: ProcSysFileKind) -> &'static Mutex<Vec<u8>> {
 
 fn proc_sys_file_content(kind: ProcSysFileKind) -> Vec<u8> {
     match kind {
-        ProcSysFileKind::Domainname | ProcSysFileKind::Hostname => {
+        ProcSysFileKind::Domainname | ProcSysFileKind::Hostname | ProcSysFileKind::KernelPrintk => {
             let state = proc_sys_string_state(kind).lock();
             let mut content = state.clone();
             content.push(b'\n');
             content
         }
+        ProcSysFileKind::KernelShmall => {
+            format!("{}\n", PROC_SYS_KERNEL_SHMALL.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::KernelShmmax => {
+            format!("{}\n", PROC_SYS_KERNEL_SHMMAX.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::KernelShmmni => {
+            format!("{}\n", PROC_SYS_KERNEL_SHMMNI.load(Ordering::Acquire)).into_bytes()
+        }
+        ProcSysFileKind::KernelTainted => {
+            format!("{}\n", PROC_SYS_KERNEL_TAINTED.load(Ordering::Acquire)).into_bytes()
+        }
         ProcSysFileKind::PipeMaxSize => {
             format!("{}\n", PROC_SYS_PIPE_MAX_SIZE.load(Ordering::Acquire)).into_bytes()
         }
+        ProcSysFileKind::PipeUserPagesHard => format!(
+            "{}\n",
+            PROC_SYS_PIPE_USER_PAGES_HARD.load(Ordering::Acquire)
+        )
+        .into_bytes(),
+        ProcSysFileKind::PipeUserPagesSoft => format!(
+            "{}\n",
+            PROC_SYS_PIPE_USER_PAGES_SOFT.load(Ordering::Acquire)
+        )
+        .into_bytes(),
         ProcSysFileKind::VmMaxMapCount => {
             format!("{}\n", PROC_SYS_VM_MAX_MAP_COUNT.load(Ordering::Acquire)).into_bytes()
         }
@@ -1183,6 +1251,18 @@ fn proc_sys_file_content(kind: ProcSysFileKind) -> Vec<u8> {
 
 pub(super) fn proc_sys_vm_max_map_count() -> usize {
     PROC_SYS_VM_MAX_MAP_COUNT.load(Ordering::Acquire)
+}
+
+pub(super) fn proc_sys_kernel_shmmax() -> usize {
+    PROC_SYS_KERNEL_SHMMAX.load(Ordering::Acquire)
+}
+
+pub(super) fn proc_sys_kernel_shmmni() -> usize {
+    PROC_SYS_KERNEL_SHMMNI.load(Ordering::Acquire)
+}
+
+pub(super) fn proc_sys_kernel_shmall() -> usize {
+    PROC_SYS_KERNEL_SHMALL.load(Ordering::Acquire)
 }
 
 fn file_is_readable(status_flags: u32) -> bool {
@@ -1294,10 +1374,28 @@ impl ProcSysFileEntry {
             return Ok(0);
         }
         match self.kind {
-            ProcSysFileKind::Domainname | ProcSysFileKind::Hostname => {
-                write_proc_sys_string(self.kind, src)?
+            ProcSysFileKind::Domainname
+            | ProcSysFileKind::Hostname
+            | ProcSysFileKind::KernelPrintk => write_proc_sys_string(self.kind, src)?,
+            ProcSysFileKind::KernelShmall => {
+                write_proc_sys_usize(src, 1, None, &PROC_SYS_KERNEL_SHMALL)?
+            }
+            ProcSysFileKind::KernelShmmax => {
+                write_proc_sys_usize(src, 1, None, &PROC_SYS_KERNEL_SHMMAX)?
+            }
+            ProcSysFileKind::KernelShmmni => {
+                write_proc_sys_usize(src, 1, None, &PROC_SYS_KERNEL_SHMMNI)?
+            }
+            ProcSysFileKind::KernelTainted => {
+                write_proc_sys_usize(src, 0, None, &PROC_SYS_KERNEL_TAINTED)?
             }
             ProcSysFileKind::PipeMaxSize => write_proc_sys_pipe_max_size(src)?,
+            ProcSysFileKind::PipeUserPagesHard => {
+                write_proc_sys_usize(src, 0, None, &PROC_SYS_PIPE_USER_PAGES_HARD)?
+            }
+            ProcSysFileKind::PipeUserPagesSoft => {
+                write_proc_sys_usize(src, 0, None, &PROC_SYS_PIPE_USER_PAGES_SOFT)?
+            }
             ProcSysFileKind::VmMaxMapCount => {
                 write_proc_sys_usize(src, 1, None, &PROC_SYS_VM_MAX_MAP_COUNT)?
             }
@@ -1363,6 +1461,10 @@ pub(super) fn synthetic_proc_sys_content(path: &str) -> Option<(&'static str, &'
         Some(PROC_SYS_KERNEL_NGROUPS_MAX_PATH) => Some((
             PROC_SYS_KERNEL_NGROUPS_MAX_PATH,
             PROC_SYS_KERNEL_NGROUPS_MAX_CONTENT,
+        )),
+        Some(PROC_SYS_KERNEL_PID_MAX_PATH) => Some((
+            PROC_SYS_KERNEL_PID_MAX_PATH,
+            PROC_SYS_KERNEL_PID_MAX_CONTENT,
         )),
         _ => None,
     }

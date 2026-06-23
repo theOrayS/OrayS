@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, string::String, sync::Arc};
 use core::ops::Deref;
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use core::{alloc::Layout, cell::UnsafeCell, fmt, ptr::NonNull};
 
 #[cfg(feature = "preempt")]
@@ -9,7 +9,7 @@ use core::sync::atomic::AtomicUsize;
 use kspin::SpinNoIrq;
 #[cfg(feature = "uspace")]
 use memory_addr::PhysAddr;
-use memory_addr::{align_up_4k, VirtAddr};
+use memory_addr::{VirtAddr, align_up_4k};
 
 use axhal::context::TaskContext;
 #[cfg(feature = "tls")]
@@ -159,6 +159,16 @@ impl TaskInner {
         self.wait_for_exit
             .wait_until(|| self.state() == TaskState::Exited);
         Some(self.exit_code.load(Ordering::Acquire))
+    }
+
+    /// Returns the exit code if the task has already reached the exited state.
+    ///
+    /// This is a non-blocking variant for cleanup paths that already have a
+    /// separate userspace/process-level completion condition.  It must not be
+    /// used as a replacement for [`Self::join`] when the caller still needs to
+    /// wait for arbitrary task work to finish.
+    pub fn try_join(&self) -> Option<i32> {
+        (self.state() == TaskState::Exited).then(|| self.exit_code.load(Ordering::Acquire))
     }
 
     /// Returns the pointer to the user-defined task extended data.

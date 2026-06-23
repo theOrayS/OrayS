@@ -1,7 +1,7 @@
 use std::string::{String, ToString};
 use std::vec::Vec;
 
-use super::linux_abi::TESTSUITE_STAGE_ROOT;
+use super::linux_abi::{LEGACY_TESTSUITE_STAGE_ROOT, TESTSUITE_STAGE_ROOT};
 
 pub(super) fn current_cwd() -> String {
     std::env::current_dir().unwrap_or_else(|_| "/".into())
@@ -41,18 +41,28 @@ pub(super) fn derive_exec_root_from_path(path: &str) -> String {
     if path == "/glibc" || path.starts_with("/glibc/") {
         return "/glibc".into();
     }
-    if path.starts_with(TESTSUITE_STAGE_ROOT) {
-        let Some(rest) = path.strip_prefix(TESTSUITE_STAGE_ROOT) else {
-            return "/".into();
-        };
-        if rest == "/musl" || rest.starts_with("/musl/") {
-            return "/musl".into();
-        }
-        if rest == "/glibc" || rest.starts_with("/glibc/") {
-            return "/glibc".into();
-        }
+    if let Some(root) = staged_exec_root(path, TESTSUITE_STAGE_ROOT) {
+        return root.into();
+    }
+    if let Some(root) = staged_exec_root(path, LEGACY_TESTSUITE_STAGE_ROOT) {
+        return root.into();
     }
     "/".into()
+}
+
+fn staged_exec_root(path: &str, stage_root: &str) -> Option<&'static str> {
+    let rest = path.strip_prefix(stage_root)?;
+    match rest {
+        "/m" => Some("/musl"),
+        "/g" => Some("/glibc"),
+        _ if rest.starts_with("/m/") => Some("/musl"),
+        _ if rest.starts_with("/g/") => Some("/glibc"),
+        "/musl" => Some("/musl"),
+        "/glibc" => Some("/glibc"),
+        _ if rest.starts_with("/musl/") => Some("/musl"),
+        _ if rest.starts_with("/glibc/") => Some("/glibc"),
+        _ => None,
+    }
 }
 
 pub(super) fn resolve_runtime_support_file(exec_root: &str, path: &str) -> Result<String, String> {
@@ -146,8 +156,55 @@ pub(super) fn runtime_absolute_path_candidates(exec_root: &str, path: &str) -> V
                 &mut candidates,
                 join_runtime_root(root.as_str(), normalized.as_str()),
             );
+        } else if normalized == "/bin"
+            || normalized.starts_with("/bin/")
+            || normalized == "/usr/bin"
+            || normalized.starts_with("/usr/bin/")
+        {
+            push_runtime_candidate(
+                &mut candidates,
+                join_runtime_root(root.as_str(), normalized.as_str()),
+            );
+            let prefix = if normalized == "/bin" || normalized.starts_with("/bin/") {
+                "/bin"
+            } else {
+                "/usr/bin"
+            };
+            if normalized == prefix {
+                push_runtime_candidate(&mut candidates, Some(root.to_string()));
+            } else if let Some(suffix) = normalized.strip_prefix(prefix) {
+                push_runtime_candidate(&mut candidates, join_runtime_root(root.as_str(), suffix));
+                if is_runtime_shell_command(suffix.trim_start_matches('/')) {
+                    push_runtime_candidate(
+                        &mut candidates,
+                        join_runtime_root(root.as_str(), "/busybox"),
+                    );
+                }
+            }
         }
         push_musl_loader_aliases(&mut candidates, root.as_str(), normalized.as_str());
+    }
+    candidates
+}
+
+pub(super) fn staged_cwd_absolute_path_candidates(cwd: &str, path: &str) -> Vec<String> {
+    let Some(normalized) = normalize_path("/", path) else {
+        return Vec::new();
+    };
+    let Some(prefix) = runtime_command_prefix(normalized.as_str()) else {
+        return Vec::new();
+    };
+    let mut candidates = Vec::new();
+    for root in staged_cwd_roots(cwd) {
+        push_runtime_candidate(
+            &mut candidates,
+            join_runtime_root(root.as_str(), normalized.as_str()),
+        );
+        if normalized == prefix {
+            push_runtime_candidate(&mut candidates, Some(root));
+        } else if let Some(suffix) = normalized.strip_prefix(prefix) {
+            push_runtime_candidate(&mut candidates, join_runtime_root(root.as_str(), suffix));
+        }
     }
     candidates
 }
@@ -177,6 +234,48 @@ pub(super) fn runtime_library_name_candidates(exec_root: &str, name: &str) -> Ve
         push_musl_loader_aliases(&mut candidates, root.as_str(), name);
     }
     candidates
+}
+
+fn runtime_command_prefix(path: &str) -> Option<&'static str> {
+    if path == "/bin" || path.starts_with("/bin/") {
+        Some("/bin")
+    } else if path == "/usr/bin" || path.starts_with("/usr/bin/") {
+        Some("/usr/bin")
+    } else {
+        None
+    }
+}
+
+fn is_runtime_shell_command(name: &str) -> bool {
+    matches!(name, "sh" | "ash" | "bash")
+}
+
+fn staged_cwd_roots(cwd: &str) -> Vec<String> {
+    let mut roots = Vec::new();
+    push_staged_cwd_roots(&mut roots, cwd, TESTSUITE_STAGE_ROOT);
+    push_staged_cwd_roots(&mut roots, cwd, LEGACY_TESTSUITE_STAGE_ROOT);
+    roots
+}
+
+fn push_staged_cwd_roots(roots: &mut Vec<String>, cwd: &str, stage_root: &str) {
+    let Some(rest) = cwd.strip_prefix(stage_root) else {
+        return;
+    };
+    let rest = rest.trim_start_matches('/');
+    if rest.is_empty() {
+        return;
+    }
+
+    let mut parts = rest.split('/').filter(|part| !part.is_empty());
+    let Some(suite) = parts.next() else {
+        return;
+    };
+    let Some(group) = parts.next() else {
+        return;
+    };
+    let group_root = format!("{}/{}/{}", stage_root.trim_end_matches('/'), suite, group);
+    push_runtime_candidate(roots, Some(group_root));
+    push_runtime_candidate(roots, Some(cwd.to_string()));
 }
 
 fn runtime_root_candidates(exec_root: &str, path: &str) -> Vec<String> {

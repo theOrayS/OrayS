@@ -8,12 +8,12 @@ use axtask::AxTaskRef;
 use std::sync::Arc;
 
 #[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{Sstatus, FS};
+use riscv::register::sstatus::{FS, Sstatus};
 
+use super::UserProcess;
 use super::linux_abi::neg_errno;
 use super::task_registry::user_thread_entry_by_tid;
 use super::user_memory::write_user_value;
-use super::UserProcess;
 
 // Linux validates set_robust_list(2) against the userspace robust_list_head
 // layout. Both supported 64-bit userspace ABIs here use a header of three
@@ -59,6 +59,9 @@ pub(super) struct UserTaskExt {
     pub(super) last_user_pc: AtomicUsize,
     pub(super) pending_sigreturn: Mutex<Option<TrapFrame>>,
     pub(super) syscall_restart_frame: Mutex<Option<TrapFrame>>,
+    pub(super) syscall_runtime_micros: AtomicU64,
+    pub(super) last_reported_user_micros: AtomicU64,
+    pub(super) last_reported_system_micros: AtomicU64,
 }
 
 impl UserTaskExt {
@@ -102,6 +105,9 @@ impl UserTaskExt {
             last_user_pc: AtomicUsize::new(0),
             pending_sigreturn: Mutex::new(None),
             syscall_restart_frame: Mutex::new(None),
+            syscall_runtime_micros: AtomicU64::new(0),
+            last_reported_user_micros: AtomicU64::new(0),
+            last_reported_system_micros: AtomicU64::new(0),
         }
     }
 }

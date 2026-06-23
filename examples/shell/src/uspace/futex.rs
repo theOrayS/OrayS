@@ -11,12 +11,12 @@ use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::linux_abi::{neg_errno, USER_MMAP_BASE};
-use super::signal_abi::current_sigcancel_pending;
+use super::UserProcess;
+use super::linux_abi::{USER_MMAP_BASE, neg_errno};
+use super::signal_abi::current_unblocked_signal_pending;
 use super::task_context::{current_task_ext, current_tid, task_ext, user_pc};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::{fault_in_user_read, read_user_value};
-use super::UserProcess;
 
 pub(super) struct FutexState {
     pub(super) seq: AtomicU32,
@@ -257,7 +257,7 @@ fn wait_addr(
     let wait_cond = || {
         current_task_ext().is_some_and(|ext| ext.futex_wait.load(Ordering::Acquire) != uaddr)
             || read_user_value::<u32>(process, uaddr).map_or(true, |value| value != val as u32)
-            || current_sigcancel_pending()
+            || current_unblocked_signal_pending()
             || process.pending_exit_group().is_some()
             || process.eval_watchdog_expired()
     };
@@ -270,13 +270,16 @@ fn wait_addr(
         prune_empty_key(key);
         if timed_out {
             clear_current_futex_wait(process, uaddr);
-            if process.eval_watchdog_expired() || process.pending_exit_group().is_some() {
+            if current_unblocked_signal_pending()
+                || process.eval_watchdog_expired()
+                || process.pending_exit_group().is_some()
+            {
                 return neg_errno(LinuxError::EINTR);
             }
             return neg_errno(LinuxError::ETIMEDOUT);
         }
         clear_current_futex_wait(process, uaddr);
-        if current_sigcancel_pending() {
+        if current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
         return 0;
@@ -289,7 +292,7 @@ fn wait_addr(
     drop(state);
     prune_empty_key(key);
     clear_current_futex_wait(process, uaddr);
-    if current_sigcancel_pending()
+    if current_unblocked_signal_pending()
         || process.pending_exit_group().is_some()
         || process.eval_watchdog_expired()
     {

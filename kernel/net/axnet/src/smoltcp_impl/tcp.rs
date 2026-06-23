@@ -3,7 +3,7 @@ use core::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use core::time::Duration;
 
-use axerrno::{ax_err, ax_err_type, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err, ax_err_type};
 use axio::PollState;
 use axsync::Mutex;
 
@@ -14,8 +14,8 @@ use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
 use super::addr::UNSPECIFIED_ENDPOINT;
 use super::loopback::LoopbackTcpEndpoint;
 use super::{
-    normalize_socket_buffer_len, SocketSetWrapper, ETH0, LISTEN_TABLE, SOCKET_SET, TCP_RX_BUF_LEN,
-    TCP_TX_BUF_LEN,
+    ETH0, LISTEN_TABLE, SOCKET_SET, SocketSetWrapper, TCP_RX_BUF_LEN, TCP_TX_BUF_LEN,
+    normalize_socket_buffer_len,
 };
 
 // State transitions:
@@ -47,6 +47,8 @@ pub struct TcpSocket {
     peer_addr: UnsafeCell<IpEndpoint>,
     loopback: UnsafeCell<Option<LoopbackTcpEndpoint>>,
     nonblock: AtomicBool,
+    reuse_addr: AtomicBool,
+    nodelay: AtomicBool,
     recv_shutdown: AtomicBool,
     send_shutdown: AtomicBool,
     recv_timeout: Mutex<Option<Duration>>,
@@ -67,6 +69,8 @@ impl TcpSocket {
             peer_addr: UnsafeCell::new(UNSPECIFIED_ENDPOINT),
             loopback: UnsafeCell::new(None),
             nonblock: AtomicBool::new(false),
+            reuse_addr: AtomicBool::new(false),
+            nodelay: AtomicBool::new(false),
             recv_shutdown: AtomicBool::new(false),
             send_shutdown: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
@@ -91,6 +95,8 @@ impl TcpSocket {
             peer_addr: UnsafeCell::new(peer_addr),
             loopback: UnsafeCell::new(None),
             nonblock: AtomicBool::new(false),
+            reuse_addr: AtomicBool::new(false),
+            nodelay: AtomicBool::new(false),
             recv_shutdown: AtomicBool::new(false),
             send_shutdown: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
@@ -112,6 +118,8 @@ impl TcpSocket {
             peer_addr: UnsafeCell::new(endpoint.peer_addr()),
             loopback: UnsafeCell::new(Some(endpoint)),
             nonblock: AtomicBool::new(false),
+            reuse_addr: AtomicBool::new(false),
+            nodelay: AtomicBool::new(false),
             recv_shutdown: AtomicBool::new(false),
             send_shutdown: AtomicBool::new(false),
             recv_timeout: Mutex::new(None),
@@ -160,6 +168,24 @@ impl TcpSocket {
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) {
         self.nonblock.store(nonblocking, Ordering::Release);
+    }
+
+    /// Sets the POSIX `SO_REUSEADDR` state for this socket.
+    ///
+    /// The current listen table still rejects simultaneous live listeners on
+    /// the same TCP port (Linux requires `SO_REUSEPORT` for that common case),
+    /// but keeping the option in the kernel socket lets userspace observe the
+    /// real option state and avoids treating a supported scalar option as
+    /// protocol-unsupported.
+    #[inline]
+    pub fn set_reuse_addr(&self, enabled: bool) {
+        self.reuse_addr.store(enabled, Ordering::Release);
+    }
+
+    /// Returns the POSIX `SO_REUSEADDR` state for this socket.
+    #[inline]
+    pub fn reuse_addr(&self) -> bool {
+        self.reuse_addr.load(Ordering::Acquire)
     }
 
     /// Sets the timeout used by blocking receive operations.
@@ -256,6 +282,7 @@ impl TcpSocket {
             let iface = &ETH0.iface;
             let (local_endpoint, remote_endpoint) = SOCKET_SET
                 .with_socket_mut::<tcp::Socket, _, _>(handle, |socket| {
+                    socket.set_nagle_enabled(!self.nodelay());
                     socket
                         .connect(iface.lock().context(), remote_addr, bound_endpoint)
                         .or_else(|e| match e {
@@ -560,31 +587,33 @@ impl TcpSocket {
         }
     }
 
-    /// Checks if Nagle's algorithm is enabled for this TCP socket.
-    pub fn nodelay(&self) -> AxResult<bool> {
-        if self.loopback_endpoint().is_some() {
-            return Ok(true);
-        }
+    /// Returns the POSIX `TCP_NODELAY` state for this TCP socket.
+    pub fn nodelay(&self) -> bool {
+        let configured = self.nodelay.load(Ordering::Acquire);
         if let Some(h) = unsafe { self.handle.get().read() } {
-            Ok(SOCKET_SET.with_socket::<tcp::Socket, _, _>(h, |socket| socket.nagle_enabled()))
+            SOCKET_SET.with_socket::<tcp::Socket, _, _>(h, |socket| !socket.nagle_enabled())
         } else {
-            ax_err!(NotConnected, "socket is not connected")
+            configured
         }
     }
 
-    /// Enables or disables Nagle's algorithm for this TCP socket.
-    pub fn set_nodelay(&self, enabled: bool) -> AxResult<()> {
+    /// Enables or disables POSIX `TCP_NODELAY` for this TCP socket.
+    pub fn set_nodelay(&self, enabled: bool) {
+        self.nodelay.store(enabled, Ordering::Release);
         if self.loopback_endpoint().is_some() {
-            return Ok(());
+            return;
         }
         if let Some(h) = unsafe { self.handle.get().read() } {
             SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(h, |socket| {
-                socket.set_nagle_enabled(enabled);
+                socket.set_nagle_enabled(!enabled);
             });
-            Ok(())
-        } else {
-            ax_err!(NotConnected, "socket is not connected")
         }
+    }
+
+    /// Returns the IPv4 TCP maximum segment size implied by the network MTU.
+    #[inline]
+    pub fn max_segment_size(&self) -> usize {
+        super::tcp_ipv4_max_segment_size()
     }
 
     /// Returns the maximum capacity of the receive buffer in bytes.

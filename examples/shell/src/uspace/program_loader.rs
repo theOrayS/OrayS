@@ -8,24 +8,25 @@ use axsync::Mutex;
 use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::fs::File;
 use std::io::Read;
 use std::string::{String, ToString};
 use std::vec::Vec;
+use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
-use xmas_elf::ElfFile;
 
 use super::linux_abi::{
-    AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, USER_BRK_GROW_SIZE,
-    USER_MMAP_BASE, USER_PIE_LOAD_BASE, USER_STACK_SIZE, USER_STACK_TOP,
+    AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, TESTSUITE_STAGE_ROOT,
+    USER_BRK_GROW_SIZE, USER_MMAP_BASE, USER_PIE_LOAD_BASE, USER_STACK_SIZE, USER_STACK_TOP,
 };
 use super::memory_map::{align_down, align_up, user_mapping_flags};
 use super::runtime_paths::{
     derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
+    runtime_absolute_path_candidates, staged_cwd_absolute_path_candidates,
 };
-use super::{str_err, BrkState, UserProcess};
+use super::{BrkState, UserProcess, str_err};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,
@@ -78,7 +79,76 @@ fn default_exec_env(exec_root: &str, cwd: &str) -> Vec<String> {
         "PATH=/musl:/glibc"
     };
     let pwd = if cwd.is_empty() { "/" } else { cwd };
-    vec![path.into(), "HOME=/".into(), format!("PWD={pwd}")]
+    let mut env = vec![path.into(), "HOME=/".into(), format!("PWD={pwd}")];
+    if runtime_has_musl_loader(exec_root) {
+        if let Some(preload) = runtime_compat_preload_path(exec_root) {
+            env.push(format!("LD_PRELOAD={preload}"));
+        }
+    }
+    env
+}
+
+fn runtime_compat_preload_path(exec_root: &str) -> Option<String> {
+    let root = exec_root.trim_end_matches('/');
+    let candidates = if root == "/musl" {
+        vec![
+            format!("{root}/liboscompat.so"),
+            format!("{TESTSUITE_STAGE_ROOT}/m/liboscompat.so"),
+        ]
+    } else {
+        vec![format!("{root}/liboscompat.so")]
+    };
+    candidates
+        .into_iter()
+        .find(|path| matches!(File::open(path), Ok(_)))
+}
+
+fn runtime_file_contains_ascii(path: &str, needle: &[u8]) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+
+    let Ok(mut file) = File::open(path) else {
+        return false;
+    };
+    let mut buffer = [0u8; 512];
+    let mut tail = Vec::new();
+    loop {
+        let Ok(len) = file.read(&mut buffer) else {
+            return false;
+        };
+        if len == 0 {
+            return false;
+        }
+        let mut window = Vec::with_capacity(tail.len() + len);
+        window.extend_from_slice(&tail);
+        window.extend_from_slice(&buffer[..len]);
+        if window
+            .windows(needle.len())
+            .any(|candidate| candidate == needle)
+        {
+            return true;
+        }
+        let keep = needle.len().saturating_sub(1).min(window.len());
+        tail.clear();
+        tail.extend_from_slice(&window[window.len() - keep..]);
+    }
+}
+
+fn runtime_has_musl_loader(exec_root: &str) -> bool {
+    let lib_dir = format!("{}/lib", exec_root.trim_end_matches('/'));
+    let Ok(entries) = std::fs::read_dir(&lib_dir) else {
+        return false;
+    };
+    entries.filter_map(Result::ok).any(|entry| {
+        let name = entry.file_name();
+        let path = format!("{lib_dir}/{name}");
+        if !matches!(std::fs::metadata(&path), Ok(metadata) if metadata.is_file()) {
+            return false;
+        }
+        name.starts_with("ld-musl-")
+            || (name == "libc.so" && runtime_file_contains_ascii(&path, b"musl"))
+    })
 }
 
 fn main_exec_image_buffer() -> &'static Mutex<Vec<u8>> {
@@ -324,6 +394,35 @@ fn effective_exec_root(path_root: &str, interpreter: Option<&str>) -> String {
     }
 }
 
+fn resolve_program_exec_path(
+    process: Option<&UserProcess>,
+    cwd: &str,
+    program_path: &str,
+) -> Result<String, String> {
+    let path = resolve_host_path(cwd.to_string(), program_path)?;
+    if matches!(File::open(&path), Ok(_)) {
+        return Ok(path);
+    }
+    if !program_path.starts_with('/') {
+        return Ok(path);
+    }
+    let Some(process) = process else {
+        return Ok(path);
+    };
+    for candidate in staged_cwd_absolute_path_candidates(cwd, path.as_str()) {
+        if candidate != path && matches!(File::open(&candidate), Ok(_)) {
+            return Ok(candidate);
+        }
+    }
+    let exec_root = process.exec_root();
+    for candidate in runtime_absolute_path_candidates(exec_root.as_str(), path.as_str()) {
+        if candidate != path && matches!(File::open(&candidate), Ok(_)) {
+            return Ok(candidate);
+        }
+    }
+    Ok(path)
+}
+
 fn prepare_program(
     process: Option<&UserProcess>,
     cwd: &str,
@@ -339,10 +438,12 @@ fn prepare_program(
         return Err("script interpreter recursion limit exceeded".into());
     }
 
-    let path = resolve_host_path(cwd.to_string(), program_path)?;
+    let path = resolve_program_exec_path(process, cwd, program_path)?;
     read_exec_image_into(process, path.as_str(), "program", image)?;
 
-    if let Some(next_argv) = parse_shebang_argv(path.as_str(), image.as_slice(), argv)? {
+    if let Some(next_argv) =
+        parse_shebang_argv(process, cwd, path.as_str(), image.as_slice(), argv)?
+    {
         let next_refs = next_argv.iter().map(String::as_str).collect::<Vec<_>>();
         let next_program = next_refs.first().copied().unwrap_or(program_path);
         return prepare_program(process, cwd, next_program, &next_refs, depth + 1, image);
@@ -356,6 +457,8 @@ fn prepare_program(
 }
 
 fn parse_shebang_argv(
+    process: Option<&UserProcess>,
+    cwd: &str,
     script_path: &str,
     image: &[u8],
     argv: &[&str],
@@ -378,7 +481,7 @@ fn parse_shebang_argv(
 
     let mut parts = line.split_whitespace();
     let raw_interpreter = parts.next().unwrap();
-    let mut next_argv = resolve_script_interpreter(script_path, raw_interpreter)?;
+    let mut next_argv = resolve_script_interpreter(process, cwd, script_path, raw_interpreter)?;
     next_argv.extend(parts.map(str::to_string));
     next_argv.push(script_path.to_string());
     next_argv.extend(argv.iter().skip(1).map(|arg| (*arg).to_string()));
@@ -386,6 +489,8 @@ fn parse_shebang_argv(
 }
 
 fn resolve_script_interpreter(
+    process: Option<&UserProcess>,
+    cwd: &str,
     script_path: &str,
     raw_interpreter: &str,
 ) -> Result<Vec<String>, String> {
@@ -393,6 +498,19 @@ fn resolve_script_interpreter(
     let resolved = resolve_host_path(base, raw_interpreter)?;
     if matches!(std::fs::metadata(&resolved), Ok(meta) if meta.is_file()) {
         return Ok(vec![resolved]);
+    }
+    let resolved = resolve_program_exec_path(process, cwd, raw_interpreter)?;
+    if matches!(std::fs::metadata(&resolved), Ok(meta) if meta.is_file()) {
+        let mut argv = vec![resolved.clone()];
+        let raw_name = raw_interpreter
+            .rsplit('/')
+            .next()
+            .unwrap_or(raw_interpreter);
+        let resolved_name = resolved.rsplit('/').next().unwrap_or(resolved.as_str());
+        if resolved_name == "busybox" && matches!(raw_name, "sh" | "ash" | "bash") {
+            argv.push(String::from("sh"));
+        }
+        return Ok(argv);
     }
 
     Err(format!("script interpreter not found: {raw_interpreter}"))

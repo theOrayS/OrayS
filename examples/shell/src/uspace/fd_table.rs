@@ -10,7 +10,6 @@ use axerrno::LinuxError;
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
 use axsync::{Mutex as AxMutex, MutexGuard as AxMutexGuard};
-use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
 use std::boxed::Box;
@@ -21,66 +20,66 @@ use std::vec::Vec;
 
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
+use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
-    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, FILE_MODE_SET_GID, FILE_MODE_STICKY,
-    MAX_IN_MEMORY_FILE_SIZE, NR_OPEN_LIMIT, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
-    RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK,
-    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
-    ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE,
+    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE,
+    FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, NR_OPEN_LIMIT, O_NOFOLLOW_FLAG,
+    O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE,
+    SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
+    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE, fd_cloexec_flag,
+    neg_errno, posix_ret_i32,
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
-    dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
-    generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
-    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
+    DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG, apply_recorded_path_metadata,
+    canonical_permission_path, dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path,
+    fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
+    stdio_stat, synthetic_block_stat_for_path, synthetic_char_stat_for_path,
 };
 use super::posix_mq::{
-    proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
-    ProcMqQueuesMaxEntry,
+    PosixMqDescriptor, ProcMqQueuesMaxEntry, proc_sys_fs_mqueue_fd_entry,
+    proc_sys_fs_mqueue_path_entry,
 };
 use super::runtime_paths::{
     normalize_path, push_runtime_candidate, runtime_absolute_path_candidates,
     runtime_library_name_candidates,
 };
 use super::select_fdset::{
-    yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until, SelectMode,
+    SelectMode, yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until,
 };
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
 };
 use super::synthetic_fs::{
-    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
-    proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry, proc_meminfo_path_entry,
-    proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
-    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
-    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
-    proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
-    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
-    proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
-    proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
-    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
-    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
-    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
-    synthetic_proc_version_content, synthetic_proc_version_fd_entry,
+    ProcSysFileEntry, dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path,
+    proc_comm_fd_entry, proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry,
+    proc_meminfo_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry,
+    proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
+    proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
+    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry,
+    proc_sys_file_path_entry, proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
+    proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
+    proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
+    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
+    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
+    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
+    synthetic_proc_sys_path_entry, synthetic_proc_version_content, synthetic_proc_version_fd_entry,
     synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry, ProcSysFileEntry,
+    synthetic_userdb_path_entry,
 };
 use super::system_info::write_default_winsize;
 use super::task_context::current_task_ext;
 use super::task_registry::{
-    user_thread_entry_by_process_pid, user_thread_entry_for_process, UserThreadEntry,
+    UserThreadEntry, user_thread_entry_by_process_pid, user_thread_entry_for_process,
 };
 use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
 use super::user_memory::{
-    fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, with_readable_user_buffer,
-    with_writable_user_buffer, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes,
+    read_user_value, user_io_buffer, validate_user_read, validate_user_write,
+    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
 };
 use super::{PathTimes, UserProcess};
 
@@ -513,8 +512,6 @@ impl EpollRegistration {
         }
     }
 }
-
-static EPOLL_IMMEDIATE_IRQ_GUARD: SpinNoIrq<()> = SpinNoIrq::new(());
 
 pub(super) fn sys_openat(
     process: &UserProcess,
@@ -1311,13 +1308,11 @@ fn sys_epoll_wait_with_timeout(
         return neg_errno(LinuxError::EFAULT);
     }
     if matches!(timeout, EpollWaitTimeout::Immediate) && sigmask == 0 {
-        let _guard = EPOLL_IMMEDIATE_IRQ_GUARD.lock();
-        if let Some(table) = process.fds.try_lock_for_pid(process.pid()) {
-            match table.epoll_try_fast_no_ready(epfd as i32) {
-                Ok(Some(true)) => return 0,
-                Ok(Some(false) | None) => {}
-                Err(err) => return neg_errno(err),
-            }
+        let table = process.fds.lock_for_pid(process.pid());
+        match table.epoll_fast_no_ready(epfd as i32) {
+            Ok(Some(true)) => return 0,
+            Ok(Some(false) | None) => {}
+            Err(err) => return neg_errno(err),
         }
     }
     let _signal_mask_guard = match install_temporary_signal_mask(process, sigmask, sigsetsize) {
@@ -4568,14 +4563,12 @@ impl FdTable {
         Ok(registrations.len())
     }
 
-    pub(super) fn epoll_try_fast_no_ready(&self, epfd: i32) -> Result<Option<bool>, LinuxError> {
+    pub(super) fn epoll_fast_no_ready(&self, epfd: i32) -> Result<Option<bool>, LinuxError> {
         let registrations = match self.entry(epfd)? {
             FdEntry::Epoll(epoll) => epoll.registrations.clone(),
             _ => return Err(LinuxError::EINVAL),
         };
-        let Some(registrations) = registrations.try_lock() else {
-            return Ok(None);
-        };
+        let registrations = registrations.lock();
         for (&fd, registration) in registrations.iter() {
             if registration.disabled {
                 continue;
@@ -9657,7 +9650,11 @@ fn is_synthetic_block_device_path(path: &str) -> bool {
 }
 
 fn is_synthetic_virtio_block_name(name: &str) -> bool {
-    SYNTHETIC_BLOCK_DEVICE_NAMES.contains(&name)
+    let bytes = name.as_bytes();
+    if bytes.len() < 3 || bytes[0] != b'v' || bytes[1] != b'd' || !bytes[2].is_ascii_lowercase() {
+        return false;
+    }
+    bytes[3..].iter().all(|byte| byte.is_ascii_digit())
 }
 
 fn synthetic_block_device_names_in_dir(path: &str) -> &'static [&'static str] {
