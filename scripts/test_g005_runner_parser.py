@@ -42,6 +42,19 @@ class G005RunnerParserGuardTest(unittest.TestCase):
             text=True,
         )
 
+    def replace_once(self, text: str, old: str, new: str) -> str:
+        self.assertIn(old, text)
+        return text.replace(old, new, 1)
+
+    def replace_nth(self, text: str, old: str, new: str, occurrence: int) -> str:
+        self.assertGreaterEqual(occurrence, 1)
+        start = 0
+        for _ in range(occurrence):
+            pos = text.find(old, start)
+            self.assertNotEqual(pos, -1)
+            start = pos + len(old)
+        return text[:pos] + new + text[pos + len(old) :]
+
     def test_current_tree_passes(self) -> None:
         result = self.run_guard(ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -51,10 +64,10 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
-        text = text.replace(
-            "if needs_case_resource_helper {",
-            "if case == \"chdir01\" {",
-            1,
+        text = self.replace_once(
+            text,
+            "let needs_case_resource_helper = ltp_case_has_resource_helper(&target_dir, case);",
+            'let needs_case_resource_helper = if case == "chdir01" { true } else { ltp_case_has_resource_helper(&target_dir, case) };',
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -65,10 +78,10 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
-        text = text.replace(
-            "Ok(0) => {\n                println!(\"testcase busybox {line} success\");",
-            "Ok(status) if status == 0 || line == \"false\" => {\n                println!(\"testcase busybox {line} success\");",
-            1,
+        text = self.replace_once(
+            text,
+            "Ok(status) if expected_status.is_met_by(status) => {",
+            'Ok(status) if expected_status.is_met_by(status) || line == "false" => {',
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -210,24 +223,23 @@ class G005RunnerParserGuardTest(unittest.TestCase):
     def test_detects_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
-        text = path.read_text(encoding="utf-8").replace(
-            "        if let Err(err) = prepare_suite_runtime_busybox_wrappers(suite_dir) {\n",
-            "        if let Err(err) = ensure_busybox_path_wrappers(suite_dir, shell) {\n",
-            1,
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "prepare_suite_runtime_busybox_wrappers(suite_dir)",
+            "missing_suite_runtime_busybox_wrappers(suite_dir)",
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("real busybox wrapper files", result.stdout)
+        self.assertIn("busybox wrapper preparation", result.stdout)
 
     def test_detects_runner_layer_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
-        text = path.read_text(encoding="utf-8").replace(
-            "    prepare_suite_runtime_busybox_wrappers(suite_dir)\n"
-            '        .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;\n',
-            "",
-            1,
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "prepare_suite_runtime_busybox_wrappers(suite_dir)",
+            "missing_suite_runtime_busybox_wrappers(suite_dir)",
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -237,11 +249,11 @@ class G005RunnerParserGuardTest(unittest.TestCase):
     def test_detects_ltp_runner_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
         path = tree / "examples/shell/src/cmd.rs"
-        text = path.read_text(encoding="utf-8").replace(
-            "        prepare_suite_runtime_busybox_wrappers(suite_dir)\n"
-            '            .map_err(|err| format!("prepare runtime busybox wrappers failed: {err}"))?;\n',
-            "",
-            1,
+        text = self.replace_nth(
+            path.read_text(encoding="utf-8"),
+            "prepare_suite_runtime_busybox_wrappers(suite_dir)",
+            "missing_suite_runtime_busybox_wrappers(suite_dir)",
+            2,
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)

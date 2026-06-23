@@ -1444,6 +1444,24 @@ fn selected_official_test_groups() -> Result<Option<Vec<String>>, String> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn skipped_official_test_groups() -> Result<BTreeSet<String>, String> {
+    let raw = ["/skip_test_groups.txt", "/tmp/skip_test_groups.txt"]
+        .iter()
+        .find_map(|path| fs::read_to_string(path).ok())
+        .or_else(|| option_env!("OSCOMP_SKIP_TEST_GROUPS").map(str::to_string))
+        .unwrap_or_default();
+    let raw = raw.trim();
+    if raw.is_empty() || raw.eq_ignore_ascii_case("none") {
+        return Ok(BTreeSet::new());
+    }
+
+    match split_ltp_case_list(raw) {
+        Ok(groups) => Ok(groups.into_iter().collect()),
+        Err(err) => Err(format!("invalid official test group skip filter: {err}")),
+    }
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn normalize_rel_path(path: &str) -> Option<String> {
     let trimmed = path.trim_matches(|c: char| matches!(c, '"' | '\'' | '`'));
     let rel = trimmed.strip_prefix("./").unwrap_or(trimmed);
@@ -2742,6 +2760,16 @@ pub fn maybe_run_official_tests() {
             std::process::exit(1);
         }
     };
+    let skipped_groups = match skipped_official_test_groups() {
+        Ok(groups) => groups,
+        Err(err) => {
+            println!("#### OS COMP TEST GROUP START official-selection ####");
+            println!("FAIL OFFICIAL TEST GROUP FILTER : -1");
+            println!("{err}");
+            println!("#### OS COMP TEST GROUP END official-selection ####");
+            std::process::exit(1);
+        }
+    };
     let mut scripts = Vec::new();
     for suite_dir in SUITE_DIRS {
         let Ok(entries) = fs::read_dir(suite_dir) else {
@@ -2801,6 +2829,45 @@ pub fn maybe_run_official_tests() {
         }
     }
 
+    if !skipped_groups.is_empty() {
+        let available_groups: BTreeSet<String> = scripts
+            .iter()
+            .map(|(_, script_name)| {
+                let script = path_to_str(script_name);
+                script
+                    .strip_suffix(SCRIPT_SUFFIX)
+                    .unwrap_or(script)
+                    .to_string()
+            })
+            .collect();
+        let available_labels: BTreeSet<String> = scripts
+            .iter()
+            .map(|(suite_dir, script_name)| {
+                let script = path_to_str(script_name);
+                suite_label(
+                    suite_dir,
+                    script.strip_suffix(SCRIPT_SUFFIX).unwrap_or(script),
+                )
+            })
+            .collect();
+        let missing_groups: Vec<&String> = skipped_groups
+            .iter()
+            .filter(|group| {
+                !available_groups.contains(group.as_str())
+                    && !available_labels.contains(group.as_str())
+            })
+            .collect();
+        if !missing_groups.is_empty() {
+            println!("#### OS COMP TEST GROUP START official-selection ####");
+            println!("FAIL OFFICIAL TEST GROUP FILTER : -1");
+            println!("unknown skipped official test groups: {missing_groups:?}");
+            println!("available official test groups: {available_groups:?}");
+            println!("available official test labels: {available_labels:?}");
+            println!("#### OS COMP TEST GROUP END official-selection ####");
+            std::process::exit(1);
+        }
+    }
+
     scripts.sort_by_key(|(suite_dir, script_name)| {
         (
             suite_group_priority(script_name),
@@ -2833,10 +2900,15 @@ pub fn maybe_run_official_tests() {
     for (suite_dir, script_name) in scripts {
         let script = path_to_str(&script_name);
         let group = script.strip_suffix(SCRIPT_SUFFIX).unwrap_or(script);
+        let label = suite_label(&suite_dir, group);
         if let Some(groups) = selected_groups.as_ref() {
             if !groups.iter().any(|selected| selected == group) {
                 continue;
             }
+        }
+        if skipped_groups.contains(group) || skipped_groups.contains(label.as_str()) {
+            println!("[CONTEST][OFFICIAL][SKIP] {label}: configured skip");
+            continue;
         }
         if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {
             println!("autorun: skip disabled test group {suite_dir}/{script}");
@@ -2923,7 +2995,6 @@ pub fn maybe_run_official_tests() {
             "{shell_path} chmod 755 {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
         );
         let (timeout_secs, nominal_timeout_secs) = bounded_official_group_timeout_secs(group);
-        let label = suite_label(&suite_dir, group);
         if timeout_secs != nominal_timeout_secs {
             println!(
                 "autorun: {label} timeout bounded to {timeout_secs}s (nominal {nominal_timeout_secs}s)"
