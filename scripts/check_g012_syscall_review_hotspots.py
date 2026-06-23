@@ -470,8 +470,14 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     require_tokens(
         findings,
         validate_personality,
-        "unsupported personalities must fail with EINVAL instead of being recorded as fake success",
-        ("PER_LINUX => Ok(PER_LINUX)", "_ => Err(LinuxError::EINVAL)"),
+        "personality validation must accept only named Linux domains/flags and reject unknown bits",
+        (
+            "PERSONALITY_PER_MASK",
+            "PERSONALITY_MAX_KNOWN_DOMAIN",
+            "PERSONALITY_KNOWN_FLAGS",
+            "Err(LinuxError::EINVAL)",
+            "Ok(persona)",
+        ),
     )
 
     wait4 = rust_function_block(lifecycle, "sys_wait4")

@@ -394,10 +394,11 @@ def scan_scheduler_backend_effect(root: Path) -> list[str]:
         "let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));",
         "UserThreadEntry",
         "UserProcessRef::Owned(entry)",
-        "let _ = axtask::set_task_priority(&entry.task, nice as isize);",
+        "scheduler_backend_priority(&entry.process, entry.process.get_sched_state())",
         "apply_task_scheduler_state(&entry.task, &entry.process, state)",
         "general::SCHED_FIFO | general::SCHED_RR",
-        "general::SCHED_IDLE => 19",
+        "general::SCHED_IDLE => BACKEND_IDLE_PRIORITY",
+        "non-negative SCHED_OTHER tasks share the",
     ):
         if token not in text:
             findings.append(f"sched_set* must affect current axtask scheduler priority, not only readback state; missing {token}")
@@ -439,12 +440,34 @@ def scan_scheduler_backend_effect(root: Path) -> list[str]:
             "fn pop_highest_priority",
             "cursor.remove_current()",
             "task.set_priority(prio)",
-            "(-20..=19).contains(&prio)",
+            "valid_backend_priority(prio)",
         ):
             if token not in scheduler_text:
                 findings.append(f"{rel}: FIFO/RR scheduler backend must consume accepted priority changes; missing {token}")
         if "fn set_priority(&mut self, _task" in scheduler_text and "\n        false\n" in scheduler_text:
             findings.append(f"{rel}: set_priority must not be a false-only stub")
+    for token in (
+        "skipped_rounds: AtomicUsize",
+        "fn scheduling_class(&self) -> isize",
+        "fn effective_priority(&self) -> isize",
+        "fn scheduling_key(&self) -> (isize, isize)",
+        "NORMAL_SCHEDULING_CLASS",
+        "REALTIME_BACKEND_PRIORITY_MAX",
+        "fn note_skipped_round(&self)",
+        "fn reset_skipped_rounds(&self)",
+        "selected.reset_skipped_rounds();",
+        "task.note_skipped_round();",
+    ):
+        if token not in rr:
+            findings.append(f"vendor/cargo/axsched/src/round_robin.rs: RR backend must age skipped lower-priority tasks to avoid starvation; missing {token}")
+    for token in (
+        "BACKEND_RT_BASE_PRIORITY",
+        "BACKEND_IDLE_PRIORITY",
+        "BACKEND_DEADLINE_BASE_PRIORITY",
+        "BACKEND_RT_BASE_PRIORITY - linux_rt_prio as isize",
+    ):
+        if token not in text:
+            findings.append(f"scheduler backend must preserve RT/deadline/idle class ordering; missing {token}")
     return findings
 
 
@@ -454,6 +477,52 @@ def scan_ltp_specific_comments(root: Path) -> list[str]:
     for token in ("open10", "creat08", "creat09", "LTP's"):
         if token in text:
             findings.append(f"fd_table.rs still contains LTP/case-specific commentary token {token!r}")
+    return findings
+
+
+def scan_user_task_exit_cleanup(root: Path) -> list[str]:
+    findings: list[str] = []
+    task = read(root / "kernel/task/axtask/src/task.rs")
+    lifecycle = read(root / "examples/shell/src/uspace/process_lifecycle.rs")
+    uspace_mod = read(root / "examples/shell/src/uspace/mod.rs")
+    memory_map = read(root / "examples/shell/src/uspace/memory_map.rs")
+
+    for token in (
+        "pub fn try_join(&self) -> Option<i32>",
+        "self.state() == TaskState::Exited",
+    ):
+        if token not in task:
+            findings.append(f"axtask must expose non-blocking exited-task cleanup state; missing {token}")
+    for token in (
+        "const USER_TASK_EXIT_JOIN_GRACE",
+        "fn join_user_task_for_cleanup(task: &AxTaskRef) -> bool",
+        "task.try_join().is_some()",
+        "axhal::time::monotonic_time() < deadline",
+        "axtask::reap_exited_tasks();",
+        "axtask::yield_now();",
+    ):
+        if token not in lifecycle:
+            findings.append(f"auto-run timeout wrapper must not use unbounded task.join after process exit; missing {token}")
+    timeout_runner = rust_function_block(lifecycle, "run_user_program_in_with_timeout")
+    some_branch = timeout_runner.split("Some(code)", 1)[1].split("None =>", 1)[0] if "Some(code)" in timeout_runner else ""
+    if "let _ = task.join();" in some_branch:
+        findings.append("timeout-bound runner still uses unbounded task.join after process exit")
+
+    for token in (
+        "impl Drop for UserExecSharedMmapCache",
+        "fn disarm_retained_frames(&mut self)",
+        "core::mem::take(&mut self.pages)",
+        "axmm::release_shared_frame_ref(frame)",
+    ):
+        if token not in uspace_mod:
+            findings.append(f"exec shared mmap cache must be RAII-owned to avoid retained-frame leaks; missing {token}")
+    for token in (
+        "if let Some(mut cache)",
+        "cache.disarm_retained_frames();",
+        "aspace.map_retained_shared_frames",
+    ):
+        if token not in memory_map:
+            findings.append(f"exec shared mmap cache transfer must disarm only after successful shared mapping install; missing {token}")
     return findings
 
 
@@ -471,6 +540,7 @@ def main() -> int:
     findings.extend(scan_axlibc_locale_pwd_env(root))
     findings.extend(scan_scheduler_backend_effect(root))
     findings.extend(scan_ltp_specific_comments(root))
+    findings.extend(scan_user_task_exit_cleanup(root))
     if findings:
         print("G010 real-kernel-semantics static check: FAIL")
         for finding in findings:

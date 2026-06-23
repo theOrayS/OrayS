@@ -8,7 +8,7 @@ use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
 use axsync::Mutex;
 
-use super::fd_ops::{add_file_like, close_file_like, FileLike};
+use super::fd_ops::{FileLike, add_file_like, close_file_like};
 use crate::ctypes;
 
 #[derive(Copy, Clone, PartialEq)]

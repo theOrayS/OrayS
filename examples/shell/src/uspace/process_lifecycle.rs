@@ -12,9 +12,9 @@ use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
-use memory_addr::{PageIter4K, VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use std::collections::BTreeMap;
-use std::string::String;
+use std::string::{String, ToString};
 use std::sync::Arc;
 #[cfg(feature = "auto-run-tests")]
 use std::sync::Weak;
@@ -27,39 +27,43 @@ use super::fd_table::{
 };
 use super::futex;
 use super::linux_abi::{
-    neg_errno, ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE,
-    USER_ASPACE_SIZE,
+    ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE, USER_ASPACE_SIZE,
+    neg_errno,
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
-use super::program_loader::{load_program_image, LoadedMapping};
+use super::program_loader::{LoadedMapping, load_program_image};
 use super::resource_sched::{
     apply_process_scheduler_state_to_task, child_sched_state_from_parent, default_sched_state,
 };
-use super::runtime_paths::{current_cwd, normalize_path};
+use super::runtime_paths::{
+    current_cwd, normalize_path, runtime_absolute_path_candidates,
+    staged_cwd_absolute_path_candidates,
+};
 use super::signal_abi::{
     all_application_signal_mask, current_unblocked_signal_pending, deliver_user_signal,
     ensure_user_return_hook_registered, thread_waits_for_signal,
 };
 use super::sysv_shm;
 use super::task_context::{
-    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
-    UserTaskExt,
+    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
+    user_pc,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    live_user_thread_count, prune_exited_user_tasks, register_user_task,
+    UserThreadEntry, live_user_thread_count, prune_exited_user_tasks, register_user_task,
     unregister_user_task_with_runtime, user_thread_entries_by_process_pid,
-    user_thread_entry_by_process_pid, UserThreadEntry,
+    user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
-    read_cstr, read_execve_argv, read_execve_envp, read_user_value, write_user_bytes,
-    write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_value,
+    write_user_bytes, write_user_value,
 };
-use super::{ChildTask, ProcessFdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
+use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE, ProcessFdTable, UserProcess};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
+const USER_TASK_EXIT_JOIN_GRACE: Duration = Duration::from_secs(2);
 // User tasks execute all Linux syscall emulation and the underlying ArceOS
 // networking/filesystem paths on their kernel stack.  glibc network workloads
 // such as netperf's TCP_RR/CRR path nest socket, scheduler, and userspace-copy
@@ -364,17 +368,37 @@ pub fn run_user_program_in_timeout(
 pub fn cleanup_user_processes() {
     for _ in 0..16 {
         let mut seen = Vec::new();
-        let entries = live_user_thread_entries();
-        if entries.is_empty() {
-            break;
-        }
-        for entry in entries {
+        let mut processes = Vec::new();
+        for entry in live_user_thread_entries() {
             let pid = entry.process.pid();
             if seen.contains(&pid) {
                 continue;
             }
             seen.push(pid);
-            entry.process.request_eval_exit_tree(137);
+            processes.push(entry.process);
+        }
+        if processes.is_empty() {
+            break;
+        }
+        for process in &processes {
+            process.request_eval_exit_tree(137);
+        }
+        yield_for_task_gc();
+
+        // Some benchmark/helper programs intentionally daemonize or block in a
+        // socket syscall after their launcher exits.  The auto-runner cleanup is
+        // an evaluator boundary, not Linux exit_group(2) behavior: once the
+        // whole launched process tree has been asked to terminate, release live
+        // descriptor resources that would otherwise keep listeners, pipes, or
+        // files visible to the next independent group.  Do not clear the address
+        // space here; the task may still be unwinding from a blocking syscall and
+        // will run the full teardown when it observes the pending exit request.
+        for process in &processes {
+            if process.live_threads.load(Ordering::Acquire) != 0
+                && process.pending_exit_group().is_some()
+            {
+                process.close_eval_file_descriptors();
+            }
         }
         yield_for_task_gc();
         if live_user_thread_count() == 0 {
@@ -430,13 +454,9 @@ fn run_user_program_in_with_timeout(
                 if expired {
                     process.request_eval_exit_tree(137);
                 }
-                let _ = task.join();
+                join_user_task_for_cleanup(&task);
                 process.teardown();
-                if expired {
-                    137
-                } else {
-                    code
-                }
+                if expired { 137 } else { code }
             }
             None => {
                 process.request_eval_exit_tree(137);
@@ -453,6 +473,26 @@ fn run_user_program_in_with_timeout(
     drop(task);
     yield_for_task_gc();
     Ok(exit_code)
+}
+
+fn join_user_task_for_cleanup(task: &AxTaskRef) -> bool {
+    if task.try_join().is_some() {
+        return true;
+    }
+
+    let deadline = axhal::time::monotonic_time() + USER_TASK_EXIT_JOIN_GRACE;
+    while axhal::time::monotonic_time() < deadline {
+        axtask::reap_exited_tasks();
+        prune_exited_user_tasks();
+        if task.try_join().is_some() {
+            return true;
+        }
+        axtask::yield_now();
+    }
+
+    axtask::reap_exited_tasks();
+    prune_exited_user_tasks();
+    task.try_join().is_some()
 }
 
 fn yield_for_task_gc() {
@@ -564,6 +604,8 @@ fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
         prof_timer_deadline_us: AtomicU64::new(0),
         prof_timer_interval_us: AtomicU64::new(0),
         syscall_runtime_micros: AtomicU64::new(0),
+        last_reported_user_micros: AtomicU64::new(0),
+        last_reported_system_micros: AtomicU64::new(0),
         completed_thread_runtime_ticks: AtomicU64::new(0),
         last_reported_user_ticks: AtomicU64::new(0),
         last_reported_system_ticks: AtomicU64::new(0),
@@ -827,6 +869,12 @@ impl UserProcess {
             Arc::strong_count(&self.fds) == 1,
             &self.children,
         );
+    }
+
+    #[cfg(feature = "auto-run-tests")]
+    fn close_eval_file_descriptors(&self) {
+        self.fds
+            .close_all_for_pid(self.pid(), Arc::strong_count(&self.fds) == 1);
     }
 
     pub(super) fn release_exec_shared_mmap_cache(&self) {
@@ -1721,6 +1769,8 @@ impl UserProcess {
             prof_timer_deadline_us: AtomicU64::new(0),
             prof_timer_interval_us: AtomicU64::new(0),
             syscall_runtime_micros: AtomicU64::new(0),
+            last_reported_user_micros: AtomicU64::new(0),
+            last_reported_system_micros: AtomicU64::new(0),
             completed_thread_runtime_ticks: AtomicU64::new(0),
             last_reported_user_ticks: AtomicU64::new(0),
             last_reported_system_ticks: AtomicU64::new(0),
@@ -2171,21 +2221,13 @@ fn check_exec_parent_components(
     Ok(())
 }
 
-fn validate_execve_target(process: &UserProcess, cwd: &str, path: &str) -> Result<(), LinuxError> {
-    if path.is_empty() {
-        return Err(LinuxError::ENOENT);
-    }
+fn validate_execve_candidate(process: &UserProcess, path: &str) -> Result<(), LinuxError> {
     if exec_path_exceeds_linux_limits(path) {
         return Err(LinuxError::ENAMETOOLONG);
     }
-
-    let normalized = normalize_path(cwd, path).ok_or(LinuxError::EINVAL)?;
-    if exec_path_exceeds_linux_limits(normalized.as_str()) {
-        return Err(LinuxError::ENAMETOOLONG);
-    }
     let resolved = process
-        .resolve_path_symlink(normalized.as_str())?
-        .unwrap_or(normalized);
+        .resolve_path_symlink(path)?
+        .unwrap_or_else(|| path.to_string());
     let physical = process
         .path_hardlink_backing(resolved.as_str())
         .unwrap_or_else(|| resolved.clone());
@@ -2201,6 +2243,45 @@ fn validate_execve_target(process: &UserProcess, cwd: &str, path: &str) -> Resul
         return Err(LinuxError::ETXTBSY);
     }
     Ok(())
+}
+
+fn validate_execve_target(process: &UserProcess, cwd: &str, path: &str) -> Result<(), LinuxError> {
+    if path.is_empty() {
+        return Err(LinuxError::ENOENT);
+    }
+    if exec_path_exceeds_linux_limits(path) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+
+    let normalized = normalize_path(cwd, path).ok_or(LinuxError::EINVAL)?;
+    if exec_path_exceeds_linux_limits(normalized.as_str()) {
+        return Err(LinuxError::ENAMETOOLONG);
+    }
+    let mut candidates = vec![normalized.clone()];
+    if path.starts_with('/') {
+        for candidate in staged_cwd_absolute_path_candidates(cwd, normalized.as_str()) {
+            if !candidates.iter().any(|item| item == &candidate) {
+                candidates.push(candidate);
+            }
+        }
+        for candidate in
+            runtime_absolute_path_candidates(process.exec_root().as_str(), normalized.as_str())
+        {
+            if !candidates.iter().any(|item| item == &candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
+    let mut missing_error = LinuxError::ENOENT;
+    for candidate in candidates {
+        match validate_execve_candidate(process, candidate.as_str()) {
+            Ok(()) => return Ok(()),
+            Err(LinuxError::ENOENT) => missing_error = LinuxError::ENOENT,
+            Err(LinuxError::ENOTDIR) => missing_error = LinuxError::ENOTDIR,
+            Err(err) => return Err(err),
+        }
+    }
+    Err(missing_error)
 }
 
 pub(super) fn sys_execve(
@@ -2507,6 +2588,11 @@ pub(super) fn sys_clone(
     let spawned = axtask::spawn_task(task);
     apply_process_scheduler_state_to_task(process.as_ref(), &spawned);
     register_user_task(spawned, process.clone());
+    // Match the fork path's fairness point for pthread/CLONE_THREAD storms.
+    // Linux may run a newly-created sibling before the creator continues; on a
+    // single-vCPU RR system this prevents one thread creator from monopolizing
+    // CPU while hundreds of runnable peers are being made ready.
+    axtask::yield_now();
     tid as isize
 }
 

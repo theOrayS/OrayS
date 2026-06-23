@@ -8,21 +8,22 @@ use axhal::context::TrapFrame;
 use axhal::mem::virt_to_phys;
 use axsync::Mutex;
 use lazyinit::LazyInit;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::collections::BTreeMap;
 use std::string::String;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::linux_abi::{
-    neg_errno, SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_INFO, SYSV_IPC_PRIVATE, SYSV_IPC_RMID,
-    SYSV_IPC_SET, SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK,
-    SYSV_SHM_LOCKED, SYSV_SHM_MAX_SEGMENTS, SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, SYSV_SHM_REMAP,
-    SYSV_SHM_RND, SYSV_SHM_STAT, SYSV_SHM_STAT_ANY, SYSV_SHM_UNLOCK, USER_MMAP_BASE,
-    USER_STACK_SIZE, USER_STACK_TOP,
+    SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_INFO, SYSV_IPC_PRIVATE, SYSV_IPC_RMID, SYSV_IPC_SET,
+    SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK, SYSV_SHM_LOCKED,
+    SYSV_SHM_MAX_SEGMENTS, SYSV_SHM_MAX_SIZE, SYSV_SHM_RDONLY, SYSV_SHM_REMAP, SYSV_SHM_RND,
+    SYSV_SHM_STAT, SYSV_SHM_STAT_ANY, SYSV_SHM_UNLOCK, USER_MMAP_BASE, USER_STACK_SIZE,
+    USER_STACK_TOP, neg_errno,
 };
 use super::memory_map::{align_down, align_up_checked, sys_munmap, user_mapping_flags};
+use super::synthetic_fs;
 use super::user_memory::{read_user_value, write_user_value};
-use super::UserProcess;
 
 #[derive(Clone)]
 struct SysvShmSegment {
@@ -121,37 +122,16 @@ fn current_time_secs() -> isize {
     axhal::time::wall_time().as_secs().min(isize::MAX as u64) as isize
 }
 
-fn parse_leading_usize(raw: &str) -> Option<usize> {
-    let mut value = 0usize;
-    let mut seen_digit = false;
-    for byte in raw.bytes() {
-        if !seen_digit && byte.is_ascii_whitespace() {
-            continue;
-        }
-        if byte.is_ascii_digit() {
-            seen_digit = true;
-            value = value.checked_mul(10)?.checked_add((byte - b'0') as usize)?;
-        } else {
-            break;
-        }
-    }
-    seen_digit.then_some(value)
-}
-
-fn read_proc_sys_usize(path: &str, default: usize) -> usize {
-    axfs::api::read_to_string(path)
-        .ok()
-        .and_then(|raw| parse_leading_usize(&raw))
-        .filter(|value| *value > 0)
-        .unwrap_or(default)
-}
-
 fn configured_shm_max_size() -> usize {
-    read_proc_sys_usize("/proc/sys/kernel/shmmax", SYSV_SHM_MAX_SIZE).min(SYSV_SHM_MAX_SIZE)
+    synthetic_fs::proc_sys_kernel_shmmax().min(SYSV_SHM_MAX_SIZE)
+}
+
+fn configured_shm_max_segments() -> usize {
+    synthetic_fs::proc_sys_kernel_shmmni().min(SYSV_SHM_MAX_SEGMENTS)
 }
 
 fn configured_shm_total_pages() -> usize {
-    read_proc_sys_usize("/proc/sys/kernel/shmall", SYSV_SHM_MAX_SIZE / PAGE_SIZE_4K)
+    synthetic_fs::proc_sys_kernel_shmall()
 }
 
 fn shm_low_boundary() -> usize {
@@ -223,7 +203,7 @@ fn get_or_create(
     if flags & SYSV_SHM_HUGETLB != 0 {
         return Err(LinuxError::EINVAL);
     }
-    if table.len() >= SYSV_SHM_MAX_SEGMENTS {
+    if table.len() >= configured_shm_max_segments() {
         return Err(LinuxError::ENOSPC);
     }
     if size == 0 || size > configured_shm_max_size() {
@@ -612,8 +592,8 @@ pub(super) fn sys_shmctl(process: &UserProcess, shmid: usize, cmd: usize, buf: u
             let info = UserShminfo64 {
                 shmmax: configured_shm_max_size(),
                 shmmin: 1,
-                shmmni: SYSV_SHM_MAX_SEGMENTS,
-                shmseg: SYSV_SHM_MAX_SEGMENTS,
+                shmmni: configured_shm_max_segments(),
+                shmseg: configured_shm_max_segments(),
                 shmall: configured_shm_total_pages(),
                 ..UserShminfo64::default()
             };

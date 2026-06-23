@@ -58,7 +58,20 @@ pub struct AllocationBucketStats {
 }
 
 const ALLOCATION_BUCKET_LIMITS: [usize; 14] = [
-    8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 65536, usize::MAX,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096,
+    8192,
+    16384,
+    65536,
+    usize::MAX,
 ];
 
 static ALLOCATION_BUCKET_COUNTS: [AtomicUsize; 14] = [

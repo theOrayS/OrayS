@@ -3,11 +3,11 @@
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use axerrno::{ax_err, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err};
 use axfs_vfs::{
     VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeRef, VfsNodeType, VfsOps, VfsResult,
 };
-use axns::{def_resource, ResArc};
+use axns::{ResArc, def_resource};
 use axsync::Mutex;
 use core::array;
 use lazyinit::LazyInit;
@@ -366,6 +366,20 @@ pub(crate) fn init_rootfs(mut disk: crate::dev::Disk) {
     root_dir
         .mount("/dev", mounts::devfs())
         .expect("failed to mount devfs at /dev");
+
+    #[cfg(feature = "ramfs")]
+    if root_dir.main_fs.root_dir().lookup("bin").is_err() {
+        root_dir
+            .mount("/bin", mounts::ramfs())
+            .expect("failed to mount ramfs at /bin");
+    }
+
+    #[cfg(feature = "ramfs")]
+    if root_dir.main_fs.root_dir().lookup("usr").is_err() {
+        root_dir
+            .mount("/usr", mounts::ramfs())
+            .expect("failed to mount ramfs at /usr");
+    }
 
     #[cfg(feature = "ramfs")]
     root_dir

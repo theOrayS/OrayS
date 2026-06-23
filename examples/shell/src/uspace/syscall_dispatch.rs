@@ -1,8 +1,10 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{SYSCALL, register_trap_handler};
+use core::sync::atomic::Ordering;
 use linux_raw_sys::general;
 
+use super::UserProcess;
 use super::credentials::{
     sys_capget, sys_capset, sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid,
     sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid,
@@ -78,23 +80,53 @@ use super::sysv_msg::{sys_msgctl, sys_msgget, sys_msgrcv, sys_msgsnd};
 use super::sysv_sem::{sys_semctl, sys_semget, sys_semop, sys_semtimedop};
 use super::sysv_shm::{sys_shmat, sys_shmctl, sys_shmdt, sys_shmget};
 use super::task_context::{
-    current_task_ext, current_tid, set_current_user_pc, sys_get_robust_list, sys_set_robust_list,
-    sys_set_tid_address, user_pc,
+    current_task_ext, current_tid, sys_get_robust_list, sys_set_robust_list, sys_set_tid_address,
+    user_pc,
 };
 use super::time_abi::{
-    monotonic_time_ticks, record_syscall_runtime_since_ticks, sys_adjtimex, sys_clock_adjtime,
-    sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_getitimer,
-    sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_timer_create, sys_timer_delete,
-    sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime, sys_times,
+    record_syscall_runtime_since_ticks, sys_adjtimex, sys_clock_adjtime, sys_clock_getres,
+    sys_clock_gettime, sys_clock_nanosleep, sys_clock_settime, sys_getitimer, sys_gettimeofday,
+    sys_nanosleep, sys_setitimer, sys_timer_create, sys_timer_delete, sys_timer_getoverrun,
+    sys_timer_gettime, sys_timer_settime, sys_times,
 };
-use super::user_memory::sys_getrandom;
+use super::user_memory::{read_user_value, sys_getrandom};
 
 #[cfg(target_arch = "loongarch64")]
 const LOONGARCH_LEGACY_GETRLIMIT: u32 = 163;
 #[cfg(target_arch = "loongarch64")]
 const LOONGARCH_LEGACY_SETRLIMIT: u32 = 164;
 
-fn should_record_syscall_runtime(syscall_num: u32, tf: &TrapFrame) -> bool {
+fn epoll_pwait2_timeout_is_zero(process: &UserProcess, timeout_ptr: usize) -> bool {
+    if timeout_ptr == 0 {
+        // epoll_pwait2(NULL) means an infinite wait, not an immediate probe.
+        return false;
+    }
+    match read_user_value::<general::timespec>(process, timeout_ptr) {
+        Ok(timeout) => timeout.tv_sec == 0 && timeout.tv_nsec == 0,
+        Err(_) => false,
+    }
+}
+
+fn is_immediate_epoll_wait(process: &UserProcess, syscall_num: u32, tf: &TrapFrame) -> bool {
+    match syscall_num {
+        general::__NR_epoll_pwait => tf.arg3() == 0,
+        general::__NR_epoll_pwait2 => epoll_pwait2_timeout_is_zero(process, tf.arg3()),
+        _ => false,
+    }
+}
+
+fn syscall_is_pure_measurement(syscall_num: u32) -> bool {
+    matches!(
+        syscall_num,
+        general::__NR_clock_gettime | general::__NR_gettimeofday | general::__NR_getrusage
+    )
+}
+
+fn should_update_current_user_pc(syscall_num: u32, immediate_epoll_wait: bool) -> bool {
+    !(syscall_is_pure_measurement(syscall_num) || immediate_epoll_wait)
+}
+
+fn should_record_syscall_runtime(syscall_num: u32, immediate_epoll_wait: bool) -> bool {
     match syscall_num {
         // This userspace kernel derives synthetic system CPU time from syscall
         // wall-time deltas.  Do not charge pure measurement syscalls for the
@@ -102,11 +134,37 @@ fn should_record_syscall_runtime(syscall_num: u32, tf: &TrapFrame) -> bool {
         // would otherwise measure the accounting machinery more than the
         // operation under test.  Keep times(2) charged: it is the ABI that
         // reports the accumulated CPU/system-time counters.
-        general::__NR_clock_gettime | general::__NR_gettimeofday | general::__NR_getrusage => false,
-        // Linux epoll_wait(timeout=0) is a non-blocking readiness probe. Keep
-        // accounting for blocking/positive-timeout waits, but do not add two
-        // extra timer reads to the immediate path.
-        general::__NR_epoll_pwait => tf.arg3() != 0,
+        _ if syscall_is_pure_measurement(syscall_num) => false,
+        // Linux epoll waits with a zero timeout are non-blocking readiness
+        // probes.  Keep accounting for blocking/positive-timeout waits and
+        // invalid timeout pointers, but do not add timer-read overhead to the
+        // immediate path.  glibc may implement epoll_wait() through
+        // epoll_pwait2() with a zero timespec, so handle both syscall ABIs.
+        general::__NR_epoll_pwait | general::__NR_epoll_pwait2 => !immediate_epoll_wait,
+        _ => true,
+    }
+}
+
+fn should_note_syscall_restart_candidate(
+    syscall_num: u32,
+    immediate_epoll_wait: bool,
+    ret: isize,
+) -> bool {
+    match syscall_num {
+        // Pure measurement syscalls are non-blocking and are never restarted
+        // after a signal. Avoid taking the restart-frame lock on hot timing
+        // paths; LTP uses clock_gettime() to measure timeout=0 syscalls, so the
+        // timing syscall overhead must stay small without changing semantics.
+        _ if syscall_is_pure_measurement(syscall_num) => false,
+        // Immediate epoll probes cannot become restartable blocking syscalls,
+        // so successful probes do not need the restart-frame lock.  Errors,
+        // EINTR, and blocking/positive-timeout waits still use normal restart
+        // bookkeeping.
+        general::__NR_epoll_pwait | general::__NR_epoll_pwait2
+            if immediate_epoll_wait && ret >= 0 =>
+        {
+            false
+        }
         _ => true,
     }
 }
@@ -117,12 +175,44 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         return neg_errno(LinuxError::ENOSYS);
     };
     let process_ref = ext.process.as_ref();
-    set_current_user_pc(user_pc(tf));
-    match syscall_num as u32 {
+    let syscall_num = syscall_num as u32;
+    let immediate_epoll_wait = is_immediate_epoll_wait(process_ref, syscall_num, tf);
+    if immediate_epoll_wait {
+        match syscall_num {
+            general::__NR_epoll_pwait => {
+                return sys_epoll_pwait(
+                    process_ref,
+                    tf.arg0(),
+                    tf.arg1(),
+                    tf.arg2(),
+                    tf.arg3() as isize,
+                    tf.arg4(),
+                    tf.arg5(),
+                );
+            }
+            general::__NR_epoll_pwait2 => {
+                return sys_epoll_pwait2(
+                    process_ref,
+                    tf.arg0(),
+                    tf.arg1(),
+                    tf.arg2(),
+                    tf.arg3(),
+                    tf.arg4(),
+                    tf.arg5(),
+                );
+            }
+            _ => {}
+        }
+    }
+    let hot_nonblocking_probe = syscall_is_pure_measurement(syscall_num) || immediate_epoll_wait;
+    if should_update_current_user_pc(syscall_num, immediate_epoll_wait) {
+        ext.last_user_pc.store(user_pc(tf), Ordering::Release);
+    }
+    match syscall_num {
         general::__NR_exit => sys_exit(process_ref, tf, tf.arg0() as i32),
         general::__NR_exit_group => sys_exit_group(process_ref, tf, tf.arg0() as i32),
         _ => {
-            if process_ref.eval_watchdog_expired() {
+            if !hot_nonblocking_probe && process_ref.eval_watchdog_expired() {
                 process_ref.request_eval_exit_tree(137);
             }
             if let Some(code) = process_ref.pending_exit_group() {
@@ -139,10 +229,9 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
         }
     };
     let process = process_ref;
-    let syscall_num = syscall_num as u32;
-    let record_runtime = should_record_syscall_runtime(syscall_num, tf);
+    let record_runtime = should_record_syscall_runtime(syscall_num, immediate_epoll_wait);
     let syscall_start_ticks = if record_runtime {
-        monotonic_time_ticks()
+        axtask::current().cpu_runtime_ticks()
     } else {
         0
     };
@@ -731,6 +820,8 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
     if record_runtime {
         record_syscall_runtime_since_ticks(process, syscall_start_ticks);
     }
-    note_syscall_restart_candidate(tf, syscall_num, ret);
+    if should_note_syscall_restart_candidate(syscall_num, immediate_epoll_wait, ret) {
+        note_syscall_restart_candidate(tf, syscall_num, ret);
+    }
     ret
 }

@@ -3,11 +3,7 @@ use arceos_posix_api as api;
 use core::ffi::{c_int, c_void};
 
 fn pthread_ret(ret: c_int) -> c_int {
-    if ret < 0 {
-        -ret
-    } else {
-        ret
-    }
+    if ret < 0 { -ret } else { ret }
 }
 
 /// Returns the `pthread` struct of current thread.

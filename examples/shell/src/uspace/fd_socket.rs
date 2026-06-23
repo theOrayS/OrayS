@@ -15,22 +15,24 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use super::fd_pipe::PipeEndpoint;
-use super::fd_table::{resolve_dirfd_path, FdEntry};
+use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    fd_cloexec_flag, neg_errno_code, posix_errno_from_ret, AF_UNIX_DOMAIN,
-    INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT,
+    AF_UNIX_DOMAIN, INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IP_MCAST_JOIN_GROUP_OPT,
+    IP_MCAST_LEAVE_GROUP_OPT, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT,
     LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE,
-    SOL_SOCKET_LEVEL, SO_ACCEPTCONN_OPT, SO_DOMAIN_OPT, SO_ERROR_OPT, SO_PEERCRED_OPT,
-    SO_PROTOCOL_OPT, SO_RCVBUF_OPT, SO_RCVTIMEO_OPT, SO_SNDBUF_OPT, SO_SNDTIMEO_OPT, SO_TYPE_OPT,
-    ST_MODE_SOCKET, TCP_INFO_COMPAT_SIZE,
+    SO_ACCEPTCONN_OPT, SO_DOMAIN_OPT, SO_ERROR_OPT, SO_PEERCRED_OPT, SO_PROTOCOL_OPT,
+    SO_RCVBUF_OPT, SO_RCVBUFFORCE_OPT, SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_SNDBUF_OPT,
+    SO_SNDBUFFORCE_OPT, SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, ST_MODE_SOCKET,
+    TCP_INFO_COMPAT_SIZE, TCP_MAXSEG_OPT, TCP_NODELAY_OPT, fd_cloexec_flag, neg_errno_code,
+    posix_errno_from_ret,
 };
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer, validate_user_read,
-    validate_user_write, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
+    validate_user_read, validate_user_write, write_user_bytes, write_user_value,
 };
-use super::{neg_errno, posix_ret_i32, posix_ret_usize, SelectMode, UserProcess};
+use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
 
 macro_rules! socket_entry_or_return {
     ($process:expr, $fd:expr) => {
@@ -46,6 +48,7 @@ pub(super) struct SocketEntry {
     pub(super) posix_fd: i32,
     pub(super) socktype: i32,
     read_shutdown: Arc<Mutex<bool>>,
+    multicast_groups: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 pub(super) struct LocalSocketEntry {
@@ -143,6 +146,7 @@ impl SocketEntry {
             posix_fd,
             socktype,
             read_shutdown: Arc::new(Mutex::new(false)),
+            multicast_groups: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -152,7 +156,24 @@ impl SocketEntry {
             posix_fd,
             socktype: self.socktype,
             read_shutdown: self.read_shutdown.clone(),
+            multicast_groups: self.multicast_groups.clone(),
         })
+    }
+
+    fn join_multicast_group(&self, group: Vec<u8>) {
+        let mut groups = self.multicast_groups.lock();
+        if !groups.iter().any(|entry| entry == &group) {
+            groups.push(group);
+        }
+    }
+
+    fn leave_multicast_group(&self, group: &[u8]) -> Result<(), LinuxError> {
+        let mut groups = self.multicast_groups.lock();
+        let Some(index) = groups.iter().position(|entry| entry.as_slice() == group) else {
+            return Err(LinuxError::EADDRNOTAVAIL);
+        };
+        groups.remove(index);
+        Ok(())
     }
 
     pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
@@ -834,6 +855,10 @@ fn socket_readonly_scalar(socket: &SocketEntry, level: i32, optname: i32) -> Opt
     }
 }
 
+fn read_socket_bool_option(process: &UserProcess, optval: usize) -> Result<bool, LinuxError> {
+    read_user_value::<i32>(process, optval).map(|value| value != 0)
+}
+
 pub(super) fn socket_entry(process: &UserProcess, fd: usize) -> Result<SocketEntry, LinuxError> {
     let table = process.fds.lock();
     match table.entry(fd as i32)? {
@@ -1103,7 +1128,8 @@ pub(super) fn recv_socket_data_to_user_with_addr(
     }
     let len = len.min(MAX_USER_IO_CHUNK);
     let mut local_addr: posix_ctypes::sockaddr = unsafe { core::mem::zeroed() };
-    let mut local_len = 0 as posix_ctypes::socklen_t;
+    let mut local_len = core::cmp::min(user_addr_len, size_of::<posix_ctypes::sockaddr>())
+        as posix_ctypes::socklen_t;
     let ret = recv_socket_data_to_user_inner(process, posix_fd, buf, len, |dst| unsafe {
         arceos_posix_api::sys_recvfrom(posix_fd, dst, len, flags, &mut local_addr, &mut local_len)
     });
@@ -1765,8 +1791,8 @@ fn accept_with_real_timer_interrupt(
     }
 }
 
-fn socket_block_interrupt_poll_required(process: &UserProcess) -> bool {
-    process.real_timer_armed() || process.eval_watchdog_remaining().is_some()
+fn socket_block_interrupt_poll_required(_process: &UserProcess) -> bool {
+    true
 }
 
 fn socket_block_interrupt_pending(process: &UserProcess) -> bool {
@@ -1913,7 +1939,7 @@ pub(super) fn sys_sendto_bridge(
     };
     let len = bytes.len();
     let data_ptr = bytes.as_ptr() as *const c_void;
-    let ret = if addr == 0 {
+    let ret = if addr == 0 || socket.socktype as u32 == posix_ctypes::SOCK_STREAM {
         unsafe { arceos_posix_api::sys_send(socket.posix_fd, data_ptr, len, flags as i32) }
     } else {
         let addr_bytes = match read_socket_addr_from_user(process, addr, addrlen) {
@@ -2032,6 +2058,9 @@ pub(super) fn sys_recvfrom_bridge(
         };
         if addr_len_value > SOCKET_ADDR_STORAGE_MAX {
             return neg_errno(LinuxError::EINVAL);
+        }
+        if socket.socktype as u32 == posix_ctypes::SOCK_STREAM {
+            return recv_socket_data_to_user(process, socket.posix_fd, buf, len, flags as i32);
         }
         if socket.socktype as u32 != posix_ctypes::SOCK_STREAM {
             if let Err(err) = validate_user_write(process, addr, addr_len_value) {
@@ -2277,6 +2306,25 @@ pub(super) fn sys_setsockopt_bridge(
                 Err(err) => neg_errno(err),
             }
         }
+    } else if level_i32 == SOL_SOCKET_LEVEL
+        && (optname_i32 == SO_SNDBUFFORCE_OPT || optname_i32 == SO_RCVBUFFORCE_OPT)
+    {
+        if process.uid() != 0 {
+            return neg_errno(LinuxError::EPERM);
+        }
+        let size = match read_user_value::<u32>(process, optval) {
+            Ok(size) => size,
+            Err(err) => return neg_errno(err),
+        };
+        let result = if optname_i32 == SO_SNDBUFFORCE_OPT {
+            arceos_posix_api::force_socket_send_buffer_size(socket.posix_fd, size)
+        } else {
+            arceos_posix_api::force_socket_recv_buffer_size(socket.posix_fd, size)
+        };
+        match result {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        }
     } else if level_i32 == SOL_SOCKET_LEVEL && matches!(optname_i32, SO_SNDBUF_OPT | SO_RCVBUF_OPT)
     {
         let size = match read_user_value::<i32>(process, optval) {
@@ -2291,6 +2339,43 @@ pub(super) fn sys_setsockopt_bridge(
         match result {
             Ok(()) => 0,
             Err(err) => neg_errno(err),
+        }
+    } else if level_i32 == SOL_SOCKET_LEVEL && optname_i32 == SO_REUSEADDR_OPT {
+        let enabled = match read_socket_bool_option(process, optval) {
+            Ok(enabled) => enabled,
+            Err(err) => return neg_errno(err),
+        };
+        match arceos_posix_api::set_socket_reuse_addr(socket.posix_fd, enabled) {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        }
+    } else if level_i32 == posix_ctypes::IPPROTO_TCP as i32 && optname_i32 == TCP_NODELAY_OPT {
+        let enabled = match read_socket_bool_option(process, optval) {
+            Ok(enabled) => enabled,
+            Err(err) => return neg_errno(err),
+        };
+        match arceos_posix_api::set_socket_tcp_nodelay(socket.posix_fd, enabled) {
+            Ok(()) => 0,
+            Err(err) => neg_errno(err),
+        }
+    } else if level_i32 == IPPROTO_IP_LEVEL
+        && matches!(
+            optname_i32,
+            IP_MCAST_JOIN_GROUP_OPT | IP_MCAST_LEAVE_GROUP_OPT
+        )
+    {
+        let group = match read_user_bytes(process, optval, optlen) {
+            Ok(group) => group,
+            Err(err) => return neg_errno(err),
+        };
+        if optname_i32 == IP_MCAST_JOIN_GROUP_OPT {
+            socket.join_multicast_group(group);
+            0
+        } else {
+            match socket.leave_multicast_group(group.as_slice()) {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            }
         }
     } else {
         neg_errno_code(setsockopt_unsupported_errno_code(level_i32))
@@ -2363,6 +2448,51 @@ pub(super) fn sys_getsockopt_bridge(
         let value = match value {
             Ok(value) => value,
             Err(err) => return neg_errno(err),
+        };
+        let ret = write_user_value(process, optval, &value);
+        if ret != 0 {
+            return ret;
+        }
+        let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
+        return write_user_value(process, optlen, &out_len);
+    }
+    if level == SOL_SOCKET_LEVEL && optname == SO_REUSEADDR_OPT {
+        if len < size_of::<i32>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
+            return neg_errno(err);
+        }
+        let value = match arceos_posix_api::socket_reuse_addr(socket.posix_fd) {
+            Ok(enabled) => i32::from(enabled),
+            Err(err) => return neg_errno(err),
+        };
+        let ret = write_user_value(process, optval, &value);
+        if ret != 0 {
+            return ret;
+        }
+        let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
+        return write_user_value(process, optlen, &out_len);
+    }
+    if level == posix_ctypes::IPPROTO_TCP as i32
+        && matches!(optname, TCP_NODELAY_OPT | TCP_MAXSEG_OPT)
+    {
+        if len < size_of::<i32>() {
+            return neg_errno(LinuxError::EINVAL);
+        }
+        if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
+            return neg_errno(err);
+        }
+        let value = if optname == TCP_NODELAY_OPT {
+            match arceos_posix_api::socket_tcp_nodelay(socket.posix_fd) {
+                Ok(enabled) => i32::from(enabled),
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            match arceos_posix_api::socket_tcp_max_segment_size(socket.posix_fd) {
+                Ok(value) => value,
+                Err(err) => return neg_errno(err),
+            }
         };
         let ret = write_user_value(process, optval, &value);
         if ret != 0 {

@@ -1,7 +1,7 @@
 use alloc::{collections::VecDeque, sync::Arc};
 use core::cmp::min;
 
-use axerrno::{ax_err, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err};
 use axio::PollState;
 use axsync::Mutex;
 use smoltcp::wire::IpEndpoint;

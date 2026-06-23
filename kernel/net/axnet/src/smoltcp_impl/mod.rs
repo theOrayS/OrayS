@@ -14,7 +14,7 @@ use core::ops::DerefMut;
 
 use axdriver::prelude::*;
 use axdriver_net::{DevError, NetBufPtr};
-use axhal::time::{wall_time_nanos, NANOS_PER_MICROS};
+use axhal::time::{NANOS_PER_MICROS, wall_time_nanos};
 use axsync::Mutex;
 use lazyinit::LazyInit;
 use smoltcp::iface::{Config, Interface, SocketHandle, SocketSet};
@@ -57,6 +57,12 @@ const LISTEN_QUEUE_SIZE: usize = 512;
 
 pub(crate) fn normalize_socket_buffer_len(size: usize, capacity: usize) -> usize {
     core::cmp::min(core::cmp::max(size, MIN_SOCKET_BUFFER_LEN), capacity)
+}
+
+pub(crate) fn tcp_ipv4_max_segment_size() -> usize {
+    const IPV4_HEADER_LEN: usize = 20;
+    const TCP_HEADER_LEN: usize = 20;
+    STANDARD_MTU - IPV4_HEADER_LEN - TCP_HEADER_LEN
 }
 
 fn udp_packet_metadata_len(buffer_len: usize) -> usize {

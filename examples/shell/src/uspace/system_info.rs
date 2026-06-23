@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 use core::{cmp, mem::size_of};
 use std::string::String;
 use std::vec::Vec;
@@ -7,12 +7,16 @@ use axalloc::global_allocator;
 use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
+use super::linux_abi::PERSONALITY_UNAME26;
+use super::task_context::current_task_ext;
 use super::task_registry::live_user_thread_count;
-use super::time_abi::{process_times, USER_HZ};
+use super::time_abi::{
+    USER_HZ, current_thread_runtime_micros, process_runtime_micros, process_times,
+};
 use super::user_memory::{
     read_user_bytes, validate_user_write, write_user_bytes, write_user_value,
 };
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 #[derive(Clone, Copy)]
 pub(super) enum SyslogAction {
@@ -185,6 +189,43 @@ fn timeval_from_ticks(ticks: isize) -> general::__kernel_old_timeval {
     }
 }
 
+fn timeval_from_micros(micros: u64) -> general::__kernel_old_timeval {
+    general::__kernel_old_timeval {
+        tv_sec: (micros / 1_000_000).min(i64::MAX as u64) as _,
+        tv_usec: (micros % 1_000_000) as _,
+    }
+}
+
+fn monotonic_reported_micros(slot: &AtomicU64, micros: u64) -> u64 {
+    let mut current = slot.load(Ordering::Acquire);
+    while micros > current {
+        match slot.compare_exchange_weak(current, micros, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => return micros,
+            Err(observed) => current = observed,
+        }
+    }
+    current
+}
+
+fn runtime_timevals_from_micros(
+    total_micros: u64,
+    raw_system_micros: u64,
+    user_slot: &AtomicU64,
+    system_slot: &AtomicU64,
+) -> (general::__kernel_old_timeval, general::__kernel_old_timeval) {
+    // Scheduler runtime is the authoritative CPU-time total.  Syscall elapsed
+    // time is only used to split that total into user/system buckets and is
+    // capped so blocking wall-clock wait inside syscalls is not reported as CPU
+    // time.  getrusage(2) reports timeval granularity, so avoid reusing the
+    // USER_HZ-rounded times(2) ABI path here.
+    let system_micros = raw_system_micros.min(total_micros);
+    let user_micros = total_micros.saturating_sub(system_micros);
+    (
+        timeval_from_micros(monotonic_reported_micros(user_slot, user_micros)),
+        timeval_from_micros(monotonic_reported_micros(system_slot, system_micros)),
+    )
+}
+
 fn rusage_target_valid(who: i32) -> bool {
     who == general::RUSAGE_SELF as i32
         || who == general::RUSAGE_THREAD as i32
@@ -203,9 +244,39 @@ fn process_rusage(process: &UserProcess, who: i32) -> Result<general::rusage, Li
             value.ru_stime = timeval_from_ticks(times.tms_cstime as isize);
             value.ru_maxrss = process.child_maxrss_kb() as _;
         }
+        who if who == general::RUSAGE_THREAD as i32 => {
+            if let Some(ext) = current_task_ext() {
+                let total_micros = current_thread_runtime_micros()
+                    .unwrap_or_else(|| process_runtime_micros(process));
+                let (utime, stime) = runtime_timevals_from_micros(
+                    total_micros,
+                    ext.syscall_runtime_micros.load(Ordering::Acquire),
+                    &ext.last_reported_user_micros,
+                    &ext.last_reported_system_micros,
+                );
+                value.ru_utime = utime;
+                value.ru_stime = stime;
+            } else {
+                let (utime, stime) = runtime_timevals_from_micros(
+                    process_runtime_micros(process),
+                    process.syscall_runtime_micros.load(Ordering::Acquire),
+                    &process.last_reported_user_micros,
+                    &process.last_reported_system_micros,
+                );
+                value.ru_utime = utime;
+                value.ru_stime = stime;
+            }
+            value.ru_maxrss = process.self_maxrss_kb() as _;
+        }
         _ => {
-            value.ru_utime = timeval_from_ticks(times.tms_utime as isize);
-            value.ru_stime = timeval_from_ticks(times.tms_stime as isize);
+            let (utime, stime) = runtime_timevals_from_micros(
+                process_runtime_micros(process),
+                process.syscall_runtime_micros.load(Ordering::Acquire),
+                &process.last_reported_user_micros,
+                &process.last_reported_system_micros,
+            );
+            value.ru_utime = utime;
+            value.ru_stime = stime;
             value.ru_maxrss = process.self_maxrss_kb() as _;
         }
     }
@@ -257,6 +328,9 @@ fn default_utsname() -> system::new_utsname {
 
 pub(super) fn write_default_utsname(process: &UserProcess, buf: usize) -> isize {
     let mut value = default_utsname();
+    if process.personality() & PERSONALITY_UNAME26 != 0 {
+        write_c_string(&mut value.release, b"2.6.40");
+    }
     let hostname = process.hostname();
     write_c_string(&mut value.nodename, hostname.as_bytes());
     let domainname = process.domainname();

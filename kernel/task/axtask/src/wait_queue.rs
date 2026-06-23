@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use kernel_guard::{NoOp, NoPreemptIrqSave};
 use kspin::{SpinNoIrq, SpinNoIrqGuard};
 
-use crate::{current_run_queue, select_run_queue, AxTaskRef, CurrentTask};
+use crate::{AxTaskRef, CurrentTask, current_run_queue, select_run_queue};
 
 /// A queue to store sleeping tasks.
 ///
@@ -285,46 +285,47 @@ impl WaitQueue {
             return (0, 0);
         }
 
-        let mut operate = |source: &mut VecDeque<AxTaskRef>,
-                           mut destination: Option<&mut VecDeque<AxTaskRef>>| {
-            let mut notified = Vec::new();
-            let mut index = 0;
-            while index < source.len() && notified.len() < wake_count {
-                let Some(task) = source.get(index).cloned() else {
-                    break;
-                };
-                if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
-                    let _ = source.remove(index);
-                    continue;
-                }
-                if !predicate(&task) {
-                    index += 1;
-                    continue;
-                }
-                let Some(task) = source.remove(index) else {
-                    break;
-                };
-                on_wake(&task);
-                unblock_one_task(task.clone(), resched);
-                notified.push(task);
-            }
-
-            let mut requeued = Vec::new();
-            if let Some(destination) = destination.as_deref_mut() {
-                while !source.is_empty() && requeued.len() < requeue_count {
-                    let Some(task) = source.pop_front() else {
+        let mut operate =
+            |source: &mut VecDeque<AxTaskRef>,
+             mut destination: Option<&mut VecDeque<AxTaskRef>>| {
+                let mut notified = Vec::new();
+                let mut index = 0;
+                while index < source.len() && notified.len() < wake_count {
+                    let Some(task) = source.get(index).cloned() else {
                         break;
                     };
-                    if requeued.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                    if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                        let _ = source.remove(index);
                         continue;
                     }
-                    on_requeue(&task);
-                    destination.push_back(task.clone());
-                    requeued.push(task);
+                    if !predicate(&task) {
+                        index += 1;
+                        continue;
+                    }
+                    let Some(task) = source.remove(index) else {
+                        break;
+                    };
+                    on_wake(&task);
+                    unblock_one_task(task.clone(), resched);
+                    notified.push(task);
                 }
-            }
-            (notified.len(), requeued.len())
-        };
+
+                let mut requeued = Vec::new();
+                if let Some(destination) = destination.as_deref_mut() {
+                    while !source.is_empty() && requeued.len() < requeue_count {
+                        let Some(task) = source.pop_front() else {
+                            break;
+                        };
+                        if requeued.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                            continue;
+                        }
+                        on_requeue(&task);
+                        destination.push_back(task.clone());
+                        requeued.push(task);
+                    }
+                }
+                (notified.len(), requeued.len())
+            };
 
         if core::ptr::eq(self, target) {
             let mut source = self.queue.lock();

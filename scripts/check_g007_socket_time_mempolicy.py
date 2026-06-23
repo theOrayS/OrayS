@@ -110,16 +110,11 @@ def scan_socket(root: Path) -> list[str]:
         if "let Some(first_iov)" in recvmsg_block or "basic LTP cases only assert" in recvmsg_block:
             findings.append("recvmsg still contains first-iov-only or LTP-return-value-only fake semantics")
     fake_sockopt_tokens = [
-        "SO_REUSEADDR_OPT",
         "SO_REUSEPORT_OPT",
         "SO_DONTROUTE_OPT",
         "SO_BROADCAST_OPT",
         "SO_KEEPALIVE_OPT",
         "IP_RECVERR_OPT",
-        "MCAST_JOIN_GROUP_OPT",
-        "MCAST_LEAVE_GROUP_OPT",
-        "TCP_NODELAY_OPT",
-        "TCP_MAXSEG_OPT",
     ]
     for token in fake_sockopt_tokens:
         if token in sockopt_block or token in setsockopt_block or token in getsockopt_block:
@@ -145,6 +140,61 @@ def scan_socket(root: Path) -> list[str]:
     axnet_loopback = read(root / "kernel/net/axnet/src/smoltcp_impl/loopback.rs")
     axnet_udp_loopback = read(root / "kernel/net/axnet/src/smoltcp_impl/udp_loopback.rs")
     listen_table = read(root / "kernel/net/axnet/src/smoltcp_impl/listen_table.rs")
+    backed_sockopts = {
+        "SO_REUSEADDR_OPT": [
+            (text, "arceos_posix_api::set_socket_reuse_addr"),
+            (text, "arceos_posix_api::socket_reuse_addr"),
+            (api_net, "fn set_reuse_addr(&self, enabled: bool)"),
+            (api_net, "fn reuse_addr(&self) -> bool"),
+            (api_net, "pub fn set_socket_reuse_addr"),
+            (api_net, "pub fn socket_reuse_addr"),
+            (axnet_tcp, "reuse_addr: AtomicBool"),
+            (axnet_tcp, "pub fn set_reuse_addr(&self, enabled: bool)"),
+            (axnet_tcp, "pub fn reuse_addr(&self) -> bool"),
+            (axnet_udp, "reuse_addr: AtomicBool"),
+            (axnet_udp, "pub fn set_reuse_addr(&self, enabled: bool)"),
+            (axnet_udp, "pub fn reuse_addr(&self) -> bool"),
+        ],
+        "TCP_NODELAY_OPT": [
+            (text, "arceos_posix_api::set_socket_tcp_nodelay"),
+            (text, "arceos_posix_api::socket_tcp_nodelay"),
+            (api_net, "fn set_tcp_nodelay(&self, enabled: bool)"),
+            (api_net, "fn tcp_nodelay(&self) -> LinuxResult<bool>"),
+            (api_net, "pub fn set_socket_tcp_nodelay"),
+            (api_net, "pub fn socket_tcp_nodelay"),
+            (axnet_tcp, "nodelay: AtomicBool"),
+            (axnet_tcp, "pub fn set_nodelay(&self, enabled: bool)"),
+            (axnet_tcp, "pub fn nodelay(&self) -> bool"),
+            (axnet_tcp, "socket.set_nagle_enabled(!self.nodelay())"),
+            (axnet_tcp, "socket.set_nagle_enabled(!enabled)"),
+        ],
+        "TCP_MAXSEG_OPT": [
+            (text, "arceos_posix_api::socket_tcp_max_segment_size"),
+            (api_net, "fn tcp_max_segment_size(&self) -> LinuxResult<usize>"),
+            (api_net, "pub fn socket_tcp_max_segment_size"),
+            (axnet_tcp, "pub fn max_segment_size(&self) -> usize"),
+            (axnet_tcp, "super::tcp_ipv4_max_segment_size()"),
+            (axnet_mod, "fn tcp_ipv4_max_segment_size() -> usize"),
+            (axnet_mod, "STANDARD_MTU - IPV4_HEADER_LEN - TCP_HEADER_LEN"),
+        ],
+        "IP_MCAST_JOIN_GROUP_OPT": [
+            (text, "multicast_groups: Arc<Mutex<Vec<Vec<u8>>>>"),
+            (text, "fn join_multicast_group(&self, group: Vec<u8>)"),
+            (text, "socket.join_multicast_group(group)"),
+        ],
+        "IP_MCAST_LEAVE_GROUP_OPT": [
+            (text, "fn leave_multicast_group(&self, group: &[u8]) -> Result<(), LinuxError>"),
+            (text, "LinuxError::EADDRNOTAVAIL"),
+            (text, "socket.leave_multicast_group(group.as_slice())"),
+        ],
+    }
+    option_blocks = sockopt_block + setsockopt_block + getsockopt_block
+    for token, required_tokens in backed_sockopts.items():
+        if token not in option_blocks:
+            continue
+        for haystack, required in required_tokens:
+            if required not in haystack:
+                findings.append(f"{token} backend is incomplete; missing {required}")
     if buffer_backed:
         tcp_recv_set = function_block(axnet_tcp, "set_recv_buffer_size")
         tcp_send_set = function_block(axnet_tcp, "set_send_buffer_size")

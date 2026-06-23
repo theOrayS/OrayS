@@ -39,6 +39,34 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     let file_cpuinfo = proc_root.clone().lookup("./cpuinfo")?;
     file_cpuinfo.write_at(0, proc_cpuinfo().as_bytes())?;
 
+    proc_root.create("sys", VfsNodeType::Dir)?;
+    proc_root.create("sys/kernel", VfsNodeType::Dir)?;
+    proc_root.create("sys/kernel/pid_max", VfsNodeType::File)?;
+    let file_pid_max = proc_root.clone().lookup("./sys/kernel/pid_max")?;
+    file_pid_max.write_at(0, b"4194304\n")?;
+    proc_root.create("sys/kernel/tainted", VfsNodeType::File)?;
+    let file_tainted = proc_root.clone().lookup("./sys/kernel/tainted")?;
+    file_tainted.write_at(0, b"0\n")?;
+    proc_root.create("sys/kernel/printk", VfsNodeType::File)?;
+    let file_printk = proc_root.clone().lookup("./sys/kernel/printk")?;
+    file_printk.write_at(0, b"7 4 1 7\n")?;
+    proc_root.create("sys/kernel/shmmax", VfsNodeType::File)?;
+    let file_shmmax = proc_root.clone().lookup("./sys/kernel/shmmax")?;
+    file_shmmax.write_at(0, b"1048576\n")?;
+    proc_root.create("sys/kernel/shmmni", VfsNodeType::File)?;
+    let file_shmmni = proc_root.clone().lookup("./sys/kernel/shmmni")?;
+    file_shmmni.write_at(0, b"128\n")?;
+    proc_root.create("sys/kernel/shmall", VfsNodeType::File)?;
+    let file_shmall = proc_root.clone().lookup("./sys/kernel/shmall")?;
+    file_shmall.write_at(0, b"256\n")?;
+    proc_root.create("sys/fs", VfsNodeType::Dir)?;
+    proc_root.create("sys/fs/pipe-user-pages-soft", VfsNodeType::File)?;
+    let file_pipe_soft = proc_root.clone().lookup("./sys/fs/pipe-user-pages-soft")?;
+    file_pipe_soft.write_at(0, b"512\n")?;
+    proc_root.create("sys/fs/pipe-user-pages-hard", VfsNodeType::File)?;
+    let file_pipe_hard = proc_root.clone().lookup("./sys/fs/pipe-user-pages-hard")?;
+    file_pipe_hard.write_at(0, b"0\n")?;
+
     proc_root.create("sysvipc", VfsNodeType::Dir)?;
     proc_root.create("sysvipc/sem", VfsNodeType::File)?;
     proc_root.create("sysvipc/shm", VfsNodeType::File)?;

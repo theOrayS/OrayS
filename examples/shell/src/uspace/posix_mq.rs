@@ -12,8 +12,9 @@ use std::string::{String, ToString};
 use std::sync::Arc;
 use std::vec::Vec;
 
+use super::UserProcess;
 use super::fd_table::{FdEntry, PathEntry};
-use super::linux_abi::{neg_errno, RLIMIT_NOFILE_RESOURCE};
+use super::linux_abi::{RLIMIT_NOFILE_RESOURCE, neg_errno};
 use super::select_fdset::yield_poll_wait;
 use super::signal_abi::{
     current_unblocked_signal_pending, deliver_user_signal_with_siginfo, validate_signal_target,
@@ -24,7 +25,6 @@ use super::user_memory::{
     read_cstr, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
     write_user_bytes, write_user_value,
 };
-use super::UserProcess;
 
 const POSIX_MQ_NAME_MAX: usize = 255;
 const POSIX_MQ_DEFAULT_MAXMSG: isize = 10;
@@ -509,11 +509,7 @@ pub(super) fn sys_mq_timedsend(
                     right.prio.cmp(&left.prio).then(left.seq.cmp(&right.seq))
                 });
                 sent = true;
-                if was_empty {
-                    state.notify.take()
-                } else {
-                    None
-                }
+                if was_empty { state.notify.take() } else { None }
             } else {
                 None
             }

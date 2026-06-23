@@ -6,7 +6,7 @@ use std::string::{String, ToString};
 use super::fd_table::{
     resolve_dirfd_path, synthetic_block_device_for_mount, synthetic_block_device_is_uninitialized,
 };
-use super::linux_abi::{neg_errno, ST_MODE_DIR, ST_MODE_TYPE_MASK};
+use super::linux_abi::{ST_MODE_DIR, ST_MODE_TYPE_MASK, neg_errno};
 use super::runtime_paths::normalize_path;
 use super::user_memory::read_cstr;
 use super::{MountPoint, UserProcess};

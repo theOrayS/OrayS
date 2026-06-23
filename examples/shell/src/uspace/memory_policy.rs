@@ -3,7 +3,7 @@ use core::mem::size_of;
 use axerrno::LinuxError;
 
 use super::user_memory::{clear_user_bytes, read_user_bytes, validate_user_read, write_user_value};
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 const MPOL_DEFAULT: usize = 0;
 const MEMBIND_SUPPORTED_FLAGS: usize = 0;

@@ -3,16 +3,16 @@ use core::fmt;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use axerrno::{ax_err, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use axhal::trap::PageFaultFlags;
 use memory_addr::{
-    is_aligned_4k, MemoryAddr, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, PAGE_SIZE_4K,
+    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
 
-use crate::backend::{retain_shared_frame, Backend};
+use crate::backend::{Backend, retain_shared_frame};
 use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.

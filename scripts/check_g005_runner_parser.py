@@ -82,7 +82,19 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
     if not runtime_wrappers:
         findings.append("examples/shell/src/cmd.rs: missing ensure_runtime_busybox_wrappers")
     else:
-        for token in ('for dir in [suite_dir, "/bin", "/usr/bin"]', "ensure_busybox_applet_wrappers", "LTP_BUSYBOX_APPLETS"):
+        wrapper_dir_loop = (
+            'for dir in [suite_dir, "/bin", "/usr/bin"]' in runtime_wrappers
+            or 'for dir in ["/bin", "/usr/bin", suite_dir]' in runtime_wrappers
+        )
+        required_wrapper_tokens = (
+            "ensure_busybox_applet_wrappers",
+            "LTP_BUSYBOX_APPLETS",
+        )
+        if not wrapper_dir_loop:
+            findings.append(
+                "examples/shell/src/cmd.rs: runtime busybox support must attempt real wrapper files for suite/bin/usr-bin paths"
+            )
+        for token in required_wrapper_tokens:
             if token not in runtime_wrappers:
                 findings.append(
                     "examples/shell/src/cmd.rs: runtime busybox support must create real wrapper files for suite/bin/usr-bin paths"
@@ -120,6 +132,8 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
         "standard_bin_busybox_applet_name": "execve must not special-case /bin or /usr/bin applet names",
         "rooted_busybox_applet_name": "execve must not special-case /musl or /glibc applet names",
         "find_busybox_for_script": "script loader must not replace missing interpreters with busybox",
+        "push_busybox_applet_candidate": "runtime path/VFS layer must not add hidden busybox applet fallbacks",
+        "busybox_applet_supported": "runtime path/VFS layer must not classify applet names for hidden fallback",
     }
     for rel in (
         Path("examples/shell/src/uspace/runtime_paths.rs"),
@@ -218,7 +232,7 @@ def scan_cmd_rs(root: Path) -> list[str]:
             findings.append("examples/shell/src/cmd.rs: ltp_case_env must not special-case chdir01")
         if "needs_case_resource_helper" not in env_block:
             findings.append("examples/shell/src/cmd.rs: ltp_case_env must be driven by generic helper/device capability")
-        if "LTP_FORCE_SINGLE_FS_TYPE=tmpfs" not in env_block or "LTP_DEV_FS_TYPE=tmpfs" not in env_block:
+        if "LTP_SINGLE_FS_TYPE=tmpfs" not in env_block or "LTP_DEV_FS_TYPE=tmpfs" not in env_block:
             findings.append("examples/shell/src/cmd.rs: helper-backed filesystem env boundary is missing")
     if not run_dir_block:
         findings.append("examples/shell/src/cmd.rs: missing prepare_ltp_case_run_dir")

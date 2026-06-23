@@ -55,6 +55,7 @@ use fd_table::{FdTable, ProcessFdTable};
 #[cfg(feature = "auto-run-tests")]
 pub use futex::futex_table_stats;
 use linux_abi::*;
+use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 #[cfg(feature = "auto-run-tests")]
@@ -70,7 +71,6 @@ pub use process_lifecycle::seed_initial_path_mode;
 pub use process_lifecycle::user_process_object_stats;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::user_process_retention_stats;
-use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use program_loader::exec_image_buffer_stats;
 use resource_sched::{UserRlimit, UserSchedState};
@@ -190,6 +190,8 @@ struct UserProcess {
     prof_timer_deadline_us: AtomicU64,
     prof_timer_interval_us: AtomicU64,
     syscall_runtime_micros: AtomicU64,
+    last_reported_user_micros: AtomicU64,
+    last_reported_system_micros: AtomicU64,
     completed_thread_runtime_ticks: AtomicU64,
     last_reported_user_ticks: AtomicU64,
     last_reported_system_ticks: AtomicU64,
@@ -258,10 +260,24 @@ struct UserExecSharedMmapCache {
 }
 
 impl UserExecSharedMmapCache {
-    fn release_retained_frames(self) {
-        for (_, frame, _) in self.pages {
+    fn release_retained_frames(mut self) {
+        self.release_retained_frames_inner();
+    }
+
+    fn disarm_retained_frames(&mut self) {
+        self.pages.clear();
+    }
+
+    fn release_retained_frames_inner(&mut self) {
+        for (_, frame, _) in core::mem::take(&mut self.pages) {
             axmm::release_shared_frame_ref(frame);
         }
+    }
+}
+
+impl Drop for UserExecSharedMmapCache {
+    fn drop(&mut self) {
+        self.release_retained_frames_inner();
     }
 }
 
