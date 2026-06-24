@@ -66,13 +66,27 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         text = self.replace_once(
             text,
-            "let needs_case_resource_helper = ltp_case_has_resource_helper(&target_dir, case);",
-            'let needs_case_resource_helper = if case == "chdir01" { true } else { ltp_case_has_resource_helper(&target_dir, case) };',
+            "let needs_case_resource_helper = ltp_case_has_resource_helper(&resource_helper_cases, case);",
+            'let needs_case_resource_helper = if case == "chdir01" { true } else { ltp_case_has_resource_helper(&resource_helper_cases, case) };',
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("chdir01", result.stdout)
+
+    def test_detects_first_underscore_resource_helper_parse(self) -> None:
+        tree = self.make_tree()
+        path = tree / "examples/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8")
+        text = self.replace_once(
+            text,
+            "helper_name.strip_prefix(case.as_str())",
+            "helper_name.split_once('_').map(|(prefix, _)| prefix)",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("first underscore", result.stdout)
 
     def test_detects_literal_command_success_override(self) -> None:
         tree = self.make_tree()

@@ -1139,6 +1139,16 @@ fn run_user_program_argv_in_timeout(
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn run_user_program_argv_in_timeout_with_env(
+    cwd: &str,
+    argv: &[&str],
+    env: &[String],
+    timeout_secs: u64,
+) -> Result<i32, String> {
+    uspace::run_user_program_in_timeout_with_env(cwd, argv, env, timeout_secs)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 // Explicit LTP lists can still contain real file-stress cases that regularly
 // take tens of seconds on the single-vCPU evaluator and can exceed 90s on
 // slower LA64/QEMU hosts or when both architectures are under verification
@@ -2073,6 +2083,7 @@ fn ltp_case_env(
     suite_dir: &str,
     target_dir: &str,
     helper_dir: &str,
+    run_dir: &str,
     _needs_case_resource_helper: bool,
 ) -> Vec<String> {
     let mut env = vec![
@@ -2083,6 +2094,8 @@ fn ltp_case_env(
         // preserves ordinary PATH lookup for tools used by LTP helpers (cp, awk,
         // chmod, ...), without falling back to case-name or hidden exec rewrites.
         format!("PATH=.:{target_dir}:{helper_dir}:/musl:/glibc:/bin:/usr/bin"),
+        "HOME=/".into(),
+        format!("PWD={run_dir}"),
         format!("LTPROOT={}/ltp", suite_dir.trim_end_matches('/')),
         "TMPDIR=/tmp/ltp-work".into(),
         // Official OSKernel's glibc LTP judge counts the real LTP library
@@ -2115,6 +2128,9 @@ fn ltp_case_env(
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn print_ltp_memory_stats(case: &str, phase: &str) {
+    if option_env!("LTP_MEMORY_STATS") != Some("1") && option_env!("LTP_ALLOC_DIAG") != Some("1") {
+        return;
+    }
     let stats = frame_allocator_stats();
     let heap = global_allocator();
     let exited = axtask::exited_task_retention_stats();
@@ -2187,25 +2203,51 @@ fn print_ltp_memory_stats(case: &str, phase: &str) {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn ltp_case_has_resource_helper(target_dir: &str, case: &str) -> bool {
-    let prefix = format!("{case}_");
+fn ltp_resource_helper_cases(target_dir: &str, cases: &[String]) -> BTreeSet<String> {
     let Ok(entries) = fs::read_dir(target_dir) else {
-        return false;
+        return BTreeSet::new();
     };
-    entries.filter_map(Result::ok).any(|entry| {
+    let mut file_names = Vec::new();
+    for entry in entries.filter_map(Result::ok) {
         let name = String::from(path_to_str(&entry.file_name()));
-        name.starts_with(&prefix)
-            && matches!(fs::metadata(&join_path(target_dir, &name)), Ok(metadata) if metadata.is_file())
-    })
+        let path = join_path(target_dir, &name);
+        if matches!(fs::metadata(&path), Ok(metadata) if metadata.is_file()) {
+            file_names.push(name);
+        }
+    }
+
+    let mut case_names = cases
+        .iter()
+        .filter(|case| valid_ltp_case_name(case))
+        .collect::<Vec<_>>();
+    case_names.sort_by(|lhs, rhs| rhs.len().cmp(&lhs.len()).then_with(|| lhs.cmp(rhs)));
+
+    let mut helper_cases = BTreeSet::new();
+    for helper_name in file_names {
+        for &case in &case_names {
+            let Some(helper_suffix) = helper_name.strip_prefix(case.as_str()) else {
+                continue;
+            };
+            if helper_suffix.starts_with('_') {
+                helper_cases.insert(case.clone());
+                break;
+            }
+        }
+    }
+    helper_cases
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn ltp_case_has_resource_helper(resource_helper_cases: &BTreeSet<String>, case: &str) -> bool {
+    resource_helper_cases.contains(case)
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn prepare_ltp_case_run_dir(
-    target_dir: &str,
+    _target_dir: &str,
     case: &str,
     needs_case_resource_helper: bool,
 ) -> io::Result<String> {
-    let _ = target_dir;
     let _ = needs_case_resource_helper;
     // Always execute the testcase from an isolated scratch directory rather than
     // from the immutable testsuite bin directory.  LTP cases are sequential in
@@ -2598,6 +2640,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
         "ltp case list: {case_list_name} ({} cases, timeout {timeout_secs}s)",
         cases.len()
     );
+    let resource_helper_cases = ltp_resource_helper_cases(&target_dir, &cases);
     cleanup_ltp_scratch();
     let mut passed = 0usize;
     let mut failed = 0usize;
@@ -2621,7 +2664,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             cleanup_ltp_scratch();
             continue;
         }
-        let needs_case_resource_helper = ltp_case_has_resource_helper(&target_dir, case);
+        let needs_case_resource_helper = ltp_case_has_resource_helper(&resource_helper_cases, case);
         let run_dir = match prepare_ltp_case_run_dir(&target_dir, case, needs_case_resource_helper)
         {
             Ok(run_dir) => run_dir,
@@ -2642,6 +2685,7 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
             suite_dir,
             &target_dir,
             &helper_dir,
+            &run_dir,
             needs_case_resource_helper,
         );
         let result = if file_has_shebang(&path) {
@@ -2652,12 +2696,12 @@ fn run_ltp_suite(suite_dir: &str) -> Result<(), String> {
                 timeout_secs,
             )
         } else {
-            let mut argv = Vec::with_capacity(env.len() + 3);
-            argv.push(busybox_path.as_str());
-            argv.push("env");
-            argv.extend(env.iter().map(String::as_str));
-            argv.push(program_arg.as_str());
-            run_user_program_argv_in_timeout(&run_dir, &argv, timeout_secs)
+            run_user_program_argv_in_timeout_with_env(
+                &run_dir,
+                &[program_arg.as_str()],
+                &env,
+                timeout_secs,
+            )
         };
         match result {
             Ok(0) => {

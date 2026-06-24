@@ -66,6 +66,8 @@ pub use process_lifecycle::run_user_program_in;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::run_user_program_in_timeout;
 #[cfg(feature = "auto-run-tests")]
+pub use process_lifecycle::run_user_program_in_timeout_with_env;
+#[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::seed_initial_path_mode;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::user_process_object_stats;
