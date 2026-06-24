@@ -416,7 +416,6 @@ pub fn cleanup_user_processes() {
         }
     }
     yield_for_task_gc();
-    prune_exited_user_tasks();
     super::futex::prune_empty_futexes();
 }
 
@@ -494,7 +493,7 @@ fn run_user_program_in_with_env_and_timeout(
         code
     };
     drop(task);
-    yield_for_task_gc();
+    settle_task_gc_after_join();
     Ok(exit_code)
 }
 
@@ -518,14 +517,21 @@ fn join_user_task_for_cleanup(task: &AxTaskRef) -> bool {
     task.try_join().is_some()
 }
 
-fn yield_for_task_gc() {
-    for _ in 0..64 {
-        axtask::reap_exited_tasks();
-        prune_exited_user_tasks();
-        axtask::yield_now();
-    }
+fn settle_task_gc_after_join() {
     axtask::reap_exited_tasks();
     prune_exited_user_tasks();
+}
+
+fn yield_for_task_gc() {
+    settle_task_gc_after_join();
+    for _ in 0..64 {
+        if live_user_thread_count() == 0 {
+            break;
+        }
+        axtask::yield_now();
+        settle_task_gc_after_join();
+    }
+    settle_task_gc_after_join();
 }
 
 fn ensure_user_task_capacity() -> Result<(), LinuxError> {
