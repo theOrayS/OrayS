@@ -147,23 +147,22 @@ pub(super) fn note_syscall_restart_candidate(tf: &TrapFrame, syscall_num: u32, r
     let Some(ext) = current_task_ext() else {
         return;
     };
-    let mut restart_frame = ext.syscall_restart_frame.lock();
     if ret == neg_errno(LinuxError::EINTR) && restartable_blocking_syscall(syscall_num) {
-        *restart_frame = Some(*tf);
+        ext.store_syscall_restart_frame(*tf);
     } else {
         // A restart frame is tied to the syscall that was just interrupted.
         // Once any later syscall reaches a non-restartable result, stale wait
         // state must not be reused by a future SA_RESTART signal delivery.
-        *restart_frame = None;
+        ext.clear_syscall_restart_frame();
     }
 }
 
 fn take_syscall_restart_frame(ext: &UserTaskExt) -> Option<TrapFrame> {
-    ext.syscall_restart_frame.lock().take()
+    ext.take_syscall_restart_frame()
 }
 
 fn clear_syscall_restart_frame(ext: &UserTaskExt) {
-    *ext.syscall_restart_frame.lock() = None;
+    ext.clear_syscall_restart_frame();
 }
 
 fn signal_action_restarts_syscall(action: &general::kernel_sigaction) -> bool {

@@ -4345,7 +4345,7 @@ impl FdTable {
         Self::poll_entry(entry, mode)
     }
 
-    fn poll_entry(entry: &FdEntry, mode: SelectMode) -> bool {
+    pub(super) fn poll_entry(entry: &FdEntry, mode: SelectMode) -> bool {
         match mode {
             SelectMode::Read => match entry {
                 FdEntry::Stdin(_) => false,

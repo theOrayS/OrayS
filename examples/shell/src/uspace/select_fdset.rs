@@ -351,21 +351,24 @@ fn poll_one_fd(table: &FdTable, pollfd: &mut UserPollFd) -> (bool, bool) {
     if pollfd.fd < 0 {
         return (false, false);
     }
-    if table.entry(pollfd.fd).is_err() {
-        pollfd.revents = POLLNVAL;
-        return (true, false);
-    }
+    let entry = match table.entry(pollfd.fd) {
+        Ok(entry) => entry,
+        Err(_) => {
+            pollfd.revents = POLLNVAL;
+            return (true, false);
+        }
+    };
     let watched = true;
-    if pollfd.events & POLLIN != 0 && table.poll(pollfd.fd, SelectMode::Read) {
+    if pollfd.events & POLLIN != 0 && FdTable::poll_entry(entry, SelectMode::Read) {
         pollfd.revents |= POLLIN;
     }
-    if pollfd.events & POLLPRI != 0 && table.poll(pollfd.fd, SelectMode::Except) {
+    if pollfd.events & POLLPRI != 0 && FdTable::poll_entry(entry, SelectMode::Except) {
         pollfd.revents |= POLLPRI;
     }
-    if pollfd.events & POLLOUT != 0 && table.poll(pollfd.fd, SelectMode::Write) {
+    if pollfd.events & POLLOUT != 0 && FdTable::poll_entry(entry, SelectMode::Write) {
         pollfd.revents |= POLLOUT;
     }
-    if table.poll(pollfd.fd, SelectMode::Except) {
+    if FdTable::poll_entry(entry, SelectMode::Except) {
         pollfd.revents |= POLLERR;
     }
     (pollfd.revents != 0, watched)
