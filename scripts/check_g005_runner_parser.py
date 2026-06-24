@@ -154,6 +154,7 @@ def scan_cmd_rs(root: Path) -> list[str]:
     env_block = function_block(text, "ltp_case_env")
     autorun_body = function_body(text, "maybe_run_official_tests")
     run_dir_block = function_block(text, "prepare_ltp_case_run_dir")
+    helper_cases_block = function_block(text, "ltp_resource_helper_cases")
     copy_block = function_block(text, "copy_script_file")
     unstaged_block = function_block(text, "prepare_unstaged_script_dir")
     forbidden_runner_rewrite_tokens = [
@@ -238,6 +239,17 @@ def scan_cmd_rs(root: Path) -> list[str]:
         findings.append("examples/shell/src/cmd.rs: missing prepare_ltp_case_run_dir")
     elif "needs_case_resource_helper" not in run_dir_block:
         findings.append("examples/shell/src/cmd.rs: run-dir selection must reuse generic helper detection")
+    if not helper_cases_block:
+        findings.append("examples/shell/src/cmd.rs: missing ltp_resource_helper_cases")
+    else:
+        if "split_once('_')" in helper_cases_block or 'split_once("_")' in helper_cases_block:
+            findings.append(
+                "examples/shell/src/cmd.rs: ltp_resource_helper_cases must not split helper names at the first underscore; underscore case names need selected-case prefix matching"
+            )
+        if "strip_prefix(case" not in helper_cases_block or "helper_suffix.starts_with('_')" not in helper_cases_block:
+            findings.append(
+                "examples/shell/src/cmd.rs: ltp_resource_helper_cases must preserve the generic {case}_ helper boundary for selected cases"
+            )
     if "PASS LTP CASE" in text:
         findings.append("examples/shell/src/cmd.rs: runner must not emit PASS LTP CASE wrapper records that can hide later TCONF/TBROK/TFAIL/timeout evidence")
     if re.search(r"if\s+case\s*==\s*\"chdir01\"", text):

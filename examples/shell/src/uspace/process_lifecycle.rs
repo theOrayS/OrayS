@@ -365,6 +365,16 @@ pub fn run_user_program_in_timeout(
 }
 
 #[cfg(feature = "auto-run-tests")]
+pub fn run_user_program_in_timeout_with_env(
+    cwd: &str,
+    argv: &[&str],
+    env: &[String],
+    timeout_secs: u64,
+) -> Result<i32, String> {
+    run_user_program_in_with_env_and_timeout(cwd, argv, Some(env), Some(timeout_secs))
+}
+
+#[cfg(feature = "auto-run-tests")]
 pub fn cleanup_user_processes() {
     for _ in 0..16 {
         let mut seen = Vec::new();
@@ -420,8 +430,21 @@ fn run_user_program_in_with_timeout(
     argv: &[&str],
     timeout_secs: Option<u64>,
 ) -> Result<i32, String> {
+    run_user_program_in_with_env_and_timeout(cwd, argv, None, timeout_secs)
+}
+
+fn run_user_program_in_with_env_and_timeout(
+    cwd: &str,
+    argv: &[&str],
+    env: Option<&[String]>,
+    timeout_secs: Option<u64>,
+) -> Result<i32, String> {
     ensure_user_return_hook_registered();
-    let loaded = load_program(cwd, argv)?;
+    let loaded = if let Some(env) = env {
+        load_program_with_env(cwd, argv, Some(env))?
+    } else {
+        load_program(cwd, argv)?
+    };
     let process = loaded.process.clone();
     if let Some(timeout_secs) = timeout_secs {
         let deadline_us = axhal::time::monotonic_time()
@@ -527,9 +550,17 @@ fn user_task_entry() {
 }
 
 fn load_program(cwd: &str, argv: &[&str]) -> Result<LoadedProgram, String> {
+    load_program_with_env(cwd, argv, None)
+}
+
+fn load_program_with_env(
+    cwd: &str,
+    argv: &[&str],
+    env: Option<&[String]>,
+) -> Result<LoadedProgram, String> {
     let mut aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
         .map_err(|err| format!("failed to create user address space: {err}"))?;
-    let image = load_program_image(None, &mut aspace, cwd, argv[0], argv, None)?;
+    let image = load_program_image(None, &mut aspace, cwd, argv[0], argv, env)?;
     let exec_path = image.exec_path.clone();
 
     let process = Arc::new(UserProcess {
