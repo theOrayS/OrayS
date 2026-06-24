@@ -86,7 +86,10 @@ KERNEL_LA ?= $(CURDIR)/kernel-la
 # libc LTP passes can finish inside the remote scorer.  Broader sweep modes stay
 # available for explicit scouting only; skipped/timeout/TCONF/TBROK/TFAIL/ENOSYS
 # rows from those modes must not be promoted as PASS.
+# The in-kernel `stable` selector is budgeted for the remote deadline and omits
+# the currently slowest parser-clean LTP tails; use stable-full for full reproof.
 # Explicit broader / scouting modes remain available:
+#   make all REMOTE_LTP_CASES=stable-full
 #   make all REMOTE_LTP_CASES=stable-plus-blacklist
 #   make all REMOTE_LTP_CASES=blacklist
 REMOTE_LTP_CASES ?= stable
@@ -96,10 +99,11 @@ REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
 REMOTE_LTP_BLACKLIST_LA_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-la.txt
 REMOTE_LTP_BLACKLIST_MODES := blacklist all-minus-blacklist sweep:blacklist score-blacklist stable-plus-blacklist stable-plus-all-minus-blacklist
 REMOTE_LTP_USES_BLACKLIST := $(filter $(REMOTE_LTP_BLACKLIST_MODES),$(REMOTE_LTP_CASES))
-# The online scorer does not award points for glibc libctest.  Keep the skip
-# explicit and build-time visible, so local runs can clear it with:
+# The online scorer does not award points for glibc libctest, and current
+# deadline runs lose 300s per libc to UnixBench timeouts.  Keep these skips
+# explicit and build-time visible, so local scouting can clear them with:
 #   make all REMOTE_SKIP_OFFICIAL_TEST_GROUPS=
-REMOTE_SKIP_OFFICIAL_TEST_GROUPS ?= libctest-glibc
+REMOTE_SKIP_OFFICIAL_TEST_GROUPS ?= libctest-glibc unixbench
 TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
 RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
 LA_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-la.img

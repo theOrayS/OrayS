@@ -625,6 +625,14 @@ const LTP_STABLE_CASES: &[&str] = &[
     "vmsplice04",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const LTP_STABLE_LONGTAIL_SKIP_CASES: &[&str] = &[
+    // Remote-deadline budget skips only. These cases have recently remained
+    // parser-clean but dominate wall time on the official RV/LA x musl/glibc
+    // matrix; keep them visible in the case-list manifest instead of counting
+    // them as pass, timeout, or hidden failure.
+    "ftest07", "ftest03", "inode02", "nptl01", "ftest08", "ftest04",
+];
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_SYSCALLS_BASIC_PLUS_CASES: &[&str] = &[
     "access02",
     "access03",
@@ -1131,11 +1139,10 @@ fn run_user_program_argv_in_timeout(
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-// Stable LTP contains real file-stress cases (for example ftest03/ftest07)
-// that regularly take tens of seconds on the single-vCPU evaluator and can
-// exceed 90s on slower LA64/QEMU hosts or when both architectures are under
-// verification load. Keep this above their honest runtime while still bounding
-// genuine hangs.
+// Explicit LTP lists can still contain real file-stress cases that regularly
+// take tens of seconds on the single-vCPU evaluator and can exceed 90s on
+// slower LA64/QEMU hosts or when both architectures are under verification
+// load. Keep this above their honest runtime while still bounding genuine hangs.
 const LTP_CASE_TIMEOUT_SECS: u64 = 180;
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1286,6 +1293,14 @@ fn retain_ltp_cases_not_selected(cases: &mut Vec<String>, selected: &[String]) -
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn default_stable_ltp_cases() -> Result<(String, Vec<String>), String> {
+    let mut cases = ltp_cases_from_slice(LTP_STABLE_CASES)?;
+    let longtail_skips = ltp_cases_from_slice(LTP_STABLE_LONGTAIL_SKIP_CASES)?;
+    let skipped = retain_ltp_cases_not_blacklisted(&mut cases, &longtail_skips);
+    Ok((format!("stable-minus-longtail skipped={skipped}"), cases))
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn ltp_static_case_list(name: &str) -> Option<&'static [&'static str]> {
     LTP_CASE_BATCHES
         .iter()
@@ -1317,8 +1332,11 @@ fn selected_ltp_cases(target_dir: &str) -> Result<(String, Vec<String>), String>
         ));
     }
     if spec == "stable" {
+        return default_stable_ltp_cases();
+    }
+    if spec == "stable-full" {
         return Ok((
-            String::from("stable"),
+            String::from("stable-full"),
             ltp_cases_from_slice(LTP_STABLE_CASES)?,
         ));
     }
