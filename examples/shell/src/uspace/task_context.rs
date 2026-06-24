@@ -58,7 +58,11 @@ pub(super) struct UserTaskExt {
     pub(super) signal_frame: AtomicUsize,
     pub(super) last_user_pc: AtomicUsize,
     pub(super) pending_sigreturn: Mutex<Option<TrapFrame>>,
-    pub(super) syscall_restart_frame: Mutex<Option<TrapFrame>>,
+    // Keep syscall restart state behind the helper methods below.  The bool is
+    // the hot-path predicate that lets ordinary syscalls avoid taking the
+    // mutex; the mutex remains the owner of the actual trap frame.
+    syscall_restart_frame_valid: AtomicBool,
+    syscall_restart_frame: Mutex<Option<TrapFrame>>,
     pub(super) syscall_runtime_micros: AtomicU64,
     pub(super) last_reported_user_micros: AtomicU64,
     pub(super) last_reported_system_micros: AtomicU64,
@@ -104,10 +108,34 @@ impl UserTaskExt {
             signal_frame: AtomicUsize::new(0),
             last_user_pc: AtomicUsize::new(0),
             pending_sigreturn: Mutex::new(None),
+            syscall_restart_frame_valid: AtomicBool::new(false),
             syscall_restart_frame: Mutex::new(None),
             syscall_runtime_micros: AtomicU64::new(0),
             last_reported_user_micros: AtomicU64::new(0),
             last_reported_system_micros: AtomicU64::new(0),
+        }
+    }
+
+    pub(super) fn store_syscall_restart_frame(&self, frame: TrapFrame) {
+        *self.syscall_restart_frame.lock() = Some(frame);
+        self.syscall_restart_frame_valid
+            .store(true, Ordering::Release);
+    }
+
+    pub(super) fn take_syscall_restart_frame(&self) -> Option<TrapFrame> {
+        self.syscall_restart_frame_valid
+            .swap(false, Ordering::AcqRel)
+            .then(|| self.syscall_restart_frame.lock().take())
+            .flatten()
+    }
+
+    pub(super) fn clear_syscall_restart_frame(&self) {
+        if self.syscall_restart_frame_valid.load(Ordering::Acquire)
+            && self
+                .syscall_restart_frame_valid
+                .swap(false, Ordering::AcqRel)
+        {
+            *self.syscall_restart_frame.lock() = None;
         }
     }
 }
