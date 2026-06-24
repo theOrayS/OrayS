@@ -2407,30 +2407,42 @@ fn suite_stage_component(suite_dir: &str) -> &str {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn suite_group_priority(script_name: &str) -> u8 {
-    let group = script_name
+fn suite_group_name(script_name: &str) -> &str {
+    script_name
         .strip_suffix(SCRIPT_SUFFIX)
-        .unwrap_or(script_name);
+        .unwrap_or(script_name)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn suite_group_priority(script_name: &str) -> u8 {
+    let group = suite_group_name(script_name);
     match group {
-        "libctest" => 0,
-        "basic" => 1,
-        "busybox" => 2,
-        "lua" => 3,
+        "ltp" => 0,
+        "basic" => 2,
+        "busybox" => 3,
+        "libctest" => 4,
+        "lua" => 5,
         // Keep network and script-heavy groups before stress/throughput groups so
         // a previous page-fault storm or long benchmark cannot leave listener
         // state and scheduling pressure that pollutes later daemon/client tests.
-        "iperf" => 4,
-        "netperf" => 5,
-        "unixbench" => 6,
-        "libcbench" => 7,
-        "lmbench" => 8,
-        "cyclictest" => 9,
-        "iozone" => 10,
-        // LTP is intentionally last: the stable list is still large enough that
-        // running it before stress/throughput groups can starve later official
-        // non-LTP groups or the second libc's LTP phase on remote evaluation.
-        "ltp" => 100,
+        "iperf" => 6,
+        "netperf" => 7,
+        "unixbench" => 8,
+        "libcbench" => 9,
+        "lmbench" => 10,
+        "cyclictest" => 11,
+        "iozone" => 12,
         _ => 90,
+    }
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn suite_run_priority(suite_dir: &str, script_name: &str) -> u8 {
+    let group = suite_group_name(script_name);
+    if group == "libctest" && suite_dir == "/musl" {
+        1
+    } else {
+        suite_group_priority(script_name)
     }
 }
 
@@ -2870,7 +2882,7 @@ pub fn maybe_run_official_tests() {
 
     scripts.sort_by_key(|(suite_dir, script_name)| {
         (
-            suite_group_priority(script_name),
+            suite_run_priority(suite_dir, script_name),
             !matches!(suite_dir.as_str(), "/musl"),
             suite_dir.clone(),
             script_name.clone(),
