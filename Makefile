@@ -99,11 +99,14 @@ REMOTE_LTP_BLACKLIST_RV_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-rv.txt
 REMOTE_LTP_BLACKLIST_LA_FILE ?= $(REMOTE_LTP_BLACKLIST_DIR)/blacklist-la.txt
 REMOTE_LTP_BLACKLIST_MODES := blacklist all-minus-blacklist sweep:blacklist score-blacklist stable-plus-blacklist stable-plus-all-minus-blacklist
 REMOTE_LTP_USES_BLACKLIST := $(filter $(REMOTE_LTP_BLACKLIST_MODES),$(REMOTE_LTP_CASES))
-# The online scorer does not award points for glibc libctest, and current
-# deadline runs lose 300s per libc to UnixBench timeouts.  Keep these skips
-# explicit and build-time visible, so local scouting can clear them with:
+# The online scorer does not award points for glibc libctest. Keep that skip
+# explicit and build-time visible, so local scouting can clear it with:
 #   make all REMOTE_SKIP_OFFICIAL_TEST_GROUPS=
-REMOTE_SKIP_OFFICIAL_TEST_GROUPS ?= libctest-glibc unixbench
+REMOTE_SKIP_OFFICIAL_TEST_GROUPS ?= libctest-glibc
+# Full UnixBench is a real official benchmark group and already has a 900s
+# nominal in-kernel timeout. Remote builds need a ceiling at least that high;
+# the local/default 300s ceiling remains available for quick scouting runs.
+REMOTE_GROUP_TIMEOUT_CEILING_SECS ?= 900
 TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
 RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
 LA_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-la.img
@@ -305,6 +308,7 @@ all:
 ifeq ($(REMOTE_LTP_USES_BLACKLIST),)
 	LTP_CASES="$(REMOTE_LTP_CASES)" \
 		OSCOMP_SKIP_TEST_GROUPS="$(REMOTE_SKIP_OFFICIAL_TEST_GROUPS)" \
+		OSCOMP_GROUP_TIMEOUT_CEILING_SECS="$(REMOTE_GROUP_TIMEOUT_CEILING_SECS)" \
 		$(MAKE) test_build ARCH=riscv64 BUS=mmio \
 		KERNEL_FEATURES="$(KERNEL_RV_FEATURES)" \
 		APP_FEATURES="$(KERNEL_RV_APP_FEATURES)" \
@@ -314,6 +318,7 @@ ifeq ($(REMOTE_LTP_USES_BLACKLIST),)
 		TARGET_DIR=$(KERNEL_RV_TARGET_DIR)
 	LTP_CASES="$(REMOTE_LTP_CASES)" \
 		OSCOMP_SKIP_TEST_GROUPS="$(REMOTE_SKIP_OFFICIAL_TEST_GROUPS)" \
+		OSCOMP_GROUP_TIMEOUT_CEILING_SECS="$(REMOTE_GROUP_TIMEOUT_CEILING_SECS)" \
 		$(MAKE) test_build ARCH=loongarch64 BUS=pci \
 		PLAT_CONFIG="$(REMOTE_LA_PLAT_CONFIG)" \
 		KERNEL_FEATURES="$(KERNEL_LA_FEATURES)" \
@@ -329,6 +334,7 @@ else
 		LTP_BLACKLIST="$$(cat "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)")" \
 		LTP_BLACKLIST_RV="$$(cat "$(REMOTE_LTP_BLACKLIST_RV_FILE)")" \
 		OSCOMP_SKIP_TEST_GROUPS="$(REMOTE_SKIP_OFFICIAL_TEST_GROUPS)" \
+		OSCOMP_GROUP_TIMEOUT_CEILING_SECS="$(REMOTE_GROUP_TIMEOUT_CEILING_SECS)" \
 		$(MAKE) test_build ARCH=riscv64 BUS=mmio \
 		KERNEL_FEATURES="$(KERNEL_RV_FEATURES)" \
 		APP_FEATURES="$(KERNEL_RV_APP_FEATURES)" \
@@ -341,6 +347,7 @@ else
 		LTP_BLACKLIST="$$(cat "$(REMOTE_LTP_BLACKLIST_COMMON_FILE)")" \
 		LTP_BLACKLIST_LA="$$(cat "$(REMOTE_LTP_BLACKLIST_LA_FILE)")" \
 		OSCOMP_SKIP_TEST_GROUPS="$(REMOTE_SKIP_OFFICIAL_TEST_GROUPS)" \
+		OSCOMP_GROUP_TIMEOUT_CEILING_SECS="$(REMOTE_GROUP_TIMEOUT_CEILING_SECS)" \
 		$(MAKE) test_build ARCH=loongarch64 BUS=pci \
 		PLAT_CONFIG="$(REMOTE_LA_PLAT_CONFIG)" \
 		KERNEL_FEATURES="$(KERNEL_LA_FEATURES)" \
