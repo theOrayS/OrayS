@@ -9,6 +9,7 @@ use linux_raw_sys::general;
 use super::linux_abi::{BITS_PER_USIZE, FD_SET_WORDS, FD_SETSIZE, neg_errno};
 use super::signal_abi::{current_unblocked_signal_pending, install_temporary_signal_mask};
 use super::task_context::current_task_ext;
+use super::task_registry::live_user_thread_count;
 use super::user_memory::{read_user_value, write_user_value};
 use super::{FdTable, UserProcess};
 
@@ -60,6 +61,12 @@ static POLL_DEADLINE_SPIN_GUARD: SpinNoPreempt<()> = SpinNoPreempt::new(());
 
 fn poll_clock_now() -> Duration {
     axhal::time::monotonic_time()
+}
+
+fn yield_if_peer_user_task() {
+    if live_user_thread_count() > 1 {
+        axtask::yield_now();
+    }
 }
 
 pub(super) fn read_pselect_deadline(
@@ -287,7 +294,10 @@ pub(super) fn sys_pselect6(
             }
             // In this cooperative single-core environment, a hot readiness loop
             // can otherwise starve the peer process that would consume the event.
-            axtask::yield_now();
+            // If this is the only live user task, however, yielding before a
+            // ready return only burns a scheduler round trip in short poll/select
+            // heavy workloads.
+            yield_if_peer_user_task();
             return ready as isize;
         }
         if wait_deadline.is_some_and(|ddl| poll_clock_now() >= ddl) {
@@ -459,7 +469,7 @@ fn sys_poll_until(
         }
         let watched = match poll_fds_once(process, fds, nfds) {
             Ok((ready, _watched)) if ready > 0 => {
-                axtask::yield_now();
+                yield_if_peer_user_task();
                 return ready as isize;
             }
             Ok((_, watched)) => watched,
