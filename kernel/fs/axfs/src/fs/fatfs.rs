@@ -78,6 +78,10 @@ impl FatFileSystem {
 impl VfsNodeOps for FileWrapper<'static> {
     axfs_vfs::impl_vfs_non_dir_default! {}
 
+    fn release(&self) -> VfsResult {
+        self.fsync()
+    }
+
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
         let size = self.0.lock().seek(SeekFrom::End(0)).map_err(as_vfs_err)?;
         let blocks = size.div_ceil(BLOCK_SIZE as u64);
@@ -96,6 +100,10 @@ impl VfsNodeOps for FileWrapper<'static> {
         let mut file = self.0.lock();
         file.seek(SeekFrom::Start(offset)).map_err(as_vfs_err)?; // TODO: more efficient
         file.write(buf).map_err(as_vfs_err)
+    }
+
+    fn fsync(&self) -> VfsResult {
+        self.0.lock().flush().map_err(as_vfs_err)
     }
 
     fn truncate(&self, size: u64) -> VfsResult {
@@ -291,7 +299,7 @@ impl Write for Disk {
         Ok(write_len)
     }
     fn flush(&mut self) -> Result<(), Self::Error> {
-        Ok(())
+        Disk::flush(self).map_err(|_| ())
     }
 }
 
@@ -307,6 +315,7 @@ impl Seek for Disk {
         if new_pos > size {
             warn!("Seek beyond the end of the block device");
         }
+        Disk::flush(self).map_err(|_| ())?;
         self.set_position(new_pos);
         Ok(new_pos)
     }

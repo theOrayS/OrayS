@@ -7,6 +7,8 @@ use core::{
 use axerrno::{LinuxError, LinuxResult};
 use axio::PollState;
 use axsync::Mutex;
+#[cfg(feature = "multitask")]
+use axtask::WaitQueue;
 
 use super::fd_ops::{FileLike, add_file_like, close_file_like};
 use crate::ctypes;
@@ -18,7 +20,7 @@ enum RingBufferStatus {
     Normal,
 }
 
-const RING_BUFFER_SIZE: usize = 256;
+const RING_BUFFER_SIZE: usize = 4096;
 const PIPE_STAT_DEV: ctypes::dev_t = 0x7069_7065;
 const PIPE_STAT_BLKSIZE: ctypes::blksize_t = 4096;
 
@@ -87,6 +89,10 @@ struct PipePeerCounts {
 pub struct Pipe {
     readable: bool,
     buffer: Arc<Mutex<PipeRingBuffer>>,
+    #[cfg(feature = "multitask")]
+    read_wait: Arc<WaitQueue>,
+    #[cfg(feature = "multitask")]
+    write_wait: Arc<WaitQueue>,
     peer_counts: Arc<PipePeerCounts>,
     nonblocking: AtomicBool,
 }
@@ -94,6 +100,10 @@ pub struct Pipe {
 impl Pipe {
     pub fn new() -> (Pipe, Pipe) {
         let buffer = Arc::new(Mutex::new(PipeRingBuffer::new()));
+        #[cfg(feature = "multitask")]
+        let read_wait = Arc::new(WaitQueue::new());
+        #[cfg(feature = "multitask")]
+        let write_wait = Arc::new(WaitQueue::new());
         let peer_counts = Arc::new(PipePeerCounts {
             readers: AtomicUsize::new(1),
             writers: AtomicUsize::new(1),
@@ -101,12 +111,20 @@ impl Pipe {
         let read_end = Pipe {
             readable: true,
             buffer: buffer.clone(),
+            #[cfg(feature = "multitask")]
+            read_wait: read_wait.clone(),
+            #[cfg(feature = "multitask")]
+            write_wait: write_wait.clone(),
             peer_counts: peer_counts.clone(),
             nonblocking: AtomicBool::new(false),
         };
         let write_end = Pipe {
             readable: false,
             buffer,
+            #[cfg(feature = "multitask")]
+            read_wait,
+            #[cfg(feature = "multitask")]
+            write_wait,
             peer_counts,
             nonblocking: AtomicBool::new(false),
         };
@@ -132,6 +150,44 @@ impl Pipe {
     fn notify_read_end_closed(&self) {
         let _ = crate::signal::raise_sigpipe();
     }
+
+    fn notify_readable(&self) {
+        // Lock order invariant: wait predicates below may inspect `buffer`
+        // while the WaitQueue is evaluating readiness. Notify callers must not
+        // hold `buffer.lock()` across these wakeups, or future changes could
+        // introduce a waitqueue -> buffer / buffer -> waitqueue cycle.
+        #[cfg(feature = "multitask")]
+        self.read_wait.notify_all(false);
+    }
+
+    fn notify_writable(&self) {
+        // Keep this paired with `notify_readable`: mutate pipe state first,
+        // drop the ring-buffer mutex, then notify waiters.
+        #[cfg(feature = "multitask")]
+        self.write_wait.notify_all(false);
+    }
+
+    fn wait_for_readable(&self) {
+        #[cfg(feature = "multitask")]
+        self.read_wait.wait_until(|| {
+            self.nonblocking.load(Ordering::Acquire)
+                || self.write_end_close()
+                || self.buffer.lock().available_read() > 0
+        });
+        #[cfg(not(feature = "multitask"))]
+        crate::sys_sched_yield();
+    }
+
+    fn wait_for_writable(&self) {
+        #[cfg(feature = "multitask")]
+        self.write_wait.wait_until(|| {
+            self.nonblocking.load(Ordering::Acquire)
+                || self.read_end_close()
+                || self.buffer.lock().available_write() > 0
+        });
+        #[cfg(not(feature = "multitask"))]
+        crate::sys_sched_yield();
+    }
 }
 
 impl Drop for Pipe {
@@ -140,6 +196,10 @@ impl Drop for Pipe {
             self.peer_counts.readers.fetch_sub(1, Ordering::AcqRel);
         } else {
             self.peer_counts.writers.fetch_sub(1, Ordering::AcqRel);
+            self.notify_readable();
+        }
+        if self.readable {
+            self.notify_writable();
         }
     }
 }
@@ -165,18 +225,22 @@ impl FileLike for Pipe {
                 if self.nonblocking.load(Ordering::Acquire) {
                     return Err(LinuxError::EAGAIN);
                 }
-                // Data not ready, wait for write end
-                crate::sys_sched_yield(); // TODO: use synconize primitive
+                // Data not ready, wait for write end or peer close.
+                self.wait_for_readable();
                 continue;
             }
             for _ in 0..loop_read {
                 if read_size == max_len {
+                    drop(ring_buffer);
+                    self.notify_writable();
                     return Ok(read_size);
                 }
                 buf[read_size] = ring_buffer.read_byte();
                 read_size += 1;
             }
             if read_size > 0 {
+                drop(ring_buffer);
+                self.notify_writable();
                 return Ok(read_size);
             }
         }
@@ -213,23 +277,30 @@ impl FileLike for Pipe {
                     };
                 }
                 if self.nonblocking.load(Ordering::Acquire) {
+                    if write_size > 0 {
+                        self.notify_readable();
+                    }
                     return if write_size == 0 {
                         Err(LinuxError::EAGAIN)
                     } else {
                         Ok(write_size)
                     };
                 }
-                // Buffer is full, wait for read end to consume
-                crate::sys_sched_yield(); // TODO: use synconize primitive
+                // Buffer is full, wait for read end to consume or close.
+                self.wait_for_writable();
                 continue;
             }
             for _ in 0..loop_write {
                 if write_size == max_len {
+                    drop(ring_buffer);
+                    self.notify_readable();
                     return Ok(write_size);
                 }
                 ring_buffer.write_byte(buf[write_size]);
                 write_size += 1;
             }
+            drop(ring_buffer);
+            self.notify_readable();
         }
     }
 
@@ -274,6 +345,10 @@ impl FileLike for Pipe {
 
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult {
         self.nonblocking.store(nonblocking, Ordering::Release);
+        if nonblocking {
+            self.notify_readable();
+            self.notify_writable();
+        }
         Ok(())
     }
 }
