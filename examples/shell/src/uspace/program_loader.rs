@@ -1,6 +1,7 @@
 use core::cmp;
 use core::mem::size_of;
 
+use axerrno::{AxError, LinuxError};
 use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use axmm::AddrSpace;
@@ -9,7 +10,6 @@ use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
 use memory_addr::{VirtAddr, PAGE_SIZE_4K};
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::string::{String, ToString};
@@ -23,9 +23,10 @@ use super::linux_abi::{
     USER_BRK_GROW_SIZE, USER_MMAP_BASE, USER_PIE_LOAD_BASE, USER_STACK_SIZE, USER_STACK_TOP,
 };
 use super::memory_map::{align_down, align_up, user_mapping_flags};
+use super::perf_counters;
 use super::runtime_paths::{
-    derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
-    runtime_absolute_path_candidates, staged_cwd_absolute_path_candidates,
+    try_derive_exec_root_from_path, try_resolve_host_path, try_resolve_runtime_support_file,
+    try_runtime_absolute_path_candidates, try_staged_cwd_absolute_path_candidates,
 };
 use super::{str_err, BrkState, UserProcess};
 
@@ -57,6 +58,110 @@ const MAX_EXEC_IMAGE_SIZE: usize = 64 * 1024 * 1024;
 // fresh multi-MiB contiguous allocation after the kernel heap is fragmented.
 const RETAINED_EXEC_IMAGE_CAPACITY: usize = 4 * 1024 * 1024;
 const EXEC_IMAGE_READ_CHUNK: usize = 64 * 1024;
+pub(super) const EXEC_LOADER_ENOMEM_PREFIX: &str = "exec-loader-ENOMEM: ";
+
+pub(super) fn exec_loader_enomem(message: String) -> String {
+    let mut tagged = String::new();
+    let _ = tagged.try_reserve_exact(EXEC_LOADER_ENOMEM_PREFIX.len() + message.len());
+    tagged.push_str(EXEC_LOADER_ENOMEM_PREFIX);
+    tagged.push_str(message.as_str());
+    tagged
+}
+
+fn exec_loader_enomem_context(context: &str) -> String {
+    let mut tagged = String::new();
+    let _ = tagged.try_reserve_exact(EXEC_LOADER_ENOMEM_PREFIX.len() + context.len());
+    tagged.push_str(EXEC_LOADER_ENOMEM_PREFIX);
+    tagged.push_str(context);
+    tagged
+}
+
+fn exec_loader_join(parts: &[&str], context: &str) -> Result<String, String> {
+    let len = parts.iter().try_fold(0usize, |len, part| {
+        len.checked_add(part.len())
+            .ok_or_else(|| exec_loader_enomem_context(context))
+    })?;
+    let mut out = String::new();
+    out.try_reserve_exact(len)
+        .map_err(|_| exec_loader_enomem_context(context))?;
+    for part in parts {
+        out.push_str(part);
+    }
+    Ok(out)
+}
+
+fn exec_loader_reserve<T>(
+    vec: &mut Vec<T>,
+    additional: usize,
+    context: &str,
+) -> Result<(), String> {
+    vec.try_reserve_exact(additional)
+        .map_err(|_| exec_loader_enomem_context(context))
+}
+
+fn exec_loader_owned_string(value: &str, context: &str) -> Result<String, String> {
+    let mut out = String::new();
+    out.try_reserve_exact(value.len())
+        .map_err(|_| exec_loader_enomem_context(context))?;
+    out.push_str(value);
+    Ok(out)
+}
+
+fn exec_loader_push_string(
+    values: &mut Vec<String>,
+    value: &str,
+    context: &str,
+) -> Result<(), String> {
+    exec_loader_reserve(values, 1, context)?;
+    values.push(exec_loader_owned_string(value, context)?);
+    Ok(())
+}
+
+fn exec_loader_owned_strings(items: &[&str], context: &str) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    exec_loader_reserve(&mut out, items.len(), context)?;
+    for item in items {
+        out.push(exec_loader_owned_string(item, context)?);
+    }
+    Ok(out)
+}
+
+fn stack_bytes_with_nul(value: &str, context: &str) -> Result<Vec<u8>, String> {
+    let total = value
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| "user stack string length overflow".to_string())?;
+    let mut bytes = Vec::new();
+    exec_loader_reserve(&mut bytes, total, context)?;
+    bytes.extend_from_slice(value.as_bytes());
+    bytes.push(0);
+    Ok(bytes)
+}
+
+pub(super) fn exec_loader_string_refs<'a>(
+    items: &'a [String],
+    context: &str,
+) -> Result<Vec<&'a str>, String> {
+    let mut refs = Vec::new();
+    exec_loader_reserve(&mut refs, items.len(), context)?;
+    refs.extend(items.iter().map(String::as_str));
+    Ok(refs)
+}
+
+pub(super) fn exec_loader_axerr(context: String, err: AxError) -> String {
+    if LinuxError::from(err) == LinuxError::ENOMEM {
+        exec_loader_enomem(context)
+    } else {
+        let message = format!("{context}: {err}");
+        message
+    }
+}
+
+#[derive(Default)]
+struct RuntimeLoaderCache {
+    musl: Option<bool>,
+    glibc: Option<bool>,
+}
 
 struct ElfLoadInfo {
     load_bias: usize,
@@ -74,47 +179,74 @@ struct AuxEntry {
     value: usize,
 }
 
-fn default_exec_env(exec_root: &str, cwd: &str) -> Vec<String> {
+fn default_exec_env(exec_root: &str, cwd: &str) -> Result<Vec<String>, String> {
     let path = if exec_root == "/glibc" {
         "PATH=/glibc:/musl"
     } else {
         "PATH=/musl:/glibc"
     };
     let pwd = if cwd.is_empty() { "/" } else { cwd };
-    let mut env = vec![path.into(), "HOME=/".into(), format!("PWD={pwd}")];
-    if runtime_has_musl_loader(exec_root) {
-        if let Some(preload) = runtime_compat_preload_path(exec_root) {
-            env.push(format!("LD_PRELOAD={preload}"));
+    let pwd_entry = {
+        let mut entry = exec_loader_owned_string("PWD=", "prepare default PWD env")?;
+        entry.try_reserve_exact(pwd.len()).map_err(|_| {
+            exec_loader_enomem("not enough kernel memory to prepare default PWD env".to_string())
+        })?;
+        entry.push_str(pwd);
+        entry
+    };
+    let mut env = exec_loader_owned_strings(&[path, "HOME=/"], "prepare default exec env")?;
+    exec_loader_reserve(&mut env, 1, "append default PWD env")?;
+    env.push(pwd_entry);
+    if runtime_has_musl_loader(exec_root)? {
+        if let Some(preload) = runtime_compat_preload_path(exec_root)? {
+            let mut entry =
+                exec_loader_owned_string("LD_PRELOAD=", "prepare default LD_PRELOAD env")?;
+            entry.try_reserve_exact(preload.len()).map_err(|_| {
+                exec_loader_enomem(
+                    "not enough kernel memory to prepare default LD_PRELOAD env".to_string(),
+                )
+            })?;
+            entry.push_str(preload.as_str());
+            exec_loader_reserve(&mut env, 1, "append default LD_PRELOAD env")?;
+            env.push(entry);
         }
     }
-    env
+    Ok(env)
 }
 
-fn runtime_compat_preload_path(exec_root: &str) -> Option<String> {
+fn runtime_compat_preload_path(exec_root: &str) -> Result<Option<String>, String> {
     let root = exec_root.trim_end_matches('/');
-    let candidates = if root == "/musl" {
-        vec![
-            format!("{root}/liboscompat.so"),
-            format!("{TESTSUITE_STAGE_ROOT}/m/liboscompat.so"),
-        ]
-    } else {
-        vec![format!("{root}/liboscompat.so")]
-    };
-    candidates
-        .into_iter()
-        .find(|path| matches!(File::open(path), Ok(_)))
+    let runtime_path = exec_loader_join(&[root, "/liboscompat.so"], "prepare LD_PRELOAD path")?;
+    if matches!(File::open(runtime_path.as_str()), Ok(_)) {
+        return Ok(Some(runtime_path));
+    }
+    if root == "/musl" {
+        let staged_path = exec_loader_join(
+            &[TESTSUITE_STAGE_ROOT, "/m/liboscompat.so"],
+            "prepare staged LD_PRELOAD path",
+        )?;
+        if matches!(File::open(staged_path.as_str()), Ok(_)) {
+            return Ok(Some(staged_path));
+        }
+    }
+    Ok(None)
 }
 
 fn runtime_file_contains_ascii(path: &str, needle: &[u8]) -> bool {
     if needle.is_empty() {
         return true;
     }
+    if needle.len() > 128 {
+        return false;
+    }
 
     let Ok(mut file) = File::open(path) else {
         return false;
     };
     let mut buffer = [0u8; 512];
-    let mut tail = Vec::new();
+    let mut window = [0u8; 640];
+    let mut tail = [0u8; 128];
+    let mut tail_len = 0usize;
     loop {
         let Ok(len) = file.read(&mut buffer) else {
             return false;
@@ -122,31 +254,46 @@ fn runtime_file_contains_ascii(path: &str, needle: &[u8]) -> bool {
         if len == 0 {
             return false;
         }
-        let mut window = Vec::with_capacity(tail.len() + len);
-        window.extend_from_slice(&tail);
-        window.extend_from_slice(&buffer[..len]);
-        if window
+        window[..tail_len].copy_from_slice(&tail[..tail_len]);
+        window[tail_len..tail_len + len].copy_from_slice(&buffer[..len]);
+        let window_len = tail_len + len;
+        if window[..window_len]
             .windows(needle.len())
             .any(|candidate| candidate == needle)
         {
             return true;
         }
-        let keep = needle.len().saturating_sub(1).min(window.len());
-        tail.clear();
-        tail.extend_from_slice(&window[window.len() - keep..]);
+        let keep = needle.len().saturating_sub(1).min(window_len);
+        if keep > 0 {
+            tail[..keep].copy_from_slice(&window[window_len - keep..window_len]);
+        }
+        tail_len = keep;
     }
 }
 
-fn runtime_has_musl_loader(exec_root: &str) -> bool {
+fn runtime_has_musl_loader(exec_root: &str) -> Result<bool, String> {
     let root = exec_root.trim_end_matches('/');
     if let Some(root) = cacheable_runtime_loader_root(root) {
         let cache = runtime_loader_cache();
-        if let Some(cached) = cache.lock().get(root).copied() {
-            return cached;
+        {
+            let cache = cache.lock();
+            let cached = match root {
+                "/musl" => cache.musl,
+                "/glibc" => cache.glibc,
+                _ => None,
+            };
+            if let Some(cached) = cached {
+                return Ok(cached);
+            }
         }
-        let has_loader = runtime_has_musl_loader_uncached(root);
-        cache.lock().insert(root, has_loader);
-        return has_loader;
+        let has_loader = runtime_has_musl_loader_uncached(root)?;
+        let mut cache = cache.lock();
+        match root {
+            "/musl" => cache.musl = Some(has_loader),
+            "/glibc" => cache.glibc = Some(has_loader),
+            _ => {}
+        }
+        return Ok(has_loader);
     }
     runtime_has_musl_loader_uncached(root)
 }
@@ -162,26 +309,36 @@ fn cacheable_runtime_loader_root(root: &str) -> Option<&'static str> {
     }
 }
 
-fn runtime_loader_cache() -> &'static Mutex<BTreeMap<&'static str, bool>> {
-    static CACHE: LazyInit<Mutex<BTreeMap<&'static str, bool>>> = LazyInit::new();
-    let _ = CACHE.call_once(|| Mutex::new(BTreeMap::new()));
+fn runtime_loader_cache() -> &'static Mutex<RuntimeLoaderCache> {
+    static CACHE: LazyInit<Mutex<RuntimeLoaderCache>> = LazyInit::new();
+    let _ = CACHE.call_once(|| Mutex::new(RuntimeLoaderCache::default()));
     &CACHE
 }
 
-fn runtime_has_musl_loader_uncached(exec_root: &str) -> bool {
-    let lib_dir = format!("{}/lib", exec_root.trim_end_matches('/'));
+fn runtime_has_musl_loader_uncached(exec_root: &str) -> Result<bool, String> {
+    let lib_dir = exec_loader_join(
+        &[exec_root.trim_end_matches('/'), "/lib"],
+        "prepare runtime lib directory",
+    )?;
     let Ok(entries) = std::fs::read_dir(&lib_dir) else {
-        return false;
+        return Ok(false);
     };
-    entries.filter_map(Result::ok).any(|entry| {
+    for entry in entries.filter_map(Result::ok) {
         let name = entry.file_name();
-        let path = format!("{lib_dir}/{name}");
-        if !matches!(std::fs::metadata(&path), Ok(metadata) if metadata.is_file()) {
-            return false;
+        let path = exec_loader_join(
+            &[lib_dir.as_str(), "/", name.as_str()],
+            "prepare runtime loader candidate",
+        )?;
+        if !matches!(std::fs::metadata(path.as_str()), Ok(metadata) if metadata.is_file()) {
+            continue;
         }
-        name.starts_with("ld-musl-")
+        if name.starts_with("ld-musl-")
             || (name == "libc.so" && runtime_file_contains_ascii(&path, b"musl"))
-    })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn main_exec_image_buffer() -> &'static Mutex<Vec<u8>> {
@@ -245,7 +402,9 @@ fn read_exec_image_into(
     if expected_len > image.capacity() {
         image
             .try_reserve_exact(expected_len - image.capacity())
-            .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
+            .map_err(|_| {
+                exec_loader_enomem(format!("not enough kernel memory to read {label} {path}"))
+            })?;
     }
 
     loop {
@@ -265,9 +424,9 @@ fn read_exec_image_into(
 
         let old_len = image.len();
         let chunk_len = EXEC_IMAGE_READ_CHUNK.min(MAX_EXEC_IMAGE_SIZE - old_len);
-        image
-            .try_reserve_exact(chunk_len)
-            .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
+        image.try_reserve_exact(chunk_len).map_err(|_| {
+            exec_loader_enomem(format!("not enough kernel memory to read {label} {path}"))
+        })?;
         image.resize(old_len + chunk_len, 0);
         let count = match file.read(&mut image[old_len..old_len + chunk_len]) {
             Ok(count) => count,
@@ -286,12 +445,17 @@ fn read_exec_image_into(
     if image.len() < expected_len {
         image
             .try_reserve_exact(expected_len - image.len())
-            .map_err(|_| format!("not enough kernel memory to read sparse {label} {path}"))?;
+            .map_err(|_| {
+                exec_loader_enomem(format!(
+                    "not enough kernel memory to read sparse {label} {path}"
+                ))
+            })?;
         image.resize(expected_len, 0);
     }
     if let Some(process) = process {
         process.copy_path_sparse_data(path, 0, image.as_mut_slice());
     }
+    perf_counters::record_exec_image(image.len());
     Ok(())
 }
 
@@ -307,7 +471,7 @@ pub(super) fn load_program_image(
     let prepared = prepare_program(process, cwd, program_path, argv, 0, &mut main_image)?;
     let elf = ElfFile::new(main_image.as_slice()).map_err(|err| format!("invalid ELF: {err}"))?;
     let main = analyze_elf(&elf, USER_PIE_LOAD_BASE)?;
-    let exec_root = effective_exec_root(prepared.exec_root.as_str(), main.interpreter.as_deref());
+    let exec_root = effective_exec_root(prepared.exec_root.as_str(), main.interpreter.as_deref())?;
 
     aspace.clear();
 
@@ -317,7 +481,7 @@ pub(super) fn load_program_image(
     let mut interp_base = 0usize;
 
     if let Some(raw_interp) = main.interpreter.as_deref() {
-        let interp_path = resolve_runtime_support_file(exec_root.as_str(), raw_interp)?;
+        let interp_path = try_resolve_runtime_support_file(exec_root.as_str(), raw_interp)?;
         let mut interp_image = interp_exec_image_buffer().lock();
         read_exec_image_into(
             process,
@@ -334,12 +498,13 @@ pub(super) fn load_program_image(
                 PAGE_SIZE_4K,
             ),
         )?;
-        mappings.extend(map_elf_image(
-            aspace,
-            interp_image.as_slice(),
-            &interp_elf,
-            &interp,
-        )?);
+        let interp_mappings = map_elf_image(aspace, interp_image.as_slice(), &interp_elf, &interp)?;
+        exec_loader_reserve(
+            &mut mappings,
+            interp_mappings.len(),
+            "append interpreter ELF mappings",
+        )?;
+        mappings.extend(interp_mappings);
         max_mapped_end = cmp::max(max_mapped_end, interp.max_segment_end);
         runtime_entry = interp.entry;
         interp_base = interp.base;
@@ -360,7 +525,7 @@ pub(super) fn load_program_image(
             user_mapping_flags(true, true, false),
             false,
         )
-        .map_err(|err| format!("failed to reserve brk area: {err}"))?;
+        .map_err(|err| exec_loader_axerr("failed to reserve brk area".to_string(), err))?;
 
     let stack_top = align_down(USER_STACK_TOP, PAGE_SIZE_4K);
     let stack_base = stack_top - USER_STACK_SIZE;
@@ -371,15 +536,15 @@ pub(super) fn load_program_image(
             user_mapping_flags(true, true, false),
             false,
         )
-        .map_err(|err| format!("failed to reserve user stack: {err}"))?;
+        .map_err(|err| exec_loader_axerr("failed to reserve user stack".to_string(), err))?;
 
-    let argv_refs = prepared.argv.iter().map(String::as_str).collect::<Vec<_>>();
+    let argv_refs = exec_loader_string_refs(prepared.argv.as_slice(), "prepare argv references")?;
     let default_env;
     let env_refs = if let Some(env) = env_override {
-        env.iter().map(String::as_str).collect::<Vec<_>>()
+        exec_loader_string_refs(env, "prepare env references")?
     } else {
-        default_env = default_exec_env(exec_root.as_str(), cwd);
-        default_env.iter().map(String::as_str).collect::<Vec<_>>()
+        default_env = default_exec_env(exec_root.as_str(), cwd)?;
+        exec_loader_string_refs(default_env.as_slice(), "prepare default env references")?
     };
     let ph_entry_size = elf.header.pt2.ph_entry_size() as usize;
     let ph_count = elf.header.pt2.ph_count() as usize;
@@ -421,20 +586,20 @@ pub(super) fn load_program_image(
     })
 }
 
-fn effective_exec_root(path_root: &str, interpreter: Option<&str>) -> String {
+fn effective_exec_root(path_root: &str, interpreter: Option<&str>) -> Result<String, String> {
     if path_root != "/" {
-        return path_root.into();
+        return exec_loader_owned_string(path_root, "copy exec root");
     }
     let Some(interpreter) = interpreter else {
-        return path_root.into();
+        return exec_loader_owned_string(path_root, "copy exec root");
     };
     let name = interpreter.rsplit('/').next().unwrap_or(interpreter);
     if name.starts_with("ld-musl-") {
-        "/musl".into()
+        exec_loader_owned_string("/musl", "copy interpreter exec root")
     } else if name.starts_with("ld-linux-") {
-        "/glibc".into()
+        exec_loader_owned_string("/glibc", "copy interpreter exec root")
     } else {
-        path_root.into()
+        exec_loader_owned_string(path_root, "copy exec root")
     }
 }
 
@@ -443,7 +608,7 @@ fn resolve_program_exec_path(
     cwd: &str,
     program_path: &str,
 ) -> Result<String, String> {
-    let path = resolve_host_path(cwd.to_string(), program_path)?;
+    let path = try_resolve_host_path(cwd, program_path)?;
     if matches!(File::open(&path), Ok(_)) {
         return Ok(path);
     }
@@ -453,13 +618,13 @@ fn resolve_program_exec_path(
     let Some(process) = process else {
         return Ok(path);
     };
-    for candidate in staged_cwd_absolute_path_candidates(cwd, path.as_str()) {
+    for candidate in try_staged_cwd_absolute_path_candidates(cwd, path.as_str())? {
         if candidate != path && matches!(File::open(&candidate), Ok(_)) {
             return Ok(candidate);
         }
     }
     let exec_root = process.exec_root();
-    for candidate in runtime_absolute_path_candidates(exec_root.as_str(), path.as_str()) {
+    for candidate in try_runtime_absolute_path_candidates(exec_root.as_str(), path.as_str())? {
         if candidate != path && matches!(File::open(&candidate), Ok(_)) {
             return Ok(candidate);
         }
@@ -488,15 +653,16 @@ fn prepare_program(
     if let Some(next_argv) =
         parse_shebang_argv(process, cwd, path.as_str(), image.as_slice(), argv)?
     {
-        let next_refs = next_argv.iter().map(String::as_str).collect::<Vec<_>>();
+        let next_refs =
+            exec_loader_string_refs(next_argv.as_slice(), "prepare shebang argv references")?;
         let next_program = next_refs.first().copied().unwrap_or(program_path);
         return prepare_program(process, cwd, next_program, &next_refs, depth + 1, image);
     }
 
     Ok(PreparedProgram {
-        argv: argv.iter().map(|arg| (*arg).to_string()).collect(),
-        path: path.clone(),
-        exec_root: derive_exec_root_from_path(path.as_str()),
+        argv: exec_loader_owned_strings(argv, "copy prepared argv")?,
+        path: exec_loader_owned_string(path.as_str(), "copy prepared exec path")?,
+        exec_root: try_derive_exec_root_from_path(path.as_str())?,
     })
 }
 
@@ -516,19 +682,32 @@ fn parse_shebang_argv(
         .position(|&byte| byte == b'\n')
         .unwrap_or(image.len());
     let line = core::str::from_utf8(&image[2..line_end])
-        .map_err(|_| format!("invalid shebang in {script_path}"))?
+        .map_err(|_| {
+            exec_loader_join(
+                &["invalid shebang in ", script_path],
+                "report invalid shebang",
+            )
+            .unwrap_or_else(|err| err)
+        })?
         .trim_end_matches('\r')
         .trim();
     if line.is_empty() {
-        return Err(format!("empty shebang interpreter in {script_path}"));
+        return Err(exec_loader_join(
+            &["empty shebang interpreter in ", script_path],
+            "report empty shebang",
+        )?);
     }
 
     let mut parts = line.split_whitespace();
     let raw_interpreter = parts.next().unwrap();
     let mut next_argv = resolve_script_interpreter(process, cwd, script_path, raw_interpreter)?;
-    next_argv.extend(parts.map(str::to_string));
-    next_argv.push(script_path.to_string());
-    next_argv.extend(argv.iter().skip(1).map(|arg| (*arg).to_string()));
+    for part in parts {
+        exec_loader_push_string(&mut next_argv, part, "copy shebang argument")?;
+    }
+    exec_loader_push_string(&mut next_argv, script_path, "copy shebang script path")?;
+    for arg in argv.iter().skip(1) {
+        exec_loader_push_string(&mut next_argv, arg, "copy shebang original argv")?;
+    }
     Ok(Some(next_argv))
 }
 
@@ -538,32 +717,46 @@ fn resolve_script_interpreter(
     script_path: &str,
     raw_interpreter: &str,
 ) -> Result<Vec<String>, String> {
-    let base = script_dir(script_path);
-    let resolved = resolve_host_path(base, raw_interpreter)?;
+    let base = script_dir(script_path)?;
+    let resolved = try_resolve_host_path(base.as_str(), raw_interpreter)?;
     if matches!(std::fs::metadata(&resolved), Ok(meta) if meta.is_file()) {
-        return Ok(vec![resolved]);
+        let mut argv = Vec::new();
+        exec_loader_push_string(
+            &mut argv,
+            resolved.as_str(),
+            "prepare script interpreter argv",
+        )?;
+        return Ok(argv);
     }
     let resolved = resolve_program_exec_path(process, cwd, raw_interpreter)?;
     if matches!(std::fs::metadata(&resolved), Ok(meta) if meta.is_file()) {
-        let mut argv = vec![resolved.clone()];
+        let mut argv = Vec::new();
+        exec_loader_push_string(
+            &mut argv,
+            resolved.as_str(),
+            "prepare script interpreter argv",
+        )?;
         let raw_name = raw_interpreter
             .rsplit('/')
             .next()
             .unwrap_or(raw_interpreter);
         let resolved_name = resolved.rsplit('/').next().unwrap_or(resolved.as_str());
         if resolved_name == "busybox" && matches!(raw_name, "sh" | "ash" | "bash") {
-            argv.push(String::from("sh"));
+            exec_loader_push_string(&mut argv, "sh", "prepare busybox shell argv")?;
         }
         return Ok(argv);
     }
 
-    Err(format!("script interpreter not found: {raw_interpreter}"))
+    Err(exec_loader_join(
+        &["script interpreter not found: ", raw_interpreter],
+        "report missing script interpreter",
+    )?)
 }
 
-fn script_dir(path: &str) -> String {
+fn script_dir(path: &str) -> Result<String, String> {
     match path.rfind('/') {
-        Some(0) | None => "/".into(),
-        Some(idx) => path[..idx].to_string(),
+        Some(0) | None => exec_loader_owned_string("/", "copy script directory"),
+        Some(idx) => exec_loader_owned_string(&path[..idx], "copy script directory"),
     }
 }
 
@@ -640,7 +833,7 @@ fn read_interp_path(elf: &ElfFile<'_>, ph: &ProgramHeader<'_>) -> Result<String,
     if path.is_empty() {
         return Err("empty PT_INTERP path".into());
     }
-    Ok(path.to_string())
+    exec_loader_owned_string(path, "copy PT_INTERP path")
 }
 
 fn map_elf_image(
@@ -650,6 +843,11 @@ fn map_elf_image(
     info: &ElfLoadInfo,
 ) -> Result<Vec<LoadedMapping>, String> {
     let mut mappings = Vec::new();
+    mappings
+        .try_reserve_exact(elf.header.pt2.ph_count() as usize)
+        .map_err(|_| {
+            exec_loader_enomem("not enough kernel memory to prepare ELF mappings".to_string())
+        })?;
     for ph in elf.program_iter() {
         if ph.get_type().map_err(str_err)? == PhType::Load {
             if let Some(mapping) = map_load_segment(aspace, image, &ph, info.load_bias)? {
@@ -682,7 +880,9 @@ fn map_load_segment(
             flags_from_ph(ph.flags()),
             true,
         )
-        .map_err(|err| format!("failed to map ELF segment at {seg_start:#x}: {err}"))?;
+        .map_err(|err| {
+            exec_loader_axerr(format!("failed to map ELF segment at {seg_start:#x}"), err)
+        })?;
 
     let file_size = ph.file_size() as usize;
     if file_size != 0 {
@@ -736,26 +936,24 @@ fn build_initial_stack(
     let mut sp = stack_top;
     let random_bytes = [0x55u8; 16];
     let random_ptr = push_stack_bytes(aspace, stack_base, &mut sp, &random_bytes, 16)?;
-    let mut execfn_bytes = execfn.as_bytes().to_vec();
-    execfn_bytes.push(0);
+    let execfn_bytes = stack_bytes_with_nul(execfn, "copy AT_EXECFN string")?;
     let execfn_ptr = push_stack_bytes(aspace, stack_base, &mut sp, &execfn_bytes, 1)?;
-    let mut platform_bytes = AUX_PLATFORM.as_bytes().to_vec();
-    platform_bytes.push(0);
+    let platform_bytes = stack_bytes_with_nul(AUX_PLATFORM, "copy AUX_PLATFORM string")?;
     let platform_ptr = push_stack_bytes(aspace, stack_base, &mut sp, &platform_bytes, 1)?;
 
-    let mut arg_ptrs = Vec::with_capacity(argv.len());
+    let mut arg_ptrs = Vec::new();
+    exec_loader_reserve(&mut arg_ptrs, argv.len(), "record argv pointers")?;
     for arg in argv.iter().rev() {
-        let mut bytes = arg.as_bytes().to_vec();
-        bytes.push(0);
+        let bytes = stack_bytes_with_nul(arg, "copy argv string")?;
         let ptr = push_stack_bytes(aspace, stack_base, &mut sp, &bytes, 1)?;
         arg_ptrs.push(ptr);
     }
     arg_ptrs.reverse();
 
-    let mut env_ptrs = Vec::with_capacity(env.len());
+    let mut env_ptrs = Vec::new();
+    exec_loader_reserve(&mut env_ptrs, env.len(), "record env pointers")?;
     for item in env.iter().rev() {
-        let mut bytes = item.as_bytes().to_vec();
-        bytes.push(0);
+        let bytes = stack_bytes_with_nul(item, "copy env string")?;
         let ptr = push_stack_bytes(aspace, stack_base, &mut sp, &bytes, 1)?;
         env_ptrs.push(ptr);
     }
@@ -844,7 +1042,19 @@ fn build_initial_stack(
         },
     ];
 
-    let mut words = Vec::with_capacity(1 + arg_ptrs.len() + 1 + env_ptrs.len() + 1 + aux.len() * 2);
+    let word_count = 1usize
+        .checked_add(arg_ptrs.len())
+        .and_then(|count| count.checked_add(1))
+        .and_then(|count| count.checked_add(env_ptrs.len()))
+        .and_then(|count| count.checked_add(1))
+        .and_then(|count| {
+            aux.len()
+                .checked_mul(2)
+                .and_then(|aux_words| count.checked_add(aux_words))
+        })
+        .ok_or_else(|| "initial user stack word count overflow".to_string())?;
+    let mut words = Vec::new();
+    exec_loader_reserve(&mut words, word_count, "prepare initial stack words")?;
     words.push(argv.len());
     words.extend(arg_ptrs.iter().copied());
     words.push(0);
@@ -854,7 +1064,7 @@ fn build_initial_stack(
         words.push(item.key);
         words.push(item.value);
     }
-    let bytes = words_to_bytes(&words);
+    let bytes = words_to_bytes(&words)?;
     sp = align_down(sp.saturating_sub(bytes.len()), 16);
     let end = sp + bytes.len();
     if sp < stack_base || end > stack_top {
@@ -862,7 +1072,7 @@ fn build_initial_stack(
     }
     aspace
         .populate_range(VirtAddr::from(sp), bytes.len(), PageFaultFlags::WRITE)
-        .map_err(|err| format!("failed to populate user stack pages: {err}"))?;
+        .map_err(|err| exec_loader_axerr("failed to populate user stack pages".to_string(), err))?;
     aspace
         .write(VirtAddr::from(sp), &bytes)
         .map_err(|err| format!("failed to populate user stack: {err}"))?;
@@ -882,19 +1092,24 @@ fn push_stack_bytes(
     }
     aspace
         .populate_range(VirtAddr::from(*sp), data.len(), PageFaultFlags::WRITE)
-        .map_err(|err| format!("failed to populate user stack pages: {err}"))?;
+        .map_err(|err| exec_loader_axerr("failed to populate user stack pages".to_string(), err))?;
     aspace
         .write(VirtAddr::from(*sp), data)
         .map_err(|err| format!("failed to write user stack data: {err}"))?;
     Ok(*sp)
 }
 
-fn words_to_bytes(words: &[usize]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(words.len() * size_of::<usize>());
+fn words_to_bytes(words: &[usize]) -> Result<Vec<u8>, String> {
+    let byte_len = words
+        .len()
+        .checked_mul(size_of::<usize>())
+        .ok_or_else(|| "initial user stack byte count overflow".to_string())?;
+    let mut bytes = Vec::new();
+    exec_loader_reserve(&mut bytes, byte_len, "prepare initial stack bytes")?;
     for word in words {
         bytes.extend_from_slice(&word.to_ne_bytes());
     }
-    bytes
+    Ok(bytes)
 }
 
 fn flags_from_ph(flags: PhFlags) -> MappingFlags {

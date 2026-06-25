@@ -1,5 +1,5 @@
-use core::mem::{size_of, MaybeUninit};
-use core::ptr;
+use core::mem::{forget, size_of, MaybeUninit};
+use core::slice;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use axerrno::LinuxError;
@@ -11,6 +11,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
+use super::perf_counters;
 use super::{neg_errno, UserProcess};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
@@ -136,6 +137,7 @@ fn fault_in_user_range(
     {
         return Err(LinuxError::EFAULT);
     }
+    perf_counters::record_user_copy_fault();
     let end = ptr.checked_add(len).ok_or(LinuxError::EFAULT)?;
     let access_flags = if write {
         MappingFlags::READ | MappingFlags::WRITE
@@ -209,6 +211,7 @@ pub(super) fn read_user_bytes(
         .lock()
         .read(VirtAddr::from(ptr), &mut bytes)
         .map_err(|_| LinuxError::EFAULT)?;
+    perf_counters::record_user_copy_read(len);
     Ok(bytes)
 }
 
@@ -225,7 +228,9 @@ pub(super) fn read_user_bytes_into(
         .aspace
         .lock()
         .read(VirtAddr::from(ptr), dst)
-        .map_err(|_| LinuxError::EFAULT)
+        .map_err(|_| LinuxError::EFAULT)?;
+    perf_counters::record_user_copy_read(dst.len());
+    Ok(())
 }
 
 pub(super) fn read_iovec_entries(
@@ -239,11 +244,25 @@ pub(super) fn read_iovec_entries(
     let iov_bytes_len = iovcnt
         .checked_mul(size_of::<general::iovec>())
         .ok_or(LinuxError::EINVAL)?;
-    let iov_bytes = read_user_bytes(process, iov, iov_bytes_len)?;
-    let entries: Vec<general::iovec> = iov_bytes
-        .chunks_exact(size_of::<general::iovec>())
-        .map(|chunk| unsafe { ptr::read_unaligned(chunk.as_ptr() as *const general::iovec) })
-        .collect();
+    let mut raw_entries: Vec<MaybeUninit<general::iovec>> = Vec::new();
+    raw_entries
+        .try_reserve_exact(iovcnt)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    raw_entries.resize_with(iovcnt, MaybeUninit::uninit);
+    // SAFETY: `raw_entries` reserves exactly `iovcnt` slots of `general::iovec`, and the
+    // byte view spans those slots only. A failed copy returns before the entries are read.
+    let dst =
+        unsafe { slice::from_raw_parts_mut(raw_entries.as_mut_ptr() as *mut u8, iov_bytes_len) };
+    read_user_bytes_into(process, iov, dst)?;
+    let len = raw_entries.len();
+    let cap = raw_entries.capacity();
+    let ptr = raw_entries.as_mut_ptr() as *mut general::iovec;
+    forget(raw_entries);
+    // SAFETY: after `read_user_bytes_into` succeeds, every byte of each `iovec` slot has
+    // been initialized from userspace, so ownership can move from `MaybeUninit<iovec>` to
+    // `Vec<iovec>` without per-entry copies. `general::iovec` is a plain C ABI record.
+    let entries = unsafe { Vec::from_raw_parts(ptr, len, cap) };
+    perf_counters::record_iovec_table(entries.len());
     let mut total_len = 0usize;
     for entry in &entries {
         total_len = total_len
@@ -270,7 +289,9 @@ pub(super) fn write_user_bytes(
         .aspace
         .lock()
         .write(VirtAddr::from(ptr), bytes)
-        .map_err(|_| LinuxError::EFAULT)
+        .map_err(|_| LinuxError::EFAULT)?;
+    perf_counters::record_user_copy_write(bytes.len());
+    Ok(())
 }
 
 pub(super) fn user_io_buffer(len: usize) -> Result<Vec<u8>, LinuxError> {
@@ -364,7 +385,13 @@ pub(super) fn write_user_value<T: Copy>(process: &UserProcess, ptr: usize, value
         .aspace
         .lock()
         .write(VirtAddr::from(ptr), src)
-        .map_or_else(|_| neg_errno(LinuxError::EFAULT), |_| 0)
+        .map_or_else(
+            |_| neg_errno(LinuxError::EFAULT),
+            |_| {
+                perf_counters::record_user_copy_write(size_of::<T>());
+                0
+            },
+        )
 }
 
 pub(super) fn read_user_value<T: Copy>(process: &UserProcess, ptr: usize) -> Result<T, LinuxError> {
@@ -378,6 +405,7 @@ pub(super) fn read_user_value<T: Copy>(process: &UserProcess, ptr: usize) -> Res
         .lock()
         .read(VirtAddr::from(ptr), dst)
         .map_err(|_| LinuxError::EFAULT)?;
+    perf_counters::record_user_copy_read(size_of::<T>());
     Ok(unsafe { value.assume_init() })
 }
 

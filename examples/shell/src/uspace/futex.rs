@@ -11,12 +11,13 @@ use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::UserProcess;
-use super::linux_abi::{USER_MMAP_BASE, neg_errno};
+use super::linux_abi::{neg_errno, USER_MMAP_BASE};
+use super::perf_counters;
 use super::signal_abi::current_unblocked_signal_pending;
 use super::task_context::{current_task_ext, current_tid, task_ext, user_pc};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::{fault_in_user_read, read_user_value};
+use super::UserProcess;
 
 pub(super) struct FutexState {
     pub(super) seq: AtomicU32,
@@ -355,6 +356,10 @@ pub(super) fn sys_futex(
     }
     let op = futex_op as u32;
     let cmd = op & general::FUTEX_CMD_MASK as u32;
+    perf_counters::record_futex_call(matches!(
+        cmd,
+        general::FUTEX_WAIT | general::FUTEX_WAIT_BITSET
+    ));
     if uaddr < USER_MMAP_BASE || (uaddr >= USER_MMAP_BASE && val <= 8) {
         user_trace!(
             "user-futex: tid={} cmd={cmd:#x} op={op:#x} uaddr={uaddr:#x} val={val:#x} timeout={timeout:#x} sp={:#x} tp={:#x} ra={:#x} pc={:#x}",

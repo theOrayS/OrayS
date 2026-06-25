@@ -6,7 +6,8 @@ use axerrno::LinuxError;
 use kspin::SpinNoPreempt;
 use linux_raw_sys::general;
 
-use super::linux_abi::{BITS_PER_USIZE, FD_SET_WORDS, FD_SETSIZE, neg_errno};
+use super::linux_abi::{neg_errno, BITS_PER_USIZE, FD_SETSIZE, FD_SET_WORDS};
+use super::perf_counters;
 use super::signal_abi::{current_unblocked_signal_pending, install_temporary_signal_mask};
 use super::task_context::current_task_ext;
 use super::task_registry::live_user_thread_count;
@@ -391,6 +392,7 @@ fn poll_fds_once(
 ) -> Result<(usize, usize), LinuxError> {
     let mut ready = 0usize;
     let mut watched = 0usize;
+    perf_counters::record_poll_fd_scan(nfds);
     let table = process.fds.lock();
     for idx in 0..nfds {
         let ptr = fds + idx * size_of::<UserPollFd>();
@@ -581,6 +583,7 @@ pub(super) fn yield_poll_wait() {
 }
 
 fn yield_poll_wait_for(delay: Duration) {
+    perf_counters::record_poll_wait();
     if let Some(ext) = current_task_ext() {
         ext.poll_wait.store(true, Ordering::Release);
         // Empty poll/select loops are waiting for an external event, not doing

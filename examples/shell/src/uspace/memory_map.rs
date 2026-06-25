@@ -13,6 +13,7 @@ use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
 use super::linux_abi::{
     neg_errno, SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP,
 };
+use super::perf_counters;
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::{current_task_ext, current_tid, user_pc};
@@ -106,6 +107,7 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         && vaddr.as_usize() >= USER_MMAP_BASE
         && vaddr.as_usize() < USER_STACK_TOP;
     if _from_user {
+        perf_counters::record_mmap_page_fault();
         let _ = process.handle_mmap_grow_down_fault(vaddr.as_usize(), flags);
     }
     let handled = {
@@ -255,12 +257,7 @@ pub(super) fn sys_mmap(
             return neg_errno(LinuxError::ENOMEM);
         };
         let limit = VirtAddrRange::from_start_size(VirtAddr::from(USER_MMAP_BASE), limit_size);
-        let start = {
-            let aspace = process.aspace.lock();
-            aspace
-                .find_free_area(VirtAddr::from(hint), size, limit)
-                .or_else(|| aspace.find_free_area(VirtAddr::from(USER_MMAP_BASE), size, limit))
-        };
+        let start = find_mmap_free_area(process, hint, size, limit);
         let Some(start) = start.map(|addr| addr.as_usize()) else {
             return neg_errno(LinuxError::ENOMEM);
         };
@@ -278,6 +275,7 @@ pub(super) fn sys_mmap(
         user_trace!("user-mmap: target={target:#x} len={size:#x} prot={prot:#x} flags={flags:#x}");
     }
     let file_backed = !anonymous && !dev_zero;
+    perf_counters::record_mmap(file_backed);
     let mut file_backing = if file_backed && shared && shared_write_allowed {
         let file = match process.fds.lock().mmap_file_backing(fd as i32) {
             Ok(file) => file,
@@ -637,12 +635,7 @@ fn mremap_find_free_area(process: &UserProcess, size: usize) -> Option<usize> {
     let limit = VirtAddrRange::from_start_size(VirtAddr::from(USER_MMAP_BASE), limit_size);
     let mut brk = process.brk.lock();
     let hint = align_up_checked(brk.next_mmap, PAGE_SIZE_4K)?;
-    let start = {
-        let aspace = process.aspace.lock();
-        aspace
-            .find_free_area(VirtAddr::from(hint), size, limit)
-            .or_else(|| aspace.find_free_area(VirtAddr::from(USER_MMAP_BASE), size, limit))
-    }?;
+    let start = find_mmap_free_area(process, hint, size, limit)?;
     let start = start.as_usize();
     brk.next_mmap = start
         .checked_add(size)
@@ -650,6 +643,20 @@ fn mremap_find_free_area(process: &UserProcess, size: usize) -> Option<usize> {
         .filter(|next| *next < mmap_limit_end())
         .unwrap_or(USER_MMAP_BASE);
     Some(start)
+}
+
+fn find_mmap_free_area(
+    process: &UserProcess,
+    hint: usize,
+    size: usize,
+    limit: VirtAddrRange,
+) -> Option<VirtAddr> {
+    let aspace = process.aspace.lock();
+    let start = aspace.find_free_area(VirtAddr::from(hint), size, limit);
+    if start.is_some() || hint == USER_MMAP_BASE {
+        return start;
+    }
+    aspace.find_free_area(VirtAddr::from(USER_MMAP_BASE), size, limit)
 }
 
 fn mremap_move(
