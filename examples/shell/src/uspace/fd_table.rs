@@ -78,7 +78,7 @@ use super::time_abi::{
 };
 use super::user_memory::{
     MAX_USER_IO_CHUNK, fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes,
-    read_user_value, user_io_buffer, validate_user_read, validate_user_write,
+    read_user_bytes_into, read_user_value, validate_user_read, validate_user_write,
     with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
 };
 use super::{PathTimes, UserProcess};
@@ -140,6 +140,16 @@ fn current_fd_table_limit() -> usize {
         FD_TABLE_LIMIT,
         soft_limit.min(FD_TABLE_LIMIT as u64) as usize,
     )
+}
+
+fn io_scratch_slice<'a>(scratch: &'a mut Vec<u8>, len: usize) -> Result<&'a mut [u8], LinuxError> {
+    if scratch.len() < len {
+        scratch
+            .try_reserve_exact(len - scratch.len())
+            .map_err(|_| LinuxError::ENOMEM)?;
+        scratch.resize(len, 0);
+    }
+    Ok(&mut scratch[..len])
 }
 
 pub(super) enum FdEntry {
@@ -1775,6 +1785,7 @@ pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usiz
     }
     if count > MAX_USER_IO_CHUNK {
         let mut total = 0usize;
+        let mut scratch = Vec::new();
         while total < count {
             let base = match buf.checked_add(total) {
                 Some(base) => base,
@@ -1794,7 +1805,7 @@ pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usiz
                     neg_errno(err)
                 };
             }
-            let mut bytes = match user_io_buffer(len) {
+            let bytes = match io_scratch_slice(&mut scratch, len) {
                 Ok(bytes) => bytes,
                 Err(err) => {
                     return if total > 0 {
@@ -1804,7 +1815,7 @@ pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usiz
                     };
                 }
             };
-            let n = match process.fds.lock().read(process, fd as i32, &mut bytes) {
+            let n = match process.fds.lock().read(process, fd as i32, &mut *bytes) {
                 Ok(n) => n,
                 Err(err) => {
                     return if total > 0 {
@@ -1863,6 +1874,7 @@ pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usi
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     if count > MAX_USER_IO_CHUNK {
         let mut written = 0usize;
+        let mut scratch = Vec::new();
         while written < count {
             let base = match buf.checked_add(written) {
                 Some(base) => base,
@@ -1875,8 +1887,15 @@ pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usi
                 }
             };
             let len = (count - written).min(MAX_USER_IO_CHUNK);
-            let src = match read_user_bytes(process, base, len) {
-                Ok(bytes) => bytes,
+            if let Err(err) = validate_user_read(process, base, len) {
+                return if written > 0 {
+                    written as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+            let src = match io_scratch_slice(&mut scratch, len) {
+                Ok(src) => src,
                 Err(err) => {
                     return if written > 0 {
                         written as isize
@@ -1885,10 +1904,17 @@ pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usi
                     };
                 }
             };
+            if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
+                return if written > 0 {
+                    written as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
             let n = match process
                 .fds
                 .lock()
-                .write(process, fd as i32, &src, Some(file_size_limit))
+                .write(process, fd as i32, src, Some(file_size_limit))
             {
                 Ok(v) => v,
                 Err(err) => {
@@ -1943,6 +1969,7 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
         Err(err) => return neg_errno(err),
     };
     let mut written = 0isize;
+    let mut scratch = Vec::new();
     for entry in iov_entries {
         let mut base = entry.iov_base as usize;
         let mut remaining = entry.iov_len as usize;
@@ -1951,15 +1978,18 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
         }
         while remaining > 0 {
             let len = remaining.min(MAX_USER_IO_CHUNK);
-            let src = match read_user_bytes(process, base, len) {
-                Ok(bytes) => bytes,
+            let src = match io_scratch_slice(&mut scratch, len) {
+                Ok(src) => src,
                 Err(err) => return if written > 0 { written } else { neg_errno(err) },
             };
+            if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
+                return if written > 0 { written } else { neg_errno(err) };
+            }
             let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
             let n = match process
                 .fds
                 .lock()
-                .write(process, fd as i32, &src, Some(file_size_limit))
+                .write(process, fd as i32, src, Some(file_size_limit))
             {
                 Ok(v) => v,
                 Err(err) => return if written > 0 { written } else { neg_errno(err) },
@@ -1981,6 +2011,7 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
         Err(err) => return neg_errno(err),
     };
     let mut total = 0isize;
+    let mut scratch = Vec::new();
     for entry in iov_entries {
         let mut base = entry.iov_base as usize;
         let mut remaining = entry.iov_len as usize;
@@ -1989,11 +2020,11 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
         }
         while remaining > 0 {
             let len = remaining.min(MAX_USER_IO_CHUNK);
-            let mut bytes = match user_io_buffer(len) {
+            let bytes = match io_scratch_slice(&mut scratch, len) {
                 Ok(bytes) => bytes,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
-            let n = match process.fds.lock().read(process, fd as i32, &mut bytes) {
+            let n = match process.fds.lock().read(process, fd as i32, &mut *bytes) {
                 Ok(v) => v,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
@@ -2035,6 +2066,7 @@ pub(super) fn sys_preadv(
     };
     let mut total = 0isize;
     let mut next_offset = offset as u64;
+    let mut scratch = Vec::new();
     for entry in iov_entries {
         let mut base = entry.iov_base as usize;
         let mut remaining = entry.iov_len as usize;
@@ -2043,7 +2075,7 @@ pub(super) fn sys_preadv(
         }
         while remaining > 0 {
             let len = remaining.min(MAX_USER_IO_CHUNK);
-            let mut bytes = match user_io_buffer(len) {
+            let bytes = match io_scratch_slice(&mut scratch, len) {
                 Ok(bytes) => bytes,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
@@ -2051,7 +2083,7 @@ pub(super) fn sys_preadv(
                 process,
                 fd as i32,
                 next_offset,
-                &mut bytes,
+                &mut *bytes,
             ) {
                 Ok(v) => v,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
@@ -2114,6 +2146,7 @@ pub(super) fn sys_pwritev(
     let mut total = 0isize;
     let mut next_offset = offset as u64;
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+    let mut scratch = Vec::new();
     for entry in iov_entries {
         let mut base = entry.iov_base as usize;
         let mut remaining = entry.iov_len as usize;
@@ -2122,15 +2155,18 @@ pub(super) fn sys_pwritev(
         }
         while remaining > 0 {
             let len = remaining.min(MAX_USER_IO_CHUNK);
-            let src = match read_user_bytes(process, base, len) {
-                Ok(bytes) => bytes,
+            let src = match io_scratch_slice(&mut scratch, len) {
+                Ok(src) => src,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
+            if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
+                return if total > 0 { total } else { neg_errno(err) };
+            }
             let n = match process.fds.lock().write_file_at(
                 process,
                 fd as i32,
                 next_offset,
-                &src,
+                src,
                 Some(file_size_limit),
             ) {
                 Ok(v) => v,
@@ -2204,9 +2240,10 @@ pub(super) fn sys_sendfile(
     }
 
     let mut copied = 0usize;
+    let mut scratch = Vec::new();
     while copied < count {
         let chunk_len = (count - copied).min(MAX_USER_IO_CHUNK);
-        let mut buf = match user_io_buffer(chunk_len) {
+        let buf = match io_scratch_slice(&mut scratch, chunk_len) {
             Ok(buf) => buf,
             Err(err) => {
                 return if copied > 0 {
@@ -2219,9 +2256,9 @@ pub(super) fn sys_sendfile(
         let read = {
             let mut table = process.fds.lock();
             match offset {
-                Some(pos) => table.read_file_at_into_fd(process, in_fd as i32, pos, &mut buf),
+                Some(pos) => table.read_file_at_into_fd(process, in_fd as i32, pos, &mut *buf),
                 None => table
-                    .read_file_at_current_offset_into_fd(process, in_fd as i32, &mut buf)
+                    .read_file_at_current_offset_into_fd(process, in_fd as i32, &mut *buf)
                     .map(|(_, read)| read),
             }
         };
@@ -2361,6 +2398,7 @@ pub(super) fn sys_splice(
     };
 
     let mut copied = 0usize;
+    let mut scratch = Vec::new();
     while copied < len {
         let mut chunk_len = (len - copied).min(MAX_USER_IO_CHUNK);
         if in_kind == SpliceEndpointKind::Pipe {
@@ -2505,7 +2543,7 @@ pub(super) fn sys_splice(
             }
         }
 
-        let mut buf = match user_io_buffer(chunk_len) {
+        let buf = match io_scratch_slice(&mut scratch, chunk_len) {
             Ok(buf) => buf,
             Err(err) => {
                 return if copied > 0 {
@@ -2517,7 +2555,7 @@ pub(super) fn sys_splice(
         };
         let read = {
             let mut table = process.fds.lock();
-            splice_read_input(&mut table, process, fd_in, in_kind, off_in, &mut buf)
+            splice_read_input(&mut table, process, fd_in, in_kind, off_in, &mut *buf)
         };
         let read = match read {
             Ok(0) => break,
@@ -2651,6 +2689,7 @@ pub(super) fn sys_vmsplice(
     };
 
     let mut total = 0isize;
+    let mut scratch = Vec::new();
     for entry in iov_entries {
         let mut base = entry.iov_base as usize;
         let mut remaining = entry.iov_len as usize;
@@ -2661,19 +2700,18 @@ pub(super) fn sys_vmsplice(
                 }
                 while remaining > 0 {
                     let len = remaining.min(MAX_USER_IO_CHUNK);
-                    let src = match read_user_bytes(process, base, len) {
-                        Ok(bytes) => bytes,
+                    let src = match io_scratch_slice(&mut scratch, len) {
+                        Ok(src) => src,
                         Err(err) => return if total > 0 { total } else { neg_errno(err) },
                     };
-                    let written =
-                        match process
-                            .fds
-                            .lock()
-                            .vmsplice_write_pipe(fd, &src, nonblocking)
-                        {
-                            Ok(written) => written,
-                            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-                        };
+                    if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
+                        return if total > 0 { total } else { neg_errno(err) };
+                    }
+                    let written = match process.fds.lock().vmsplice_write_pipe(fd, src, nonblocking)
+                    {
+                        Ok(written) => written,
+                        Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                    };
                     total += written as isize;
                     if written == 0 {
                         return total;
@@ -2691,7 +2729,7 @@ pub(super) fn sys_vmsplice(
                 }
                 while remaining > 0 {
                     let len = remaining.min(MAX_USER_IO_CHUNK);
-                    let mut bytes = match user_io_buffer(len) {
+                    let bytes = match io_scratch_slice(&mut scratch, len) {
                         Ok(bytes) => bytes,
                         Err(err) => return if total > 0 { total } else { neg_errno(err) },
                     };
@@ -2699,7 +2737,7 @@ pub(super) fn sys_vmsplice(
                         match process
                             .fds
                             .lock()
-                            .vmsplice_read_pipe(fd, &mut bytes, nonblocking)
+                            .vmsplice_read_pipe(fd, &mut *bytes, nonblocking)
                         {
                             Ok(read) => read,
                             Err(err) => return if total > 0 { total } else { neg_errno(err) },
@@ -2975,9 +3013,10 @@ pub(super) fn sys_copy_file_range(
     }
 
     let mut copied = 0usize;
+    let mut scratch = Vec::new();
     while copied < len {
         let chunk_len = (len - copied).min(MAX_USER_IO_CHUNK);
-        let mut buf = match user_io_buffer(chunk_len) {
+        let buf = match io_scratch_slice(&mut scratch, chunk_len) {
             Ok(buf) => buf,
             Err(err) => {
                 return if copied > 0 {
@@ -2990,9 +3029,9 @@ pub(super) fn sys_copy_file_range(
         let read = {
             let mut table = process.fds.lock();
             match off_in {
-                Some(pos) => table.read_file_at_into_fd(process, fd_in as i32, pos, &mut buf),
+                Some(pos) => table.read_file_at_into_fd(process, fd_in as i32, pos, &mut *buf),
                 None => table
-                    .read_file_at_current_offset_into_fd(process, fd_in as i32, &mut buf)
+                    .read_file_at_current_offset_into_fd(process, fd_in as i32, &mut *buf)
                     .map(|(_, read)| read),
             }
         };
@@ -8082,10 +8121,41 @@ fn executable_running(path: &str) -> bool {
 
 fn file_logical_size(process: &UserProcess, file: &FileEntry) -> Result<u64, LinuxError> {
     let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
-    Ok(process
+    Ok(file_logical_size_from_physical(
+        process,
+        file,
+        physical_size,
+    ))
+}
+
+fn file_logical_size_from_physical(
+    process: &UserProcess,
+    file: &FileEntry,
+    physical_size: u64,
+) -> u64 {
+    process
         .path_sparse_size(file.path.as_str())
         .unwrap_or(physical_size)
-        .max(physical_size))
+        .max(physical_size)
+}
+
+fn read_physical_file_prefix(
+    file: &FileEntry,
+    offset: u64,
+    dst: &mut [u8],
+) -> Result<usize, LinuxError> {
+    let mut read = 0usize;
+    while read < dst.len() {
+        let chunk = file
+            .file
+            .read_at(offset.saturating_add(read as u64), &mut dst[read..])
+            .map_err(LinuxError::from)?;
+        if chunk == 0 {
+            break;
+        }
+        read += chunk;
+    }
+    Ok(read)
 }
 
 fn read_regular_file_to_vec(
@@ -8312,7 +8382,9 @@ fn read_regular_file_at(
         return Ok(0);
     }
     let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
-    let logical_size = file_logical_size(process, file)?;
+    let sparse_size = process.path_sparse_size(file.path.as_str());
+    let data_ranges = process.path_data_ranges(file.path.as_str());
+    let logical_size = sparse_size.unwrap_or(physical_size).max(physical_size);
     if offset >= logical_size {
         return Ok(0);
     }
@@ -8320,9 +8392,18 @@ fn read_regular_file_at(
         dst.len(),
         logical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
     );
+    if sparse_size.is_none() && data_ranges.is_none() {
+        if offset >= physical_size {
+            return Ok(0);
+        }
+        let physical_len = cmp::min(
+            read_len,
+            physical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
+        );
+        return read_physical_file_prefix(file, offset, &mut dst[..physical_len]);
+    }
     dst[..read_len].fill(0);
-    if let Some(mut ranges) = process.path_data_ranges(file.path.as_str()) {
-        ranges.sort_by_key(|(start, _)| *start);
+    if let Some(ranges) = data_ranges {
         let read_end = offset.saturating_add(read_len as u64);
         for (range_start, range_end) in ranges {
             let data_start = range_start.max(offset);
@@ -8332,21 +8413,12 @@ fn read_regular_file_at(
             }
             let physical_end = data_end.min(physical_size);
             let dst_start = data_start.saturating_sub(offset) as usize;
-            let mut physical_read = 0usize;
             let physical_len = physical_end.saturating_sub(data_start) as usize;
-            while physical_read < physical_len {
-                let chunk = file
-                    .file
-                    .read_at(
-                        data_start.saturating_add(physical_read as u64),
-                        &mut dst[dst_start + physical_read..dst_start + physical_len],
-                    )
-                    .map_err(LinuxError::from)?;
-                if chunk == 0 {
-                    break;
-                }
-                physical_read += chunk;
-            }
+            let _ = read_physical_file_prefix(
+                file,
+                data_start,
+                &mut dst[dst_start..dst_start + physical_len],
+            )?;
         }
         process.copy_path_sparse_data(file.path.as_str(), offset, &mut dst[..read_len]);
         return Ok(read_len);
@@ -8356,20 +8428,7 @@ fn read_regular_file_at(
             read_len,
             physical_size.saturating_sub(offset).min(usize::MAX as u64) as usize,
         );
-        let mut physical_read = 0usize;
-        while physical_read < physical_len {
-            let chunk = file
-                .file
-                .read_at(
-                    offset.saturating_add(physical_read as u64),
-                    &mut dst[physical_read..physical_len],
-                )
-                .map_err(LinuxError::from)?;
-            if chunk == 0 {
-                break;
-            }
-            physical_read += chunk;
-        }
+        let physical_read = read_physical_file_prefix(file, offset, &mut dst[..physical_len])?;
         if physical_read < physical_len {
             process.copy_path_sparse_data(file.path.as_str(), offset, &mut dst[..physical_read]);
             return Ok(physical_read);

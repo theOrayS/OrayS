@@ -81,10 +81,21 @@ pub unsafe fn sys_writev(fd: c_int, iov: *const ctypes::iovec, iocnt: c_int) -> 
 
         let iovs = unsafe { readable_user_slice(iov, iocnt as usize)? };
         let mut ret = 0;
+        #[cfg(feature = "fd")]
+        let mut cached_file = None;
         for iov in iovs.iter() {
             if iov.iov_len == 0 {
                 continue;
             }
+            #[cfg(feature = "fd")]
+            let result = {
+                let src = unsafe { readable_user_buffer(iov.iov_base, iov.iov_len)? };
+                if cached_file.is_none() {
+                    cached_file = Some(get_file_like(fd)?);
+                }
+                cached_file.as_ref().unwrap().write(src)? as ctypes::ssize_t
+            };
+            #[cfg(not(feature = "fd"))]
             let result = unsafe { write_impl(fd, iov.iov_base, iov.iov_len) }?;
             if result < 0 {
                 return Ok(result);

@@ -212,6 +212,22 @@ pub(super) fn read_user_bytes(
     Ok(bytes)
 }
 
+pub(super) fn read_user_bytes_into(
+    process: &UserProcess,
+    ptr: usize,
+    dst: &mut [u8],
+) -> Result<(), LinuxError> {
+    if dst.is_empty() {
+        return Ok(());
+    }
+    fault_in_user_read(process, ptr, dst.len())?;
+    process
+        .aspace
+        .lock()
+        .read(VirtAddr::from(ptr), dst)
+        .map_err(|_| LinuxError::EFAULT)
+}
+
 pub(super) fn read_iovec_entries(
     process: &UserProcess,
     iov: usize,
