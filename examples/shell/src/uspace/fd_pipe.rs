@@ -6,12 +6,12 @@ use lazyinit::LazyInit;
 use linux_raw_sys::general;
 use std::collections::BTreeMap;
 use std::string::String;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::vec::Vec;
 
 use super::fd_table::FdEntry;
-use super::linux_abi::{SIGPIPE_NUM, fd_cloexec_flag};
+use super::linux_abi::{fd_cloexec_flag, SIGPIPE_NUM};
 use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal};
 use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::{
@@ -19,7 +19,7 @@ use super::task_registry::{
     user_thread_entry_by_tid,
 };
 use super::user_memory::{read_user_value, validate_user_write, write_user_value};
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum RingBufferStatus {
@@ -189,23 +189,68 @@ impl PipeRingBuffer {
         }
     }
 
-    fn write_byte(&mut self, byte: u8) {
-        self.status = RingBufferStatus::Normal;
-        self.data[self.tail] = byte;
-        self.tail = (self.tail + 1) % self.capacity;
-        if self.tail == self.head {
-            self.status = RingBufferStatus::Full;
+    // Keep this ring state machine aligned with the kernel pipe path: batch
+    // copies must be byte-for-byte equivalent to repeated single-byte
+    // operations, and callers must notify only after dropping the buffer lock.
+    fn read_slice(&mut self, dst: &mut [u8]) -> usize {
+        let count = dst.len().min(self.available_read());
+        if count == 0 {
+            return 0;
         }
-    }
-
-    fn read_byte(&mut self) -> u8 {
         self.status = RingBufferStatus::Normal;
-        let byte = self.data[self.head];
-        self.head = (self.head + 1) % self.capacity;
+
+        let first = count.min(self.capacity - self.head);
+        dst[..first].copy_from_slice(&self.data[self.head..self.head + first]);
+        self.head = (self.head + first) % self.capacity;
+
+        let second = count - first;
+        if second > 0 {
+            dst[first..first + second].copy_from_slice(&self.data[..second]);
+            self.head = second;
+        }
+
         if self.head == self.tail {
             self.status = RingBufferStatus::Empty;
         }
-        byte
+        count
+    }
+
+    fn write_slice(&mut self, src: &[u8]) -> usize {
+        let count = src.len().min(self.available_write());
+        if count == 0 {
+            return 0;
+        }
+        self.status = RingBufferStatus::Normal;
+
+        let first = count.min(self.capacity - self.tail);
+        self.data[self.tail..self.tail + first].copy_from_slice(&src[..first]);
+        self.tail = (self.tail + first) % self.capacity;
+
+        let second = count - first;
+        if second > 0 {
+            self.data[..second].copy_from_slice(&src[first..first + second]);
+            self.tail = second;
+        }
+
+        if self.tail == self.head {
+            self.status = RingBufferStatus::Full;
+        }
+        count
+    }
+
+    fn copy_into(&self, dst: &mut Self, len: usize) -> usize {
+        let count = len.min(self.available_read()).min(dst.available_write());
+        let mut copied = 0usize;
+        while copied < count {
+            let src_pos = (self.head + copied) % self.capacity;
+            let contiguous = (count - copied).min(self.capacity - src_pos);
+            let written = dst.write_slice(&self.data[src_pos..src_pos + contiguous]);
+            copied += written;
+            if written < contiguous {
+                break;
+            }
+        }
+        copied
     }
 
     const fn available_read(&self) -> usize {
@@ -516,19 +561,16 @@ impl PipeEndpoint {
             }
 
             let to_copy = len.min(available_read).min(available_write);
-            let mut cursor = src_ring.head;
-            for _ in 0..to_copy {
-                let byte = src_ring.data[cursor];
-                cursor = (cursor + 1) % src_ring.capacity;
-                dst_ring.write_byte(byte);
-                dst.peers.buffered.fetch_add(1, Ordering::AcqRel);
+            let copied = src_ring.copy_into(&mut dst_ring, to_copy);
+            if copied > 0 {
+                dst.peers.buffered.fetch_add(copied, Ordering::AcqRel);
             }
             drop(dst_ring);
             drop(src_ring);
-            if to_copy > 0 {
+            if copied > 0 {
                 dst.notify_readable();
             }
-            return Ok(to_copy);
+            return Ok(copied);
         }
     }
 
@@ -662,15 +704,11 @@ impl PipeEndpoint {
                 self.wait_for_readable()?;
                 continue;
             }
-            for _ in 0..available {
-                if read_len == dst.len() {
-                    drop(ring);
-                    self.notify_writable();
-                    return Ok(read_len);
-                }
-                dst[read_len] = ring.read_byte();
-                self.peers.buffered.fetch_sub(1, Ordering::AcqRel);
-                read_len += 1;
+            let to_read = (dst.len() - read_len).min(available);
+            let copied = ring.read_slice(&mut dst[read_len..read_len + to_read]);
+            if copied > 0 {
+                self.peers.buffered.fetch_sub(copied, Ordering::AcqRel);
+                read_len += copied;
             }
             if read_len > 0 {
                 drop(ring);
@@ -730,15 +768,16 @@ impl PipeEndpoint {
                 self.wait_for_writable()?;
                 continue;
             }
-            for _ in 0..available {
-                if written == src.len() {
-                    drop(ring);
-                    self.notify_readable();
-                    return Ok(written);
-                }
-                ring.write_byte(src[written]);
-                self.peers.buffered.fetch_add(1, Ordering::AcqRel);
-                written += 1;
+            let to_write = (src.len() - written).min(available);
+            let copied = ring.write_slice(&src[written..written + to_write]);
+            if copied > 0 {
+                self.peers.buffered.fetch_add(copied, Ordering::AcqRel);
+                written += copied;
+            }
+            if written == src.len() {
+                drop(ring);
+                self.notify_readable();
+                return Ok(written);
             }
         }
         if written > 0 {
@@ -773,15 +812,15 @@ impl PipeEndpoint {
                 continue;
             }
             let to_write = src.len().min(available);
-            for byte in &src[..to_write] {
-                ring.write_byte(*byte);
-                self.peers.buffered.fetch_add(1, Ordering::AcqRel);
+            let copied = ring.write_slice(&src[..to_write]);
+            if copied > 0 {
+                self.peers.buffered.fetch_add(copied, Ordering::AcqRel);
             }
             drop(ring);
-            if to_write > 0 {
+            if copied > 0 {
                 self.notify_readable();
             }
-            return Ok(to_write);
+            return Ok(copied);
         }
     }
 

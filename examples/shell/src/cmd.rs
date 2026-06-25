@@ -2216,20 +2216,21 @@ fn ltp_resource_helper_cases(target_dir: &str, cases: &[String]) -> BTreeSet<Str
         }
     }
 
-    let mut case_names = cases
+    let case_names = cases
         .iter()
         .filter(|case| valid_ltp_case_name(case))
-        .collect::<Vec<_>>();
-    case_names.sort_by(|lhs, rhs| rhs.len().cmp(&lhs.len()).then_with(|| lhs.cmp(rhs)));
+        .map(|case| case.as_str())
+        .collect::<BTreeSet<_>>();
 
     let mut helper_cases = BTreeSet::new();
     for helper_name in file_names {
-        for &case in &case_names {
-            let Some(helper_suffix) = helper_name.strip_prefix(case.as_str()) else {
+        for (idx, _) in helper_name.rmatch_indices('_') {
+            let case = &helper_name[..idx];
+            let Some(helper_suffix) = helper_name.strip_prefix(case) else {
                 continue;
             };
-            if helper_suffix.starts_with('_') {
-                helper_cases.insert(case.clone());
+            if case_names.contains(case) && helper_suffix.starts_with('_') {
+                helper_cases.insert(case.to_string());
                 break;
             }
         }

@@ -8,14 +8,15 @@ use axsync::Mutex;
 use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, VirtAddr};
+use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::string::{String, ToString};
 use std::vec::Vec;
-use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
+use xmas_elf::ElfFile;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, TESTSUITE_STAGE_ROOT,
@@ -26,7 +27,7 @@ use super::runtime_paths::{
     derive_exec_root_from_path, resolve_host_path, resolve_runtime_support_file,
     runtime_absolute_path_candidates, staged_cwd_absolute_path_candidates,
 };
-use super::{BrkState, UserProcess, str_err};
+use super::{str_err, BrkState, UserProcess};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,
@@ -136,6 +137,37 @@ fn runtime_file_contains_ascii(path: &str, needle: &[u8]) -> bool {
 }
 
 fn runtime_has_musl_loader(exec_root: &str) -> bool {
+    let root = exec_root.trim_end_matches('/');
+    if let Some(root) = cacheable_runtime_loader_root(root) {
+        let cache = runtime_loader_cache();
+        if let Some(cached) = cache.lock().get(root).copied() {
+            return cached;
+        }
+        let has_loader = runtime_has_musl_loader_uncached(root);
+        cache.lock().insert(root, has_loader);
+        return has_loader;
+    }
+    runtime_has_musl_loader_uncached(root)
+}
+
+// Only suite image roots are cacheable here.  Do not cache `/tmp` stage
+// artifacts or LD_PRELOAD candidates: `liboscompat.so` can be generated during
+// evaluator setup and must remain visible to later exec probes.
+fn cacheable_runtime_loader_root(root: &str) -> Option<&'static str> {
+    match root {
+        "/musl" => Some("/musl"),
+        "/glibc" => Some("/glibc"),
+        _ => None,
+    }
+}
+
+fn runtime_loader_cache() -> &'static Mutex<BTreeMap<&'static str, bool>> {
+    static CACHE: LazyInit<Mutex<BTreeMap<&'static str, bool>>> = LazyInit::new();
+    let _ = CACHE.call_once(|| Mutex::new(BTreeMap::new()));
+    &CACHE
+}
+
+fn runtime_has_musl_loader_uncached(exec_root: &str) -> bool {
     let lib_dir = format!("{}/lib", exec_root.trim_end_matches('/'));
     let Ok(entries) = std::fs::read_dir(&lib_dir) else {
         return false;

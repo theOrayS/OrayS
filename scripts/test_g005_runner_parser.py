@@ -80,7 +80,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         text = self.replace_once(
             text,
-            "helper_name.strip_prefix(case.as_str())",
+            "helper_name.strip_prefix(case)",
             "helper_name.split_once('_').map(|(prefix, _)| prefix)",
         )
         path.write_text(text, encoding="utf-8")
