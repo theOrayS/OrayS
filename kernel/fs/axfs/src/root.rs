@@ -134,7 +134,7 @@ impl RootDirectory {
             fs.mount(path, mount_point)?;
             mounts.push(MountPoint::new(path, fs));
         }
-        self.invalidate_read_dir_cache();
+        self.invalidate_caches();
         Ok(())
     }
 
@@ -146,7 +146,7 @@ impl RootDirectory {
             mounts.len() != before
         };
         if changed {
-            self.invalidate_read_dir_cache();
+            self.invalidate_caches();
         }
         changed
     }
@@ -176,7 +176,7 @@ impl RootDirectory {
         Ok(Arc::new(MountAnchor::new(root)))
     }
 
-    fn invalidate_read_dir_cache(&self) {
+    fn invalidate_caches(&self) {
         self.read_dir_cache.lock().invalidate();
     }
 
@@ -307,7 +307,7 @@ impl VfsNodeOps for RootDirectory {
             }
         });
         if result.is_ok() {
-            self.invalidate_read_dir_cache();
+            self.invalidate_caches();
         }
         result
     }
@@ -321,7 +321,7 @@ impl VfsNodeOps for RootDirectory {
             }
         });
         if result.is_ok() {
-            self.invalidate_read_dir_cache();
+            self.invalidate_caches();
         }
         result
     }
@@ -342,7 +342,7 @@ impl VfsNodeOps for RootDirectory {
         };
         let result = fs.root_dir().rename(src_rest, dst_rest);
         if result.is_ok() {
-            self.invalidate_read_dir_cache();
+            self.invalidate_caches();
         }
         result
     }
@@ -521,6 +521,10 @@ fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {
     }
 }
 
+fn invalidate_root_caches() {
+    ROOT_DIR.invalidate_caches();
+}
+
 pub(crate) fn absolute_path(path: &str) -> AxResult<String> {
     if path.starts_with('/') {
         Ok(axfs_vfs::path::canonicalize(path))
@@ -558,6 +562,7 @@ pub(crate) fn create_file_with_perm(
     }
     let parent = parent_node_of(dir, path);
     parent.create(path, VfsNodeType::File)?;
+    invalidate_root_caches();
     let node = parent.lookup(path)?;
     match node.set_perm(perm) {
         Ok(()) | Err(AxError::Unsupported) => {}
@@ -569,7 +574,11 @@ pub(crate) fn create_file_with_perm(
 pub(crate) fn create_dir(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
     match lookup(dir, path) {
         Ok(_) => Err(AxError::AlreadyExists),
-        Err(AxError::NotFound) => parent_node_of(dir, path).create(path, VfsNodeType::Dir),
+        Err(AxError::NotFound) => {
+            parent_node_of(dir, path).create(path, VfsNodeType::Dir)?;
+            invalidate_root_caches();
+            Ok(())
+        }
         Err(e) => Err(e),
     }
 }
@@ -582,7 +591,9 @@ pub(crate) fn remove_file(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
     } else if !attr.perm().owner_writable() {
         ax_err!(PermissionDenied)
     } else {
-        parent_node_of(dir, path).remove(path)
+        parent_node_of(dir, path).remove(path)?;
+        invalidate_root_caches();
+        Ok(())
     }
 }
 
@@ -611,7 +622,9 @@ pub(crate) fn remove_dir(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
     } else if !attr.perm().owner_writable() {
         ax_err!(PermissionDenied)
     } else {
-        parent_node_of(dir, path).remove(path)
+        parent_node_of(dir, path).remove(path)?;
+        invalidate_root_caches();
+        Ok(())
     }
 }
 
@@ -647,5 +660,7 @@ pub(crate) fn rename(old: &str, new: &str) -> AxResult {
     if old == new {
         return Ok(());
     }
-    parent_node_of(None, old).rename(old, new)
+    parent_node_of(None, old).rename(old, new)?;
+    invalidate_root_caches();
+    Ok(())
 }

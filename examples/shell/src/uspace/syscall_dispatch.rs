@@ -1,10 +1,9 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{SYSCALL, register_trap_handler};
+use axhal::trap::{register_trap_handler, SYSCALL};
 use core::sync::atomic::Ordering;
 use linux_raw_sys::general;
 
-use super::UserProcess;
 use super::credentials::{
     sys_capget, sys_capset, sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid,
     sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid,
@@ -43,6 +42,7 @@ use super::metadata::{
     sys_truncate, sys_umask, sys_utimensat,
 };
 use super::mount_abi::{sys_mount, sys_umount2};
+use super::perf_counters;
 use super::posix_mq::{
     sys_mq_getsetattr, sys_mq_notify, sys_mq_open, sys_mq_timedreceive, sys_mq_timedsend,
     sys_mq_unlink,
@@ -90,6 +90,7 @@ use super::time_abi::{
     sys_timer_gettime, sys_timer_settime, sys_times,
 };
 use super::user_memory::{read_user_value, sys_getrandom};
+use super::UserProcess;
 
 #[cfg(target_arch = "loongarch64")]
 const LOONGARCH_LEGACY_GETRLIMIT: u32 = 163;
@@ -177,6 +178,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
     let process_ref = ext.process.as_ref();
     let syscall_num = syscall_num as u32;
     let immediate_epoll_wait = is_immediate_epoll_wait(process_ref, syscall_num, tf);
+    perf_counters::record_syscall(syscall_num);
     if immediate_epoll_wait {
         match syscall_num {
             general::__NR_epoll_pwait => {

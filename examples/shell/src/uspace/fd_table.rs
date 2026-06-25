@@ -20,66 +20,67 @@ use std::vec::Vec;
 
 use super::credentials::access_allowed;
 use super::fd_pipe::PipeEndpoint;
-use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
+use super::fd_socket::{recv_socket_data_to_user, socket_entry, LocalSocketEntry, SocketEntry};
 use super::linux_abi::{
-    ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE,
-    FILE_MODE_SET_GID, FILE_MODE_STICKY, MAX_IN_MEMORY_FILE_SIZE, NR_OPEN_LIMIT, O_NOFOLLOW_FLAG,
-    O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE, RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE,
-    SEEK_HOLE_WHENCE, ST_MODE_BLK, ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE,
-    ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE, fd_cloexec_flag,
-    neg_errno, posix_ret_i32,
+    fd_cloexec_flag, neg_errno, posix_ret_i32, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK,
+    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, FILE_MODE_SET_GID, FILE_MODE_STICKY,
+    MAX_IN_MEMORY_FILE_SIZE, NR_OPEN_LIMIT, O_NOFOLLOW_FLAG, O_PATH_FLAG, RLIMIT_FSIZE_RESOURCE,
+    RLIMIT_NOFILE_RESOURCE, RTC_RD_TIME, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, ST_MODE_BLK,
+    ST_MODE_CHR, ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET,
+    ST_MODE_TYPE_MASK, SYNTHETIC_BLOCK_DEVICE_SIZE,
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG, apply_recorded_path_metadata,
-    canonical_permission_path, dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path,
-    fd_entry_statfs_path, file_attr_to_stat, file_type_mode, generic_statfs, path_inode,
-    stdio_stat, synthetic_block_stat_for_path, synthetic_char_stat_for_path,
+    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
+    dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
+    generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
+    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
 };
+use super::perf_counters;
 use super::posix_mq::{
-    PosixMqDescriptor, ProcMqQueuesMaxEntry, proc_sys_fs_mqueue_fd_entry,
-    proc_sys_fs_mqueue_path_entry,
+    proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
+    ProcMqQueuesMaxEntry,
 };
 use super::runtime_paths::{
     normalize_path, push_runtime_candidate, runtime_absolute_path_candidates,
     runtime_library_name_candidates,
 };
 use super::select_fdset::{
-    SelectMode, yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until,
+    yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until, SelectMode,
 };
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
 };
 use super::synthetic_fs::{
-    ProcSysFileEntry, dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path,
-    proc_comm_fd_entry, proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry,
-    proc_meminfo_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry,
-    proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
-    proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
-    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry,
-    proc_sys_file_path_entry, proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
-    proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
-    proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
-    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
-    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
-    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
-    synthetic_proc_sys_path_entry, synthetic_proc_version_content, synthetic_proc_version_fd_entry,
+    dev_shm_host_path, ensure_dev_shm_dir, is_proc_self_maps_path, proc_comm_fd_entry,
+    proc_comm_path_entry, proc_exe_link_target, proc_meminfo_fd_entry, proc_meminfo_path_entry,
+    proc_pagemap_fd_entry, proc_pagemap_path_entry, proc_pid_stat_fd_entry,
+    proc_pid_stat_path_entry, proc_pid_status_fd_entry, proc_pid_status_path_entry,
+    proc_self_maps_fd_entry, proc_self_maps_is_writable_open, proc_self_maps_path_entry,
+    proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
+    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
+    proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
+    proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
+    proc_timerslack_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
+    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
+    synthetic_proc_version_content, synthetic_proc_version_fd_entry,
     synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
-    synthetic_userdb_path_entry,
+    synthetic_userdb_path_entry, ProcSysFileEntry,
 };
 use super::system_info::write_default_winsize;
 use super::task_context::current_task_ext;
 use super::task_registry::{
-    UserThreadEntry, user_thread_entry_by_process_pid, user_thread_entry_for_process,
+    user_thread_entry_by_process_pid, user_thread_entry_for_process, UserThreadEntry,
 };
 use super::time_abi::{
     clock_gettime_timespec, clock_now_duration, rtc_time_from_wall_time, timespec_to_duration,
 };
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes,
-    read_user_bytes_into, read_user_value, validate_user_read, validate_user_write,
-    with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
+    fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes, read_user_bytes_into,
+    read_user_value, validate_user_read, validate_user_write, with_readable_user_buffer,
+    with_writable_user_buffer, write_user_bytes, write_user_value, MAX_USER_IO_CHUNK,
 };
 use super::{PathTimes, UserProcess};
 
@@ -1317,6 +1318,7 @@ fn sys_epoll_wait_with_timeout(
     if events == 0 {
         return neg_errno(LinuxError::EFAULT);
     }
+    perf_counters::record_epoll_wait();
     if matches!(timeout, EpollWaitTimeout::Immediate) && sigmask == 0 {
         let table = process.fds.lock_for_pid(process.pid());
         match table.epoll_fast_no_ready(epfd as i32) {
@@ -4581,6 +4583,7 @@ impl FdTable {
             _ => return Err(LinuxError::EINVAL),
         };
         let mut registrations = registrations.lock();
+        perf_counters::record_epoll_ready_scan(registrations.len());
         for (&fd, registration) in registrations.iter_mut() {
             if registration.disabled {
                 continue;
@@ -4592,6 +4595,7 @@ impl FdTable {
             let should_emit = ready_events != 0 && (!edge_triggered || became_ready);
             let has_capacity = out.len() < maxevents;
             if should_emit && has_capacity {
+                out.try_reserve_exact(1).map_err(|_| LinuxError::ENOMEM)?;
                 out.push(general::epoll_event {
                     events: ready_events,
                     data: registration.event.data,

@@ -31,13 +31,16 @@ use super::linux_abi::{
     USER_ASPACE_SIZE,
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
-use super::program_loader::{load_program_image, LoadedMapping};
+use super::program_loader::{
+    exec_loader_axerr, exec_loader_string_refs, load_program_image, LoadedMapping,
+    EXEC_LOADER_ENOMEM_PREFIX,
+};
 use super::resource_sched::{
     apply_process_scheduler_state_to_task, child_sched_state_from_parent, default_sched_state,
 };
 use super::runtime_paths::{
-    current_cwd, normalize_path, runtime_absolute_path_candidates,
-    staged_cwd_absolute_path_candidates,
+    current_cwd, normalize_path, try_normalize_path, try_runtime_absolute_path_candidates,
+    try_staged_cwd_absolute_path_candidates,
 };
 use super::signal_abi::{
     all_application_signal_mask, current_unblocked_signal_pending, deliver_user_signal,
@@ -704,9 +707,9 @@ fn exec_program(
     argv: &[String],
     env: &[String],
 ) -> Result<(usize, usize, usize), String> {
-    let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
+    let argv_refs = exec_loader_string_refs(argv, "prepare exec argv references")?;
     let mut new_aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
-        .map_err(|err| format!("failed to create exec address space: {err:?}"))?;
+        .map_err(|err| exec_loader_axerr("failed to create exec address space".to_string(), err))?;
     let image = load_program_image(
         Some(process),
         &mut new_aspace,
@@ -2333,21 +2336,41 @@ fn validate_execve_target(process: &UserProcess, cwd: &str, path: &str) -> Resul
         return Err(LinuxError::ENAMETOOLONG);
     }
 
-    let normalized = normalize_path(cwd, path).ok_or(LinuxError::EINVAL)?;
+    let normalized = try_normalize_path(cwd, path)
+        .map_err(|_| LinuxError::ENOMEM)?
+        .ok_or(LinuxError::EINVAL)?;
     if exec_path_exceeds_linux_limits(normalized.as_str()) {
         return Err(LinuxError::ENAMETOOLONG);
     }
-    let mut candidates = vec![normalized.clone()];
+    let mut candidates = Vec::new();
+    candidates
+        .try_reserve_exact(1)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    let mut primary = String::new();
+    primary
+        .try_reserve_exact(normalized.len())
+        .map_err(|_| LinuxError::ENOMEM)?;
+    primary.push_str(normalized.as_str());
+    candidates.push(primary);
     if path.starts_with('/') {
-        for candidate in staged_cwd_absolute_path_candidates(cwd, normalized.as_str()) {
+        for candidate in try_staged_cwd_absolute_path_candidates(cwd, normalized.as_str())
+            .map_err(|_| LinuxError::ENOMEM)?
+        {
             if !candidates.iter().any(|item| item == &candidate) {
+                candidates
+                    .try_reserve_exact(1)
+                    .map_err(|_| LinuxError::ENOMEM)?;
                 candidates.push(candidate);
             }
         }
         for candidate in
-            runtime_absolute_path_candidates(process.exec_root().as_str(), normalized.as_str())
+            try_runtime_absolute_path_candidates(process.exec_root().as_str(), normalized.as_str())
+                .map_err(|_| LinuxError::ENOMEM)?
         {
             if !candidates.iter().any(|item| item == &candidate) {
+                candidates
+                    .try_reserve_exact(1)
+                    .map_err(|_| LinuxError::ENOMEM)?;
                 candidates.push(candidate);
             }
         }
@@ -2356,12 +2379,55 @@ fn validate_execve_target(process: &UserProcess, cwd: &str, path: &str) -> Resul
     for candidate in candidates {
         match validate_execve_candidate(process, candidate.as_str()) {
             Ok(()) => return Ok(()),
-            Err(LinuxError::ENOENT) => missing_error = LinuxError::ENOENT,
+            Err(LinuxError::ENOENT) => {
+                if missing_error != LinuxError::ENOTDIR {
+                    missing_error = LinuxError::ENOENT;
+                }
+            }
             Err(LinuxError::ENOTDIR) => missing_error = LinuxError::ENOTDIR,
             Err(err) => return Err(err),
         }
     }
     Err(missing_error)
+}
+
+fn contains_ascii_case_insensitive(haystack: &str, needle: &str) -> bool {
+    let haystack = haystack.as_bytes();
+    let needle = needle.as_bytes();
+    if needle.is_empty() {
+        return true;
+    }
+    if needle.len() > haystack.len() {
+        return false;
+    }
+    haystack.windows(needle.len()).any(|window| {
+        window
+            .iter()
+            .zip(needle.iter())
+            .all(|(&actual, &expected)| ascii_lower(actual) == ascii_lower(expected))
+    })
+}
+
+fn ascii_lower(byte: u8) -> u8 {
+    if byte.is_ascii_uppercase() {
+        byte + (b'a' - b'A')
+    } else {
+        byte
+    }
+}
+
+fn exec_loader_errno_from_message(err: &str) -> LinuxError {
+    if err.starts_with(EXEC_LOADER_ENOMEM_PREFIX) {
+        LinuxError::ENOMEM
+    } else if contains_ascii_case_insensitive(err, "not a directory") {
+        LinuxError::ENOTDIR
+    } else if contains_ascii_case_insensitive(err, "entity not found")
+        || contains_ascii_case_insensitive(err, "not found")
+    {
+        LinuxError::ENOENT
+    } else {
+        LinuxError::ENOEXEC
+    }
 }
 
 pub(super) fn sys_execve(
@@ -2393,16 +2459,7 @@ pub(super) fn sys_execve(
     let (entry, stack_ptr, argc) =
         match exec_program(process, cwd.as_str(), raw_path.as_str(), &argv, &env) {
             Ok(image) => image,
-            Err(err) => {
-                let errno = if err.contains("Entity not found") {
-                    LinuxError::ENOENT
-                } else if err.contains("Not a directory") {
-                    LinuxError::ENOTDIR
-                } else {
-                    LinuxError::ENOEXEC
-                };
-                return neg_errno(errno);
-            }
+            Err(err) => return neg_errno(exec_loader_errno_from_message(err.as_str())),
         };
     process.reset_caught_signal_handlers_for_exec();
     let context = make_uspace_context(entry, stack_ptr, argc);

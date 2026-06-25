@@ -33,6 +33,7 @@ mod memory_map;
 mod memory_policy;
 mod metadata;
 mod mount_abi;
+mod perf_counters;
 mod posix_mq;
 mod process_abi;
 mod process_lifecycle;
@@ -56,6 +57,8 @@ use fd_table::{FdTable, ProcessFdTable};
 #[cfg(feature = "auto-run-tests")]
 pub use futex::futex_table_stats;
 use linux_abi::*;
+#[cfg(feature = "auto-run-tests")]
+pub(crate) use perf_counters::perf_snapshot;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 #[cfg(feature = "auto-run-tests")]

@@ -156,8 +156,8 @@ impl Write for Logger {
 
 impl Log for Logger {
     #[inline]
-    fn enabled(&self, _metadata: &Metadata) -> bool {
-        true
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level().to_level_filter() <= log::max_level()
     }
 
     fn log(&self, record: &Record) {

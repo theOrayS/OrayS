@@ -17,13 +17,13 @@ use ext4_view::{Ext4, Ext4Error, Ext4Read, FileType, Metadata};
 use crate::dev::Disk;
 
 const BLOCK_SIZE: u64 = 512;
-const EXT4_METADATA_CACHE_CAP: usize = 512;
-const EXT4_READ_OBSERVED_CAP: usize = 512;
-const EXT4_READ_CACHE_MAX_ENTRIES: usize = 64;
+const EXT4_METADATA_CACHE_CAP: usize = 1024;
+const EXT4_READ_OBSERVED_CAP: usize = 1024;
+const EXT4_READ_CACHE_MAX_ENTRIES: usize = 96;
 const EXT4_READ_CACHE_MAX_FILE_BYTES: usize = 4 * 1024 * 1024;
-const EXT4_READ_CACHE_TOTAL_BYTES: usize = 24 * 1024 * 1024;
-const EXT4_DIR_OBSERVED_CAP: usize = 128;
-const EXT4_DIR_CACHE_MAX_DIRS: usize = 32;
+const EXT4_READ_CACHE_TOTAL_BYTES: usize = 32 * 1024 * 1024;
+const EXT4_DIR_OBSERVED_CAP: usize = 256;
+const EXT4_DIR_CACHE_MAX_DIRS: usize = 64;
 const EXT4_DIR_CACHE_MAX_ENTRIES_PER_DIR: usize = 2048;
 
 pub struct Ext4FileSystem {

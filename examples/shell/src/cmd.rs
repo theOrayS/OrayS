@@ -2128,7 +2128,10 @@ fn ltp_case_env(
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn print_ltp_memory_stats(case: &str, phase: &str) {
-    if option_env!("LTP_MEMORY_STATS") != Some("1") && option_env!("LTP_ALLOC_DIAG") != Some("1") {
+    if option_env!("LTP_MEMORY_STATS") != Some("1")
+        && option_env!("LTP_ALLOC_DIAG") != Some("1")
+        && option_env!("USER_PERF") != Some("1")
+    {
         return;
     }
     let stats = frame_allocator_stats();
@@ -2185,6 +2188,35 @@ fn print_ltp_memory_stats(case: &str, phase: &str) {
         exec_interp_len,
         exec_interp_cap
     );
+    if option_env!("USER_PERF") == Some("1") {
+        let perf = uspace::perf_snapshot();
+        println!(
+            "LTP PERF {case} {phase}: syscalls={} fs_syscalls={} exec_syscalls={} mmap_syscalls={} iovec_syscalls={} epoll_syscalls={} futex_syscalls={} user_copy_faults={} user_copy_read_bytes={} user_copy_write_bytes={} iovec_tables={} iovec_entries={} exec_images={} exec_image_bytes={} mmap_calls={} mmap_file_backed_calls={} mmap_page_faults={} epoll_waits={} epoll_ready_scans={} futex_calls={} futex_waits={} poll_fd_scans={} poll_waits={}",
+            perf.syscalls,
+            perf.fs_syscalls,
+            perf.exec_syscalls,
+            perf.mmap_syscalls,
+            perf.iovec_syscalls,
+            perf.epoll_syscalls,
+            perf.futex_syscalls,
+            perf.user_copy_faults,
+            perf.user_copy_read_bytes,
+            perf.user_copy_write_bytes,
+            perf.iovec_tables,
+            perf.iovec_entries,
+            perf.exec_images,
+            perf.exec_image_bytes,
+            perf.mmap_calls,
+            perf.mmap_file_backed_calls,
+            perf.mmap_page_faults,
+            perf.epoll_waits,
+            perf.epoll_ready_scans,
+            perf.futex_calls,
+            perf.futex_waits,
+            perf.poll_fd_scans,
+            perf.poll_waits,
+        );
+    }
     if option_env!("LTP_ALLOC_DIAG") == Some("1") {
         print!("LTP ALLOC {case} {phase}:");
         for bucket in allocation_bucket_stats() {
