@@ -110,15 +110,17 @@ impl FdSets {
             if all_bits == 0 {
                 continue;
             }
-            let mut j = 0;
             let fd_base = word_idx * BITS_PER_WORD;
-            while j < BITS_PER_WORD && fd_base + j < self.nfds {
-                let bit = 1 << j;
-                if all_bits & bit == 0 {
-                    j += 1;
-                    continue;
-                }
-                let fd = fd_base + j;
+            let valid_bits = self.nfds.saturating_sub(fd_base).min(BITS_PER_WORD);
+            let mut bits = if valid_bits < BITS_PER_WORD {
+                all_bits & ((1 << valid_bits) - 1)
+            } else {
+                all_bits
+            };
+            while bits != 0 {
+                let bit_idx = bits.trailing_zeros() as usize;
+                let bit = 1 << bit_idx;
+                let fd = fd_base + bit_idx;
                 match get_file_like(fd as _)?.poll() {
                     Ok(state) => {
                         if state.readable && read_bits & bit != 0 {
@@ -138,7 +140,7 @@ impl FdSets {
                         }
                     }
                 }
-                j += 1;
+                bits &= bits - 1;
             }
         }
         Ok(res_num)

@@ -10,7 +10,7 @@ use axsync::Mutex;
 #[cfg(feature = "multitask")]
 use axtask::WaitQueue;
 
-use super::fd_ops::{FileLike, add_file_like, close_file_like};
+use super::fd_ops::{add_file_like, close_file_like, FileLike};
 use crate::ctypes;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -41,23 +41,53 @@ impl PipeRingBuffer {
         }
     }
 
-    pub fn write_byte(&mut self, byte: u8) {
-        self.status = RingBufferStatus::Normal;
-        self.arr[self.tail] = byte;
-        self.tail = (self.tail + 1) % RING_BUFFER_SIZE;
-        if self.tail == self.head {
-            self.status = RingBufferStatus::Full;
+    // Batch copies must stay equivalent to the former byte-at-a-time ring
+    // operations: update head/tail/status under the buffer lock, then let
+    // callers drop the lock before notifying waiters.
+    pub fn read_slice(&mut self, dst: &mut [u8]) -> usize {
+        let count = dst.len().min(self.available_read());
+        if count == 0 {
+            return 0;
         }
-    }
-
-    pub fn read_byte(&mut self) -> u8 {
         self.status = RingBufferStatus::Normal;
-        let c = self.arr[self.head];
-        self.head = (self.head + 1) % RING_BUFFER_SIZE;
+
+        let first = count.min(RING_BUFFER_SIZE - self.head);
+        dst[..first].copy_from_slice(&self.arr[self.head..self.head + first]);
+        self.head = (self.head + first) % RING_BUFFER_SIZE;
+
+        let second = count - first;
+        if second > 0 {
+            dst[first..first + second].copy_from_slice(&self.arr[..second]);
+            self.head = second;
+        }
+
         if self.head == self.tail {
             self.status = RingBufferStatus::Empty;
         }
-        c
+        count
+    }
+
+    pub fn write_slice(&mut self, src: &[u8]) -> usize {
+        let count = src.len().min(self.available_write());
+        if count == 0 {
+            return 0;
+        }
+        self.status = RingBufferStatus::Normal;
+
+        let first = count.min(RING_BUFFER_SIZE - self.tail);
+        self.arr[self.tail..self.tail + first].copy_from_slice(&src[..first]);
+        self.tail = (self.tail + first) % RING_BUFFER_SIZE;
+
+        let second = count - first;
+        if second > 0 {
+            self.arr[..second].copy_from_slice(&src[first..first + second]);
+            self.tail = second;
+        }
+
+        if self.tail == self.head {
+            self.status = RingBufferStatus::Full;
+        }
+        count
     }
 
     /// Get the length of remaining data in the buffer
@@ -229,15 +259,9 @@ impl FileLike for Pipe {
                 self.wait_for_readable();
                 continue;
             }
-            for _ in 0..loop_read {
-                if read_size == max_len {
-                    drop(ring_buffer);
-                    self.notify_writable();
-                    return Ok(read_size);
-                }
-                buf[read_size] = ring_buffer.read_byte();
-                read_size += 1;
-            }
+            let to_read = (max_len - read_size).min(loop_read);
+            let copied = ring_buffer.read_slice(&mut buf[read_size..read_size + to_read]);
+            read_size += copied;
             if read_size > 0 {
                 drop(ring_buffer);
                 self.notify_writable();
@@ -290,14 +314,13 @@ impl FileLike for Pipe {
                 self.wait_for_writable();
                 continue;
             }
-            for _ in 0..loop_write {
-                if write_size == max_len {
-                    drop(ring_buffer);
-                    self.notify_readable();
-                    return Ok(write_size);
-                }
-                ring_buffer.write_byte(buf[write_size]);
-                write_size += 1;
+            let to_write = (max_len - write_size).min(loop_write);
+            let copied = ring_buffer.write_slice(&buf[write_size..write_size + to_write]);
+            write_size += copied;
+            if write_size == max_len {
+                drop(ring_buffer);
+                self.notify_readable();
+                return Ok(write_size);
             }
             drop(ring_buffer);
             self.notify_readable();
