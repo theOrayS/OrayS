@@ -56,6 +56,7 @@ const MAX_EXEC_IMAGE_SIZE: usize = 64 * 1024 * 1024;
 // Keep a bounded reusable exec buffer so long full-suite runs do not need a
 // fresh multi-MiB contiguous allocation after the kernel heap is fragmented.
 const RETAINED_EXEC_IMAGE_CAPACITY: usize = 4 * 1024 * 1024;
+const EXEC_IMAGE_READ_CHUNK: usize = 64 * 1024;
 
 struct ElfLoadInfo {
     load_bias: usize,
@@ -247,28 +248,39 @@ fn read_exec_image_into(
             .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
     }
 
-    let mut chunk = [0u8; 4096];
     loop {
-        let count = file
-            .read(&mut chunk)
-            .map_err(|err| format!("failed to read {label} {path}: {err}"))?;
-        if count == 0 {
-            break;
-        }
-        let next_len = image
-            .len()
-            .checked_add(count)
-            .ok_or_else(|| format!("{label} {path} size overflow while loading"))?;
-        if next_len > MAX_EXEC_IMAGE_SIZE {
+        if image.len() == MAX_EXEC_IMAGE_SIZE {
+            let mut probe = [0u8; 1];
+            let count = file
+                .read(&mut probe)
+                .map_err(|err| format!("failed to read {label} {path}: {err}"))?;
+            if count == 0 {
+                break;
+            }
             return Err(format!(
                 "{label} {path} is too large to load (exceeds {} bytes)",
                 MAX_EXEC_IMAGE_SIZE
             ));
         }
+
+        let old_len = image.len();
+        let chunk_len = EXEC_IMAGE_READ_CHUNK.min(MAX_EXEC_IMAGE_SIZE - old_len);
         image
-            .try_reserve_exact(count)
+            .try_reserve_exact(chunk_len)
             .map_err(|_| format!("not enough kernel memory to read {label} {path}"))?;
-        image.extend_from_slice(&chunk[..count]);
+        image.resize(old_len + chunk_len, 0);
+        let count = match file.read(&mut image[old_len..old_len + chunk_len]) {
+            Ok(count) => count,
+            Err(err) => {
+                image.truncate(old_len);
+                return Err(format!("failed to read {label} {path}: {err}"));
+            }
+        };
+        if count == 0 {
+            image.truncate(old_len);
+            break;
+        }
+        image.truncate(old_len + count);
     }
 
     if image.len() < expected_len {

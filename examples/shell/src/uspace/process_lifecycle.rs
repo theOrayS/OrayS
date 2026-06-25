@@ -12,7 +12,7 @@ use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
+use memory_addr::{PageIter4K, VirtAddr, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
 use std::string::{String, ToString};
 use std::sync::Arc;
@@ -27,11 +27,11 @@ use super::fd_table::{
 };
 use super::futex;
 use super::linux_abi::{
-    ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE, USER_ASPACE_SIZE,
-    neg_errno,
+    neg_errno, ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE,
+    USER_ASPACE_SIZE,
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
-use super::program_loader::{LoadedMapping, load_program_image};
+use super::program_loader::{load_program_image, LoadedMapping};
 use super::resource_sched::{
     apply_process_scheduler_state_to_task, child_sched_state_from_parent, default_sched_state,
 };
@@ -45,21 +45,21 @@ use super::signal_abi::{
 };
 use super::sysv_shm;
 use super::task_context::{
-    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
-    user_pc,
+    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
+    UserTaskExt,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    UserThreadEntry, live_user_thread_count, prune_exited_user_tasks, register_user_task,
+    live_user_thread_count, prune_exited_user_tasks, register_user_task,
     unregister_user_task_with_runtime, user_thread_entries_by_process_pid,
-    user_thread_entry_by_process_pid,
+    user_thread_entry_by_process_pid, UserThreadEntry,
 };
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_value,
-    write_user_bytes, write_user_value,
+    read_cstr, read_execve_argv, read_execve_envp, read_user_value, write_user_bytes,
+    write_user_value, MAX_USER_IO_CHUNK,
 };
-use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE, ProcessFdTable, UserProcess};
+use super::{ChildTask, ProcessFdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -115,6 +115,21 @@ fn global_path_sparse_repeats() -> &'static Mutex<BTreeMap<String, Vec<(u64, u64
 fn global_path_data_ranges() -> &'static Mutex<BTreeMap<String, Vec<(u64, u64)>>> {
     let _ = GLOBAL_PATH_DATA_RANGES.call_once(|| Mutex::new(BTreeMap::new()));
     &GLOBAL_PATH_DATA_RANGES
+}
+
+fn first_overlapping_mmap_region(ranges: &[super::UserMmapRegion], start: usize) -> usize {
+    ranges.partition_point(|region| region.end() <= start)
+}
+
+fn overlapping_mmap_regions<'a>(
+    ranges: &'a [super::UserMmapRegion],
+    start: usize,
+    end: usize,
+) -> impl Iterator<Item = &'a super::UserMmapRegion> + 'a {
+    let first = first_overlapping_mmap_region(ranges, start);
+    ranges[first..]
+        .iter()
+        .take_while(move |region| region.start < end)
 }
 
 #[cfg(feature = "auto-run-tests")]
@@ -478,7 +493,11 @@ fn run_user_program_in_with_env_and_timeout(
                 }
                 join_user_task_for_cleanup(&task);
                 process.teardown();
-                if expired { 137 } else { code }
+                if expired {
+                    137
+                } else {
+                    code
+                }
             }
             None => {
                 process.request_eval_exit_tree(137);
@@ -1247,9 +1266,11 @@ impl UserProcess {
     }
 
     pub(super) fn fault_in_mmap_sigbus_range(&self, addr: usize) -> bool {
-        self.mmap_sigbus_ranges
-            .lock()
+        let ranges = self.mmap_sigbus_ranges.lock();
+        let cutoff = ranges.partition_point(|(start, _)| *start <= addr);
+        ranges[..cutoff]
             .iter()
+            .rev()
             .any(|(start, end)| addr >= *start && addr < *end)
     }
 
@@ -1264,12 +1285,20 @@ impl UserProcess {
         let requested_access = MappingFlags::from_bits_truncate(fault_flags.bits());
         let candidate = {
             let ranges = self.mmap_ranges.lock();
-            let Some(region) = ranges
-                .iter()
-                .filter(|region| region.grow_down && fault_page < region.start)
-                .min_by_key(|region| region.start - fault_page)
-                .cloned()
-            else {
+            let mut candidate = None;
+            for region in ranges.iter() {
+                if region.grow_down
+                    && fault_page < region.start
+                    && candidate
+                        .as_ref()
+                        .map_or(true, |best: &super::UserMmapRegion| {
+                            region.start < best.start
+                        })
+                {
+                    candidate = Some(region.clone());
+                }
+            }
+            let Some(region) = candidate else {
                 return false;
             };
             let grow_end = region.start;
@@ -1280,17 +1309,16 @@ impl UserProcess {
             if !map_flags.contains(requested_access) {
                 return false;
             }
-            if ranges.iter().any(|other| {
-                other.start < grow_end && other.end() > fault_page && other.start != region.start
-            }) {
-                return false;
-            }
             let guard_floor = fault_page.saturating_sub(STACK_GUARD_GAP);
-            if ranges
-                .iter()
-                .any(|other| other.end() <= fault_page && other.end() > guard_floor)
-            {
-                return false;
+            for other in ranges.iter() {
+                let other_end = other.end();
+                let same_region = other.start == region.start && other_end == region.end();
+                if !same_region && other.start < grow_end && other_end > fault_page {
+                    return false;
+                }
+                if other_end <= fault_page && other_end > guard_floor {
+                    return false;
+                }
             }
             (region.start, region.end(), grow_end - fault_page, map_flags)
         };
@@ -1340,8 +1368,9 @@ impl UserProcess {
         if end <= start {
             return Vec::new();
         }
-        self.mmap_sigbus_ranges
-            .lock()
+        let ranges = self.mmap_sigbus_ranges.lock();
+        let cutoff = ranges.partition_point(|(range_start, _)| *range_start < end);
+        ranges[..cutoff]
             .iter()
             .filter_map(|(range_start, range_end)| {
                 let segment_start = (*range_start).max(start);
@@ -1411,7 +1440,11 @@ impl UserProcess {
     }
 
     pub(super) fn mmap_range_denies_write(&self, start: usize, end: usize) -> bool {
-        self.mmap_ranges.lock().iter().any(|region| {
+        if end <= start {
+            return false;
+        }
+        let ranges = self.mmap_ranges.lock();
+        overlapping_mmap_regions(&ranges, start, end).any(|region| {
             region.shared && !region.may_write && region.start < end && region.end() > start
         })
     }
@@ -1432,9 +1465,11 @@ impl UserProcess {
     }
 
     pub(super) fn mmap_range_has_locked(&self, start: usize, end: usize) -> bool {
-        self.mmap_ranges
-            .lock()
-            .iter()
+        if end <= start {
+            return false;
+        }
+        let ranges = self.mmap_ranges.lock();
+        overlapping_mmap_regions(&ranges, start, end)
             .any(|region| region.locked && region.start < end && region.end() > start)
     }
 
