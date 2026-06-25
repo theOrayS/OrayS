@@ -3,11 +3,11 @@
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axfs_vfs::{
     VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeRef, VfsNodeType, VfsOps, VfsResult,
 };
-use axns::{ResArc, def_resource};
+use axns::{def_resource, ResArc};
 use axsync::Mutex;
 use core::array;
 use lazyinit::LazyInit;
@@ -31,6 +31,12 @@ struct MountAnchor {
 struct RootDirectory {
     main_fs: Arc<dyn VfsOps>,
     mounts: Mutex<Vec<MountPoint>>,
+    read_dir_cache: Mutex<RootReadDirCache>,
+}
+
+struct RootReadDirCache {
+    main_count: Option<usize>,
+    synthetic_mount_names: Option<Vec<&'static str>>,
 }
 
 static ROOT_DIR: LazyInit<Arc<RootDirectory>> = LazyInit::new();
@@ -40,12 +46,21 @@ impl MountPoint {
         Self { path, fs }
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.path
             .trim_matches('/')
             .rsplit('/')
             .next()
             .unwrap_or(self.path.trim_matches('/'))
+    }
+}
+
+impl RootReadDirCache {
+    const fn new() -> Self {
+        Self {
+            main_count: None,
+            synthetic_mount_names: None,
+        }
     }
 }
 
@@ -91,6 +106,7 @@ impl RootDirectory {
         Self {
             main_fs,
             mounts: Mutex::new(Vec::new()),
+            read_dir_cache: Mutex::new(RootReadDirCache::new()),
         }
     }
 
@@ -101,21 +117,30 @@ impl RootDirectory {
         if !path.starts_with('/') {
             return ax_err!(InvalidInput, "mount path must start with '/'");
         }
-        let mut mounts = self.mounts.lock();
-        if mounts.iter().any(|mp| mp.path == path) {
-            return ax_err!(InvalidInput, "mount point already exists");
+        {
+            let mut mounts = self.mounts.lock();
+            if mounts.iter().any(|mp| mp.path == path) {
+                return ax_err!(InvalidInput, "mount point already exists");
+            }
+            let mount_point = self.prepare_mount_point(path)?;
+            fs.mount(path, mount_point)?;
+            mounts.push(MountPoint::new(path, fs));
         }
-        let mount_point = self.prepare_mount_point(path)?;
-        fs.mount(path, mount_point)?;
-        mounts.push(MountPoint::new(path, fs));
+        self.invalidate_read_dir_cache();
         Ok(())
     }
 
     pub fn _umount(&self, path: &str) -> bool {
-        let mut mounts = self.mounts.lock();
-        let before = mounts.len();
-        mounts.retain(|mp| mp.path != path);
-        mounts.len() != before
+        let changed = {
+            let mut mounts = self.mounts.lock();
+            let before = mounts.len();
+            mounts.retain(|mp| mp.path != path);
+            mounts.len() != before
+        };
+        if changed {
+            self.invalidate_read_dir_cache();
+        }
+        changed
     }
 
     pub fn contains(&self, path: &str) -> bool {
@@ -143,7 +168,14 @@ impl RootDirectory {
         Ok(Arc::new(MountAnchor::new(root)))
     }
 
+    fn invalidate_read_dir_cache(&self) {
+        *self.read_dir_cache.lock() = RootReadDirCache::new();
+    }
+
     fn count_main_root_entries(&self) -> AxResult<usize> {
+        if let Some(count) = self.read_dir_cache.lock().main_count {
+            return Ok(count);
+        }
         let root = self.main_fs.root_dir();
         let mut count = 0;
         loop {
@@ -151,21 +183,27 @@ impl RootDirectory {
             let read = root.read_dir(count, &mut buf)?;
             count += read;
             if read < buf.len() {
+                self.read_dir_cache.lock().main_count = Some(count);
                 return Ok(count);
             }
         }
     }
 
-    fn synthetic_mount_entries(&self) -> Vec<VfsDirEntry> {
+    fn synthetic_mount_entry_names(&self) -> Vec<&'static str> {
+        if let Some(names) = self.read_dir_cache.lock().synthetic_mount_names.clone() {
+            return names;
+        }
         let root = self.main_fs.root_dir();
-        let mut entries = Vec::new();
+        let mut names = Vec::new();
         let mounts = self.mounts.lock();
         for mp in mounts.iter() {
             if root.clone().lookup(mp.path).is_err() {
-                entries.push(VfsDirEntry::new(mp.name(), VfsNodeType::Dir));
+                names.push(mp.name());
             }
         }
-        entries
+        drop(mounts);
+        self.read_dir_cache.lock().synthetic_mount_names = Some(names.clone());
+        names
     }
 
     fn mount_match_len(path: &str, mount_path: &str) -> Option<usize> {
@@ -233,23 +271,31 @@ impl VfsNodeOps for RootDirectory {
     }
 
     fn create(&self, path: &str, ty: VfsNodeType) -> VfsResult {
-        self.lookup_mounted_fs(path, |fs, rest_path| {
+        let result = self.lookup_mounted_fs(path, |fs, rest_path| {
             if rest_path.is_empty() {
                 Ok(()) // already exists
             } else {
                 fs.root_dir().create(rest_path, ty)
             }
-        })
+        });
+        if result.is_ok() {
+            self.invalidate_read_dir_cache();
+        }
+        result
     }
 
     fn remove(&self, path: &str) -> VfsResult {
-        self.lookup_mounted_fs(path, |fs, rest_path| {
+        let result = self.lookup_mounted_fs(path, |fs, rest_path| {
             if rest_path.is_empty() {
                 ax_err!(PermissionDenied) // cannot remove mount points
             } else {
                 fs.root_dir().remove(rest_path)
             }
-        })
+        });
+        if result.is_ok() {
+            self.invalidate_read_dir_cache();
+        }
+        result
     }
 
     fn rename(&self, src_path: &str, dst_path: &str) -> VfsResult {
@@ -266,7 +312,11 @@ impl VfsNodeOps for RootDirectory {
             Some((_, fs)) => fs,
             None => self.main_fs.clone(),
         };
-        fs.root_dir().rename(src_rest, dst_rest)
+        let result = fs.root_dir().rename(src_rest, dst_rest);
+        if result.is_ok() {
+            self.invalidate_read_dir_cache();
+        }
+        result
     }
 
     fn read_dir(&self, start_idx: usize, dirents: &mut [VfsDirEntry]) -> VfsResult<usize> {
@@ -281,14 +331,14 @@ impl VfsNodeOps for RootDirectory {
             }
         }
 
-        let synthetic_entries = self.synthetic_mount_entries();
+        let synthetic_names = self.synthetic_mount_entry_names();
         let synth_start = start_idx.saturating_sub(main_count);
-        for entry in synthetic_entries
-            .into_iter()
+        for name in synthetic_names
+            .iter()
             .skip(synth_start)
             .take(dirents.len() - written)
         {
-            dirents[written] = entry;
+            dirents[written] = VfsDirEntry::new(name, VfsNodeType::Dir);
             written += 1;
         }
         Ok(written)

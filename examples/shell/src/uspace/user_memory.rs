@@ -1,4 +1,4 @@
-use core::mem::{MaybeUninit, size_of};
+use core::mem::{size_of, MaybeUninit};
 use core::ptr;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -6,12 +6,12 @@ use axerrno::LinuxError;
 use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
-use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, VirtAddr};
+use memory_addr::{MemoryAddr, PageIter4K, VirtAddr, PAGE_SIZE_4K};
 use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
-use super::{UserProcess, neg_errno};
+use super::{neg_errno, UserProcess};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
 
@@ -433,6 +433,7 @@ pub(super) fn read_execve_envp(
 
 pub(super) fn read_cstr(process: &UserProcess, ptr: usize) -> Result<String, LinuxError> {
     const MAX_USER_CSTR_LEN: usize = 128 * 1024;
+    const USER_CSTR_COPY_CHUNK: usize = 256;
 
     if ptr == 0 {
         return read_cstr_efault(process, ptr, ptr, "null pointer");
@@ -441,35 +442,72 @@ pub(super) fn read_cstr(process: &UserProcess, ptr: usize) -> Result<String, Lin
         return read_cstr_efault(process, ptr, ptr, "pointer overflow");
     }
 
-    let mut aspace = process.aspace.lock();
     let mut bytes = Vec::new();
-    for offset in 0..MAX_USER_CSTR_LEN {
+    let mut offset = 0usize;
+    let mut chunk = [0u8; USER_CSTR_COPY_CHUNK];
+    while offset < MAX_USER_CSTR_LEN {
         let addr = match ptr.checked_add(offset) {
             Some(addr) => addr,
             None => {
+                let aspace = process.aspace.lock();
                 log_read_cstr_efault(process, ptr, ptr, "string pointer overflow", &aspace);
                 return Err(LinuxError::EFAULT);
             }
         };
-        drop(aspace);
-        if let Err(err) = fault_in_user_read(process, addr, 1) {
+        let remaining = MAX_USER_CSTR_LEN - offset;
+        let chunk_len = match cstr_chunk_len(process, addr, remaining, chunk.len()) {
+            Ok(len) if len > 0 => len,
+            Ok(_) => {
+                let aspace = process.aspace.lock();
+                log_read_cstr_efault(process, ptr, addr, "range is not readable", &aspace);
+                return Err(LinuxError::EFAULT);
+            }
+            Err(err) => {
+                let aspace = process.aspace.lock();
+                log_read_cstr_efault(process, ptr, addr, "range is not readable", &aspace);
+                return Err(err);
+            }
+        };
+        if let Err(err) = fault_in_user_read(process, addr, chunk_len) {
             let aspace = process.aspace.lock();
             log_read_cstr_efault(process, ptr, addr, "range is not readable", &aspace);
             return Err(err);
         }
-        aspace = process.aspace.lock();
-        let mut byte = [0u8; 1];
-        if aspace.read(VirtAddr::from(addr), &mut byte).is_err() {
+        let mut aspace = process.aspace.lock();
+        if aspace
+            .read(VirtAddr::from(addr), &mut chunk[..chunk_len])
+            .is_err()
+        {
             log_read_cstr_efault(process, ptr, addr, "address-space read failed", &aspace);
             return Err(LinuxError::EFAULT);
         }
-        if byte[0] == 0 {
+        if let Some(nul) = chunk[..chunk_len].iter().position(|&byte| byte == 0) {
+            bytes.extend_from_slice(&chunk[..nul]);
             return String::from_utf8(bytes).map_err(|_| LinuxError::EINVAL);
         }
-        bytes.push(byte[0]);
+        bytes.extend_from_slice(&chunk[..chunk_len]);
+        offset += chunk_len;
     }
 
     Err(LinuxError::EINVAL)
+}
+
+fn cstr_chunk_len(
+    process: &UserProcess,
+    addr: usize,
+    remaining: usize,
+    scratch_len: usize,
+) -> Result<usize, LinuxError> {
+    let page_remaining = PAGE_SIZE_4K - (addr & (PAGE_SIZE_4K - 1));
+    let mut len = remaining.min(page_remaining).min(scratch_len);
+    let brk = process.brk.lock();
+    if addr < brk.limit {
+        if addr >= brk.end {
+            return Err(LinuxError::EFAULT);
+        }
+        len = len.min(brk.end - addr);
+    }
+    Ok(len)
 }
 
 fn read_cstr_efault(

@@ -14,10 +14,11 @@ use std::vec::Vec;
 
 macro_rules! user_trace {
     ($($arg:tt)*) => {{
-        if option_env!("USER_TRACE").is_some() {
-            println!($($arg)*);
-        } else {
-            let _ = core::format_args!($($arg)*);
+        match option_env!("USER_TRACE") {
+            Some(_) => println!($($arg)*),
+            None => {
+                let _ = core::format_args!("");
+            }
         }
     }};
 }
@@ -55,7 +56,6 @@ use fd_table::{FdTable, ProcessFdTable};
 #[cfg(feature = "auto-run-tests")]
 pub use futex::futex_table_stats;
 use linux_abi::*;
-use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 #[cfg(feature = "auto-run-tests")]
@@ -73,6 +73,7 @@ pub use process_lifecycle::seed_initial_path_mode;
 pub use process_lifecycle::user_process_object_stats;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::user_process_retention_stats;
+use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use program_loader::exec_image_buffer_stats;
 use resource_sched::{UserRlimit, UserSchedState};

@@ -3,23 +3,23 @@ use core::sync::atomic::Ordering;
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
 use axhal::paging::MappingFlags;
-use axhal::trap::{PAGE_FAULT, PageFaultFlags, register_trap_handler};
+use axhal::trap::{register_trap_handler, PageFaultFlags, PAGE_FAULT};
 use linux_raw_sys::general;
-use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr, VirtAddrRange};
+use memory_addr::{PageIter4K, VirtAddr, VirtAddrRange, PAGE_SIZE_4K};
 use std::collections::BTreeMap;
 use std::vec::Vec;
 
-use super::UserProcess;
 use super::fd_table::{read_mmap_file_backing, write_mmap_file_backing};
 use super::linux_abi::{
-    SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP, neg_errno,
+    neg_errno, SIGSEGV_NUM, USER_ASPACE_BASE, USER_MMAP_BASE, USER_STACK_SIZE, USER_STACK_TOP,
 };
 use super::process_lifecycle::{terminate_current_thread, terminate_current_thread_for_exit_group};
 use super::signal_abi::queue_current_synchronous_signal;
 use super::task_context::{current_task_ext, current_tid, user_pc};
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_user_bytes, validate_user_write, write_user_bytes,
+    read_user_bytes, user_io_buffer, validate_user_write, write_user_bytes, MAX_USER_IO_CHUNK,
 };
+use super::UserProcess;
 
 pub(super) fn sys_brk(process: &UserProcess, addr: usize) -> isize {
     let mut brk = process.brk.lock();
@@ -355,9 +355,14 @@ pub(super) fn sys_mmap(
 
     let mut sigbus_range = None;
     if file_backed {
-        const FILE_MMAP_COPY_CHUNK: usize = PAGE_SIZE_4K;
         let mut copied = 0usize;
-        let mut buf = [0u8; FILE_MMAP_COPY_CHUNK];
+        let mut buf = match user_io_buffer(len) {
+            Ok(buf) => buf,
+            Err(err) => {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(err);
+            }
+        };
         while copied < len {
             let chunk_len = core::cmp::min(len - copied, buf.len());
             let Some(file_offset) = (offset as u64).checked_add(copied as u64) else {
