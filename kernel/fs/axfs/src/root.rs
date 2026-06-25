@@ -35,8 +35,9 @@ struct RootDirectory {
 }
 
 struct RootReadDirCache {
-    main_count: Option<usize>,
-    synthetic_mount_names: Option<Vec<&'static str>>,
+    generation: u64,
+    main_count: Option<(u64, usize)>,
+    synthetic_mount_names: Option<(u64, Vec<&'static str>)>,
 }
 
 static ROOT_DIR: LazyInit<Arc<RootDirectory>> = LazyInit::new();
@@ -58,9 +59,16 @@ impl MountPoint {
 impl RootReadDirCache {
     const fn new() -> Self {
         Self {
+            generation: 0,
             main_count: None,
             synthetic_mount_names: None,
         }
+    }
+
+    fn invalidate(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.main_count = None;
+        self.synthetic_mount_names = None;
     }
 }
 
@@ -169,13 +177,20 @@ impl RootDirectory {
     }
 
     fn invalidate_read_dir_cache(&self) {
-        *self.read_dir_cache.lock() = RootReadDirCache::new();
+        self.read_dir_cache.lock().invalidate();
     }
 
     fn count_main_root_entries(&self) -> AxResult<usize> {
-        if let Some(count) = self.read_dir_cache.lock().main_count {
-            return Ok(count);
-        }
+        let observed_generation = {
+            let cache = self.read_dir_cache.lock();
+            if let Some((generation, count)) = cache.main_count {
+                if generation == cache.generation {
+                    return Ok(count);
+                }
+            }
+            cache.generation
+        };
+
         let root = self.main_fs.root_dir();
         let mut count = 0;
         loop {
@@ -183,16 +198,26 @@ impl RootDirectory {
             let read = root.read_dir(count, &mut buf)?;
             count += read;
             if read < buf.len() {
-                self.read_dir_cache.lock().main_count = Some(count);
+                let mut cache = self.read_dir_cache.lock();
+                if cache.generation == observed_generation {
+                    cache.main_count = Some((observed_generation, count));
+                }
                 return Ok(count);
             }
         }
     }
 
     fn synthetic_mount_entry_names(&self) -> Vec<&'static str> {
-        if let Some(names) = self.read_dir_cache.lock().synthetic_mount_names.clone() {
-            return names;
-        }
+        let observed_generation = {
+            let cache = self.read_dir_cache.lock();
+            if let Some((generation, names)) = &cache.synthetic_mount_names {
+                if *generation == cache.generation {
+                    return names.clone();
+                }
+            }
+            cache.generation
+        };
+
         let root = self.main_fs.root_dir();
         let mut names = Vec::new();
         let mounts = self.mounts.lock();
@@ -202,7 +227,10 @@ impl RootDirectory {
             }
         }
         drop(mounts);
-        self.read_dir_cache.lock().synthetic_mount_names = Some(names.clone());
+        let mut cache = self.read_dir_cache.lock();
+        if cache.generation == observed_generation {
+            cache.synthetic_mount_names = Some((observed_generation, names.clone()));
+        }
         names
     }
 
