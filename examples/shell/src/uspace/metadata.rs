@@ -617,6 +617,43 @@ impl UserProcess {
         self.path_data_ranges.lock().get(path).cloned()
     }
 
+    pub(super) fn missing_path_data_512_blocks(
+        &self,
+        path: &str,
+        start: u64,
+        end: u64,
+    ) -> Option<u64> {
+        self.path_data_ranges
+            .lock()
+            .get(path)
+            .map(|ranges| Self::missing_data_range_512_blocks(ranges, start, end))
+    }
+
+    pub(super) fn path_data_ranges_cover(&self, path: &str, offset: u64, len: u64) -> bool {
+        if len == 0 {
+            return true;
+        }
+        let end = offset.saturating_add(len);
+        let ranges = self.path_data_ranges.lock();
+        let Some(ranges) = ranges.get(path) else {
+            return false;
+        };
+        let mut cursor = offset;
+        for &(range_start, range_end) in ranges {
+            if range_end <= cursor {
+                continue;
+            }
+            if range_start > cursor {
+                return false;
+            }
+            cursor = cursor.max(range_end);
+            if cursor >= end {
+                return true;
+            }
+        }
+        false
+    }
+
     fn take_path_free_512_block_credit(extents: &mut Vec<(u64, Vec<u8>)>) -> u64 {
         let mut blocks = 0u64;
         extents.retain(|(offset, data)| {
@@ -869,11 +906,12 @@ impl UserProcess {
     }
 
     fn missing_data_range_512_blocks(ranges: &[(u64, u64)], start: u64, end: u64) -> u64 {
-        let mut sorted = ranges.to_vec();
-        sorted.sort_by_key(|(range_start, _)| *range_start);
+        // All path_data_ranges mutators keep ranges ordered and non-overlapping.
+        // Query hot paths can therefore scan in place instead of cloning and
+        // sorting the whole vector on every write-capacity check.
         let mut cursor = start;
         let mut missing = 0u64;
-        for (range_start, range_end) in sorted {
+        for &(range_start, range_end) in ranges {
             if range_end <= cursor {
                 continue;
             }
@@ -966,9 +1004,10 @@ impl UserProcess {
     }
 
     pub(super) fn path_allocated_512_blocks(&self, path: &str, logical_size: u64) -> Option<u64> {
-        let ranges = self.path_data_ranges.lock().get(path)?.clone();
+        let all_ranges = self.path_data_ranges.lock();
+        let ranges = all_ranges.get(path)?;
         let mut blocks = 0u64;
-        for (start, end) in ranges {
+        for &(start, end) in ranges {
             if start >= logical_size || start >= end {
                 continue;
             }

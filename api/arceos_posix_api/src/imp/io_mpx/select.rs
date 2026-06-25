@@ -194,12 +194,11 @@ pub unsafe fn sys_select(
                 return Ok(res);
             }
 
-            if deadline.is_some_and(|ddl| wall_time() >= ddl) {
+            if super::wait_for_poll_retry(deadline) {
                 debug!("    timeout!");
                 unsafe { result_sets.write_back_to(readfds, writefds, exceptfds)? };
                 return Ok(0);
             }
-            crate::sys_sched_yield();
         }
     })
 }

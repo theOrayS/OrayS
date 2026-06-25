@@ -1,11 +1,15 @@
-use alloc::collections::VecDeque;
+use alloc::collections::{BTreeSet, VecDeque};
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use kernel_guard::{NoOp, NoPreemptIrqSave};
 use kspin::{SpinNoIrq, SpinNoIrqGuard};
 
 use crate::{AxTaskRef, CurrentTask, current_run_queue, select_run_queue};
+
+#[inline]
+fn task_ptr_key(task: &AxTaskRef) -> usize {
+    Arc::as_ptr(task) as usize
+}
 
 /// A queue to store sleeping tasks.
 ///
@@ -202,19 +206,20 @@ impl WaitQueue {
             return 0;
         }
 
-        let mut notified = Vec::new();
+        let mut notified = BTreeSet::new();
         let mut wq = self.queue.lock();
-        while notified.len() < count {
+        let mut notified_len = 0usize;
+        while notified_len < count {
             let Some(task) = wq.pop_front() else {
                 break;
             };
-            if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+            if !notified.insert(task_ptr_key(&task)) {
                 continue;
             }
-            unblock_one_task(task.clone(), resched);
-            notified.push(task);
+            unblock_one_task(task, resched);
+            notified_len += 1;
         }
-        notified.len()
+        notified_len
     }
 
     /// Wakes up to `count` distinct tasks that satisfy `predicate`, invoking
@@ -234,14 +239,15 @@ impl WaitQueue {
             return 0;
         }
 
-        let mut notified = Vec::new();
+        let mut notified = BTreeSet::new();
+        let mut notified_len = 0usize;
         let mut wq = self.queue.lock();
         let mut index = 0;
-        while index < wq.len() && notified.len() < count {
+        while index < wq.len() && notified_len < count {
             let Some(task) = wq.get(index).cloned() else {
                 break;
             };
-            if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+            if notified.contains(&task_ptr_key(&task)) {
                 let _ = wq.remove(index);
                 continue;
             }
@@ -253,10 +259,11 @@ impl WaitQueue {
                 break;
             };
             on_task(&task);
-            unblock_one_task(task.clone(), resched);
-            notified.push(task);
+            notified.insert(task_ptr_key(&task));
+            unblock_one_task(task, resched);
+            notified_len += 1;
         }
-        notified.len()
+        notified_len
     }
 
     /// Wakes up to `wake_count` distinct source waiters matching `predicate`
@@ -288,13 +295,14 @@ impl WaitQueue {
         let mut operate =
             |source: &mut VecDeque<AxTaskRef>,
              mut destination: Option<&mut VecDeque<AxTaskRef>>| {
-                let mut notified = Vec::new();
+                let mut notified = BTreeSet::new();
+                let mut notified_len = 0usize;
                 let mut index = 0;
-                while index < source.len() && notified.len() < wake_count {
+                while index < source.len() && notified_len < wake_count {
                     let Some(task) = source.get(index).cloned() else {
                         break;
                     };
-                    if notified.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                    if notified.contains(&task_ptr_key(&task)) {
                         let _ = source.remove(index);
                         continue;
                     }
@@ -306,25 +314,28 @@ impl WaitQueue {
                         break;
                     };
                     on_wake(&task);
-                    unblock_one_task(task.clone(), resched);
-                    notified.push(task);
+                    notified.insert(task_ptr_key(&task));
+                    unblock_one_task(task, resched);
+                    notified_len += 1;
                 }
 
-                let mut requeued = Vec::new();
+                let mut requeued = BTreeSet::new();
+                let mut requeued_len = 0usize;
                 if let Some(destination) = destination.as_deref_mut() {
-                    while !source.is_empty() && requeued.len() < requeue_count {
+                    while !source.is_empty() && requeued_len < requeue_count {
                         let Some(task) = source.pop_front() else {
                             break;
                         };
-                        if requeued.iter().any(|seen| Arc::ptr_eq(seen, &task)) {
+                        let key = task_ptr_key(&task);
+                        if notified.contains(&key) || !requeued.insert(key) {
                             continue;
                         }
                         on_requeue(&task);
-                        destination.push_back(task.clone());
-                        requeued.push(task);
+                        destination.push_back(task);
+                        requeued_len += 1;
                     }
                 }
-                (notified.len(), requeued.len())
+                (notified_len, requeued_len)
             };
 
         if core::ptr::eq(self, target) {

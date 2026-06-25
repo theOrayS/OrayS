@@ -1733,6 +1733,14 @@ impl UserProcess {
             .into_iter()
             .flat_map(|(start, end)| range_segments_excluding(start, end, &dont_fork_ranges))
             .collect();
+        let cwd = self.cwd();
+        let fs_root = self.fs_root();
+        let exec_root = self.exec_root();
+        let exec_path = self.exec_path();
+        let prctl_name = self.prctl_name();
+        let groups = self.groups();
+        let timer_slack_ns = self.timer_slack_ns();
+        let parent_task_id = axtask::current().id().as_u64() as i32;
 
         let child = Arc::new(UserProcess {
             aspace: child_aspace,
@@ -1745,13 +1753,13 @@ impl UserProcess {
             mlock_future: AtomicBool::new(false),
             mlockall_accounted_kb: AtomicUsize::new(0),
             fds: child_fds,
-            cwd: Mutex::new(self.cwd()),
-            fs_root: Mutex::new(self.fs_root()),
-            exec_root: Mutex::new(self.exec_root()),
-            exec_path: Mutex::new(self.exec_path()),
+            cwd: Mutex::new(cwd),
+            fs_root: Mutex::new(fs_root),
+            exec_root: Mutex::new(exec_root),
+            exec_path: Mutex::new(exec_path.clone()),
             hostname: self.hostname.clone(),
             domainname: self.domainname.clone(),
-            prctl_name: Mutex::new(self.prctl_name()),
+            prctl_name: Mutex::new(prctl_name),
             children: Mutex::new(Vec::new()),
             child_exit_wait: WaitQueue::new(),
             timer_wait: WaitQueue::new(),
@@ -1786,7 +1794,7 @@ impl UserProcess {
             gid: AtomicU32::new(self.gid()),
             saved_gid: AtomicU32::new(self.saved_gid()),
             fs_gid: AtomicU32::new(self.fs_gid()),
-            groups: Mutex::new(self.groups()),
+            groups: Mutex::new(groups),
             credential_generation: AtomicUsize::new(self.credential_generation()),
             cap_effective: AtomicU64::new(self.cap_effective()),
             cap_permitted: AtomicU64::new(self.cap_permitted()),
@@ -1794,8 +1802,8 @@ impl UserProcess {
             cap_bounding: AtomicU64::new(self.cap_bounding()),
             personality: AtomicUsize::new(self.personality()),
             parent_death_signal: AtomicI32::new(self.parent_death_signal.load(Ordering::Acquire)),
-            default_timer_slack_ns: AtomicU64::new(self.timer_slack_ns()),
-            timer_slack_ns: AtomicU64::new(self.timer_slack_ns()),
+            default_timer_slack_ns: AtomicU64::new(timer_slack_ns),
+            timer_slack_ns: AtomicU64::new(timer_slack_ns),
             posix_timers: Mutex::new(BTreeMap::new()),
             next_posix_timer_id: AtomicI32::new(1),
             real_timer_generation: AtomicU64::new(0),
@@ -1824,7 +1832,7 @@ impl UserProcess {
             pid: AtomicI32::new(0),
             pgid: AtomicI32::new(self.pgid()),
             sid: AtomicI32::new(self.sid()),
-            ppid: axtask::current().id().as_u64() as i32,
+            ppid: parent_task_id,
             live_threads: AtomicUsize::new(1),
             exit_group_code: AtomicI32::new(NO_EXIT_GROUP_CODE),
             exit_code: AtomicI32::new(0),
@@ -1839,7 +1847,7 @@ impl UserProcess {
         if !share_vm {
             zero_child_wipe_on_fork_ranges(child.as_ref(), &wipe_on_fork_ranges)?;
         }
-        track_running_executable(child.exec_path().as_str());
+        track_running_executable(exec_path.as_str());
         Ok(child)
     }
 

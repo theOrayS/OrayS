@@ -29,8 +29,8 @@ use super::linux_abi::{
 use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_iovec_entries, read_user_bytes, read_user_value, user_io_buffer,
-    validate_user_read, validate_user_write, write_user_bytes, write_user_value,
+    MAX_USER_IO_CHUNK, read_iovec_entries, read_user_bytes, read_user_bytes_into, read_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, write_user_bytes, write_user_value,
 };
 use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
 
@@ -252,8 +252,13 @@ impl LocalSocketBuffer {
             return;
         }
         let mut new_data = vec![0; new_capacity];
-        for (idx, byte) in new_data.iter_mut().enumerate().take(available_read) {
-            *byte = self.data[(self.head + idx) % self.capacity];
+        if available_read != 0 {
+            let first = available_read.min(self.capacity - self.head);
+            new_data[..first].copy_from_slice(&self.data[self.head..self.head + first]);
+            let second = available_read - first;
+            if second != 0 {
+                new_data[first..first + second].copy_from_slice(&self.data[..second]);
+            }
         }
         self.data = new_data;
         self.capacity = new_capacity;
@@ -268,23 +273,42 @@ impl LocalSocketBuffer {
         };
     }
 
-    fn write_byte(&mut self, byte: u8) {
-        self.status = LocalSocketBufferStatus::Normal;
-        self.data[self.tail] = byte;
-        self.tail = (self.tail + 1) % self.capacity;
-        if self.tail == self.head {
-            self.status = LocalSocketBufferStatus::Full;
+    fn read_into(&mut self, dst: &mut [u8]) -> usize {
+        let take = self.available_read().min(dst.len());
+        if take == 0 {
+            return 0;
         }
-    }
-
-    fn read_byte(&mut self) -> u8 {
         self.status = LocalSocketBufferStatus::Normal;
-        let byte = self.data[self.head];
-        self.head = (self.head + 1) % self.capacity;
+        let first = take.min(self.capacity - self.head);
+        dst[..first].copy_from_slice(&self.data[self.head..self.head + first]);
+        let second = take - first;
+        if second != 0 {
+            dst[first..first + second].copy_from_slice(&self.data[..second]);
+        }
+        self.head = (self.head + take) % self.capacity;
         if self.head == self.tail {
             self.status = LocalSocketBufferStatus::Empty;
         }
-        byte
+        take
+    }
+
+    fn write_from(&mut self, src: &[u8]) -> usize {
+        let take = self.available_write().min(src.len());
+        if take == 0 {
+            return 0;
+        }
+        self.status = LocalSocketBufferStatus::Normal;
+        let first = take.min(self.capacity - self.tail);
+        self.data[self.tail..self.tail + first].copy_from_slice(&src[..first]);
+        let second = take - first;
+        if second != 0 {
+            self.data[..second].copy_from_slice(&src[first..first + second]);
+        }
+        self.tail = (self.tail + take) % self.capacity;
+        if self.tail == self.head {
+            self.status = LocalSocketBufferStatus::Full;
+        }
+        take
     }
 
     fn available_read(&self) -> usize {
@@ -545,9 +569,7 @@ impl LocalSocketEntry {
                 continue;
             }
             let take = cmp::min(available, dst.len() - read_len);
-            for byte in &mut dst[read_len..read_len + take] {
-                *byte = buffer.read_byte();
-            }
+            let take = buffer.read_into(&mut dst[read_len..read_len + take]);
             read_len += take;
             if read_len > 0 {
                 drop(buffer);
@@ -575,9 +597,7 @@ impl LocalSocketEntry {
             };
         }
         let take = cmp::min(available, dst.len());
-        for byte in &mut dst[..take] {
-            *byte = buffer.read_byte();
-        }
+        let take = buffer.read_into(&mut dst[..take]);
         drop(buffer);
         pair.state.notify_writable(1 - pair.side);
         Ok(take)
@@ -624,9 +644,7 @@ impl LocalSocketEntry {
                 continue;
             }
             let take = cmp::min(available, src.len() - written);
-            for byte in &src[written..written + take] {
-                buffer.write_byte(*byte);
-            }
+            let take = buffer.write_from(&src[written..written + take]);
             written += take;
             drop(buffer);
             pair.state.notify_readable(peer_side);
@@ -652,9 +670,7 @@ impl LocalSocketEntry {
             return Err(LinuxError::EAGAIN);
         }
         let take = cmp::min(available, src.len());
-        for byte in &src[..take] {
-            buffer.write_byte(*byte);
-        }
+        let take = buffer.write_from(&src[..take]);
         drop(buffer);
         pair.state.notify_readable(peer_side);
         Ok(take)
@@ -731,9 +747,7 @@ impl LocalSocketEntry {
             if read == 0 {
                 return Ok(0);
             }
-            for byte in &staging[..read] {
-                buffer.write_byte(*byte);
-            }
+            debug_assert_eq!(buffer.write_from(&staging[..read]), read);
             drop(buffer);
             pair.state.notify_readable(peer_side);
             return Ok(read);
@@ -1990,9 +2004,16 @@ pub(super) fn sys_sendmsg_bridge(
         if let Err(err) = validate_user_read(process, base, len) {
             return neg_errno(err);
         }
-        match read_user_bytes(process, base, len) {
-            Ok(mut chunk) => bytes.append(&mut chunk),
-            Err(err) => return neg_errno(err),
+        if len == 0 {
+            continue;
+        }
+        let start = bytes.len();
+        if bytes.try_reserve_exact(len).is_err() {
+            return neg_errno(LinuxError::ENOMEM);
+        }
+        bytes.resize(start + len, 0);
+        if let Err(err) = read_user_bytes_into(process, base, &mut bytes[start..start + len]) {
+            return neg_errno(err);
         }
     }
     if matches!(is_local_socket_fd(process, fd), Ok(true)) {

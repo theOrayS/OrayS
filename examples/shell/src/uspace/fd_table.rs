@@ -4232,9 +4232,14 @@ impl FdTable {
     }
 
     pub(super) fn fork_copy(&self) -> Result<Self, LinuxError> {
-        let mut entries = Vec::with_capacity(self.entries.len());
-        let mut fd_flags = Vec::with_capacity(self.entries.len());
-        for (idx, entry) in self.entries.iter().enumerate() {
+        let active_len = self
+            .entries
+            .iter()
+            .rposition(Option::is_some)
+            .map_or(0, |idx| idx + 1);
+        let mut entries = Vec::with_capacity(active_len);
+        let mut fd_flags = Vec::with_capacity(active_len);
+        for (idx, entry) in self.entries.iter().take(active_len).enumerate() {
             entries.push(match entry {
                 Some(entry) => Some(entry.duplicate_for_fork()?),
                 None => None,
@@ -8476,32 +8481,9 @@ fn missing_path_data_512_blocks(process: &UserProcess, path: &str, offset: u64, 
     if start >= end {
         return 0;
     }
-    let Some(mut ranges) = process.path_data_ranges(path) else {
+    let Some(missing) = process.missing_path_data_512_blocks(path, start, end) else {
         return end.saturating_sub(start) / 512;
     };
-    ranges.sort_by_key(|(range_start, _)| *range_start);
-    let mut cursor = start;
-    let mut missing = 0u64;
-    for (range_start, range_end) in ranges {
-        if range_end <= cursor {
-            continue;
-        }
-        let covered_start = range_start.max(start);
-        let covered_end = range_end.min(end);
-        if covered_end <= covered_start {
-            continue;
-        }
-        if covered_start > cursor {
-            missing = missing.saturating_add(covered_start.saturating_sub(cursor) / 512);
-        }
-        cursor = cursor.max(covered_end);
-        if cursor >= end {
-            break;
-        }
-    }
-    if cursor < end {
-        missing = missing.saturating_add(end.saturating_sub(cursor) / 512);
-    }
     missing
 }
 
@@ -8639,8 +8621,7 @@ fn write_regular_file_at(
                 let preallocated_sparse_extent = process
                     .path_sparse_size(file.path.as_str())
                     .is_some_and(|size| sparse_end <= size);
-                let sparse_backed = path_data_ranges_cover(
-                    process,
+                let sparse_backed = process.path_data_ranges_cover(
                     file.path.as_str(),
                     sparse_offset,
                     sparse_len as u64,
@@ -8809,31 +8790,6 @@ fn regular_file_data_ranges(
         normalized.push((start, end));
     }
     Ok(normalized)
-}
-
-fn path_data_ranges_cover(process: &UserProcess, path: &str, offset: u64, len: u64) -> bool {
-    if len == 0 {
-        return true;
-    }
-    let end = offset.saturating_add(len);
-    let Some(mut ranges) = process.path_data_ranges(path) else {
-        return false;
-    };
-    ranges.sort_by_key(|(start, _)| *start);
-    let mut cursor = offset;
-    for (range_start, range_end) in ranges {
-        if range_end <= cursor {
-            continue;
-        }
-        if range_start > cursor {
-            return false;
-        }
-        cursor = cursor.max(range_end);
-        if cursor >= end {
-            return true;
-        }
-    }
-    false
 }
 
 fn file_entry_seek_data_or_hole(

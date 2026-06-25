@@ -339,11 +339,10 @@ pub unsafe fn sys_epoll_wait(
                 return Ok(events_num as c_int);
             }
 
-            if deadline.is_some_and(|ddl| wall_time() >= ddl) {
+            if super::wait_for_poll_retry(deadline) {
                 debug!("    timeout!");
                 return Ok(0);
             }
-            crate::sys_sched_yield();
         }
     })
 }

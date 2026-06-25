@@ -99,13 +99,13 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "    } else {\n        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))\n    }",
-            "    } else if level_i32 == SOL_SOCKET_LEVEL && optname_i32 == SO_REUSEADDR_OPT {\n        0\n    } else {\n        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))\n    }",
+            "    } else if level_i32 == SOL_SOCKET_LEVEL && optname_i32 == SO_REUSEPORT_OPT {\n        0\n    } else {\n        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))\n    }",
             1,
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("SO_REUSEADDR_OPT", result.stdout)
+        self.assertIn("SO_REUSEPORT_OPT", result.stdout)
 
     def test_detects_socket_buffer_backend_without_listener_plumbing(self) -> None:
         tree = self.make_tree()
