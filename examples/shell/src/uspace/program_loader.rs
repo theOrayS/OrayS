@@ -10,6 +10,7 @@ use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
 use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::string::{String, ToString};
@@ -58,6 +59,8 @@ const MAX_EXEC_IMAGE_SIZE: usize = 64 * 1024 * 1024;
 // fresh multi-MiB contiguous allocation after the kernel heap is fragmented.
 const RETAINED_EXEC_IMAGE_CAPACITY: usize = 4 * 1024 * 1024;
 const EXEC_IMAGE_READ_CHUNK: usize = 64 * 1024;
+const EXEC_IMAGE_CACHE_MAX_ENTRY_SIZE: usize = 4 * 1024 * 1024;
+const EXEC_IMAGE_CACHE_MAX_TOTAL_SIZE: usize = 24 * 1024 * 1024;
 pub(super) const EXEC_LOADER_ENOMEM_PREFIX: &str = "exec-loader-ENOMEM: ";
 
 pub(super) fn exec_loader_enomem(message: String) -> String {
@@ -161,6 +164,12 @@ pub(super) fn exec_loader_axerr(context: String, err: AxError) -> String {
 struct RuntimeLoaderCache {
     musl: Option<bool>,
     glibc: Option<bool>,
+}
+
+#[derive(Default)]
+struct ExecImageCache {
+    entries: BTreeMap<String, Vec<u8>>,
+    total_bytes: usize,
 }
 
 struct ElfLoadInfo {
@@ -315,6 +324,78 @@ fn runtime_loader_cache() -> &'static Mutex<RuntimeLoaderCache> {
     &CACHE
 }
 
+fn exec_image_cache() -> &'static Mutex<ExecImageCache> {
+    static CACHE: LazyInit<Mutex<ExecImageCache>> = LazyInit::new();
+    let _ = CACHE.call_once(|| Mutex::new(ExecImageCache::default()));
+    &CACHE
+}
+
+fn cacheable_exec_image_path(path: &str) -> bool {
+    matches!(
+        path.strip_prefix('/')
+            .and_then(|path| path.split('/').next()),
+        Some("musl" | "glibc")
+    )
+}
+
+fn process_has_sparse_exec_overlay(process: Option<&UserProcess>, path: &str) -> bool {
+    process.is_some_and(|process| {
+        process.path_sparse_size(path).is_some() || process.path_data_ranges(path).is_some()
+    })
+}
+
+fn try_copy_cached_exec_image(path: &str, image: &mut Vec<u8>) -> Result<bool, String> {
+    let cache = exec_image_cache().lock();
+    let Some(cached) = cache.entries.get(path) else {
+        return Ok(false);
+    };
+    image.clear();
+    if cached.len() > image.capacity() {
+        image
+            .try_reserve_exact(cached.len() - image.capacity())
+            .map_err(|_| {
+                exec_loader_enomem(format!(
+                    "not enough kernel memory to copy cached exec {path}"
+                ))
+            })?;
+    }
+    image.extend_from_slice(cached.as_slice());
+    perf_counters::record_exec_image(image.len());
+    Ok(true)
+}
+
+fn store_cached_exec_image(path: &str, image: &[u8]) {
+    if image.is_empty() || image.len() > EXEC_IMAGE_CACHE_MAX_ENTRY_SIZE {
+        return;
+    }
+    let mut cached = Vec::new();
+    if cached.try_reserve_exact(image.len()).is_err() {
+        return;
+    }
+    cached.extend_from_slice(image);
+
+    let mut cache = exec_image_cache().lock();
+    if let Some(old) = cache.entries.remove(path) {
+        cache.total_bytes = cache.total_bytes.saturating_sub(old.len());
+    }
+    if cache.total_bytes.saturating_add(cached.len()) > EXEC_IMAGE_CACHE_MAX_TOTAL_SIZE {
+        cache.entries.clear();
+        cache.total_bytes = 0;
+    }
+    cache.total_bytes = cache.total_bytes.saturating_add(cached.len());
+    cache.entries.insert(path.to_string(), cached);
+}
+
+pub(super) fn invalidate_exec_image_cache(path: &str) {
+    if !cacheable_exec_image_path(path) {
+        return;
+    }
+    let mut cache = exec_image_cache().lock();
+    if let Some(old) = cache.entries.remove(path) {
+        cache.total_bytes = cache.total_bytes.saturating_sub(old.len());
+    }
+}
+
 fn runtime_has_musl_loader_uncached(exec_root: &str) -> Result<bool, String> {
     let lib_dir = exec_loader_join(
         &[exec_root.trim_end_matches('/'), "/lib"],
@@ -376,6 +457,12 @@ fn read_exec_image_into(
     label: &str,
     image: &mut Vec<u8>,
 ) -> Result<(), String> {
+    let cacheable =
+        cacheable_exec_image_path(path) && !process_has_sparse_exec_overlay(process, path);
+    if cacheable && try_copy_cached_exec_image(path, image)? {
+        return Ok(());
+    }
+
     let mut file =
         File::open(path).map_err(|err| format!("failed to open {label} {path}: {err}"))?;
     let physical_len = file
@@ -456,6 +543,9 @@ fn read_exec_image_into(
         process.copy_path_sparse_data(path, 0, image.as_mut_slice());
     }
     perf_counters::record_exec_image(image.len());
+    if cacheable {
+        store_cached_exec_image(path, image.as_slice());
+    }
     Ok(())
 }
 
