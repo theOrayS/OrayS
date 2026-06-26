@@ -1,5 +1,6 @@
 use core::mem::size_of;
 use core::sync::atomic::{AtomicU32, Ordering};
+use core::time::Duration;
 
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
@@ -23,6 +24,8 @@ pub(super) struct FutexState {
     pub(super) seq: AtomicU32,
     pub(super) queue: WaitQueue,
 }
+
+const FUTEX_TIMEOUT_SPIN_WINDOW: Duration = Duration::from_micros(950);
 
 fn table() -> &'static Mutex<BTreeMap<usize, Arc<FutexState>>> {
     static FUTEXES: LazyInit<Mutex<BTreeMap<usize, Arc<FutexState>>>> = LazyInit::new();
@@ -226,6 +229,46 @@ fn read_futex_timeout(
     Ok(Some(dur))
 }
 
+fn wait_timeout_until_precise<F>(state: &FutexState, dur: Duration, condition: F) -> bool
+where
+    F: Fn() -> bool,
+{
+    if condition() {
+        return false;
+    }
+    if dur.is_zero() {
+        return true;
+    }
+    let Some(deadline) = axhal::time::monotonic_time().checked_add(dur) else {
+        return state.queue.wait_timeout_until(dur, condition);
+    };
+
+    loop {
+        if condition() {
+            return false;
+        }
+        let now = axhal::time::monotonic_time();
+        if now >= deadline {
+            return true;
+        }
+        let remaining = deadline.saturating_sub(now);
+        if remaining <= FUTEX_TIMEOUT_SPIN_WINDOW {
+            while axhal::time::monotonic_time() < deadline {
+                if condition() {
+                    return false;
+                }
+                core::hint::spin_loop();
+            }
+            return !condition();
+        }
+
+        let block_for = remaining.saturating_sub(FUTEX_TIMEOUT_SPIN_WINDOW);
+        if !state.queue.wait_timeout_until(block_for, || condition()) {
+            return false;
+        }
+    }
+}
+
 fn wait_addr(
     process: &UserProcess,
     uaddr: usize,
@@ -266,7 +309,7 @@ fn wait_addr(
         let dur = process
             .eval_watchdog_remaining()
             .map_or(dur, |remaining| remaining.min(dur));
-        let timed_out = state.queue.wait_timeout_until(dur, wait_cond);
+        let timed_out = wait_timeout_until_precise(&state, dur, wait_cond);
         drop(state);
         prune_empty_key(key);
         if timed_out {

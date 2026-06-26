@@ -603,6 +603,14 @@ impl LocalSocketEntry {
         Ok(take)
     }
 
+    pub(super) fn available_read_and_peer_open(&self) -> Result<(usize, bool), LinuxError> {
+        let Some(pair) = &self.pair else {
+            return Err(LinuxError::EINVAL);
+        };
+        let available = pair.state.buffers[pair.side].lock().available_read();
+        Ok((available, pair.state.peer_open(pair.side)))
+    }
+
     pub(super) fn write(&self, process: &UserProcess, src: &[u8]) -> Result<usize, LinuxError> {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
@@ -747,7 +755,8 @@ impl LocalSocketEntry {
             if read == 0 {
                 return Ok(0);
             }
-            debug_assert_eq!(buffer.write_from(&staging[..read]), read);
+            let written = buffer.write_from(&staging[..read]);
+            debug_assert_eq!(written, read);
             drop(buffer);
             pair.state.notify_readable(peer_side);
             return Ok(read);

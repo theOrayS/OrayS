@@ -65,7 +65,7 @@ fn timer_helper_sleep(duration: core::time::Duration) {
         axtask::sleep(duration);
     }
 }
-const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_micros(50);
+const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_micros(950);
 const USER_SLEEP_POLL_QUANTUM: core::time::Duration = core::time::Duration::from_millis(1);
 
 fn has_effective_capability(process: &UserProcess, cap: u32) -> bool {
@@ -86,10 +86,13 @@ fn user_sleep_quantum(remaining: core::time::Duration) -> core::time::Duration {
 
 fn short_user_sleep_step(remaining: core::time::Duration) -> bool {
     if remaining <= USER_SLEEP_BUSY_WAIT_THRESHOLD {
-        // Use a tiny spin only for the final sub-tick sliver.  Millisecond-scale
-        // sleeps must block on the timer queue; otherwise several RT test threads
-        // busy-wait in kernel context and starve peers on single-core evaluator
-        // runs.
+        // The task timer backend protects near-expired one-shot timers with a
+        // one-millisecond minimum reprogramming window.  If the final
+        // sub-millisecond tail goes back through axtask::sleep(), POSIX sleeps
+        // are rounded up by another tick and LTP's timer tests see consistent
+        // oversleep.  Spin only for that final tail; millisecond-scale waits
+        // still block on the timer queue so multi-threaded RT tests are not
+        // starved for their whole interval.
         axhal::time::busy_wait(remaining);
         true
     } else {
