@@ -84,33 +84,31 @@ def_test_sched!(rr, RRScheduler::<usize, 5>, RRTask::<usize, 5>);
 def_test_sched!(cfs, CFScheduler::<usize>, CFSTask::<usize>);
 
 #[test]
-fn rr_priority_aging_preserves_low_priority_forward_progress() {
+fn rr_preempted_task_keeps_remaining_slice_at_front() {
     use crate::{BaseScheduler, RRScheduler, RRTask};
     use alloc::sync::Arc;
 
     let mut scheduler = RRScheduler::<usize, 5>::new();
-    let high = Arc::new(RRTask::<usize, 5>::new(0));
-    let low = Arc::new(RRTask::<usize, 5>::new(1));
-    assert!(scheduler.set_priority(&high, 0));
-    assert!(scheduler.set_priority(&low, 18));
-    scheduler.add_task(high);
-    scheduler.add_task(low);
+    let first = Arc::new(RRTask::<usize, 5>::new(0));
+    let second = Arc::new(RRTask::<usize, 5>::new(1));
+    scheduler.add_task(first);
+    scheduler.add_task(second);
 
-    let mut saw_low = false;
-    for _ in 0..40 {
-        let next = scheduler.pick_next_task().unwrap();
-        if *next.inner() == 1 {
-            saw_low = true;
-            break;
-        }
-        scheduler.put_prev_task(next, false);
-    }
+    let next = scheduler.pick_next_task().unwrap();
+    assert_eq!(*next.inner(), 0);
+    scheduler.task_tick(&next);
+    scheduler.put_prev_task(next, true);
 
-    assert!(saw_low, "low-priority RR task must not starve forever");
+    let next = scheduler.pick_next_task().unwrap();
+    assert_eq!(
+        *next.inner(),
+        0,
+        "preempted RR task with remaining slice should stay ahead"
+    );
 }
 
 #[test]
-fn rr_realtime_priority_is_not_overtaken_by_normal_aging() {
+fn rr_realtime_priority_preempts_normal_tasks() {
     use crate::{BaseScheduler, RRScheduler, RRTask};
     use alloc::sync::Arc;
 
@@ -127,7 +125,7 @@ fn rr_realtime_priority_is_not_overtaken_by_normal_aging() {
         assert_eq!(
             *next.inner(),
             0,
-            "normal-class aging must not outrank a runnable RT/deadline task"
+            "runnable RT/deadline task should outrank normal tasks"
         );
         scheduler.put_prev_task(next, false);
     }

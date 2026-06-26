@@ -1,8 +1,7 @@
+use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use core::ops::Deref;
-use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
-
-use linked_list_r4l::{GetLinks, Links, List};
+use core::sync::atomic::{AtomicIsize, Ordering};
 
 use crate::{valid_backend_priority, BaseScheduler};
 
@@ -13,8 +12,6 @@ pub struct RRTask<T, const MAX_TIME_SLICE: usize> {
     inner: T,
     time_slice: AtomicIsize,
     priority: AtomicIsize,
-    skipped_rounds: AtomicUsize,
-    links: Links<Self>,
 }
 
 impl<T, const S: usize> RRTask<T, S> {
@@ -24,14 +21,11 @@ impl<T, const S: usize> RRTask<T, S> {
             inner,
             time_slice: AtomicIsize::new(S as isize),
             priority: AtomicIsize::new(0),
-            // A freshly spawned normal task should get a prompt first slice
-            // even when a long-running benchmark has already filled the ready
-            // queue.  This boost is still confined to the normal scheduling
-            // class: it never outranks runnable RT/deadline tasks because class
-            // ordering is compared before effective priority.
-            skipped_rounds: AtomicUsize::new(NEW_TASK_READY_BOOST),
-            links: Links::new(),
         }
+    }
+
+    fn time_slice(&self) -> isize {
+        self.time_slice.load(Ordering::Acquire)
     }
 
     fn reset_time_slice(&self) {
@@ -46,59 +40,9 @@ impl<T, const S: usize> RRTask<T, S> {
         self.priority.store(prio, Ordering::Release);
     }
 
-    fn scheduling_class(&self) -> isize {
-        scheduling_class(self.priority())
-    }
-
-    fn effective_priority(&self) -> isize {
-        let priority = self.priority();
-        if self.scheduling_class() != NORMAL_SCHEDULING_CLASS {
-            return priority;
-        }
-        let boost = self
-            .skipped_rounds
-            .load(Ordering::Acquire)
-            .min(NEW_TASK_READY_BOOST) as isize;
-        priority.saturating_sub(boost)
-    }
-
-    fn scheduling_key(&self) -> (isize, isize) {
-        (self.scheduling_class(), self.effective_priority())
-    }
-
-    fn note_skipped_round(&self) {
-        let mut current = self.skipped_rounds.load(Ordering::Acquire);
-        loop {
-            if current >= MAX_AGING_BOOST {
-                return;
-            }
-            match self.skipped_rounds.compare_exchange_weak(
-                current,
-                current + 1,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => return,
-                Err(next) => current = next,
-            }
-        }
-    }
-
-    fn reset_skipped_rounds(&self) {
-        self.skipped_rounds.store(0, Ordering::Release);
-    }
-
     /// Returns a reference to the inner task struct.
     pub const fn inner(&self) -> &T {
         &self.inner
-    }
-}
-
-impl<T, const MAX_TIME_SLICE: usize> GetLinks for RRTask<T, MAX_TIME_SLICE> {
-    type EntryType = Self;
-
-    fn get_links(data: &Self::EntryType) -> &Links<Self::EntryType> {
-        &data.links
     }
 }
 
@@ -122,32 +66,14 @@ impl<T, const S: usize> Deref for RRTask<T, S> {
 /// [Round-Robin]: https://en.wikipedia.org/wiki/Round-robin_scheduling
 /// [`FifoScheduler`]: crate::FifoScheduler
 pub struct RRScheduler<T, const MAX_TIME_SLICE: usize> {
-    ready_queue: List<Arc<RRTask<T, MAX_TIME_SLICE>>>,
-}
-
-const MAX_AGING_BOOST: usize = 39;
-const NEW_TASK_READY_BOOST: usize = MAX_AGING_BOOST * 2;
-const REALTIME_BACKEND_PRIORITY_MAX: isize = -21;
-const IDLE_BACKEND_PRIORITY_MIN: isize = 20;
-const REALTIME_SCHEDULING_CLASS: isize = 0;
-const NORMAL_SCHEDULING_CLASS: isize = 1;
-const IDLE_SCHEDULING_CLASS: isize = 2;
-
-fn scheduling_class(priority: isize) -> isize {
-    if priority <= REALTIME_BACKEND_PRIORITY_MAX {
-        REALTIME_SCHEDULING_CLASS
-    } else if priority >= IDLE_BACKEND_PRIORITY_MIN {
-        IDLE_SCHEDULING_CLASS
-    } else {
-        NORMAL_SCHEDULING_CLASS
-    }
+    ready_queue: VecDeque<Arc<RRTask<T, MAX_TIME_SLICE>>>,
 }
 
 impl<T, const S: usize> RRScheduler<T, S> {
     /// Creates a new empty [`RRScheduler`].
     pub const fn new() -> Self {
         Self {
-            ready_queue: List::new(),
+            ready_queue: VecDeque::new(),
         }
     }
     /// get the name of scheduler
@@ -156,37 +82,19 @@ impl<T, const S: usize> RRScheduler<T, S> {
     }
 
     fn pop_highest_priority(&mut self) -> Option<Arc<RRTask<T, S>>> {
-        let mut cursor = self.ready_queue.cursor_front_mut();
-        let mut best_key = cursor.current()?.scheduling_key();
-        cursor.move_next();
-        while let Some(task) = cursor.current() {
-            let key = task.scheduling_key();
-            if key < best_key {
-                best_key = key;
+        let mut best_priority = self.ready_queue.front()?.priority();
+        for task in self.ready_queue.iter().skip(1) {
+            let priority = task.priority();
+            if priority < best_priority {
+                best_priority = priority;
             }
-            cursor.move_next();
         }
 
-        let mut cursor = self.ready_queue.cursor_front_mut();
-        let mut selected = None;
-        loop {
-            match cursor.current() {
-                Some(task) if task.scheduling_key() == best_key => {
-                    selected = cursor.remove_current();
-                    break;
-                }
-                Some(_) => cursor.move_next(),
-                None => break,
-            }
-        }
-        let selected = selected?;
-        selected.reset_skipped_rounds();
-        let mut cursor = self.ready_queue.cursor_front_mut();
-        while let Some(task) = cursor.current() {
-            task.note_skipped_round();
-            cursor.move_next();
-        }
-        Some(selected)
+        let index = self
+            .ready_queue
+            .iter()
+            .position(|task| task.priority() == best_priority)?;
+        self.ready_queue.remove(index)
     }
 }
 
@@ -200,22 +108,24 @@ impl<T, const S: usize> BaseScheduler for RRScheduler<T, S> {
     }
 
     fn remove_task(&mut self, task: &Self::SchedItem) -> Option<Self::SchedItem> {
-        unsafe { self.ready_queue.remove(task) }
+        let index = self
+            .ready_queue
+            .iter()
+            .position(|queued| Arc::ptr_eq(queued, task))?;
+        self.ready_queue.remove(index)
     }
 
     fn pick_next_task(&mut self) -> Option<Self::SchedItem> {
         self.pop_highest_priority()
     }
 
-    fn put_prev_task(&mut self, prev: Self::SchedItem, _preempt: bool) {
-        // Keep priority selection in `pick_next_task()` and round-robin fairness
-        // in the queue order.  Timer wakeups pass `preempt=true`; inserting them
-        // at the front lets the shortest-period RT thread immediately outrun
-        // equal-priority peers under stress.  Pushing runnable tasks to the back
-        // still lets higher-priority tasks win by key while preserving same-class
-        // rotation.
-        prev.reset_time_slice();
-        self.ready_queue.push_back(prev)
+    fn put_prev_task(&mut self, prev: Self::SchedItem, preempt: bool) {
+        if prev.time_slice() > 0 && preempt {
+            self.ready_queue.push_front(prev)
+        } else {
+            prev.reset_time_slice();
+            self.ready_queue.push_back(prev)
+        }
     }
 
     fn task_tick(&mut self, current: &Self::SchedItem) -> bool {
