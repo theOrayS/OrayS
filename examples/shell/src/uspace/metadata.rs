@@ -2246,6 +2246,7 @@ pub(super) fn dev_cpu_dma_latency_stat() -> general::stat {
 pub(super) fn path_inode(path: Option<&str>) -> u64 {
     const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    const COMPAT_INO_MAX: u64 = i32::MAX as u64;
     let Some(path) = path else {
         return 1;
     };
@@ -2254,7 +2255,7 @@ pub(super) fn path_inode(path: Option<&str>) -> u64 {
         hash ^= byte as u64;
         hash = hash.wrapping_mul(FNV_PRIME);
     }
-    hash.max(1)
+    (hash % COMPAT_INO_MAX) + 1
 }
 
 pub(super) fn file_type_mode(ty: FileType) -> u32 {

@@ -22,7 +22,11 @@ const SUITE_DIRS: &[&str] = &["/musl", "/glibc"];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const SCRIPT_SUFFIX: &str = "_testcode.sh";
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-const TESTSUITE_STAGE_ROOT: &str = "/tmp/t";
+// Keep the guest-visible staging prefix short while staying under the writable
+// temporary tree: small libc/POSIX probes often pass compact getcwd(2) buffers,
+// and a short temp root preserves normal ERANGE semantics without making
+// evaluator paths fail only because our harness prefix is unusually long.
+const TESTSUITE_STAGE_ROOT: &str = "/tmp";
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const SCRIPT_BUSYBOX_APPLETS: &[&str] = &["basename", "dirname", "kill", "sleep"];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]

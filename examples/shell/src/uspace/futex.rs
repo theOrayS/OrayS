@@ -25,7 +25,14 @@ pub(super) struct FutexState {
     pub(super) queue: WaitQueue,
 }
 
-const FUTEX_TIMEOUT_SPIN_WINDOW: Duration = Duration::from_micros(950);
+// Keep short timed futex waits out of the task timer queue.  The timer backend
+// intentionally protects near-expired one-shot deadlines with a one-millisecond
+// minimum programming window; if a 1ms userspace futex timeout first blocks for
+// the tiny `remaining - spin_window` tail, the wakeup can overshoot the Linux
+// timer-test tolerance.  Spinning only for sub-few-millisecond futex timeouts
+// preserves the POSIX rule that timeouts are not reported early while avoiding
+// scheduler/timer rounding on precision probes.
+const FUTEX_TIMEOUT_SPIN_WINDOW: Duration = Duration::from_millis(2);
 
 fn table() -> &'static Mutex<BTreeMap<usize, Arc<FutexState>>> {
     static FUTEXES: LazyInit<Mutex<BTreeMap<usize, Arc<FutexState>>>> = LazyInit::new();

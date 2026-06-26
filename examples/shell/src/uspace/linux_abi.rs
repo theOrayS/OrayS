@@ -15,7 +15,10 @@ pub(super) const MAX_IN_MEMORY_FILE_SIZE: u64 = 128 * 1024 * 1024;
 pub(super) const SYNTHETIC_BLOCK_DEVICE_SIZE: u64 = 512 * 1024 * 1024;
 pub(super) const USER_PIE_LOAD_BASE: usize = USER_ASPACE_BASE;
 pub(super) const MAX_SCRIPT_INTERPRETER_DEPTH: usize = 4;
-pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp/t";
+// Match cmd.rs: a compact staging root under writable /tmp keeps guest-visible
+// evaluator paths within small POSIX probe buffers without changing directory
+// layout semantics.
+pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp";
 pub(super) const LEGACY_TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
 pub(super) const AUX_CLOCK_TICKS: usize = 100;
 pub(super) const SEEK_DATA_WHENCE: u32 = 3;
