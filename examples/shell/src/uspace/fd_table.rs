@@ -2332,6 +2332,14 @@ enum SpliceEndpointKind {
     Stream,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SpliceStreamReadiness {
+    Data(usize),
+    WouldBlock { endpoint_nonblocking: bool },
+    Eof,
+    Unknown,
+}
+
 #[derive(Clone, Copy)]
 enum VmspliceDirection {
     ToPipe,
@@ -2402,7 +2410,6 @@ pub(super) fn sys_splice(
         }
         (in_kind, out_kind)
     };
-
     let mut copied = 0usize;
     let mut scratch = Vec::new();
     while copied < len {
@@ -2428,6 +2435,40 @@ pub(super) fn sys_splice(
             }
             if available > 0 {
                 chunk_len = chunk_len.min(available);
+            }
+        }
+        if in_kind == SpliceEndpointKind::Stream {
+            let readiness = match process.fds.lock().splice_stream_readiness(fd_in) {
+                Ok(readiness) => readiness,
+                Err(err) => {
+                    return if copied > 0 {
+                        copied as isize
+                    } else {
+                        neg_errno(err)
+                    };
+                }
+            };
+            match readiness {
+                SpliceStreamReadiness::Data(available) => {
+                    chunk_len = chunk_len.min(available);
+                }
+                SpliceStreamReadiness::WouldBlock {
+                    endpoint_nonblocking,
+                } => {
+                    if copied > 0 {
+                        break;
+                    }
+                    if nonblocking || endpoint_nonblocking {
+                        return neg_errno(LinuxError::EAGAIN);
+                    }
+                    if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+                        return neg_errno(LinuxError::EINTR);
+                    }
+                    axtask::yield_now();
+                    continue;
+                }
+                SpliceStreamReadiness::Eof => break,
+                SpliceStreamReadiness::Unknown => {}
             }
         }
         if out_kind == SpliceEndpointKind::Pipe {
@@ -4321,6 +4362,29 @@ impl FdTable {
             // Proc/sys writes are synchronous in-kernel updates rather than bounded socket
             // queues, so there is no stream buffer capacity to pre-limit here.
             FdEntry::ProcSysFile(_) => Ok(usize::MAX),
+            _ => Err(LinuxError::EBADF),
+        }
+    }
+
+    fn splice_stream_readiness(&self, fd: i32) -> Result<SpliceStreamReadiness, LinuxError> {
+        match self.entry(fd)? {
+            FdEntry::LocalSocket(socket) => {
+                let (available, peer_open) = socket.available_read_and_peer_open()?;
+                if available > 0 {
+                    Ok(SpliceStreamReadiness::Data(available))
+                } else if peer_open {
+                    Ok(SpliceStreamReadiness::WouldBlock {
+                        endpoint_nonblocking: socket.status_flags()
+                            & general::O_NONBLOCK as i32
+                            != 0,
+                    })
+                } else {
+                    Ok(SpliceStreamReadiness::Eof)
+                }
+            }
+            // Proc/sys streams synthesize data synchronously, so no socket buffer
+            // readiness can be sampled before the read itself.
+            FdEntry::ProcSysFile(_) => Ok(SpliceStreamReadiness::Unknown),
             _ => Err(LinuxError::EBADF),
         }
     }
