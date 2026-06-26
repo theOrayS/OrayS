@@ -177,7 +177,11 @@ ifneq ($(wildcard $(CURDIR)/cargo-home/config.toml),)
 endif
 
 # App options
-A ?= examples/helloworld
+# The official evaluator runs `make` / `make all` without passing `A`.
+# Default the top-level app to the same entry used by the submission kernels so
+# the parse-time APP existence check below does not depend on non-submission demo
+# examples such as `examples/helloworld`.
+A ?= $(KERNEL_APP)
 APP ?= $(A)
 FEATURES ?=
 APP_FEATURES ?=
