@@ -4,11 +4,30 @@ use alloc::sync::Arc;
 use kernel_guard::{NoOp, NoPreemptIrqSave};
 use kspin::{SpinNoIrq, SpinNoIrqGuard};
 
-use crate::{AxTaskRef, CurrentTask, current_run_queue, select_run_queue};
+use crate::{current_run_queue, select_run_queue, AxTaskRef, CurrentTask};
 
 #[inline]
 fn task_ptr_key(task: &AxTaskRef) -> usize {
     Arc::as_ptr(task) as usize
+}
+
+fn remove_waiters_matching<F>(queue: &mut VecDeque<AxTaskRef>, mut should_remove: F) -> bool
+where
+    F: FnMut(&AxTaskRef) -> bool,
+{
+    let len = queue.len();
+    let mut removed = false;
+    for _ in 0..len {
+        let Some(task) = queue.pop_front() else {
+            break;
+        };
+        if should_remove(&task) {
+            removed = true;
+        } else {
+            queue.push_back(task);
+        }
+    }
+    removed
 }
 
 /// A queue to store sleeping tasks.
@@ -61,7 +80,8 @@ impl WaitQueue {
         // the event from another queue.
         if curr.in_wait_queue() {
             // wake up by timer (timeout).
-            self.queue.lock().retain(|t| !curr.ptr_eq(t));
+            let mut wq = self.queue.lock();
+            remove_waiters_matching(&mut wq, |t| curr.ptr_eq(t));
             curr.set_in_wait_queue(false);
         }
 
@@ -387,9 +407,7 @@ impl WaitQueue {
     /// destination queue woke it.
     pub fn remove_task(&self, task: &AxTaskRef) -> bool {
         let mut wq = self.queue.lock();
-        let old_len = wq.len();
-        wq.retain(|queued| !Arc::ptr_eq(queued, task));
-        wq.len() != old_len
+        remove_waiters_matching(&mut wq, |queued| Arc::ptr_eq(queued, task))
     }
 
     /// Transfers up to `count` tasks from this wait queue to another wait queue.
