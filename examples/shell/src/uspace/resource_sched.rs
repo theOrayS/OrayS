@@ -13,7 +13,7 @@ use super::linux_abi::{
 };
 use super::task_registry::{
     UserThreadEntry, live_user_process_entries, user_thread_entries_by_process_group,
-    user_thread_entry_by_process_pid,
+    user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
     clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
@@ -556,11 +556,19 @@ fn apply_task_scheduler_state(
     process: &UserProcess,
     state: UserSchedState,
 ) {
-    // axtask exposes a CFS-style nice hook.  Linux policy state is still
-    // preserved for get* calls; map accepted policy/priority into the nearest
-    // available backend priority so sched_set* changes affect scheduling
-    // where the configured scheduler supports it.
+    // Linux policy state is still preserved for get* calls; map accepted
+    // policy/priority into the nearest available backend priority so sched_set*
+    // changes affect scheduling where the configured scheduler supports it.
     let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));
+}
+
+fn apply_process_scheduler_state_to_live_tasks(process: &UserProcess, state: UserSchedState) {
+    let pid = process.pid();
+    for entry in user_thread_entries_by_process_pid(pid) {
+        apply_task_scheduler_state(&entry.task, &entry.process, state);
+    }
+    let current = axtask::current();
+    apply_task_scheduler_state(current.as_task_ref(), process, state);
 }
 
 pub(super) fn apply_process_scheduler_state_to_task(
@@ -622,14 +630,17 @@ fn set_sched_target_state(
         return Err(LinuxError::EINVAL);
     }
     if pid == 0 || pid == current_tid() || pid == process.pid() {
-        let current = axtask::current();
-        apply_task_scheduler_state(current.as_task_ref(), process, state);
         process.set_sched_state(state);
+        apply_process_scheduler_state_to_live_tasks(process, state);
         return Ok(());
     }
     let entry = user_thread_entry_by_process_pid(pid).ok_or(LinuxError::ESRCH)?;
-    apply_task_scheduler_state(&entry.task, &entry.process, state);
     entry.process.set_sched_state(state);
+    if pid == entry.process.pid() {
+        apply_process_scheduler_state_to_live_tasks(&entry.process, state);
+    } else {
+        apply_task_scheduler_state(&entry.task, &entry.process, state);
+    }
     Ok(())
 }
 

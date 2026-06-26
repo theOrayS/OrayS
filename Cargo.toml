@@ -75,3 +75,4 @@ lto = true
 axcpu = { path = "vendor/axcpu" }
 axfs_ramfs = { path = "vendor/axfs_ramfs" }
 axfs_vfs = { path = "vendor/axfs_vfs" }
+axsched = { path = "vendor/axsched" }

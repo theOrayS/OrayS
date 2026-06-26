@@ -1526,6 +1526,23 @@ fn scan_script_dependencies(script: &str) -> Vec<String> {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn looks_like_absolute_build_script(path: &str) -> bool {
+    let Ok(mut file) = File::open(path) else {
+        return false;
+    };
+    let mut buffer = [0u8; 256];
+    let Ok(len) = file.read(&mut buffer) else {
+        return false;
+    };
+    if len == 0 || buffer[..len].contains(&0) {
+        return false;
+    }
+    let content = core::str::from_utf8(&buffer[..len]).unwrap_or_default();
+    let first_line = content.lines().find(|line| !line.trim().is_empty());
+    matches!(first_line.map(str::trim_start), Some(line) if line.starts_with("/code/"))
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn join_path(base: &str, rel: &str) -> String {
     if base == "/" {
         format!("/{}", rel.trim_start_matches('/'))
@@ -1667,6 +1684,17 @@ fn cleanup_ltp_scratch() {
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn cleanup_official_group_scratch() {
+    // Official non-LTP scripts are independent. Several upstream benchmarks use
+    // fixed scratch paths under /tmp, including helper programs later exec'ed by
+    // the benchmark itself. Clear previous group artifacts before staging the
+    // next group so a failed copy cannot leave an old ABI/arch file to be
+    // executed by a later benchmark.
+    let _ = ensure_world_writable_sticky_dir("/tmp");
+    let _ = remove_dir_contents_except("/tmp", &["t", "testsuite", "ltp-work"]);
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn copy_file(src: &str, dst: &str) -> io::Result<()> {
     if let Some(parent) = parent_dir(dst) {
         ensure_dir_all(parent)?;
@@ -1796,16 +1824,25 @@ fn copy_script_file(
     dst: &str,
     busybox_path: &str,
     rewrite_busybox_path: bool,
+    ensure_shell_shebang: bool,
 ) -> io::Result<()> {
     if let Some(parent) = parent_dir(dst) {
         ensure_dir_all(parent)?;
     }
     let raw_script = fs::read_to_string(src)?;
-    let mut script = raw_script
-        .lines()
-        .map(|line| rewrite_script_line(line, busybox_path, rewrite_busybox_path))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let mut script = String::new();
+    if ensure_shell_shebang && !raw_script.starts_with("#!") {
+        script.push_str("#!");
+        script.push_str(busybox_path);
+        script.push_str(" sh\n");
+    }
+    script.push_str(
+        &raw_script
+            .lines()
+            .map(|line| rewrite_script_line(line, busybox_path, rewrite_busybox_path))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
     if raw_script.ends_with('\n') {
         script.push('\n');
     }
@@ -1931,10 +1968,10 @@ fn rewrite_script_line(line: &str, busybox_path: &str, rewrite_busybox_path: boo
         }
     }
     if !rewrite_busybox_path {
-        return line.to_string();
+        return rewrite_absolute_build_command(line);
     }
 
-    let mut line = line.replace("./busybox", busybox_path);
+    let mut line = rewrite_absolute_build_command(line).replace("./busybox", busybox_path);
     line = rewrite_basename_substitutions(&line);
     for applet in SCRIPT_BUSYBOX_APPLETS {
         line = line.replace(
@@ -1952,6 +1989,33 @@ fn rewrite_script_line(line: &str, busybox_path: &str, rewrite_busybox_path: boo
         }
     }
     line
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn rewrite_absolute_build_command(line: &str) -> String {
+    let trimmed = line.trim_start();
+    let Some(rest) = trimmed.strip_prefix("/code/") else {
+        return line.to_string();
+    };
+    let command_len = rest
+        .find(|ch: char| ch.is_ascii_whitespace())
+        .map(|idx| idx + "/code/".len())
+        .unwrap_or(trimmed.len());
+    let command = &trimmed[..command_len];
+    let Some(name) = command.rsplit('/').next() else {
+        return line.to_string();
+    };
+    if name.is_empty()
+        || !name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+    {
+        return line.to_string();
+    }
+    let indent_len = line.len() - trimmed.len();
+    let indent = &line[..indent_len];
+    let args = &trimmed[command_len..];
+    format!("{indent}${{TESTSUITE_TOOLS_DIR:-.}}/{name}{args}")
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -2349,7 +2413,9 @@ fn copy_stage_entry(
             copy_stage_entry(src_root, dst_root, &child_rel, busybox_path)?;
         }
     } else if rel.ends_with(".sh") {
-        copy_script_file(&src, &dst, busybox_path, !rel.contains('/'))?;
+        copy_script_file(&src, &dst, busybox_path, !rel.contains('/'), false)?;
+    } else if metadata.is_file() && looks_like_absolute_build_script(&src) {
+        copy_script_file(&src, &dst, busybox_path, !rel.contains('/'), true)?;
     } else {
         copy_file(&src, &dst)?;
     }
@@ -2485,6 +2551,7 @@ fn prepare_unstaged_script_dir(
         &join_path(&stage_root, script_name),
         busybox_path,
         true,
+        false,
     )?;
     Ok(stage_root)
 }
@@ -3024,6 +3091,9 @@ pub fn maybe_run_official_tests() {
         if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {
             println!("autorun: skip disabled test group {suite_dir}/{script}");
             continue;
+        }
+        if group != "ltp" {
+            cleanup_official_group_scratch();
         }
         let staged_dir = match prepare_suite_stage_dir(&suite_dir, script) {
             Ok(dir) => dir,
