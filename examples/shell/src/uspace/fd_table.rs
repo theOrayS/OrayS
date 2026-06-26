@@ -31,10 +31,11 @@ use super::linux_abi::{
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    apply_recorded_path_metadata, canonical_permission_path, dev_null_stat, dev_zero_stat,
-    dirent_type, fd_entry_path, fd_entry_statfs_path, file_attr_to_stat, file_type_mode,
-    generic_statfs, path_inode, stdio_stat, synthetic_block_stat_for_path,
-    synthetic_char_stat_for_path, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
+    apply_recorded_path_metadata, canonical_permission_path, dev_cpu_dma_latency_stat,
+    dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path,
+    file_attr_to_stat, file_type_mode, generic_statfs, path_inode, stdio_stat,
+    synthetic_block_stat_for_path, synthetic_char_stat_for_path,
+    DEV_CPU_DMA_LATENCY_RDEV, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
 };
 use super::perf_counters;
 use super::posix_mq::{
@@ -130,6 +131,7 @@ const FALLOC_FL_ZERO_RANGE: usize = 0x10;
 const FALLOC_FL_INSERT_RANGE: usize = 0x20;
 const POSIX_FADV_MIN: i32 = 0;
 const POSIX_FADV_MAX: i32 = 5;
+const SYNTHETIC_CHAR_DEVICE_NAMES: &[&str] = &["cpu_dma_latency"];
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda"];
 
 fn current_fd_table_limit() -> usize {
@@ -160,6 +162,7 @@ pub(super) enum FdEntry {
     DevNull,
     DevZero(u32),
     DevRandom(u32),
+    DevCpuDmaLatency(u32),
     BlockDevice(BlockDeviceEntry),
     Rtc,
     File(FileEntry),
@@ -203,6 +206,7 @@ pub(super) struct DirectoryEntry {
     pub(super) attr: FileAttr,
     pub(super) path: String,
     next_dirent_cookie: u64,
+    next_synthetic_dirent_index: usize,
     synthetic_dirents_emitted: bool,
 }
 
@@ -3319,6 +3323,7 @@ pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
             | FdEntry::DevNull
             | FdEntry::DevZero(_)
             | FdEntry::DevRandom(_)
+            | FdEntry::DevCpuDmaLatency(_)
             | FdEntry::BlockDevice(_)
             | FdEntry::Rtc
             | FdEntry::Directory(_)
@@ -3848,6 +3853,10 @@ pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize
         let path = {
             let table = process.fds.lock();
             match table.entry(fd as i32) {
+                Ok(FdEntry::DevCpuDmaLatency(_)) => return neg_errno(LinuxError::ENOTTY),
+                Ok(FdEntry::Path(path)) if path.path == "/dev/cpu_dma_latency" => {
+                    return neg_errno(LinuxError::ENOTTY);
+                }
                 Ok(entry) => fd_entry_path(entry).map(ToString::to_string),
                 Err(err) => return neg_errno(err),
             }
@@ -4399,6 +4408,7 @@ impl FdTable {
                 FdEntry::DevNull
                 | FdEntry::DevZero(_)
                 | FdEntry::DevRandom(_)
+                | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
@@ -4430,6 +4440,7 @@ impl FdTable {
                 | FdEntry::DevNull
                 | FdEntry::DevZero(_)
                 | FdEntry::DevRandom(_)
+                | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc => true,
                 FdEntry::File(_) | FdEntry::Memfd(_) => true,
@@ -4686,6 +4697,7 @@ impl FdTable {
                 FdEntry::DevNull
                 | FdEntry::DevZero(_)
                 | FdEntry::DevRandom(_)
+                | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
@@ -4715,6 +4727,7 @@ impl FdTable {
                 | FdEntry::DevNull
                 | FdEntry::DevZero(_)
                 | FdEntry::DevRandom(_)
+                | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
                 | FdEntry::Rtc
                 | FdEntry::File(_)
@@ -4765,6 +4778,12 @@ impl FdTable {
                 }
                 fill_pseudo_random_bytes(dst);
                 Ok(dst.len())
+            }
+            FdEntry::DevCpuDmaLatency(status_flags) => {
+                if !file_is_readable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                Ok(0)
             }
             FdEntry::BlockDevice(dev) => dev.read(dst),
             FdEntry::Rtc => Ok(0),
@@ -4823,6 +4842,18 @@ impl FdTable {
                 if !file_is_writable(*status_flags) {
                     return Err(LinuxError::EBADF);
                 }
+                Ok(src.len())
+            }
+            FdEntry::DevCpuDmaLatency(status_flags) => {
+                if !file_is_writable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                // Linux exposes /dev/cpu_dma_latency as a PM QoS request file:
+                // userspace writes a binary i32 target or hex string and keeps
+                // the fd open while the request is active.  This single-vCPU
+                // virtual kernel has no CPU power states to constrain, so a
+                // syntactically valid request is accepted as a no-op.
+                validate_cpu_dma_latency_request(src)?;
                 Ok(src.len())
             }
             FdEntry::BlockDevice(dev) => dev.write(src),
@@ -4996,9 +5027,10 @@ impl FdTable {
                 process.truncate_path_sparse_file(file.path.clone(), size);
                 Ok(())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
-                Err(LinuxError::EOPNOTSUPP)
-            }
+            FdEntry::DevNull
+            | FdEntry::DevCpuDmaLatency(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc => Err(LinuxError::EOPNOTSUPP),
             FdEntry::Memfd(file) => file.truncate(size),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
@@ -5034,9 +5066,10 @@ impl FdTable {
                 process.mark_path_data_range(file.path.clone(), offset, len);
                 Ok(())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
-                Err(LinuxError::EOPNOTSUPP)
-            }
+            FdEntry::DevNull
+            | FdEntry::DevCpuDmaLatency(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc => Err(LinuxError::EOPNOTSUPP),
             FdEntry::Memfd(file) => {
                 if keep_size {
                     file.fallocate_keep_size()
@@ -5070,9 +5103,10 @@ impl FdTable {
                 process.clear_path_data_range(file.path.clone(), offset, len);
                 Ok(())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
-                Err(LinuxError::EOPNOTSUPP)
-            }
+            FdEntry::DevNull
+            | FdEntry::DevCpuDmaLatency(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc => Err(LinuxError::EOPNOTSUPP),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -5125,9 +5159,10 @@ impl FdTable {
                 }
                 write_memfd_zero_range(file, offset, len)
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
-                Err(LinuxError::EOPNOTSUPP)
-            }
+            FdEntry::DevNull
+            | FdEntry::DevCpuDmaLatency(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc => Err(LinuxError::EOPNOTSUPP),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -5171,9 +5206,10 @@ impl FdTable {
                 file.truncate(0)?;
                 file.write_at(0, &data, None).map(|_| ())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
-                Err(LinuxError::EOPNOTSUPP)
-            }
+            FdEntry::DevNull
+            | FdEntry::DevCpuDmaLatency(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc => Err(LinuxError::EOPNOTSUPP),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -5218,9 +5254,10 @@ impl FdTable {
                 file.truncate(0)?;
                 file.write_at(0, &data, None).map(|_| ())
             }
-            FdEntry::DevNull | FdEntry::BlockDevice(_) | FdEntry::Rtc => {
-                Err(LinuxError::EOPNOTSUPP)
-            }
+            FdEntry::DevNull
+            | FdEntry::DevCpuDmaLatency(_)
+            | FdEntry::BlockDevice(_)
+            | FdEntry::Rtc => Err(LinuxError::EOPNOTSUPP),
             FdEntry::Path(_)
             | FdEntry::MemoryFile(_)
             | FdEntry::ProcPagemap(_)
@@ -5279,6 +5316,7 @@ impl FdTable {
         match self.entry_mut(fd)? {
             FdEntry::File(file) => file_entry_seek(process, file, pos),
             FdEntry::DevNull => Ok(0),
+            FdEntry::DevCpuDmaLatency(_) => Ok(0),
             FdEntry::BlockDevice(dev) => dev.seek(pos),
             FdEntry::Rtc => Ok(0),
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
@@ -5440,40 +5478,20 @@ impl FdTable {
             out[name_start..name_start + name.len()].copy_from_slice(name);
         }
         if !dir.synthetic_dirents_emitted && out.len() < max_len {
+            let mut synthetic_dirents = Vec::new();
             for name in process.path_symlink_names_in_dir(dir.path.as_str()) {
-                if seen_names.iter().any(|seen| seen == &name) {
-                    continue;
-                }
-                let name_bytes = name.as_bytes();
-                let reclen = align_up(
-                    offset_of!(general::linux_dirent64, d_name) + name_bytes.len() + 1,
-                    8,
-                );
-                if out.len() + reclen > max_len {
-                    break;
-                }
-                let entry_path = normalize_path(dir.path.as_str(), name.as_str());
-                dir.next_dirent_cookie = dir.next_dirent_cookie.saturating_add(1);
-                let start = out.len();
-                out.resize(start + reclen, 0);
-                unsafe {
-                    let dirent = out[start..].as_mut_ptr() as *mut general::linux_dirent64;
-                    ptr::write_unaligned(
-                        dirent,
-                        general::linux_dirent64 {
-                            d_ino: path_inode(entry_path.as_deref()) as _,
-                            d_off: dir.next_dirent_cookie as _,
-                            d_reclen: reclen as _,
-                            d_type: general::DT_LNK as u8,
-                            d_name: Default::default(),
-                        },
-                    );
-                }
-                let name_start = start + offset_of!(general::linux_dirent64, d_name);
-                out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
+                synthetic_dirents.push((name, general::DT_LNK as u8));
             }
             for &name in synthetic_block_device_names_in_dir(dir.path.as_str()) {
+                synthetic_dirents.push((name.to_string(), general::DT_BLK as u8));
+            }
+            for &name in synthetic_char_device_names_in_dir(dir.path.as_str()) {
+                synthetic_dirents.push((name.to_string(), general::DT_CHR as u8));
+            }
+            while dir.next_synthetic_dirent_index < synthetic_dirents.len() {
+                let (name, d_type) = &synthetic_dirents[dir.next_synthetic_dirent_index];
                 if seen_names.iter().any(|seen| seen == name) {
+                    dir.next_synthetic_dirent_index += 1;
                     continue;
                 }
                 let name_bytes = name.as_bytes();
@@ -5496,15 +5514,18 @@ impl FdTable {
                             d_ino: path_inode(entry_path.as_deref()) as _,
                             d_off: dir.next_dirent_cookie as _,
                             d_reclen: reclen as _,
-                            d_type: general::DT_BLK as u8,
+                            d_type: *d_type,
                             d_name: Default::default(),
                         },
                     );
                 }
                 let name_start = start + offset_of!(general::linux_dirent64, d_name);
                 out[name_start..name_start + name_bytes.len()].copy_from_slice(name_bytes);
+                dir.next_synthetic_dirent_index += 1;
             }
-            dir.synthetic_dirents_emitted = true;
+            if dir.next_synthetic_dirent_index >= synthetic_dirents.len() {
+                dir.synthetic_dirents_emitted = true;
+            }
         }
         Ok(out)
     }
@@ -5657,7 +5678,7 @@ impl FdTable {
                 Err(LinuxError::ESPIPE)
             }
             FdEntry::DevZero(_) => Ok(()),
-            FdEntry::DevRandom(_) => Err(LinuxError::ENODEV),
+            FdEntry::DevRandom(_) | FdEntry::DevCpuDmaLatency(_) => Err(LinuxError::ENODEV),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -6228,6 +6249,7 @@ impl FdTable {
             FdEntry::DevNull => Ok(dev_null_stat()),
             FdEntry::DevZero(_) => Ok(dev_zero_stat()),
             FdEntry::DevRandom(_) => Ok(PathEntry::synthetic_char("/dev/urandom").stat()),
+            FdEntry::DevCpuDmaLatency(_) => Ok(dev_cpu_dma_latency_stat()),
             FdEntry::BlockDevice(dev) => Ok(PathEntry::synthetic_block(dev.path.as_str()).stat()),
             FdEntry::Rtc => Ok(stdio_stat(false)),
             FdEntry::File(file) => Ok(file_attr_to_stat(
@@ -6309,6 +6331,7 @@ impl FdTable {
             Ok(FdEntry::DevNull)
             | Ok(FdEntry::DevZero(_))
             | Ok(FdEntry::DevRandom(_))
+            | Ok(FdEntry::DevCpuDmaLatency(_))
             | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
             Ok(FdEntry::BlockDevice(dev)) => {
                 Ok(PathEntry::synthetic_block(dev.path.as_str()).stat())
@@ -6519,7 +6542,8 @@ impl FdTable {
             general::F_GETFL => match self.entry(fd)? {
                 FdEntry::Stdin(status_flags)
                 | FdEntry::Stdout(status_flags)
-                | FdEntry::Stderr(status_flags) => Ok(*status_flags as i32),
+                | FdEntry::Stderr(status_flags)
+                | FdEntry::DevCpuDmaLatency(status_flags) => Ok(*status_flags as i32),
                 FdEntry::File(file) => Ok(file.status_flags as i32),
                 FdEntry::Memfd(file) => Ok(file.status_flags as i32),
                 FdEntry::Pipe(pipe) => Ok(pipe.status_flags() as i32),
@@ -6564,7 +6588,8 @@ impl FdTable {
             general::F_SETFL => match self.entry_mut(fd)? {
                 FdEntry::Stdin(status_flags)
                 | FdEntry::Stdout(status_flags)
-                | FdEntry::Stderr(status_flags) => {
+                | FdEntry::Stderr(status_flags)
+                | FdEntry::DevCpuDmaLatency(status_flags) => {
                     *status_flags =
                         (*status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
                     Ok(0)
@@ -6838,9 +6863,13 @@ impl PathEntry {
     }
 
     pub(super) fn synthetic_char(path: &str) -> Self {
+        Self::synthetic_char_with_mode(path, 0o440)
+    }
+
+    pub(super) fn synthetic_char_with_mode(path: &str, mode: u32) -> Self {
         Self {
             path: path.into(),
-            mode: ST_MODE_CHR | 0o440,
+            mode: ST_MODE_CHR | (mode & 0o7777),
             size: 0,
             blocks: 0,
         }
@@ -7926,6 +7955,7 @@ impl FdEntry {
             Self::DevNull => Ok(Self::DevNull),
             Self::DevZero(status_flags) => Ok(Self::DevZero(*status_flags)),
             Self::DevRandom(status_flags) => Ok(Self::DevRandom(*status_flags)),
+            Self::DevCpuDmaLatency(status_flags) => Ok(Self::DevCpuDmaLatency(*status_flags)),
             Self::BlockDevice(dev) => Ok(Self::BlockDevice(dev.clone())),
             Self::Rtc => Ok(Self::Rtc),
             Self::File(file) => Ok(Self::File(file.clone())),
@@ -9029,6 +9059,31 @@ fn check_open_permission(process: &UserProcess, path: &str, flags: u32) -> Resul
     }
 }
 
+fn check_synthetic_open_permission(
+    process: &UserProcess,
+    path: &str,
+    st: &general::stat,
+    flags: u32,
+) -> Result<(), LinuxError> {
+    if flags & O_PATH_FLAG != 0 {
+        return Ok(());
+    }
+    let uid = process.fs_uid();
+    let gid = process.fs_gid();
+    if !parent_dirs_searchable_absolute(process, path, uid, gid)? {
+        return Err(LinuxError::EACCES);
+    }
+    let mode = open_permission_mode(flags);
+    if mode & ACCESS_W_OK != 0 && process.path_on_readonly_mount(path) {
+        return Err(LinuxError::EROFS);
+    }
+    if access_allowed(st, mode, uid, gid) {
+        Ok(())
+    } else {
+        Err(LinuxError::EACCES)
+    }
+}
+
 fn fcntl_status_flags(open_flags: u32) -> u32 {
     open_flags
         & (general::O_ACCMODE
@@ -9042,6 +9097,38 @@ fn fcntl_status_flags(open_flags: u32) -> u32 {
 
 fn fcntl_setfl_flags(flags: u32) -> u32 {
     flags & (general::O_APPEND | general::O_NONBLOCK | general::O_DIRECT | general::O_NOATIME)
+}
+
+fn validate_cpu_dma_latency_request(src: &[u8]) -> Result<i32, LinuxError> {
+    if src.len() == size_of::<i32>() {
+        return Ok(i32::from_ne_bytes([src[0], src[1], src[2], src[3]]));
+    }
+
+    let text = core::str::from_utf8(src).map_err(|_| LinuxError::EINVAL)?;
+    let text = text.trim_matches(|ch: char| ch == '\0' || ch.is_ascii_whitespace());
+    if text.is_empty() {
+        return Err(LinuxError::EINVAL);
+    }
+    let (negative, digits) = if let Some(rest) = text.strip_prefix('-') {
+        (true, rest)
+    } else if let Some(rest) = text.strip_prefix('+') {
+        (false, rest)
+    } else {
+        (false, text)
+    };
+    let digits = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+        .unwrap_or(digits);
+    if digits.is_empty() {
+        return Err(LinuxError::EINVAL);
+    }
+    let value = i64::from_str_radix(digits, 16).map_err(|_| LinuxError::EINVAL)?;
+    let value = if negative { -value } else { value };
+    if value < i32::MIN as i64 || value > i32::MAX as i64 {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok(value as i32)
 }
 
 fn supported_open_flags() -> u32 {
@@ -9460,6 +9547,28 @@ fn open_candidates(
                 FdEntry::DevRandom(fcntl_status_flags(flags))
             });
         }
+        if path == "/dev/cpu_dma_latency" {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
+                return Err(LinuxError::EEXIST);
+            }
+            check_synthetic_open_permission(
+                process,
+                "/dev/cpu_dma_latency",
+                &dev_cpu_dma_latency_stat(),
+                flags,
+            )?;
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_char_with_mode(
+                    "/dev/cpu_dma_latency",
+                    0o600,
+                ))
+            } else {
+                FdEntry::DevCpuDmaLatency(fcntl_status_flags(flags))
+            });
+        }
         if is_synthetic_block_device_path(path.as_str()) {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -9502,6 +9611,9 @@ fn open_candidates(
                 (ST_MODE_CHR, Some(DEV_NULL_RDEV)) => return Ok(FdEntry::DevNull),
                 (ST_MODE_CHR, Some(DEV_ZERO_RDEV)) => {
                     return Ok(FdEntry::DevZero(fcntl_status_flags(flags)));
+                }
+                (ST_MODE_CHR, Some(DEV_CPU_DMA_LATENCY_RDEV)) => {
+                    return Ok(FdEntry::DevCpuDmaLatency(fcntl_status_flags(flags)));
                 }
                 (ST_MODE_BLK, _) => {
                     return Ok(FdEntry::BlockDevice(BlockDeviceEntry::new(
@@ -9683,6 +9795,13 @@ fn synthetic_block_device_names_in_dir(path: &str) -> &'static [&'static str] {
     }
 }
 
+fn synthetic_char_device_names_in_dir(path: &str) -> &'static [&'static str] {
+    match normalize_path("/", path).as_deref() {
+        Some("/dev") => SYNTHETIC_CHAR_DEVICE_NAMES,
+        _ => &[],
+    }
+}
+
 fn record_missing_candidate(last_err: &mut LinuxError, err: LinuxError) -> Result<(), LinuxError> {
     match err {
         LinuxError::ENOENT => Ok(()),
@@ -9716,6 +9835,7 @@ pub(super) fn open_dir_entry(path: &str) -> Result<FdEntry, LinuxError> {
         attr,
         path: path.into(),
         next_dirent_cookie: 0,
+        next_synthetic_dirent_index: 0,
         synthetic_dirents_emitted: false,
     }))
 }

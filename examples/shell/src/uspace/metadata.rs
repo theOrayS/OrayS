@@ -29,6 +29,7 @@ use super::{PathTimes, UserProcess};
 
 pub(super) const DEV_NULL_RDEV: u64 = 259; // Linux makedev(1, 3).
 pub(super) const DEV_ZERO_RDEV: u64 = 261; // Linux makedev(1, 5).
+pub(super) const DEV_CPU_DMA_LATENCY_RDEV: u64 = 2_684; // Linux misc makedev(10, 124).
 const DEV_VDA_RDEV: u64 = 65_024; // Linux makedev(254, 0), virtio block.
 const LINUX_PATH_MAX: usize = 4096;
 const XATTR_CREATE: usize = 0x1;
@@ -1289,6 +1290,7 @@ pub(super) fn canonical_permission_path(path: String) -> String {
 
 pub(super) fn fd_entry_path(entry: &FdEntry) -> Option<&str> {
     match entry {
+        FdEntry::DevCpuDmaLatency(_) => Some("/dev/cpu_dma_latency"),
         FdEntry::BlockDevice(dev) => Some(dev.path.as_str()),
         FdEntry::File(file) => Some(file.path.as_str()),
         FdEntry::Directory(dir) => Some(dir.path.as_str()),
@@ -2121,6 +2123,7 @@ fn proc_self_fd_number(path: &str) -> Option<i32> {
 pub(super) fn fd_entry_statfs_path(entry: &FdEntry) -> Option<&str> {
     match entry {
         FdEntry::DevNull => Some("/dev/null"),
+        FdEntry::DevCpuDmaLatency(_) => Some("/dev/cpu_dma_latency"),
         FdEntry::Rtc => Some("/dev/misc/rtc"),
         FdEntry::Pipe(_) => Some("pipe:"),
         FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Some("socket:"),
@@ -2202,6 +2205,7 @@ pub(super) fn synthetic_char_stat_for_path(path: &str, mode: u32) -> general::st
     let rdev = match path {
         "/dev/null" => DEV_NULL_RDEV,
         "/dev/zero" => DEV_ZERO_RDEV,
+        "/dev/cpu_dma_latency" => DEV_CPU_DMA_LATENCY_RDEV,
         _ => 0,
     };
     synthetic_char_stat(path_inode(Some(path)), mode, rdev)
@@ -2233,6 +2237,10 @@ pub(super) fn dev_null_stat() -> general::stat {
 
 pub(super) fn dev_zero_stat() -> general::stat {
     synthetic_char_stat_for_path("/dev/zero", ST_MODE_CHR | 0o666)
+}
+
+pub(super) fn dev_cpu_dma_latency_stat() -> general::stat {
+    synthetic_char_stat_for_path("/dev/cpu_dma_latency", ST_MODE_CHR | 0o600)
 }
 
 pub(super) fn path_inode(path: Option<&str>) -> u64 {

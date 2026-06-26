@@ -325,13 +325,21 @@ pub(super) fn timeval_from_duration(duration: core::time::Duration) -> general::
 }
 
 pub(super) fn clock_resolution_timespec() -> general::timespec {
-    // Report the user-visible clock granularity, not the raw counter width.
-    // The single-vCPU evaluator can delay back-to-back user/kernel round trips
-    // by more than one 10ms tick under full syscall/test load, so advertising raw or
-    // single-tick resolution over-promises what clock_gettime() can
-    // consistently expose.
-    // Keep this well below the old scheduler-tick-scale 50ms value so POSIX
-    // timer callers still build short absolute deadlines safely.
+    // Linux exposes high-resolution POSIX clock APIs in nanoseconds even when a
+    // particular virtual timer backend has a coarser hardware counter.  The
+    // scheduler wake-up latency is validated by the actual sleep path; it should
+    // not be folded into clock_getres(), whose ABI reports the kernel clock API
+    // granularity used by clock_gettime()/clock_nanosleep().
+    general::timespec {
+        tv_sec: 0,
+        tv_nsec: 1,
+    }
+}
+
+fn coarse_clock_resolution_timespec() -> general::timespec {
+    // The Linux *_COARSE clocks deliberately trade precision for cheap reads.
+    // This no-vDSO compatibility layer still crosses into the kernel, so keep
+    // their advertised resolution conservative.
     general::timespec {
         tv_sec: 0,
         tv_nsec: 20_000_000,
@@ -341,13 +349,8 @@ pub(super) fn clock_resolution_timespec() -> general::timespec {
 pub(super) fn clock_getres_timespec(clockid: u32) -> Result<general::timespec, LinuxError> {
     validate_clock_id(clockid)?;
     Ok(match clockid {
-        // Coarse clocks still cross the same userspace-kernel boundary in this
-        // no-vDSO runtime, so their advertised user-visible resolution must not
-        // be tighter than what back-to-back clock_gettime() calls can reliably
-        // expose on the single-vCPU RR evaluator.  Reporting the shared clock
-        // budget is a conservative ABI statement, not a test-name special case.
         general::CLOCK_REALTIME_COARSE | general::CLOCK_MONOTONIC_COARSE => {
-            clock_resolution_timespec()
+            coarse_clock_resolution_timespec()
         }
         _ => clock_resolution_timespec(),
     })
