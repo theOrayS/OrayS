@@ -724,45 +724,45 @@ impl UserProcess {
         if offset >= end || extents.is_empty() {
             return;
         }
-        let mut retained = Vec::new();
-        let old = core::mem::take(extents);
-        let mut iter = old.into_iter();
-        while let Some((extent_offset, mut data)) = iter.next() {
-            if data.is_empty() {
-                retained.push((extent_offset, data));
+
+        let mut idx = extents.partition_point(|(extent_offset, data)| {
+            !data.is_empty() && extent_offset.saturating_add(data.len() as u64) <= offset
+        });
+        while idx < extents.len() {
+            if extents[idx].1.is_empty() {
+                break;
+            }
+            let extent_offset = extents[idx].0;
+            let extent_end = extent_offset.saturating_add(extents[idx].1.len() as u64);
+            if extent_end <= offset {
+                idx += 1;
                 continue;
             }
-            let extent_end = extent_offset.saturating_add(data.len() as u64);
-            if extent_end <= offset || extent_offset >= end {
-                retained.push((extent_offset, data));
-                if extent_offset >= end {
-                    retained.extend(iter);
-                    break;
-                }
-                continue;
+            if extent_offset >= end {
+                break;
             }
 
             if extent_offset < offset {
                 let keep = offset.saturating_sub(extent_offset) as usize;
                 if extent_end > end {
                     let skip = end.saturating_sub(extent_offset) as usize;
-                    let right = data.split_off(skip);
-                    data.truncate(keep);
-                    // Preserve the sorted invariant required by partition-based
-                    // sparse reads and subsequent local insert/merge operations.
-                    retained.push((extent_offset, data));
-                    retained.push((end, right));
+                    let right = extents[idx].1.split_off(skip);
+                    extents[idx].1.truncate(keep);
+                    extents.insert(idx + 1, (end, right));
+                    break;
                 } else {
-                    data.truncate(keep);
-                    retained.push((extent_offset, data));
+                    extents[idx].1.truncate(keep);
+                    idx += 1;
                 }
             } else if extent_end > end {
                 let skip = end.saturating_sub(extent_offset) as usize;
-                data.drain(..skip);
-                retained.push((end, data));
+                extents[idx].1.drain(..skip);
+                extents[idx].0 = end;
+                break;
+            } else {
+                extents.remove(idx);
             }
         }
-        *extents = retained;
     }
 
     fn merge_sparse_byte_neighbors(extents: &mut Vec<(u64, Vec<u8>)>, mut idx: usize) {
@@ -803,20 +803,32 @@ impl UserProcess {
     }
 
     fn clear_sparse_repeat_extents(extents: &mut Vec<(u64, u64, u8)>, offset: u64, end: u64) {
-        let mut retained = Vec::new();
-        for (extent_start, extent_end, byte) in extents.drain(..) {
-            if extent_end <= offset || extent_start >= end {
-                retained.push((extent_start, extent_end, byte));
-                continue;
+        if offset >= end || extents.is_empty() {
+            return;
+        }
+        let mut idx = extents.partition_point(|(_, extent_end, _)| *extent_end <= offset);
+        while idx < extents.len() {
+            let (extent_start, extent_end, byte) = extents[idx];
+            if extent_start >= end {
+                break;
             }
             if extent_start < offset {
-                retained.push((extent_start, offset, byte));
+                if extent_end > end {
+                    extents[idx].1 = offset;
+                    extents.insert(idx + 1, (end, extent_end, byte));
+                    break;
+                }
+                extents[idx].1 = offset;
+                idx += 1;
+                continue;
             }
             if extent_end > end {
-                retained.push((end, extent_end, byte));
+                extents[idx] = (end, extent_end, byte);
+                break;
+            } else {
+                extents.remove(idx);
             }
         }
-        *extents = retained;
     }
 
     fn insert_sparse_repeat_extent(

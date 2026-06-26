@@ -42,6 +42,7 @@ use super::posix_mq::{
     proc_sys_fs_mqueue_fd_entry, proc_sys_fs_mqueue_path_entry, PosixMqDescriptor,
     ProcMqQueuesMaxEntry,
 };
+use super::program_loader::invalidate_exec_image_cache;
 use super::runtime_paths::{
     normalize_path, push_runtime_candidate, runtime_absolute_path_candidates,
     runtime_library_name_candidates,
@@ -3507,11 +3508,14 @@ fn renameat2_paths(
             process.remove_path_hardlink(old_abs_path.as_str());
             process.remove_path_inode(old_abs_path.as_str());
             process.set_path_hardlink(backing_path.as_str(), new_abs_path, old_st.st_ino as u64);
+            invalidate_exec_image_cache(old_abs_path.as_str());
             return Ok(());
         }
     }
 
     axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()).map_err(LinuxError::from)?;
+    invalidate_exec_image_cache(old_abs_path.as_str());
+    invalidate_exec_image_cache(new_abs_path.as_str());
     process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
     Ok(())
 }
@@ -3541,6 +3545,9 @@ fn rename_exchange(
         let _ = axfs::api::rename(tmp_path.as_str(), old_abs_path);
         return Err(err);
     }
+    invalidate_exec_image_cache(old_abs_path);
+    invalidate_exec_image_cache(new_abs_path);
+    invalidate_exec_image_cache(tmp_path.as_str());
     process.move_path_metadata(old_abs_path, tmp_path.clone());
     process.move_path_metadata(new_abs_path, old_abs_path.to_string());
     process.move_path_metadata(tmp_path.as_str(), new_abs_path.to_string());
@@ -5085,6 +5092,7 @@ impl FdTable {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EINVAL);
                 }
+                invalidate_exec_image_cache(file.path.as_str());
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
                 resize_regular_file_physical_prefix(file, physical_size, size)?;
@@ -5118,6 +5126,7 @@ impl FdTable {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
+                invalidate_exec_image_cache(file.path.as_str());
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 let logical_size = file_logical_size(process, file)?;
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
@@ -5162,6 +5171,7 @@ impl FdTable {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
+                invalidate_exec_image_cache(file.path.as_str());
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
                 process.clear_path_data_range(file.path.clone(), offset, len);
@@ -5193,6 +5203,7 @@ impl FdTable {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EBADF);
                 }
+                invalidate_exec_image_cache(file.path.as_str());
                 let physical_size = file.file.get_attr().map_err(LinuxError::from)?.size();
                 let logical_size = file_logical_size(process, file)?;
                 process.ensure_path_data_ranges(file.path.clone(), physical_size);
@@ -6261,6 +6272,7 @@ impl FdTable {
                 process.remove_path_rdev(abs_path.as_str());
                 process.remove_path_times(abs_path.as_str());
                 process.clear_path_sparse_file(abs_path.as_str());
+                invalidate_exec_image_cache(abs_path.as_str());
                 return Ok(());
             }
         }
@@ -6284,6 +6296,7 @@ impl FdTable {
             process.remove_path_symlink(abs_path.as_str());
             process.remove_path_inode_flags(abs_path.as_str());
             process.remove_path_times(abs_path.as_str());
+            invalidate_exec_image_cache(abs_path.as_str());
             return Ok(());
         }
         let removed = if remove_dir {
@@ -6302,6 +6315,7 @@ impl FdTable {
             process.remove_path_rdev(abs_path.as_str());
             process.remove_path_times(abs_path.as_str());
             process.clear_path_sparse_file(abs_path.as_str());
+            invalidate_exec_image_cache(abs_path.as_str());
         }
         removed
     }
@@ -6887,6 +6901,15 @@ impl PathEntry {
             mode: file_type_mode(attr.file_type()) | attr.perm().bits() as u32,
             size: attr.size(),
             blocks: attr.blocks(),
+        }
+    }
+
+    pub(super) fn from_metadata(path: &str, metadata: &axfs::api::Metadata) -> Self {
+        Self {
+            path: path.into(),
+            mode: file_type_mode(metadata.file_type()) | metadata.permissions().bits() as u32,
+            size: metadata.size(),
+            blocks: metadata.blocks(),
         }
     }
 
@@ -8430,6 +8453,7 @@ fn add_timespec_ns(ts: general::timespec, ns: i128) -> general::timespec {
 }
 
 fn touch_regular_file_after_write(process: &UserProcess, file: &FileEntry) {
+    invalidate_exec_image_cache(file.path.as_str());
     let Ok(now) = clock_gettime_timespec(general::CLOCK_REALTIME) else {
         return;
     };
@@ -9724,12 +9748,17 @@ fn open_candidates(
                 return Err(LinuxError::ETXTBSY);
             }
             check_open_permission(process, backing_path.as_str(), flags)?;
-            let file = File::open(backing_path.as_str(), file_opts).map_err(LinuxError::from)?;
             if path_only {
-                let attr = file.get_attr().map_err(LinuxError::from)?;
-                return Ok(FdEntry::Path(PathEntry::from_attr(path.as_str(), &attr)));
+                let metadata =
+                    axfs::api::metadata(backing_path.as_str()).map_err(LinuxError::from)?;
+                return Ok(FdEntry::Path(PathEntry::from_metadata(
+                    path.as_str(),
+                    &metadata,
+                )));
             }
+            let file = File::open(backing_path.as_str(), file_opts).map_err(LinuxError::from)?;
             if flags & general::O_TRUNC != 0 {
+                invalidate_exec_image_cache(backing_path.as_str());
                 process.truncate_path_sparse_file(backing_path.clone(), 0);
             }
             return Ok(FdEntry::File(FileEntry {
@@ -9792,11 +9821,21 @@ fn open_candidates(
             check_open_permission(process, path.as_str(), flags)?;
             None
         };
-        match File::open(path.as_str(), file_opts) {
-            Ok(file) if path_only => {
-                let attr = file.get_attr().map_err(LinuxError::from)?;
-                return Ok(FdEntry::Path(PathEntry::from_attr(path.as_str(), &attr)));
+        if path_only {
+            match axfs::api::metadata(path.as_str()) {
+                Ok(metadata) => {
+                    return Ok(FdEntry::Path(PathEntry::from_metadata(
+                        path.as_str(),
+                        &metadata,
+                    )));
+                }
+                Err(err) => {
+                    record_missing_candidate(&mut last_err, LinuxError::from(err))?;
+                    continue;
+                }
             }
+        }
+        match File::open(path.as_str(), file_opts) {
             Ok(file) => {
                 if created_by_this_open {
                     if let Some(parent_st) = create_parent_st.as_ref() {
@@ -9805,6 +9844,7 @@ fn open_candidates(
                     record_created_path_times(process, path.clone());
                 }
                 if flags & general::O_TRUNC != 0 {
+                    invalidate_exec_image_cache(path.as_str());
                     process.truncate_path_sparse_file(path.clone(), 0);
                 }
                 return Ok(FdEntry::File(FileEntry {
