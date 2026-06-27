@@ -23,3 +23,9 @@ __pycache__/
 kernel-*
 .gdb_history
 build/
+
+# Local-only review/runtime artifacts
+/.local-archive/
+/.codegraph/
+/output/
+/complete.md
