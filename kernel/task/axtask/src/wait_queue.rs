@@ -206,12 +206,15 @@ impl WaitQueue {
     /// preemption is enabled.
     pub fn notify_one(&self, resched: bool) -> bool {
         let mut wq = self.queue.lock();
-        if let Some(task) = wq.pop_front() {
-            unblock_one_task(task, resched);
-            true
-        } else {
-            false
+        // Timed waits can be woken by their timer before a notifier reaches the
+        // queued entry. Drain such stale entries until one task actually moves
+        // from Blocked to Ready.
+        while let Some(task) = wq.pop_front() {
+            if unblock_one_task(task, resched) {
+                return true;
+            }
         }
+        false
     }
 
     /// Wakes up to `count` distinct tasks, ignoring duplicate queue entries for
@@ -236,14 +239,15 @@ impl WaitQueue {
             if !notified.insert(task_ptr_key(&task)) {
                 continue;
             }
-            unblock_one_task(task, resched);
-            notified_len += 1;
+            if unblock_one_task(task, resched) {
+                notified_len += 1;
+            }
         }
         notified_len
     }
 
     /// Wakes up to `count` distinct tasks that satisfy `predicate`, invoking
-    /// `on_task` immediately before each selected task is unblocked.
+    /// `on_task` only for tasks that are actually moved from blocked to ready.
     pub fn notify_many_where<F, G>(
         &self,
         count: usize,
@@ -259,7 +263,7 @@ impl WaitQueue {
             return 0;
         }
 
-        let mut notified = BTreeSet::new();
+        let mut selected = BTreeSet::new();
         let mut notified_len = 0usize;
         let mut wq = self.queue.lock();
         let mut index = 0;
@@ -267,7 +271,8 @@ impl WaitQueue {
             let Some(task) = wq.get(index).cloned() else {
                 break;
             };
-            if notified.contains(&task_ptr_key(&task)) {
+            let key = task_ptr_key(&task);
+            if selected.contains(&key) {
                 let _ = wq.remove(index);
                 continue;
             }
@@ -278,10 +283,10 @@ impl WaitQueue {
             let Some(task) = wq.remove(index) else {
                 break;
             };
-            on_task(&task);
-            notified.insert(task_ptr_key(&task));
-            unblock_one_task(task, resched);
-            notified_len += 1;
+            selected.insert(key);
+            if unblock_one_task_with(task, resched, |task| on_task(task)) {
+                notified_len += 1;
+            }
         }
         notified_len
     }
@@ -315,14 +320,15 @@ impl WaitQueue {
         let mut operate =
             |source: &mut VecDeque<AxTaskRef>,
              mut destination: Option<&mut VecDeque<AxTaskRef>>| {
-                let mut notified = BTreeSet::new();
+                let mut selected = BTreeSet::new();
                 let mut notified_len = 0usize;
                 let mut index = 0;
                 while index < source.len() && notified_len < wake_count {
                     let Some(task) = source.get(index).cloned() else {
                         break;
                     };
-                    if notified.contains(&task_ptr_key(&task)) {
+                    let key = task_ptr_key(&task);
+                    if selected.contains(&key) {
                         let _ = source.remove(index);
                         continue;
                     }
@@ -333,10 +339,10 @@ impl WaitQueue {
                     let Some(task) = source.remove(index) else {
                         break;
                     };
-                    on_wake(&task);
-                    notified.insert(task_ptr_key(&task));
-                    unblock_one_task(task, resched);
-                    notified_len += 1;
+                    selected.insert(key);
+                    if unblock_one_task_with(task, resched, |task| on_wake(task)) {
+                        notified_len += 1;
+                    }
                 }
 
                 let mut requeued = BTreeSet::new();
@@ -347,7 +353,7 @@ impl WaitQueue {
                             break;
                         };
                         let key = task_ptr_key(&task);
-                        if notified.contains(&key) || !requeued.insert(key) {
+                        if selected.contains(&key) || !requeued.insert(key) {
                             continue;
                         }
                         on_requeue(&task);
@@ -393,8 +399,7 @@ impl WaitQueue {
     pub fn notify_task(&self, resched: bool, task: &AxTaskRef) -> bool {
         let mut wq = self.queue.lock();
         if let Some(index) = wq.iter().position(|t| Arc::ptr_eq(t, task)) {
-            unblock_one_task(wq.remove(index).unwrap(), resched);
-            true
+            unblock_one_task(wq.remove(index).unwrap(), resched)
         } else {
             false
         }
@@ -480,11 +485,18 @@ impl WaitQueue {
     }
 }
 
-fn unblock_one_task(task: AxTaskRef, resched: bool) {
+fn unblock_one_task(task: AxTaskRef, resched: bool) -> bool {
+    unblock_one_task_with(task, resched, |_| {})
+}
+
+fn unblock_one_task_with<F>(task: AxTaskRef, resched: bool, on_ready: F) -> bool
+where
+    F: FnOnce(&AxTaskRef),
+{
     // Mark task as not in wait queue.
     task.set_in_wait_queue(false);
     // Select run queue by the CPU set of the task.
     // Use `NoOp` kernel guard here because the function is called with holding the
     // lock of wait queue, where the irq and preemption are disabled.
-    select_run_queue::<NoOp>(&task).unblock_task(task, resched)
+    select_run_queue::<NoOp>(&task).unblock_task_with(task, resched, on_ready)
 }

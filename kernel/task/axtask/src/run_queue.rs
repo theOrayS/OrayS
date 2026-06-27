@@ -252,7 +252,16 @@ impl<G: BaseGuard> AxRunQueueRef<'_, G> {
     ///
     /// This function does nothing if the task is not in [`TaskState::Blocked`],
     /// which means the task is already unblocked by other cores.
-    pub fn unblock_task(&mut self, task: AxTaskRef, resched: bool) {
+    pub fn unblock_task(&mut self, task: AxTaskRef, resched: bool) -> bool {
+        self.unblock_task_with(task, resched, |_| {})
+    }
+
+    /// Unblock one task and run `on_ready` after the `Blocked -> Ready`
+    /// transition succeeds but before the task is visible on a ready queue.
+    pub fn unblock_task_with<F>(&mut self, task: AxTaskRef, resched: bool, on_ready: F) -> bool
+    where
+        F: FnOnce(&AxTaskRef),
+    {
         let task_id_name = task.id_name();
         // Try to change the state of the task from `Blocked` to `Ready`,
         // if successful, the task will be put into this run queue,
@@ -261,7 +270,7 @@ impl<G: BaseGuard> AxRunQueueRef<'_, G> {
         // target task can not be insert into the run queue until it finishes its scheduling process.
         if self
             .inner
-            .put_task_with_state(task, TaskState::Blocked, resched)
+            .put_task_with_state_and(task, TaskState::Blocked, resched, on_ready)
         {
             // Since now, the task to be unblocked is in the `Ready` state.
             let cpu_id = self.inner.cpu_id;
@@ -272,6 +281,9 @@ impl<G: BaseGuard> AxRunQueueRef<'_, G> {
                 #[cfg(feature = "preempt")]
                 crate::current().set_preempt_pending(true);
             }
+            true
+        } else {
+            false
         }
     }
 }
@@ -489,6 +501,22 @@ impl AxRunQueue {
         current_state: TaskState,
         preempt: bool,
     ) -> bool {
+        self.put_task_with_state_and(task, current_state, preempt, |_| {})
+    }
+
+    /// Puts target task into current run queue with `Ready` state, invoking
+    /// `on_ready` after the state transition succeeds but before the task is
+    /// inserted into the scheduler's ready queue.
+    fn put_task_with_state_and<F>(
+        &mut self,
+        task: AxTaskRef,
+        current_state: TaskState,
+        preempt: bool,
+        on_ready: F,
+    ) -> bool
+    where
+        F: FnOnce(&AxTaskRef),
+    {
         // If the task's state matches `current_state`, set its state to `Ready` and
         // put it back to the run queue (except idle task).
         if task.transition_state(current_state, TaskState::Ready) && !task.is_idle() {
@@ -512,6 +540,7 @@ impl AxRunQueue {
                 }
             }
             // TODO: priority
+            on_ready(&task);
             #[cfg(feature = "smp")]
             task.set_cpu_id(self.cpu_id as _);
             self.scheduler.lock().put_prev_task(task, preempt);

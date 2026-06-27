@@ -90,8 +90,8 @@ struct LocalSocketBuffer {
 struct LocalSocketPairState {
     buffers: [Mutex<LocalSocketBuffer>; 2],
     open_ends: Mutex<[usize; 2]>,
-    read_wait: [WaitQueue; 2],
-    write_wait: [WaitQueue; 2],
+    read_wait: [Arc<WaitQueue>; 2],
+    write_wait: [Arc<WaitQueue>; 2],
 }
 
 struct LocalSocketPairEndpoint {
@@ -342,8 +342,8 @@ impl LocalSocketPairState {
                 Mutex::new(LocalSocketBuffer::new()),
             ],
             open_ends: Mutex::new([1, 1]),
-            read_wait: [WaitQueue::new(), WaitQueue::new()],
-            write_wait: [WaitQueue::new(), WaitQueue::new()],
+            read_wait: [Arc::new(WaitQueue::new()), Arc::new(WaitQueue::new())],
+            write_wait: [Arc::new(WaitQueue::new()), Arc::new(WaitQueue::new())],
         })
     }
 
@@ -402,13 +402,15 @@ impl LocalSocketPairState {
     }
 
     fn wait_readable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) {
-        self.read_wait[side].wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
+        let wait = self.read_wait[side].clone();
+        wait.wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
             self.readable_or_peer_closed_or_interrupted(side, process)
         });
     }
 
     fn wait_writable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) {
-        self.write_wait[side].wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
+        let wait = self.write_wait[side].clone();
+        wait.wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
             self.writable_or_peer_closed_or_interrupted(side, process)
         });
     }

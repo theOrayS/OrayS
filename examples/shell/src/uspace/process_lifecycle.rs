@@ -356,7 +356,6 @@ impl ProcessTeardown {
         }
         fds.close_all_for_pid(pid, close_fd_base);
         children.lock().clear();
-        axtask::reap_exited_tasks();
     }
 }
 
@@ -504,6 +503,7 @@ fn run_user_program_in_with_env_and_timeout(
             }
             None => {
                 process.request_eval_exit_tree(137);
+                join_user_task_for_cleanup(&task);
                 process.teardown();
                 137
             }
@@ -526,22 +526,34 @@ fn join_user_task_for_cleanup(task: &AxTaskRef) -> bool {
 
     let deadline = axhal::time::monotonic_time() + USER_TASK_EXIT_JOIN_GRACE;
     while axhal::time::monotonic_time() < deadline {
-        axtask::reap_exited_tasks();
-        prune_exited_user_tasks();
+        reap_user_runtime_once();
         if task.try_join().is_some() {
             return true;
         }
         axtask::yield_now();
     }
 
-    axtask::reap_exited_tasks();
-    prune_exited_user_tasks();
+    reap_user_runtime_once();
     task.try_join().is_some()
 }
 
-fn settle_task_gc_after_join() {
-    axtask::reap_exited_tasks();
+fn reap_user_runtime_once() {
+    // Drop registry/process references before scanning axtask's exited queue so
+    // exited user tasks can be reclaimed in the same evaluator boundary.  The
+    // old order left tasks whose final registry reference was pruned after the
+    // scan retained until a later program, which accumulates badly across full
+    // musl+glibc LTP sweeps.
     prune_exited_user_tasks();
+    axtask::reap_exited_tasks();
+}
+
+fn settle_task_gc_after_join() {
+    reap_user_runtime_once();
+    // A first pass can drop user-process child edges/FdTables whose drops make
+    // more exited tasks single-owned.  A second pass is bounded and keeps this
+    // cleanup local to the just-finished program instead of leaking pressure to
+    // later LTP cases.
+    reap_user_runtime_once();
 }
 
 fn yield_for_task_gc() {
