@@ -12,7 +12,7 @@ use axsync::Mutex;
 use axtask::{self, AxTaskRef, TaskInner, WaitQueue};
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
-use memory_addr::{PageIter4K, VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use std::collections::BTreeMap;
 use std::string::{String, ToString};
 use std::sync::Arc;
@@ -27,13 +27,13 @@ use super::fd_table::{
 };
 use super::futex;
 use super::linux_abi::{
-    neg_errno, ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE,
-    USER_ASPACE_SIZE,
+    ACCESS_X_OK, SIGCHLD_NUM, ST_MODE_DIR, ST_MODE_TYPE_MASK, USER_ASPACE_BASE, USER_ASPACE_SIZE,
+    neg_errno,
 };
 use super::metadata::{apply_recorded_path_metadata, file_type_mode, path_inode};
 use super::program_loader::{
-    exec_loader_axerr, exec_loader_string_refs, load_program_image, LoadedMapping,
-    EXEC_LOADER_ENOMEM_PREFIX,
+    EXEC_LOADER_ENOMEM_PREFIX, LoadedMapping, exec_loader_axerr, exec_loader_string_refs,
+    load_program_image,
 };
 use super::resource_sched::{
     apply_process_scheduler_state_to_task, child_sched_state_from_parent, default_sched_state,
@@ -48,21 +48,21 @@ use super::signal_abi::{
 };
 use super::sysv_shm;
 use super::task_context::{
-    child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext, user_pc,
-    UserTaskExt,
+    UserTaskExt, child_trap_frame, current_task_ext, current_tid, make_uspace_context, task_ext,
+    user_pc,
 };
 #[cfg(feature = "auto-run-tests")]
 use super::task_registry::live_user_thread_entries;
 use super::task_registry::{
-    live_user_thread_count, prune_exited_user_tasks, register_user_task,
+    UserThreadEntry, live_user_thread_count, prune_exited_user_tasks, register_user_task,
     unregister_user_task_with_runtime, user_thread_entries_by_process_pid,
-    user_thread_entry_by_process_pid, UserThreadEntry,
+    user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
-    read_cstr, read_execve_argv, read_execve_envp, read_user_value, write_user_bytes,
-    write_user_value, MAX_USER_IO_CHUNK,
+    MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_value,
+    write_user_bytes, write_user_value,
 };
-use super::{ChildTask, ProcessFdTable, UserProcess, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE};
+use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE, ProcessFdTable, UserProcess};
 
 const MAX_LIVE_USER_THREADS: usize = 512;
 const MIN_FORK_FREE_FRAMES: usize = 8192;
@@ -495,11 +495,7 @@ fn run_user_program_in_with_env_and_timeout(
                 }
                 join_user_task_for_cleanup(&task);
                 process.teardown();
-                if expired {
-                    137
-                } else {
-                    code
-                }
+                if expired { 137 } else { code }
             }
             None => {
                 process.request_eval_exit_tree(137);

@@ -1,4 +1,4 @@
-use core::mem::{forget, size_of, MaybeUninit};
+use core::mem::{MaybeUninit, forget, size_of};
 use core::slice;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -6,13 +6,13 @@ use axerrno::LinuxError;
 use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
-use memory_addr::{MemoryAddr, PageIter4K, VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
 use super::perf_counters;
-use super::{neg_errno, UserProcess};
+use super::{UserProcess, neg_errno};
 
 pub(super) const MAX_USER_IO_CHUNK: usize = 64 * 1024;
 

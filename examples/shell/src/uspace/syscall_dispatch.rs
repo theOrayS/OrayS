@@ -1,9 +1,10 @@
 use axerrno::LinuxError;
 use axhal::context::TrapFrame;
-use axhal::trap::{register_trap_handler, SYSCALL};
+use axhal::trap::{SYSCALL, register_trap_handler};
 use core::sync::atomic::Ordering;
 use linux_raw_sys::general;
 
+use super::UserProcess;
 use super::credentials::{
     sys_capget, sys_capset, sys_getgroups, sys_getresgid, sys_getresuid, sys_setfsgid,
     sys_setfsuid, sys_setgid, sys_setgroups, sys_setregid, sys_setresgid, sys_setresuid,
@@ -90,7 +91,6 @@ use super::time_abi::{
     sys_timer_gettime, sys_timer_settime, sys_times,
 };
 use super::user_memory::{read_user_value, sys_getrandom};
-use super::UserProcess;
 
 #[cfg(target_arch = "loongarch64")]
 const LOONGARCH_LEGACY_GETRLIMIT: u32 = 163;

@@ -9,15 +9,15 @@ use axsync::Mutex;
 use lazyinit::LazyInit;
 use linux_raw_sys::auxvec;
 use linux_raw_sys::general;
-use memory_addr::{VirtAddr, PAGE_SIZE_4K};
+use memory_addr::{PAGE_SIZE_4K, VirtAddr};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::string::{String, ToString};
 use std::vec::Vec;
+use xmas_elf::ElfFile;
 use xmas_elf::header::{Machine, Type as ElfType};
 use xmas_elf::program::{Flags as PhFlags, ProgramHeader, Type as PhType};
-use xmas_elf::ElfFile;
 
 use super::linux_abi::{
     AUX_CLOCK_TICKS, AUX_PLATFORM, MAX_SCRIPT_INTERPRETER_DEPTH, TESTSUITE_STAGE_ROOT,
@@ -29,7 +29,7 @@ use super::runtime_paths::{
     try_derive_exec_root_from_path, try_resolve_host_path, try_resolve_runtime_support_file,
     try_runtime_absolute_path_candidates, try_staged_cwd_absolute_path_candidates,
 };
-use super::{str_err, BrkState, UserProcess};
+use super::{BrkState, UserProcess, str_err};
 
 pub(super) struct LoadedImage {
     pub(super) entry: usize,

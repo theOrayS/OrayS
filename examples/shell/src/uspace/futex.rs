@@ -12,13 +12,13 @@ use memory_addr::VirtAddr;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::linux_abi::{neg_errno, USER_MMAP_BASE};
+use super::UserProcess;
+use super::linux_abi::{USER_MMAP_BASE, neg_errno};
 use super::perf_counters;
 use super::signal_abi::current_unblocked_signal_pending;
 use super::task_context::{current_task_ext, current_tid, task_ext, user_pc};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::{fault_in_user_read, read_user_value};
-use super::UserProcess;
 
 pub(super) struct FutexState {
     pub(super) seq: AtomicU32,
