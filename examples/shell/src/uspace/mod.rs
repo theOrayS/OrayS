@@ -59,6 +59,7 @@ pub use futex::futex_table_stats;
 use linux_abi::*;
 #[cfg(feature = "auto-run-tests")]
 pub(crate) use perf_counters::perf_snapshot;
+use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::cleanup_user_processes;
 #[cfg(feature = "auto-run-tests")]
@@ -76,7 +77,6 @@ pub use process_lifecycle::seed_initial_path_mode;
 pub use process_lifecycle::user_process_object_stats;
 #[cfg(feature = "auto-run-tests")]
 pub use process_lifecycle::user_process_retention_stats;
-use process_lifecycle::ProcessTeardown;
 #[cfg(feature = "auto-run-tests")]
 pub use program_loader::exec_image_buffer_stats;
 use resource_sched::{UserRlimit, UserSchedState};

@@ -1458,8 +1458,7 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
         if !short_user_sleep_step(remaining) {
             let wait_span = user_sleep_wait_span(ext.process.as_ref(), remaining);
             ext.process.timer_wait.wait_timeout_until(wait_span, || {
-                ext.process.pending_exit_group().is_some()
-                    || ext.process.eval_watchdog_expired()
+                ext.process.pending_exit_group().is_some() || ext.process.eval_watchdog_expired()
             });
         }
     }
