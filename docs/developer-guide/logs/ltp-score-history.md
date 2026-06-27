@@ -6,7 +6,7 @@
 
 | 阶段 | 目标 / 结果 | 关键结果 | 首选证据 |
 | --- | --- | --- | --- |
-| 2026-05-22 remote/local 统一 | stable157 级别验证 | RV/LA 各 314 wrapper PASS / 0 FAIL；musl/glibc 各 157/0 | `docs/remote-local-eval-unification-2026-05-22/final-terminal-report.md` |
+| 2026-05-22 remote/local 统一 | stable157 级别验证 | RV/LA 各 314 wrapper PASS / 0 FAIL；musl/glibc 各 157/0 | `docs/archive/pre-review-docs-2026-06-27/remote-local-eval-unification-2026-05-22/final-terminal-report.md` |
 | 2026-05-24 phase-a | stable250 -> stable300 | RV/LA 各 600 PASS / 0 FAIL；musl/glibc 300/0；`read02` TCONF 透明披露 | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-24-phase-a/final-gate-quality-gate.json` |
 | 2026-05-25 phase-a | stable300 -> stable350 | RV/LA 各 700 PASS / 0 FAIL；musl/glibc 350/0；`kill02` demote，`abs01` replacement | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-a/final-gate-quality-gate.json` |
 | 2026-05-25 phase-b | stable350 -> stable375 | RV/LA 各 750 PASS / 0 FAIL；musl/glibc 375/0；`kill02` 不交付 | `docs/archive/ltp-score-improvement/ltp-score-improvement-2026-05-25-phase-b/stable375-delivery-report.md` |

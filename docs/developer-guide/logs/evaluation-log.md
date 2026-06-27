@@ -12,9 +12,9 @@
 
 关键证据：
 
-- `docs/remote-local-eval-unification-2026-05-22/final-terminal-report.md`
-- `docs/remote-local-eval-unification-2026-05-22/remote-offline-terminal-report.md`
-- `docs/remote-local-eval-unification-2026-05-22/final-gate-quality-gate.json`
+- `docs/archive/pre-review-docs-2026-06-27/remote-local-eval-unification-2026-05-22/final-terminal-report.md`
+- `docs/archive/pre-review-docs-2026-06-27/remote-local-eval-unification-2026-05-22/remote-offline-terminal-report.md`
+- `docs/archive/pre-review-docs-2026-06-27/remote-local-eval-unification-2026-05-22/final-gate-quality-gate.json`
 
 ## 2. LoongArch 远程地址映射修复
 
@@ -28,7 +28,7 @@
 - 本地 LA 构建配置：`make test_build ARCH=loongarch64 BUS=pci` 通过，入口为 `0xFFFF000080000000`。
 - `./run-eval.sh la` 和 `./run-eval.sh rv` 在该阶段均通过；当时 LTP musl/glibc 各 157 passed / 0 failed。
 
-首选阅读：`docs/remote-local-eval-unification-2026-05-22/final-terminal-report.md`。
+首选阅读：`docs/archive/pre-review-docs-2026-06-27/remote-local-eval-unification-2026-05-22/final-terminal-report.md`。
 
 ## 3. 远程离线构建修复
 
@@ -50,7 +50,7 @@ PATH=$PWD/tools/bin:$PATH make all
 CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true PATH=$PWD/tools/bin:$PATH make all KERNEL_BUILD_DIR=/tmp/oskernel-remote-offline-build KERNEL_RV=/tmp/oskernel-remote-offline-build/kernel-rv KERNEL_LA=/tmp/oskernel-remote-offline-build/kernel-la
 ```
 
-首选阅读：`docs/remote-local-eval-unification-2026-05-22/remote-offline-terminal-report.md`。
+首选阅读：`docs/archive/pre-review-docs-2026-06-27/remote-local-eval-unification-2026-05-22/remote-offline-terminal-report.md`。
 
 ## 4. 远程输出与本地输出对比
 
