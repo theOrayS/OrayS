@@ -65,8 +65,7 @@ fn timer_helper_sleep(duration: core::time::Duration) {
         axtask::sleep(duration);
     }
 }
-const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_micros(950);
-const USER_SLEEP_POLL_QUANTUM: core::time::Duration = core::time::Duration::from_millis(1);
+const USER_SLEEP_BUSY_WAIT_THRESHOLD: core::time::Duration = core::time::Duration::from_micros(50);
 
 fn has_effective_capability(process: &UserProcess, cap: u32) -> bool {
     cap <= general::CAP_LAST_CAP && process.cap_effective() & (1u64 << cap) != 0
@@ -76,28 +75,29 @@ fn can_set_system_time(process: &UserProcess) -> bool {
     process.uid() == 0 && has_effective_capability(process, general::CAP_SYS_TIME)
 }
 
-fn user_sleep_quantum(remaining: core::time::Duration) -> core::time::Duration {
-    if remaining > USER_SLEEP_POLL_QUANTUM {
-        USER_SLEEP_POLL_QUANTUM
-    } else {
-        remaining
-    }
-}
-
 fn short_user_sleep_step(remaining: core::time::Duration) -> bool {
     if remaining <= USER_SLEEP_BUSY_WAIT_THRESHOLD {
         // The task timer backend protects near-expired one-shot timers with a
-        // one-millisecond minimum reprogramming window.  If the final
-        // sub-millisecond tail goes back through axtask::sleep(), POSIX sleeps
-        // are rounded up by another tick and LTP's timer tests see consistent
-        // oversleep.  Spin only for that final tail; millisecond-scale waits
-        // still block on the timer queue so multi-threaded RT tests are not
-        // starved for their whole interval.
+        // one-millisecond minimum reprogramming window.  Spin only for the
+        // tiny race window where programming another interrupt is likely to
+        // overshoot more than just finishing the wait.  Longer sub-millisecond
+        // tails must still block/yield through the timer queue: burning almost
+        // a millisecond in several RT threads can starve the normal-priority
+        // controller thread that stops cyclic timer tests.
         axhal::time::busy_wait(remaining);
         true
     } else {
         false
     }
+}
+
+fn user_sleep_wait_span(
+    process: &UserProcess,
+    remaining: core::time::Duration,
+) -> core::time::Duration {
+    process
+        .eval_watchdog_remaining()
+        .map_or(remaining, |watchdog| remaining.min(watchdog))
 }
 
 impl UserProcess {
@@ -1456,7 +1456,11 @@ pub(super) fn sleep_duration(duration: core::time::Duration) {
         }
         let remaining = deadline.saturating_sub(now);
         if !short_user_sleep_step(remaining) {
-            axtask::sleep(user_sleep_quantum(remaining));
+            let wait_span = user_sleep_wait_span(ext.process.as_ref(), remaining);
+            ext.process.timer_wait.wait_timeout_until(wait_span, || {
+                ext.process.pending_exit_group().is_some()
+                    || ext.process.eval_watchdog_expired()
+            });
         }
     }
 }
@@ -1481,12 +1485,20 @@ fn sleep_duration_interruptible(duration: core::time::Duration) -> Option<core::
         if let Some(code) = ext.process.pending_exit_group() {
             terminate_current_thread_for_exit_group(ext.process.as_ref(), code);
         }
+        if ext.process.eval_watchdog_expired() {
+            return Some(deadline.saturating_sub(now));
+        }
         if current_unblocked_signal_pending() {
             return Some(deadline.saturating_sub(now));
         }
         let remaining = deadline.saturating_sub(now);
         if !short_user_sleep_step(remaining) {
-            axtask::sleep(user_sleep_quantum(remaining));
+            let wait_span = user_sleep_wait_span(ext.process.as_ref(), remaining);
+            ext.process.timer_wait.wait_timeout_until(wait_span, || {
+                current_unblocked_signal_pending()
+                    || ext.process.pending_exit_group().is_some()
+                    || ext.process.eval_watchdog_expired()
+            });
         }
     }
 }
