@@ -10,12 +10,12 @@
 pthserv
 
 # 2026-05-29 rv-iter002: oom/resource exhaustion killed QEMU/runner.
-# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter002-host-oom-dmesg.txt
+# Evidence: docs/archive/pre-review-docs-2026-06-27/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter002-host-oom-dmesg.txt
 # Removal condition: targeted oom01 completes without killing QEMU/runner or exhausting host/guest memory.
 oom01
 
 # 2026-05-29 rv-iter003: SysV shared-memory stress exhausted host/guest memory and killed QEMU/runner.
-# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter003-host-oom-dmesg.txt
+# Evidence: docs/archive/pre-review-docs-2026-06-27/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter003-host-oom-dmesg.txt
 # Removal condition: targeted shmat1 completes without killing QEMU/runner or exhausting host/guest memory.
 shmat1
 
@@ -25,6 +25,6 @@ shmat1
 accept02
 
 # 2026-05-29 rv-iter005: mincore03 caused resource exhaustion and host OOM killed QEMU/runner.
-# Evidence: docs/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter005-host-oom-dmesg.txt
+# Evidence: docs/archive/pre-review-docs-2026-06-27/ltp-full-sweep-blacklist-2026-05-29/summaries/rv-iter005-host-oom-dmesg.txt
 # Removal condition: targeted mincore03 completes without killing QEMU/runner or exhausting host/guest memory.
 mincore03
