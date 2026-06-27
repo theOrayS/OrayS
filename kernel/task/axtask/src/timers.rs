@@ -35,7 +35,7 @@ impl TimerEvent for TaskWakeupEvent {
         }
 
         // Timer ticket match.
-        select_run_queue::<NoOp>(&self.task).unblock_task(self.task, true)
+        let _ = select_run_queue::<NoOp>(&self.task).unblock_task(self.task, true);
     }
 }
 

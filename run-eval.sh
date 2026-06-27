@@ -7,6 +7,10 @@ TESTSUITE_DIR="${TESTSUITE_DIR:-$SCRIPT_DIR/../testsuits-for-oskernel}"
 RV_IMG="${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}"
 LA_IMG="${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}"
 export PATH="$HOME/.cargo/bin:$PATH"
+# Match the official remote `make all` timeout ceiling for full local evaluator
+# runs. Some official groups have a real 900s in-kernel group budget; callers
+# that want a shorter scouting run can still override this variable explicitly.
+export OSCOMP_GROUP_TIMEOUT_CEILING_SECS="${OSCOMP_GROUP_TIMEOUT_CEILING_SECS:-900}"
 
 require_img() {
     if [ ! -f "$1" ]; then
