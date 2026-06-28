@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=file:docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable440-vfs-scout-001-cases.txt LTP_CASE_TIMEOUT_SECS=75 timeout 80m ./run-eval.sh rv

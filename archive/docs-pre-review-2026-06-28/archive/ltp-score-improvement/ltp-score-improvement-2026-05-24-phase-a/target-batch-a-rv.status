@@ -1,7 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=gettid02,dup05,pread02,pwrite02,pwrite04,readlink03,fstat02,ftruncate04,mmap04,sysinfo03 LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv
-started_at: 2026-05-24T09:38:43+08:00
-cases: gettid02,dup05,pread02,pwrite02,pwrite04,readlink03,fstat02,ftruncate04,mmap04,sysinfo03
-finished_at: 2026-05-24T09:42:07+08:00
-status: 0
-log: docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-batch-a-rv-20260524T093843+0800.log
-summary: docs/ltp-score-improvement-2026-05-24-phase-a/target-batch-a-rv-summary.txt

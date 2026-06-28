@@ -1,1 +1,0 @@
-qemu-system-loongarch64 -kernel /root/oskernel2026-orays/kernel-la -m 1G -nographic -smp 1 -drive file=/root/oskernel-eval-runs/g007-official-local-20260619-110459/sdcard-la.img\,if=none\,format=raw\,id=x0 -device virtio-blk-pci\,drive=x0 -no-reboot -device virtio-net-pci\,netdev=net0 -netdev user\,id=net0 -rtc base=utc

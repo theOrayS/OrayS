@@ -1,2 +1,0 @@
-examples/shell/src/cmd.rs:268:#[rustfmt::skip]
-examples/shell/src/cmd.rs:1571:            println!("autorun: skip disabled test group {suite_dir}/{script}");

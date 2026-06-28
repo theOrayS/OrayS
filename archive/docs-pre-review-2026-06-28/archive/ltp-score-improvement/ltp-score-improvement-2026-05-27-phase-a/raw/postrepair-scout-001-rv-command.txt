@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=fcntl07\,fcntl07_64\,open06\,creat04\,mkdir04\,rmdir03\,unlink08\,unlink07\,getdents01\,getdents02\,fstatfs01\,fstatfs01_64\,statfs01\,statfs01_64\,statfs03\,statfs03_64\,statvfs01\,getcwd03\,getcwd04 LTP_CASE_TIMEOUT_SECS=70 timeout 80m ./run-eval.sh rv

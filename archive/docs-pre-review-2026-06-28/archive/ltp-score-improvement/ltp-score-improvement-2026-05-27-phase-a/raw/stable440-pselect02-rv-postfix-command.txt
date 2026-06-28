@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES="pselect02 pselect02_64" LTP_CASE_TIMEOUT_SECS=80 timeout 80m ./run-eval.sh rv

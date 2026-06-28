@@ -1,3 +1,0 @@
-# stable460-rv-final-gate-002 command
-date=2026-05-28T02:23:38+08:00
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=60 timeout 120m ./run-eval.sh rv

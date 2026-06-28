@@ -1,1 +1,0 @@
-sched_getscheduler02,gettid02,gethostname02,alarm05,alarm07,write05,fchmod05,fstat03,fstat03_64,statfs02,fstatfs02,nice04,sbrk01

@@ -1,1 +1,0 @@
-getpgid01,getsid01,getrusage02,gettimeofday02,gettid02,getgroups01,getresuid01,getresuid02,getresuid03,getresgid01,getresgid02,getresgid03,sched_getparam01,sched_getscheduler01,sched_getscheduler02,waitpid01

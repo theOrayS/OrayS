@@ -1,3 +1,0 @@
-[Sat May 30 01:57:01 2026] [ 722284]     0 722284   483088   281270  2691072        0             0 qemu-system-ris
-[Sat May 30 01:57:01 2026] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=init.scope,mems_allowed=0,global_oom,task_memcg=/system.slice/tat_agent.service,task=qemu-system-ris,pid=722284,uid=0
-[Sat May 30 01:57:01 2026] Out of memory: Killed process 722284 (qemu-system-ris) total-vm:1932352kB, anon-rss:1125080kB, file-rss:2580kB, shmem-rss:0kB, UID:0 pgtables:2628kB oom_score_adj:0
