@@ -1,0 +1,16 @@
+faccessat01
+access02
+access04
+getgroups01
+getrlimit03
+setrlimit02
+dup03
+pipe02
+lseek02
+readlinkat01
+readlinkat02
+chmod02
+fchmod02
+truncate01
+truncate02
+ftruncate03

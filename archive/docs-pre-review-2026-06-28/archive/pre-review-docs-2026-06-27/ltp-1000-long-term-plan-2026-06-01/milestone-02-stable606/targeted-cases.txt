@@ -1,0 +1,429 @@
+# milestone-02-stable606 targeted cases preflight
+
+Unit: LTP case name.
+
+## RV scout 001 candidates (80 cases)
+
+modify_ldt01
+modify_ldt02
+modify_ldt03
+print_caps
+test_ioctl
+tst_kvcmp
+tst_ncpus
+tst_ncpus_conf
+tst_ncpus_max
+tst_supported_fs
+fanotify_child
+genload
+gensin
+gensinh
+gensqrt
+gentan
+gentanh
+geny0
+geny1
+tst_exit
+tst_hexdump
+access04
+chmod06
+chmod07
+chown04
+clone04
+fchmod02
+fchmod06
+fchown04
+fchownat02
+mknod01
+mknod03
+mknod04
+mknod07
+mknod09
+mknodat02
+nice04
+openat02
+openat03
+rename03
+rename04
+rename05
+sched_rr_get_interval03
+sched_setaffinity01
+setpriority01
+setrlimit04
+signal01
+clock_gettime04
+nanosleep01
+getdents01
+getdents02
+fstat02
+fstat02_64
+fstatfs01
+fstatfs01_64
+statfs01
+statfs01_64
+statvfs01
+getcwd03
+getcwd04
+waitid07
+waitid08
+waitid10
+mmap04
+mmap05
+munmap01
+mmap10_1
+mmap12
+mmap13
+mmap14
+vma01
+vma02
+pipe07
+open10
+creat08
+socket01
+setitimer01
+times03
+diotest4
+shmctl02
+
+## RV scout 001 clean two-libc candidates (21; inherited deferred bank)
+
+modify_ldt01
+modify_ldt02
+modify_ldt03
+print_caps
+test_ioctl
+tst_kvcmp
+tst_ncpus
+tst_ncpus_conf
+tst_ncpus_max
+tst_supported_fs
+fanotify_child
+genload
+gensin
+gensinh
+gensqrt
+gentan
+gentanh
+geny0
+geny1
+tst_exit
+tst_hexdump
+
+## Socket errno fix targeted/regression cases
+
+socket01
+socket02
+socketpair02
+accept01
+listen01
+
+## Time lane rescout
+
+nanosleep01
+
+## Explicitly not promoted from this preflight
+
+nice04
+clone04
+signal01
+setitimer01
+getdents02
+sched_rr_get_interval03
+setpriority01
+openat02
+openat03
+mknodat02
+rename03
+
+## Proc maps / mmap fix and regression cases
+
+mmap04
+vma01
+mmap14
+mmap01
+mmap02
+mmap03
+mmap06
+mmap09
+mmap10
+mmap11
+mincore01
+mprotect05
+
+
+## times03 CPU accounting targeted/regression cases
+
+times03
+times01
+gettimeofday01
+gettimeofday02
+clock_gettime02
+
+## MAP_LOCKED / VmLck follow-up
+
+mmap14
+
+## /proc/self/pagemap / mmap12 follow-up
+
+mmap12
+mmap01
+mmap02
+mmap03
+mmap04
+mmap06
+mmap09
+mmap11
+mmap14
+mincore01
+mprotect05
+vma01
+
+## open10 / creat08 setgid inheritance follow-up
+
+open10
+creat08
+open01
+open03
+open08
+open09
+creat01
+creat03
+creat04
+creat05
+chmod05
+chown01
+chown02
+chown03
+mkdir04
+mknod02
+
+
+## chmod07 / fchmod02 group database follow-up
+
+chmod07
+fchmod02
+chmod05
+chown01
+chown02
+chown03
+open01
+creat01
+
+## tmpfs read-only mount metadata follow-up
+
+access04
+chmod06
+chown04
+fchmod06
+fchown04
+access01
+access02
+chmod05
+chmod07
+fchmod02
+chown01
+chown02
+chown03
+open01
+creat01
+
+
+## /proc/self/fd / pipe07 follow-up
+
+pipe07
+pipe01
+pipe02
+pipe03
+pipe04
+pipe05
+pipe06
+pipe08
+pipe09
+pipe10
+pipe14
+pipe2_01
+pipe2_02
+pipe2_04
+proc01
+readlink01
+readlinkat01
+fcntl01
+fcntl02
+fcntl03
+
+## mknod mode errno follow-up
+
+mknod03
+mknod04
+mknod09
+mknod02
+open10
+creat08
+chmod07
+fchmod02
+access04
+chmod06
+chown04
+fchmod06
+fchown04
+
+## fchownat symlink nofollow follow-up
+
+fchownat02
+symlink01
+symlink02
+readlink01
+readlinkat01
+lstat01
+lstat01_64
+chown01
+chown02
+chown03
+fchownat01
+fchmodat01
+chown04
+fchown04
+chmod07
+fchmod02
+
+## setrlimit04 busybox applet exec follow-up
+
+setrlimit04
+setrlimit01
+setrlimit02
+setrlimit03
+getrlimit01
+getrlimit02
+fork01
+waitpid01
+wait401
+wait402
+waitid01
+
+
+## clock_gettime04 evidence-only follow-up
+
+clock_gettime04
+clock_gettime02
+gettimeofday01
+gettimeofday02
+times01
+
+
+## legacy clean-tail evidence-only follow-up
+
+locktests
+ltpServer
+stress
+
+## Non-countable process/signal/scheduler scout
+
+sched_setaffinity01
+signal01
+nice04
+clone04
+gethostname02
+gethostid01
+getpgid01
+kill05
+kill10
+
+## Non-countable VFS/FD remainder scout
+
+readlinkat02
+readlink03
+statx01
+statx04
+fcntl30
+pipe15
+pipe2_03
+writev03
+pwritev03
+
+## Explicitly not promoted from the post-clock scouts
+
+sched_setaffinity01
+signal01
+nice04
+clone04
+gethostname02
+gethostid01
+getpgid01
+kill05
+kill10
+readlinkat02
+readlink03
+statx01
+statx04
+fcntl30
+pipe15
+pipe2_03
+writev03
+pwritev03
+
+
+<!-- stable606-final-closure:start -->
+## Final stable606 promoted cases (+50 from live baseline 556)
+
+Unit: LTP case name. These are the 50 rows added to `examples/shell/src/cmd.rs::LTP_STABLE_CASES` for this milestone:
+
+- `modify_ldt01`
+- `modify_ldt02`
+- `modify_ldt03`
+- `print_caps`
+- `test_ioctl`
+- `tst_kvcmp`
+- `tst_ncpus`
+- `tst_ncpus_conf`
+- `tst_ncpus_max`
+- `tst_supported_fs`
+- `fanotify_child`
+- `genload`
+- `gensin`
+- `gensinh`
+- `gensqrt`
+- `gentan`
+- `gentanh`
+- `geny0`
+- `geny1`
+- `tst_exit`
+- `tst_hexdump`
+- `socket01`
+- `nanosleep01`
+- `mmap04`
+- `vma01`
+- `times03`
+- `mmap14`
+- `mmap12`
+- `open10`
+- `creat08`
+- `chmod07`
+- `fchmod02`
+- `access04`
+- `chmod06`
+- `chown04`
+- `fchmod06`
+- `fchown04`
+- `pipe07`
+- `mknod03`
+- `mknod04`
+- `mknod09`
+- `fchownat02`
+- `setrlimit04`
+- `clock_gettime04`
+- `locktests`
+- `ltpServer`
+- `stress`
+- `fcntl30`
+- `mknod01`
+- `pipe15`
+
+## Final gate and regression cases run
+
+- Full stable gate: `LTP_CASES=stable` on RV and LA, covering all 606 stable rows across musl + glibc.
+- Final mknod/pipe clean subset: `fcntl30,mknod01,pipe15` on RV and LA, both parser-clean across musl + glibc.
+- Proc-sys pipe rescout: `fcntl30,pipe15` on RV and LA, both parser-clean across musl + glibc.
+- LA recovery subset: `rename14,kill02,times03` on LA, parser-clean across musl + glibc after the first full LA gate stalled.
+- LA local-order regression shard 457-489: `fcntl11,fcntl14,fcntl19,fcntl22,syscall01,mknod06,mknod02,mknod05,getitimer01,ppoll01,fpathconf01,pathconf01,rename14,mknod08,mknodat01,getxattr01,listxattr01,statx03,diotest1,diotest2,diotest3,diotest5,diotest6,mprotect05,mmap001,mmap15,mmap17,mmap19,mincore01,futex_wait02,futex_wait04,futex_wake01,kill02`, parser-clean across musl + glibc.
+- Explicit non-countable row: `statx01` still emitted `TCONF` for `stx_mnt_id` in the mixed mknod/statx/pipe run, so it was not promoted.
+<!-- stable606-final-closure:end -->

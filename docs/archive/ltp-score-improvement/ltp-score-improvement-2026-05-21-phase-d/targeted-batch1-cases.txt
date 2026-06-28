@@ -1,1 +1,0 @@
-sched_get_priority_max01,sched_get_priority_min01,sched_getscheduler01,uname04,clock_gettime03,clock_gettime04,clock_nanosleep01,clock_nanosleep02,sigaction02,rt_sigaction02,kill05,getrusage02

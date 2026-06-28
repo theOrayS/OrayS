@@ -1,0 +1,3 @@
+run-eval rc=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch2-uid16-rv-20260524T125902+0800.log
+cases=geteuid01_16,getegid01_16,getuid01_16,getgid01_16,getgroups01_16,getresuid01_16,getresgid01_16,setuid01_16,setgid01_16,setreuid01_16,setregid01_16,setresuid01_16,setresgid01_16,setfsuid01_16,setfsgid01_16

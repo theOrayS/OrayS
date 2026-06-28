@@ -92,8 +92,8 @@ def scan_program_loader(root: Path) -> list[str]:
 
 
 def scan_docs(root: Path) -> list[str]:
-    manifest = root / "docs/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"
-    gate = root / "docs/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
+    manifest = root / "archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"
+    gate = root / "archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
     findings: list[str] = []
     if not manifest.exists():
         findings.append("docs: missing musl-runtime-patch-manifest.md retirement note")

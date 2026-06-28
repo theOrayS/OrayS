@@ -1,4 +1,0 @@
-command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=access02\,open08\,open13\,chmod05\,statx01\,pipe12\,pipe2_01\,pipe2_04\,pipe13\ LTP_CASE_TIMEOUT_SECS=60\ ./run-eval.sh\ rv
-exit=0
-log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-priority-repair-rv-20260524T152106+0800.log
-cases=access02,open08,open13,chmod05,statx01,pipe12,pipe2_01,pipe2_04,pipe13

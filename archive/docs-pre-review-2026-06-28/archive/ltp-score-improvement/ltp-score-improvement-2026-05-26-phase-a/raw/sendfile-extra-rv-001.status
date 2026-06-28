@@ -1,0 +1,3 @@
+arch=rv
+cases=sendfile06,sendfile06_64,sendfile08,sendfile08_64
+run-eval rc=0

@@ -1,0 +1,132 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-21/rv-stable-44-g104.log`
+
+- PASS LTP CASE: 88
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 4 ({'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 44 passed, 0 failed
+- ltp-glibc: 44 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| access01 | rv | glibc | ltp-glibc | PASS | 0 | 7219 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access01 | rv | musl | ltp-musl | PASS | 0 | 6975 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access03 | rv | glibc | ltp-glibc | PASS | 0 | 1695 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access03 | rv | musl | ltp-musl | PASS | 0 | 1434 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brk01 | rv | glibc | ltp-glibc | PASS | 0 | 1307 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brk01 | rv | musl | ltp-musl | PASS | 0 | 1098 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chdir01 | rv | glibc | ltp-glibc | PASS | 0 | 1334 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chdir01 | rv | musl | ltp-musl | PASS | 0 | 1048 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod01 | rv | glibc | ltp-glibc | PASS | 0 | 1711 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod01 | rv | musl | ltp-musl | PASS | 0 | 1170 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone01 | rv | glibc | ltp-glibc | PASS | 0 | 1709 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clone01 | rv | musl | ltp-musl | PASS | 0 | 1105 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close01 | rv | glibc | ltp-glibc | PASS | 0 | 1523 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close01 | rv | musl | ltp-musl | PASS | 0 | 936 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close02 | rv | glibc | ltp-glibc | PASS | 0 | 1419 | 0 | 0 | 0 | 0 | 0 | 0 |
+| close02 | rv | musl | ltp-musl | PASS | 0 | 1395 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat01 | rv | glibc | ltp-glibc | PASS | 0 | 1226 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat01 | rv | musl | ltp-musl | PASS | 0 | 1036 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat03 | rv | glibc | ltp-glibc | PASS | 0 | 1297 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat03 | rv | musl | ltp-musl | PASS | 0 | 1028 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup01 | rv | glibc | ltp-glibc | PASS | 0 | 1144 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup01 | rv | musl | ltp-musl | PASS | 0 | 1097 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup02 | rv | glibc | ltp-glibc | PASS | 0 | 1312 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup02 | rv | musl | ltp-musl | PASS | 0 | 922 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod01 | rv | glibc | ltp-glibc | PASS | 0 | 1170 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod01 | rv | musl | ltp-musl | PASS | 0 | 1090 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl01 | rv | glibc | ltp-glibc | PASS | 0 | 1187 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl01 | rv | musl | ltp-musl | PASS | 0 | 1168 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl02 | rv | glibc | ltp-glibc | PASS | 0 | 1162 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl02 | rv | musl | ltp-musl | PASS | 0 | 1040 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl03 | rv | glibc | ltp-glibc | PASS | 0 | 1557 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl03 | rv | musl | ltp-musl | PASS | 0 | 1120 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork01 | rv | glibc | ltp-glibc | PASS | 0 | 1283 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork01 | rv | musl | ltp-musl | PASS | 0 | 1250 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate01 | rv | glibc | ltp-glibc | PASS | 0 | 1142 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate01 | rv | musl | ltp-musl | PASS | 0 | 1197 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcwd01 | rv | glibc | ltp-glibc | PASS | 0 | 1177 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getcwd01 | rv | musl | ltp-musl | PASS | 0 | 1045 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01 | rv | glibc | ltp-glibc | PASS | 0 | 1446 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01 | rv | musl | ltp-musl | PASS | 0 | 982 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid01 | rv | glibc | ltp-glibc | PASS | 0 | 1288 | 0 | 0 | 0 | 0 | 0 | 0 |
+| geteuid01 | rv | musl | ltp-musl | PASS | 0 | 1103 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid01 | rv | glibc | ltp-glibc | PASS | 0 | 1328 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgid01 | rv | musl | ltp-musl | PASS | 0 | 1087 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid01 | rv | glibc | ltp-glibc | PASS | 0 | 6747 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid01 | rv | musl | ltp-musl | PASS | 0 | 5533 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid02 | rv | glibc | ltp-glibc | PASS | 0 | 1218 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpid02 | rv | musl | ltp-musl | PASS | 0 | 1073 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid01 | rv | glibc | ltp-glibc | PASS | 0 | 1107 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getppid01 | rv | musl | ltp-musl | PASS | 0 | 815 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid01 | rv | glibc | ltp-glibc | PASS | 0 | 1163 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getuid01 | rv | musl | ltp-musl | PASS | 0 | 1160 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek01 | rv | glibc | ltp-glibc | PASS | 0 | 1393 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek01 | rv | musl | ltp-musl | PASS | 0 | 1088 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lstat01 | rv | glibc | ltp-glibc | PASS | 0 | 1575 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lstat01 | rv | musl | ltp-musl | PASS | 0 | 1072 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap01 | rv | glibc | ltp-glibc | PASS | 0 | 1419 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap01 | rv | musl | ltp-musl | PASS | 0 | 848 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open01 | rv | glibc | ltp-glibc | PASS | 0 | 1607 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open01 | rv | musl | ltp-musl | PASS | 0 | 1100 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open02 | rv | glibc | ltp-glibc | PASS | 0 | 1425 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open02 | rv | musl | ltp-musl | PASS | 0 | 1059 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open03 | rv | glibc | ltp-glibc | PASS | 0 | 1449 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open03 | rv | musl | ltp-musl | PASS | 0 | 1066 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe01 | rv | glibc | ltp-glibc | PASS | 0 | 1700 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe01 | rv | musl | ltp-musl | PASS | 0 | 892 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read01 | rv | glibc | ltp-glibc | PASS | 0 | 1394 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read01 | rv | musl | ltp-musl | PASS | 0 | 1046 | 0 | 0 | 0 | 0 | 0 | 0 |
+| read02 | rv | glibc | ltp-glibc | PASS | 0 | 1270 | 0 | 0 | 2 | 0 | 0 | 0 |
+| read02 | rv | musl | ltp-musl | PASS | 0 | 983 | 0 | 0 | 2 | 0 | 0 | 0 |
+| readlink01 | rv | glibc | ltp-glibc | PASS | 0 | 1447 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink01 | rv | musl | ltp-musl | PASS | 0 | 1306 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir01 | rv | glibc | ltp-glibc | PASS | 0 | 1291 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir01 | rv | musl | ltp-musl | PASS | 0 | 812 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat01 | rv | glibc | ltp-glibc | PASS | 0 | 1555 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat01 | rv | musl | ltp-musl | PASS | 0 | 1231 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat02 | rv | glibc | ltp-glibc | PASS | 0 | 1345 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat02 | rv | musl | ltp-musl | PASS | 0 | 1038 | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | rv | glibc | ltp-glibc | PASS | 0 | 1350 | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | rv | musl | ltp-musl | PASS | 0 | 895 | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | rv | glibc | ltp-glibc | PASS | 0 | 1665 | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | rv | musl | ltp-musl | PASS | 0 | 1524 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait401 | rv | glibc | ltp-glibc | PASS | 0 | 1501 | 0 | 0 | 0 | 0 | 0 | 0 |
+| wait401 | rv | musl | ltp-musl | PASS | 0 | 1091 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write01 | rv | glibc | ltp-glibc | PASS | 0 | 2629 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write01 | rv | musl | ltp-musl | PASS | 0 | 925 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write02 | rv | glibc | ltp-glibc | PASS | 0 | 1415 | 0 | 0 | 0 | 0 | 0 | 0 |
+| write02 | rv | musl | ltp-musl | PASS | 0 | 1084 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 86 (rv:glibc:access01, rv:musl:access01, rv:glibc:access03, rv:musl:access03, rv:glibc:brk01, rv:musl:brk01, rv:glibc:chdir01, rv:musl:chdir01, rv:glibc:chmod01, rv:musl:chmod01, rv:glibc:clone01, rv:musl:clone01, rv:glibc:close01, rv:musl:close01, rv:glibc:close02, rv:musl:close02, rv:glibc:creat01, rv:musl:creat01, rv:glibc:creat03, rv:musl:creat03, rv:glibc:dup01, rv:musl:dup01, rv:glibc:dup02, rv:musl:dup02, rv:glibc:fchmod01, rv:musl:fchmod01, rv:glibc:fcntl01, rv:musl:fcntl01, rv:glibc:fcntl02, rv:musl:fcntl02, rv:glibc:fcntl03, rv:musl:fcntl03, rv:glibc:fork01, rv:musl:fork01, rv:glibc:ftruncate01, rv:musl:ftruncate01, rv:glibc:getcwd01, rv:musl:getcwd01, rv:glibc:getegid01, rv:musl:getegid01, rv:glibc:geteuid01, rv:musl:geteuid01, rv:glibc:getgid01, rv:musl:getgid01, rv:glibc:getpid01, rv:musl:getpid01, rv:glibc:getpid02, rv:musl:getpid02, rv:glibc:getppid01, rv:musl:getppid01, rv:glibc:getuid01, rv:musl:getuid01, rv:glibc:lseek01, rv:musl:lseek01, rv:glibc:lstat01, rv:musl:lstat01, rv:glibc:mmap01, rv:musl:mmap01, rv:glibc:open01, rv:musl:open01, rv:glibc:open02, rv:musl:open02, rv:glibc:open03, rv:musl:open03, rv:glibc:pipe01, rv:musl:pipe01, rv:glibc:read01, rv:musl:read01, rv:glibc:readlink01, rv:musl:readlink01, rv:glibc:rmdir01, rv:musl:rmdir01, rv:glibc:stat01, rv:musl:stat01, rv:glibc:stat02, rv:musl:stat02, rv:glibc:symlink01, rv:musl:symlink01, rv:glibc:umask01, rv:musl:umask01, rv:glibc:wait401, rv:musl:wait401, rv:glibc:write01, rv:musl:write01, rv:glibc:write02, rv:musl:write02)
+- pass_with_tconf: 2 (rv:glibc:read02, rv:musl:read02)
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 44
+- FAIL: 0
+- Internal: {'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 44
+- FAIL: 0
+- Internal: {'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

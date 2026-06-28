@@ -1,0 +1,106 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post285-scout5-rv.log`
+
+- PASS LTP CASE: 2
+- FAIL LTP CASE: 28
+- Internal TFAIL/TBROK/TCONF: 40 ({'TFAIL': 20, 'TBROK': 16, 'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 1 passed, 14 failed
+- ltp-glibc: 1 passed, 14 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| lseek02 | rv | glibc | ltp-glibc | FAIL | 2 | 3878 | 256543 | 256529 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| lseek02 | rv | musl | ltp-musl | FAIL | 2 | 2937 | 256690 | 256676 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| lseek07 | rv | glibc | ltp-glibc | PASS | 0 | 4706 | 256529 | 256515 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek07 | rv | musl | ltp-musl | PASS | 0 | 2343 | 256676 | 256662 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | glibc | ltp-glibc | FAIL | 5 | 5237 | 256585 | 256571 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | musl | ltp-musl | FAIL | 5 | 3063 | 256732 | 256718 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat01 | rv | glibc | ltp-glibc | FAIL | 1 | 4975 | 256571 | 256557 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat01 | rv | musl | ltp-musl | FAIL | 1 | 3228 | 256718 | 256704 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | glibc | ltp-glibc | FAIL | 1 | 5073 | 256557 | 256543 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | musl | ltp-musl | FAIL | 1 | 2926 | 256704 | 256690 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| statx03 | rv | glibc | ltp-glibc | FAIL | 1 | 4054 | 256662 | 256648 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| statx03 | rv | musl | ltp-musl | FAIL | 1 | 3993 | 258857 | 256795 | -2062 | 2 | 0 | 0 | 0 | 0 | 0 |
+| statx04 | rv | glibc | ltp-glibc | FAIL | 6 | 4406 | 256648 | 256641 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx04 | rv | musl | ltp-musl | FAIL | 6 | 3203 | 256795 | 256788 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx05 | rv | glibc | ltp-glibc | FAIL | 32 | 4171 | 256641 | 256634 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx05 | rv | musl | ltp-musl | FAIL | 32 | 2567 | 256788 | 256781 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx06 | rv | glibc | ltp-glibc | FAIL | 6 | 4046 | 256634 | 256627 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx06 | rv | musl | ltp-musl | FAIL | 6 | 3440 | 256781 | 256774 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx07 | rv | glibc | ltp-glibc | FAIL | 32 | 4483 | 256627 | 256620 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx07 | rv | musl | ltp-musl | FAIL | 32 | 2334 | 256774 | 256767 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| statx08 | rv | glibc | ltp-glibc | FAIL | 6 | 3862 | 256620 | 256613 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx08 | rv | musl | ltp-musl | FAIL | 6 | 3453 | 256767 | 256760 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx09 | rv | glibc | ltp-glibc | FAIL | 2 | 3746 | 256613 | 256606 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx09 | rv | musl | ltp-musl | FAIL | 2 | 3055 | 256760 | 256753 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx10 | rv | glibc | ltp-glibc | FAIL | 6 | 4488 | 256606 | 256599 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx10 | rv | musl | ltp-musl | FAIL | 6 | 2331 | 256753 | 256746 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx11 | rv | glibc | ltp-glibc | FAIL | 6 | 4262 | 256599 | 256592 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx11 | rv | musl | ltp-musl | FAIL | 6 | 3342 | 256746 | 256739 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx12 | rv | glibc | ltp-glibc | FAIL | 6 | 4494 | 256592 | 256585 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx12 | rv | musl | ltp-musl | FAIL | 6 | 2963 | 256739 | 256732 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:glibc:lseek07, rv:musl:lseek07)
+- pass_with_tconf: 0
+- fail_wrapper: 28 (rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:readlinkat01, rv:musl:readlinkat01, rv:glibc:readlinkat02, rv:musl:readlinkat02, rv:glibc:statx03, rv:musl:statx03, rv:glibc:statx04, rv:musl:statx04, rv:glibc:statx05, rv:musl:statx05, rv:glibc:statx06, rv:musl:statx06, rv:glibc:statx07, rv:musl:statx07, rv:glibc:statx08, rv:musl:statx08, rv:glibc:statx09, rv:musl:statx09, rv:glibc:statx10, rv:musl:statx10, rv:glibc:statx11, rv:musl:statx11, rv:glibc:statx12, rv:musl:statx12)
+- internal_tfail: 8 (rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:readlinkat01, rv:musl:readlinkat01, rv:glibc:readlinkat02, rv:musl:readlinkat02, rv:glibc:statx03, rv:musl:statx03)
+- internal_tbrok: 16 (rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:statx04, rv:musl:statx04, rv:glibc:statx06, rv:musl:statx06, rv:glibc:statx08, rv:musl:statx08, rv:glibc:statx09, rv:musl:statx09, rv:glibc:statx10, rv:musl:statx10, rv:glibc:statx11, rv:musl:statx11, rv:glibc:statx12, rv:musl:statx12)
+- timeout: 0
+- enosys: 2 (rv:glibc:lseek02, rv:musl:lseek02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:statx03
+- ltp-musl:statx04
+- ltp-musl:statx05
+- ltp-musl:statx06
+- ltp-musl:statx07
+- ltp-musl:statx08
+- ltp-musl:statx09
+- ltp-musl:statx10
+- ltp-musl:statx11
+- ltp-musl:statx12
+- ltp-musl:readlink03
+- ltp-musl:readlinkat01
+- ltp-musl:readlinkat02
+- ltp-musl:lseek02
+- ltp-glibc:statx03
+- ltp-glibc:statx04
+- ltp-glibc:statx05
+- ltp-glibc:statx06
+- ltp-glibc:statx07
+- ltp-glibc:statx08
+- ltp-glibc:statx09
+- ltp-glibc:statx10
+- ltp-glibc:statx11
+- ltp-glibc:statx12
+- ltp-glibc:readlink03
+- ltp-glibc:readlinkat01
+- ltp-glibc:readlinkat02
+- ltp-glibc:lseek02
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 14
+- Internal: {'TFAIL': 10, 'TBROK': 8, 'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: statx03, statx04, statx05, statx06, statx07, statx08, statx09, statx10, statx11, statx12, readlink03, readlinkat01, readlinkat02, lseek02
+
+### ltp-glibc
+- PASS: 1
+- FAIL: 14
+- Internal: {'TFAIL': 10, 'TBROK': 8, 'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: statx03, statx04, statx05, statx06, statx07, statx08, statx09, statx10, statx11, statx12, readlink03, readlinkat01, readlinkat02, lseek02

@@ -1,0 +1,90 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-22/rv-getter-statfs-exit-candidates15.log`
+
+- PASS LTP CASE: 18
+- FAIL LTP CASE: 12
+- Internal TFAIL/TBROK/TCONF: 14 ({'TFAIL': 6, 'TBROK': 8})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 9 passed, 6 failed
+- ltp-glibc: 9 passed, 6 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| exit01 | rv | glibc | ltp-glibc | PASS | 0 | 1045 | 256621 | 256607 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit01 | rv | musl | ltp-musl | PASS | 0 | 908 | 258865 | 256803 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit02 | rv | glibc | ltp-glibc | PASS | 0 | 1128 | 256607 | 256586 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit02 | rv | musl | ltp-musl | PASS | 0 | 836 | 256803 | 256782 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit_group01 | rv | glibc | ltp-glibc | PASS | 0 | 1194 | 256586 | 256563 | -23 | 0 | 0 | 0 | 0 | 0 | 0 |
+| exit_group01 | rv | musl | ltp-musl | PASS | 0 | 996 | 256782 | 256761 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1105 | 252390 | 252383 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | musl | ltp-musl | FAIL | 6 | 815 | 256684 | 256677 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 1093 | 256563 | 256542 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 804 | 256761 | 256740 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgrp01 | rv | glibc | ltp-glibc | PASS | 0 | 1069 | 256542 | 256528 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgrp01 | rv | musl | ltp-musl | PASS | 0 | 875 | 256740 | 256726 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit01 | rv | glibc | ltp-glibc | PASS | 0 | 975 | 252369 | 252355 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit01 | rv | musl | ltp-musl | PASS | 0 | 843 | 256663 | 256649 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage01 | rv | glibc | ltp-glibc | PASS | 0 | 1131 | 252355 | 252341 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage01 | rv | musl | ltp-musl | PASS | 0 | 865 | 256649 | 256635 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getsid01 | rv | glibc | ltp-glibc | FAIL | 1 | 1128 | 256528 | 252418 | -4110 | 1 | 0 | 0 | 0 | 1 | 0 |
+| getsid01 | rv | musl | ltp-musl | FAIL | 1 | 825 | 256726 | 256712 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| gettid01 | rv | glibc | ltp-glibc | PASS | 0 | 1088 | 252418 | 252404 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettid01 | rv | musl | ltp-musl | PASS | 0 | 746 | 256712 | 256698 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_yield01 | rv | glibc | ltp-glibc | PASS | 0 | 1083 | 252341 | 252334 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_yield01 | rv | musl | ltp-musl | PASS | 0 | 845 | 256635 | 256628 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 940 | 252383 | 252376 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 828 | 256677 | 256670 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1013 | 252376 | 252369 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | musl | ltp-musl | FAIL | 6 | 911 | 256670 | 256663 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| sysinfo01 | rv | glibc | ltp-glibc | FAIL | 1 | 1028 | 252334 | 252327 | -7 | 1 | 0 | 0 | 0 | 1 | 0 |
+| sysinfo01 | rv | musl | ltp-musl | FAIL | 1 | 711 | 256628 | 256621 | -7 | 1 | 0 | 0 | 0 | 1 | 0 |
+| uname01 | rv | glibc | ltp-glibc | PASS | 0 | 1047 | 252404 | 252390 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| uname01 | rv | musl | ltp-musl | PASS | 0 | 808 | 256698 | 256684 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 18 (rv:glibc:exit01, rv:musl:exit01, rv:glibc:exit02, rv:musl:exit02, rv:glibc:exit_group01, rv:musl:exit_group01, rv:glibc:getpgrp01, rv:musl:getpgrp01, rv:glibc:getrlimit01, rv:musl:getrlimit01, rv:glibc:getrusage01, rv:musl:getrusage01, rv:glibc:gettid01, rv:musl:gettid01, rv:glibc:sched_yield01, rv:musl:sched_yield01, rv:glibc:uname01, rv:musl:uname01)
+- pass_with_tconf: 0
+- fail_wrapper: 12 (rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:getsid01, rv:musl:getsid01, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statvfs01, rv:musl:statvfs01, rv:glibc:sysinfo01, rv:musl:sysinfo01)
+- internal_tfail: 6 (rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:getsid01, rv:musl:getsid01, rv:glibc:sysinfo01, rv:musl:sysinfo01)
+- internal_tbrok: 8 (rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statvfs01, rv:musl:statvfs01)
+- timeout: 0
+- enosys: 4 (rv:glibc:getsid01, rv:musl:getsid01, rv:glibc:sysinfo01, rv:musl:sysinfo01)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getpgid01
+- ltp-musl:getsid01
+- ltp-musl:fstatfs01
+- ltp-musl:statfs01
+- ltp-musl:statvfs01
+- ltp-musl:sysinfo01
+- ltp-glibc:getpgid01
+- ltp-glibc:getsid01
+- ltp-glibc:fstatfs01
+- ltp-glibc:statfs01
+- ltp-glibc:statvfs01
+- ltp-glibc:sysinfo01
+
+## Groups
+### ltp-musl
+- PASS: 9
+- FAIL: 6
+- Internal: {'TFAIL': 3, 'TBROK': 4}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getpgid01, getsid01, fstatfs01, statfs01, statvfs01, sysinfo01
+
+### ltp-glibc
+- PASS: 9
+- FAIL: 6
+- Internal: {'TFAIL': 3, 'TBROK': 4}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getpgid01, getsid01, fstatfs01, statfs01, statvfs01, sysinfo01

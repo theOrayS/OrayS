@@ -1,0 +1,5 @@
+# df before 2026-06-19T11:04:59+08:00
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda2        59G   43G   14G  76% /
+/dev/vda2        59G   43G   14G  76% /
+/dev/vda2        59G   43G   14G  76% /

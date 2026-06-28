@@ -1,0 +1,154 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-primary30-rv-002.log`
+
+- PASS LTP CASE: 14
+- FAIL LTP CASE: 46
+- Internal TFAIL/TBROK/TCONF: 78 ({'TBROK': 40, 'TCONF': 2, 'TFAIL': 36})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 6 passed, 24 failed
+- ltp-glibc: 8 passed, 22 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| access02 | rv | glibc | ltp-glibc | PASS | 0 | 9632 | 252235 | 252137 | -98 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access02 | rv | musl | ltp-musl | PASS | 0 | 8613 | 258855 | 256709 | -2146 | 0 | 0 | 0 | 0 | 0 | 0 |
+| access04 | rv | glibc | ltp-glibc | FAIL | 2 | 3794 | 252137 | 252130 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| access04 | rv | musl | ltp-musl | FAIL | 2 | 2840 | 256709 | 256702 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod05 | rv | glibc | ltp-glibc | PASS | 0 | 3702 | 252130 | 252116 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod05 | rv | musl | ltp-musl | FAIL | 2 | 2799 | 256702 | 256688 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod06 | rv | glibc | ltp-glibc | FAIL | 2 | 3170 | 252116 | 252109 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod06 | rv | musl | ltp-musl | FAIL | 2 | 2953 | 256688 | 256681 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod07 | rv | glibc | ltp-glibc | FAIL | 2 | 3179 | 252109 | 252095 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod07 | rv | musl | ltp-musl | FAIL | 2 | 2512 | 256681 | 256667 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod02 | rv | glibc | ltp-glibc | FAIL | 2 | 3563 | 252095 | 252081 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod02 | rv | musl | ltp-musl | FAIL | 2 | 2779 | 256667 | 256653 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod05 | rv | glibc | ltp-glibc | PASS | 0 | 3768 | 252081 | 252067 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod05 | rv | musl | ltp-musl | FAIL | 2 | 2648 | 256653 | 256639 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod06 | rv | glibc | ltp-glibc | FAIL | 2 | 3406 | 252067 | 252060 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod06 | rv | musl | ltp-musl | FAIL | 2 | 2453 | 256639 | 256632 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmodat02 | rv | glibc | ltp-glibc | PASS | 0 | 3598 | 252060 | 252046 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmodat02 | rv | musl | ltp-musl | PASS | 0 | 3119 | 256632 | 256618 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | rv | glibc | ltp-glibc | PASS | 0 | 13729 | 251892 | 251857 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | rv | musl | ltp-musl | PASS | 0 | 13070 | 256464 | 256429 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap04 | rv | glibc | ltp-glibc | FAIL | 2 | 3494 | 251857 | 251843 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap04 | rv | musl | ltp-musl | FAIL | 2 | 2946 | 256429 | 256415 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap05 | rv | glibc | ltp-glibc | FAIL | 2 | 3650 | 251843 | 251829 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap05 | rv | musl | ltp-musl | FAIL | 2 | 2516 | 256415 | 256401 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap06 | rv | glibc | ltp-glibc | PASS | 0 | 2894 | 251829 | 251815 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap06 | rv | musl | ltp-musl | PASS | 0 | 2733 | 256401 | 252291 | -4110 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mprotect01 | rv | glibc | ltp-glibc | FAIL | 1 | 3394 | 251808 | 251801 | -7 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mprotect01 | rv | musl | ltp-musl | FAIL | 1 | 2565 | 252284 | 252277 | -7 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mprotect02 | rv | glibc | ltp-glibc | FAIL | 2 | 2665 | 251801 | 251787 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| mprotect02 | rv | musl | ltp-musl | FAIL | 2 | 2630 | 252277 | 252263 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| munmap01 | rv | glibc | ltp-glibc | FAIL | 139 | 3129 | 251815 | 251808 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| munmap01 | rv | musl | ltp-musl | FAIL | 139 | 2255 | 252291 | 252284 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| openat02 | rv | glibc | ltp-glibc | FAIL | 2 | 3430 | 251997 | 251983 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat02 | rv | musl | ltp-musl | FAIL | 2 | 2689 | 256569 | 256555 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat03 | rv | glibc | ltp-glibc | FAIL | 2 | 3463 | 251787 | 251780 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat03 | rv | musl | ltp-musl | FAIL | 2 | 2765 | 252263 | 252256 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| pipe2_02 | rv | glibc | ltp-glibc | PASS | 0 | 5958 | 251976 | 251948 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe2_02 | rv | musl | ltp-musl | PASS | 0 | 5164 | 256548 | 256520 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | glibc | ltp-glibc | PASS | 0 | 3445 | 252032 | 252018 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | musl | ltp-musl | PASS | 0 | 2335 | 256604 | 256590 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 3319 | 252018 | 252011 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 3172 | 256590 | 256583 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename03 | rv | glibc | ltp-glibc | FAIL | 6 | 2647 | 252011 | 252004 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename03 | rv | musl | ltp-musl | FAIL | 6 | 2394 | 256583 | 256576 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename04 | rv | glibc | ltp-glibc | FAIL | 6 | 3552 | 252004 | 251997 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename04 | rv | musl | ltp-musl | FAIL | 6 | 2237 | 256576 | 256569 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename05 | rv | glibc | ltp-glibc | FAIL | 6 | 2863 | 251780 | 251773 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename05 | rv | musl | ltp-musl | FAIL | 6 | 2709 | 252256 | 252249 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx01 | rv | glibc | ltp-glibc | FAIL | 2 | 3400 | 252046 | 252032 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| statx01 | rv | musl | ltp-musl | FAIL | 2 | 2848 | 256618 | 256604 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| statx03 | rv | glibc | ltp-glibc | FAIL | 1 | 3356 | 251773 | 251759 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statx03 | rv | musl | ltp-musl | FAIL | 1 | 2460 | 252249 | 252235 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| waitid07 | rv | glibc | ltp-glibc | FAIL | 1 | 3557 | 251948 | 251927 | -21 | 5 | 0 | 0 | 0 | 0 | 0 |
+| waitid07 | rv | musl | ltp-musl | FAIL | 1 | 2849 | 256520 | 256499 | -21 | 5 | 0 | 0 | 0 | 0 | 0 |
+| waitid08 | rv | glibc | ltp-glibc | FAIL | 1 | 4022 | 251927 | 251906 | -21 | 10 | 0 | 0 | 0 | 0 | 0 |
+| waitid08 | rv | musl | ltp-musl | FAIL | 1 | 2662 | 256499 | 256478 | -21 | 10 | 0 | 0 | 0 | 0 | 0 |
+| waitid10 | rv | glibc | ltp-glibc | FAIL | 2 | 3375 | 251906 | 251892 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| waitid10 | rv | musl | ltp-musl | FAIL | 2 | 2899 | 256478 | 256464 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| writev03 | rv | glibc | ltp-glibc | FAIL | 32 | 2723 | 251983 | 251976 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| writev03 | rv | musl | ltp-musl | FAIL | 32 | 2656 | 256555 | 256548 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 14 (rv:glibc:access02, rv:musl:access02, rv:glibc:chmod05, rv:glibc:fchmod05, rv:glibc:fchmodat02, rv:musl:fchmodat02, rv:glibc:kill02, rv:musl:kill02, rv:glibc:mmap06, rv:musl:mmap06, rv:glibc:pipe2_02, rv:musl:pipe2_02, rv:glibc:readlinkat02, rv:musl:readlinkat02)
+- pass_with_tconf: 0
+- fail_wrapper: 46 (rv:glibc:access04, rv:musl:access04, rv:musl:chmod05, rv:glibc:chmod06, rv:musl:chmod06, rv:glibc:chmod07, rv:musl:chmod07, rv:glibc:fchmod02, rv:musl:fchmod02, rv:musl:fchmod05, rv:glibc:fchmod06, rv:musl:fchmod06, rv:glibc:mmap04, rv:musl:mmap04, rv:glibc:mmap05, rv:musl:mmap05, rv:glibc:mprotect01, rv:musl:mprotect01, rv:glibc:mprotect02, rv:musl:mprotect02, rv:glibc:munmap01, rv:musl:munmap01, rv:glibc:openat02, rv:musl:openat02, rv:glibc:openat03, rv:musl:openat03, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename03, rv:musl:rename03, rv:glibc:rename04, rv:musl:rename04, rv:glibc:rename05, rv:musl:rename05, rv:glibc:statx01, rv:musl:statx01, rv:glibc:statx03, rv:musl:statx03, rv:glibc:waitid07, rv:musl:waitid07, rv:glibc:waitid08, rv:musl:waitid08, rv:glibc:waitid10, rv:musl:waitid10, rv:glibc:writev03, rv:musl:writev03)
+- internal_tfail: 8 (rv:glibc:mprotect01, rv:musl:mprotect01, rv:glibc:statx03, rv:musl:statx03, rv:glibc:waitid07, rv:musl:waitid07, rv:glibc:waitid08, rv:musl:waitid08)
+- internal_tbrok: 34 (rv:glibc:access04, rv:musl:access04, rv:musl:chmod05, rv:glibc:chmod06, rv:musl:chmod06, rv:glibc:chmod07, rv:musl:chmod07, rv:glibc:fchmod02, rv:musl:fchmod02, rv:musl:fchmod05, rv:glibc:fchmod06, rv:musl:fchmod06, rv:glibc:mmap04, rv:musl:mmap04, rv:glibc:mmap05, rv:musl:mmap05, rv:glibc:mprotect02, rv:musl:mprotect02, rv:glibc:openat02, rv:musl:openat02, rv:glibc:openat03, rv:musl:openat03, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename03, rv:musl:rename03, rv:glibc:rename04, rv:musl:rename04, rv:glibc:rename05, rv:musl:rename05, rv:glibc:statx01, rv:musl:statx01, rv:glibc:waitid10, rv:musl:waitid10)
+- timeout: 0
+- enosys: 2 (rv:glibc:statx01, rv:musl:statx01)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:access04
+- ltp-musl:chmod05
+- ltp-musl:chmod06
+- ltp-musl:chmod07
+- ltp-musl:fchmod02
+- ltp-musl:fchmod05
+- ltp-musl:fchmod06
+- ltp-musl:statx01
+- ltp-musl:rename01
+- ltp-musl:rename03
+- ltp-musl:rename04
+- ltp-musl:openat02
+- ltp-musl:writev03
+- ltp-musl:waitid07
+- ltp-musl:waitid08
+- ltp-musl:waitid10
+- ltp-musl:mmap04
+- ltp-musl:mmap05
+- ltp-musl:munmap01
+- ltp-musl:mprotect01
+- ltp-musl:mprotect02
+- ltp-musl:openat03
+- ltp-musl:rename05
+- ltp-musl:statx03
+- ltp-glibc:access04
+- ltp-glibc:chmod06
+- ltp-glibc:chmod07
+- ltp-glibc:fchmod02
+- ltp-glibc:fchmod06
+- ltp-glibc:statx01
+- ltp-glibc:rename01
+- ltp-glibc:rename03
+- ltp-glibc:rename04
+- ltp-glibc:openat02
+- ltp-glibc:writev03
+- ltp-glibc:waitid07
+- ltp-glibc:waitid08
+- ltp-glibc:waitid10
+- ltp-glibc:mmap04
+- ltp-glibc:mmap05
+- ltp-glibc:munmap01
+- ltp-glibc:mprotect01
+- ltp-glibc:mprotect02
+- ltp-glibc:openat03
+- ltp-glibc:rename05
+- ltp-glibc:statx03
+
+## Groups
+### ltp-musl
+- PASS: 6
+- FAIL: 24
+- Internal: {'TBROK': 21, 'TCONF': 1, 'TFAIL': 18}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: access04, chmod05, chmod06, chmod07, fchmod02, fchmod05, fchmod06, statx01, rename01, rename03, rename04, openat02, writev03, waitid07, waitid08, waitid10, mmap04, mmap05, munmap01, mprotect01, mprotect02, openat03, rename05, statx03
+
+### ltp-glibc
+- PASS: 8
+- FAIL: 22
+- Internal: {'TBROK': 19, 'TCONF': 1, 'TFAIL': 18}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: access04, chmod06, chmod07, fchmod02, fchmod06, statx01, rename01, rename03, rename04, openat02, writev03, waitid07, waitid08, waitid10, mmap04, mmap05, munmap01, mprotect01, mprotect02, openat03, rename05, statx03

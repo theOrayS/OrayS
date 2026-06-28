@@ -1,0 +1,52 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-la-sigsegv-waitstatus-001.log`
+
+- PASS LTP CASE: 8
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 0 failed
+- ltp-glibc: 4 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fstat03 | la | glibc | ltp-glibc | PASS | 0 | 4062 | 192195 | 192156 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstat03 | la | musl | ltp-musl | PASS | 0 | 2031 | 194403 | 192323 | -2080 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstat03_64 | la | glibc | ltp-glibc | PASS | 0 | 4566 | 192156 | 192117 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstat03_64 | la | musl | ltp-musl | PASS | 0 | 2572 | 192323 | 192291 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs02 | la | glibc | ltp-glibc | PASS | 0 | 3854 | 192042 | 192003 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs02 | la | musl | ltp-musl | PASS | 0 | 1917 | 192227 | 192195 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs02 | la | glibc | ltp-glibc | PASS | 0 | 5083 | 192117 | 192042 | -75 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs02 | la | musl | ltp-musl | PASS | 0 | 2567 | 192291 | 192227 | -64 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (la:glibc:fstat03, la:musl:fstat03, la:glibc:fstat03_64, la:musl:fstat03_64, la:glibc:fstatfs02, la:musl:fstatfs02, la:glibc:statfs02, la:musl:statfs02)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

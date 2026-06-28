@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES='fchown05 fchownat01 fcntl18 fcntl18_64 syscall01 kill02 readlinkat02 rename14 mknod02 mknod05 mknod06 mknod08 mknodat01' LTP_CASE_TIMEOUT_SECS=90 timeout 90m ./run-eval.sh la

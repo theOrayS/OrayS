@@ -1,0 +1,220 @@
+     1	use core::ffi::{c_int, c_void};
+     2
+     3	use arceos_posix_api::{sys_read, sys_write, sys_writev};
+     4
+     5	use crate::{ctypes, utils::e};
+     6
+     7	/// Read data from the file indicated by `fd`.
+     8	///
+     9	/// Return the read size if success.
+    10	#[unsafe(no_mangle)]
+    11	pub unsafe extern "C" fn read(fd: c_int, buf: *mut c_void, count: usize) -> ctypes::ssize_t {
+    12	    e(unsafe { sys_read(fd, buf, count) } as _) as _
+    13	}
+    14
+    15	/// Write data to the file indicated by `fd`.
+    16	///
+    17	/// Return the written size if success.
+    18	#[unsafe(no_mangle)]
+    19	#[cfg(not(test))]
+    20	pub unsafe extern "C" fn write(fd: c_int, buf: *const c_void, count: usize) -> ctypes::ssize_t {
+    21	    e(unsafe { sys_write(fd, buf, count) } as _) as _
+    22	}
+    23
+    24	/// Write a vector.
+    25	#[unsafe(no_mangle)]
+    26	pub unsafe extern "C" fn writev(
+    27	    fd: c_int,
+    28	    iov: *const ctypes::iovec,
+    29	    iocnt: c_int,
+    30	) -> ctypes::ssize_t {
+    31	    e(unsafe { sys_writev(fd, iov, iocnt) } as _) as _
+    32	}
+    33	use core::ffi::{c_char, c_int};
+    34
+    35	use arceos_posix_api::{
+    36	    sys_fstat, sys_getcwd, sys_lseek, sys_lstat, sys_open, sys_rename, sys_stat,
+    37	};
+    38
+    39	use crate::{ctypes, utils::e};
+    40
+    41	/// Open a file by `filename` and insert it into the file descriptor table.
+    42	///
+    43	/// Return its index in the file table (`fd`). Return `EMFILE` if it already
+    44	/// has the maximum number of files open.
+    45	#[unsafe(no_mangle)]
+    46	pub unsafe extern "C" fn ax_open(
+    47	    filename: *const c_char,
+    48	    flags: c_int,
+    49	    mode: ctypes::mode_t,
+    50	) -> c_int {
+    51	    e(unsafe { sys_open(filename, flags, mode) })
+    52	}
+    53
+    54	/// Set the position of the file indicated by `fd`.
+    55	///
+    56	/// Return its position after seek.
+    57	#[unsafe(no_mangle)]
+    58	pub unsafe extern "C" fn lseek(fd: c_int, offset: ctypes::off_t, whence: c_int) -> ctypes::off_t {
+    59	    e(sys_lseek(fd, offset, whence) as _) as _
+    60	}
+    61
+    62	/// Get the file metadata by `path` and write into `buf`.
+    63	///
+    64	/// Return 0 if success.
+    65	#[unsafe(no_mangle)]
+    66	pub unsafe extern "C" fn stat(path: *const c_char, buf: *mut ctypes::stat) -> c_int {
+    67	    e(unsafe { sys_stat(path, buf) })
+    68	}
+    69
+    70	/// Get file metadata by `fd` and write into `buf`.
+    71	///
+    72	/// Return 0 if success.
+    73	#[unsafe(no_mangle)]
+    74	pub unsafe extern "C" fn fstat(fd: c_int, buf: *mut ctypes::stat) -> c_int {
+    75	    e(unsafe { sys_fstat(fd, buf) })
+    76	}
+    77
+    78	/// Get the metadata of the symbolic link and write into `buf`.
+    79	///
+    80	/// Return 0 if success.
+    81	#[unsafe(no_mangle)]
+    82	pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut ctypes::stat) -> c_int {
+    83	    e(unsafe { sys_lstat(path, buf) } as _)
+    84	}
+    85
+    86	/// Get the path of the current directory.
+    87	#[unsafe(no_mangle)]
+    88	pub unsafe extern "C" fn getcwd(buf: *mut c_char, size: usize) -> *mut c_char {
+    89	    unsafe { sys_getcwd(buf, size) }
+    90	}
+    91
+    92	/// Rename `old` to `new`
+    93	/// If new exists, it is first removed.
+    94	///
+    95	/// Return 0 if the operation succeeds, otherwise return -1.
+    96	#[unsafe(no_mangle)]
+    97	pub unsafe extern "C" fn rename(old: *const c_char, new: *const c_char) -> c_int {
+    98	    e(unsafe { sys_rename(old, new) })
+    99	}
+   100	use crate::ctypes;
+   101	use arceos_posix_api as api;
+   102	use core::ffi::{c_int, c_void};
+   103
+   104	fn pthread_ret(ret: c_int) -> c_int {
+   105	    if ret < 0 {
+   106	        -ret
+   107	    } else {
+   108	        ret
+   109	    }
+   110	}
+   111
+   112	/// Returns the `pthread` struct of current thread.
+   113	#[unsafe(no_mangle)]
+   114	pub unsafe extern "C" fn pthread_self() -> ctypes::pthread_t {
+   115	    api::sys_pthread_self()
+   116	}
+   117
+   118	/// Create a new thread with the given entry point and argument.
+   119	///
+   120	/// If successful, it stores the pointer to the newly created `struct __pthread`
+   121	/// in `res` and returns 0.
+   122	#[unsafe(no_mangle)]
+   123	pub unsafe extern "C" fn pthread_create(
+   124	    res: *mut ctypes::pthread_t,
+   125	    attr: *const ctypes::pthread_attr_t,
+   126	    start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,
+   127	    arg: *mut c_void,
+   128	) -> c_int {
+   129	    pthread_ret(unsafe { api::sys_pthread_create(res, attr, start_routine, arg) })
+   130	}
+   131
+   132	/// Exits the current thread. The value `retval` will be returned to the joiner.
+   133	#[unsafe(no_mangle)]
+   134	pub unsafe extern "C" fn pthread_exit(retval: *mut c_void) -> ! {
+   135	    api::sys_pthread_exit(retval)
+   136	}
+   137
+   138	/// Waits for the given thread to exit, and stores the return value in `retval`.
+   139	#[unsafe(no_mangle)]
+   140	pub unsafe extern "C" fn pthread_join(
+   141	    thread: ctypes::pthread_t,
+   142	    retval: *mut *mut c_void,
+   143	) -> c_int {
+   144	    pthread_ret(unsafe { api::sys_pthread_join(thread, retval) })
+   145	}
+   146
+   147	/// Initialize a mutex.
+   148	#[unsafe(no_mangle)]
+   149	pub unsafe extern "C" fn pthread_mutex_init(
+   150	    mutex: *mut ctypes::pthread_mutex_t,
+   151	    attr: *const ctypes::pthread_mutexattr_t,
+   152	) -> c_int {
+   153	    pthread_ret(unsafe { api::sys_pthread_mutex_init(mutex, attr) })
+   154	}
+   155
+   156	/// Lock the given mutex.
+   157	#[unsafe(no_mangle)]
+   158	pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut ctypes::pthread_mutex_t) -> c_int {
+   159	    pthread_ret(unsafe { api::sys_pthread_mutex_lock(mutex) })
+   160	}
+   161
+   162	/// Unlock the given mutex.
+   163	#[unsafe(no_mangle)]
+   164	pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut ctypes::pthread_mutex_t) -> c_int {
+   165	    pthread_ret(unsafe { api::sys_pthread_mutex_unlock(mutex) })
+   166	}
+   167
+   168	/// Try to lock the given mutex without blocking.
+   169	#[unsafe(no_mangle)]
+   170	pub unsafe extern "C" fn ax_pthread_mutex_trylock(mutex: *mut ctypes::pthread_mutex_t) -> c_int {
+   171	    pthread_ret(unsafe { api::sys_pthread_mutex_trylock(mutex) })
+   172	}
+   173	use core::ffi::c_int;
+   174
+   175	use arceos_posix_api::{sys_getrlimit, sys_setrlimit};
+   176
+   177	use crate::utils::e;
+   178
+   179	/// Get resource limitations
+   180	#[unsafe(no_mangle)]
+   181	pub unsafe extern "C" fn getrlimit(resource: c_int, rlimits: *mut crate::ctypes::rlimit) -> c_int {
+   182	    e(unsafe { sys_getrlimit(resource, rlimits) })
+   183	}
+   184
+   185	/// Set resource limitations
+   186	#[unsafe(no_mangle)]
+   187	pub unsafe extern "C" fn setrlimit(resource: c_int, rlimits: *mut crate::ctypes::rlimit) -> c_int {
+   188	    e(unsafe { sys_setrlimit(resource, rlimits) })
+   189	}
+   190	use arceos_posix_api::{
+   191	    sys_accept, sys_bind, sys_connect, sys_freeaddrinfo, sys_getaddrinfo, sys_getpeername,
+   192	    sys_getsockname, sys_listen, sys_recv, sys_recvfrom, sys_send, sys_sendto, sys_shutdown,
+   193	    sys_socket,
+   194	};
+   195	use core::ffi::{c_char, c_int, c_void};
+   196
+   197	use crate::{ctypes, utils::e};
+   198
+   199	/// Create an socket for communication.
+   200	///
+   201	/// Return the socket file descriptor.
+   202	#[unsafe(no_mangle)]
+   203	pub unsafe extern "C" fn socket(domain: c_int, socktype: c_int, protocol: c_int) -> c_int {
+   204	    e(sys_socket(domain, socktype, protocol))
+   205	}
+   206
+   207	/// Bind a address to a socket.
+   208	///
+   209	/// Return 0 if success.
+   210	#[unsafe(no_mangle)]
+   211	pub unsafe extern "C" fn bind(
+   212	    socket_fd: c_int,
+   213	    socket_addr: *const ctypes::sockaddr,
+   214	    addrlen: ctypes::socklen_t,
+   215	) -> c_int {
+   216	    e(sys_bind(socket_fd, socket_addr, addrlen))
+   217	}
+   218
+   219	/// Connects the socket to the address specified.
+   220	///

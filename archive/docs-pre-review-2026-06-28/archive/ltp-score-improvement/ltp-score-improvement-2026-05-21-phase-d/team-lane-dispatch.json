@@ -1,0 +1,26 @@
+[
+  {
+    "worker": "worker-1",
+    "returncode": 0,
+    "stdout": "{\"schema_version\":\"1.0\",\"timestamp\":\"2026-05-21T16:14:36.429Z\",\"command\":\"omx team api send-message\",\"ok\":true,\"operation\":\"send-message\",\"data\":{\"message\":{\"message_id\":\"8c7b3128-3d8b-4a7e-8fd0-81b545812858\",\"from_worker\":\"leader-fixed\",\"to_worker\":\"worker-1\",\"body\":\"Lane assignment: own Discovery+Stats. Claim your explicit task if available; produce candidate matrix and first targeted batch recommendation under docs/ltp-score-improvement-2026-05-24/. No .omx/ultragoal mutation.\",\"created_at\":\"2026-05-21T16:14:36.695Z\",\"notified_at\":\"2026-05-21T16:14:40.175Z\"},\"dispatch\":{\"ok\":true,\"transport\":\"tmux_send_keys\",\"reason\":\"hook_timeout_fallback_confirmed:tmux_send_keys_sent\",\"request_id\":\"1eaf385d-5f06-461b-863b-736ad8fe3824\",\"message_id\":\"8c7b3128-3d8b-4a7e-8fd0-81b545812858\"}}}\n",
+    "stderr": ""
+  },
+  {
+    "worker": "worker-2",
+    "returncode": 0,
+    "stdout": "{\"schema_version\":\"1.0\",\"timestamp\":\"2026-05-21T16:14:44.692Z\",\"command\":\"omx team api send-message\",\"ok\":true,\"operation\":\"send-message\",\"data\":{\"message\":{\"message_id\":\"efb48d25-0da6-424c-a167-5a68c7379fbd\",\"from_worker\":\"leader-fixed\",\"to_worker\":\"worker-2\",\"body\":\"Lane assignment: own Proc/Wait/Session ABI. Focus getpgid01/getsid01/wait/getrlimit neighbors; no fake PASS/case-name hardcode; report evidence and blockers. No .omx/ultragoal mutation.\",\"created_at\":\"2026-05-21T16:14:45.027Z\",\"notified_at\":\"2026-05-21T16:14:48.412Z\"},\"dispatch\":{\"ok\":true,\"transport\":\"tmux_send_keys\",\"reason\":\"hook_timeout_fallback_confirmed:tmux_send_keys_sent\",\"request_id\":\"7525f72d-90dc-4a55-8517-1c3c30c729e0\",\"message_id\":\"efb48d25-0da6-424c-a167-5a68c7379fbd\"}}}\n",
+    "stderr": ""
+  },
+  {
+    "worker": "worker-3",
+    "returncode": 0,
+    "stdout": "{\"schema_version\":\"1.0\",\"timestamp\":\"2026-05-21T16:14:51.624Z\",\"command\":\"omx team api send-message\",\"ok\":true,\"operation\":\"send-message\",\"data\":{\"message\":{\"message_id\":\"a68e57e3-8787-4191-a0fa-8d0e84288b7c\",\"from_worker\":\"leader-fixed\",\"to_worker\":\"worker-3\",\"body\":\"Lane assignment: own Time/Signal ABI. Focus clock/nanosleep/pause/sigprocmask/sigsuspend/kill candidates; targeted evidence first. No .omx/ultragoal mutation.\",\"created_at\":\"2026-05-21T16:14:51.818Z\",\"notified_at\":\"2026-05-21T16:14:55.135Z\"},\"dispatch\":{\"ok\":true,\"transport\":\"tmux_send_keys\",\"reason\":\"hook_timeout_fallback_confirmed:tmux_send_keys_sent\",\"request_id\":\"d10c5b01-34c2-42e2-82f1-fd2ff4f8c85a\",\"message_id\":\"a68e57e3-8787-4191-a0fa-8d0e84288b7c\"}}}\n",
+    "stderr": ""
+  },
+  {
+    "worker": "worker-4",
+    "returncode": 0,
+    "stdout": "{\"schema_version\":\"1.0\",\"timestamp\":\"2026-05-21T16:14:58.676Z\",\"command\":\"omx team api send-message\",\"ok\":true,\"operation\":\"send-message\",\"data\":{\"message\":{\"message_id\":\"d3002f2f-7b6a-471c-80b2-0976e4630420\",\"from_worker\":\"leader-fixed\",\"to_worker\":\"worker-4\",\"body\":\"Lane assignment: own FS/Metadata plus verification audit. Focus access/link/rename/unlink/mkdir/lseek/pipe/dup/statfs/sysinfo and no-fake audit. No .omx/ultragoal mutation.\",\"created_at\":\"2026-05-21T16:14:59.054Z\",\"notified_at\":\"2026-05-21T16:15:02.544Z\"},\"dispatch\":{\"ok\":true,\"transport\":\"tmux_send_keys\",\"reason\":\"hook_timeout_fallback_confirmed:tmux_send_keys_sent\",\"request_id\":\"46c1ee0e-3613-4a08-90c5-fdf9f3f8b2bb\",\"message_id\":\"d3002f2f-7b6a-471c-80b2-0976e4630420\"}}}\n",
+    "stderr": ""
+  }
+]

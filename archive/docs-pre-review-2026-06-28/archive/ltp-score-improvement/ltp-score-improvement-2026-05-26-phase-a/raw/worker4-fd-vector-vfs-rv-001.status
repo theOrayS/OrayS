@@ -1,0 +1,3 @@
+arch=rv
+cases=preadv01,preadv02,pwritev01,pwritev02,unlink07
+run-eval rc=0

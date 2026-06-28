@@ -1,0 +1,10 @@
+gettid02
+dup05
+pread02
+pwrite02
+pwrite04
+readlink03
+fstat02
+ftruncate04
+mmap04
+sysinfo03

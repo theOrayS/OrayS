@@ -1,4 +1,0 @@
-command=OSCOMP_TEST_GROUPS=ltp LTP_CASES=getcwd02,gethostname02,write05,alarm05,alarm07,sched_getscheduler02,gettid02 LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv
-exit=0
-log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-near-clean-rv-20260524T144731+0800.log
-cases=getcwd02,gethostname02,write05,alarm05,alarm07,sched_getscheduler02,gettid02

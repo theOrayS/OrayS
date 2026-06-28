@@ -1,0 +1,6 @@
+# df after cleanup 2026-06-19T12:51:04+08:00
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda2        59G   43G   14G  76% /
+/dev/vda2        59G   43G   14G  76% /
+/dev/vda2        59G   43G   14G  76% /
+11M	/root/oskernel-eval-runs/g007-official-local-20260619-110459

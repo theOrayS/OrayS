@@ -1,0 +1,120 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-fill19-rv-001.log`
+
+- PASS LTP CASE: 4
+- FAIL LTP CASE: 34
+- Internal TFAIL/TBROK/TCONF: 42 ({'TCONF': 4, 'TBROK': 22, 'TFAIL': 16})
+- timeout matches: 2
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 2 passed, 17 failed
+- ltp-glibc: 2 passed, 17 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| close_range01 | rv | glibc | ltp-glibc | FAIL | 6 | 2728 | 256422 | 256415 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| close_range01 | rv | musl | ltp-musl | FAIL | 6 | 2712 | 256646 | 256639 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fdatasync03 | rv | glibc | ltp-glibc | FAIL | 6 | 2801 | 256457 | 256450 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fdatasync03 | rv | musl | ltp-musl | FAIL | 6 | 2652 | 256681 | 256674 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstat02 | rv | glibc | ltp-glibc | FAIL | 2 | 2567 | 256499 | 256485 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fstat02 | rv | musl | ltp-musl | FAIL | 2 | 1751 | 256723 | 256709 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fstatfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1895 | 256366 | 256359 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | musl | ltp-musl | FAIL | 6 | 1638 | 256590 | 256583 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fsync01 | rv | glibc | ltp-glibc | FAIL | 6 | 2788 | 256464 | 256457 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fsync01 | rv | musl | ltp-musl | FAIL | 6 | 2197 | 256688 | 256681 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | glibc | ltp-glibc | FAIL | 2 | 1952 | 256471 | 256464 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | musl | ltp-musl | FAIL | 2 | 1329 | 256695 | 256688 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getrusage02 | rv | glibc | ltp-glibc | PASS | 0 | 3016 | 256583 | 256562 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage02 | rv | musl | ltp-musl | PASS | 0 | 3229 | 258855 | 256786 | -2069 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage03 | rv | glibc | ltp-glibc | FAIL | 32 | 4894 | 256562 | 256541 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage03 | rv | musl | ltp-musl | FAIL | 32 | 4007 | 256786 | 256765 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage04 | rv | glibc | ltp-glibc | FAIL | 137 | 46729 | 256541 | 256513 | -28 | 0 | 0 | 0 | 1 | 0 | 0 |
+| getrusage04 | rv | musl | ltp-musl | FAIL | 137 | 46386 | 256765 | 256737 | -28 | 0 | 0 | 0 | 1 | 0 | 0 |
+| lstat02 | rv | glibc | ltp-glibc | FAIL | 1 | 2587 | 256485 | 256471 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| lstat02 | rv | musl | ltp-musl | FAIL | 1 | 2437 | 256709 | 256695 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| mprotect03 | rv | glibc | ltp-glibc | FAIL | 1 | 3077 | 256380 | 256366 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| mprotect03 | rv | musl | ltp-musl | FAIL | 1 | 1425 | 256604 | 256590 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| munmap02 | rv | glibc | ltp-glibc | FAIL | 139 | 2811 | 256387 | 256380 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| munmap02 | rv | musl | ltp-musl | FAIL | 139 | 1923 | 256611 | 256604 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| poll01 | rv | glibc | ltp-glibc | PASS | 0 | 2520 | 256450 | 256436 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| poll01 | rv | musl | ltp-musl | PASS | 0 | 2354 | 256674 | 256660 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | glibc | ltp-glibc | FAIL | 1 | 2586 | 256401 | 256387 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | musl | ltp-musl | FAIL | 1 | 2858 | 256625 | 256611 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| select01 | rv | glibc | ltp-glibc | FAIL | 6 | 2747 | 256436 | 256422 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| select01 | rv | musl | ltp-musl | FAIL | 6 | 2288 | 256660 | 256646 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 2488 | 256408 | 256401 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 1969 | 256632 | 256625 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| sync01 | rv | glibc | ltp-glibc | FAIL | 6 | 3164 | 256415 | 256408 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| sync01 | rv | musl | ltp-musl | FAIL | 6 | 2149 | 256639 | 256632 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime01 | rv | glibc | ltp-glibc | FAIL | 6 | 2766 | 256513 | 256506 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime01 | rv | musl | ltp-musl | FAIL | 6 | 2457 | 256737 | 256730 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime02 | rv | glibc | ltp-glibc | FAIL | 6 | 2966 | 256506 | 256499 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime02 | rv | musl | ltp-musl | FAIL | 6 | 2533 | 256730 | 256723 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:glibc:poll01, rv:musl:poll01)
+- pass_with_tconf: 2 (rv:glibc:getrusage02, rv:musl:getrusage02)
+- fail_wrapper: 34 (rv:glibc:close_range01, rv:musl:close_range01, rv:glibc:fdatasync03, rv:musl:fdatasync03, rv:glibc:fstat02, rv:musl:fstat02, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:fsync01, rv:musl:fsync01, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:getrusage03, rv:musl:getrusage03, rv:glibc:getrusage04, rv:musl:getrusage04, rv:glibc:lstat02, rv:musl:lstat02, rv:glibc:mprotect03, rv:musl:mprotect03, rv:glibc:munmap02, rv:musl:munmap02, rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:select01, rv:musl:select01, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:sync01, rv:musl:sync01, rv:glibc:utime01, rv:musl:utime01, rv:glibc:utime02, rv:musl:utime02)
+- internal_tfail: 6 (rv:glibc:lstat02, rv:musl:lstat02, rv:glibc:mprotect03, rv:musl:mprotect03, rv:glibc:readlink03, rv:musl:readlink03)
+- internal_tbrok: 22 (rv:glibc:close_range01, rv:musl:close_range01, rv:glibc:fdatasync03, rv:musl:fdatasync03, rv:glibc:fstat02, rv:musl:fstat02, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:fsync01, rv:musl:fsync01, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:select01, rv:musl:select01, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:sync01, rv:musl:sync01, rv:glibc:utime01, rv:musl:utime01, rv:glibc:utime02, rv:musl:utime02)
+- timeout: 2 (rv:glibc:getrusage04, rv:musl:getrusage04)
+- enosys: 4 (rv:glibc:fstat02, rv:musl:fstat02, rv:glibc:select01, rv:musl:select01)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getrusage03
+- ltp-musl:getrusage04
+- ltp-musl:utime01
+- ltp-musl:utime02
+- ltp-musl:fstat02
+- ltp-musl:lstat02
+- ltp-musl:ftruncate04
+- ltp-musl:fsync01
+- ltp-musl:fdatasync03
+- ltp-musl:select01
+- ltp-musl:close_range01
+- ltp-musl:sync01
+- ltp-musl:statfs01
+- ltp-musl:readlink03
+- ltp-musl:munmap02
+- ltp-musl:mprotect03
+- ltp-musl:fstatfs01
+- ltp-glibc:getrusage03
+- ltp-glibc:getrusage04
+- ltp-glibc:utime01
+- ltp-glibc:utime02
+- ltp-glibc:fstat02
+- ltp-glibc:lstat02
+- ltp-glibc:ftruncate04
+- ltp-glibc:fsync01
+- ltp-glibc:fdatasync03
+- ltp-glibc:select01
+- ltp-glibc:close_range01
+- ltp-glibc:sync01
+- ltp-glibc:statfs01
+- ltp-glibc:readlink03
+- ltp-glibc:munmap02
+- ltp-glibc:mprotect03
+- ltp-glibc:fstatfs01
+
+## Groups
+### ltp-musl
+- PASS: 2
+- FAIL: 17
+- Internal: {'TCONF': 2, 'TBROK': 11, 'TFAIL': 8}
+- timeout: 1
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getrusage03, getrusage04, utime01, utime02, fstat02, lstat02, ftruncate04, fsync01, fdatasync03, select01, close_range01, sync01, statfs01, readlink03, munmap02, mprotect03, fstatfs01
+
+### ltp-glibc
+- PASS: 2
+- FAIL: 17
+- Internal: {'TCONF': 2, 'TBROK': 11, 'TFAIL': 8}
+- timeout: 1
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getrusage03, getrusage04, utime01, utime02, fstat02, lstat02, ftruncate04, fsync01, fdatasync03, select01, close_range01, sync01, statfs01, readlink03, munmap02, mprotect03, fstatfs01

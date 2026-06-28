@@ -1,0 +1,18 @@
+--- before ---
+ 171032 3433682  171032 Ts         34:14 bash            /bin/bash -c set -o pipefail OUT=docs/self-check-recheck-2026-06-19/raw {   echo "START $(date -Is)"   timeout 2400 ./run-eval.sh rv   rc=$?   echo "END $(date -Is) rc=$rc"   exit $rc } 2>&1 | tee "$OUT/g005-run-eval-rv.log" printf '%s\n' "${PIPESTATUS[0]}" > "$OUT/g005-run-eval-rv.status"
+ 171034  171032  171032 S          34:14 bash            /bin/bash -c set -o pipefail OUT=docs/self-check-recheck-2026-06-19/raw {   echo "START $(date -Is)"   timeout 2400 ./run-eval.sh rv   rc=$?   echo "END $(date -Is) rc=$rc"   exit $rc } 2>&1 | tee "$OUT/g005-run-eval-rv.log" printf '%s\n' "${PIPESTATUS[0]}" > "$OUT/g005-run-eval-rv.status"
+ 171035  171032  171032 S          34:14 tee             tee docs/self-check-recheck-2026-06-19/raw/g005-run-eval-rv.log
+ 171037  171034  171037 S          34:14 timeout         timeout 2400 ./run-eval.sh rv
+ 171038  171037  171037 S          34:14 bash            bash ./run-eval.sh rv
+ 171865  171041  171037 Sl         33:29 qemu-system-ris qemu-system-riscv64 -machine virt -kernel /root/oskernel2026-orays/kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=/tmp/arceos-sdcard-rv.run.qcow2,if=none,format=qcow2,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
+ 194103  194101  194101 S          00:00 tee             tee docs/self-check-recheck-2026-06-19/raw/g005-rv-timeout-paused-correction.txt
+actual_timeout_pid=171037
+STOPPED actual timeout pid=171037 at 2026-06-19T20:27:19+08:00
+--- after ---
+ 171032 3433682  171032 Ts         34:14 bash            /bin/bash -c set -o pipefail OUT=docs/self-check-recheck-2026-06-19/raw {   echo "START $(date -Is)"   timeout 2400 ./run-eval.sh rv   rc=$?   echo "END $(date -Is) rc=$rc"   exit $rc } 2>&1 | tee "$OUT/g005-run-eval-rv.log" printf '%s\n' "${PIPESTATUS[0]}" > "$OUT/g005-run-eval-rv.status"
+ 171034  171032  171032 S          34:14 bash            /bin/bash -c set -o pipefail OUT=docs/self-check-recheck-2026-06-19/raw {   echo "START $(date -Is)"   timeout 2400 ./run-eval.sh rv   rc=$?   echo "END $(date -Is) rc=$rc"   exit $rc } 2>&1 | tee "$OUT/g005-run-eval-rv.log" printf '%s\n' "${PIPESTATUS[0]}" > "$OUT/g005-run-eval-rv.status"
+ 171035  171032  171032 S          34:14 tee             tee docs/self-check-recheck-2026-06-19/raw/g005-run-eval-rv.log
+ 171037  171034  171037 T          34:14 timeout         timeout 2400 ./run-eval.sh rv
+ 171038  171037  171037 S          34:14 bash            bash ./run-eval.sh rv
+ 171865  171041  171037 Sl         33:29 qemu-system-ris qemu-system-riscv64 -machine virt -kernel /root/oskernel2026-orays/kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=/tmp/arceos-sdcard-rv.run.qcow2,if=none,format=qcow2,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
+ 194103  194101  194101 S          00:00 tee             tee docs/self-check-recheck-2026-06-19/raw/g005-rv-timeout-paused-correction.txt

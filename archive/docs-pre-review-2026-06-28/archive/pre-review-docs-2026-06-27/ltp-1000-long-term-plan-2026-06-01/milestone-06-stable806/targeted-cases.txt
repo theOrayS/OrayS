@@ -1,0 +1,938 @@
+# milestone-06 stable806 targeted/scouted cases (case unit)
+
+# RV proc/synthetic/sched scout, 2026-06-03
+utsname02
+utsname03
+sysinfo03
+getrusage02
+getrusage03
+getrusage04
+prctl02
+prctl03
+prctl04
+prctl06
+prctl07
+prctl08
+prctl09
+prctl10
+setrlimit06
+setpriority01
+nice04
+
+# RV time/fd/signal scout, 2026-06-03
+epoll_create01
+epoll_create02
+eventfd06
+timerfd04
+timer_delete01
+timer_delete02
+timer_getoverrun01
+timer_gettime01
+timer_settime01
+timer_settime02
+timer_settime03
+clock_gettime01
+clock_gettime03
+clock_nanosleep01
+clock_nanosleep03
+setitimer01
+sigtimedwait01
+sigwait01
+sigwaitinfo01
+
+# RV/LA timerslack targeted retest, 2026-06-03 (retested cases from proc/synthetic/sched scout)
+prctl08
+prctl09
+
+# RV socket core broad scout, 2026-06-03 (partial/blocker-only; not promotion evidence)
+accept02
+accept03
+accept4_01
+bind01
+bind02
+bind03
+bind04
+bind05
+bind06
+connect01
+connect02
+getsockopt02
+setsockopt02
+setsockopt03
+setsockopt04
+setsockopt05
+setsockopt06
+recv01
+recvfrom01
+recvmsg01
+send01
+send02
+sendto01
+sendto02
+sendto03
+sockioctl01
+
+# RV/LA UTS shared-hostname targeted retest, 2026-06-03
+utsname01
+utsname02
+
+# RV/LA UTS adjacent stable regression subset, 2026-06-03
+gethostname01
+sethostname01
+sethostname02
+sethostname03
+uname01
+uname02
+uname04
+newuname01
+utsname01
+utsname04
+
+# RV/LA readlink near-clean blocker triage, 2026-06-03 (blocked on LA musl; not promotion evidence)
+readlink03
+readlinkat02
+
+# RV statx VFS scout, 2026-06-03 (blocker-only; not promotion evidence)
+statx01
+statx04
+statx05
+statx06
+statx07
+statx08
+statx09
+statx10
+statx11
+statx12
+
+# RV credential/capability scout, 2026-06-03 (blocker-only; not promotion evidence)
+gettid02
+getuid01_16
+getuid03_16
+setuid01_16
+setuid03_16
+setuid04_16
+capget01
+capget02
+capset01
+capset02
+capset03
+capset04
+
+# RV VFS/FD/select scout, 2026-06-03 (blocker-only; not promotion evidence)
+unlink09
+rename11
+renameat01
+symlink03
+mknod07
+mknodat02
+mkdir02
+mkdir03
+mkdir09
+mkdirat02
+rmdir02
+openat03
+openat04
+fcntl17
+fcntl17_64
+fcntl24
+fcntl24_64
+fcntl25
+fcntl25_64
+fcntl26
+fcntl26_64
+fcntl27
+fcntl27_64
+select01
+select02
+select03
+select04
+
+
+# RV VFS parent-symlink/rmdir targeted repair retest, 2026-06-03
+unlink09
+symlink03
+mkdir02
+mkdir03
+mkdir09
+mkdirat02
+rmdir02
+mknod07
+mknodat02
+
+# LA VFS parent-symlink/rmdir candidate retest, 2026-06-03
+mkdirat02
+rmdir02
+
+# RV/LA VFS parent-symlink/rmdir adjacent stable regression subset, 2026-06-03
+mkdir04
+mkdir05
+mkdirat01
+rmdir01
+rmdir03
+unlink05
+unlink07
+unlink08
+unlinkat01
+symlink01
+symlink02
+symlink04
+symlinkat01
+mknod01
+mknod02
+mknod03
+mknod04
+mknod05
+mknod06
+mknod08
+mknod09
+mknodat01
+rename01
+rename03
+rename04
+rename05
+rename06
+rename07
+rename08
+rename09
+rename10
+rename12
+rename13
+rename14
+renameat201
+renameat202
+
+# RV/LA mkdir setgid/final-symlink targeted repair retest, 2026-06-03
+mkdir02
+mkdir03
+mkdirat02
+rmdir02
+
+# RV/LA mkdir setgid/final-symlink adjacent stable regression subset, 2026-06-03
+chmod01
+chmod05
+fchmod01
+fchmod05
+fchmodat02
+chown01
+chown02
+chown03
+chown05
+fchown01
+fchown02
+fchown03
+fchown05
+fchownat01
+open10
+creat08
+creat09
+mkdir04
+mkdir05
+mkdirat01
+mknod01
+mknod02
+mknod03
+mknod04
+mknod05
+mknod06
+mknod08
+mknod09
+mknodat01
+symlink01
+symlink02
+symlink04
+symlinkat01
+rmdir01
+rmdir03
+
+# RV VFS/FD isolation scout after mkdir repair, 2026-06-03 (blocker-only except fcntl27 root cause)
+symlink03
+mkdir09
+fcntl27
+
+# RV/LA fcntl27 read-lease targeted repair retest, 2026-06-03
+fcntl27
+
+# RV/LA fcntl27 adjacent stable regression subset, 2026-06-03
+fcntl01
+fcntl02
+fcntl03
+fcntl04
+fcntl08
+fcntl09
+fcntl10
+fcntl16
+fcntl29
+fcntl01_64
+fcntl02_64
+fcntl03_64
+fcntl04_64
+fcntl08_64
+fcntl09_64
+fcntl10_64
+fcntl16_64
+fcntl29_64
+fcntl23
+fcntl23_64
+fcntl05
+fcntl05_64
+fcntl12
+fcntl12_64
+fcntl13
+fcntl13_64
+fcntl07
+fcntl07_64
+fcntl18
+fcntl18_64
+fcntl11
+fcntl14
+fcntl19
+fcntl22
+fcntl19_64
+fcntl20
+fcntl20_64
+fcntl21
+fcntl21_64
+fcntl22_64
+fcntl30
+fcntl11_64
+fcntl15
+fcntl14_64
+fcntl15_64
+fcntl30_64
+fcntl35
+fcntl35_64
+fcntl27
+# RV/LA fcntl27_64 read-lease targeted repair retest, 2026-06-03
+fcntl27_64
+
+
+# RV/LA symlink03 tmpdir and parent permission targeted repair retest, 2026-06-03
+symlink03
+
+# RV/LA symlink03 adjacent stable regression subset, 2026-06-03
+access01
+access02
+access03
+access04
+faccessat01
+faccessat02
+chmod01
+chmod03
+chmod05
+symlink01
+symlink02
+symlink04
+symlinkat01
+readlink01
+readlinkat01
+link02
+linkat01
+unlinkat01
+rmdir01
+mkdir04
+
+# RV/LA unlink09 FS_IOC inode-flags targeted repair retest, 2026-06-03
+unlink09
+
+# RV/LA unlink09 FS_IOC inode-flags adjacent stable regression subset, 2026-06-03
+access01
+access02
+access03
+access04
+faccessat01
+faccessat02
+chmod01
+chmod03
+chmod05
+symlink01
+symlink02
+symlink04
+symlinkat01
+readlink01
+readlinkat01
+link02
+linkat01
+unlink05
+unlink07
+unlinkat01
+rmdir01
+mkdir04
+unlink09
+
+
+# RV mkdir09 current blocker retest before futex bitset repair, 2026-06-03
+mkdir09
+
+# RV/LA mkdir09 futex bitset targeted repair retest, 2026-06-03
+mkdir09
+
+# RV/LA futex bitset adjacent stable regression subset, 2026-06-03
+futex_wait01
+futex_wait02
+futex_wait03
+futex_wait04
+futex_wait05
+futex_wake01
+futex_wake03
+clone01
+clone03
+clone06
+clone07
+
+# gettid02 follow-up after futex bitset repair (2026-06-03)
+gettid02
+# RV: target/ltp-1000-milestone-06-stable806/rv-gettid02-after-futex-bitset-20260603T224424+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# LA: target/ltp-1000-milestone-06-stable806/la-gettid02-after-futex-bitset-20260603T224549+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/rv-la-gettid02-after-futex-bitset-20260603T224549+0800.promotion-candidates.txt — four-combo clean candidate.
+
+
+# RV futex adjacent scout after futex bitset repair (2026-06-03; blocker-only except futex_wait_bitset01)
+futex_wait_bitset01
+futex_wake02
+futex_wake04
+futex_cmp_requeue01
+futex_cmp_requeue02
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-futex-adjacent-scout-20260603T225625+0800.summary.txt — 2 PASS / 8 FAIL; wake/requeue rows have visible TBROK/TCONF and are not candidates.
+
+# LA futex_wait_bitset01 follow-up (2026-06-03)
+futex_wait_bitset01
+# LA summary: target/ltp-1000-milestone-06-stable806/la-futex-wait-bitset01-followup-20260603T225741+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/rv-la-futex-wait-bitset01-followup-20260603T225741+0800.promotion-candidates.txt — four-combo clean candidate.
+
+# RV clone adjacent scout (2026-06-03; blocker-only)
+clone02
+clone04
+clone05
+clone08
+clone09
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-clone-adjacent-scout-20260603T225857+0800.summary.txt — 1 PASS / 9 FAIL with TFAIL/TBROK/ENOSYS; zero candidates.
+
+# RV FD/vector-IO scout (2026-06-03; blocker-only)
+writev03
+preadv03
+preadv03_64
+preadv203
+preadv203_64
+pwritev03
+pwritev03_64
+sendfile09
+sendfile09_64
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-vector-io-scout-20260603T225958+0800.summary.txt — 0 PASS / 18 FAIL with TCONF=18; zero candidates.
+
+
+# RV VFS/MM small scout (2026-06-03; blocker-only except RV-only mmap05, later LA-blocked)
+rename11
+renameat01
+linkat02
+getdents01
+getdents02
+utimensat01
+utimes01
+mprotect01
+mprotect03
+msync01
+msync02
+msync03
+msync04
+mmap05
+mmap08
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-vfs-mm-small-scout-20260603T230922+0800.summary.txt — 4 PASS / 26 FAIL; only mmap05 was RV-clean.
+
+# LA mmap05 follow-up (2026-06-03; blocker-only)
+mmap05
+# LA summary: target/ltp-1000-milestone-06-stable806/la-mmap05-followup-20260603T231053+0800.summary.txt — 0 PASS / 2 FAIL / TFAIL=2; no candidate.
+
+# RV process/exec/signal scout (2026-06-03; blocker-only, allocator panic marker)
+getpgid01
+setpgid03
+setsid01
+kill05
+kill10
+kill13
+signal06
+sigpending02
+sigrelse01
+nanosleep02
+execve01
+execve02
+execve03
+execve04
+execve05
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-process-exec-signal-scout-20260603T231200+0800.summary.txt — 1 PASS / 3 FAIL before panic marker; zero candidates.
+
+# RV exec-only scout (2026-06-03; blocker-only)
+execl01
+execle01
+execlp01
+execv01
+execvp01
+execve01
+execve02
+execve03
+execve04
+execve05
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-exec-small-scout-20260603T231306+0800.summary.txt — 2 PASS / 18 FAIL with visible TBROK/TFAIL; zero candidates.
+
+# RV FD/path small scout (2026-06-03; fstat02/fstat02_64 RV-clean, others blocker-only)
+fstat02
+fstat02_64
+getcwd03
+getcwd04
+close_range01
+close_range02
+openat03
+openat04
+open14
+creat07
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-path-small-scout-20260603T231708+0800.summary.txt — 4 PASS / 16 FAIL; RV candidates fstat02/fstat02_64.
+
+# LA fstat02/fstat02_64 follow-up (2026-06-03)
+fstat02
+fstat02_64
+# LA summary: target/ltp-1000-milestone-06-stable806/la-fstat02-followup-20260603T231936+0800.summary.txt — 4 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/combined-fstat02-fourway-20260603T232030+0800.promotion-candidates.txt — four-combo clean candidates.
+
+
+# RV sync/fd/io scout (2026-06-03; blocker-only)
+fdatasync03
+fsync03
+fsync04
+sync01
+syncfs01
+sync_file_range01
+sync_file_range02
+read03
+write04
+lseek11
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-sync-fd-io-scout-20260603T232921+0800.summary.txt — 0 PASS / 20 FAIL; zero candidates.
+
+# RV xattr small scout (2026-06-03; blocker-only)
+fgetxattr02
+fsetxattr02
+getxattr02
+getxattr03
+getxattr04
+getxattr05
+setxattr02
+setxattr03
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-small-scout-20260603T233055+0800.summary.txt — 0 PASS / 16 FAIL; zero candidates.
+
+# RV/LA setxattr03 immutable/append-only xattr mutation targeted repair retest (2026-06-03)
+setxattr03
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-setxattr03-followup-20260603T234026+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# LA summary: target/ltp-1000-milestone-06-stable806/la-setxattr03-followup-20260603T234111+0800.summary.txt — 2 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/combined-setxattr03-fourway-20260603T234153+0800.promotion-candidates.txt — four-combo clean candidate.
+
+# RV/LA xattr adjacent stable regression subset (2026-06-03)
+fgetxattr01
+fgetxattr03
+flistxattr01
+flistxattr02
+flistxattr03
+fremovexattr01
+fremovexattr02
+fsetxattr01
+getxattr01
+lgetxattr01
+lgetxattr02
+listxattr01
+listxattr02
+listxattr03
+llistxattr01
+llistxattr02
+llistxattr03
+lremovexattr01
+removexattr01
+removexattr02
+setxattr01
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-stable-regression-20260603T234206+0800.summary.txt — 42 PASS / 0 FAIL / 0 internal markers.
+# LA summary: target/ltp-1000-milestone-06-stable806/la-xattr-stable-regression-20260603T234337+0800.summary.txt — 42 PASS / 0 FAIL / 0 internal markers.
+
+
+# RV/LA xattr special-node / AF_UNIX pathname socket targeted repair retest (2026-06-04)
+fgetxattr02
+getxattr02
+setxattr02
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-bind-fix-20260604T000534+0800.summary.txt — 6 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# LA summary: target/ltp-1000-milestone-06-stable806/la-xattr-special-node-bind-fix-20260604T000627+0800.summary.txt — 6 PASS / 0 FAIL / 0 TFAIL/TBROK/TCONF / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Combined: target/ltp-1000-milestone-06-stable806/combined-xattr-special-node-bind-fix-20260604T000627+0800.promotion-candidates.txt — four-combo clean candidates fgetxattr02/getxattr02/setxattr02.
+
+# RV/LA xattr/mknod/socket adjacent stable regression subset (2026-06-04)
+getxattr01
+listxattr01
+fgetxattr01
+fgetxattr03
+flistxattr01
+flistxattr02
+flistxattr03
+fremovexattr01
+fremovexattr02
+fsetxattr01
+lgetxattr01
+lgetxattr02
+listxattr02
+listxattr03
+llistxattr01
+llistxattr02
+llistxattr03
+lremovexattr01
+removexattr01
+removexattr02
+setxattr01
+mknod06
+mknod02
+mknod05
+mknod08
+mknodat01
+mknod03
+mknod04
+mknod09
+mknod01
+socket02
+socketpair02
+socket01
+getsockname01
+getsockopt01
+setsockopt01
+socketpair01
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-special-node-adjacent-regression-20260604T000750+0800.summary.txt — 74 PASS / 0 FAIL / 0 internal markers.
+# LA summary: target/ltp-1000-milestone-06-stable806/la-xattr-special-node-adjacent-regression-20260604T001000+0800:.summary.txt — 74 PASS / 0 FAIL / 0 internal markers.
+
+# RV remaining xattr blocker-only retest after special-node repair (2026-06-04)
+fsetxattr02
+getxattr03
+getxattr04
+getxattr05
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.summary.txt — 0 PASS / 8 FAIL / TCONF=8 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-xattr-remaining-after-special-node-20260604T002120+0800.promotion-candidates.txt — 0 promotion candidates; all four cases remain blocker-only and must not be counted.
+
+# 2026-06-04 late actual-bin blocker reprobes: RV FD/VFS/IO blocker-only reprobe
+chmod04
+chdir02
+getcwd05
+open05
+open14
+open15
+open16
+close08
+read03
+write04
+write07
+write08
+readv03
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.summary.txt — 0 PASS / 26 FAIL / TCONF=4 / TBROK=4 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-fd-vfs-io-reprobe-20260604T002533+0800.promotion-candidates.txt — 0 promotion candidates; blocker-only.
+
+# 2026-06-04 late actual-bin blocker reprobes: RV fcntl actual-bin blocker-only reprobe
+fcntl24
+fcntl24_64
+fcntl25
+fcntl25_64
+fcntl26
+fcntl26_64
+fcntl31
+fcntl31_64
+fcntl32
+fcntl32_64
+fcntl33
+fcntl33_64
+fcntl34
+fcntl34_64
+fcntl36
+fcntl36_64
+fcntl37
+fcntl37_64
+fcntl38
+fcntl38_64
+fcntl39
+fcntl39_64
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.summary.txt — 0 PASS / 44 FAIL / TCONF=48 / TFAIL=4 / TBROK=8 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-fcntl-uncovered-reprobe-20260604T002658+0800.promotion-candidates.txt — 0 promotion candidates; blocker-only.
+
+# 2026-06-04 late actual-bin blocker reprobes: RV process/time/signal blocker-only reprobe
+setsid01
+getpgid01
+setpgid03
+getrusage02
+getrusage04
+sysinfo03
+adjtimex02
+signal06
+rt_sigaction03
+sigpending02
+sigwait01
+sigwaitinfo01
+kill05
+kill13
+tgkill01
+tgkill02
+tgkill03
+prctl02
+prctl03
+prctl04
+prctl07
+prctl10
+sched_rr_get_interval03
+setpriority01
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.summary.txt — 10 PASS / 38 FAIL / TFAIL=321 / TBROK=12 / TCONF=26 / timeout=4 / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-process-time-signal-reprobe-20260604T002910+0800.promotion-candidates.txt — 0 promotion candidates; wrapper PASS rows with internal markers are not counted.
+
+# 2026-06-04 epoll/eventfd/poll/pselect RV scout: RV mixed new-row + adjacent stable regression scout
+epoll_create01
+epoll_create02
+eventfd01
+eventfd02
+eventfd03
+eventfd04
+eventfd05
+eventfd06
+eventfd2_01
+eventfd2_02
+eventfd2_03
+poll01
+poll02
+ppoll01
+pselect01
+pselect01_64
+pselect02
+pselect02_64
+pselect03
+pselect03_64
+# RV summary: target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.summary.txt — 37 PASS / 3 FAIL / TCONF=6 / TFAIL=2 / 0 timeout / 0 ENOSYS / 0 panic/trap.
+# Candidate report: target/ltp-1000-milestone-06-stable806/rv-epoll-eventfd-poll-pselect-scout-20260604T013000+0800.promotion-candidates.txt — 17 RV candidates are all already stable; 0 new unique candidates. epoll_create01/02 and eventfd06 remain blocked.
+
+# 2026-06-04 generic splice(2) lane
+# Initial RV blocker scout, not promotion evidence.
+splice01
+splice02
+splice03
+splice04
+splice05
+splice06
+splice07
+splice08
+splice09
+# RV scout summary: target/ltp-1000-milestone-06-stable806/rv-splice-scout-20260604T004741+0800.summary.txt — 0 PASS / 18 FAIL / TBROK=2 / TFAIL=342 / TCONF=342 / timeout=2 / ENOSYS=680.
+# Current-code RV gate: target/ltp-1000-milestone-06-stable806/rv-splice01-05-gate-20260604T011100+0800.summary.txt — splice01..splice05: 10 PASS / 0 FAIL / 0 internal markers.
+# Current-code LA gate: target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.summary.txt — splice01..splice05: 10 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/la-splice01-05-gate-20260604T011154+0800.promotion-candidates.txt — five four-combo candidates splice01..splice05.
+# RV splice07 cleanup retest: target/ltp-1000-milestone-06-stable806/rv-splice07-fix-20260604T011013+0800.summary.txt — wrapper PASS but TCONF=336/ENOSYS=336, blocker-only.
+
+
+# 2026-06-04 generic SEEK_DATA/SEEK_HOLE lane
+# Targeted candidate gate plus adjacent stable lseek regression.
+lseek11
+lseek01
+lseek02
+lseek07
+llseek01
+# RV lseek11 gate: target/ltp-1000-milestone-06-stable806/rv-lseek11-seek-data-hole-20260604T013358+0800.summary.txt — 2 PASS / 0 FAIL / 0 internal markers.
+# LA lseek11 gate: target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.summary.txt — 2 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/la-lseek11-seek-data-hole-20260604T013443+0800.promotion-candidates.txt — one four-combo candidate lseek11.
+# RV adjacent stable lseek regression: target/ltp-1000-milestone-06-stable806/rv-lseek-adjacent-regression-20260604T013535+0800.summary.txt — 8 PASS / 0 FAIL / 0 internal markers.
+# LA adjacent stable lseek regression: target/ltp-1000-milestone-06-stable806/la-lseek-adjacent-regression-20260604T013626+0800.summary.txt — 8 PASS / 0 FAIL / 0 internal markers.
+
+
+# 2026-06-04 socket errno/address candidate follow-up
+# Candidate gates and blocker-only follow-up; case unit.
+accept02
+bind01
+bind02
+connect01
+recv01
+recvfrom01
+send01
+sendto01
+bind03
+# RV socket basic scout: target/ltp-1000-milestone-06-stable806/rv-socket-basic-scout-20260604T015858+0800.summary.txt — accept02 RV-clean; other rows blocker-only.
+# LA accept02 follow-up: target/ltp-1000-milestone-06-stable806/la-accept02-followup-20260604T020823+0800.summary.txt — 2 PASS / 0 FAIL / 0 internal markers.
+# RV/LA bind/connect gate: bind01, bind02, connect01 — rv-bind-privileged-port-fix-20260604T022349+0800.summary.txt and la-bind-privileged-port-fix-20260604T022457+0800.summary.txt are both parser-clean.
+# RV/LA recv gate: recv01, recvfrom01 — rv-recv-flags-fix-20260604T022734+0800.summary.txt and la-recv-flags-fix-20260604T022833+0800.summary.txt are both parser-clean.
+# RV/LA send gate: send01 — rv-send01-flags-size-fix-20260604T023249+0800.summary.txt and la-send01-flags-size-fix-20260604T023335+0800.summary.txt are both parser-clean.
+# RV/LA sendto gate: sendto01 — rv-sendto01-tcp-ignore-dest-20260604T024113+0800.summary.txt and la-sendto01-tcp-ignore-dest-20260604T024159+0800.summary.txt are both parser-clean.
+# RV/LA AF_UNIX pathname bind gate: bind03 — rv-bind03-unix-bound-path-20260604T024400+0800.summary.txt and la-bind03-unix-bound-path-20260604T024448+0800.summary.txt are both parser-clean.
+
+# Blocker-only scouts after socket candidate gate.
+readlink03
+readlinkat02
+bind04
+bind05
+bind06
+connect02
+send02
+sendto02
+sendto03
+recvmsg02
+recvmsg03
+setsockopt02
+setsockopt03
+setsockopt04
+setsockopt05
+setsockopt06
+setsockopt07
+setsockopt08
+setsockopt09
+setsockopt10
+epoll_create01
+epoll_create02
+eventfd06
+# Plus 29 current 16-bit credential rows and the VFS/time/proc low-risk scout rows recorded in validation.md; all have visible parser blockers and zero promotion candidates.
+
+# 2026-06-04 AF_UNIX SO_PEERCRED/recvmsg candidate follow-up
+# Targeted candidate gate plus adjacent socket regression; case unit.
+getsockopt02
+recvmsg01
+socket01
+socket02
+socketpair01
+socketpair02
+accept01
+getsockopt01
+setsockopt01
+accept02
+bind01
+bind02
+bind03
+connect01
+recv01
+recvfrom01
+send01
+sendto01
+# RV targeted summary: target/ltp-1000-milestone-06-stable806/rv-afunix-getsockopt02-recvmsg01-20260604T033322+0800-summary.txt — 4 PASS / 0 FAIL / 0 internal markers.
+# LA targeted summary: target/ltp-1000-milestone-06-stable806/la-afunix-getsockopt02-recvmsg01-20260604T033757+0800-summary.txt — 4 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/afunix-getsockopt02-recvmsg01-promotion-candidates-20260604T034432+0800.txt — four-combo candidates getsockopt02/recvmsg01.
+# RV adjacent socket regression: target/ltp-1000-milestone-06-stable806/rv-afunix-socket-adjacent-regression-20260604T034559+0800-summary.txt — 36 PASS / 0 FAIL / 0 internal markers.
+# LA adjacent socket regression: target/ltp-1000-milestone-06-stable806/la-afunix-socket-adjacent-regression-20260604T035259+0800-summary.txt — 36 PASS / 0 FAIL / 0 internal markers.
+# Current pool after this AF_UNIX follow-up: 37/50; later fadvise/fallocate follow-up raises it to 42/50. Stable list remains 756 total / 756 unique / 0 duplicate.
+
+# 2026-06-04 fadvise64/fallocate KEEP_SIZE follow-up
+# Candidate gate, adjacent regression, and blocker-only scout; case unit.
+
+# SysV shm blocker-only RV scout: zero candidates, no LA follow-up.
+shmget02
+shmget03
+shmget04
+shmget05
+shmget06
+shmat01
+shmat02
+shmat03
+shmat1
+shmdt01
+shmctl01
+shmctl02
+shmctl03
+# Summary: target/ltp-1000-milestone-06-stable806/rv-sysv-shm-small-scout-20260604T041600+0800.summary.txt — 0 PASS / 26 FAIL / TCONF=3 / TBROK=2 / TFAIL=9.
+
+# fadvise/fallocate broad RV scout; only the later targeted five are counted.
+posix_fadvise01
+posix_fadvise01_64
+posix_fadvise02
+posix_fadvise02_64
+posix_fadvise03
+posix_fadvise03_64
+posix_fadvise04
+posix_fadvise04_64
+fallocate01
+fallocate02
+fallocate03
+fallocate04
+fallocate05
+fallocate06
+# Scout summary: target/ltp-1000-milestone-06-stable806/rv-fadvise-fallocate-scout-20260604T042346+08:00.summary.txt — 4 PASS / 24 FAIL, all pass rows had internal TCONF; zero candidates.
+
+# Four-combo clean targeted candidate gate after generic fadvise64 and KEEP_SIZE fallocate repair.
+posix_fadvise02
+posix_fadvise02_64
+posix_fadvise04
+posix_fadvise04_64
+fallocate03
+# RV targeted summary: target/ltp-1000-milestone-06-stable806/rv-fadvise02-04-fallocate03-fix-20260604T043416+0800.summary.txt — 10 PASS / 0 FAIL / 0 internal markers.
+# LA targeted summary: target/ltp-1000-milestone-06-stable806/la-fadvise02-04-fallocate03-fix-20260604T043828+0800.summary.txt — 10 PASS / 0 FAIL / 0 internal markers.
+# Combined candidate report: target/ltp-1000-milestone-06-stable806/fadvise02-04-fallocate03-rv-la-fourway.promotion-candidates.txt — candidates posix_fadvise02, posix_fadvise02_64, posix_fadvise04, posix_fadvise04_64, fallocate03.
+
+# Adjacent FD/storage regression after fadvise/fallocate repair.
+fcntl27
+fcntl27_64
+lseek11
+splice01
+splice02
+splice03
+splice04
+splice05
+fstat02
+fstat02_64
+# RV adjacent summary: target/ltp-1000-milestone-06-stable806/rv-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044511+0800.summary.txt — 20 PASS / 0 FAIL / 0 internal markers.
+# LA adjacent summary: target/ltp-1000-milestone-06-stable806/la-adjacent-fd-storage-regression-after-fadvise-fallocate-20260604T044915+0800.summary.txt — 20 PASS / 0 FAIL / 0 internal markers.
+# Current pool after this follow-up: 42/50; stable list remains 756 total / 756 unique / 0 duplicate.
+
+# RV/LA SysV SHM final8 + adjacent gate, 2026-06-04
+shmget02
+shmget03
+shmget04
+shmat02
+shmat03
+shmdt01
+shmctl03
+shmctl04
+# adjacent already-stable rows
+shmat04
+shmdt02
+
+# RV/LA stable806 final 50-case promotion gate, 2026-06-04
+prctl08
+prctl09
+utsname02
+mkdirat02
+rmdir02
+mkdir02
+mkdir03
+fcntl27
+fcntl27_64
+symlink03
+unlink09
+mkdir09
+gettid02
+futex_wait_bitset01
+fstat02
+fstat02_64
+setxattr03
+fgetxattr02
+getxattr02
+setxattr02
+splice01
+splice02
+splice03
+splice04
+splice05
+lseek11
+accept02
+bind01
+bind02
+connect01
+recv01
+recvfrom01
+send01
+sendto01
+bind03
+getsockopt02
+recvmsg01
+posix_fadvise02
+posix_fadvise02_64
+posix_fadvise04
+posix_fadvise04_64
+fallocate03
+shmget02
+shmget03
+shmget04
+shmat02
+shmat03
+shmdt01
+shmctl03
+shmctl04
+
+# SysV SHM excluded/blocker-only rows, 2026-06-04
+shmat01
+shmctl01
+shmctl02
+shmctl05

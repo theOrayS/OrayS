@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES=pipe02,pipe07,dup05,select01,select02,select03,select04,sendfile07,sendfile07_64,getpgid01 LTP_CASE_TIMEOUT_SECS=70 timeout 70m ./run-eval.sh rv

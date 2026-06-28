@@ -1,0 +1,53 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-light25-rv-001.log`
+
+- PASS LTP CASE: 3
+- FAIL LTP CASE: 7
+- Internal TFAIL/TBROK/TCONF: 28 ({'TCONF': 11, 'TBROK': 2, 'TFAIL': 15})
+- timeout matches: 1
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clock_getres01 | rv | musl | ltp-musl | PASS | 0 | 4142 | 258855 | 256772 | -2083 | 0 | 0 | 8 | 0 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 62175 | 256772 | 256758 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime03 | rv | musl | ltp-musl | FAIL | 2 | 3281 | 256758 | 256751 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| clock_gettime04 | rv | musl | ltp-musl | FAIL | 1 | 4460 | 256751 | 256730 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| clock_nanosleep01 | rv | musl | ltp-musl | FAIL | 1 | 34494 | 256730 | 256688 | -42 | 3 | 0 | 2 | 0 | 0 | 0 |
+| clock_nanosleep02 | rv | musl | ltp-musl | FAIL | 1 | 16792 | 256688 | 256667 | -21 | 6 | 0 | 0 | 0 | 0 | 0 |
+| clock_nanosleep03 | rv | musl | ltp-musl | FAIL | 2 | 3510 | 256667 | 256660 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| clock_settime01 | rv | musl | ltp-musl | PASS | 0 | 3835 | 256660 | 256639 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_settime02 | rv | musl | ltp-musl | PASS | 0 | 3872 | 256639 | 256625 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_settime03 | rv | musl | ltp-musl | FAIL | 32 | 4011 | 256625 | 256611 | -14 | 0 | 0 | 1 | 0 | 0 | 0 |
+| creat04 | rv | musl | ltp-musl | UNKNOWN |  |  | 256611 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:musl:clock_settime01, rv:musl:clock_settime02)
+- pass_with_tconf: 1 (rv:musl:clock_getres01)
+- fail_wrapper: 7 (rv:musl:clock_gettime01, rv:musl:clock_gettime03, rv:musl:clock_gettime04, rv:musl:clock_nanosleep01, rv:musl:clock_nanosleep02, rv:musl:clock_nanosleep03, rv:musl:clock_settime03)
+- internal_tfail: 3 (rv:musl:clock_gettime04, rv:musl:clock_nanosleep01, rv:musl:clock_nanosleep02)
+- internal_tbrok: 2 (rv:musl:clock_gettime03, rv:musl:clock_nanosleep03)
+- timeout: 1 (rv:musl:clock_gettime01)
+- enosys: 0
+- panic_trap: 0
+- unknown: 1 (rv:musl:creat04)
+
+## FAIL LTP CASE
+- ltp-musl:clock_gettime01
+- ltp-musl:clock_gettime03
+- ltp-musl:clock_gettime04
+- ltp-musl:clock_nanosleep01
+- ltp-musl:clock_nanosleep02
+- ltp-musl:clock_nanosleep03
+- ltp-musl:clock_settime03
+
+## Groups
+### ltp-musl
+- PASS: 3
+- FAIL: 7
+- Internal: {'TCONF': 11, 'TBROK': 2, 'TFAIL': 15}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: clock_gettime01, clock_gettime03, clock_gettime04, clock_nanosleep01, clock_nanosleep02, clock_nanosleep03, clock_settime03

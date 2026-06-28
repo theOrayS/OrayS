@@ -1,0 +1,2762 @@
+cmd=OSCOMP_TEST_GROUPS=ltp LTP_CASES=<wave-a2-fd-fs-proc.cases> LTP_CASE_TIMEOUT_SECS=20 ./run-eval.sh
+cases=access02,access04,faccessat01,open01,open02,openat01,close01,close02,dup01,dup02,dup03,dup05,dup201,dup202,pipe01,pipe02,pipe04,pipe05,lseek01,lseek02,pread01,pwrite01,readlink01,readlinkat01,readlinkat02,link01,link02,linkat01,unlink01,unlink05,unlinkat01,rename01,renameat01,mkdir01,mkdir02,mkdirat01,rmdir01,stat01,stat02,fstat01,lstat01,statfs01,statfs02,fstatfs01,fstatfs02,statvfs01,fstatvfs01,sysinfo01,chmod01,chmod02,fchmod02,truncate01,truncate02,ftruncate01,ftruncate03,getpgrp01,getgroups03,getrlimit03
+2026-05-22T11:58:19+08:00
+make test_build ARCH=riscv64 BUS=mmio \
+	KERNEL_FEATURES="alloc,paging,irq,multitask,fs,net" \
+	APP_FEATURES="auto-run-tests,uspace" \
+	AXCONFIG_WRITES="-w plat.phys-memory-size=0x4000_0000" \
+	OUT_DIR=/root/oskernel2026-orays/build/kernels/riscv64 \
+	OUT_CONFIG=/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml \
+	TARGET_DIR=/root/oskernel2026-orays/build/kernels/target/riscv64
+make[1]: Entering directory '/root/oskernel2026-orays'
+make A=examples/shell MODE=release LOG=info SMP=1 FEATURES=alloc,paging,irq,multitask,fs,net \
+	ARCH=riscv64 BUS=mmio \
+	APP_FEATURES="auto-run-tests,uspace" \
+	AXCONFIG_WRITES="-w plat.phys-memory-size=0x4000_0000" \
+	OUT_DIR=/root/oskernel2026-orays/build/kernels/riscv64 \
+	OUT_CONFIG=/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml \
+	TARGET_DIR=/root/oskernel2026-orays/build/kernels/target/riscv64 \
+	build
+make[2]: Entering directory '/root/oskernel2026-orays'
+[37maxconfig-gen[0m [90mconfigs/defconfig.toml /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axplat-riscv64-qemu-virt-0.4.1/axconfig.toml  -w arch=riscv64 -w platform=riscv64-qemu-virt -o "/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml" -w plat.phys-memory-size=0x4000_0000 -w plat.max-cpu-num=1 -c "/root/oskernel2026-orays/build/kernels/riscv64.axconfig.toml"[0m
+    [92;1mBuilding[0m App: shell, Arch: riscv64, Platform: riscv64-qemu-virt, App type: rust
+[37mcargo -C examples/shell build[0m [90m-Z unstable-options --target riscv64gc-unknown-none-elf --target-dir /root/oskernel2026-orays/build/kernels/target/riscv64 --release  --features "axstd/defplat axstd/log-level-info axstd/bus-mmio axstd/alloc axstd/paging axstd/irq axstd/multitask axstd/fs axstd/net auto-run-tests uspace"[0m
+warning: unused import: `super::fragmentation::PacketAssemblerSet`
+  --> vendor/smoltcp/src/iface/interface/mod.rs:35:5
+   |
+35 | use super::fragmentation::PacketAssemblerSet;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `IFACE_MAX_SIXLOWPAN_ADDRESS_CONTEXT_COUNT`
+  --> vendor/smoltcp/src/iface/interface/mod.rs:41:43
+   |
+41 | use crate::config::{IFACE_MAX_ADDR_COUNT, IFACE_MAX_SIXLOWPAN_ADDRESS_CONTEXT_COUNT};
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `frag`
+  --> vendor/smoltcp/src/iface/interface/ipv4.rs:91:9
+   |
+91 |         frag: &'a mut FragmentsBuffer,
+   |         ^^^^ help: if this is intentional, prefix it with an underscore: `_frag`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unreachable pattern
+    --> vendor/smoltcp/src/iface/interface/mod.rs:1177:13
+     |
+1171 |             Medium::Ethernet => {
+     |             ---------------- matches all the relevant values
+...
+1177 |             _ => (EthernetAddress([0; 6]), tx_token),
+     |             ^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` on by default
+
+warning: unreachable pattern
+    --> vendor/smoltcp/src/iface/interface/mod.rs:1174:21
+     |
+1173 |                     (HardwareAddress::Ethernet(addr), tx_token) => (addr, tx_token),
+     |                     ------------------------------------------- matches all the relevant values
+1174 |                     (_, _) => unreachable!(),
+     |                     ^^^^^^ no value can reach this
+
+warning: unused variable: `repr`
+    --> vendor/smoltcp/src/iface/interface/mod.rs:1211:26
+     |
+1211 |             IpRepr::Ipv4(repr) => {
+     |                          ^^^^ help: if this is intentional, prefix it with an underscore: `_repr`
+
+warning: variable does not need to be mutable
+   --> vendor/smoltcp/src/socket/dns.rs:249:13
+    |
+249 |         let mut mdns = MulticastDns::Disabled;
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: methods `link_local_ipv6_address` and `mldv2_report_packet` are never used
+   --> vendor/smoltcp/src/iface/interface/ipv6.rs:171:8
+    |
+21  | impl InterfaceInner {
+    | ------------------- methods in this implementation
+...
+171 |     fn link_local_ipv6_address(&self) -> Option<Ipv6Address> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+536 |     pub(super) fn mldv2_report_packet<'any>(
+    |                   ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: variant `HopByHopIcmpv6` is never constructed
+   --> vendor/smoltcp/src/iface/packet.rs:215:5
+    |
+207 | pub(crate) enum IpPayload<'p> {
+    |                 --------- variant in this enum
+...
+215 |     HopByHopIcmpv6(Ipv6HopByHopRepr<'p>, Icmpv6Repr<'p>),
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `IpPayload` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `is_solicited_node_multicast` is never used
+   --> vendor/smoltcp/src/wire/ipv6.rs:131:8
+    |
+79  | pub(crate) trait AddressExt {
+    |                  ---------- method in this trait
+...
+131 |     fn is_solicited_node_multicast(&self) -> bool;
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `emit_header` is never used
+   --> vendor/smoltcp/src/wire/udp.rs:275:19
+    |
+232 | impl Repr {
+    | --------- method in this implementation
+...
+275 |     pub(crate) fn emit_header<T>(&self, packet: &mut Packet<&mut T>, payload_len: usize)
+    |                   ^^^^^^^^^^^
+
+warning: `smoltcp` (lib) generated 11 warnings (run `cargo fix --lib -p smoltcp` to apply 3 suggestions)
+warning: methods `recv_loopback` and `recv_loopback_from` are never used
+   --> kernel/net/axnet/src/smoltcp_impl/udp.rs:319:8
+    |
+276 | impl UdpSocket {
+    | -------------- methods in this implementation
+...
+319 |     fn recv_loopback(&self, buf: &mut [u8], remote: Option<IpEndpoint>) -> AxResult<usize> {
+    |        ^^^^^^^^^^^^^
+...
+323 |     fn recv_loopback_from(
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `axnet` (lib) generated 1 warning
+   Compiling arceos-shell v0.1.0 (/root/oskernel2026-orays/examples/shell)
+    Finished `release` profile [optimized] target(s) in 2m 30s
+[37mrust-objcopy --binary-architecture=riscv64[0m [90m/root/oskernel2026-orays/build/kernels/riscv64/shell_riscv64-qemu-virt.elf --strip-all -O binary /root/oskernel2026-orays/build/kernels/riscv64/shell_riscv64-qemu-virt.bin[0m
+make[2]: Leaving directory '/root/oskernel2026-orays'
+rust-objcopy -I binary -O elf64-littleriscv --rename-section .data=.text,alloc,load,readonly,code /root/oskernel2026-orays/build/kernels/riscv64/shell_riscv64-qemu-virt.bin /root/oskernel2026-orays/build/kernels/kernel-rv.wrap.o
+rust-lld -flavor gnu -m elf64lriscv -T scripts/make/riscv64-kernel-wrap.lds /root/oskernel2026-orays/build/kernels/kernel-rv.wrap.o -o /root/oskernel2026-orays/kernel-rv
+make[1]: Leaving directory '/root/oskernel2026-orays'
+rm -f /tmp/arceos-sdcard-rv.run.qcow2
+qemu-img create -f qcow2 -F raw -b /root/oskernel2026-orays/sdcard-rv.img /tmp/arceos-sdcard-rv.run.qcow2
+Formatting '/tmp/arceos-sdcard-rv.run.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=4294967296 backing_file=/root/oskernel2026-orays/sdcard-rv.img backing_fmt=raw lazy_refcounts=off refcount_bits=16
+qemu-system-riscv64 -machine virt -kernel /root/oskernel2026-orays/kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=/tmp/arceos-sdcard-rv.run.qcow2,if=none,format=qcow2,id=x0 \
+	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
+	-rtc base=utc 
+
+OpenSBI v1.3
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|___ /_____|
+        | |
+        |_|
+
+Platform Name             : riscv-virtio,qemu
+Platform Features         : medeleg
+Platform HART Count       : 1
+Platform IPI Device       : aclint-mswi
+Platform Timer Device     : aclint-mtimer @ 10000000Hz
+Platform Console Device   : semihosting
+Platform HSM Device       : ---
+Platform PMU Device       : ---
+Platform Reboot Device    : sifive_test
+Platform Shutdown Device  : sifive_test
+Platform Suspend Device   : ---
+Platform CPPC Device      : ---
+Firmware Base             : 0x80000000
+Firmware Size             : 194 KB
+Firmware RW Offset        : 0x20000
+Firmware RW Size          : 66 KB
+Firmware Heap Offset      : 0x28000
+Firmware Heap Size        : 34 KB (total), 2 KB (reserved), 9 KB (used), 22 KB (free)
+Firmware Scratch Size     : 4096 B (total), 760 B (used), 3336 B (free)
+Runtime SBI Version       : 1.0
+
+Domain0 Name              : root
+Domain0 Boot HART         : 0
+Domain0 HARTs             : 0*
+Domain0 Region00          : 0x0000000002000000-0x000000000200ffff M: (I,R,W) S/U: ()
+Domain0 Region01          : 0x0000000080000000-0x000000008001ffff M: (R,X) S/U: ()
+Domain0 Region02          : 0x0000000080020000-0x000000008003ffff M: (R,W) S/U: ()
+Domain0 Region03          : 0x0000000000000000-0xffffffffffffffff M: (R,W,X) S/U: (R,W,X)
+Domain0 Next Address      : 0x0000000080200000
+Domain0 Next Arg1         : 0x00000000bf000000
+Domain0 Next Mode         : S-mode
+Domain0 SysReset          : yes
+Domain0 SysSuspend        : yes
+
+Boot HART ID              : 0
+Boot HART Domain          : root
+Boot HART Priv Version    : v1.10
+Boot HART Base ISA        : rv64imafdc
+Boot HART ISA Extensions  : time
+Boot HART PMP Count       : 16
+Boot HART PMP Granularity : 4
+Boot HART PMP Address Bits: 54
+Boot HART MHPM Count      : 0
+Boot HART MIDELEG         : 0x0000000000000222
+Boot HART MEDELEG         : 0x000000000000b109
+
+       d8888                            .d88888b.   .d8888b.
+      d88888                           d88P" "Y88b d88P  Y88b
+     d88P888                           888     888 Y88b.
+    d88P 888 888d888  .d8888b  .d88b.  888     888  "Y888b.
+   d88P  888 888P"   d88P"    d8P  Y8b 888     888     "Y88b.
+  d88P   888 888     888      88888888 888     888       "888
+ d8888888888 888     Y88b.    Y8b.     Y88b. .d88P Y88b  d88P
+d88P     888 888      "Y8888P  "Y8888   "Y88888P"   "Y8888P"
+
+arch = riscv64
+platform = riscv64-qemu-virt
+target = riscv64gc-unknown-none-elf
+build_mode = release
+log_level = info
+
+[37m[  0.198079 0 axruntime:135] [32mLogging is enabled.[m
+[m[37m[  0.209618 0 axruntime:136] [32mPrimary CPU 0 started, arg = 0xbf000000.[m
+[m[37m[  0.218979 0 axruntime:139] [32mFound physcial memory regions:[m
+[m[37m[  0.222936 0 axruntime:141] [32m  [PA:0x101000, PA:0x102000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.237127 0 axruntime:141] [32m  [PA:0xc000000, PA:0xc210000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.245209 0 axruntime:141] [32m  [PA:0x10000000, PA:0x10001000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.253658 0 axruntime:141] [32m  [PA:0x10001000, PA:0x10009000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.264251 0 axruntime:141] [32m  [PA:0x30000000, PA:0x40000000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.266912 0 axruntime:141] [32m  [PA:0x40000000, PA:0x80000000) mmio (READ | WRITE | DEVICE | RESERVED)[m
+[m[37m[  0.282287 0 axruntime:141] [32m  [PA:0x80200000, PA:0x802e3000) .text (READ | EXECUTE | RESERVED)[m
+[m[37m[  0.288114 0 axruntime:141] [32m  [PA:0x802e3000, PA:0x8030e000) .rodata (READ | RESERVED)[m
+[m[37m[  0.291576 0 axruntime:141] [32m  [PA:0x8030e000, PA:0x80312000) .data .tdata .tbss .percpu (READ | WRITE | RESERVED)[m
+[m[37m[  0.298439 0 axruntime:141] [32m  [PA:0x80312000, PA:0x80352000) boot stack (READ | WRITE | RESERVED)[m
+[m[37m[  0.302372 0 axruntime:141] [32m  [PA:0x80352000, PA:0x8037b000) .bss (READ | WRITE | RESERVED)[m
+[m[37m[  0.306775 0 axruntime:141] [32m  [PA:0x8037b000, PA:0xc0000000) free memory (READ | WRITE | FREE)[m
+[m[37m[  0.311818 0 axruntime:216] [32mInitialize global memory allocator...[m
+[m[37m[  0.314704 0 axruntime:217] [32m  use TLSF allocator.[m
+[m[37m[  0.323540 0 axmm:103] [32mInitialize virtual memory management...[m
+[m[37m[  0.882421 0 axruntime:156] [32mInitialize platform devices...[m
+[msmp = 1
+[37m[  0.886357 0 axtask::api:73] [32mInitialize scheduling...[m
+[m[37m[  0.893357 0 axtask::api:83] [32m  use Round-robin scheduler.[m
+[m[37m[  0.905344 0 axdriver:152] [32mInitialize device drivers...[m
+[m[37m[  0.905620 0 axdriver:153] [32m  device model: static[m
+[m[37m[  0.907575 0 virtio_drivers::device::blk:63] [32mfound a block device of size 4194304KB[m
+[m[37m[  0.923895 0 axdriver::bus::mmio:11] [32mregistered a new Block device at [PA:0x10001000, PA:0x10002000): "virtio-blk"[m
+[m[37m[  0.927545 0 virtio_drivers::device::net::dev_raw:33] [32mnegotiated_features Features(MAC | STATUS | RING_INDIRECT_DESC | RING_EVENT_IDX)[m
+[m[37m[  0.948097 0 axdriver::bus::mmio:11] [32mregistered a new Net device at [PA:0x10008000, PA:0x10009000): "virtio-net"[m
+[m[37m[  0.948590 0 axfs:44] [32mInitialize filesystems...[m
+[m[37m[  0.948864 0 axfs:47] [32m  use block device 0: "virtio-blk"[m
+[m[37m[  0.962351 0 axfs::root:336] [32m  detected root filesystem: Ext4[m
+[m[37m[  1.141907 0 axnet:42] [32mInitialize network subsystem...[m
+[m[37m[  1.142234 0 axnet:45] [32m  use NIC 0: "virtio-net"[m
+[m[37m[  1.162990 0 axnet::smoltcp_impl:335] [32mcreated net interface "eth0":[m
+[m[37m[  1.171408 0 axnet::smoltcp_impl:336] [32m  ether:    52-54-00-12-34-56[m
+[m[37m[  1.172111 0 axnet::smoltcp_impl:337] [32m  ip:       10.0.2.15/24[m
+[m[37m[  1.172650 0 axnet::smoltcp_impl:338] [32m  gateway:  10.0.2.2[m
+[m[37m[  1.172988 0 axruntime:182] [32mInitialize interrupt handlers...[m
+[m[37m[  1.184268 0 axruntime:194] [32mPrimary CPU 0 init OK.[m
+[m#### OS COMP TEST GROUP START ltp-musl ####
+ltp case list: inline (58 cases, timeout 20s)
+========== START ltp access02 ==========
+RUN LTP CASE access02
+LTP MEMORY access02 before: free_frames=258864 allocated_frames=2389
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+access02.c:139: [1;32mTPASS: [0maccess(file_f, F_OK) as root behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(file_f, F_OK) as nobody behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(file_r, R_OK) as root behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(file_r, R_OK) as nobody behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(file_w, W_OK) as root behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(file_w, W_OK) as nobody behaviour is correct.
+access02.c:129: [1;31mTFAIL: [0mexecute file_x as root failed: ENOENT (2)
+access02.c:129: [1;31mTFAIL: [0mexecute file_x as nobody failed: ENOENT (2)
+access02.c:139: [1;32mTPASS: [0maccess(symlink_f, F_OK) as root behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(symlink_f, F_OK) as nobody behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(symlink_r, R_OK) as root behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(symlink_r, R_OK) as nobody behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(symlink_w, W_OK) as root behaviour is correct.
+access02.c:139: [1;32mTPASS: [0maccess(symlink_w, W_OK) as nobody behaviour is correct.
+access02.c:129: [1;31mTFAIL: [0mexecute file_x as root failed: ENOENT (2)
+access02.c:129: [1;31mTFAIL: [0mexecute file_x as nobody failed: ENOENT (2)
+
+Summary:
+passed   12
+failed   4
+broken   0
+skipped  0
+warnings 0
+[37m[  9.061318 0:4 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[  9.081874 0:4 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[  9.088663 0:4 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[  9.096241 0:4 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[  9.100812 0:4 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE access02 : 1
+LTP MEMORY access02 after_run: free_frames=256718 allocated_frames=4535
+LTP MEMORY access02 after_cleanup: free_frames=256718 allocated_frames=4535
+LTP CASE RUNTIME access02: 7713 ms
+========== END ltp access02 ==========
+========== START ltp access04 ==========
+RUN LTP CASE access04
+LTP MEMORY access04 before: free_frames=256718 allocated_frames=4535
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1017: [1;34mTINFO: [0mCannot resolve the absolute path of mntpoint: ENOENT (2)
+tst_test.c:1017: [1;31mTBROK: [0mmount((null), mntpoint, tmpfs, 33, 0) failed: EINVAL (22)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[ 14.034773 0:20 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[ 14.048635 0:20 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 14.059261 0:20 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[ 14.061886 0:20 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE access04 : 2
+LTP MEMORY access04 after_run: free_frames=256711 allocated_frames=4542
+LTP MEMORY access04 after_cleanup: free_frames=256711 allocated_frames=4542
+LTP CASE RUNTIME access04: 4912 ms
+========== END ltp access04 ==========
+========== START ltp faccessat01 ==========
+RUN LTP CASE faccessat01
+LTP MEMORY faccessat01 before: free_frames=256711 allocated_frames=4542
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+faccessat01.c:51: [1;32mTPASS: [0mfaccessat(3, faccessatfile, R_OK, 0) passed
+faccessat01.c:51: [1;32mTPASS: [0mfaccessat(3, /tmp/ltp-work/LTP_facBFgOEE/faccessatdir/faccessatfile, R_OK, 0) passed
+faccessat01.c:51: [1;32mTPASS: [0mfaccessat(-100, faccessatdir/faccessatfile, R_OK, 0) passed
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 19.083887 0:21 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 19.087408 0:21 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[ 19.091228 0:21 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE faccessat01 : 0
+Pass!
+LTP MEMORY faccessat01 after_run: free_frames=256697 allocated_frames=4556
+LTP MEMORY faccessat01 after_cleanup: free_frames=256697 allocated_frames=4556
+LTP CASE RUNTIME faccessat01: 4998 ms
+========== END ltp faccessat01 ==========
+========== START ltp open01 ==========
+RUN LTP CASE open01
+LTP MEMORY open01 before: free_frames=256697 allocated_frames=4556
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+open01.c:59: [1;32mTPASS: [0msticky bit is set as expected
+open01.c:59: [1;32mTPASS: [0msirectory bit is set as expected
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 23.768964 0:25 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[ 23.772849 0:25 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE open01 : 0
+Pass!
+LTP MEMORY open01 after_run: free_frames=256683 allocated_frames=4570
+LTP MEMORY open01 after_cleanup: free_frames=256683 allocated_frames=4570
+LTP CASE RUNTIME open01: 4686 ms
+========== END ltp open01 ==========
+========== START ltp open02 ==========
+RUN LTP CASE open02
+LTP MEMORY open02 before: free_frames=256683 allocated_frames=4570
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+open02.c:49: [1;32mTPASS: [0mopen() new file without O_CREAT : ENOENT (2)
+open02.c:49: [1;32mTPASS: [0mopen() unprivileged O_RDONLY | O_NOATIME : EPERM (1)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 28.313817 0:29 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 28.321594 0:29 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE open02 : 0
+Pass!
+LTP MEMORY open02 after_run: free_frames=256669 allocated_frames=4584
+LTP MEMORY open02 after_cleanup: free_frames=256669 allocated_frames=4584
+LTP CASE RUNTIME open02: 4587 ms
+========== END ltp open02 ==========
+========== START ltp openat01 ==========
+RUN LTP CASE openat01
+LTP MEMORY openat01 before: free_frames=256669 allocated_frames=4584
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+openat01.c:71: [1;32mTPASS: [0mopenat(*tc->dir_fd, tc->pathname, O_RDWR, 0600) returned fd 5
+openat01.c:71: [1;32mTPASS: [0mopenat(*tc->dir_fd, tc->pathname, O_RDWR, 0600) returned fd 5
+openat01.c:64: [1;32mTPASS: [0mopenat with a filefd instead of dirfd : ENOTDIR (20)
+openat01.c:67: [1;32mTPASS: [0mopenat with invalid fd : EBADF (9)
+openat01.c:71: [1;32mTPASS: [0mopenat(*tc->dir_fd, tc->pathname, O_RDWR, 0600) returned fd 5
+
+Summary:
+passed   5
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 32.556596 0:33 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 32.576439 0:33 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[ 32.585767 0:33 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE openat01 : 0
+Pass!
+LTP MEMORY openat01 after_run: free_frames=256655 allocated_frames=4598
+LTP MEMORY openat01 after_cleanup: free_frames=256655 allocated_frames=4598
+LTP CASE RUNTIME openat01: 4248 ms
+========== END ltp openat01 ==========
+========== START ltp close01 ==========
+RUN LTP CASE close01
+LTP MEMORY close01 before: free_frames=256655 allocated_frames=4598
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+close01.c:50: [1;32mTPASS: [0mclose a file fd passed
+close01.c:50: [1;32mTPASS: [0mclose a pipe fd passed
+close01.c:50: [1;32mTPASS: [0mclose a socket fd passed
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 37.167185 0:37 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 37.184990 0:37 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE close01 : 0
+Pass!
+LTP MEMORY close01 after_run: free_frames=256641 allocated_frames=4612
+LTP MEMORY close01 after_cleanup: free_frames=256641 allocated_frames=4612
+LTP CASE RUNTIME close01: 4593 ms
+========== END ltp close01 ==========
+========== START ltp close02 ==========
+RUN LTP CASE close02
+LTP MEMORY close02 before: free_frames=256641 allocated_frames=4612
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+close02.c:20: [1;32mTPASS: [0mclose(-1) : EBADF (9)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 42.556192 0:41 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE close02 : 0
+Pass!
+LTP MEMORY close02 after_run: free_frames=256627 allocated_frames=4626
+LTP MEMORY close02 after_cleanup: free_frames=256627 allocated_frames=4626
+LTP CASE RUNTIME close02: 5346 ms
+========== END ltp close02 ==========
+========== START ltp dup01 ==========
+RUN LTP CASE dup01
+LTP MEMORY dup01 before: free_frames=256627 allocated_frames=4626
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup01.c:24: [1;32mTPASS: [0mdup(fd) returned fd 4
+dup01.c:27: [1;32mTPASS: [0mbuf1.st_ino == buf2.st_ino (7415788936802536454)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 47.267233 0:45 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 47.283884 0:45 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup01 : 0
+Pass!
+LTP MEMORY dup01 after_run: free_frames=256613 allocated_frames=4640
+LTP MEMORY dup01 after_cleanup: free_frames=256613 allocated_frames=4640
+LTP CASE RUNTIME dup01: 4776 ms
+========== END ltp dup01 ==========
+========== START ltp dup02 ==========
+RUN LTP CASE dup02
+LTP MEMORY dup02 before: free_frames=256613 allocated_frames=4640
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup02.c:29: [1;32mTPASS: [0mdup(-1) : EBADF (9)
+dup02.c:29: [1;32mTPASS: [0mdup(1500) : EBADF (9)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 51.569296 0:49 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup02 : 0
+Pass!
+LTP MEMORY dup02 after_run: free_frames=256599 allocated_frames=4654
+LTP MEMORY dup02 after_cleanup: free_frames=256599 allocated_frames=4654
+LTP CASE RUNTIME dup02: 4275 ms
+========== END ltp dup02 ==========
+========== START ltp dup03 ==========
+RUN LTP CASE dup03
+LTP MEMORY dup03 before: free_frames=256599 allocated_frames=4654
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup03.c:22: [1;31mTFAIL: [0mdup(3) succeeded
+
+Summary:
+passed   0
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[ 56.325506 0:53 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 56.337977 0:53 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup03 : 1
+LTP MEMORY dup03 after_run: free_frames=256585 allocated_frames=4668
+LTP MEMORY dup03 after_cleanup: free_frames=256585 allocated_frames=4668
+LTP CASE RUNTIME dup03: 4767 ms
+========== END ltp dup03 ==========
+========== START ltp dup05 ==========
+RUN LTP CASE dup05
+LTP MEMORY dup05 before: free_frames=256585 allocated_frames=4668
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup05.c:28: [1;31mTBROK: [0mmkfifo(dupfile, 0777) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[ 61.695158 0:57 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup05 : 2
+LTP MEMORY dup05 after_run: free_frames=256571 allocated_frames=4682
+LTP MEMORY dup05 after_cleanup: free_frames=256571 allocated_frames=4682
+LTP CASE RUNTIME dup05: 5355 ms
+========== END ltp dup05 ==========
+========== START ltp dup201 ==========
+RUN LTP CASE dup201
+LTP MEMORY dup201 before: free_frames=256571 allocated_frames=4682
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup201.c:47: [1;32mTPASS: [0mdup2(-1, 5) : EBADF (9)
+dup201.c:47: [1;32mTPASS: [0mdup2(1024, 5) : EBADF (9)
+dup201.c:47: [1;32mTPASS: [0mdup2(0, -1) : EBADF (9)
+dup201.c:47: [1;31mTFAIL: [0mdup2(0, 1024) succeeded
+
+Summary:
+passed   3
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[ 66.010900 0:61 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup201 : 1
+LTP MEMORY dup201 after_run: free_frames=256557 allocated_frames=4696
+LTP MEMORY dup201 after_cleanup: free_frames=256557 allocated_frames=4696
+LTP CASE RUNTIME dup201: 4315 ms
+========== END ltp dup201 ==========
+========== START ltp dup202 ==========
+RUN LTP CASE dup202
+LTP MEMORY dup202 before: free_frames=256557 allocated_frames=4696
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+dup202.c:104: [1;32mTPASS: [0moriginal(100444) and duped(100444) are the same mode
+dup202.c:104: [1;32mTPASS: [0moriginal(100222) and duped(100222) are the same mode
+dup202.c:104: [1;32mTPASS: [0moriginal(100666) and duped(100666) are the same mode
+dup202.c:93: [1;34mTINFO: [0moriginal mode 0777, new mode 0444 after chmod
+dup202.c:104: [1;32mTPASS: [0moriginal(100444) and duped(100444) are the same mode
+dup202.c:93: [1;34mTINFO: [0moriginal mode 0777, new mode 0222 after chmod
+dup202.c:104: [1;32mTPASS: [0moriginal(100222) and duped(100222) are the same mode
+dup202.c:93: [1;34mTINFO: [0moriginal mode 0777, new mode 0666 after chmod
+dup202.c:104: [1;32mTPASS: [0moriginal(100666) and duped(100666) are the same mode
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 70.788811 0:65 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup202 : 0
+Pass!
+LTP MEMORY dup202 after_run: free_frames=256543 allocated_frames=4710
+LTP MEMORY dup202 after_cleanup: free_frames=256543 allocated_frames=4710
+LTP CASE RUNTIME dup202: 4755 ms
+========== END ltp dup202 ==========
+========== START ltp pipe01 ==========
+RUN LTP CASE pipe01
+LTP MEMORY pipe01 before: free_frames=256543 allocated_frames=4710
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+pipe01.c:48: [1;32mTPASS: [0mpipe() functionality is correct
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 75.663825 0:69 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pipe01 : 0
+Pass!
+LTP MEMORY pipe01 after_run: free_frames=256529 allocated_frames=4724
+LTP MEMORY pipe01 after_cleanup: free_frames=256529 allocated_frames=4724
+LTP CASE RUNTIME pipe01: 4854 ms
+========== END ltp pipe01 ==========
+========== START ltp pipe02 ==========
+RUN LTP CASE pipe02
+LTP MEMORY pipe02 before: free_frames=256529 allocated_frames=4724
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+pipe02.c:70: [1;31mTFAIL: [0mChild wasn't killed by signal
+
+Summary:
+passed   0
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[ 80.962944 0:73 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 80.974490 0:73 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pipe02 : 1
+LTP MEMORY pipe02 after_run: free_frames=256508 allocated_frames=4745
+LTP MEMORY pipe02 after_cleanup: free_frames=256508 allocated_frames=4745
+LTP CASE RUNTIME pipe02: 5322 ms
+========== END ltp pipe02 ==========
+========== START ltp pipe04 ==========
+RUN LTP CASE pipe04
+LTP MEMORY pipe04 before: free_frames=256508 allocated_frames=4745
+pipe04      1  [1;32mTPASS[0m  :  Child 1 killed while writing to a pipe
+pipe04      2  [1;32mTPASS[0m  :  Child 2 killed while writing to a pipe
+FAIL LTP CASE pipe04 : 0
+Pass!
+LTP MEMORY pipe04 after_run: free_frames=256487 allocated_frames=4766
+LTP MEMORY pipe04 after_cleanup: free_frames=256487 allocated_frames=4766
+LTP CASE RUNTIME pipe04: 4272 ms
+========== END ltp pipe04 ==========
+========== START ltp pipe05 ==========
+RUN LTP CASE pipe05
+LTP MEMORY pipe05 before: free_frames=256487 allocated_frames=4766
+pipe05      1  [1;32mTPASS[0m  :  expected failure - errno = 14 : Bad address
+FAIL LTP CASE pipe05 : 0
+Pass!
+LTP MEMORY pipe05 after_run: free_frames=256480 allocated_frames=4773
+LTP MEMORY pipe05 after_cleanup: free_frames=256480 allocated_frames=4773
+LTP CASE RUNTIME pipe05: 3932 ms
+========== END ltp pipe05 ==========
+========== START ltp lseek01 ==========
+RUN LTP CASE lseek01
+LTP MEMORY lseek01 before: free_frames=256480 allocated_frames=4773
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, 4, SEEK_SET) read correct data
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, -2, SEEK_CUR) read correct data
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, -4, SEEK_END) read correct data
+lseek01.c:67: [1;32mTPASS: [0mlseek(tfile, 0, SEEK_END) read correct data
+
+Summary:
+passed   4
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[ 93.974416 0:83 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 93.989421 0:83 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE lseek01 : 0
+Pass!
+LTP MEMORY lseek01 after_run: free_frames=256466 allocated_frames=4787
+LTP MEMORY lseek01 after_cleanup: free_frames=256466 allocated_frames=4787
+LTP CASE RUNTIME lseek01: 4795 ms
+========== END ltp lseek01 ==========
+========== START ltp lseek02 ==========
+RUN LTP CASE lseek02
+LTP MEMORY lseek02 before: free_frames=256466 allocated_frames=4787
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+lseek02.c:76: [1;31mTBROK: [0mmkfifo(tfifo1, 0777) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[ 99.153028 0:87 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[ 99.174251 0:87 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE lseek02 : 2
+LTP MEMORY lseek02 after_run: free_frames=256452 allocated_frames=4801
+LTP MEMORY lseek02 after_cleanup: free_frames=256452 allocated_frames=4801
+LTP CASE RUNTIME lseek02: 5191 ms
+========== END ltp lseek02 ==========
+========== START ltp pread01 ==========
+RUN LTP CASE pread01
+LTP MEMORY pread01 before: free_frames=256452 allocated_frames=4801
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+pread01.c:56: [1;32mTPASS: [0mFunctionality of pread() is correct
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[104.988014 0:91 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[104.990919 0:91 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pread01 : 0
+Pass!
+LTP MEMORY pread01 after_run: free_frames=256438 allocated_frames=4815
+LTP MEMORY pread01 after_cleanup: free_frames=256438 allocated_frames=4815
+LTP CASE RUNTIME pread01: 5823 ms
+========== END ltp pread01 ==========
+========== START ltp pwrite01 ==========
+RUN LTP CASE pwrite01
+LTP MEMORY pwrite01 before: free_frames=256438 allocated_frames=4815
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+pwrite01.c:60: [1;32mTPASS: [0mFunctionality of pwrite() successful
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[111.207893 0:95 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[111.213485 0:95 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pwrite01 : 0
+Pass!
+LTP MEMORY pwrite01 after_run: free_frames=256424 allocated_frames=4829
+LTP MEMORY pwrite01 after_cleanup: free_frames=256424 allocated_frames=4829
+LTP CASE RUNTIME pwrite01: 6192 ms
+========== END ltp pwrite01 ==========
+========== START ltp readlink01 ==========
+RUN LTP CASE readlink01
+LTP MEMORY readlink01 before: free_frames=256424 allocated_frames=4829
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+readlink01.c:64: [1;34mTINFO: [0mRunning test as root
+readlink01.c:45: [1;32mTPASS: [0mreadlink() functionality on 'slink_file' was correct
+readlink01.c:55: [1;34mTINFO: [0mRunning test as nobody
+readlink01.c:45: [1;32mTPASS: [0mreadlink() functionality on 'slink_file' was correct
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[116.696401 0:99 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[116.711154 0:99 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE readlink01 : 0
+Pass!
+LTP MEMORY readlink01 after_run: free_frames=256403 allocated_frames=4850
+LTP MEMORY readlink01 after_cleanup: free_frames=256403 allocated_frames=4850
+LTP CASE RUNTIME readlink01: 5481 ms
+========== END ltp readlink01 ==========
+========== START ltp readlinkat01 ==========
+RUN LTP CASE readlinkat01
+LTP MEMORY readlinkat01 before: free_frames=256403 allocated_frames=4850
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+[37m[121.657286 0:107 axfs::fops:151] [33m[AxError::InvalidInput][m
+[mreadlinkat01.c:74: [1;31mTBROK: [0mopen(readlink_file,64,0600) failed: EINVAL (22)
+readlinkat01.c:86: [1;35mTWARN: [0mclose(0) failed: EBADF (9)
+readlinkat01.c:89: [1;35mTWARN: [0mclose(0) failed: EBADF (9)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 2
+[37m[121.739523 0:105 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE readlinkat01 : 6
+LTP MEMORY readlinkat01 after_run: free_frames=256389 allocated_frames=4864
+LTP MEMORY readlinkat01 after_cleanup: free_frames=256389 allocated_frames=4864
+LTP CASE RUNTIME readlinkat01: 5015 ms
+========== END ltp readlinkat01 ==========
+========== START ltp readlinkat02 ==========
+RUN LTP CASE readlinkat02
+LTP MEMORY readlinkat02 before: free_frames=256389 allocated_frames=4864
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+readlinkat02.c:56: [1;32mTPASS: [0mreadlinkat(3, symlink_file, NULL, 0) : EINVAL (22)
+readlinkat02.c:56: [1;31mTFAIL: [0mreadlinkat(3, test_file, NULL, 256) expected EINVAL: ENOTDIR (20)
+readlinkat02.c:56: [1;32mTPASS: [0mreadlinkat(4, symlink_file, NULL, 256) : ENOTDIR (20)
+readlinkat02.c:56: [1;32mTPASS: [0mreadlinkat(3, test_file/test_file, NULL, 256) : ENOTDIR (20)
+readlinkat02.c:56: [1;32mTPASS: [0mreadlinkat(-1, symlink_file, NULL, 256) : EBADF (9)
+readlinkat02.c:56: [1;31mTFAIL: [0mreadlinkat(3, does_not_exists, NULL, 256) expected ENOENT: ENOTDIR (20)
+
+Summary:
+passed   4
+failed   2
+broken   0
+skipped  0
+warnings 0
+[37m[126.364943 0:109 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[126.372742 0:109 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE readlinkat02 : 1
+LTP MEMORY readlinkat02 after_run: free_frames=256375 allocated_frames=4878
+LTP MEMORY readlinkat02 after_cleanup: free_frames=256375 allocated_frames=4878
+LTP CASE RUNTIME readlinkat02: 4645 ms
+========== END ltp readlinkat02 ==========
+========== START ltp link01 ==========
+RUN LTP CASE link01
+LTP MEMORY link01 before: free_frames=256375 allocated_frames=4878
+FAIL LTP CASE link01 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/link01
+LTP CASE RUNTIME link01: 33 ms
+========== END ltp link01 ==========
+========== START ltp link02 ==========
+RUN LTP CASE link02
+LTP MEMORY link02 before: free_frames=256375 allocated_frames=4878
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+link02.c:26: [1;31mTFAIL: [0mlink(OLDPATH, NEWPATH) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[131.322001 0:113 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[131.333664 0:113 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE link02 : 1
+LTP MEMORY link02 after_run: free_frames=256361 allocated_frames=4892
+LTP MEMORY link02 after_cleanup: free_frames=256361 allocated_frames=4892
+LTP CASE RUNTIME link02: 4911 ms
+========== END ltp link02 ==========
+========== START ltp linkat01 ==========
+RUN LTP CASE linkat01
+LTP MEMORY linkat01 before: free_frames=256361 allocated_frames=4892
+[37m[135.123470 0:117 axfs::fops:151] [33m[AxError::InvalidInput][m
+[mlinkat01    1  [1;31mTBROK[0m  :  linkat01.c:303: open(olddir/oldfile,192,0600) failed: errno=EINVAL(22): Invalid argument
+linkat01    2  [1;31mTBROK[0m  :  linkat01.c:303: Remaining cases broken
+[37m[135.161853 0:117 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[135.164765 0:117 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE linkat01 : 2
+LTP MEMORY linkat01 after_run: free_frames=256354 allocated_frames=4899
+LTP MEMORY linkat01 after_cleanup: free_frames=256354 allocated_frames=4899
+LTP CASE RUNTIME linkat01: 3818 ms
+========== END ltp linkat01 ==========
+========== START ltp unlink01 ==========
+RUN LTP CASE unlink01
+LTP MEMORY unlink01 before: free_frames=256354 allocated_frames=4899
+FAIL LTP CASE unlink01 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/unlink01
+LTP CASE RUNTIME unlink01: 10 ms
+========== END ltp unlink01 ==========
+========== START ltp unlink05 ==========
+RUN LTP CASE unlink05
+LTP MEMORY unlink05 before: free_frames=256354 allocated_frames=4899
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+unlink05.c:61: [1;32mTPASS: [0munlink(file) succeeded
+unlink05.c:31: [1;31mTBROK: [0mmkfifo(tfifo_120, 0777) failed: ENOSYS (38)
+
+Summary:
+passed   1
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[138.902060 0:118 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE unlink05 : 2
+LTP MEMORY unlink05 after_run: free_frames=256340 allocated_frames=4913
+LTP MEMORY unlink05 after_cleanup: free_frames=256340 allocated_frames=4913
+LTP CASE RUNTIME unlink05: 3749 ms
+========== END ltp unlink05 ==========
+========== START ltp unlinkat01 ==========
+RUN LTP CASE unlinkat01
+LTP MEMORY unlinkat01 before: free_frames=256340 allocated_frames=4913
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: SUCCESS (0)
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: SUCCESS (0)
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: ENOTDIR (20)
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: EBADF (9)
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: EINVAL (22)
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: SUCCESS (0)
+unlinkat01.c:79: [1;32mTPASS: [0munlinkat() returned expected errno: SUCCESS (0)
+
+Summary:
+passed   7
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[142.498025 0:122 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[142.512531 0:122 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE unlinkat01 : 0
+Pass!
+LTP MEMORY unlinkat01 after_run: free_frames=256326 allocated_frames=4927
+LTP MEMORY unlinkat01 after_cleanup: free_frames=256326 allocated_frames=4927
+LTP CASE RUNTIME unlinkat01: 3574 ms
+========== END ltp unlinkat01 ==========
+========== START ltp rename01 ==========
+RUN LTP CASE rename01
+LTP MEMORY rename01 before: free_frames=256326 allocated_frames=4927
+tst_device.c:293: [1;35mTWARN: [0mFailed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: [1;31mTBROK: [0mFailed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[145.949745 0:126 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[145.962813 0:126 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE rename01 : 6
+LTP MEMORY rename01 after_run: free_frames=256319 allocated_frames=4934
+LTP MEMORY rename01 after_cleanup: free_frames=256319 allocated_frames=4934
+LTP CASE RUNTIME rename01: 3453 ms
+========== END ltp rename01 ==========
+========== START ltp renameat01 ==========
+RUN LTP CASE renameat01
+LTP MEMORY renameat01 before: free_frames=256319 allocated_frames=4934
+renameat01    0  [1;35mTWARN[0m  :  tst_device.c:293: Failed to create test_dev.img: errno=ENOSPC(28): No space left on device
+renameat01    1  [1;31mTBROK[0m  :  tst_device.c:354: Failed to acquire device
+renameat01    2  [1;31mTBROK[0m  :  tst_device.c:354: Remaining cases broken
+[37m[151.080699 0:127 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE renameat01 : 6
+LTP MEMORY renameat01 after_run: free_frames=256312 allocated_frames=4941
+LTP MEMORY renameat01 after_cleanup: free_frames=256312 allocated_frames=4941
+LTP CASE RUNTIME renameat01: 5131 ms
+========== END ltp renameat01 ==========
+========== START ltp mkdir01 ==========
+RUN LTP CASE mkdir01
+LTP MEMORY mkdir01 before: free_frames=256312 allocated_frames=4941
+FAIL LTP CASE mkdir01 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/mkdir01
+LTP CASE RUNTIME mkdir01: 51 ms
+========== END ltp mkdir01 ==========
+========== START ltp mkdir02 ==========
+RUN LTP CASE mkdir02
+LTP MEMORY mkdir02 before: free_frames=256312 allocated_frames=4941
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+mkdir02.c:56: [1;31mTBROK: [0mGroup ID lookup failed: ENOTSOCK (88)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[156.586516 0:128 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE mkdir02 : 2
+LTP MEMORY mkdir02 after_run: free_frames=256298 allocated_frames=4955
+LTP MEMORY mkdir02 after_cleanup: free_frames=256298 allocated_frames=4955
+LTP CASE RUNTIME mkdir02: 5474 ms
+========== END ltp mkdir02 ==========
+========== START ltp mkdirat01 ==========
+RUN LTP CASE mkdirat01
+LTP MEMORY mkdirat01 before: free_frames=256298 allocated_frames=4955
+mkdirat01    1  [1;32mTPASS[0m  :  mkdirat() returned 0: TEST_ERRNO=SUCCESS(0): No error information
+mkdirat01    2  [1;32mTPASS[0m  :  mkdirat() returned 0: TEST_ERRNO=SUCCESS(0): No error information
+mkdirat01    3  [1;32mTPASS[0m  :  mkdirat() returned 0: TEST_ERRNO=SUCCESS(0): No error information
+mkdirat01    4  [1;32mTPASS[0m  :  mkdirat() returned -1: TEST_ERRNO=ENOTDIR(20): Not a directory
+mkdirat01    5  [1;32mTPASS[0m  :  mkdirat() returned -1: TEST_ERRNO=EBADF(9): Bad file descriptor
+[37m[160.242371 0:132 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[160.256187 0:132 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[160.273672 0:132 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[160.283419 0:132 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[160.293508 0:132 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[160.307610 0:132 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE mkdirat01 : 0
+Pass!
+LTP MEMORY mkdirat01 after_run: free_frames=256291 allocated_frames=4962
+LTP MEMORY mkdirat01 after_cleanup: free_frames=256291 allocated_frames=4962
+LTP CASE RUNTIME mkdirat01: 3665 ms
+========== END ltp mkdirat01 ==========
+========== START ltp rmdir01 ==========
+RUN LTP CASE rmdir01
+LTP MEMORY rmdir01 before: free_frames=256291 allocated_frames=4962
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+rmdir01.c:33: [1;32mTPASS: [0mrmdir(testdir) success
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[166.580343 0:133 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE rmdir01 : 0
+Pass!
+LTP MEMORY rmdir01 after_run: free_frames=256277 allocated_frames=4976
+LTP MEMORY rmdir01 after_cleanup: free_frames=256277 allocated_frames=4976
+LTP CASE RUNTIME rmdir01: 6311 ms
+========== END ltp rmdir01 ==========
+========== START ltp stat01 ==========
+RUN LTP CASE stat01
+LTP MEMORY stat01 before: free_frames=256277 allocated_frames=4976
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+stat01.c:43: [1;32mTPASS: [0mstat(tc->pathname, &stat_buf) passed
+stat01.c:45: [1;32mTPASS: [0mstat_buf.st_uid == user_id (65534)
+stat01.c:46: [1;32mTPASS: [0mstat_buf.st_gid == group_id (0)
+stat01.c:47: [1;32mTPASS: [0mstat_buf.st_size == FILE_SIZE (1024)
+stat01.c:48: [1;32mTPASS: [0mstat_buf.st_mode & MASK == tc->mode (438)
+stat01.c:49: [1;32mTPASS: [0mstat_buf.st_nlink == 1 (1)
+stat01.c:43: [1;32mTPASS: [0mstat(tc->pathname, &stat_buf) passed
+stat01.c:45: [1;32mTPASS: [0mstat_buf.st_uid == user_id (65534)
+stat01.c:46: [1;32mTPASS: [0mstat_buf.st_gid == group_id (0)
+stat01.c:47: [1;32mTPASS: [0mstat_buf.st_size == FILE_SIZE (1024)
+stat01.c:48: [1;32mTPASS: [0mstat_buf.st_mode & MASK == tc->mode (146)
+stat01.c:49: [1;32mTPASS: [0mstat_buf.st_nlink == 1 (1)
+
+Summary:
+passed   12
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[172.362926 0:137 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[172.370754 0:137 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[172.379473 0:137 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE stat01 : 0
+Pass!
+LTP MEMORY stat01 after_run: free_frames=256263 allocated_frames=4990
+LTP MEMORY stat01 after_cleanup: free_frames=256263 allocated_frames=4990
+LTP CASE RUNTIME stat01: 5765 ms
+========== END ltp stat01 ==========
+========== START ltp stat02 ==========
+RUN LTP CASE stat02
+LTP MEMORY stat02 before: free_frames=256263 allocated_frames=4990
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+stat02.c:67: [1;32mTPASS: [0mFile size reported as expected
+stat02.c:67: [1;32mTPASS: [0mFile size reported as expected
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[178.566629 0:141 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE stat02 : 0
+Pass!
+LTP MEMORY stat02 after_run: free_frames=256249 allocated_frames=5004
+LTP MEMORY stat02 after_cleanup: free_frames=256249 allocated_frames=5004
+LTP CASE RUNTIME stat02: 6198 ms
+========== END ltp stat02 ==========
+========== START ltp fstat01 ==========
+RUN LTP CASE fstat01
+LTP MEMORY fstat01 before: free_frames=256249 allocated_frames=5004
+FAIL LTP CASE fstat01 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/fstat01
+LTP CASE RUNTIME fstat01: 47 ms
+========== END ltp fstat01 ==========
+========== START ltp lstat01 ==========
+RUN LTP CASE lstat01
+LTP MEMORY lstat01 before: free_frames=256249 allocated_frames=5004
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+lstat01.c:46: [1;32mTPASS: [0mlstat() reported correct values for the symlink!
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[183.476543 0:145 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[183.484550 0:145 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE lstat01 : 0
+Pass!
+LTP MEMORY lstat01 after_run: free_frames=256235 allocated_frames=5018
+LTP MEMORY lstat01 after_cleanup: free_frames=256235 allocated_frames=5018
+LTP CASE RUNTIME lstat01: 4866 ms
+========== END ltp lstat01 ==========
+========== START ltp statfs01 ==========
+RUN LTP CASE statfs01
+LTP MEMORY statfs01 before: free_frames=256235 allocated_frames=5018
+tst_device.c:293: [1;35mTWARN: [0mFailed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: [1;31mTBROK: [0mFailed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[188.506456 0:149 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[188.511873 0:149 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE statfs01 : 6
+LTP MEMORY statfs01 after_run: free_frames=256228 allocated_frames=5025
+LTP MEMORY statfs01 after_cleanup: free_frames=256228 allocated_frames=5025
+LTP CASE RUNTIME statfs01: 5004 ms
+========== END ltp statfs01 ==========
+========== START ltp statfs02 ==========
+RUN LTP CASE statfs02
+LTP MEMORY statfs02 before: free_frames=256228 allocated_frames=5025
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+[37m[195.649732 0:153 axfs_ramfs::file:69] [33m[AxError::NotADirectory][m
+[mstatfs02.c:57: [1;32mTPASS: [0mstatfs() : ENOTDIR (20)
+statfs02.c:57: [1;32mTPASS: [0mstatfs() : ENOENT (2)
+statfs02.c:57: [1;31mTFAIL: [0mstatfs() expected ENAMETOOLONG: ENOENT (2)
+statfs02.c:57: [1;32mTPASS: [0mstatfs() : EFAULT (14)
+statfs02.c:72: [1;31mTFAIL: [0mChild exited with 139
+statfs02.c:57: [1;32mTPASS: [0mstatfs() : ELOOP (40)
+
+Summary:
+passed   4
+failed   2
+broken   0
+skipped  0
+warnings 0
+[37m[197.405533 0:150 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[197.428898 0:150 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE statfs02 : 1
+LTP MEMORY statfs02 after_run: free_frames=256172 allocated_frames=5081
+LTP MEMORY statfs02 after_cleanup: free_frames=256172 allocated_frames=5081
+LTP CASE RUNTIME statfs02: 8953 ms
+========== END ltp statfs02 ==========
+========== START ltp fstatfs01 ==========
+RUN LTP CASE fstatfs01
+LTP MEMORY fstatfs01 before: free_frames=256172 allocated_frames=5081
+tst_device.c:293: [1;35mTWARN: [0mFailed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: [1;31mTBROK: [0mFailed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[203.124388 0:160 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[203.132955 0:160 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE fstatfs01 : 6
+LTP MEMORY fstatfs01 after_run: free_frames=256165 allocated_frames=5088
+LTP MEMORY fstatfs01 after_cleanup: free_frames=256165 allocated_frames=5088
+LTP CASE RUNTIME fstatfs01: 5694 ms
+========== END ltp fstatfs01 ==========
+========== START ltp fstatfs02 ==========
+RUN LTP CASE fstatfs02
+LTP MEMORY fstatfs02 before: free_frames=256165 allocated_frames=5088
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+fstatfs02.c:40: [1;32mTPASS: [0mfstatfs() : EBADF (9)
+fstatfs02.c:55: [1;31mTFAIL: [0mChild exited with 139
+
+Summary:
+passed   1
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[207.495463 0:161 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[207.516888 0:161 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE fstatfs02 : 1
+LTP MEMORY fstatfs02 after_run: free_frames=256137 allocated_frames=5116
+LTP MEMORY fstatfs02 after_cleanup: free_frames=256137 allocated_frames=5116
+LTP CASE RUNTIME fstatfs02: 4375 ms
+========== END ltp fstatfs02 ==========
+========== START ltp statvfs01 ==========
+RUN LTP CASE statvfs01
+LTP MEMORY statvfs01 before: free_frames=256137 allocated_frames=5116
+tst_device.c:293: [1;35mTWARN: [0mFailed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: [1;31mTBROK: [0mFailed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[211.441845 0:168 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[211.463424 0:168 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE statvfs01 : 6
+LTP MEMORY statvfs01 after_run: free_frames=256130 allocated_frames=5123
+LTP MEMORY statvfs01 after_cleanup: free_frames=256130 allocated_frames=5123
+LTP CASE RUNTIME statvfs01: 3944 ms
+========== END ltp statvfs01 ==========
+========== START ltp fstatvfs01 ==========
+RUN LTP CASE fstatvfs01
+LTP MEMORY fstatvfs01 before: free_frames=256130 allocated_frames=5123
+FAIL LTP CASE fstatvfs01 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/fstatvfs01
+LTP CASE RUNTIME fstatvfs01: 25 ms
+========== END ltp fstatvfs01 ==========
+========== START ltp sysinfo01 ==========
+RUN LTP CASE sysinfo01
+LTP MEMORY sysinfo01 before: free_frames=256130 allocated_frames=5123
+sysinfo01    1  [1;32mTPASS[0m  :  Test to check the return code PASSED
+FAIL LTP CASE sysinfo01 : 0
+Pass!
+LTP MEMORY sysinfo01 after_run: free_frames=256123 allocated_frames=5130
+LTP MEMORY sysinfo01 after_cleanup: free_frames=256123 allocated_frames=5130
+LTP CASE RUNTIME sysinfo01: 6293 ms
+========== END ltp sysinfo01 ==========
+========== START ltp chmod01 ==========
+RUN LTP CASE chmod01
+LTP MEMORY chmod01 before: free_frames=256123 allocated_frames=5130
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: [1;34mTINFO: [0mTesting variant: verify permissions of file
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0000) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0000
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0007) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0007
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0070) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0070
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0700) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0700
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 0777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=0777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 2777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=2777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 4777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=4777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testfile, 6777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testfile) mode=6777
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: [1;34mTINFO: [0mTesting variant: verify permissions of directory
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0000) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0000
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0007) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0007
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0070) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0070
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0700) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0700
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 0777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=0777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 2777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=2777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 4777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=4777
+chmod01.c:40: [1;32mTPASS: [0mchmod(testdir_1, 6777) passed
+chmod01.c:50: [1;32mTPASS: [0mstat(testdir_1) mode=6777
+
+Summary:
+passed   32
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[225.037969 0:170 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[225.057163 0:170 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[225.073776 0:170 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE chmod01 : 0
+Pass!
+LTP MEMORY chmod01 after_run: free_frames=256102 allocated_frames=5151
+LTP MEMORY chmod01 after_cleanup: free_frames=256102 allocated_frames=5151
+LTP CASE RUNTIME chmod01: 7305 ms
+========== END ltp chmod01 ==========
+========== START ltp chmod02 ==========
+RUN LTP CASE chmod02
+LTP MEMORY chmod02 before: free_frames=256102 allocated_frames=5151
+FAIL LTP CASE chmod02 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/chmod02
+LTP CASE RUNTIME chmod02: 54 ms
+========== END ltp chmod02 ==========
+========== START ltp fchmod02 ==========
+RUN LTP CASE fchmod02
+LTP MEMORY fchmod02 before: free_frames=256102 allocated_frames=5151
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+fchmod02.c:54: [1;34mTINFO: [0mgetgrnam(users) failed - try fallback daemon
+fchmod02.c:54: [1;31mTBROK: [0mgetgrnam(daemon) failed: ENOTSOCK (88)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[231.650609 0:177 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE fchmod02 : 2
+LTP MEMORY fchmod02 after_run: free_frames=256088 allocated_frames=5165
+LTP MEMORY fchmod02 after_cleanup: free_frames=256088 allocated_frames=5165
+LTP CASE RUNTIME fchmod02: 6522 ms
+========== END ltp fchmod02 ==========
+========== START ltp truncate01 ==========
+RUN LTP CASE truncate01
+LTP MEMORY truncate01 before: free_frames=256088 allocated_frames=5165
+FAIL LTP CASE truncate01 : -1
+missing ltp testcase: /musl/ltp/testcases/bin/truncate01
+LTP CASE RUNTIME truncate01: 57 ms
+========== END ltp truncate01 ==========
+========== START ltp truncate02 ==========
+RUN LTP CASE truncate02
+LTP MEMORY truncate02 before: free_frames=256088 allocated_frames=5165
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+truncate02.c:55: [1;31mTFAIL: [0mtruncate(testfile, 256) failed: ENOSYS (38)
+truncate02.c:55: [1;31mTFAIL: [0mtruncate(testfile, 512) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   2
+broken   0
+skipped  0
+warnings 0
+[37m[238.778057 0:181 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[238.792599 0:181 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE truncate02 : 1
+LTP MEMORY truncate02 after_run: free_frames=256074 allocated_frames=5179
+LTP MEMORY truncate02 after_cleanup: free_frames=256074 allocated_frames=5179
+LTP CASE RUNTIME truncate02: 7038 ms
+========== END ltp truncate02 ==========
+========== START ltp ftruncate01 ==========
+RUN LTP CASE ftruncate01
+LTP MEMORY ftruncate01 before: free_frames=256074 allocated_frames=5179
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+ftruncate01.c:65: [1;34mTINFO: [0mTruncated length smaller than file size
+ftruncate01.c:60: [1;32mTPASS: [0mftruncate() succeeded
+ftruncate01.c:74: [1;34mTINFO: [0mTruncated length exceeds file size
+ftruncate01.c:60: [1;32mTPASS: [0mftruncate() succeeded
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[246.143146 0:185 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[246.153507 0:185 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE ftruncate01 : 0
+Pass!
+LTP MEMORY ftruncate01 after_run: free_frames=256060 allocated_frames=5193
+LTP MEMORY ftruncate01 after_cleanup: free_frames=256060 allocated_frames=5193
+LTP CASE RUNTIME ftruncate01: 7462 ms
+========== END ltp ftruncate01 ==========
+========== START ltp ftruncate03 ==========
+RUN LTP CASE ftruncate03
+LTP MEMORY ftruncate03 before: free_frames=256060 allocated_frames=5193
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+[37m[252.744867 0:191 axfs::fops:151] [33m[AxError::InvalidInput][m
+[mftruncate03.c:70: [1;31mTBROK: [0mopen(testfile1,64,0644) failed: EINVAL (22)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[252.878684 0:189 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE ftruncate03 : 2
+LTP MEMORY ftruncate03 after_run: free_frames=256046 allocated_frames=5207
+LTP MEMORY ftruncate03 after_cleanup: free_frames=256046 allocated_frames=5207
+LTP CASE RUNTIME ftruncate03: 6709 ms
+========== END ltp ftruncate03 ==========
+========== START ltp getpgrp01 ==========
+RUN LTP CASE getpgrp01
+LTP MEMORY getpgrp01 before: free_frames=256046 allocated_frames=5207
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getpgrp01.c:18: [1;32mTPASS: [0mgetpgrp() returned pid 195
+getpgrp01.c:19: [1;32mTPASS: [0mTST_RET == SAFE_GETPGID(0) (195)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[261.008029 0:193 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE getpgrp01 : 0
+Pass!
+LTP MEMORY getpgrp01 after_run: free_frames=256032 allocated_frames=5221
+LTP MEMORY getpgrp01 after_cleanup: free_frames=256032 allocated_frames=5221
+LTP CASE RUNTIME getpgrp01: 8152 ms
+========== END ltp getpgrp01 ==========
+========== START ltp getgroups03 ==========
+RUN LTP CASE getgroups03
+LTP MEMORY getgroups03 before: free_frames=256032 allocated_frames=5221
+getgroups03    1  [1;32mTPASS[0m  :  getgroups functionality correct
+FAIL LTP CASE getgroups03 : 0
+Pass!
+LTP MEMORY getgroups03 after_run: free_frames=256025 allocated_frames=5228
+LTP MEMORY getgroups03 after_cleanup: free_frames=256025 allocated_frames=5228
+LTP CASE RUNTIME getgroups03: 6608 ms
+========== END ltp getgroups03 ==========
+========== START ltp getrlimit03 ==========
+RUN LTP CASE getrlimit03
+LTP MEMORY getrlimit03 before: free_frames=256025 allocated_frames=5228
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_memutils.c:152: [1;34mTINFO: [0moom_score_adj does not exist, skipping the adjustment
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(0) returned 0 (SUCCESS) but __NR_getrlimit(0) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(1) returned 0 (SUCCESS) but __NR_getrlimit(1) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(2) returned 0 (SUCCESS) but __NR_getrlimit(2) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(3) returned 0 (SUCCESS) but __NR_getrlimit(3) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(4) returned 0 (SUCCESS) but __NR_getrlimit(4) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(5) returned 0 (SUCCESS) but __NR_getrlimit(5) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(6) returned 0 (SUCCESS) but __NR_getrlimit(6) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(7) returned 0 (SUCCESS) but __NR_getrlimit(7) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(8) returned 0 (SUCCESS) but __NR_getrlimit(8) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(9) returned 0 (SUCCESS) but __NR_getrlimit(9) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(10) returned 0 (SUCCESS) but __NR_getrlimit(10) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(11) returned 0 (SUCCESS) but __NR_getrlimit(11) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(12) returned 0 (SUCCESS) but __NR_getrlimit(12) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(13) returned 0 (SUCCESS) but __NR_getrlimit(13) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(14) returned 0 (SUCCESS) but __NR_getrlimit(14) returned -1 (ENOSYS)
+getrlimit03.c:102: [1;31mTFAIL: [0m__NR_prlimit64(15) returned 0 (SUCCESS) but __NR_getrlimit(15) returned -1 (ENOSYS)
+
+Summary:
+passed   0
+failed   16
+broken   0
+skipped  0
+warnings 0
+[37m[274.022186 0:198 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE getrlimit03 : 1
+LTP MEMORY getrlimit03 after_run: free_frames=256011 allocated_frames=5242
+LTP MEMORY getrlimit03 after_cleanup: free_frames=256011 allocated_frames=5242
+LTP CASE RUNTIME getrlimit03: 6375 ms
+========== END ltp getrlimit03 ==========
+ltp cases: 27 passed, 31 failed, 0 timed out
+#### OS COMP TEST GROUP END ltp-musl ####
+#### OS COMP TEST GROUP START ltp-glibc ####
+ltp case list: inline (58 cases, timeout 20s)
+========== START ltp access02 ==========
+RUN LTP CASE access02
+LTP MEMORY access02 before: free_frames=256011 allocated_frames=5242
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+access02.c:139: TPASS: access(file_f, F_OK) as root behaviour is correct.
+access02.c:139: TPASS: access(file_f, F_OK) as nobody behaviour is correct.
+access02.c:139: TPASS: access(file_r, R_OK) as root behaviour is correct.
+access02.c:139: TPASS: access(file_r, R_OK) as nobody behaviour is correct.
+access02.c:139: TPASS: access(file_w, W_OK) as root behaviour is correct.
+access02.c:139: TPASS: access(file_w, W_OK) as nobody behaviour is correct.
+access02.c:129: TFAIL: execute file_x as root failed: SUCCESS (0)
+access02.c:129: TFAIL: execute file_x as nobody failed: SUCCESS (0)
+access02.c:139: TPASS: access(symlink_f, F_OK) as root behaviour is correct.
+access02.c:139: TPASS: access(symlink_f, F_OK) as nobody behaviour is correct.
+access02.c:139: TPASS: access(symlink_r, R_OK) as root behaviour is correct.
+access02.c:139: TPASS: access(symlink_r, R_OK) as nobody behaviour is correct.
+access02.c:139: TPASS: access(symlink_w, W_OK) as root behaviour is correct.
+access02.c:139: TPASS: access(symlink_w, W_OK) as nobody behaviour is correct.
+access02.c:129: TFAIL: execute file_x as root failed: SUCCESS (0)
+access02.c:129: TFAIL: execute file_x as nobody failed: SUCCESS (0)
+
+Summary:
+passed   12
+failed   4
+broken   0
+skipped  0
+warnings 0
+[37m[293.457555 0:202 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[293.461822 0:202 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[293.472480 0:202 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[293.497377 0:202 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[293.527663 0:202 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE access02 : 1
+LTP MEMORY access02 after_run: free_frames=255913 allocated_frames=5340
+LTP MEMORY access02 after_cleanup: free_frames=255913 allocated_frames=5340
+LTP CASE RUNTIME access02: 19248 ms
+========== END ltp access02 ==========
+========== START ltp access04 ==========
+RUN LTP CASE access04
+LTP MEMORY access04 before: free_frames=255913 allocated_frames=5340
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_test.c:1017: TINFO: Mounting (null) to /tmp/ltp-work/LTP_accHmcJxZ/mntpoint fstyp=tmpfs flags=21
+tst_test.c:1017: TBROK: mount((null), mntpoint, tmpfs, 33, (nil)) failed: EINVAL (22)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[302.442787 0:218 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[302.465396 0:218 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[302.482344 0:218 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[302.493171 0:218 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE access04 : 2
+LTP MEMORY access04 after_run: free_frames=255906 allocated_frames=5347
+LTP MEMORY access04 after_cleanup: free_frames=255906 allocated_frames=5347
+LTP CASE RUNTIME access04: 8954 ms
+========== END ltp access04 ==========
+========== START ltp faccessat01 ==========
+RUN LTP CASE faccessat01
+LTP MEMORY faccessat01 before: free_frames=255906 allocated_frames=5347
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+faccessat01.c:51: TPASS: faccessat(3, faccessatfile, R_OK, 0) passed
+faccessat01.c:51: TPASS: faccessat(3, /tmp/ltp-work/LTP_facuExJFp/faccessatdir/faccessatfile, R_OK, 0) passed
+faccessat01.c:51: TPASS: faccessat(-100, faccessatdir/faccessatfile, R_OK, 0) passed
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[314.425652 0:219 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[314.434644 0:219 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[314.450226 0:219 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE faccessat01 : 0
+Pass!
+LTP MEMORY faccessat01 after_run: free_frames=255892 allocated_frames=5361
+LTP MEMORY faccessat01 after_cleanup: free_frames=255892 allocated_frames=5361
+LTP CASE RUNTIME faccessat01: 11958 ms
+========== END ltp faccessat01 ==========
+========== START ltp open01 ==========
+RUN LTP CASE open01
+LTP MEMORY open01 before: free_frames=255892 allocated_frames=5361
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+open01.c:59: TPASS: sticky bit is set as expected
+open01.c:59: TPASS: sirectory bit is set as expected
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[324.631901 0:223 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[324.633782 0:223 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE open01 : 0
+Pass!
+LTP MEMORY open01 after_run: free_frames=255878 allocated_frames=5375
+LTP MEMORY open01 after_cleanup: free_frames=255878 allocated_frames=5375
+LTP CASE RUNTIME open01: 10227 ms
+========== END ltp open01 ==========
+========== START ltp open02 ==========
+RUN LTP CASE open02
+LTP MEMORY open02 before: free_frames=255878 allocated_frames=5375
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+open02.c:49: TPASS: open() new file without O_CREAT : ENOENT (2)
+open02.c:49: TPASS: open() unprivileged O_RDONLY | O_NOATIME : EPERM (1)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[335.561131 0:227 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[335.564157 0:227 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE open02 : 0
+Pass!
+LTP MEMORY open02 after_run: free_frames=255864 allocated_frames=5389
+LTP MEMORY open02 after_cleanup: free_frames=255864 allocated_frames=5389
+LTP CASE RUNTIME open02: 10920 ms
+========== END ltp open02 ==========
+========== START ltp openat01 ==========
+RUN LTP CASE openat01
+LTP MEMORY openat01 before: free_frames=255864 allocated_frames=5389
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+openat01.c:71: TPASS: openat(*tc->dir_fd, tc->pathname, O_RDWR, 0600) returned fd 5
+openat01.c:71: TPASS: openat(*tc->dir_fd, tc->pathname, O_RDWR, 0600) returned fd 5
+openat01.c:64: TPASS: openat with a filefd instead of dirfd : ENOTDIR (20)
+openat01.c:67: TPASS: openat with invalid fd : EBADF (9)
+openat01.c:71: TPASS: openat(*tc->dir_fd, tc->pathname, O_RDWR, 0600) returned fd 5
+
+Summary:
+passed   5
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[346.364330 0:231 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[346.383720 0:231 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[346.400588 0:231 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE openat01 : 0
+Pass!
+LTP MEMORY openat01 after_run: free_frames=255850 allocated_frames=5403
+LTP MEMORY openat01 after_cleanup: free_frames=255850 allocated_frames=5403
+LTP CASE RUNTIME openat01: 10827 ms
+========== END ltp openat01 ==========
+========== START ltp close01 ==========
+RUN LTP CASE close01
+LTP MEMORY close01 before: free_frames=255850 allocated_frames=5403
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+close01.c:50: TPASS: close a file fd passed
+close01.c:50: TPASS: close a pipe fd passed
+close01.c:50: TPASS: close a socket fd passed
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[357.865007 0:235 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[357.885522 0:235 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE close01 : 0
+Pass!
+LTP MEMORY close01 after_run: free_frames=255836 allocated_frames=5417
+LTP MEMORY close01 after_cleanup: free_frames=255836 allocated_frames=5417
+LTP CASE RUNTIME close01: 11434 ms
+========== END ltp close01 ==========
+========== START ltp close02 ==========
+RUN LTP CASE close02
+LTP MEMORY close02 before: free_frames=255836 allocated_frames=5417
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+close02.c:20: TPASS: close(-1) : EBADF (9)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[367.136254 0:239 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE close02 : 0
+Pass!
+LTP MEMORY close02 after_run: free_frames=255822 allocated_frames=5431
+LTP MEMORY close02 after_cleanup: free_frames=255822 allocated_frames=5431
+LTP CASE RUNTIME close02: 9255 ms
+========== END ltp close02 ==========
+========== START ltp dup01 ==========
+RUN LTP CASE dup01
+LTP MEMORY dup01 before: free_frames=255822 allocated_frames=5431
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup01.c:24: TPASS: dup(fd) returned fd 4
+dup01.c:27: TPASS: buf1.st_ino == buf2.st_ino (1661929382267268710)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[375.821935 0:243 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[375.853727 0:243 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup01 : 0
+Pass!
+LTP MEMORY dup01 after_run: free_frames=255808 allocated_frames=5445
+LTP MEMORY dup01 after_cleanup: free_frames=255808 allocated_frames=5445
+LTP CASE RUNTIME dup01: 8732 ms
+========== END ltp dup01 ==========
+========== START ltp dup02 ==========
+RUN LTP CASE dup02
+LTP MEMORY dup02 before: free_frames=255808 allocated_frames=5445
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup02.c:29: TPASS: dup(-1) : EBADF (9)
+dup02.c:29: TPASS: dup(1500) : EBADF (9)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[385.503863 0:247 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup02 : 0
+Pass!
+LTP MEMORY dup02 after_run: free_frames=255794 allocated_frames=5459
+LTP MEMORY dup02 after_cleanup: free_frames=255794 allocated_frames=5459
+LTP CASE RUNTIME dup02: 9690 ms
+========== END ltp dup02 ==========
+========== START ltp dup03 ==========
+RUN LTP CASE dup03
+LTP MEMORY dup03 before: free_frames=255794 allocated_frames=5459
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup03.c:22: TFAIL: dup(3) succeeded
+
+Summary:
+passed   0
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[396.740356 0:251 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[396.742378 0:251 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup03 : 1
+LTP MEMORY dup03 after_run: free_frames=255780 allocated_frames=5473
+LTP MEMORY dup03 after_cleanup: free_frames=255780 allocated_frames=5473
+LTP CASE RUNTIME dup03: 11225 ms
+========== END ltp dup03 ==========
+========== START ltp dup05 ==========
+RUN LTP CASE dup05
+LTP MEMORY dup05 before: free_frames=255780 allocated_frames=5473
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup05.c:28: TBROK: mkfifo(dupfile, 0777) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[405.395603 0:255 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup05 : 2
+LTP MEMORY dup05 after_run: free_frames=255766 allocated_frames=5487
+LTP MEMORY dup05 after_cleanup: free_frames=255766 allocated_frames=5487
+LTP CASE RUNTIME dup05: 8569 ms
+========== END ltp dup05 ==========
+========== START ltp dup201 ==========
+RUN LTP CASE dup201
+LTP MEMORY dup201 before: free_frames=255766 allocated_frames=5487
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup201.c:47: TPASS: dup2(-1, 5) : EBADF (9)
+dup201.c:47: TPASS: dup2(1024, 5) : EBADF (9)
+dup201.c:47: TPASS: dup2(0, -1) : EBADF (9)
+dup201.c:47: TFAIL: dup2(0, 1024) succeeded
+
+Summary:
+passed   3
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[414.980420 0:259 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup201 : 1
+LTP MEMORY dup201 after_run: free_frames=255752 allocated_frames=5501
+LTP MEMORY dup201 after_cleanup: free_frames=255752 allocated_frames=5501
+LTP CASE RUNTIME dup201: 9529 ms
+========== END ltp dup201 ==========
+========== START ltp dup202 ==========
+RUN LTP CASE dup202
+LTP MEMORY dup202 before: free_frames=255752 allocated_frames=5501
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+dup202.c:104: TPASS: original(100444) and duped(100444) are the same mode
+dup202.c:104: TPASS: original(100222) and duped(100222) are the same mode
+dup202.c:104: TPASS: original(100666) and duped(100666) are the same mode
+dup202.c:93: TINFO: original mode 0777, new mode 0444 after chmod
+dup202.c:104: TPASS: original(100444) and duped(100444) are the same mode
+dup202.c:93: TINFO: original mode 0777, new mode 0222 after chmod
+dup202.c:104: TPASS: original(100222) and duped(100222) are the same mode
+dup202.c:93: TINFO: original mode 0777, new mode 0666 after chmod
+dup202.c:104: TPASS: original(100666) and duped(100666) are the same mode
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[422.937495 0:263 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE dup202 : 0
+Pass!
+LTP MEMORY dup202 after_run: free_frames=255738 allocated_frames=5515
+LTP MEMORY dup202 after_cleanup: free_frames=255738 allocated_frames=5515
+LTP CASE RUNTIME dup202: 8020 ms
+========== END ltp dup202 ==========
+========== START ltp pipe01 ==========
+RUN LTP CASE pipe01
+LTP MEMORY pipe01 before: free_frames=255738 allocated_frames=5515
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+pipe01.c:48: TPASS: pipe() functionality is correct
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[430.426198 0:268 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pipe01 : 0
+Pass!
+LTP MEMORY pipe01 after_run: free_frames=255724 allocated_frames=5529
+LTP MEMORY pipe01 after_cleanup: free_frames=255724 allocated_frames=5529
+LTP CASE RUNTIME pipe01: 7527 ms
+========== END ltp pipe01 ==========
+========== START ltp pipe02 ==========
+RUN LTP CASE pipe02
+LTP MEMORY pipe02 before: free_frames=255724 allocated_frames=5529
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+pipe02.c:70: TFAIL: Child wasn't killed by signal
+
+Summary:
+passed   0
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[441.111324 0:273 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[441.130167 0:273 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pipe02 : 1
+LTP MEMORY pipe02 after_run: free_frames=255703 allocated_frames=5550
+LTP MEMORY pipe02 after_cleanup: free_frames=255703 allocated_frames=5550
+LTP CASE RUNTIME pipe02: 10663 ms
+========== END ltp pipe02 ==========
+========== START ltp pipe04 ==========
+RUN LTP CASE pipe04
+LTP MEMORY pipe04 before: free_frames=255703 allocated_frames=5550
+pipe04      1  TPASS  :  Child 1 killed while writing to a pipe
+pipe04      2  TPASS  :  Child 2 killed while writing to a pipe
+FAIL LTP CASE pipe04 : 0
+Pass!
+LTP MEMORY pipe04 after_run: free_frames=255682 allocated_frames=5571
+LTP MEMORY pipe04 after_cleanup: free_frames=255682 allocated_frames=5571
+LTP CASE RUNTIME pipe04: 9640 ms
+========== END ltp pipe04 ==========
+========== START ltp pipe05 ==========
+RUN LTP CASE pipe05
+LTP MEMORY pipe05 before: free_frames=255682 allocated_frames=5571
+pipe05      1  TPASS  :  expected failure - errno = 14 : Bad address
+FAIL LTP CASE pipe05 : 0
+Pass!
+LTP MEMORY pipe05 after_run: free_frames=255675 allocated_frames=5578
+LTP MEMORY pipe05 after_cleanup: free_frames=255675 allocated_frames=5578
+LTP CASE RUNTIME pipe05: 10572 ms
+========== END ltp pipe05 ==========
+========== START ltp lseek01 ==========
+RUN LTP CASE lseek01
+LTP MEMORY lseek01 before: free_frames=255675 allocated_frames=5578
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+lseek01.c:67: TPASS: lseek(tfile, 4, SEEK_SET) read correct data
+lseek01.c:67: TPASS: lseek(tfile, -2, SEEK_CUR) read correct data
+lseek01.c:67: TPASS: lseek(tfile, -4, SEEK_END) read correct data
+lseek01.c:67: TPASS: lseek(tfile, 0, SEEK_END) read correct data
+
+Summary:
+passed   4
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[473.831612 0:284 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[473.834285 0:284 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE lseek01 : 0
+Pass!
+LTP MEMORY lseek01 after_run: free_frames=255661 allocated_frames=5592
+LTP MEMORY lseek01 after_cleanup: free_frames=255661 allocated_frames=5592
+LTP CASE RUNTIME lseek01: 12474 ms
+========== END ltp lseek01 ==========
+========== START ltp lseek02 ==========
+RUN LTP CASE lseek02
+LTP MEMORY lseek02 before: free_frames=255661 allocated_frames=5592
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+lseek02.c:76: TBROK: mkfifo(tfifo1, 0777) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[483.792489 0:288 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[483.794604 0:288 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE lseek02 : 2
+LTP MEMORY lseek02 after_run: free_frames=255647 allocated_frames=5606
+LTP MEMORY lseek02 after_cleanup: free_frames=255647 allocated_frames=5606
+LTP CASE RUNTIME lseek02: 9973 ms
+========== END ltp lseek02 ==========
+========== START ltp pread01 ==========
+RUN LTP CASE pread01
+LTP MEMORY pread01 before: free_frames=255647 allocated_frames=5606
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+pread01.c:56: TPASS: Functionality of pread() is correct
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[493.211863 0:292 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[493.234999 0:292 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pread01 : 0
+Pass!
+LTP MEMORY pread01 after_run: free_frames=255633 allocated_frames=5620
+LTP MEMORY pread01 after_cleanup: free_frames=255633 allocated_frames=5620
+LTP CASE RUNTIME pread01: 9437 ms
+========== END ltp pread01 ==========
+========== START ltp pwrite01 ==========
+RUN LTP CASE pwrite01
+LTP MEMORY pwrite01 before: free_frames=255633 allocated_frames=5620
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+pwrite01.c:60: TPASS: Functionality of pwrite() successful
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[502.276234 0:297 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[502.281733 0:297 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE pwrite01 : 0
+Pass!
+LTP MEMORY pwrite01 after_run: free_frames=255619 allocated_frames=5634
+LTP MEMORY pwrite01 after_cleanup: free_frames=255619 allocated_frames=5634
+LTP CASE RUNTIME pwrite01: 8984 ms
+========== END ltp pwrite01 ==========
+========== START ltp readlink01 ==========
+RUN LTP CASE readlink01
+LTP MEMORY readlink01 before: free_frames=255619 allocated_frames=5634
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+readlink01.c:64: TINFO: Running test as root
+readlink01.c:45: TPASS: readlink() functionality on 'slink_file' was correct
+readlink01.c:55: TINFO: Running test as nobody
+readlink01.c:45: TPASS: readlink() functionality on 'slink_file' was correct
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[508.577840 0:301 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[508.585564 0:301 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE readlink01 : 0
+Pass!
+LTP MEMORY readlink01 after_run: free_frames=255598 allocated_frames=5655
+LTP MEMORY readlink01 after_cleanup: free_frames=255598 allocated_frames=5655
+LTP CASE RUNTIME readlink01: 6286 ms
+========== END ltp readlink01 ==========
+========== START ltp readlinkat01 ==========
+RUN LTP CASE readlinkat01
+LTP MEMORY readlinkat01 before: free_frames=255598 allocated_frames=5655
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+[37m[515.305576 0:308 axfs::fops:151] [33m[AxError::InvalidInput][m
+[mreadlinkat01.c:74: TBROK: open(readlink_file,64,0600) failed: EINVAL (22)
+readlinkat01.c:86: TWARN: close(0) failed: EBADF (9)
+readlinkat01.c:89: TWARN: close(0) failed: EBADF (9)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 2
+[37m[515.513809 0:306 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE readlinkat01 : 6
+LTP MEMORY readlinkat01 after_run: free_frames=255584 allocated_frames=5669
+LTP MEMORY readlinkat01 after_cleanup: free_frames=255584 allocated_frames=5669
+LTP CASE RUNTIME readlinkat01: 7005 ms
+========== END ltp readlinkat01 ==========
+========== START ltp readlinkat02 ==========
+RUN LTP CASE readlinkat02
+LTP MEMORY readlinkat02 before: free_frames=255584 allocated_frames=5669
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+readlinkat02.c:56: TPASS: readlinkat(3, symlink_file, NULL, 0) : EINVAL (22)
+readlinkat02.c:56: TFAIL: readlinkat(3, test_file, NULL, 256) expected EINVAL: ENOTDIR (20)
+readlinkat02.c:56: TPASS: readlinkat(4, symlink_file, NULL, 256) : ENOTDIR (20)
+readlinkat02.c:56: TPASS: readlinkat(3, test_file/test_file, NULL, 256) : ENOTDIR (20)
+readlinkat02.c:56: TPASS: readlinkat(-1, symlink_file, NULL, 256) : EBADF (9)
+readlinkat02.c:56: TFAIL: readlinkat(3, does_not_exists, NULL, 256) expected ENOENT: ENOTDIR (20)
+
+Summary:
+passed   4
+failed   2
+broken   0
+skipped  0
+warnings 0
+[37m[522.679482 0:310 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[522.691852 0:310 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE readlinkat02 : 1
+LTP MEMORY readlinkat02 after_run: free_frames=255570 allocated_frames=5683
+LTP MEMORY readlinkat02 after_cleanup: free_frames=255570 allocated_frames=5683
+LTP CASE RUNTIME readlinkat02: 7094 ms
+========== END ltp readlinkat02 ==========
+========== START ltp link01 ==========
+RUN LTP CASE link01
+LTP MEMORY link01 before: free_frames=255570 allocated_frames=5683
+FAIL LTP CASE link01 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/link01
+LTP CASE RUNTIME link01: 65 ms
+========== END ltp link01 ==========
+========== START ltp link02 ==========
+RUN LTP CASE link02
+LTP MEMORY link02 before: free_frames=255570 allocated_frames=5683
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+link02.c:26: TFAIL: link(OLDPATH, NEWPATH) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[528.140358 0:314 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[528.142185 0:314 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE link02 : 1
+LTP MEMORY link02 after_run: free_frames=255556 allocated_frames=5697
+LTP MEMORY link02 after_cleanup: free_frames=255556 allocated_frames=5697
+LTP CASE RUNTIME link02: 5365 ms
+========== END ltp link02 ==========
+========== START ltp linkat01 ==========
+RUN LTP CASE linkat01
+LTP MEMORY linkat01 before: free_frames=255556 allocated_frames=5697
+[37m[533.646111 0:318 axfs::fops:151] [33m[AxError::InvalidInput][m
+[m[37m[533.721405 0:318 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[533.728195 0:318 axfs::root:433] [33m[AxError::IsADirectory][m
+[mlinkat01    1  TBROK  :  linkat01.c:303: open(olddir/oldfile,192,0600) failed: errno=EINVAL(22): Invalid argument
+linkat01    2  TBROK  :  linkat01.c:303: Remaining cases broken
+FAIL LTP CASE linkat01 : 2
+LTP MEMORY linkat01 after_run: free_frames=255549 allocated_frames=5704
+LTP MEMORY linkat01 after_cleanup: free_frames=255549 allocated_frames=5704
+LTP CASE RUNTIME linkat01: 5573 ms
+========== END ltp linkat01 ==========
+========== START ltp unlink01 ==========
+RUN LTP CASE unlink01
+LTP MEMORY unlink01 before: free_frames=255549 allocated_frames=5704
+FAIL LTP CASE unlink01 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/unlink01
+LTP CASE RUNTIME unlink01: 12 ms
+========== END ltp unlink01 ==========
+========== START ltp unlink05 ==========
+RUN LTP CASE unlink05
+LTP MEMORY unlink05 before: free_frames=255549 allocated_frames=5704
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+unlink05.c:61: TPASS: unlink(file) succeeded
+unlink05.c:31: TBROK: mkfifo(tfifo_321, 0777) failed: ENOSYS (38)
+
+Summary:
+passed   1
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[538.600995 0:319 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE unlink05 : 2
+LTP MEMORY unlink05 after_run: free_frames=255535 allocated_frames=5718
+LTP MEMORY unlink05 after_cleanup: free_frames=255535 allocated_frames=5718
+LTP CASE RUNTIME unlink05: 4898 ms
+========== END ltp unlink05 ==========
+========== START ltp unlinkat01 ==========
+RUN LTP CASE unlinkat01
+LTP MEMORY unlinkat01 before: free_frames=255535 allocated_frames=5718
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: SUCCESS (0)
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: SUCCESS (0)
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: ENOTDIR (20)
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: EBADF (9)
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: EINVAL (22)
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: SUCCESS (0)
+unlinkat01.c:79: TPASS: unlinkat() returned expected errno: SUCCESS (0)
+
+Summary:
+passed   7
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[544.014293 0:323 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[544.031247 0:323 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE unlinkat01 : 0
+Pass!
+LTP MEMORY unlinkat01 after_run: free_frames=255521 allocated_frames=5732
+LTP MEMORY unlinkat01 after_cleanup: free_frames=255521 allocated_frames=5732
+LTP CASE RUNTIME unlinkat01: 5443 ms
+========== END ltp unlinkat01 ==========
+========== START ltp rename01 ==========
+RUN LTP CASE rename01
+LTP MEMORY rename01 before: free_frames=255521 allocated_frames=5732
+tst_device.c:293: TWARN: Failed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: TBROK: Failed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[549.155084 0:327 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[549.161921 0:327 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE rename01 : 6
+LTP MEMORY rename01 after_run: free_frames=255514 allocated_frames=5739
+LTP MEMORY rename01 after_cleanup: free_frames=255514 allocated_frames=5739
+LTP CASE RUNTIME rename01: 5102 ms
+========== END ltp rename01 ==========
+========== START ltp renameat01 ==========
+RUN LTP CASE renameat01
+LTP MEMORY renameat01 before: free_frames=255514 allocated_frames=5739
+[37m[555.939481 0:328 axfs::root:433] [33m[AxError::IsADirectory][m
+[mrenameat01    0  TWARN  :  tst_device.c:293: Failed to create test_dev.img: errno=ENOSPC(28): No space left on device
+renameat01    1  TBROK  :  tst_device.c:354: Failed to acquire device
+renameat01    2  TBROK  :  tst_device.c:354: Remaining cases broken
+FAIL LTP CASE renameat01 : 6
+LTP MEMORY renameat01 after_run: free_frames=255507 allocated_frames=5746
+LTP MEMORY renameat01 after_cleanup: free_frames=255507 allocated_frames=5746
+LTP CASE RUNTIME renameat01: 6747 ms
+========== END ltp renameat01 ==========
+========== START ltp mkdir01 ==========
+RUN LTP CASE mkdir01
+LTP MEMORY mkdir01 before: free_frames=255507 allocated_frames=5746
+FAIL LTP CASE mkdir01 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/mkdir01
+LTP CASE RUNTIME mkdir01: 36 ms
+========== END ltp mkdir01 ==========
+========== START ltp mkdir02 ==========
+RUN LTP CASE mkdir02
+LTP MEMORY mkdir02 before: free_frames=255507 allocated_frames=5746
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+mkdir02.c:56: TINFO: Found unused GID 1: SUCCESS (0)
+mkdir02.c:34: TFAIL: New dir FAILED to inherit GID: has 0, expected 1
+mkdir02.c:41: TFAIL: New dir FAILED to inherit S_ISGID
+
+Summary:
+passed   0
+failed   2
+broken   0
+skipped  0
+warnings 0
+[37m[560.223493 0:329 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[560.228830 0:329 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE mkdir02 : 1
+LTP MEMORY mkdir02 after_run: free_frames=255493 allocated_frames=5760
+LTP MEMORY mkdir02 after_cleanup: free_frames=255493 allocated_frames=5760
+LTP CASE RUNTIME mkdir02: 4231 ms
+========== END ltp mkdir02 ==========
+========== START ltp mkdirat01 ==========
+RUN LTP CASE mkdirat01
+LTP MEMORY mkdirat01 before: free_frames=255493 allocated_frames=5760
+[37m[563.527601 0:333 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[563.547146 0:333 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[563.560151 0:333 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[563.576411 0:333 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[563.587776 0:333 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[563.590021 0:333 axfs::root:433] [33m[AxError::IsADirectory][m
+[mmkdirat01    1  TPASS  :  mkdirat() returned 0: TEST_ERRNO=SUCCESS(0): Success
+mkdirat01    2  TPASS  :  mkdirat() returned 0: TEST_ERRNO=SUCCESS(0): Success
+mkdirat01    3  TPASS  :  mkdirat() returned 0: TEST_ERRNO=SUCCESS(0): Success
+mkdirat01    4  TPASS  :  mkdirat() returned -1: TEST_ERRNO=ENOTDIR(20): Not a directory
+mkdirat01    5  TPASS  :  mkdirat() returned -1: TEST_ERRNO=EBADF(9): Bad file descriptor
+FAIL LTP CASE mkdirat01 : 0
+Pass!
+LTP MEMORY mkdirat01 after_run: free_frames=255486 allocated_frames=5767
+LTP MEMORY mkdirat01 after_cleanup: free_frames=255486 allocated_frames=5767
+LTP CASE RUNTIME mkdirat01: 3363 ms
+========== END ltp mkdirat01 ==========
+========== START ltp rmdir01 ==========
+RUN LTP CASE rmdir01
+LTP MEMORY rmdir01 before: free_frames=255486 allocated_frames=5767
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+rmdir01.c:33: TPASS: rmdir(testdir) success
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[567.616287 0:334 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE rmdir01 : 0
+Pass!
+LTP MEMORY rmdir01 after_run: free_frames=255472 allocated_frames=5781
+LTP MEMORY rmdir01 after_cleanup: free_frames=255472 allocated_frames=5781
+LTP CASE RUNTIME rmdir01: 4003 ms
+========== END ltp rmdir01 ==========
+========== START ltp stat01 ==========
+RUN LTP CASE stat01
+LTP MEMORY stat01 before: free_frames=255472 allocated_frames=5781
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+stat01.c:43: TPASS: stat(tc->pathname, &stat_buf) passed
+stat01.c:45: TPASS: stat_buf.st_uid == user_id (65534)
+stat01.c:46: TPASS: stat_buf.st_gid == group_id (0)
+stat01.c:47: TPASS: stat_buf.st_size == FILE_SIZE (1024)
+stat01.c:48: TPASS: stat_buf.st_mode & MASK == tc->mode (438)
+stat01.c:49: TPASS: stat_buf.st_nlink == 1 (1)
+stat01.c:43: TPASS: stat(tc->pathname, &stat_buf) passed
+stat01.c:45: TPASS: stat_buf.st_uid == user_id (65534)
+stat01.c:46: TPASS: stat_buf.st_gid == group_id (0)
+stat01.c:47: TPASS: stat_buf.st_size == FILE_SIZE (1024)
+stat01.c:48: TPASS: stat_buf.st_mode & MASK == tc->mode (146)
+stat01.c:49: TPASS: stat_buf.st_nlink == 1 (1)
+
+Summary:
+passed   12
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[572.274885 0:338 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[572.284234 0:338 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[572.291975 0:338 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE stat01 : 0
+Pass!
+LTP MEMORY stat01 after_run: free_frames=255458 allocated_frames=5795
+LTP MEMORY stat01 after_cleanup: free_frames=255458 allocated_frames=5795
+LTP CASE RUNTIME stat01: 4708 ms
+========== END ltp stat01 ==========
+========== START ltp stat02 ==========
+RUN LTP CASE stat02
+LTP MEMORY stat02 before: free_frames=255458 allocated_frames=5795
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+stat02.c:67: TPASS: File size reported as expected
+stat02.c:67: TPASS: File size reported as expected
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[578.801912 0:343 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE stat02 : 0
+Pass!
+LTP MEMORY stat02 after_run: free_frames=255444 allocated_frames=5809
+LTP MEMORY stat02 after_cleanup: free_frames=255444 allocated_frames=5809
+LTP CASE RUNTIME stat02: 6531 ms
+========== END ltp stat02 ==========
+========== START ltp fstat01 ==========
+RUN LTP CASE fstat01
+LTP MEMORY fstat01 before: free_frames=255444 allocated_frames=5809
+FAIL LTP CASE fstat01 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/fstat01
+LTP CASE RUNTIME fstat01: 27 ms
+========== END ltp fstat01 ==========
+========== START ltp lstat01 ==========
+RUN LTP CASE lstat01
+LTP MEMORY lstat01 before: free_frames=255444 allocated_frames=5809
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+lstat01.c:46: TPASS: lstat() reported correct values for the symlink!
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[584.741408 0:347 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[584.757650 0:347 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE lstat01 : 0
+Pass!
+LTP MEMORY lstat01 after_run: free_frames=255430 allocated_frames=5823
+LTP MEMORY lstat01 after_cleanup: free_frames=255430 allocated_frames=5823
+LTP CASE RUNTIME lstat01: 5945 ms
+========== END ltp lstat01 ==========
+========== START ltp statfs01 ==========
+RUN LTP CASE statfs01
+LTP MEMORY statfs01 before: free_frames=255430 allocated_frames=5823
+tst_device.c:293: TWARN: Failed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: TBROK: Failed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[590.724250 0:351 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[590.731814 0:351 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE statfs01 : 6
+LTP MEMORY statfs01 after_run: free_frames=255423 allocated_frames=5830
+LTP MEMORY statfs01 after_cleanup: free_frames=255423 allocated_frames=5830
+LTP CASE RUNTIME statfs01: 5927 ms
+========== END ltp statfs01 ==========
+========== START ltp statfs02 ==========
+RUN LTP CASE statfs02
+LTP MEMORY statfs02 before: free_frames=255423 allocated_frames=5830
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+[37m[599.519936 0:355 axfs_ramfs::file:69] [33m[AxError::NotADirectory][m
+[mstatfs02.c:57: TPASS: statfs() : ENOTDIR (20)
+statfs02.c:57: TPASS: statfs() : ENOENT (2)
+statfs02.c:57: TFAIL: statfs() expected ENAMETOOLONG: ENOENT (2)
+statfs02.c:57: TPASS: statfs() : EFAULT (14)
+statfs02.c:57: TPASS: statfs() : EFAULT (14)
+statfs02.c:57: TPASS: statfs() : ELOOP (40)
+
+Summary:
+passed   5
+failed   1
+broken   0
+skipped  0
+warnings 0
+[37m[600.878242 0:352 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[600.885975 0:352 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE statfs02 : 1
+LTP MEMORY statfs02 after_run: free_frames=255367 allocated_frames=5886
+LTP MEMORY statfs02 after_cleanup: free_frames=255367 allocated_frames=5886
+LTP CASE RUNTIME statfs02: 10154 ms
+========== END ltp statfs02 ==========
+========== START ltp fstatfs01 ==========
+RUN LTP CASE fstatfs01
+LTP MEMORY fstatfs01 before: free_frames=255367 allocated_frames=5886
+tst_device.c:293: TWARN: Failed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: TBROK: Failed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[606.758934 0:363 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[606.781313 0:363 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE fstatfs01 : 6
+LTP MEMORY fstatfs01 after_run: free_frames=255360 allocated_frames=5893
+LTP MEMORY fstatfs01 after_cleanup: free_frames=255360 allocated_frames=5893
+LTP CASE RUNTIME fstatfs01: 5911 ms
+========== END ltp fstatfs01 ==========
+========== START ltp fstatfs02 ==========
+RUN LTP CASE fstatfs02
+LTP MEMORY fstatfs02 before: free_frames=255360 allocated_frames=5893
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+fstatfs02.c:40: TPASS: fstatfs() : EBADF (9)
+fstatfs02.c:40: TPASS: fstatfs() : EFAULT (14)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[615.781187 0:364 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[615.819581 0:364 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE fstatfs02 : 0
+Pass!
+LTP MEMORY fstatfs02 after_run: free_frames=255332 allocated_frames=5921
+LTP MEMORY fstatfs02 after_cleanup: free_frames=255332 allocated_frames=5921
+LTP CASE RUNTIME fstatfs02: 9097 ms
+========== END ltp fstatfs02 ==========
+========== START ltp statvfs01 ==========
+RUN LTP CASE statvfs01
+LTP MEMORY statvfs01 before: free_frames=255332 allocated_frames=5921
+tst_device.c:293: TWARN: Failed to create test_dev.img: ENOSPC (28)
+tst_device.c:354: TBROK: Failed to acquire device
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+[37m[622.374309 0:370 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[622.384928 0:370 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE statvfs01 : 6
+LTP MEMORY statvfs01 after_run: free_frames=255325 allocated_frames=5928
+LTP MEMORY statvfs01 after_cleanup: free_frames=255325 allocated_frames=5928
+LTP CASE RUNTIME statvfs01: 6499 ms
+========== END ltp statvfs01 ==========
+========== START ltp fstatvfs01 ==========
+RUN LTP CASE fstatvfs01
+LTP MEMORY fstatvfs01 before: free_frames=255325 allocated_frames=5928
+FAIL LTP CASE fstatvfs01 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/fstatvfs01
+LTP CASE RUNTIME fstatvfs01: 63 ms
+========== END ltp fstatvfs01 ==========
+========== START ltp sysinfo01 ==========
+RUN LTP CASE sysinfo01
+LTP MEMORY sysinfo01 before: free_frames=255325 allocated_frames=5928
+sysinfo01    1  TPASS  :  Test to check the return code PASSED
+FAIL LTP CASE sysinfo01 : 0
+Pass!
+LTP MEMORY sysinfo01 after_run: free_frames=255318 allocated_frames=5935
+LTP MEMORY sysinfo01 after_cleanup: free_frames=255318 allocated_frames=5935
+LTP CASE RUNTIME sysinfo01: 6675 ms
+========== END ltp sysinfo01 ==========
+========== START ltp chmod01 ==========
+RUN LTP CASE chmod01
+LTP MEMORY chmod01 before: free_frames=255318 allocated_frames=5935
+tst_buffers.c:57: TINFO: Test is using guarded buffers
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: TINFO: Testing variant: verify permissions of file
+chmod01.c:40: TPASS: chmod(testfile, 0000) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0000
+chmod01.c:40: TPASS: chmod(testfile, 0007) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0007
+chmod01.c:40: TPASS: chmod(testfile, 0070) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0070
+chmod01.c:40: TPASS: chmod(testfile, 0700) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0700
+chmod01.c:40: TPASS: chmod(testfile, 0777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=0777
+chmod01.c:40: TPASS: chmod(testfile, 2777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=2777
+chmod01.c:40: TPASS: chmod(testfile, 4777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=4777
+chmod01.c:40: TPASS: chmod(testfile, 6777) passed
+chmod01.c:50: TPASS: stat(testfile) mode=6777
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+chmod01.c:60: TINFO: Testing variant: verify permissions of directory
+chmod01.c:40: TPASS: chmod(testdir_1, 0000) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0000
+chmod01.c:40: TPASS: chmod(testdir_1, 0007) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0007
+chmod01.c:40: TPASS: chmod(testdir_1, 0070) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0070
+chmod01.c:40: TPASS: chmod(testdir_1, 0700) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0700
+chmod01.c:40: TPASS: chmod(testdir_1, 0777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=0777
+chmod01.c:40: TPASS: chmod(testdir_1, 2777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=2777
+chmod01.c:40: TPASS: chmod(testdir_1, 4777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=4777
+chmod01.c:40: TPASS: chmod(testdir_1, 6777) passed
+chmod01.c:50: TPASS: stat(testdir_1) mode=6777
+
+Summary:
+passed   32
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[639.538439 0:372 axfs::root:433] [33m[AxError::IsADirectory][m
+[m[37m[639.557601 0:372 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[639.566727 0:372 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE chmod01 : 0
+Pass!
+LTP MEMORY chmod01 after_run: free_frames=255297 allocated_frames=5956
+LTP MEMORY chmod01 after_cleanup: free_frames=255297 allocated_frames=5956
+LTP CASE RUNTIME chmod01: 10498 ms
+========== END ltp chmod01 ==========
+========== START ltp chmod02 ==========
+RUN LTP CASE chmod02
+LTP MEMORY chmod02 before: free_frames=255297 allocated_frames=5956
+FAIL LTP CASE chmod02 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/chmod02
+LTP CASE RUNTIME chmod02: 49 ms
+========== END ltp chmod02 ==========
+========== START ltp fchmod02 ==========
+RUN LTP CASE fchmod02
+LTP MEMORY fchmod02 before: free_frames=255297 allocated_frames=5956
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+fchmod02.c:54: TINFO: getgrnam(users) failed - try fallback daemon
+fchmod02.c:54: TBROK: getgrnam(daemon) failed: SUCCESS (0)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[646.731482 0:379 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE fchmod02 : 2
+LTP MEMORY fchmod02 after_run: free_frames=255283 allocated_frames=5970
+LTP MEMORY fchmod02 after_cleanup: free_frames=255283 allocated_frames=5970
+LTP CASE RUNTIME fchmod02: 7105 ms
+========== END ltp fchmod02 ==========
+========== START ltp truncate01 ==========
+RUN LTP CASE truncate01
+LTP MEMORY truncate01 before: free_frames=255283 allocated_frames=5970
+FAIL LTP CASE truncate01 : -1
+missing ltp testcase: /glibc/ltp/testcases/bin/truncate01
+LTP CASE RUNTIME truncate01: 24 ms
+========== END ltp truncate01 ==========
+========== START ltp truncate02 ==========
+RUN LTP CASE truncate02
+LTP MEMORY truncate02 before: free_frames=255283 allocated_frames=5970
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+truncate02.c:55: TFAIL: truncate(testfile, 256) failed: ENOSYS (38)
+truncate02.c:55: TFAIL: truncate(testfile, 512) failed: ENOSYS (38)
+
+Summary:
+passed   0
+failed   2
+broken   0
+skipped  0
+warnings 0
+[37m[654.311787 0:383 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[654.328000 0:383 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE truncate02 : 1
+LTP MEMORY truncate02 after_run: free_frames=255269 allocated_frames=5984
+LTP MEMORY truncate02 after_cleanup: free_frames=255269 allocated_frames=5984
+LTP CASE RUNTIME truncate02: 7519 ms
+========== END ltp truncate02 ==========
+========== START ltp ftruncate01 ==========
+RUN LTP CASE ftruncate01
+LTP MEMORY ftruncate01 before: free_frames=255269 allocated_frames=5984
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+ftruncate01.c:65: TINFO: Truncated length smaller than file size
+ftruncate01.c:60: TPASS: ftruncate() succeeded
+ftruncate01.c:74: TINFO: Truncated length exceeds file size
+ftruncate01.c:60: TPASS: ftruncate() succeeded
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[662.712397 0:387 axfs::fops:297] [33m[AxError::NotADirectory][m
+[m[37m[662.727753 0:387 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE ftruncate01 : 0
+Pass!
+LTP MEMORY ftruncate01 after_run: free_frames=255255 allocated_frames=5998
+LTP MEMORY ftruncate01 after_cleanup: free_frames=255255 allocated_frames=5998
+LTP CASE RUNTIME ftruncate01: 8486 ms
+========== END ltp ftruncate01 ==========
+========== START ltp ftruncate03 ==========
+RUN LTP CASE ftruncate03
+LTP MEMORY ftruncate03 before: free_frames=255255 allocated_frames=5998
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+[37m[672.570973 0:393 axfs::fops:151] [33m[AxError::InvalidInput][m
+[mftruncate03.c:70: TBROK: open(testfile1,64,0644) failed: EINVAL (22)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+[37m[672.722328 0:391 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE ftruncate03 : 2
+LTP MEMORY ftruncate03 after_run: free_frames=255241 allocated_frames=6012
+LTP MEMORY ftruncate03 after_cleanup: free_frames=255241 allocated_frames=6012
+LTP CASE RUNTIME ftruncate03: 9920 ms
+========== END ltp ftruncate03 ==========
+========== START ltp getpgrp01 ==========
+RUN LTP CASE getpgrp01
+LTP MEMORY getpgrp01 before: free_frames=255241 allocated_frames=6012
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getpgrp01.c:18: TPASS: getpgrp() returned pid 397
+getpgrp01.c:19: TPASS: TST_RET == SAFE_GETPGID(0) (397)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+[37m[679.895181 0:395 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE getpgrp01 : 0
+Pass!
+LTP MEMORY getpgrp01 after_run: free_frames=255227 allocated_frames=6026
+LTP MEMORY getpgrp01 after_cleanup: free_frames=255227 allocated_frames=6026
+LTP CASE RUNTIME getpgrp01: 7160 ms
+========== END ltp getpgrp01 ==========
+========== START ltp getgroups03 ==========
+RUN LTP CASE getgroups03
+LTP MEMORY getgroups03 before: free_frames=255227 allocated_frames=6026
+getgroups03    1  TPASS  :  getgroups functionality correct
+FAIL LTP CASE getgroups03 : 0
+Pass!
+LTP MEMORY getgroups03 after_run: free_frames=255220 allocated_frames=6033
+LTP MEMORY getgroups03 after_cleanup: free_frames=255220 allocated_frames=6033
+LTP CASE RUNTIME getgroups03: 6722 ms
+========== END ltp getgroups03 ==========
+========== START ltp getrlimit03 ==========
+RUN LTP CASE getrlimit03
+LTP MEMORY getrlimit03 before: free_frames=255220 allocated_frames=6033
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+tst_test.c:1733: TINFO: LTP version: 20240524
+tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s
+tst_memutils.c:152: TINFO: oom_score_adj does not exist, skipping the adjustment
+getrlimit03.c:102: TFAIL: __NR_prlimit64(0) returned 0 (SUCCESS) but __NR_getrlimit(0) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(1) returned 0 (SUCCESS) but __NR_getrlimit(1) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(2) returned 0 (SUCCESS) but __NR_getrlimit(2) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(3) returned 0 (SUCCESS) but __NR_getrlimit(3) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(4) returned 0 (SUCCESS) but __NR_getrlimit(4) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(5) returned 0 (SUCCESS) but __NR_getrlimit(5) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(6) returned 0 (SUCCESS) but __NR_getrlimit(6) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(7) returned 0 (SUCCESS) but __NR_getrlimit(7) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(8) returned 0 (SUCCESS) but __NR_getrlimit(8) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(9) returned 0 (SUCCESS) but __NR_getrlimit(9) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(10) returned 0 (SUCCESS) but __NR_getrlimit(10) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(11) returned 0 (SUCCESS) but __NR_getrlimit(11) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(12) returned 0 (SUCCESS) but __NR_getrlimit(12) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(13) returned 0 (SUCCESS) but __NR_getrlimit(13) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(14) returned 0 (SUCCESS) but __NR_getrlimit(14) returned -1 (ENOSYS)
+getrlimit03.c:102: TFAIL: __NR_prlimit64(15) returned 0 (SUCCESS) but __NR_getrlimit(15) returned -1 (ENOSYS)
+
+Summary:
+passed   0
+failed   16
+broken   0
+skipped  0
+warnings 0
+[37m[694.602575 0:400 axfs::root:433] [33m[AxError::IsADirectory][m
+[mFAIL LTP CASE getrlimit03 : 1
+LTP MEMORY getrlimit03 after_run: free_frames=255206 allocated_frames=6047
+LTP MEMORY getrlimit03 after_cleanup: free_frames=255206 allocated_frames=6047
+LTP CASE RUNTIME getrlimit03: 7963 ms
+========== END ltp getrlimit03 ==========
+ltp cases: 28 passed, 30 failed, 0 timed out
+#### OS COMP TEST GROUP END ltp-glibc ####
+[37m[694.718465 0:2 axplat_riscv64_qemu_virt::power:28] [32mShutting down...[m
+[m2026-05-22T12:12:32+08:00
+exit=0

@@ -1,0 +1,4 @@
+command: RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img OSCOMP_TEST_GROUPS=ltp LTP_CASES=clock_gettime01,clock_gettime03,clock_gettime04,clock_getres01,clock_nanosleep01,clock_nanosleep02,nanosleep01,nanosleep02,kill02,kill04,kill05,pause01,sigpending02,rt_sigpending01,sigaltstack01,sigaltstack02,sigwait01,sigtimedwait01,alarm01,setitimer01,getitimer01 LTP_CASE_TIMEOUT_SECS=20 ./run-eval.sh
+started_at: 2026-05-22T14:00:33+08:00
+exit=0
+finished_at: 2026-05-22T14:20:13+08:00

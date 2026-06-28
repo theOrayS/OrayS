@@ -1,0 +1,8 @@
+[LA] pass=170 fail=0 internal={'TCONF': 4} timeouts=0 enosys=0 panic_trap=0
+  ltp-musl: PASS=85 FAIL=0 internal={'TCONF': 2} timeout=0 enosys=0 panic_trap=0
+  ltp-glibc: PASS=85 FAIL=0 internal={'TCONF': 2} timeout=0 enosys=0 panic_trap=0
+  pass_with_tconf=['la:glibc:read02', 'la:musl:read02']
+[RV] pass=170 fail=0 internal={'TCONF': 4} timeouts=0 enosys=0 panic_trap=0
+  ltp-musl: PASS=85 FAIL=0 internal={'TCONF': 2} timeout=0 enosys=0 panic_trap=0
+  ltp-glibc: PASS=85 FAIL=0 internal={'TCONF': 2} timeout=0 enosys=0 panic_trap=0
+  pass_with_tconf=['rv:glibc:read02', 'rv:musl:read02']

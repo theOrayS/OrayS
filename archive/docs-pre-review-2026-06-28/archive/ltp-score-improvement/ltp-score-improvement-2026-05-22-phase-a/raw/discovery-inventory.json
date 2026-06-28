@@ -1,0 +1,580 @@
+{
+  "generated_at": "2026-05-22T00:00:00Z",
+  "stable_count": 85,
+  "stable_cases": [
+    "access01",
+    "brk01",
+    "chdir01",
+    "clone01",
+    "close01",
+    "dup01",
+    "fcntl01",
+    "fcntl02",
+    "fork01",
+    "getpid01",
+    "mmap01",
+    "open01",
+    "pipe01",
+    "read01",
+    "stat01",
+    "wait401",
+    "write01",
+    "access03",
+    "close02",
+    "dup02",
+    "fcntl03",
+    "getcwd01",
+    "getpid02",
+    "getppid01",
+    "getuid01",
+    "geteuid01",
+    "getgid01",
+    "getegid01",
+    "getresuid01",
+    "getresuid02",
+    "getresuid03",
+    "getresgid01",
+    "getresgid02",
+    "getresgid03",
+    "lseek01",
+    "read02",
+    "write02",
+    "creat01",
+    "creat03",
+    "open02",
+    "open03",
+    "stat02",
+    "lstat01",
+    "chmod01",
+    "fchmod01",
+    "rmdir01",
+    "symlink01",
+    "readlink01",
+    "ftruncate01",
+    "umask01",
+    "alarm02",
+    "alarm03",
+    "clock_gettime02",
+    "gettimeofday01",
+    "time01",
+    "times01",
+    "kill03",
+    "rt_sigaction01",
+    "rt_sigaction02",
+    "sigaction01",
+    "proc01",
+    "exit01",
+    "exit02",
+    "exit_group01",
+    "getpgrp01",
+    "getsid01",
+    "gettid01",
+    "uname01",
+    "uname04",
+    "getrlimit01",
+    "getrusage01",
+    "sched_getscheduler01",
+    "sched_yield01",
+    "getpgid02",
+    "getsid02",
+    "getppid02",
+    "getuid03",
+    "geteuid02",
+    "getgid03",
+    "getegid02",
+    "getgroups03",
+    "uname02",
+    "wait01",
+    "wait02",
+    "getrlimit02"
+  ],
+  "image_case_counts": {
+    "rv:musl": 2822,
+    "rv:glibc": 2842,
+    "la:musl": 2822,
+    "la:glibc": 2842
+  },
+  "common_image_cases": 2822,
+  "common_not_stable_count": 2737,
+  "current_batch_nonstable": {
+    "LTP_SYSCALLS_BASIC_PLUS_CASES": [
+      "access02",
+      "access04",
+      "dup03",
+      "lseek02",
+      "pipe02"
+    ],
+    "LTP_FS_BASIC_CASES": [
+      "mkdir02",
+      "link02",
+      "unlink05",
+      "rename01"
+    ],
+    "LTP_PROC_BASIC_CASES": [],
+    "LTP_TIME_SIGNAL_BASIC_CASES": [
+      "clock_getres01",
+      "clock_gettime01",
+      "nanosleep01",
+      "nanosleep02",
+      "kill02",
+      "pause01",
+      "rt_sigprocmask01",
+      "sigprocmask01",
+      "sigpending02",
+      "sigsuspend01"
+    ]
+  },
+  "wave1_cases": [
+    "sched_getscheduler02",
+    "sched_getparam01",
+    "getpgid01",
+    "getgroups01",
+    "gettid02",
+    "waitpid01",
+    "gettimeofday02",
+    "getrusage02",
+    "getpriority01",
+    "getpriority02",
+    "setpriority01",
+    "setpriority02",
+    "waitpid03"
+  ],
+  "wave2_cases": [
+    "clock_gettime03",
+    "clock_gettime04",
+    "clock_nanosleep01",
+    "clock_nanosleep02",
+    "nanosleep01",
+    "nanosleep02",
+    "kill05",
+    "sigaction02",
+    "pause01",
+    "sigprocmask01",
+    "rt_sigprocmask01",
+    "sigpending02",
+    "sigsuspend01",
+    "access02",
+    "access04",
+    "link02",
+    "rename01",
+    "unlink05"
+  ],
+  "absent_or_stable_from_plan": [
+    {
+      "case": "lseek03",
+      "source": "backup",
+      "present_all_images": false,
+      "already_stable": false
+    }
+  ],
+  "candidate_pool": [
+    {
+      "case": "sched_getscheduler02",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sched_getparam01",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getpgid01",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getgroups01",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "gettid02",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid01",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "gettimeofday02",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getrusage02",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getpriority01",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getpriority02",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "setpriority01",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "setpriority02",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid03",
+      "source": "wave1",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "clock_gettime03",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "clock_gettime04",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "clock_nanosleep01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "clock_nanosleep02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "nanosleep01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "nanosleep02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "kill05",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sigaction02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "pause01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sigprocmask01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "rt_sigprocmask01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sigpending02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sigsuspend01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "access02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "access04",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "link02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "rename01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "unlink05",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "mkdir02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "lseek02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "pipe02",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "dup03",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "statfs01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "statvfs01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "fstatfs01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sysinfo01",
+      "source": "wave2",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "clock_getres01",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "clock_gettime01",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "kill02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "rt_sigprocmask02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "readlinkat01",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "readlinkat02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "symlinkat01",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "fchmod02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "fchmod03",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "truncate02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "ftruncate03",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getrlimit03",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "getrusage03",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid04",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid06",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid07",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid08",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid09",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid10",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid11",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid12",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "waitpid13",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sched_get_priority_max01",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "sched_get_priority_min01",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "fstatfs02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "statfs02",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "dup04",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "dup05",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    },
+    {
+      "case": "pipe03",
+      "source": "backup",
+      "present_all_images": true,
+      "already_stable": false
+    }
+  ]
+}

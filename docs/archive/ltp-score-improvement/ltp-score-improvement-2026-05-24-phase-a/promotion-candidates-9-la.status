@@ -1,4 +1,0 @@
-command=OSCOMP_TEST_GROUPS=ltp LTP_CASES=fcntl23,open09,sched_getattr02,pipe12,pipe2_01,dup207,pipe2_04,pipe13,sched_getscheduler02 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la
-exit=0
-log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/promotion-candidates-9-la-20260524T145109+0800.log
-cases=fcntl23,open09,sched_getattr02,pipe12,pipe2_01,dup207,pipe2_04,pipe13,sched_getscheduler02

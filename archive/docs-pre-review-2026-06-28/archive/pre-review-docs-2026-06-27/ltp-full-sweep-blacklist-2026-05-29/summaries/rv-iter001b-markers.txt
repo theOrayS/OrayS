@@ -1,0 +1,99 @@
+# marker counts for rv-iter001b
+raw_log: target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter001b.log
+sha256: 617e674f5255d20ad8a5276131956d273a3fcc713da98ee2562ad70f76ad2b37
+selected: ltp case list: all-minus-blacklist skipped=35 (2333 cases, timeout 15s)
+RUN: 1268
+raw PASS markers: 0
+raw FAIL markers: 1267
+raw FAIL status=0 (parser-normalized pass candidates): 348
+raw FAIL nonzero: 919
+TIMEOUT markers: 17
+SKIP markers: 0
+incomplete unique: 1 ['pthserv']
+
+RUN_META / WORKER_META:
+RUN_META arch=rv iter=001b start=2026-05-29T10:55:58Z head=9e8c6ed7 cwd=/root/oskernel2026-orays-team-fullsweep-20260529 blacklist=/root/oskernel2026-orays/docs/ltp-full-sweep-blacklist-2026-05-29/blacklist.txt rv_img=/root/oskernel2026-orays/sdcard-rv.img
+RUN_META exit_code=0 end=2026-05-29T11:48:26Z
+WORKER_META blocker=pthserv action=terminate_stalled_qemu at=2026-05-29T11:48:21Z reason="no log growth since 2026-05-29T11:42:10Z; incomplete RUN marker without closure"
+
+last markers:
+FAIL LTP CASE prctl10 : 32
+RUN LTP CASE pread01
+FAIL LTP CASE pread01 : 0
+RUN LTP CASE pread01_64
+FAIL LTP CASE pread01_64 : 0
+RUN LTP CASE pread02
+FAIL LTP CASE pread02 : 0
+RUN LTP CASE pread02_64
+FAIL LTP CASE pread02_64 : 0
+RUN LTP CASE preadv01
+FAIL LTP CASE preadv01 : 0
+RUN LTP CASE preadv01_64
+FAIL LTP CASE preadv01_64 : 0
+RUN LTP CASE preadv02
+FAIL LTP CASE preadv02 : 0
+RUN LTP CASE preadv02_64
+FAIL LTP CASE preadv02_64 : 0
+RUN LTP CASE preadv03
+FAIL LTP CASE preadv03 : 6
+RUN LTP CASE preadv03_64
+FAIL LTP CASE preadv03_64 : 6
+RUN LTP CASE preadv201
+FAIL LTP CASE preadv201 : 0
+RUN LTP CASE preadv201_64
+FAIL LTP CASE preadv201_64 : 0
+RUN LTP CASE preadv202
+FAIL LTP CASE preadv202 : 0
+RUN LTP CASE preadv202_64
+FAIL LTP CASE preadv202_64 : 0
+RUN LTP CASE preadv203
+FAIL LTP CASE preadv203 : 6
+RUN LTP CASE preadv203_64
+FAIL LTP CASE preadv203_64 : 6
+RUN LTP CASE print_caps
+FAIL LTP CASE print_caps : 0
+RUN LTP CASE proc01
+FAIL LTP CASE proc01 : 0
+RUN LTP CASE proc_sched_rt01
+FAIL LTP CASE proc_sched_rt01 : 2
+RUN LTP CASE process_madvise01
+FAIL LTP CASE process_madvise01 : 2
+RUN LTP CASE process_vm01
+FAIL LTP CASE process_vm01 : 32
+RUN LTP CASE process_vm_readv02
+FAIL LTP CASE process_vm_readv02 : 32
+RUN LTP CASE process_vm_readv03
+FAIL LTP CASE process_vm_readv03 : 32
+RUN LTP CASE process_vm_writev02
+FAIL LTP CASE process_vm_writev02 : 32
+RUN LTP CASE profil01
+FAIL LTP CASE profil01 : 32
+RUN LTP CASE prot_hsymlinks
+FAIL LTP CASE prot_hsymlinks : 134
+RUN LTP CASE pselect01
+FAIL LTP CASE pselect01 : 1
+RUN LTP CASE pselect01_64
+FAIL LTP CASE pselect01_64 : 1
+RUN LTP CASE pselect02
+FAIL LTP CASE pselect02 : 0
+RUN LTP CASE pselect02_64
+FAIL LTP CASE pselect02_64 : 0
+RUN LTP CASE pselect03
+FAIL LTP CASE pselect03 : 0
+RUN LTP CASE pselect03_64
+FAIL LTP CASE pselect03_64 : 0
+RUN LTP CASE pt_test
+FAIL LTP CASE pt_test : 32
+RUN LTP CASE ptem01
+FAIL LTP CASE ptem01 : 2
+RUN LTP CASE pth_str01
+FAIL LTP CASE pth_str01 : 137
+TIMEOUT LTP CASE pth_str01 after 15s
+RUN LTP CASE pth_str02
+FAIL LTP CASE pth_str02 : 0
+RUN LTP CASE pth_str03
+FAIL LTP CASE pth_str03 : 137
+TIMEOUT LTP CASE pth_str03 after 15s
+RUN LTP CASE pthcli
+FAIL LTP CASE pthcli : 1
+RUN LTP CASE pthserv

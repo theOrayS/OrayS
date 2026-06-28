@@ -1,0 +1,3 @@
+command: RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img OSCOMP_TEST_GROUPS=ltp LTP_CASES=<117-case-inline-from-wave-a-targeted.cases> LTP_CASE_TIMEOUT_SECS=20 ./run-eval.sh
+started_at: 2026-05-22T13:56:18+08:00
+case_count: 117

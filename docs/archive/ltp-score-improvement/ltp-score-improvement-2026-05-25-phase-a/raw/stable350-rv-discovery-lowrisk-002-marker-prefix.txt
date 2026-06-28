@@ -1,2 +1,0 @@
-TOTAL markers=11 bad=0
-ABORTED: leader killed slow discovery run after timer failures/timeouts before completion; discovery only, no promotion evidence.

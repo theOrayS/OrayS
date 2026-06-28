@@ -1,0 +1,102 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/postrepair-scout-001-rv.log`
+
+- PASS LTP CASE: 22
+- FAIL LTP CASE: 16
+- Internal TFAIL/TBROK/TCONF: 25 ({'TCONF': 8, 'TFAIL': 5, 'TBROK': 12})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 11 passed, 8 failed
+- ltp-glibc: 11 passed, 8 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| creat04 | rv | glibc | ltp-glibc | PASS | 0 | 2476 | 252280 | 252252 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat04 | rv | musl | ltp-musl | PASS | 0 | 1819 | 256719 | 256691 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | rv | glibc | ltp-glibc | PASS | 0 | 5979 | 252364 | 252329 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | rv | musl | ltp-musl | PASS | 0 | 4904 | 258851 | 256768 | -2083 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07_64 | rv | glibc | ltp-glibc | PASS | 0 | 7079 | 252329 | 252294 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07_64 | rv | musl | ltp-musl | PASS | 0 | 4231 | 256768 | 256733 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1724 | 252105 | 252098 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | musl | ltp-musl | FAIL | 6 | 1391 | 256544 | 252441 | -4103 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01_64 | rv | glibc | ltp-glibc | FAIL | 6 | 2280 | 252098 | 252091 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01_64 | rv | musl | ltp-musl | FAIL | 6 | 1547 | 252441 | 252434 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getcwd03 | rv | glibc | ltp-glibc | FAIL | 2 | 2240 | 252042 | 252028 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getcwd03 | rv | musl | ltp-musl | FAIL | 2 | 1775 | 252385 | 252371 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getcwd04 | rv | glibc | ltp-glibc | FAIL | 32 | 2924 | 252028 | 252021 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getcwd04 | rv | musl | ltp-musl | FAIL | 32 | 1808 | 252371 | 252364 | -7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getdents01 | rv | glibc | ltp-glibc | FAIL | 33 | 2344 | 252175 | 252140 | -35 | 2 | 0 | 2 | 0 | 1 | 0 |
+| getdents01 | rv | musl | ltp-musl | FAIL | 33 | 1879 | 256614 | 256579 | -35 | 3 | 0 | 1 | 0 | 0 | 0 |
+| getdents02 | rv | glibc | ltp-glibc | PASS | 0 | 2190 | 252140 | 252105 | -35 | 0 | 0 | 2 | 0 | 1 | 0 |
+| getdents02 | rv | musl | ltp-musl | PASS | 0 | 2190 | 256579 | 256544 | -35 | 0 | 0 | 1 | 0 | 0 | 0 |
+| mkdir04 | rv | glibc | ltp-glibc | PASS | 0 | 2265 | 252252 | 252238 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdir04 | rv | musl | ltp-musl | PASS | 0 | 1810 | 256691 | 256677 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open06 | rv | glibc | ltp-glibc | PASS | 0 | 2499 | 252294 | 252280 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open06 | rv | musl | ltp-musl | PASS | 0 | 1900 | 256733 | 256719 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir03 | rv | glibc | ltp-glibc | PASS | 0 | 2758 | 252238 | 252224 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir03 | rv | musl | ltp-musl | PASS | 0 | 1539 | 256677 | 256663 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 1653 | 252091 | 252084 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 1308 | 252434 | 252427 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01_64 | rv | glibc | ltp-glibc | FAIL | 6 | 3960 | 252084 | 252077 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01_64 | rv | musl | ltp-musl | FAIL | 6 | 1754 | 252427 | 252420 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs03 | rv | glibc | ltp-glibc | PASS | 0 | 2275 | 252077 | 252063 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03 | rv | musl | ltp-musl | PASS | 0 | 1740 | 252420 | 252406 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03_64 | rv | glibc | ltp-glibc | PASS | 0 | 2556 | 252063 | 252049 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs03_64 | rv | musl | ltp-musl | PASS | 0 | 1969 | 252406 | 252392 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 2413 | 252049 | 252042 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | musl | ltp-musl | FAIL | 6 | 1920 | 252392 | 252385 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| unlink07 | rv | glibc | ltp-glibc | PASS | 0 | 3029 | 252189 | 252175 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink07 | rv | musl | ltp-musl | PASS | 0 | 1751 | 256628 | 256614 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink08 | rv | glibc | ltp-glibc | PASS | 0 | 4609 | 252224 | 252189 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink08 | rv | musl | ltp-musl | PASS | 0 | 2026 | 256663 | 256628 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 20 (rv:glibc:creat04, rv:musl:creat04, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fcntl07_64, rv:musl:fcntl07_64, rv:glibc:mkdir04, rv:musl:mkdir04, rv:glibc:open06, rv:musl:open06, rv:glibc:rmdir03, rv:musl:rmdir03, rv:glibc:statfs03, rv:musl:statfs03, rv:glibc:statfs03_64, rv:musl:statfs03_64, rv:glibc:unlink07, rv:musl:unlink07, rv:glibc:unlink08, rv:musl:unlink08)
+- pass_with_tconf: 2 (rv:glibc:getdents02, rv:musl:getdents02)
+- fail_wrapper: 16 (rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:fstatfs01_64, rv:musl:fstatfs01_64, rv:glibc:getcwd03, rv:musl:getcwd03, rv:glibc:getcwd04, rv:musl:getcwd04, rv:glibc:getdents01, rv:musl:getdents01, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statfs01_64, rv:musl:statfs01_64, rv:glibc:statvfs01, rv:musl:statvfs01)
+- internal_tfail: 2 (rv:glibc:getdents01, rv:musl:getdents01)
+- internal_tbrok: 12 (rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:fstatfs01_64, rv:musl:fstatfs01_64, rv:glibc:getcwd03, rv:musl:getcwd03, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statfs01_64, rv:musl:statfs01_64, rv:glibc:statvfs01, rv:musl:statvfs01)
+- timeout: 0
+- enosys: 2 (rv:glibc:getdents01, rv:glibc:getdents02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getdents01
+- ltp-musl:fstatfs01
+- ltp-musl:fstatfs01_64
+- ltp-musl:statfs01
+- ltp-musl:statfs01_64
+- ltp-musl:statvfs01
+- ltp-musl:getcwd03
+- ltp-musl:getcwd04
+- ltp-glibc:getdents01
+- ltp-glibc:fstatfs01
+- ltp-glibc:fstatfs01_64
+- ltp-glibc:statfs01
+- ltp-glibc:statfs01_64
+- ltp-glibc:statvfs01
+- ltp-glibc:getcwd03
+- ltp-glibc:getcwd04
+
+## Groups
+### ltp-musl
+- PASS: 11
+- FAIL: 8
+- Internal: {'TCONF': 3, 'TFAIL': 3, 'TBROK': 6}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: getdents01, fstatfs01, fstatfs01_64, statfs01, statfs01_64, statvfs01, getcwd03, getcwd04
+
+### ltp-glibc
+- PASS: 11
+- FAIL: 8
+- Internal: {'TCONF': 5, 'TFAIL': 2, 'TBROK': 6}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getdents01, fstatfs01, fstatfs01_64, statfs01, statfs01_64, statvfs01, getcwd03, getcwd04

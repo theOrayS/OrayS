@@ -1,3 +1,0 @@
-arch=rv
-cases=poll02,gethostid01,getcpu01,gethostname02
-run-eval rc=0

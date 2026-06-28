@@ -1,0 +1,60 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-discovery-process-clean-001.log`
+
+- PASS LTP CASE: 16
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 8 passed, 0 failed
+- ltp-glibc: 8 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fork03 | la | glibc | ltp-glibc | PASS | 0 | 4361 | 191375 | 191345 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork03 | la | musl | ltp-musl | PASS | 0 | 3136 | 192330 | 192306 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork04 | la | glibc | ltp-glibc | PASS | 0 | 4655 | 191345 | 191315 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork04 | la | musl | ltp-musl | PASS | 0 | 2826 | 192306 | 192282 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | la | glibc | ltp-glibc | PASS | 0 | 4158 | 191315 | 191303 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork05 | la | musl | ltp-musl | PASS | 0 | 2904 | 192282 | 192274 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork07 | la | glibc | ltp-glibc | PASS | 0 | 15521 | 191303 | 190382 | -921 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork07 | la | musl | ltp-musl | PASS | 0 | 9945 | 192274 | 191458 | -816 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork08 | la | glibc | ltp-glibc | PASS | 0 | 4842 | 190382 | 190343 | -39 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork08 | la | musl | ltp-musl | PASS | 0 | 2899 | 191458 | 191426 | -32 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork09 | la | glibc | ltp-glibc | PASS | 0 | 5322 | 190343 | 190322 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork09 | la | musl | ltp-musl | PASS | 0 | 5786 | 191426 | 191408 | -18 | 0 | 0 | 0 | 0 | 0 | 0 |
+| signal05 | la | glibc | ltp-glibc | PASS | 0 | 4612 | 191396 | 191375 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| signal05 | la | musl | ltp-musl | PASS | 0 | 3570 | 192346 | 192330 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| string01 | la | glibc | ltp-glibc | PASS | 0 | 4614 | 191408 | 191396 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| string01 | la | musl | ltp-musl | PASS | 0 | 2712 | 194402 | 192346 | -2056 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 16 (la:glibc:fork03, la:musl:fork03, la:glibc:fork04, la:musl:fork04, la:glibc:fork05, la:musl:fork05, la:glibc:fork07, la:musl:fork07, la:glibc:fork08, la:musl:fork08, la:glibc:fork09, la:musl:fork09, la:glibc:signal05, la:musl:signal05, la:glibc:string01, la:musl:string01)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 8
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 8
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

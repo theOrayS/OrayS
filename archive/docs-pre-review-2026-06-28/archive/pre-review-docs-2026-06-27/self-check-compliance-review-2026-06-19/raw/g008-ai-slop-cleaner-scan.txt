@@ -1,0 +1,355 @@
+# G008 ai-slop-cleaner scan 2026-06-19T13:07:16+08:00
+# Scope
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-report.md
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-architect-review-watch.md
+docs/self-check-compliance-review-2026-06-19/raw/g007-code-reviewer-review.md
+docs/self-check-compliance-review-2026-06-19/raw/g007-disk-prep.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-df-after-cleanup.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-df-after-image-copy.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-df-before.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-kernel-artifacts.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-make-all.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-metadata.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-official-judge-summary.json
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-la.cmd
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-la.exit
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-monitor.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-rv.cmd
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-rv.exit
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-run-root.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-score-comparison.json
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-score-summary.json
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt
+docs/self-check-compliance-review-2026-06-19/raw/g008-pre-cleaner-verification.txt
+docs/self-check-compliance-review-2026-06-19/report.md
+# Fallback-like / masking terms in scope
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-report.md:11:- `fake`, `hardcoded`, `TPASS`, `TCONF`, `TBROK`, `TFAIL`, `ENOSYS`, `timeout`, `panic`, and `trap` appear only as explicit compliance/audit terms in the report and preserved raw summaries.
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-report.md:12:- `docker=missing`, `qemu-la.exit=124`, local-LA non-authoritative status, and LTP failing cases are visible; they are not masked by fallback prose.
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-report.md:42:- Official Docker/OJ remote run still not possible on this host because `docker` is missing.
+docs/self-check-compliance-review-2026-06-19/raw/g007-architect-review-watch.md:9:- Official Docker/OJ remote reproduction is still not available because docker is missing.
+docs/self-check-compliance-review-2026-06-19/raw/g007-architect-review-watch.md:15:- No evidence that local official-equivalent is overstated as official Docker/OJ remote.
+docs/self-check-compliance-review-2026-06-19/raw/g007-architect-review-watch.md:16:- No expression encourages restoring busybox false fake-success; the report explicitly forbids that regression.
+docs/self-check-compliance-review-2026-06-19/raw/g007-architect-review-watch.md:17:- TCONF/TBROK/TFAIL/ENOSYS/timeout/panic/trap visibility is preserved.
+docs/self-check-compliance-review-2026-06-19/raw/g007-architect-review-watch.md:19:Recommendation: keep gate WATCH unless either official Docker/OJ remote is run or the G007 target is formally scoped to local official-equivalent plus explicit environment limits, and align report.md's older WATCH wording with G006/G007.
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:44:  printf '\n' | timeout -k 30s 9000s "${RV_CMD[@]}" > "$RUN/os_serial_out_rv.txt" 2>&1
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:45:  echo $? > "$RUN/qemu-rv.exit"
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:46:  echo "rv done $(date -Is) exit=$(cat "$RUN/qemu-rv.exit")" > "$RUN/qemu-rv.done"
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:52:  printf '\n' | timeout -k 30s 300s "${LA_CMD[@]}" > "$RUN/os_serial_out_la.txt" 2>&1
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:53:  echo $? > "$RUN/qemu-la.exit"
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:54:  echo "la done $(date -Is) exit=$(cat "$RUN/qemu-la.exit")" > "$RUN/qemu-la.done"
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:111:cp "$RUN/qemu-rv.exit" "$RAW/g007-official-local-qemu-rv.exit"
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:112:cp "$RUN/qemu-la.exit" "$RAW/g007-official-local-qemu-la.exit"
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:4:- Wrapper FAIL (nonzero/timeout): 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:5:- Internal TFAIL/TBROK/TCONF: 0 ({})
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:6:- timeout matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:7:- ENOSYS/not implemented matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:8:- panic/trap matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:12:- pass_with_tconf: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:14:- internal_tfail: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:15:- internal_tbrok: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:16:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:17:- enosys: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:18:- panic_trap: 0
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:5:G007 在 G001-G006 self-check 源码合规修复之后，补跑了用户要求的官方评测路径。当前环境没有 `docker`，因此**没有声称已完成官方 Docker/OJ 远程环境**；本轮采用的是最大可复现的本地官方等价链：
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:14:合规结论：G007 没有发现新的 self-check 违规实现，也没有为了追回分数恢复固定输入/固定 case 的成功豁免。少数子项分数下降被保留为真实评测结果；其中 busybox `false` 从旧基线 54 降到 53 是 G001-G006 已删除固定命令成功豁免后的预期合规代价，不允许以 fake success 方式恢复。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:26:- `docker=missing`，见 `raw/g007-official-local-metadata.txt`；因此不是官方 Docker/OJ 完整复现。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:27:- 本地 LA QEMU 串口只有 77 bytes，`qemu-la.exit=124`；根据仓库既有约束，本地 LA 无输出/超时不作为远程 LA 回归结论。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:28:- RV QEMU 完整执行结束，`qemu-rv.exit=0`，当前分数主要来自 RV 侧官方 judge 输出。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:40:- QEMU exit：`raw/g007-official-local-qemu-rv.exit`=`0`，`raw/g007-official-local-qemu-la.exit`=`124`
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:80:- `busybox-*-rv`：54 → 53，原因是固定命令 `false` 不再被 wrapper 人为算作 success。这是 self-check 合规修复，不应回滚。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:81:- `iperf-*-rv`：旧基线非零，当前为 0；G007 没有引入或修复该项，保留真实 judge 输出，不用任何固定输出/路径投机补分。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:92:- 内部状态：`TCONF=2`、`TBROK=4`、`TFAIL=7`。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:93:- `ENOSYS/not implemented`：2。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:94:- LTP timeout：0。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:95:- panic/trap：0。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:97:注意：runner 文本中仍存在 `FAIL LTP CASE <case> : 0` 这类容易误读的 wrapper 行；G007 不把 wrapper 文本当成 PASS 证据，官方分数以官方 judge 的 inner LTP 输出解析为准。所有 `TCONF/TBROK/TFAIL/ENOSYS` 均保留在日志与汇总中。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:103:- 没有新增按测试程序名、路径、固定输入、固定目录、固定顺序的通过分支。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:104:- 没有伪造 `TPASS` / wrapper PASS。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:105:- 没有把 `TCONF/TBROK/TFAIL/ENOSYS/timeout/panic/trap` 过滤掉或改写为成功。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:106:- 没有恢复 `busybox false` 固定命令成功豁免。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:114:- 本报告中的“官方评测路径”指当前机器可执行的**官方本地等价链**，不是官方 Docker/OJ 远程复现；`docker=missing` 仍保留为环境限制。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:116:- 官方 Docker/OJ 远程执行在本机不可运行，后续若具备 Docker/OJ 环境应重新验证；但当前缺失不表示存在 self-check 违规实现，也不能作为恢复 fake-success 补丁的理由。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:121:- 官方 Docker/OJ 远程执行未完成：当前机器没有 `docker`，不能声称远程完全等价。
+docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:122:- 本地 LA 不权威：`qemu-la.exit=124` 仅记录本地现象，不推导远程 LA 分数。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:16:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-la.exit
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:19:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-qemu-rv.exit
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:26:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:14:合规结论：G007 没有发现新的 self-check 违规实现，也没有为了追回分数恢复固定输入/固定 case 的成功豁免。少数子项分数下降被保留为真实评测结果；其中 busybox `false` 从旧基线 54 降到 53 是 G001-G006 已删除固定命令成功豁免后的预期合规代价，不允许以 fake success 方式恢复。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:27:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:80:- `busybox-*-rv`：54 → 53，原因是固定命令 `false` 不再被 wrapper 人为算作 success。这是 self-check 合规修复，不应回滚。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:28:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:81:- `iperf-*-rv`：旧基线非零，当前为 0；G007 没有引入或修复该项，保留真实 judge 输出，不用任何固定输出/路径投机补分。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:29:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:92:- 内部状态：`TCONF=2`、`TBROK=4`、`TFAIL=7`。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:30:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:93:- `ENOSYS/not implemented`：2。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:31:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:94:- LTP timeout：0。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:32:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:95:- panic/trap：0。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:33:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:97:注意：runner 文本中仍存在 `FAIL LTP CASE <case> : 0` 这类容易误读的 wrapper 行；G007 不把 wrapper 文本当成 PASS 证据，官方分数以官方 judge 的 inner LTP 输出解析为准。所有 `TCONF/TBROK/TFAIL/ENOSYS` 均保留在日志与汇总中。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:34:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:103:- 没有新增按测试程序名、路径、固定输入、固定目录、固定顺序的通过分支。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:35:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:104:- 没有伪造 `TPASS` / wrapper PASS。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:36:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:105:- 没有把 `TCONF/TBROK/TFAIL/ENOSYS/timeout/panic/trap` 过滤掉或改写为成功。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:37:docs/self-check-compliance-review-2026-06-19/g007-official-evaluation-report.md:106:- 没有恢复 `busybox false` 固定命令成功豁免。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:38:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:4:- Wrapper FAIL (nonzero/timeout): 10
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:39:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:5:- Internal TFAIL/TBROK/TCONF: 13 ({'TCONF': 2, 'TBROK': 4, 'TFAIL': 7})
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:40:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:6:- timeout matches: 1
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:41:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:7:- ENOSYS/not implemented matches: 2
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:42:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:8:- panic/trap matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:43:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:11:- ltp-musl: `stable` (1000 cases, timeout 180s)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:44:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:12:- ltp-glibc: `stable` (1000 cases, timeout 180s)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:45:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:19:| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:46:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2024:- pass_with_tconf: 2 (rv:musl:brk01, rv:musl:brk02)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:47:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2026:- internal_tfail: 6 (rv:musl:gethostname02, rv:musl:mmapstress02, rv:musl:mmapstress03, rv:musl:mmapstress05, rv:musl:nice04, rv:musl:sbrk01)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:48:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2027:- internal_tbrok: 4 (rv:glibc:accept02, rv:musl:accept02, rv:glibc:setsockopt04, rv:musl:setsockopt04)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:49:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2028:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:50:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2029:- enosys: 2 (rv:musl:brk01, rv:musl:brk02)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:51:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2030:- panic_trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:52:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2050:- timeout: 1
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:53:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2051:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:54:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2052:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:55:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2058:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:56:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2059:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:57:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2060:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:58:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2066:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:59:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2067:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:60:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2068:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:61:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2074:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:62:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2075:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:63:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2076:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:64:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2082:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:65:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2083:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:66:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2084:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:67:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2090:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:68:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2091:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:69:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2092:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:70:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2098:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:71:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2099:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:72:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2100:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:73:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2106:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:74:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2107:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:75:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2108:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:76:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2114:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:77:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2115:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:78:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2116:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:79:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2122:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:80:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2123:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:81:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2124:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:82:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2130:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:83:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2131:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:84:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2132:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:85:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2138:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:86:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2139:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:87:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2140:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:88:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2146:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:89:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2147:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:90:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2148:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:91:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2154:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:92:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2155:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:93:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2156:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:94:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2162:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:95:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2163:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:96:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2164:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:97:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2170:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:98:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2171:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:99:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2172:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:100:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2178:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:101:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2179:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:102:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2180:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:103:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2186:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:104:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2187:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:105:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2188:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:106:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2194:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:107:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2195:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:108:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2196:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:109:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2202:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:110:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2203:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:111:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2204:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:112:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2210:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:113:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2211:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:114:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2212:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:115:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2217:- Internal: {'TCONF': 2, 'TBROK': 2, 'TFAIL': 7}
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:116:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2218:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:117:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2219:- ENOSYS/not implemented: 2
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:118:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2220:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:119:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2226:- Internal: {'TBROK': 2}
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:120:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2227:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:121:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2228:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:122:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2229:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:123:docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:3:+ python3 scripts/check_g002_fake_success.py
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:124:docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:4:G002 fake-success static check: PASS (0 findings)
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:125:docs/self-check-compliance-review-2026-06-19/report.md:21:1. busybox runner 对固定命令 `false` 的成功豁免（固定输入 fake success 风险）。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:126:docs/self-check-compliance-review-2026-06-19/report.md:24:4. `pthread_mutex_lock/unlock` 在递归锁/非 owner 解锁时 `assert!` panic。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:127:docs/self-check-compliance-review-2026-06-19/report.md:28:本轮没有发现新的 stable LTP case 名称硬编码通过、伪造 TPASS、隐藏 TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap 的证据。仍需持续跟踪的架构风险见“剩余风险与后续项”。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:128:docs/self-check-compliance-review-2026-06-19/report.md:34:- 禁止行为 1：7 条（测试程序/二进制特征特殊判断、特定参数/输入/目录硬编码、高分集合局部实现、利用环境/固定路径/时间/顺序投机、破坏 Linux syscall 兼容或安全边界、绕过真实进程/内存/FS/同步机制、其他投机性实现）。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:129:docs/self-check-compliance-review-2026-06-19/report.md:35:- 禁止行为 2：6 条（牺牲 Linux syscall 兼容换速度、特定输入硬编码、跳过权限/资源/错误处理、隐藏条件崩溃/数据错误、固定测例优化、其他不符合正确性/通用性/可解释性优化）。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:130:docs/self-check-compliance-review-2026-06-19/report.md:61:- `ftest03` / `ftest07`：case 名 token 同时出现在 stable/core case 列表或 guard/parser 测试语境，没有发现 runner 对它们分支返回 PASS、伪造输出或绕过真实执行。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:131:docs/self-check-compliance-review-2026-06-19/report.md:74:| code-reviewer/LTP runner | LTP runner/parser/marker | 未发现 fake TPASS；建议强化 G005 guard，已补充固定命令成功豁免检测 |
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:132:docs/self-check-compliance-review-2026-06-19/report.md:78:| architect | 合规架构视角 | runner/summary/promotion 有防 fake 机制；提示 raw pointer 与脏工作区证据删除需显式报告 |
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:133:docs/self-check-compliance-review-2026-06-19/report.md:82:### 1. busybox 固定输入 fake success 风险
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:134:docs/self-check-compliance-review-2026-06-19/report.md:85:- 修复：删除 `Ok(status) if status == 0 || line == "false"` 中对固定命令 `false` 的成功豁免，只把真实 exit status 0 记为 success。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:135:docs/self-check-compliance-review-2026-06-19/report.md:105:### 4. pthread mutex misuse 不再 panic
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:136:docs/self-check-compliance-review-2026-06-19/report.md:111:  - 去掉隐藏条件下可触发内核 panic 的 `assert!`。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:137:docs/self-check-compliance-review-2026-06-19/report.md:125:- 文件：`scripts/test_g002_fake_success.py`、`scripts/test_g003_stat_metadata.py`、`scripts/test_g004_rlimit_fd.py`
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:138:docs/self-check-compliance-review-2026-06-19/report.md:132:- `python3 scripts/check_g002_fake_success.py` → PASS
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:139:docs/self-check-compliance-review-2026-06-19/report.md:144:- `python3 -m unittest scripts/test_g002_fake_success.py scripts/test_g003_stat_metadata.py scripts/test_g004_rlimit_fd.py` → 25 tests OK
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:140:docs/self-check-compliance-review-2026-06-19/report.md:145:- `python3 -m unittest scripts/test_g002_fake_success.py scripts/test_g003_stat_metadata.py scripts/test_g004_rlimit_fd.py scripts/test_g005_runner_parser.py` → 33 tests OK
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:141:docs/self-check-compliance-review-2026-06-19/report.md:176:- 新增逻辑没有发现“silent fallback / just bypass / hardcoded test pass”式掩盖路径。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:142:docs/self-check-compliance-review-2026-06-19/report.md:177:- `scripts/test_g00*.py` 中的 `fake`、`unimplemented`、`case == "chdir01"`、`line == "false"` 是静态 guard 的恶意样例 fixture，不是运行时实现路径。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:143:docs/self-check-compliance-review-2026-06-19/report.md:178:- `ulib/axlibc/c/fcntl.c` 既有 `posix_fadvise` / `sync_file_range` 明确返回 `ENOSYS`，属于诚实 unsupported，不计为 fake pass。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:144:docs/self-check-compliance-review-2026-06-19/report.md:196:   - 本轮没有把该架构项伪装成已解决，也没有隐藏风险。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:145:docs/self-check-compliance-review-2026-06-19/report.md:209:- busybox：固定命令 `false` 不再被 wrapper 记为 success；只有真实 exit status 0 才 success。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:146:docs/self-check-compliance-review-2026-06-19/report.md:212:- pthread mutex：错误用法返回 errno，不再触发 panic。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:147:docs/self-check-compliance-review-2026-06-19/report.md:235:- LTP raw：`ltp-musl-rv=4101`、`ltp-glibc-rv=4104`；`TCONF/TBROK/TFAIL/ENOSYS` 全部保留可见，panic/trap 为 0。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:148:docs/self-check-compliance-review-2026-06-19/report.md:236:- 少数子项下降不被隐藏；`busybox false` 的 1 分下降来自删除固定命令 fake-success 风险，不允许回滚。
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:149:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:4:- Wrapper FAIL (nonzero/timeout): 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:150:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:5:- Internal TFAIL/TBROK/TCONF: 0 ({})
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:151:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:6:- timeout matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:152:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:7:- ENOSYS/not implemented matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:153:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:8:- panic/trap matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:154:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:12:- pass_with_tconf: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:155:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:14:- internal_tfail: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:156:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:15:- internal_tbrok: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:157:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:16:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:158:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:17:- enosys: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:159:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-la.txt:18:- panic_trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:160:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:44:  printf '\n' | timeout -k 30s 9000s "${RV_CMD[@]}" > "$RUN/os_serial_out_rv.txt" 2>&1
+docs/self-check-compliance-review-2026-06-19/raw/g007-ai-slop-cleaner-scan.txt:161:docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-driver.sh.txt:52:  printf '\n' | timeout -k 30s 300s "${LA_CMD[@]}" > "$RUN/os_serial_out_la.txt" 2>&1
+docs/self-check-compliance-review-2026-06-19/raw/g007-code-reviewer-review.md:18:- G007 scope only adds report/evidence; no Makefile, run-eval.sh, scripts, configs, examples/shell/src/cmd.rs, evaluator, testsuite, or runner bypass changes.
+docs/self-check-compliance-review-2026-06-19/raw/g007-code-reviewer-review.md:19:- Report honestly states docker missing, local LA qemu-la.exit=124 non-authoritative, and RV qemu-rv.exit=0 completed.
+docs/self-check-compliance-review-2026-06-19/raw/g007-code-reviewer-review.md:21:- RV LTP summary preserves TCONF=2, TBROK=4, TFAIL=7, ENOSYS=2, fail case list, and panic/trap stats.
+docs/self-check-compliance-review-2026-06-19/raw/g007-code-reviewer-review.md:24:Approval recommendation: APPROVE. No fake PASS, hardcoded testcase, fixed input/path/process-name adaptation, hidden failure status, or testsuite/evaluator bypass found.
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:3:+ python3 scripts/check_g002_fake_success.py
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:4:G002 fake-success static check: PASS (0 findings)
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:49:26:- `docker=missing`，见 `raw/g007-official-local-metadata.txt`；因此不是官方 Docker/OJ 完整复现。
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:50:27:- 本地 LA QEMU 串口只有 77 bytes，`qemu-la.exit=124`；根据仓库既有约束，本地 LA 无输出/超时不作为远程 LA 回归结论。
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:51:28:- RV QEMU 完整执行结束，`qemu-rv.exit=0`，当前分数主要来自 RV 侧官方 judge 输出。
+docs/self-check-compliance-review-2026-06-19/raw/g007-pre-cleaner-verification.txt:52:112:- 本地 LA 不权威：`qemu-la.exit=124` 仅记录本地现象，不推导远程 LA 分数。
+docs/self-check-compliance-review-2026-06-19/report.md:21:1. busybox runner 对固定命令 `false` 的成功豁免（固定输入 fake success 风险）。
+docs/self-check-compliance-review-2026-06-19/report.md:24:4. `pthread_mutex_lock/unlock` 在递归锁/非 owner 解锁时 `assert!` panic。
+docs/self-check-compliance-review-2026-06-19/report.md:28:本轮没有发现新的 stable LTP case 名称硬编码通过、伪造 TPASS、隐藏 TFAIL/TBROK/TCONF/ENOSYS/timeout/panic/trap 的证据。仍需持续跟踪的架构风险见“剩余风险与后续项”。
+docs/self-check-compliance-review-2026-06-19/report.md:34:- 禁止行为 1：7 条（测试程序/二进制特征特殊判断、特定参数/输入/目录硬编码、高分集合局部实现、利用环境/固定路径/时间/顺序投机、破坏 Linux syscall 兼容或安全边界、绕过真实进程/内存/FS/同步机制、其他投机性实现）。
+docs/self-check-compliance-review-2026-06-19/report.md:35:- 禁止行为 2：6 条（牺牲 Linux syscall 兼容换速度、特定输入硬编码、跳过权限/资源/错误处理、隐藏条件崩溃/数据错误、固定测例优化、其他不符合正确性/通用性/可解释性优化）。
+docs/self-check-compliance-review-2026-06-19/report.md:61:- `ftest03` / `ftest07`：case 名 token 同时出现在 stable/core case 列表或 guard/parser 测试语境，没有发现 runner 对它们分支返回 PASS、伪造输出或绕过真实执行。
+docs/self-check-compliance-review-2026-06-19/report.md:74:| code-reviewer/LTP runner | LTP runner/parser/marker | 未发现 fake TPASS；建议强化 G005 guard，已补充固定命令成功豁免检测 |
+docs/self-check-compliance-review-2026-06-19/report.md:78:| architect | 合规架构视角 | runner/summary/promotion 有防 fake 机制；提示 raw pointer 与脏工作区证据删除需显式报告 |
+docs/self-check-compliance-review-2026-06-19/report.md:82:### 1. busybox 固定输入 fake success 风险
+docs/self-check-compliance-review-2026-06-19/report.md:85:- 修复：删除 `Ok(status) if status == 0 || line == "false"` 中对固定命令 `false` 的成功豁免，只把真实 exit status 0 记为 success。
+docs/self-check-compliance-review-2026-06-19/report.md:105:### 4. pthread mutex misuse 不再 panic
+docs/self-check-compliance-review-2026-06-19/report.md:111:  - 去掉隐藏条件下可触发内核 panic 的 `assert!`。
+docs/self-check-compliance-review-2026-06-19/report.md:125:- 文件：`scripts/test_g002_fake_success.py`、`scripts/test_g003_stat_metadata.py`、`scripts/test_g004_rlimit_fd.py`
+docs/self-check-compliance-review-2026-06-19/report.md:132:- `python3 scripts/check_g002_fake_success.py` → PASS
+docs/self-check-compliance-review-2026-06-19/report.md:144:- `python3 -m unittest scripts/test_g002_fake_success.py scripts/test_g003_stat_metadata.py scripts/test_g004_rlimit_fd.py` → 25 tests OK
+docs/self-check-compliance-review-2026-06-19/report.md:145:- `python3 -m unittest scripts/test_g002_fake_success.py scripts/test_g003_stat_metadata.py scripts/test_g004_rlimit_fd.py scripts/test_g005_runner_parser.py` → 33 tests OK
+docs/self-check-compliance-review-2026-06-19/report.md:176:- 新增逻辑没有发现“silent fallback / just bypass / hardcoded test pass”式掩盖路径。
+docs/self-check-compliance-review-2026-06-19/report.md:177:- `scripts/test_g00*.py` 中的 `fake`、`unimplemented`、`case == "chdir01"`、`line == "false"` 是静态 guard 的恶意样例 fixture，不是运行时实现路径。
+docs/self-check-compliance-review-2026-06-19/report.md:178:- `ulib/axlibc/c/fcntl.c` 既有 `posix_fadvise` / `sync_file_range` 明确返回 `ENOSYS`，属于诚实 unsupported，不计为 fake pass。
+docs/self-check-compliance-review-2026-06-19/report.md:193:- G008 只负责澄清交付口径：当前机器缺少 Docker，所以 official Docker/OJ 远程复现仍是环境后续项；它不构成 self-check 源码合规 blocker，也不得被写成已完成的远程官方分数。
+docs/self-check-compliance-review-2026-06-19/report.md:200:   - 本轮没有把该架构项伪装成已解决，也没有隐藏风险。
+docs/self-check-compliance-review-2026-06-19/report.md:208:   - 当前机器缺少 `docker`，因此仍不声称官方 Docker/OJ 完整复现；本地 LA QEMU 超时也不作为远程 LA 回归证据。
+docs/self-check-compliance-review-2026-06-19/report.md:213:- busybox：固定命令 `false` 不再被 wrapper 记为 success；只有真实 exit status 0 才 success。
+docs/self-check-compliance-review-2026-06-19/report.md:216:- pthread mutex：错误用法返回 errno，不再触发 panic。
+docs/self-check-compliance-review-2026-06-19/report.md:232:G007 已补跑官方本地等价评测，详见 `g007-official-evaluation-report.md`。当前环境没有 `docker`，因此不声称官方 Docker/OJ 完整复现；本轮使用官方 `make all`、官方 QEMU 参数、官方 `parse_serial_out_new()` 与官方 `postwork.py` 计分公式完成本地等价链。
+docs/self-check-compliance-review-2026-06-19/report.md:236:- RV QEMU：`qemu-rv.exit=0`，完整跑完；LA 本地 QEMU：`qemu-la.exit=124`，因本地/远程 LA 地址映射差异不作为远程 LA 回归结论。
+docs/self-check-compliance-review-2026-06-19/report.md:239:- LTP raw：`ltp-musl-rv=4101`、`ltp-glibc-rv=4104`；`TCONF/TBROK/TFAIL/ENOSYS` 全部保留可见，panic/trap 为 0。
+docs/self-check-compliance-review-2026-06-19/report.md:240:- 少数子项下降不被隐藏；`busybox false` 的 1 分下降来自删除固定命令 fake-success 风险，不允许回滚。
+docs/self-check-compliance-review-2026-06-19/report.md:250:- 官方 Docker/OJ 远程执行仍未完成，因为本机 `docker=missing`；这是环境后续项，不是源码合规 blocker，也不能被报告成已完成。
+docs/self-check-compliance-review-2026-06-19/report.md:251:- 本地 LA `qemu-la.exit=124` 仍不作为远程 LA 回归结论。
+docs/self-check-compliance-review-2026-06-19/report.md:252:- `busybox false` 的 1 分下降仍被明确保留为删除 fixed-input fake-success 后的合规代价，不允许回滚。
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:3:+ python3 scripts/check_g002_fake_success.py
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:4:G002 fake-success static check: PASS (0 findings)
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:49:26:- `docker=missing`，见 `raw/g007-official-local-metadata.txt`；因此不是官方 Docker/OJ 完整复现。
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:50:27:- 本地 LA QEMU 串口只有 77 bytes，`qemu-la.exit=124`；根据仓库既有约束，本地 LA 无输出/超时不作为远程 LA 回归结论。
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:51:28:- RV QEMU 完整执行结束，`qemu-rv.exit=0`，当前分数主要来自 RV 侧官方 judge 输出。
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:52:112:- 本地 LA 不权威：`qemu-la.exit=124` 仅记录本地现象，不推导远程 LA 分数。
+docs/self-check-compliance-review-2026-06-19/raw/g007-post-cleaner-verification.txt:53:42:- Official Docker/OJ remote run still not possible on this host because `docker` is missing.
+docs/self-check-compliance-review-2026-06-19/raw/g008-pre-cleaner-verification.txt:3:+ python3 scripts/check_g002_fake_success.py
+docs/self-check-compliance-review-2026-06-19/raw/g008-pre-cleaner-verification.txt:4:G002 fake-success static check: PASS (0 findings)
+docs/self-check-compliance-review-2026-06-19/raw/g008-pre-cleaner-verification.txt:44:docs/self-check-compliance-review-2026-06-19/report.md:193:- G008 只负责澄清交付口径：当前机器缺少 Docker，所以 official Docker/OJ 远程复现仍是环境后续项；它不构成 self-check 源码合规 blocker，也不得被写成已完成的远程官方分数。
+docs/self-check-compliance-review-2026-06-19/raw/g008-pre-cleaner-verification.txt:45:docs/self-check-compliance-review-2026-06-19/report.md:250:- 官方 Docker/OJ 远程执行仍未完成，因为本机 `docker=missing`；这是环境后续项，不是源码合规 blocker，也不能被报告成已完成。
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-metadata.txt:7:docker=missing
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:4:- Wrapper FAIL (nonzero/timeout): 10
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:5:- Internal TFAIL/TBROK/TCONF: 13 ({'TCONF': 2, 'TBROK': 4, 'TFAIL': 7})
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:6:- timeout matches: 1
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:7:- ENOSYS/not implemented matches: 2
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:8:- panic/trap matches: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:11:- ltp-musl: `stable` (1000 cases, timeout 180s)
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:12:- ltp-glibc: `stable` (1000 cases, timeout 180s)
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:19:| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2024:- pass_with_tconf: 2 (rv:musl:brk01, rv:musl:brk02)
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2026:- internal_tfail: 6 (rv:musl:gethostname02, rv:musl:mmapstress02, rv:musl:mmapstress03, rv:musl:mmapstress05, rv:musl:nice04, rv:musl:sbrk01)
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2027:- internal_tbrok: 4 (rv:glibc:accept02, rv:musl:accept02, rv:glibc:setsockopt04, rv:musl:setsockopt04)
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2028:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2029:- enosys: 2 (rv:musl:brk01, rv:musl:brk02)
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2030:- panic_trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2050:- timeout: 1
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2051:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2052:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2058:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2059:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2060:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2066:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2067:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2068:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2074:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2075:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2076:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2082:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2083:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2084:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2090:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2091:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2092:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2098:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2099:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2100:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2106:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2107:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2108:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2114:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2115:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2116:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2122:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2123:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2124:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2130:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2131:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2132:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2138:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2139:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2140:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2146:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2147:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2148:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2154:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2155:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2156:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2162:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2163:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2164:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2170:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2171:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2172:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2178:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2179:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2180:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2186:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2187:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2188:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2194:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2195:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2196:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2202:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2203:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2204:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2210:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2211:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2212:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2217:- Internal: {'TCONF': 2, 'TBROK': 2, 'TFAIL': 7}
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2218:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2219:- ENOSYS/not implemented: 2
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2220:- panic/trap: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2226:- Internal: {'TBROK': 2}
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2227:- timeout: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2228:- ENOSYS/not implemented: 0
+docs/self-check-compliance-review-2026-06-19/raw/g007-official-local-ltp-summary-rv.txt:2229:- panic/trap: 0

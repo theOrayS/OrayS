@@ -1,0 +1,86 @@
+{
+  "plan": {
+    "version": 1,
+    "createdAt": "2026-06-19T11:38:10.373Z",
+    "updatedAt": "2026-06-19T11:38:17.404Z",
+    "briefPath": ".omx/ultragoal/brief.md",
+    "goalsPath": ".omx/ultragoal/goals.json",
+    "ledgerPath": ".omx/ultragoal/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-g001-live-rules-and-evaluation-inven",
+        "title": "G001 Live rules and evaluation inventory",
+        "objective": "Re-read live self-check.md, AGENTS task rules, Makefile/run-eval official paths, current LTP_STABLE_CASES, and non-LTP evaluator/test entries; produce a fresh inventory without relying on prior review reports.",
+        "status": "in_progress",
+        "attempt": 1,
+        "createdAt": "2026-06-19T11:38:10.373Z",
+        "updatedAt": "2026-06-19T11:38:17.404Z",
+        "startedAt": "2026-06-19T11:38:17.404Z"
+      },
+      {
+        "id": "G002-g002-per-testcase-audit-matrix",
+        "title": "G002 Per-testcase audit matrix",
+        "objective": "Generate a fresh machine-readable matrix containing every current stable LTP case and every discovered non-LTP/evaluator entry, with semantic family, implementation touchpoints, self-check risk class, and evidence source.",
+        "status": "pending",
+        "attempt": 0,
+        "createdAt": "2026-06-19T11:38:10.373Z",
+        "updatedAt": "2026-06-19T11:38:10.373Z"
+      },
+      {
+        "id": "G003-g003-fresh-source-compliance-scan",
+        "title": "G003 Fresh source compliance scan",
+        "objective": "Run fresh static/source review for forbidden patterns across kernel/api/ulib/examples/shell/scripts/configs, including case-name/path/binary special casing, fixed-parameter hardcoding, fake success, hidden failures, unsafe shortcuts, and testsuite/evaluator bypasses.",
+        "status": "pending",
+        "attempt": 0,
+        "createdAt": "2026-06-19T11:38:10.373Z",
+        "updatedAt": "2026-06-19T11:38:10.373Z"
+      },
+      {
+        "id": "G004-g004-confirm-and-repair-violations",
+        "title": "G004 Confirm and repair violations",
+        "objective": "For each confirmed violation from G003, implement the smallest real semantic fix or record a blocking honest-unsupportable finding; do not modify testsuite/evaluator to bypass failures and do not stage unrelated dirty worktree files.",
+        "status": "pending",
+        "attempt": 0,
+        "createdAt": "2026-06-19T11:38:10.373Z",
+        "updatedAt": "2026-06-19T11:38:10.373Z"
+      },
+      {
+        "id": "G005-g005-official-regression-and-final-r",
+        "title": "G005 Official regression and final review gate",
+        "objective": "Run fresh verification, official or official-local-equivalent evaluator evidence as environment permits, ai-slop-cleaner no-op/pass on changed files, independent code-reviewer and architect review, then commit agent-owned artifacts/fixes only.",
+        "status": "pending",
+        "attempt": 0,
+        "createdAt": "2026-06-19T11:38:10.373Z",
+        "updatedAt": "2026-06-19T11:38:10.373Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",
+    "activeGoalId": "G001-g001-live-rules-and-evaluation-inven"
+  },
+  "summary": {
+    "total": 5,
+    "pending": 4,
+    "inProgress": 1,
+    "complete": 0,
+    "failed": 0,
+    "reviewBlocked": 0,
+    "needsUserDecision": 0,
+    "superseded": 0,
+    "steeringBlocked": 0,
+    "aggregateComplete": false,
+    "artifactComplete": false,
+    "activeGoalId": "G001-g001-live-rules-and-evaluation-inven"
+  },
+  "reconciliation": {
+    "ok": true,
+    "snapshot": {
+      "available": false,
+      "raw": null
+    },
+    "warnings": [
+      "Codex goal snapshot is absent or reports no active goal; call get_goal and pass its JSON with --codex-goal-json."
+    ],
+    "errors": []
+  }
+}

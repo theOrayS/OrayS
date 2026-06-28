@@ -1,0 +1,74 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-scout26-rv-001.log`
+
+- PASS LTP CASE: 6
+- FAIL LTP CASE: 16
+- Internal TFAIL/TBROK/TCONF: 33 ({'TCONF': 12, 'TBROK': 6, 'TFAIL': 15})
+- timeout matches: 3
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 1
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| abort01 | rv | musl | ltp-musl | PASS | 0 | 2715 | 258855 | 256786 | -2069 | 0 | 0 | 0 | 0 | 0 | 0 |
+| alarm06 | rv | musl | ltp-musl | PASS | 0 | 5486 | 256568 | 256554 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_getres01 | rv | musl | ltp-musl | PASS | 0 | 3072 | 256708 | 256673 | -35 | 0 | 0 | 8 | 0 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 61534 | 256673 | 256659 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime03 | rv | musl | ltp-musl | FAIL | 2 | 2316 | 256659 | 256652 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| clock_nanosleep01 | rv | musl | ltp-musl | FAIL | 1 | 32860 | 256652 | 256610 | -42 | 3 | 0 | 2 | 0 | 0 | 0 |
+| dup05 | rv | musl | ltp-musl | FAIL | 2 | 2233 | 129101 | 129087 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fcntl07 | rv | musl | ltp-musl | FAIL | 2 | 1963 | 129087 | 129080 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fork05 | rv | musl | ltp-musl | PASS | 0 | 2047 | 256786 | 256779 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill05 | rv | musl | ltp-musl | FAIL | 3 | 2851 | 256554 | 256525 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill10 | rv | musl | ltp-musl | FAIL | 137 | 61755 | 256525 | 129388 | -127137 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill11 | rv | musl | ltp-musl | PASS | 0 | 3801 | 129388 | 129206 | -182 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | rv | musl | ltp-musl | PASS | 0 | 8207 | 256779 | 256708 | -71 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mlock02 | rv | musl | ltp-musl | FAIL | 1 | 2641 | 129143 | 129129 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| mlock05 | rv | musl | ltp-musl | FAIL | 2 | 2174 | 129129 | 129115 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap12 | rv | musl | ltp-musl | FAIL | 1 | 2737 | 129115 | 129101 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| munmap02 | rv | musl | ltp-musl | FAIL | 139 | 2730 | 129157 | 129150 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| munmap03 | rv | musl | ltp-musl | FAIL | 1 | 2186 | 129150 | 129143 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep01 | rv | musl | ltp-musl | FAIL | 1 | 14113 | 256610 | 256589 | -21 | 5 | 0 | 0 | 0 | 0 | 0 |
+| nanosleep02 | rv | musl | ltp-musl | FAIL | 1 | 7196 | 256589 | 256568 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| pipe02 | rv | musl | ltp-musl | UNKNOWN |  |  | 129080 |  |  | 0 | 0 | 0 | 0 | 0 | 1 |
+| signal01 | rv | musl | ltp-musl | FAIL | 137 | 61487 | 129206 | 129164 | -42 | 0 | 0 | 0 | 1 | 0 | 0 |
+| signal06 | rv | musl | ltp-musl | FAIL | 32 | 2366 | 129164 | 129157 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 5 (rv:musl:abort01, rv:musl:alarm06, rv:musl:fork05, rv:musl:kill11, rv:musl:mem02)
+- pass_with_tconf: 1 (rv:musl:clock_getres01)
+- fail_wrapper: 16 (rv:musl:clock_gettime01, rv:musl:clock_gettime03, rv:musl:clock_nanosleep01, rv:musl:dup05, rv:musl:fcntl07, rv:musl:kill05, rv:musl:kill10, rv:musl:mlock02, rv:musl:mlock05, rv:musl:mmap12, rv:musl:munmap02, rv:musl:munmap03, rv:musl:nanosleep01, rv:musl:nanosleep02, rv:musl:signal01, rv:musl:signal06)
+- internal_tfail: 7 (rv:musl:clock_nanosleep01, rv:musl:kill05, rv:musl:mlock02, rv:musl:mmap12, rv:musl:munmap03, rv:musl:nanosleep01, rv:musl:nanosleep02)
+- internal_tbrok: 5 (rv:musl:clock_gettime03, rv:musl:dup05, rv:musl:fcntl07, rv:musl:kill05, rv:musl:mlock05)
+- timeout: 3 (rv:musl:clock_gettime01, rv:musl:kill10, rv:musl:signal01)
+- enosys: 2 (rv:musl:dup05, rv:musl:fcntl07)
+- panic_trap: 1 (rv:musl:pipe02)
+- unknown: 1 (rv:musl:pipe02)
+
+## FAIL LTP CASE
+- ltp-musl:clock_gettime01
+- ltp-musl:clock_gettime03
+- ltp-musl:clock_nanosleep01
+- ltp-musl:nanosleep01
+- ltp-musl:nanosleep02
+- ltp-musl:kill05
+- ltp-musl:kill10
+- ltp-musl:signal01
+- ltp-musl:signal06
+- ltp-musl:munmap02
+- ltp-musl:munmap03
+- ltp-musl:mlock02
+- ltp-musl:mlock05
+- ltp-musl:mmap12
+- ltp-musl:dup05
+- ltp-musl:fcntl07
+
+## Groups
+### ltp-musl
+- PASS: 6
+- FAIL: 16
+- Internal: {'TCONF': 12, 'TBROK': 6, 'TFAIL': 15}
+- timeout: 3
+- ENOSYS/not implemented: 2
+- panic/trap: 1
+- Fail cases: clock_gettime01, clock_gettime03, clock_nanosleep01, nanosleep01, nanosleep02, kill05, kill10, signal01, signal06, munmap02, munmap03, mlock02, mlock05, mmap12, dup05, fcntl07

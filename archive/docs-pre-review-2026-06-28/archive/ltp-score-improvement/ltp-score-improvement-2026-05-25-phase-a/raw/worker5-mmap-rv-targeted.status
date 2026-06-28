@@ -1,0 +1,5 @@
+command=OSCOMP_TEST_GROUPS=ltp LTP_CASES=mmap04,mmap05,mmap06,mprotect01,mprotect02,munmap01 LTP_CASE_TIMEOUT_SECS=60 RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img RV_TESTSUITE_RUN_IMG=/tmp/arceos-worker5-rv-869990.qcow2 ./run-eval.sh rv
+started_at=2026-05-25T00:22:41+08:00
+cases=mmap04,mmap05,mmap06,mprotect01,mprotect02,munmap01
+finished_at=2026-05-25T00:37:41+08:00
+exit_code=124

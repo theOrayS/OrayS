@@ -1,0 +1,75 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-kill-signal-rv-20260524T103449+0800.log`
+
+- PASS LTP CASE: 9
+- FAIL LTP CASE: 9
+- Internal TFAIL/TBROK/TCONF: 7 ({'TFAIL': 3, 'TBROK': 4})
+- timeout matches: 5
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 3 passed, 6 failed
+- ltp-glibc: 6 passed, 3 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| kill02 | rv | glibc | ltp-glibc | PASS | 0 | 14090 | 256607 | 256572 | -35 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | rv | musl | ltp-musl | FAIL | 137 | 61117 | 258860 | 256777 | -2083 | 1 | 0 | 0 | 1 | 0 | 0 |
+| kill05 | rv | glibc | ltp-glibc | FAIL | 3 | 4199 | 256572 | 256543 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill05 | rv | musl | ltp-musl | FAIL | 3 | 3586 | 256777 | 256748 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill07 | rv | glibc | ltp-glibc | PASS | 0 | 5775 | 256543 | 256528 | -15 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill07 | rv | musl | ltp-musl | PASS | 0 | 3960 | 256748 | 256733 | -15 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill08 | rv | glibc | ltp-glibc | PASS | 0 | 5392 | 256528 | 256479 | -49 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill08 | rv | musl | ltp-musl | PASS | 0 | 3357 | 256733 | 256684 | -49 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill09 | rv | glibc | ltp-glibc | PASS | 0 | 3538 | 256479 | 256465 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill09 | rv | musl | ltp-musl | PASS | 0 | 2352 | 256684 | 256670 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill10 | rv | glibc | ltp-glibc | FAIL | 137 | 61895 | 256465 | 194864 | -61601 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill10 | rv | musl | ltp-musl | FAIL | 137 | 60729 | 256670 | 256649 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill11 | rv | glibc | ltp-glibc | PASS | 0 | 8258 | 194864 | 194682 | -182 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill11 | rv | musl | ltp-musl | FAIL | 137 | 60817 | 256649 | 256628 | -21 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill12 | rv | glibc | ltp-glibc | PASS | 0 | 21708 | 194682 | 194584 | -98 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill12 | rv | musl | ltp-musl | FAIL | 137 | 61215 | 256628 | 256614 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill13 | rv | glibc | ltp-glibc | FAIL | 2 | 4085 | 194584 | 194577 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| kill13 | rv | musl | ltp-musl | FAIL | 2 | 2666 | 256614 | 256607 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 9 (rv:glibc:kill02, rv:glibc:kill07, rv:musl:kill07, rv:glibc:kill08, rv:musl:kill08, rv:glibc:kill09, rv:musl:kill09, rv:glibc:kill11, rv:glibc:kill12)
+- pass_with_tconf: 0
+- fail_wrapper: 9 (rv:musl:kill02, rv:glibc:kill05, rv:musl:kill05, rv:glibc:kill10, rv:musl:kill10, rv:musl:kill11, rv:musl:kill12, rv:glibc:kill13, rv:musl:kill13)
+- internal_tfail: 3 (rv:musl:kill02, rv:glibc:kill05, rv:musl:kill05)
+- internal_tbrok: 4 (rv:glibc:kill05, rv:musl:kill05, rv:glibc:kill13, rv:musl:kill13)
+- timeout: 5 (rv:musl:kill02, rv:glibc:kill10, rv:musl:kill10, rv:musl:kill11, rv:musl:kill12)
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:kill02
+- ltp-musl:kill05
+- ltp-musl:kill10
+- ltp-musl:kill11
+- ltp-musl:kill12
+- ltp-musl:kill13
+- ltp-glibc:kill05
+- ltp-glibc:kill10
+- ltp-glibc:kill13
+
+## Groups
+### ltp-musl
+- PASS: 3
+- FAIL: 6
+- Internal: {'TFAIL': 2, 'TBROK': 2}
+- timeout: 4
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: kill02, kill05, kill10, kill11, kill12, kill13
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 3
+- Internal: {'TFAIL': 1, 'TBROK': 2}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: kill05, kill10, kill13

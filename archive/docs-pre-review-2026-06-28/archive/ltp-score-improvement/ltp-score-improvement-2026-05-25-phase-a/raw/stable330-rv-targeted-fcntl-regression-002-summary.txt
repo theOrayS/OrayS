@@ -1,0 +1,68 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable330-rv-targeted-fcntl-regression-002.log`
+
+- PASS LTP CASE: 12
+- FAIL LTP CASE: 4
+- Internal TFAIL/TBROK/TCONF: 4 ({'TFAIL': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 6 passed, 2 failed
+- ltp-glibc: 6 passed, 2 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fcntl05 | rv | glibc | ltp-glibc | PASS | 0 | 3407 | 256682 | 256668 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | musl | ltp-musl | PASS | 0 | 1330 | 256794 | 256780 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05_64 | rv | glibc | ltp-glibc | PASS | 0 | 3195 | 256668 | 256654 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05_64 | rv | musl | ltp-musl | PASS | 0 | 2661 | 256780 | 256766 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | glibc | ltp-glibc | PASS | 0 | 4101 | 256654 | 256633 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | musl | ltp-musl | PASS | 0 | 3234 | 256766 | 256745 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12_64 | rv | glibc | ltp-glibc | PASS | 0 | 4768 | 256633 | 256612 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12_64 | rv | musl | ltp-musl | PASS | 0 | 4814 | 256745 | 256724 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | glibc | ltp-glibc | PASS | 0 | 3305 | 256612 | 256598 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | musl | ltp-musl | PASS | 0 | 2231 | 256724 | 256710 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13_64 | rv | glibc | ltp-glibc | PASS | 0 | 2803 | 256598 | 256584 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13_64 | rv | musl | ltp-musl | PASS | 0 | 2563 | 256710 | 256696 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23 | rv | glibc | ltp-glibc | FAIL | 1 | 2367 | 256696 | 256689 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23 | rv | musl | ltp-musl | FAIL | 1 | 1513 | 258856 | 256801 | -2055 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23_64 | rv | glibc | ltp-glibc | FAIL | 1 | 3062 | 256689 | 256682 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23_64 | rv | musl | ltp-musl | FAIL | 1 | 3116 | 256801 | 256794 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 12 (rv:glibc:fcntl05, rv:musl:fcntl05, rv:glibc:fcntl05_64, rv:musl:fcntl05_64, rv:glibc:fcntl12, rv:musl:fcntl12, rv:glibc:fcntl12_64, rv:musl:fcntl12_64, rv:glibc:fcntl13, rv:musl:fcntl13, rv:glibc:fcntl13_64, rv:musl:fcntl13_64)
+- pass_with_tconf: 0
+- fail_wrapper: 4 (rv:glibc:fcntl23, rv:musl:fcntl23, rv:glibc:fcntl23_64, rv:musl:fcntl23_64)
+- internal_tfail: 4 (rv:glibc:fcntl23, rv:musl:fcntl23, rv:glibc:fcntl23_64, rv:musl:fcntl23_64)
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:fcntl23
+- ltp-musl:fcntl23_64
+- ltp-glibc:fcntl23
+- ltp-glibc:fcntl23_64
+
+## Groups
+### ltp-musl
+- PASS: 6
+- FAIL: 2
+- Internal: {'TFAIL': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: fcntl23, fcntl23_64
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 2
+- Internal: {'TFAIL': 2}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: fcntl23, fcntl23_64

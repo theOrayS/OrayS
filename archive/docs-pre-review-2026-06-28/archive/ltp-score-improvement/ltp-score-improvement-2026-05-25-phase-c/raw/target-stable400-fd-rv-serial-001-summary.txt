@@ -1,0 +1,80 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-fd-rv-serial-001.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 16
+- Internal TFAIL/TBROK/TCONF: 910 ({'TBROK': 10, 'TFAIL': 900})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 6
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 8 failed
+- ltp-glibc: 0 passed, 8 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| dup05 | rv | glibc | ltp-glibc | FAIL | 2 | 3648 | 243364 | 243350 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| dup05 | rv | musl | ltp-musl | FAIL | 2 | 3120 | 258855 | 256793 | -2062 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fcntl07 | rv | glibc | ltp-glibc | FAIL | 2 | 3488 | 243350 | 243343 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl07 | rv | musl | ltp-musl | FAIL | 2 | 2358 | 256793 | 256786 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl07_64 | rv | glibc | ltp-glibc | FAIL | 2 | 3704 | 225888 | 225881 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl07_64 | rv | musl | ltp-musl | FAIL | 2 | 2779 | 243427 | 243420 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl11 | rv | glibc | ltp-glibc | FAIL | 1 | 2617 | 243343 | 243329 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11 | rv | musl | ltp-musl | FAIL | 1 | 2287 | 256786 | 256772 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11_64 | rv | glibc | ltp-glibc | FAIL | 1 | 4032 | 225881 | 225867 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11_64 | rv | musl | ltp-musl | FAIL | 1 | 3101 | 243420 | 243406 | -14 | 66 | 0 | 0 | 0 | 0 | 0 |
+| fcntl14 | rv | glibc | ltp-glibc | FAIL | 1 | 24972 | 243329 | 225930 | -17399 | 304 | 0 | 0 | 0 | 0 | 0 |
+| fcntl14 | rv | musl | ltp-musl | FAIL | 1 | 17403 | 256772 | 243469 | -13303 | 304 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15 | rv | glibc | ltp-glibc | FAIL | 1 | 2813 | 225930 | 225888 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15 | rv | musl | ltp-musl | FAIL | 1 | 2259 | 243469 | 243427 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15_64 | rv | glibc | ltp-glibc | FAIL | 1 | 4590 | 225867 | 225825 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15_64 | rv | musl | ltp-musl | FAIL | 1 | 2948 | 243406 | 243364 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 16 (rv:glibc:dup05, rv:musl:dup05, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fcntl07_64, rv:musl:fcntl07_64, rv:glibc:fcntl11, rv:musl:fcntl11, rv:glibc:fcntl11_64, rv:musl:fcntl11_64, rv:glibc:fcntl14, rv:musl:fcntl14, rv:glibc:fcntl15, rv:musl:fcntl15, rv:glibc:fcntl15_64, rv:musl:fcntl15_64)
+- internal_tfail: 10 (rv:glibc:fcntl11, rv:musl:fcntl11, rv:glibc:fcntl11_64, rv:musl:fcntl11_64, rv:glibc:fcntl14, rv:musl:fcntl14, rv:glibc:fcntl15, rv:musl:fcntl15, rv:glibc:fcntl15_64, rv:musl:fcntl15_64)
+- internal_tbrok: 6 (rv:glibc:dup05, rv:musl:dup05, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fcntl07_64, rv:musl:fcntl07_64)
+- timeout: 0
+- enosys: 6 (rv:glibc:dup05, rv:musl:dup05, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fcntl07_64, rv:musl:fcntl07_64)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:dup05
+- ltp-musl:fcntl07
+- ltp-musl:fcntl11
+- ltp-musl:fcntl14
+- ltp-musl:fcntl15
+- ltp-musl:fcntl07_64
+- ltp-musl:fcntl11_64
+- ltp-musl:fcntl15_64
+- ltp-glibc:dup05
+- ltp-glibc:fcntl07
+- ltp-glibc:fcntl11
+- ltp-glibc:fcntl14
+- ltp-glibc:fcntl15
+- ltp-glibc:fcntl07_64
+- ltp-glibc:fcntl11_64
+- ltp-glibc:fcntl15_64
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 8
+- Internal: {'TBROK': 5, 'TFAIL': 450}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: dup05, fcntl07, fcntl11, fcntl14, fcntl15, fcntl07_64, fcntl11_64, fcntl15_64
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 8
+- Internal: {'TBROK': 5, 'TFAIL': 450}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: dup05, fcntl07, fcntl11, fcntl14, fcntl15, fcntl07_64, fcntl11_64, fcntl15_64

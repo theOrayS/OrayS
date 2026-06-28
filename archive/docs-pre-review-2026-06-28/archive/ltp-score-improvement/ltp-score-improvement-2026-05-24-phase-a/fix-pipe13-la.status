@@ -1,0 +1,4 @@
+command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=pipe13\ LTP_CASE_TIMEOUT_SECS=90\ ./run-eval.sh\ la
+exit=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe13-la-20260524T142855+0800.log
+cases=pipe13

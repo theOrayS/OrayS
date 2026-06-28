@@ -1,0 +1,11 @@
+rv/musl: 2820 regular entries
+rv/glibc: 2840 regular entries
+la/musl: 2820 regular entries
+la/glibc: 2840 regular entries
+common_all_four: 2820
+union_all_four: 2840
+LTP_STABLE_CASES: 44 configured, missing_common=[]
+LTP_SYSCALLS_BASIC_PLUS_CASES: 20 configured, missing_common=[]
+LTP_FS_BASIC_CASES: 17 configured, missing_common=[]
+LTP_PROC_BASIC_CASES: 1 configured, missing_common=[]
+LTP_TIME_SIGNAL_BASIC_CASES: 19 configured, missing_common=[]
