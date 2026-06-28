@@ -1,283 +1,118 @@
-# OSKernel 2026 ArceOS Evaluation Branch
+# OSKernel 2026 ArceOS 评审分支
 
-This repository is an ArceOS-based experimental modular OS/unikernel, adapted
-for the OSKernel 2026 evaluation flow.  It keeps the upstream ArceOS workspace
-structure, but the maintained branch is focused on bootable evaluator kernels,
-Linux/POSIX compatibility in the shell/user-space path, and honest LTP result
-reporting for both local QEMU validation and remote submission builds.
+本仓库是基于 ArceOS 的 OSKernel 2026 评审/提交分支。默认说明、交付说明和维护约定均使用中文；只有上游原始文档、第三方代码或工具输出保留原语言。
 
-The current working branch is the single maintained source tree for both modes:
+本分支目标是交付一个可复现、可评审、不过度携带历史日志的源码树：保留真实内核、用户态和评测入口；不追踪本地评测输出、归档日志、镜像和构建产物；所有 LTP/兼容性结论以源码、脚本和真实输出为准。
 
-- **Local validation:** `./run-eval.sh rv` and `./run-eval.sh la` run the
-  RISC-V and LoongArch QEMU evaluator paths against local sdcard images.
-- **Remote submission build:** `make all` builds the root-level `kernel-rv` and
-  `kernel-la` artifacts expected by the remote evaluator.  The LoongArch
-  submission build uses `configs/remote-eval/axplat-loongarch64-qemu-virt.toml`
-  so its address map matches the remote environment.
-- **Offline-friendly dependencies:** helper shims under `scripts/` and
-  `tools/bin/`, the non-hidden `cargo-home/`, and `vendor/cargo-vendor.tar.gz`
-  keep submission builds from depending on network access.
+## 当前交付范围
 
-ArceOS itself was inspired by [Unikraft](https://github.com/unikraft/unikraft).
-This branch is still experimental and under active compatibility work.
+- **架构**：RISC-V 与 LoongArch 是远程评测主路径；仓库仍保留 x86_64、AArch64 等 ArceOS 平台支持。
+- **远程提交入口**：`make all` 生成仓库根目录下的 `kernel-rv` 和 `kernel-la`。
+- **本地验证入口**：`./run-eval.sh rv`、`./run-eval.sh la` 分别运行本地 QEMU 评测路径。
+- **用户态/系统调用边界**：`api/arceos_posix_api/`、`ulib/`、`examples/shell/` 负责 POSIX/Linux 可见行为、ELF 加载、进程、文件描述符、信号、futex、mmap 和 LTP runner。
+- **LTP stable 集合**：`examples/shell/src/cmd.rs::LTP_STABLE_CASES` 当前包含 1000 个唯一 case；runner 会分别对 `/musl` 和 `/glibc` 执行所选 case。
 
-## Current feature focus
+## 快速开始
 
-- Architectures: `x86_64`, `riscv64`, `aarch64`, `loongarch64`.
-- QEMU platforms: pc-q35 for x86_64 and virt platforms for
-  RISC-V/AArch64/LoongArch.
-- Kernel subsystems: multitasking, FIFO/RR/CFS schedulers, SMP scheduling,
-  VirtIO block/network/display, file systems, and a smoltcp-based TCP/UDP stack.
-- User-space boundary: `api/arceos_posix_api` plus `examples/shell` provide the
-  POSIX/Linux-facing evaluator integration, ELF loading, process lifecycle,
-  file descriptors, signals, futexes, memory mapping, and syscall dispatch.
-- Evaluator harness: `examples/shell` can auto-run official groups and LTP cases
-  from the mounted test images.
-- LTP stable set: `examples/shell/src/cmd.rs::LTP_STABLE_CASES` currently lists
-  383 unique cases.  The runner executes the selected list for both `/musl` and
-  `/glibc`, so the stable default is 766 LTP case executions per architecture.
+### 构建远程评测内核
 
-## Repository layout
+```bash
+make all
+```
 
-| Path | Purpose |
+生成文件：
+
+```text
+kernel-rv
+kernel-la
+```
+
+也可以单独构建：
+
+```bash
+make kernel-rv
+make kernel-la
+```
+
+### 运行本地评测
+
+请先准备官方评测镜像/SD 卡镜像，然后运行：
+
+```bash
+./run-eval.sh rv
+./run-eval.sh la
+```
+
+本地 LoongArch QEMU 与远程官方评测机的地址映射可能不同；判断 LoongArch 远程结果时，应优先以远程 `make all` 提交构建和官方评测输出为准。
+
+### 常用静态/单元检查
+
+```bash
+python3 scripts/test_ltp_summary.py
+python3 scripts/test_g008_musl_patch_stable.py
+git diff --check
+```
+
+完整构建、QEMU 和 evaluator 运行时间较长，运行前后建议检查磁盘空间：
+
+```bash
+df -h / /root
+```
+
+## 目录说明
+
+| 路径 | 说明 |
 | --- | --- |
-| `kernel/` | Core ArceOS runtime, HAL, memory, tasking, drivers, fs, net, sync, and SMP modules. |
-| `api/arceos_posix_api/` | Linux/POSIX ABI-facing syscall and user-space integration layer. |
-| `ulib/` | User libraries, including `axstd` and `axlibc`. |
-| `examples/shell/` | Interactive shell and OSKernel evaluator integration point. |
-| `configs/` | Default, platform, custom, and remote-evaluator platform configs. |
-| `scripts/` | Build helper shims, QEMU/build make fragments, and LTP summary tools. |
-| `tools/bin/` | Repo-provided helper executables preferred by offline/submission builds. |
-| `cargo-home/` | Non-hidden Cargo home for vendored/offline source replacement. |
-| `vendor/` | Local crate patches and `cargo-vendor.tar.gz` restore archive. |
-| `docs/` | Local compatibility notes, remote/local eval unification evidence, LTP plans, raw summaries, and final gates. |
-| `eval-reports/` | Archived evaluator result bundles, when present. |
-| `doc/` | Upstream-style ArceOS documentation and platform notes. |
+| `kernel/` | ArceOS 内核运行时、HAL、内存、任务、驱动、文件系统、网络和同步模块。 |
+| `api/arceos_posix_api/` | Linux/POSIX ABI 可见的 syscall 与用户态集成边界。 |
+| `ulib/` | 用户库，包括 `axstd`、`axlibc` 等。 |
+| `examples/shell/` | shell、官方分组 runner、LTP runner 和评测集成入口。 |
+| `configs/` | 默认平台、自定义平台和远程评测平台配置。 |
+| `scripts/` | 构建辅助、评测辅助、LTP 汇总和回归检查脚本。 |
+| `scripts/fixtures/` | 仍被回归测试使用的小型固定输入；这些文件需要随仓库追踪。 |
+| `tools/bin/` | 仓库内置辅助工具，优先支持离线/提交环境。 |
+| `cargo-home/` | 非隐藏 Cargo home，用于 vendored/offline source replacement。 |
+| `vendor/` | 本地 crate patch 与离线 vendor 归档。 |
+| `docs/agent-workflow/` | agent 工作流、验证、分支和协作规则。 |
+| `docs/ltp-full-sweep-blacklist-2026-05-30-arch/` | Makefile 仍引用的 LTP blacklist 输入，不能随意移动。 |
+| `doc/` | 上游风格 ArceOS 文档和平台说明。 |
 
-Generated/local artifacts such as `kernel-rv`, `kernel-la`, `sdcard-*.img`,
-`disk*.img`, `output*.md`, `*.log`, `build/`, and `target/` may exist in a
-working checkout.  They are not source-of-truth files unless a task explicitly
-asks to preserve generated evidence.
+## 不追踪的本地文件
 
-## Prerequisites
+以下内容可能在本地存在，但不属于评审源码树的 source of truth：
 
-The Rust toolchain is pinned by `rust-toolchain.toml`:
+- `eval-reports/`
+- `archive/docs-pre-review-2026-06-28/`
+- `.local-archive/`
+- `.codegraph/`
+- `output/`
+- `complete.md`
+- `output*.md`
+- `*.log`
+- `kernel-rv`、`kernel-la`
+- `sdcard-*.img`、`disk*.img`
+- `build/`、`target/`
 
-- channel: `nightly-2025-05-20`
-- components: `rust-src`, `llvm-tools`, `rustfmt`, `clippy`
-- targets: `x86_64-unknown-none`, `riscv64gc-unknown-none-elf`,
-  `aarch64-unknown-none-softfloat`, `loongarch64-unknown-none-softfloat`
+如果需要保留历史输出，请放在被忽略的本地归档目录；不要把旧日志、评测输出或大文件重新加入 Git。
 
-On Debian/Ubuntu, install the host packages needed for direct builds and QEMU
-runs:
+## 竞赛合规红线
 
-```bash
-sudo apt-get update
-sudo apt-get install -y build-essential make git wget ca-certificates \
-    python3 python3-venv pkg-config libclang-dev qemu-system qemu-utils
-```
+评审分支必须保持真实语义，禁止通过伪造输出或硬编码测例来换取分数：
 
-The Makefile prefers repository helper shims before user-installed tools, but a
-normal development host can also install the upstream Cargo helpers:
+- 不得硬编码 LTP case 名、路径、进程名或二进制特征。
+- 不得伪造 `TPASS`、wrapper PASS 或隐藏 `TCONF`、`TBROK`、`TFAIL`、`ENOSYS`、timeout、panic、trap。
+- 不得修改 testsuite 或 evaluator 脚本来制造通过。
+- 不得牺牲 Linux/POSIX 主要语义、权限检查、资源检查或安全边界。
+- blacklist 只能用于隔离会卡死、炸内存、破坏评测器或明显不适合当前内核模型的 case；被 blacklist 的 case 不能计为通过。
 
-```bash
-cargo install cargo-binutils axconfig-gen cargo-axplat
-```
+## 交付建议
 
-C examples and libc-oriented rebuilds need the appropriate musl cross toolchains
-for the target architecture.  See the upstream toolchain notes in this file's
-history or the contest environment setup if you need to rebuild C user apps.
-
-## Quick start
-
-### Build remote-submission kernels
-
-The default target is `all`, which builds both evaluator artifacts:
+评审前建议确认：
 
 ```bash
+git status --short --branch
+git ls-files --others --exclude-standard
 make all
-# outputs:
-#   ./kernel-rv
-#   ./kernel-la
 ```
 
-Equivalent per-architecture targets are available:
-
-```bash
-make kernel-rv
-make kernel-la
-```
-
-`kernel-rv` is wrapped from the RISC-V binary through
-`scripts/make/riscv64-kernel-wrap.lds`; `kernel-la` is copied from the
-LoongArch ELF output.  `make all` intentionally uses the remote LoongArch
-platform config, while local `kernel-la`/`run-la` keep the package default
-LoongArch config unless you override `PLAT_CONFIG`.
-
-### Run local evaluator images
-
-Place or point to the evaluator sdcard images, then run:
-
-```bash
-./run-eval.sh rv
-./run-eval.sh la
-```
-
-By default the script looks for `sdcard-rv.img` and `sdcard-la.img` in the
-repository root.  You can override paths with:
-
-```bash
-RV_TESTSUITE_IMG=/path/to/sdcard-rv.img ./run-eval.sh rv
-LA_TESTSUITE_IMG=/path/to/sdcard-la.img ./run-eval.sh la
-```
-
-The script checks for `cargo`, `qemu-img`, and the matching QEMU system binary
-before launching the run.
-
-### Run QEMU targets directly
-
-```bash
-make run-rv ARCH=riscv64
-make run-la ARCH=loongarch64
-```
-
-The direct targets build `kernel-rv`/`kernel-la`, create temporary qcow2 overlays
-under `/tmp`, and boot QEMU with the mounted evaluator image.  Avoid running RV
-or LA evaluator QEMU jobs in parallel unless their run-image paths are isolated.
-
-### Build or run a normal ArceOS app
-
-```bash
-make A=examples/helloworld ARCH=riscv64 run
-make A=examples/httpserver ARCH=aarch64 LOG=info SMP=4 run NET=y
-make A=examples/shell ARCH=riscv64 build
-```
-
-`ARCH` must be one of `x86_64`, `riscv64`, `aarch64`, or `loongarch64`.
-Common Make variables include `A`/`APP`, `FEATURES`, `APP_FEATURES`, `LOG`,
-`SMP`, `MODE`, `PLAT_CONFIG`, `TARGET_DIR`, `BLK`, `NET`, `GRAPHIC`, `MEM`, and
-`DISK_IMG`.  QEMU flags such as `NET=y` or `BLK=y` affect runtime device
-configuration, not the Rust feature set by themselves.
-
-## LTP and evaluator workflow
-
-The shell evaluator path is selected with `APP_FEATURES=auto-run-tests,uspace`
-by the kernel build targets.  LTP execution is controlled in
-`examples/shell/src/cmd.rs`:
-
-- `LTP_CORE_CASES` is the small smoke set.
-- `LTP_STABLE_CASES` is the current high-confidence contest set.
-- `LTP_CASE_BATCHES` contains named targeted batches.
-- `/ltp_cases.txt` or `/tmp/ltp_cases.txt` inside the guest overrides the case
-  selection at runtime.
-- Build-time `LTP_CASES` can select `stable`, `core`, `batch:<name>`,
-  `file:<path>`, or an inline comma/space-separated case list.
-- `/ltp_case_timeout_secs` or build-time `LTP_CASE_TIMEOUT_SECS` can override
-  the default per-case timeout.
-
-The runner keeps the remote evaluator's wrapper wire format for completed LTP
-cases: `FAIL LTP CASE <case> : <status>`, where status `0` is a wrapper-level
-pass and non-zero is a failure.  Internal LTP output (`TFAIL`, `TBROK`, `TCONF`),
-timeouts, ENOSYS, and panic/trap signals remain visible in the raw log.
-
-Always summarize evaluator logs with the parser before promoting a result:
-
-```bash
-python3 scripts/ltp_summary.py output_rv.md
-python3 scripts/ltp_summary.py output_la.md
-python3 scripts/ltp_summary.py --promotion-candidates rv.log la.log
-```
-
-Do not rely on the outer QEMU/run-eval exit code alone.  A clean promotion needs
-wrapper pass counts plus no unexpected internal failure, timeout, ENOSYS, or
-panic/trap signals for the selected scope.
-
-## Validation commands
-
-Use the smallest check that proves your change:
-
-```bash
-# Formatting / static checks
-make fmt
-make fmt_c
-make clippy
-make doc_check_missing
-make unittest_no_fail_fast
-
-# Build-only evaluator artifacts
-make kernel-rv
-make kernel-la
-make all
-
-# Local evaluator gates when images and QEMU are available
-./run-eval.sh rv
-./run-eval.sh la
-```
-
-For POSIX/user-space changes, at least build the shell for the affected target;
-for evaluator behavior changes, follow build validation with RV and LA evaluator
-runs when the images and QEMU are available.
-
-## Docker workflow
-
-A Dockerfile is provided for a development container with the pinned Rust
-workflow and QEMU/tooling assumptions:
-
-```bash
-docker build -t orays-arceos-dev -f Dockerfile .
-docker run --rm -it -v "$(pwd):/work" -w /work orays-arceos-dev bash
-```
-
-The Makefile also provides `make docker-image` and `make docker`; the latter
-uses the Makefile's built-in `/code/arceos` mount convention, so the manual
-command above is safer when this checkout is not literally named `arceos`.
-
-## Writing ArceOS apps
-
-Rust applications should be `no_std`/`no_main` crates that depend on `axstd`:
-
-```toml
-[dependencies]
-axstd = { path = "/path/to/arceos/ulib/axstd", features = ["..."] }
-```
-
-Annotate the entry point with `#[unsafe(no_mangle)]`, then build through this
-repository:
-
-```bash
-make -C /path/to/arceos A=$(pwd) ARCH=<arch> run
-```
-
-C applications can provide `axbuild.mk` and `features.txt` like the examples in
-`examples/`, then use the same Make interface.
-
-## Platform-specific builds
-
-Use `MYPLAT` for platform crates or `PLAT_CONFIG` for explicit TOML configs:
-
-```bash
-make MYPLAT=axplat-aarch64-raspi SMP=4 A=examples/helloworld
-make PLAT_CONFIG=$(pwd)/configs/custom/x86_64-pc-oslab.toml \
-    A=examples/httpserver FEATURES=page-alloc-4g,driver-ixgbe,driver-ramdisk SMP=4
-```
-
-Repository configs are under `configs/platforms/`, `configs/custom/`, and
-`configs/remote-eval/`.
-
-## Documentation and evidence
-
-- Active agent workflow guidance remains under `docs/agent-workflow/`.
-- Makefile-referenced LTP blacklist inputs remain under
-  `docs/ltp-full-sweep-blacklist-2026-05-30-arch/`.
-- Historical developer guides, LTP score reports, compatibility notes, and old
-  evidence may be kept locally under ignored review archives such as
-  `archive/docs-pre-review-2026-06-28/`, but are not part of the tracked review tree.
-- Upstream-style platform docs remain under `doc/`.
-
-Keep evaluator reports honest: do not hardcode test names, fake `TPASS`, hide
-`TCONF`/timeouts, or edit testsuite sources to manufacture a pass.
-
-## Licenses
-
-This workspace inherits the upstream ArceOS licensing files in the repository
-root: Apache-2.0, GPLv3, MulanPSL2, and MulanPubL2.
+若只做文档/路径整理，可用 `git diff --check` 和相关脚本测试作为最小验证；若改动 syscall、ABI、runner 或 Makefile，必须补充对应构建、QEMU 或 parser-backed LTP 证据。
