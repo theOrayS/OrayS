@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES="flock01 flock02 flock03 flock04" LTP_CASE_TIMEOUT_SECS=90 timeout 100m ./run-eval.sh la

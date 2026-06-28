@@ -1,3 +1,0 @@
-followup-rv-pipe2_02-binsh-001.log: markers=2 bad=0
-followup-la-pipe2_02-binsh-001.log: markers=2 bad=0
-TOTAL markers=4 bad=0

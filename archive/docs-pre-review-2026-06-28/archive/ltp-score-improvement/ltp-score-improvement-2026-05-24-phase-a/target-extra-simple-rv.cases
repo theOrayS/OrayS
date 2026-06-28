@@ -1,1 +1,0 @@
-alarm05,alarm07,gethostname02,gettid02,write05,clock_getres01,clock_getres02,clock_gettime03,clock_gettime04,clock_gettime05,getitimer01,getitimer02,getrusage02,getrusage03,getpriority03,setpriority03,umask02,link01,rename01,truncate01

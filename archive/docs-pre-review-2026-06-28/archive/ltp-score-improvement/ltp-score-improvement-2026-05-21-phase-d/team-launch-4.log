@@ -1,5 +1,0 @@
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx] tmux resize hook unavailable for codex_local:0 (omx_resize_continue-ltp-stable-s-8231c807_codex_local_0_67): invalid option: window-resized[2048513180]; continuing with best-effort HUD resize fallback.

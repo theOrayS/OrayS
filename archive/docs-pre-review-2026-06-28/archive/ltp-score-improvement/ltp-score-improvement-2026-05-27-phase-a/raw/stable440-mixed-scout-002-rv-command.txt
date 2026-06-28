@@ -1,1 +1,0 @@
-OSCOMP_TEST_GROUPS=ltp LTP_CASES="readlink03 open15 statfs01 statfs01_64 fstatfs01 fstatfs01_64 statvfs01 clone06 clone07 clone08 clone09 pselect03_64" LTP_CASE_TIMEOUT_SECS=80 timeout 100m ./run-eval.sh rv

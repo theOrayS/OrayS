@@ -1,1 +1,0 @@
-getsid01,getresuid01,getresuid02,getresuid03,getresgid01,getresgid02,getresgid03,sched_getscheduler01,sched_getscheduler02,rt_sigaction02,uname04

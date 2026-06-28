@@ -1,3 +1,0 @@
-run-eval rc=0
-log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-rv-clean-la-confirm-20260524T131247+0800.log
-cases=open09,fcntl23,getegid01_16,sched_getattr02

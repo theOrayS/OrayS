@@ -1,5 +1,0 @@
-# stable460-clean13-la-confirm-001 precheck 2026-05-28T01:11:20+08:00
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/vda2        59G   21G   36G  37% /
-/dev/vda2        59G   21G   36G  37% /
-1.4G	/root/.codex

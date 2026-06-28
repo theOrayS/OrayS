@@ -270,7 +270,8 @@ Repository configs are under `configs/platforms/`, `configs/custom/`, and
 - Makefile-referenced LTP blacklist inputs remain under
   `docs/ltp-full-sweep-blacklist-2026-05-30-arch/`.
 - Historical developer guides, LTP score reports, compatibility notes, and old
-  evidence were moved to `archive/docs-pre-review-2026-06-28/`.
+  evidence may be kept locally under ignored review archives such as
+  `archive/docs-pre-review-2026-06-28/`, but are not part of the tracked review tree.
 - Upstream-style platform docs remain under `doc/`.
 
 Keep evaluator reports honest: do not hardcode test names, fake `TPASS`, hide

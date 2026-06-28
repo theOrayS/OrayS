@@ -44,7 +44,6 @@
 | Rust/POSIX/ABI/高风险子系统修改边界 | `docs/agent-workflow/coding-boundaries.md` |
 | 分支命名、`score/best`、release/fix/feat/exp 用途 | `docs/agent-workflow/branch-policy.md` |
 | 多 agent 协作、冻结期、交付模板、Lore commit | `docs/agent-workflow/collaboration-and-delivery.md` |
-| 更完整的开发者背景材料 | `archive/docs-pre-review-2026-06-28/developer-guide/README.md` |
 
 示例：如果任务是“决定下一步跑哪些测例”，只需再读
 `ltp-selection.md` 和必要的当前 score/log/source；不要重读远程启动、提交模板、

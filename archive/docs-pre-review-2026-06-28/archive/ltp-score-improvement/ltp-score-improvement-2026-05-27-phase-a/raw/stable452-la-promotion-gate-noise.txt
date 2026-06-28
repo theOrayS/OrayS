@@ -1,3 +1,0 @@
-AxError::NotADirectory=10
-AxError::IsADirectory=0
-AxError::AlreadyExists=0

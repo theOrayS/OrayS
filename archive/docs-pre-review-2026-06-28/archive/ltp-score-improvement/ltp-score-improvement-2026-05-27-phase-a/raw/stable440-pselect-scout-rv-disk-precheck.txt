@@ -1,4 +1,0 @@
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/vda2        59G   21G   37G  37% /
-/dev/vda2        59G   21G   37G  37% /
-1.4G	/root/.codex

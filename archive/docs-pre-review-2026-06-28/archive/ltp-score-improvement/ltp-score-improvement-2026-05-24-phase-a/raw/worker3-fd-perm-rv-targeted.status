@@ -1,4 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=access02,access04,open05,open06,openat02,pipe02,pipe07,pipe08,close08,close09,lseek02,lseek03 LTP_CASE_TIMEOUT_SECS=30 RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img ./run-eval.sh rv
-exit=terminated_before_qemu (tool/session killed during first cargo build; no LTP markers emitted)
-note=partial build log retained for blocker transparency; do not treat as LTP evidence
-guardrail=aborted/untrusted for promotion after leader warning about shared /tmp/arceos-sdcard-*.run.qcow2 runner names; leader should rerun serially if needed
