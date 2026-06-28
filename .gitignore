@@ -32,3 +32,6 @@ build/
 
 # Local review archive; preserved on disk but not tracked.
 /archive/docs-pre-review-2026-06-28/
+
+# Local evaluator report archives; preserved on disk but not tracked.
+/eval-reports/
