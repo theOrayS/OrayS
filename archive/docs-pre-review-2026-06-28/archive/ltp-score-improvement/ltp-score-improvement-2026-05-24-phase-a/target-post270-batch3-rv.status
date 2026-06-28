@@ -1,0 +1,3 @@
+run-eval rc=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch3-rv-20260524T130305+0800.log
+cases=getgroups02,getpriority03,setpriority03,prlimit01,prlimit02,dup08,dup09,lseek04,lseek05,pread03,pread04,read05,read06,readlink02,unlink01

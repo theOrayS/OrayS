@@ -1,5 +1,0 @@
-branch=refactor/moss_kernel_like_remote
-status-before:
-?? "LoongArch\350\276\223\345\207\272.txt"
-?? "Riscv\350\276\223\345\207\272.txt"
-?? docs/merge-moss-kernel-like-remote-2026-05-21/

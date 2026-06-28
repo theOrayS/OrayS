@@ -2,7 +2,7 @@
 # Run LA with: LTP_BLACKLIST_COMMON_FILE=<dir>/blacklist-common.txt LTP_BLACKLIST_LA_FILE=<dir>/blacklist-la.txt LTP_CASES=blacklist ./run-eval.sh la
 # Entries here must be LA-specific severe blockers with evidence and removal conditions.
 
-# 2026-06-01 Session 7 removal: creat07 is no longer listed here after an LA LTP-only targeted run closed normally as ordinary FAIL/TBROK (no timeout/panic/resource/incomplete); see docs/archive/ltp-os-long-term-plan-2026-06-01/ltp-os-long-term-plan-sessions-0601-docs/session-07-la-severe-blockers/.
+# 2026-06-01 Session 7 removal: creat07 is no longer listed here after an LA LTP-only targeted run closed normally as ordinary FAIL/TBROK (no timeout/panic/resource/incomplete); see archive/docs-pre-review-2026-06-28/archive/ltp-os-long-term-plan-2026-06-01/ltp-os-long-term-plan-sessions-0601-docs/session-07-la-severe-blockers/.
 
 # 2026-05-30 la-arch001: LA-only network stress family resource exhaustion / environment pollution.
 # Reason category: arch=la resource exhaustion / fork failure / environment pollution; blocks full-sweep closure, not ordinary TFAIL/ENOSYS.

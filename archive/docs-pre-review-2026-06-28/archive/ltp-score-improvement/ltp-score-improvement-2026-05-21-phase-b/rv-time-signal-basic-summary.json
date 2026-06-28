@@ -1,0 +1,2482 @@
+{
+  "case_matrix": {
+    "alarm02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "alarm02",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8855,
+              "free_frames": 252399
+            },
+            "after_run": {
+              "allocated_frames": 8855,
+              "free_frames": 252399
+            },
+            "before": {
+              "allocated_frames": 8841,
+              "free_frames": 252413
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1088,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "alarm02",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -2062,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4451,
+              "free_frames": 256803
+            },
+            "after_run": {
+              "allocated_frames": 4451,
+              "free_frames": 256803
+            },
+            "before": {
+              "allocated_frames": 2389,
+              "free_frames": 258865
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1408,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "alarm03": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "alarm03",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8876,
+              "free_frames": 252378
+            },
+            "after_run": {
+              "allocated_frames": 8876,
+              "free_frames": 252378
+            },
+            "before": {
+              "allocated_frames": 8855,
+              "free_frames": 252399
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1124,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "alarm03",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4472,
+              "free_frames": 256782
+            },
+            "after_run": {
+              "allocated_frames": 4472,
+              "free_frames": 256782
+            },
+            "before": {
+              "allocated_frames": 4451,
+              "free_frames": 256803
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 814,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "clock_getres01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "clock_getres01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -35,
+          "group": "ltp-glibc",
+          "internal": {
+            "TCONF": 8
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8911,
+              "free_frames": 252343
+            },
+            "after_run": {
+              "allocated_frames": 8911,
+              "free_frames": 252343
+            },
+            "before": {
+              "allocated_frames": 8876,
+              "free_frames": 252378
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1133,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "clock_getres01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -35,
+          "group": "ltp-musl",
+          "internal": {
+            "TCONF": 8
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4507,
+              "free_frames": 256747
+            },
+            "after_run": {
+              "allocated_frames": 4507,
+              "free_frames": 256747
+            },
+            "before": {
+              "allocated_frames": 4472,
+              "free_frames": 256782
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 916,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "clock_gettime01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "clock_gettime01",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8925,
+              "free_frames": 252329
+            },
+            "after_run": {
+              "allocated_frames": 8925,
+              "free_frames": 252329
+            },
+            "before": {
+              "allocated_frames": 8911,
+              "free_frames": 252343
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 8331,
+          "status": "FAIL",
+          "timeouts": 1
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "clock_gettime01",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4521,
+              "free_frames": 256733
+            },
+            "after_run": {
+              "allocated_frames": 4521,
+              "free_frames": 256733
+            },
+            "before": {
+              "allocated_frames": 4507,
+              "free_frames": 256747
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 8272,
+          "status": "FAIL",
+          "timeouts": 1
+        }
+      }
+    },
+    "clock_gettime02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "clock_gettime02",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8939,
+              "free_frames": 252315
+            },
+            "after_run": {
+              "allocated_frames": 8939,
+              "free_frames": 252315
+            },
+            "before": {
+              "allocated_frames": 8925,
+              "free_frames": 252329
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1059,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "clock_gettime02",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4535,
+              "free_frames": 256719
+            },
+            "after_run": {
+              "allocated_frames": 4535,
+              "free_frames": 256719
+            },
+            "before": {
+              "allocated_frames": 4521,
+              "free_frames": 256733
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1000,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "gettimeofday01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "gettimeofday01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8953,
+              "free_frames": 252301
+            },
+            "after_run": {
+              "allocated_frames": 8953,
+              "free_frames": 252301
+            },
+            "before": {
+              "allocated_frames": 8939,
+              "free_frames": 252315
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1161,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "gettimeofday01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4549,
+              "free_frames": 256705
+            },
+            "after_run": {
+              "allocated_frames": 4549,
+              "free_frames": 256705
+            },
+            "before": {
+              "allocated_frames": 4535,
+              "free_frames": 256719
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 735,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "kill02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "kill02",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -35,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9058,
+              "free_frames": 252196
+            },
+            "after_run": {
+              "allocated_frames": 9058,
+              "free_frames": 252196
+            },
+            "before": {
+              "allocated_frames": 9023,
+              "free_frames": 252231
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 11146,
+          "status": "FAIL",
+          "timeouts": 1
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "kill02",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -4131,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8750,
+              "free_frames": 252504
+            },
+            "after_run": {
+              "allocated_frames": 8750,
+              "free_frames": 252504
+            },
+            "before": {
+              "allocated_frames": 4619,
+              "free_frames": 256635
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 10842,
+          "status": "FAIL",
+          "timeouts": 1
+        }
+      }
+    },
+    "kill03": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "kill03",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9072,
+              "free_frames": 252182
+            },
+            "after_run": {
+              "allocated_frames": 9072,
+              "free_frames": 252182
+            },
+            "before": {
+              "allocated_frames": 9058,
+              "free_frames": 252196
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1157,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "kill03",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8764,
+              "free_frames": 252490
+            },
+            "after_run": {
+              "allocated_frames": 8764,
+              "free_frames": 252490
+            },
+            "before": {
+              "allocated_frames": 8750,
+              "free_frames": 252504
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 703,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "nanosleep01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "nanosleep01",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8974,
+              "free_frames": 252280
+            },
+            "after_run": {
+              "allocated_frames": 8974,
+              "free_frames": 252280
+            },
+            "before": {
+              "allocated_frames": 8953,
+              "free_frames": 252301
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 8728,
+          "status": "FAIL",
+          "timeouts": 1
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "nanosleep01",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4570,
+              "free_frames": 256684
+            },
+            "after_run": {
+              "allocated_frames": 4570,
+              "free_frames": 256684
+            },
+            "before": {
+              "allocated_frames": 4549,
+              "free_frames": 256705
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 8511,
+          "status": "FAIL",
+          "timeouts": 1
+        }
+      }
+    },
+    "nanosleep02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "nanosleep02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8995,
+              "free_frames": 252259
+            },
+            "after_run": {
+              "allocated_frames": 8995,
+              "free_frames": 252259
+            },
+            "before": {
+              "allocated_frames": 8974,
+              "free_frames": 252280
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 6097,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "nanosleep02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4591,
+              "free_frames": 256663
+            },
+            "after_run": {
+              "allocated_frames": 4591,
+              "free_frames": 256663
+            },
+            "before": {
+              "allocated_frames": 4570,
+              "free_frames": 256684
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 5822,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "pause01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "pause01",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9093,
+              "free_frames": 252161
+            },
+            "after_run": {
+              "allocated_frames": 9093,
+              "free_frames": 252161
+            },
+            "before": {
+              "allocated_frames": 9072,
+              "free_frames": 252182
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 8317,
+          "status": "FAIL",
+          "timeouts": 1
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "pause01",
+          "code": 137,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -21,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8785,
+              "free_frames": 252469
+            },
+            "after_run": {
+              "allocated_frames": 8785,
+              "free_frames": 252469
+            },
+            "before": {
+              "allocated_frames": 8764,
+              "free_frames": 252490
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 8373,
+          "status": "FAIL",
+          "timeouts": 1
+        }
+      }
+    },
+    "rt_sigaction01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "rt_sigaction01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9100,
+              "free_frames": 252154
+            },
+            "after_run": {
+              "allocated_frames": 9100,
+              "free_frames": 252154
+            },
+            "before": {
+              "allocated_frames": 9093,
+              "free_frames": 252161
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1174,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "rt_sigaction01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8792,
+              "free_frames": 252462
+            },
+            "after_run": {
+              "allocated_frames": 8792,
+              "free_frames": 252462
+            },
+            "before": {
+              "allocated_frames": 8785,
+              "free_frames": 252469
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 974,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "rt_sigprocmask01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "rt_sigprocmask01",
+          "code": 32,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {
+            "TCONF": 2
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9107,
+              "free_frames": 252147
+            },
+            "after_run": {
+              "allocated_frames": 9107,
+              "free_frames": 252147
+            },
+            "before": {
+              "allocated_frames": 9100,
+              "free_frames": 252154
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 998,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "rt_sigprocmask01",
+          "code": 32,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {
+            "TCONF": 2
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8799,
+              "free_frames": 252455
+            },
+            "after_run": {
+              "allocated_frames": 8799,
+              "free_frames": 252455
+            },
+            "before": {
+              "allocated_frames": 8792,
+              "free_frames": 252462
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 668,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "sigaction01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "sigaction01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9114,
+              "free_frames": 252140
+            },
+            "after_run": {
+              "allocated_frames": 9114,
+              "free_frames": 252140
+            },
+            "before": {
+              "allocated_frames": 9107,
+              "free_frames": 252147
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1353,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "sigaction01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8806,
+              "free_frames": 252448
+            },
+            "after_run": {
+              "allocated_frames": 8806,
+              "free_frames": 252448
+            },
+            "before": {
+              "allocated_frames": 8799,
+              "free_frames": 252455
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 780,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "sigpending02": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "sigpending02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9135,
+              "free_frames": 252119
+            },
+            "after_run": {
+              "allocated_frames": 9135,
+              "free_frames": 252119
+            },
+            "before": {
+              "allocated_frames": 9121,
+              "free_frames": 252133
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1083,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "sigpending02",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8827,
+              "free_frames": 252427
+            },
+            "after_run": {
+              "allocated_frames": 8827,
+              "free_frames": 252427
+            },
+            "before": {
+              "allocated_frames": 8813,
+              "free_frames": 252441
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 825,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "sigprocmask01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "sigprocmask01",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9121,
+              "free_frames": 252133
+            },
+            "after_run": {
+              "allocated_frames": 9121,
+              "free_frames": 252133
+            },
+            "before": {
+              "allocated_frames": 9114,
+              "free_frames": 252140
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1015,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "sigprocmask01",
+          "code": 1,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -7,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8813,
+              "free_frames": 252441
+            },
+            "after_run": {
+              "allocated_frames": 8813,
+              "free_frames": 252441
+            },
+            "before": {
+              "allocated_frames": 8806,
+              "free_frames": 252448
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 708,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "sigsuspend01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "sigsuspend01",
+          "code": 1,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9149,
+              "free_frames": 252105
+            },
+            "after_run": {
+              "allocated_frames": 9149,
+              "free_frames": 252105
+            },
+            "before": {
+              "allocated_frames": 9135,
+              "free_frames": 252119
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1035,
+          "status": "FAIL",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "sigsuspend01",
+          "code": 1,
+          "enosys": 1,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {
+            "TFAIL": 1
+          },
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 8841,
+              "free_frames": 252413
+            },
+            "after_run": {
+              "allocated_frames": 8841,
+              "free_frames": 252413
+            },
+            "before": {
+              "allocated_frames": 8827,
+              "free_frames": 252427
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 793,
+          "status": "FAIL",
+          "timeouts": 0
+        }
+      }
+    },
+    "time01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "time01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9009,
+              "free_frames": 252245
+            },
+            "after_run": {
+              "allocated_frames": 9009,
+              "free_frames": 252245
+            },
+            "before": {
+              "allocated_frames": 8995,
+              "free_frames": 252259
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1088,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "time01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4605,
+              "free_frames": 256649
+            },
+            "after_run": {
+              "allocated_frames": 4605,
+              "free_frames": 256649
+            },
+            "before": {
+              "allocated_frames": 4591,
+              "free_frames": 256663
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 793,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    },
+    "times01": {
+      "rv": {
+        "glibc": {
+          "arch": "rv",
+          "case": "times01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-glibc",
+          "internal": {},
+          "libc": "glibc",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 9023,
+              "free_frames": 252231
+            },
+            "after_run": {
+              "allocated_frames": 9023,
+              "free_frames": 252231
+            },
+            "before": {
+              "allocated_frames": 9009,
+              "free_frames": 252245
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 1073,
+          "status": "PASS",
+          "timeouts": 0
+        },
+        "musl": {
+          "arch": "rv",
+          "case": "times01",
+          "code": 0,
+          "enosys": 0,
+          "free_frames_delta_after_cleanup": -14,
+          "group": "ltp-musl",
+          "internal": {},
+          "libc": "musl",
+          "memory": {
+            "after_cleanup": {
+              "allocated_frames": 4619,
+              "free_frames": 256635
+            },
+            "after_run": {
+              "allocated_frames": 4619,
+              "free_frames": 256635
+            },
+            "before": {
+              "allocated_frames": 4605,
+              "free_frames": 256649
+            }
+          },
+          "panic_trap": 0,
+          "runtime_ms": 807,
+          "status": "PASS",
+          "timeouts": 0
+        }
+      }
+    }
+  },
+  "case_matrix_rows": [
+    {
+      "arch": "rv",
+      "case": "alarm02",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8855,
+          "free_frames": 252399
+        },
+        "after_run": {
+          "allocated_frames": 8855,
+          "free_frames": 252399
+        },
+        "before": {
+          "allocated_frames": 8841,
+          "free_frames": 252413
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1088,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "alarm02",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -2062,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4451,
+          "free_frames": 256803
+        },
+        "after_run": {
+          "allocated_frames": 4451,
+          "free_frames": 256803
+        },
+        "before": {
+          "allocated_frames": 2389,
+          "free_frames": 258865
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1408,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "alarm03",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8876,
+          "free_frames": 252378
+        },
+        "after_run": {
+          "allocated_frames": 8876,
+          "free_frames": 252378
+        },
+        "before": {
+          "allocated_frames": 8855,
+          "free_frames": 252399
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1124,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "alarm03",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4472,
+          "free_frames": 256782
+        },
+        "after_run": {
+          "allocated_frames": 4472,
+          "free_frames": 256782
+        },
+        "before": {
+          "allocated_frames": 4451,
+          "free_frames": 256803
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 814,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "clock_getres01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -35,
+      "group": "ltp-glibc",
+      "internal": {
+        "TCONF": 8
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8911,
+          "free_frames": 252343
+        },
+        "after_run": {
+          "allocated_frames": 8911,
+          "free_frames": 252343
+        },
+        "before": {
+          "allocated_frames": 8876,
+          "free_frames": 252378
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1133,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "clock_getres01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -35,
+      "group": "ltp-musl",
+      "internal": {
+        "TCONF": 8
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4507,
+          "free_frames": 256747
+        },
+        "after_run": {
+          "allocated_frames": 4507,
+          "free_frames": 256747
+        },
+        "before": {
+          "allocated_frames": 4472,
+          "free_frames": 256782
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 916,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "clock_gettime01",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8925,
+          "free_frames": 252329
+        },
+        "after_run": {
+          "allocated_frames": 8925,
+          "free_frames": 252329
+        },
+        "before": {
+          "allocated_frames": 8911,
+          "free_frames": 252343
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 8331,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "clock_gettime01",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4521,
+          "free_frames": 256733
+        },
+        "after_run": {
+          "allocated_frames": 4521,
+          "free_frames": 256733
+        },
+        "before": {
+          "allocated_frames": 4507,
+          "free_frames": 256747
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 8272,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "clock_gettime02",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8939,
+          "free_frames": 252315
+        },
+        "after_run": {
+          "allocated_frames": 8939,
+          "free_frames": 252315
+        },
+        "before": {
+          "allocated_frames": 8925,
+          "free_frames": 252329
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1059,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "clock_gettime02",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4535,
+          "free_frames": 256719
+        },
+        "after_run": {
+          "allocated_frames": 4535,
+          "free_frames": 256719
+        },
+        "before": {
+          "allocated_frames": 4521,
+          "free_frames": 256733
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1000,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "gettimeofday01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8953,
+          "free_frames": 252301
+        },
+        "after_run": {
+          "allocated_frames": 8953,
+          "free_frames": 252301
+        },
+        "before": {
+          "allocated_frames": 8939,
+          "free_frames": 252315
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1161,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "gettimeofday01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4549,
+          "free_frames": 256705
+        },
+        "after_run": {
+          "allocated_frames": 4549,
+          "free_frames": 256705
+        },
+        "before": {
+          "allocated_frames": 4535,
+          "free_frames": 256719
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 735,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "kill02",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -35,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9058,
+          "free_frames": 252196
+        },
+        "after_run": {
+          "allocated_frames": 9058,
+          "free_frames": 252196
+        },
+        "before": {
+          "allocated_frames": 9023,
+          "free_frames": 252231
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 11146,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "kill02",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -4131,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8750,
+          "free_frames": 252504
+        },
+        "after_run": {
+          "allocated_frames": 8750,
+          "free_frames": 252504
+        },
+        "before": {
+          "allocated_frames": 4619,
+          "free_frames": 256635
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 10842,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "kill03",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9072,
+          "free_frames": 252182
+        },
+        "after_run": {
+          "allocated_frames": 9072,
+          "free_frames": 252182
+        },
+        "before": {
+          "allocated_frames": 9058,
+          "free_frames": 252196
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1157,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "kill03",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8764,
+          "free_frames": 252490
+        },
+        "after_run": {
+          "allocated_frames": 8764,
+          "free_frames": 252490
+        },
+        "before": {
+          "allocated_frames": 8750,
+          "free_frames": 252504
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 703,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "nanosleep01",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8974,
+          "free_frames": 252280
+        },
+        "after_run": {
+          "allocated_frames": 8974,
+          "free_frames": 252280
+        },
+        "before": {
+          "allocated_frames": 8953,
+          "free_frames": 252301
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 8728,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "nanosleep01",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4570,
+          "free_frames": 256684
+        },
+        "after_run": {
+          "allocated_frames": 4570,
+          "free_frames": 256684
+        },
+        "before": {
+          "allocated_frames": 4549,
+          "free_frames": 256705
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 8511,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "nanosleep02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8995,
+          "free_frames": 252259
+        },
+        "after_run": {
+          "allocated_frames": 8995,
+          "free_frames": 252259
+        },
+        "before": {
+          "allocated_frames": 8974,
+          "free_frames": 252280
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 6097,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "nanosleep02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4591,
+          "free_frames": 256663
+        },
+        "after_run": {
+          "allocated_frames": 4591,
+          "free_frames": 256663
+        },
+        "before": {
+          "allocated_frames": 4570,
+          "free_frames": 256684
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 5822,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "pause01",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9093,
+          "free_frames": 252161
+        },
+        "after_run": {
+          "allocated_frames": 9093,
+          "free_frames": 252161
+        },
+        "before": {
+          "allocated_frames": 9072,
+          "free_frames": 252182
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 8317,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "pause01",
+      "code": 137,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -21,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8785,
+          "free_frames": 252469
+        },
+        "after_run": {
+          "allocated_frames": 8785,
+          "free_frames": 252469
+        },
+        "before": {
+          "allocated_frames": 8764,
+          "free_frames": 252490
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 8373,
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "arch": "rv",
+      "case": "rt_sigaction01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9100,
+          "free_frames": 252154
+        },
+        "after_run": {
+          "allocated_frames": 9100,
+          "free_frames": 252154
+        },
+        "before": {
+          "allocated_frames": 9093,
+          "free_frames": 252161
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1174,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "rt_sigaction01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8792,
+          "free_frames": 252462
+        },
+        "after_run": {
+          "allocated_frames": 8792,
+          "free_frames": 252462
+        },
+        "before": {
+          "allocated_frames": 8785,
+          "free_frames": 252469
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 974,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "rt_sigprocmask01",
+      "code": 32,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {
+        "TCONF": 2
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9107,
+          "free_frames": 252147
+        },
+        "after_run": {
+          "allocated_frames": 9107,
+          "free_frames": 252147
+        },
+        "before": {
+          "allocated_frames": 9100,
+          "free_frames": 252154
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 998,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "rt_sigprocmask01",
+      "code": 32,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {
+        "TCONF": 2
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8799,
+          "free_frames": 252455
+        },
+        "after_run": {
+          "allocated_frames": 8799,
+          "free_frames": 252455
+        },
+        "before": {
+          "allocated_frames": 8792,
+          "free_frames": 252462
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 668,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigaction01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9114,
+          "free_frames": 252140
+        },
+        "after_run": {
+          "allocated_frames": 9114,
+          "free_frames": 252140
+        },
+        "before": {
+          "allocated_frames": 9107,
+          "free_frames": 252147
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1353,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigaction01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8806,
+          "free_frames": 252448
+        },
+        "after_run": {
+          "allocated_frames": 8806,
+          "free_frames": 252448
+        },
+        "before": {
+          "allocated_frames": 8799,
+          "free_frames": 252455
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 780,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigpending02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9135,
+          "free_frames": 252119
+        },
+        "after_run": {
+          "allocated_frames": 9135,
+          "free_frames": 252119
+        },
+        "before": {
+          "allocated_frames": 9121,
+          "free_frames": 252133
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1083,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigpending02",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8827,
+          "free_frames": 252427
+        },
+        "after_run": {
+          "allocated_frames": 8827,
+          "free_frames": 252427
+        },
+        "before": {
+          "allocated_frames": 8813,
+          "free_frames": 252441
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 825,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigprocmask01",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9121,
+          "free_frames": 252133
+        },
+        "after_run": {
+          "allocated_frames": 9121,
+          "free_frames": 252133
+        },
+        "before": {
+          "allocated_frames": 9114,
+          "free_frames": 252140
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1015,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigprocmask01",
+      "code": 1,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -7,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8813,
+          "free_frames": 252441
+        },
+        "after_run": {
+          "allocated_frames": 8813,
+          "free_frames": 252441
+        },
+        "before": {
+          "allocated_frames": 8806,
+          "free_frames": 252448
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 708,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigsuspend01",
+      "code": 1,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9149,
+          "free_frames": 252105
+        },
+        "after_run": {
+          "allocated_frames": 9149,
+          "free_frames": 252105
+        },
+        "before": {
+          "allocated_frames": 9135,
+          "free_frames": 252119
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1035,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "sigsuspend01",
+      "code": 1,
+      "enosys": 1,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {
+        "TFAIL": 1
+      },
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 8841,
+          "free_frames": 252413
+        },
+        "after_run": {
+          "allocated_frames": 8841,
+          "free_frames": 252413
+        },
+        "before": {
+          "allocated_frames": 8827,
+          "free_frames": 252427
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 793,
+      "status": "FAIL",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "time01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9009,
+          "free_frames": 252245
+        },
+        "after_run": {
+          "allocated_frames": 9009,
+          "free_frames": 252245
+        },
+        "before": {
+          "allocated_frames": 8995,
+          "free_frames": 252259
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1088,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "time01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4605,
+          "free_frames": 256649
+        },
+        "after_run": {
+          "allocated_frames": 4605,
+          "free_frames": 256649
+        },
+        "before": {
+          "allocated_frames": 4591,
+          "free_frames": 256663
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 793,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "times01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-glibc",
+      "internal": {},
+      "libc": "glibc",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 9023,
+          "free_frames": 252231
+        },
+        "after_run": {
+          "allocated_frames": 9023,
+          "free_frames": 252231
+        },
+        "before": {
+          "allocated_frames": 9009,
+          "free_frames": 252245
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 1073,
+      "status": "PASS",
+      "timeouts": 0
+    },
+    {
+      "arch": "rv",
+      "case": "times01",
+      "code": 0,
+      "enosys": 0,
+      "free_frames_delta_after_cleanup": -14,
+      "group": "ltp-musl",
+      "internal": {},
+      "libc": "musl",
+      "memory": {
+        "after_cleanup": {
+          "allocated_frames": 4619,
+          "free_frames": 256635
+        },
+        "after_run": {
+          "allocated_frames": 4619,
+          "free_frames": 256635
+        },
+        "before": {
+          "allocated_frames": 4605,
+          "free_frames": 256649
+        }
+      },
+      "panic_trap": 0,
+      "runtime_ms": 807,
+      "status": "PASS",
+      "timeouts": 0
+    }
+  ],
+  "categories": {
+    "enosys": [
+      "rv:glibc:sigsuspend01",
+      "rv:musl:sigsuspend01"
+    ],
+    "fail_wrapper": [
+      "rv:glibc:clock_gettime01",
+      "rv:musl:clock_gettime01",
+      "rv:glibc:kill02",
+      "rv:musl:kill02",
+      "rv:glibc:nanosleep01",
+      "rv:musl:nanosleep01",
+      "rv:glibc:nanosleep02",
+      "rv:musl:nanosleep02",
+      "rv:glibc:pause01",
+      "rv:musl:pause01",
+      "rv:glibc:rt_sigprocmask01",
+      "rv:musl:rt_sigprocmask01",
+      "rv:glibc:sigpending02",
+      "rv:musl:sigpending02",
+      "rv:glibc:sigprocmask01",
+      "rv:musl:sigprocmask01",
+      "rv:glibc:sigsuspend01",
+      "rv:musl:sigsuspend01"
+    ],
+    "internal_tbrok": [],
+    "internal_tfail": [
+      "rv:glibc:nanosleep02",
+      "rv:musl:nanosleep02",
+      "rv:glibc:sigpending02",
+      "rv:musl:sigpending02",
+      "rv:glibc:sigprocmask01",
+      "rv:musl:sigprocmask01",
+      "rv:glibc:sigsuspend01",
+      "rv:musl:sigsuspend01"
+    ],
+    "panic_trap": [],
+    "pass_clean": [
+      "rv:glibc:alarm02",
+      "rv:musl:alarm02",
+      "rv:glibc:alarm03",
+      "rv:musl:alarm03",
+      "rv:glibc:clock_gettime02",
+      "rv:musl:clock_gettime02",
+      "rv:glibc:gettimeofday01",
+      "rv:musl:gettimeofday01",
+      "rv:glibc:kill03",
+      "rv:musl:kill03",
+      "rv:glibc:rt_sigaction01",
+      "rv:musl:rt_sigaction01",
+      "rv:glibc:sigaction01",
+      "rv:musl:sigaction01",
+      "rv:glibc:time01",
+      "rv:musl:time01",
+      "rv:glibc:times01",
+      "rv:musl:times01"
+    ],
+    "pass_with_tconf": [
+      "rv:glibc:clock_getres01",
+      "rv:musl:clock_getres01"
+    ],
+    "timeout": [
+      "rv:glibc:clock_gettime01",
+      "rv:musl:clock_gettime01",
+      "rv:glibc:kill02",
+      "rv:musl:kill02",
+      "rv:glibc:nanosleep01",
+      "rv:musl:nanosleep01",
+      "rv:glibc:pause01",
+      "rv:musl:pause01"
+    ],
+    "unknown": []
+  },
+  "enosys": 2,
+  "fail_cases": [
+    "ltp-musl:clock_gettime01",
+    "ltp-musl:nanosleep01",
+    "ltp-musl:nanosleep02",
+    "ltp-musl:kill02",
+    "ltp-musl:pause01",
+    "ltp-musl:rt_sigprocmask01",
+    "ltp-musl:sigprocmask01",
+    "ltp-musl:sigpending02",
+    "ltp-musl:sigsuspend01",
+    "ltp-glibc:clock_gettime01",
+    "ltp-glibc:nanosleep01",
+    "ltp-glibc:nanosleep02",
+    "ltp-glibc:kill02",
+    "ltp-glibc:pause01",
+    "ltp-glibc:rt_sigprocmask01",
+    "ltp-glibc:sigprocmask01",
+    "ltp-glibc:sigpending02",
+    "ltp-glibc:sigsuspend01"
+  ],
+  "fail_count": 18,
+  "groups": {
+    "ltp-glibc": {
+      "enosys": 1,
+      "fail_cases": [
+        "clock_gettime01",
+        "nanosleep01",
+        "nanosleep02",
+        "kill02",
+        "pause01",
+        "rt_sigprocmask01",
+        "sigprocmask01",
+        "sigpending02",
+        "sigsuspend01"
+      ],
+      "fail_count": 9,
+      "internal": {
+        "TCONF": 10,
+        "TFAIL": 4
+      },
+      "panic_trap": 0,
+      "pass_cases": [
+        "alarm02",
+        "alarm03",
+        "clock_getres01",
+        "clock_gettime02",
+        "gettimeofday01",
+        "time01",
+        "times01",
+        "kill03",
+        "rt_sigaction01",
+        "sigaction01"
+      ],
+      "pass_count": 10,
+      "suite_summaries": [
+        {
+          "failed": 9,
+          "group": "ltp-glibc",
+          "passed": 10,
+          "timed_out": 4
+        }
+      ],
+      "timeouts": 4
+    },
+    "ltp-musl": {
+      "enosys": 1,
+      "fail_cases": [
+        "clock_gettime01",
+        "nanosleep01",
+        "nanosleep02",
+        "kill02",
+        "pause01",
+        "rt_sigprocmask01",
+        "sigprocmask01",
+        "sigpending02",
+        "sigsuspend01"
+      ],
+      "fail_count": 9,
+      "internal": {
+        "TCONF": 10,
+        "TFAIL": 4
+      },
+      "panic_trap": 0,
+      "pass_cases": [
+        "alarm02",
+        "alarm03",
+        "clock_getres01",
+        "clock_gettime02",
+        "gettimeofday01",
+        "time01",
+        "times01",
+        "kill03",
+        "rt_sigaction01",
+        "sigaction01"
+      ],
+      "pass_count": 10,
+      "suite_summaries": [
+        {
+          "failed": 9,
+          "group": "ltp-musl",
+          "passed": 10,
+          "timed_out": 4
+        }
+      ],
+      "timeouts": 4
+    }
+  },
+  "internal": {
+    "TCONF": 20,
+    "TFAIL": 8
+  },
+  "panic_trap": 0,
+  "pass_cases": [
+    "ltp-musl:alarm02",
+    "ltp-musl:alarm03",
+    "ltp-musl:clock_getres01",
+    "ltp-musl:clock_gettime02",
+    "ltp-musl:gettimeofday01",
+    "ltp-musl:time01",
+    "ltp-musl:times01",
+    "ltp-musl:kill03",
+    "ltp-musl:rt_sigaction01",
+    "ltp-musl:sigaction01",
+    "ltp-glibc:alarm02",
+    "ltp-glibc:alarm03",
+    "ltp-glibc:clock_getres01",
+    "ltp-glibc:clock_gettime02",
+    "ltp-glibc:gettimeofday01",
+    "ltp-glibc:time01",
+    "ltp-glibc:times01",
+    "ltp-glibc:kill03",
+    "ltp-glibc:rt_sigaction01",
+    "ltp-glibc:sigaction01"
+  ],
+  "pass_count": 20,
+  "suite_summaries": [
+    {
+      "failed": 9,
+      "group": "ltp-musl",
+      "passed": 10,
+      "timed_out": 4
+    },
+    {
+      "failed": 9,
+      "group": "ltp-glibc",
+      "passed": 10,
+      "timed_out": 4
+    }
+  ],
+  "timeouts": 8
+}

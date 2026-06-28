@@ -1,0 +1,56 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-discovery-libc-lowrisk-clean-001.log`
+
+- PASS LTP CASE: 12
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 6 passed, 0 failed
+- ltp-glibc: 6 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| abort01 | la | glibc | ltp-glibc | PASS | 0 | 5154 | 191769 | 191739 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| abort01 | la | musl | ltp-musl | PASS | 0 | 2371 | 194402 | 192330 | -2072 | 0 | 0 | 0 | 0 | 0 | 0 |
+| abs01 | la | glibc | ltp-glibc | PASS | 0 | 5379 | 191739 | 191727 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| abs01 | la | musl | ltp-musl | PASS | 0 | 2638 | 192330 | 192322 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | la | glibc | ltp-glibc | PASS | 0 | 18809 | 191727 | 191651 | -76 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mem02 | la | musl | ltp-musl | PASS | 0 | 32959 | 192322 | 191817 | -505 | 0 | 0 | 0 | 0 | 0 | 0 |
+| memcmp01 | la | glibc | ltp-glibc | PASS | 0 | 4860 | 191651 | 191630 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| memcmp01 | la | musl | ltp-musl | PASS | 0 | 2826 | 191817 | 191801 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| memcpy01 | la | glibc | ltp-glibc | PASS | 0 | 5379 | 191630 | 191609 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| memcpy01 | la | musl | ltp-musl | PASS | 0 | 3208 | 191801 | 191785 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| memset01 | la | glibc | ltp-glibc | PASS | 0 | 4594 | 191609 | 191588 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| memset01 | la | musl | ltp-musl | PASS | 0 | 3485 | 191785 | 191769 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 12 (la:glibc:abort01, la:musl:abort01, la:glibc:abs01, la:musl:abs01, la:glibc:mem02, la:musl:mem02, la:glibc:memcmp01, la:musl:memcmp01, la:glibc:memcpy01, la:musl:memcpy01, la:glibc:memset01, la:musl:memset01)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 6
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

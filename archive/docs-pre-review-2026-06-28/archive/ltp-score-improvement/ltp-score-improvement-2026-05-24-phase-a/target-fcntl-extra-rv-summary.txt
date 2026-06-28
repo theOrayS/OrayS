@@ -1,0 +1,48 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-fcntl-extra-rv-20260524T110244+0800.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 6
+- Internal TFAIL/TBROK/TCONF: 82 ({'TFAIL': 80, 'TBROK': 2})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 1
+- panic/trap matches: 0
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fcntl05 | rv | musl | ltp-musl | FAIL | 1 | 3253 | 258860 | 256798 | -2062 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl06 | rv | musl | ltp-musl | FAIL | -1 | 53 | 256798 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | rv | musl | ltp-musl | FAIL | 2 | 3352 | 256798 | 256791 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl11 | rv | musl | ltp-musl | FAIL | 1 | 3036 | 256791 | 256777 | -14 | 75 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | musl | ltp-musl | FAIL | 5 | 3422 | 256777 | 256756 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | musl | ltp-musl | FAIL | 1 | 3449 | 256756 | 256742 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| fcntl14 | rv | musl | ltp-musl | UNKNOWN |  |  | 256742 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 6 (rv:musl:fcntl05, rv:musl:fcntl06, rv:musl:fcntl07, rv:musl:fcntl11, rv:musl:fcntl12, rv:musl:fcntl13)
+- internal_tfail: 4 (rv:musl:fcntl05, rv:musl:fcntl11, rv:musl:fcntl12, rv:musl:fcntl13)
+- internal_tbrok: 1 (rv:musl:fcntl07)
+- timeout: 0
+- enosys: 1 (rv:musl:fcntl07)
+- panic_trap: 0
+- unknown: 1 (rv:musl:fcntl14)
+
+## FAIL LTP CASE
+- ltp-musl:fcntl05
+- ltp-musl:fcntl06
+- ltp-musl:fcntl07
+- ltp-musl:fcntl11
+- ltp-musl:fcntl12
+- ltp-musl:fcntl13
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 6
+- Internal: {'TFAIL': 80, 'TBROK': 2}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: fcntl05, fcntl06, fcntl07, fcntl11, fcntl12, fcntl13

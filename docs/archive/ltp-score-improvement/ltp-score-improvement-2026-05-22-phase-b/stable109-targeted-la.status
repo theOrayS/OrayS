@@ -1,4 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=20 ./run-eval.sh la
-started_at: 2026-05-22T04:22:11Z
-aborted_by_leader: stable targeted gate already had real timeout/TFAIL; stopped to prevent wasted runtime
-aborted_at: 2026-05-22T04:31:20Z

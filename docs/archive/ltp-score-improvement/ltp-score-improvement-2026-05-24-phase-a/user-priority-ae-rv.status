@@ -1,7 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=access02,access04,open08,open13,chmod05,statx01,readv02,writev01,writev03,writev05,writev06,writev07,pipe12,pipe2_01,pipe2_02,pipe2_04,pipe13,waitpid01,waitid01,waitid02,waitid03,waitid04,mmap05,mprotect01,mprotect02,munmap01,mmap04,mmap06 LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv
-started_at: 2026-05-24T09:49:47+08:00
-cases: access02,access04,open08,open13,chmod05,statx01,readv02,writev01,writev03,writev05,writev06,writev07,pipe12,pipe2_01,pipe2_02,pipe2_04,pipe13,waitpid01,waitid01,waitid02,waitid03,waitid04,mmap05,mprotect01,mprotect02,munmap01,mmap04,mmap06
-finished_at: 2026-05-24T09:57:44+08:00
-status: 0
-log: docs/ltp-score-improvement-2026-05-24-phase-a/raw/user-priority-ae-rv-20260524T094947+0800.log
-summary: docs/ltp-score-improvement-2026-05-24-phase-a/user-priority-ae-rv-summary.txt

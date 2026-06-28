@@ -266,12 +266,11 @@ Repository configs are under `configs/platforms/`, `configs/custom/`, and
 
 ## Documentation and evidence
 
-- Chinese developer-facing maintenance docs start at
-  `docs/developer-guide/README.md`.
-- Long-running LTP score work is recorded in dated folders such as
-  `docs/ltp-score-improvement-YYYY-MM-DD-phase-x/`.
-- Compatibility notes live in `docs/`, for example FD/socket progress and
-  network loopback behavior.
+- Active agent workflow guidance remains under `docs/agent-workflow/`.
+- Makefile-referenced LTP blacklist inputs remain under
+  `docs/ltp-full-sweep-blacklist-2026-05-30-arch/`.
+- Historical developer guides, LTP score reports, compatibility notes, and old
+  evidence were moved to `archive/docs-pre-review-2026-06-28/`.
 - Upstream-style platform docs remain under `doc/`.
 
 Keep evaluator reports honest: do not hardcode test names, fake `TPASS`, hide

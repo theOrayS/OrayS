@@ -1,0 +1,4 @@
+command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=readv02\,writev01\,pipe12\,pipe2_01\,pipe2_04\,dup207\ LTP_CASE_TIMEOUT_SECS=60\ ./run-eval.sh\ rv
+exit=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-iovec-pipe-dup-rv-20260524T135648+0800.log
+cases=readv02,writev01,pipe12,pipe2_01,pipe2_04,dup207

@@ -1,0 +1,90 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-rv-lowrisk-tail-001.log`
+
+- PASS LTP CASE: 2
+- FAIL LTP CASE: 20
+- Internal TFAIL/TBROK/TCONF: 26 ({'TFAIL': 14, 'TBROK': 12})
+- timeout matches: 2
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 1 passed, 10 failed
+- ltp-glibc: 1 passed, 10 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clock_gettime01 | rv | glibc | ltp-glibc | FAIL | 137 | 61433 | 256582 | 256568 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 61522 | 256744 | 256730 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| fchmod02 | rv | glibc | ltp-glibc | FAIL | 2 | 3235 | 256568 | 256554 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod02 | rv | musl | ltp-musl | FAIL | 2 | 2572 | 256730 | 256716 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 3029 | 256646 | 256625 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 2647 | 258856 | 256787 | -2069 | 1 | 1 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | glibc | ltp-glibc | PASS | 0 | 12984 | 256625 | 256611 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | musl | ltp-musl | PASS | 0 | 12609 | 256787 | 256773 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill05 | rv | glibc | ltp-glibc | FAIL | 3 | 3308 | 256611 | 256582 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| kill05 | rv | musl | ltp-musl | FAIL | 3 | 2819 | 256773 | 256744 | -29 | 1 | 1 | 0 | 0 | 0 | 0 |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 3103 | 256498 | 256484 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 2478 | 256660 | 256646 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| lseek02 | rv | glibc | ltp-glibc | FAIL | 2 | 2847 | 256547 | 256533 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| lseek02 | rv | musl | ltp-musl | FAIL | 2 | 2594 | 256709 | 256695 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| readlinkat01 | rv | glibc | ltp-glibc | FAIL | 1 | 2500 | 256533 | 256519 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat01 | rv | musl | ltp-musl | FAIL | 1 | 2134 | 256695 | 256681 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | glibc | ltp-glibc | FAIL | 1 | 3100 | 256519 | 256505 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | musl | ltp-musl | FAIL | 1 | 2856 | 256681 | 256667 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 3573 | 256505 | 256498 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 2265 | 256667 | 256660 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 2228 | 256554 | 256547 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 2440 | 256716 | 256709 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:glibc:gettimeofday02, rv:musl:gettimeofday02)
+- pass_with_tconf: 0
+- fail_wrapper: 20 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:glibc:fchmod02, rv:musl:fchmod02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:kill05, rv:musl:kill05, rv:glibc:link02, rv:musl:link02, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:readlinkat01, rv:musl:readlinkat01, rv:glibc:readlinkat02, rv:musl:readlinkat02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:statfs01, rv:musl:statfs01)
+- internal_tfail: 10 (rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:kill05, rv:musl:kill05, rv:glibc:link02, rv:musl:link02, rv:glibc:readlinkat01, rv:musl:readlinkat01, rv:glibc:readlinkat02, rv:musl:readlinkat02)
+- internal_tbrok: 12 (rv:glibc:fchmod02, rv:musl:fchmod02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:kill05, rv:musl:kill05, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:statfs01, rv:musl:statfs01)
+- timeout: 2 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01)
+- enosys: 4 (rv:glibc:link02, rv:musl:link02, rv:glibc:lseek02, rv:musl:lseek02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getpgid01
+- ltp-musl:kill05
+- ltp-musl:clock_gettime01
+- ltp-musl:fchmod02
+- ltp-musl:statfs01
+- ltp-musl:lseek02
+- ltp-musl:readlinkat01
+- ltp-musl:readlinkat02
+- ltp-musl:rename01
+- ltp-musl:link02
+- ltp-glibc:getpgid01
+- ltp-glibc:kill05
+- ltp-glibc:clock_gettime01
+- ltp-glibc:fchmod02
+- ltp-glibc:statfs01
+- ltp-glibc:lseek02
+- ltp-glibc:readlinkat01
+- ltp-glibc:readlinkat02
+- ltp-glibc:rename01
+- ltp-glibc:link02
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 10
+- Internal: {'TFAIL': 7, 'TBROK': 6}
+- timeout: 1
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getpgid01, kill05, clock_gettime01, fchmod02, statfs01, lseek02, readlinkat01, readlinkat02, rename01, link02
+
+### ltp-glibc
+- PASS: 1
+- FAIL: 10
+- Internal: {'TFAIL': 7, 'TBROK': 6}
+- timeout: 1
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: getpgid01, kill05, clock_gettime01, fchmod02, statfs01, lseek02, readlinkat01, readlinkat02, rename01, link02

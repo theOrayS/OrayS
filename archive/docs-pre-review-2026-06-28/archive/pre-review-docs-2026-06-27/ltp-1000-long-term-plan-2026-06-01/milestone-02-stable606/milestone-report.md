@@ -1,0 +1,386 @@
+<!-- stable606-final-closure:start -->
+## Final stable606 closure on 2026-06-02
+
+The milestone is closed with `LTP_STABLE_CASES` at 606 total / 606 unique / 0 duplicate. The +50 promoted rows are:
+
+- `modify_ldt01`
+- `modify_ldt02`
+- `modify_ldt03`
+- `print_caps`
+- `test_ioctl`
+- `tst_kvcmp`
+- `tst_ncpus`
+- `tst_ncpus_conf`
+- `tst_ncpus_max`
+- `tst_supported_fs`
+- `fanotify_child`
+- `genload`
+- `gensin`
+- `gensinh`
+- `gensqrt`
+- `gentan`
+- `gentanh`
+- `geny0`
+- `geny1`
+- `tst_exit`
+- `tst_hexdump`
+- `socket01`
+- `nanosleep01`
+- `mmap04`
+- `vma01`
+- `times03`
+- `mmap14`
+- `mmap12`
+- `open10`
+- `creat08`
+- `chmod07`
+- `fchmod02`
+- `access04`
+- `chmod06`
+- `chown04`
+- `fchmod06`
+- `fchown04`
+- `pipe07`
+- `mknod03`
+- `mknod04`
+- `mknod09`
+- `fchownat02`
+- `setrlimit04`
+- `clock_gettime04`
+- `locktests`
+- `ltpServer`
+- `stress`
+- `fcntl30`
+- `mknod01`
+- `pipe15`
+
+Final gate evidence:
+
+- RV stable gate: `target/ltp-1000-milestone-02-stable606/rv-stable606-final-gate-20260601T200557Z.log`.
+  - Command: `OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=120 timeout 180m ./run-eval.sh rv`.
+  - Wrapper: `ltp cases: 606 passed, 0 failed, 0 timed out`; `ltp-musl` 606/0 and `ltp-glibc` 606/0.
+  - Parser: 1212 `PASS LTP CASE`, 0 wrapper FAIL, 4 internal `TCONF`, 0 timeout, 0 ENOSYS/not-implemented, 0 panic/trap.
+- LA stable gate retry: `target/ltp-1000-milestone-02-stable606/la-stable606-final-gate-retry-20260601T211001Z.log`.
+  - Command: `OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=180 timeout 240m ./run-eval.sh la`.
+  - Wrapper: `ltp cases: 606 passed, 0 failed, 0 timed out`; `ltp-musl` 606/0 and `ltp-glibc` 606/0.
+  - Parser: 1212 `PASS LTP CASE`, 0 wrapper FAIL, 4 internal `TCONF`, 0 timeout, 0 ENOSYS/not-implemented, 0 panic/trap.
+- Combined report: `target/ltp-1000-milestone-02-stable606/stable606-final-rv-la.promotion-candidates.txt` reports 605 parser-clean rows and one blocked/incomplete row, `read02`, because each arch/libc combo records the already-known `TCONF=2` caveat.
+
+Caveat boundary:
+
+- The `read02` TCONF rows are inherited from the stable506 final gate and are explicitly retained as a known baseline caveat, not a new stable606 regression.
+- The first LA full gate (`la-stable606-final-gate-20260601T203354Z.log`) exited 143 after `rename14`, `kill02`, and later `times03` stalled/failed in that run; it is preserved as non-promotion evidence. Follow-up targeted `rename14,kill02,times03` and local-order shard 457-489 runs were parser-clean, and the fresh LA stable retry above is the promotion evidence.
+
+Implementation boundary for the final three additional cases:
+
+- `/proc/sys/fs/pipe-max-size`, `/proc/sys/fs/pipe-user-pages-soft`, and `/proc/sys/fs/pipe-user-pages-hard` are synthetic read-only procfs entries aligned with the kernel's visible pipe capacity/NOFILE resource envelope; this closed `fcntl30` and `pipe15` without pretending unsupported pipe resize capacity exists.
+- Root-created `mknod`/`mknodat` char/block nodes now record synthetic file type and `st_rdev`; `O_PATH`/stat/statx/lstat can observe the metadata, while normal open returns `ENXIO`. Non-root char/block creation still returns `EPERM`; invalid node types still return `EINVAL`. This closed `mknod01` without adding real device I/O.
+<!-- stable606-final-closure:end -->
+
+# milestone-02-stable606 final promotion report
+
+## Goal
+
+Promote the live stable baseline from 556 to the next milestone target of 606 trusted unique LTP stable cases on `dev/1000ltp-plan`, without counting blacklist/SKIP/status0 evidence and without hiding parser caveats.
+
+## Current result
+
+- Current stable list: 606 total / 606 unique / 0 duplicate.
+- Target for this milestone: 606 total / 606 unique / 0 duplicate.
+- Milestone status: **complete / promoted** with the inherited `read02` TCONF caveat still disclosed.
+- Stable list update in this milestone: +50 unique cases from the live 556 baseline.
+- Ultragoal checkpoint for G009: not included in this git commit; the durable team run was already inactive/finished and this commit records the leader-owned promotion evidence.
+- Historical preflight sections below remain for traceability; this final result supersedes earlier "not complete" notes.
+
+## Evidence generated in this preflight
+
+Evidence directory: `target/ltp-1000-milestone-02-stable606/`.
+
+1. `rv-m02-scout-001-20260601T154726Z.log`
+   - 80-case RV scout across musl + glibc.
+   - Parser result: 51 wrapper PASS / 109 wrapper FAIL rows; internal signals `TBROK=73`, `TFAIL=122`, `TCONF=24`; timeout matches 4; ENOSYS/not-implemented matches 6; panic/trap 0.
+   - Clean RV two-libc candidates were limited to the 21 deferred clean rows from milestone-01.
+2. `rv-socket01-postfix-20260601T160003Z.log` and `la-socket01-postfix-20260601T160247Z.log`
+   - After the generic socket errno fix, `socket01` is clean on RV + LA x musl + glibc.
+3. `rv-socket-adjacent-postfix-20260601T160853Z.log` and `la-socket-adjacent-postfix-20260601T160953Z.log`
+   - Adjacent socket regression subset (`socket01`, existing stable `socket02`, `socketpair02`, `accept01`, `listen01`) is parser-clean on RV + LA x musl + glibc.
+4. `rv-nanosleep01-rescout-20260601T160605Z.log` and `la-nanosleep01-rescout-20260601T160721Z.log`
+   - Isolated `nanosleep01` rescout is parser-clean on RV + LA x musl + glibc.
+   - Caveat: the earlier 80-case RV scout had one musl timing TFAIL for `nanosleep01`; it should be re-run in a later grouped gate before milestone promotion.
+
+## Candidate bank after this preflight
+
+- Deferred four-way clean bank inherited from milestone-01: 21 cases.
+- New fixed/scouted candidates with current four-way targeted evidence: `socket01`, `nanosleep01`, `mmap04`, `vma01`, `times03`, `mmap14`, `mmap12`, `open10`, `creat08`, `chmod07`, `fchmod02`, `access04`, `chmod06`, `chown04`, `fchmod06`, `fchown04`, `pipe07`, `mknod03`, `mknod04`, `mknod09`, `fchownat02`, `setrlimit04`, `clock_gettime04`, `locktests`, `ltpServer`, `stress`.
+- Current candidate bank size for stable606 planning: at most 47 cases, still short of the +50 milestone.
+
+## User-visible behavior / ABI impact
+
+The initial preflight included one kernel-visible errno fix in `examples/shell/src/uspace/fd_socket.rs::sys_socket_bridge`:
+
+- AF_INET `SOCK_RAW` with unsupported protocol now returns `EPROTONOSUPPORT` instead of `ESOCKTNOSUPPORT`.
+- Other invalid AF_INET socket types now return `EINVAL` instead of `ESOCKTNOSUPPORT`.
+- No LTP case/path/process/output is hardcoded.
+
+At the initial preflight stage, no stable-list ABI surface change was made. The final stable606 ABI impact is recorded in `abi-and-behavior-impact.md`; this historical note is retained for the proc-maps impact boundary and the deliberately rejected `nice04` errno shortcut.
+
+## Risk and caveats
+
+- This is a preflight, not a promotion commit.
+- `nanosleep01` has mixed scout history; keep it as a tentative candidate until a later grouped milestone gate proves stability.
+- The 80-case RV scout exposed broad VFS/device/metadata blockers (`ENOSPC`, missing device/mount behavior, getdents symlink visibility, signal/itimer timeout) that require real semantic work.
+- No blacklist changes were made.
+
+## Next step
+
+Milestone-02 is promoted to stable606. Continue toward the next 50-case milestone (stable656) only after preserving the stable606 final gate evidence and keeping the inherited `read02` caveat visible.
+
+## Additional G009 progress on 2026-06-02
+
+A generic `/proc/self/maps` improvement was added after the socket preflight:
+
+- `UserProcess` now tracks user-created mmap regions, including current protection bits and shared/private display state.
+- `/proc/self/maps` now emits parseable dynamic mmap ranges in addition to executable/heap/stack rows.
+- `MAP_FIXED`, `munmap`, `exec`, `fork`, and `mprotect` update or preserve this synthetic maps state generically.
+
+Targeted evidence:
+
+- `rv-proc-maps-mmap-vma-postfix2-20260601T162318Z.log`: `mmap04,vma01` RV musl+glibc PASS, parser-clean.
+- `la-proc-maps-mmap-vma-postfix-20260601T162441Z.log`: `mmap04,vma01` LA musl+glibc PASS, parser-clean.
+- `rv-proc-maps-mmap-regression-20260601T162607Z.log`: RV mmap/proc maps regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `la-proc-maps-mmap-regression-20260601T162755Z.log`: LA mmap/proc maps regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `proc-maps-mmap-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the eleven clean rows, new not-yet-stable candidates are `mmap04` and `vma01`.
+
+At this historical checkpoint, promotion remained blocked after the proc-maps fix: the stable606 candidate bank was at most 25, still short of +50, and no final stable606 gate had been run.
+
+
+## times03 CPU accounting follow-up
+
+A generic `times()` accounting improvement was added after the proc-maps work:
+
+- `UserProcess` now records a process start clock tick and waited-child user/system tick totals.
+- `times()` now returns `USER_HZ` clock ticks instead of milliseconds and fills `tms_utime`, `tms_stime`, `tms_cutime`, and `tms_cstime` from process lifetime and waited-child accounting.
+- `wait4`/`waitid` accumulate an exited waited child's self and descendant CPU counters before teardown.
+
+Targeted evidence:
+
+- `rv-times03-postfix-20260601T164216Z.log`: `times03` RV musl+glibc PASS, parser-clean.
+- `la-times03-postfix-20260601T164436Z.log`: `times03` LA musl+glibc PASS, parser-clean.
+- `rv-times03-regression-20260601T164708Z.log`: RV time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `la-times03-regression-20260601T164956Z.log`: LA time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `times03-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the five clean rows, the new not-yet-stable candidate is `times03`.
+
+At this historical checkpoint, promotion remained blocked after the time follow-up: the stable606 candidate bank was at most 26, still short of +50, and no final stable606 gate had been run.
+
+
+## mmap14 MAP_LOCKED / VmLck follow-up
+
+A generic mmap/proc-status improvement was added after the `times03` work:
+
+- `UserMmapRegion` now records whether a mapping was created with `MAP_LOCKED`.
+- `MAP_LOCKED` mappings are eagerly populated and tracked as locked mmap bytes until `munmap`/`MAP_FIXED` removes or splits the range.
+- `/proc/self/status` now reports `VmLck` from per-process locked mmap metadata.
+
+Targeted evidence:
+
+- `rv-mmap14-postfix-20260601T170355Z.log`: `mmap14` RV musl+glibc PASS, parser-clean.
+- `la-mmap14-postfix-20260601T170553Z.log`: `mmap14` LA musl+glibc PASS, parser-clean.
+- `rv-mmap14-regression-20260601T170753Z.log`: RV mmap/proc regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `la-mmap14-regression-20260601T171057Z.log`: LA mmap/proc regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `mmap14-regression-rv-la.promotion-candidates.txt`: combined four-way report; among the twelve clean rows, the new not-yet-stable candidate from this follow-up is `mmap14`.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 27, still short of +50, and no final stable606 gate has been run.
+
+## mmap12 /proc/self/pagemap follow-up
+
+A generic synthetic pagemap improvement was added after the `mmap14` work:
+
+- `/proc/self/pagemap` and `/proc/<pid>/pagemap` are now exposed as read-only synthetic procfs files.
+- The fd implementation supports sparse `lseek`/`read` at pagemap-entry offsets and returns one native-endian `u64` per virtual page.
+- Bit 63 (`present`) is set for pages visible in the process text approximation, heap, stack, and current tracked mmap regions when the pagemap file is opened. PFN/soft-dirty/swap bits remain intentionally zero.
+
+Targeted evidence:
+
+- `rv-mmap12-postfix-20260601T173127Z.log`: `mmap12` RV musl+glibc PASS, parser-clean.
+- `la-mmap12-postfix-20260601T173441Z.log`: `mmap12` LA musl+glibc PASS, parser-clean.
+- `mmap12-rv-la-postfix.promotion-candidates.txt`: combined four-way report; `mmap12` is clean across RV + LA x musl + glibc.
+- `rv-mmap12-regression-20260601T174051Z.log`: RV mmap/proc/pagemap regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `la-mmap12-regression-20260601T174435Z.log`: LA mmap/proc/pagemap regression subset 24 PASS / 0 FAIL, no internal caveats.
+- `mmap12-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twelve rows are clean, with `mmap12` as the new not-yet-stable candidate from this follow-up.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 28, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+## open10 / creat08 setgid inheritance follow-up
+
+A generic VFS metadata improvement was added after the `mmap12` work:
+
+- New file/FIFO/directory metadata recording now derives the child gid from the parent directory when the parent has `S_ISGID` set.
+- New subdirectories under a setgid parent also inherit the setgid bit in the recorded mode.
+- Non-setgid parents keep the previous process `fs_gid()` behavior. No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-open-creat-setgid-postfix-20260601T180048Z.log`: `open10,creat08` RV musl+glibc PASS, parser-clean.
+- `la-open-creat-setgid-postfix-20260601T180132Z.log`: `open10,creat08` LA musl+glibc PASS, parser-clean.
+- `open-creat-setgid-rv-la-postfix.promotion-candidates.txt`: combined four-way report; `open10` and `creat08` are clean across RV + LA x musl + glibc.
+- `rv-open-creat-setgid-regression-20260601T180236Z.log`: RV VFS metadata regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `la-open-creat-setgid-regression-20260601T180348Z.log`: LA VFS metadata regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `open-creat-setgid-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `open10` and `creat08` as the new not-yet-stable candidates from this follow-up.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 30, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+
+## chmod07 / fchmod02 group database follow-up
+
+A generic synthetic `/etc/group` improvement was added after the setgid-create work:
+
+- The default group database now includes conventional `daemon` and `users` entries in addition to `root` and `nogroup`.
+- This resolves generic libc `getgrnam("users")` / fallback `getgrnam("daemon")` setup paths used by chmod/fchmod permission tests.
+- No LTP case/path/process/output is hardcoded; the visible behavior change is the content of `/etc/group` for all callers.
+
+Targeted evidence:
+
+- `rv-groupdb-chmod-fchmod-20260601T181203Z.log`: `chmod07,fchmod02` RV musl+glibc PASS, parser-clean.
+- `la-groupdb-chmod-fchmod-20260601T181243Z.log`: `chmod07,fchmod02` LA musl+glibc PASS, parser-clean.
+- `groupdb-chmod-fchmod-rv-la.promotion-candidates.txt`: combined four-way report; `chmod07` and `fchmod02` are clean across RV + LA x musl + glibc.
+- `rv-groupdb-chmod-regression-20260601T181338Z.log`: RV chmod/chown/open/creat regression subset 16 PASS / 0 FAIL, no internal caveats.
+- `la-groupdb-chmod-regression-20260601T181429Z.log`: LA chmod/chown/open/creat regression subset 16 PASS / 0 FAIL, no internal caveats.
+- `groupdb-chmod-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eight rows are clean, with `chmod07` and `fchmod02` as the new not-yet-stable candidates from this follow-up.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 32, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+## tmpfs read-only remount metadata follow-up
+
+A generic mount/VFS metadata improvement was added after the group database work:
+
+- `mount(..., MS_REMOUNT|MS_RDONLY, "tmpfs")` is now accepted only for an existing mount point and records the mount as read-only in per-process mount metadata.
+- Path translation keeps mount source-root plus read-only state, and write-capable metadata paths now return `EROFS` when operating under a read-only mount.
+- Parent search permission is checked before chown metadata permission checks so inaccessible path prefixes surface `EACCES` instead of a later ownership `EPERM`.
+- No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-tmpfs-readonly-metadata-20260601T182849Z.log`: `access04,chmod06,chown04,fchmod06,fchown04` RV musl+glibc PASS, parser-clean.
+- `la-tmpfs-readonly-metadata-20260601T182942Z.log`: same five cases LA musl+glibc PASS, parser-clean.
+- `tmpfs-readonly-rv-la.promotion-candidates.txt`: combined four-way report; five candidates are clean across RV + LA x musl + glibc.
+- `rv-tmpfs-readonly-regression-20260601T183034Z.log`: RV VFS permission regression subset 30 PASS / 0 FAIL, no internal caveats.
+- `la-tmpfs-readonly-regression-20260601T183152Z.log`: LA VFS permission regression subset 30 PASS / 0 FAIL, no internal caveats.
+- `tmpfs-readonly-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all fifteen rows are clean, with `access04`, `chmod06`, `chown04`, `fchmod06`, and `fchown04` as the new not-yet-stable candidates from this follow-up.
+
+At this historical checkpoint, promotion remained blocked after the tmpfs read-only mount follow-up: the stable606 candidate bank was at most 37, still short of +50, and no final stable606 gate had been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+
+## /proc/self/fd directory follow-up
+
+A generic procfs FD-directory improvement was added after the tmpfs read-only mount work:
+
+- `/proc/self/fd`, `/proc/<current-pid>/fd`, and `/dev/fd` can now be opened as read-only synthetic directories.
+- `getdents64` on those directories enumerates `.`, `..`, and the process's currently open numeric fd entries dynamically, with numeric entries exposed as symlink-like `DT_LNK` rows.
+- Directory fd behavior is generic (`read`/file-like I/O returns directory errors, `fstat`/path stat report a directory mode, `O_PATH` works through the existing synthetic path machinery). No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-proc-fd-pipe07-20260601T184539Z.log`: `pipe07` RV musl+glibc PASS, parser-clean.
+- `la-proc-fd-pipe07-20260601T184915Z.log`: `pipe07` LA musl+glibc PASS, parser-clean.
+- `proc-fd-pipe07-rv-la.promotion-candidates.txt`: combined four-way report; `pipe07` is clean across RV + LA x musl + glibc.
+- `rv-proc-fd-regression-20260601T185013Z.log`: RV pipe/proc-fd/readlink/fcntl regression subset 40 PASS / 0 FAIL, no internal caveats.
+- `la-proc-fd-regression-20260601T185013Z.log`: LA pipe/proc-fd/readlink/fcntl regression subset 40 PASS / 0 FAIL, no internal caveats.
+- `proc-fd-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all twenty rows are clean, with `pipe07` as the new not-yet-stable candidate from this follow-up.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 38, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+## mknod03 / mknod04 / mknod09 mode-errno follow-up
+
+A generic `mknodat()` mode validation improvement was added after the `/proc/self/fd` work:
+
+- Regular files and FIFOs remain the only creatable node types in the current synthetic filesystem model.
+- Character/block devices still return `EPERM`, preserving the existing no-`CAP_MKNOD`/no-device-node boundary.
+- Invalid or nonsensical file-type encodings such as `S_IFMT`, directory, symlink, and socket type bits now return `EINVAL` instead of the previous catch-all `EPERM`.
+- No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-mknod-mode-rescout-20260601T190332Z.log`: `mknod03,mknod04,mknod09` RV musl+glibc PASS, parser-clean.
+- `la-mknod-mode-rescout-20260601T190415Z.log`: `mknod03,mknod04,mknod09` LA musl+glibc PASS, parser-clean.
+- `mknod-mode-rv-la.promotion-candidates.txt`: combined four-way report; `mknod03`, `mknod04`, and `mknod09` are clean across RV + LA x musl + glibc.
+- `rv-mknod-vfs-regression-20260601T190520Z.log`: RV mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
+- `la-mknod-vfs-regression-20260601T190623Z.log`: LA mknod/VFS metadata regression subset 26 PASS / 0 FAIL, no internal caveats.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 41, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+## fchownat02 symlink nofollow metadata follow-up
+
+A generic symlink ownership metadata improvement was added after the mknod mode-errno work:
+
+- `fchownat(..., AT_SYMLINK_NOFOLLOW)` now operates on the final symlink metadata record when the resolved final path is a synthetic symlink instead of following to the target.
+- Synthetic symlink `lstat` rows now apply recorded path ownership so later nofollow stat checks can observe `lchown`-style changes.
+- Non-symlink paths and empty-path fd behavior keep the existing `fchownat` flow. No LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-fchownat02-nofollow-20260601T191133Z.log`: `fchownat02` RV musl+glibc PASS, parser-clean.
+- `la-fchownat02-nofollow-20260601T191212Z.log`: `fchownat02` LA musl+glibc PASS, parser-clean.
+- `fchownat02-nofollow-rv-la.promotion-candidates.txt`: combined four-way report; `fchownat02` is clean across RV + LA x musl + glibc.
+- `rv-fchownat-symlink-regression-20260601T191310Z.log`: RV symlink/chown regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `la-fchownat-symlink-regression-20260601T191417Z.log`: LA symlink/chown regression subset 32 PASS / 0 FAIL, no internal caveats.
+- `fchownat-symlink-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all sixteen rows are clean, with `fchownat02` as the only new not-yet-stable candidate from this follow-up.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 42, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+## setrlimit04 busybox applet exec follow-up
+
+A generic exec compatibility improvement was added after the fchownat nofollow work:
+
+- Missing `/bin/<applet>` and `/usr/bin/<applet>` paths are mapped to the current libc root's busybox when `<applet>` is in the existing busybox applet allowlist and no real file exists at the requested path.
+- `argv[0]` is normalized to the applet basename for those fallback execs, preserving the existing `/bin/sh` compatibility path while adding other standard busybox applets such as `true` generically.
+- Existing real files still win; no LTP case/path/process/output is hardcoded.
+
+Targeted evidence:
+
+- `rv-setrlimit04-bin-true-20260601T191920Z.log`: `setrlimit04` RV musl+glibc PASS, parser-clean.
+- `la-setrlimit04-bin-true-20260601T191959Z.log`: `setrlimit04` LA musl+glibc PASS, parser-clean.
+- `setrlimit04-bin-true-rv-la.promotion-candidates.txt`: combined four-way report; `setrlimit04` is clean across RV + LA x musl + glibc.
+- `rv-setrlimit-exec-regression-20260601T192057Z.log`: RV rlimit/exec/wait regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `la-setrlimit-exec-regression-20260601T192159Z.log`: LA rlimit/exec/wait regression subset 22 PASS / 0 FAIL, no internal caveats.
+- `setrlimit-exec-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all eleven rows are clean, with `setrlimit04` as the only new not-yet-stable candidate from this follow-up.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 43, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+
+## clock_gettime04 evidence-only follow-up
+
+No kernel behavior change was required for this follow-up; the case was isolated from the mixed mm/time RV scout and then re-run as a targeted clock/time validation lane.
+
+Targeted evidence:
+
+- `rv-clock-gettime04-rescout-20260601T193254Z.log`: `clock_gettime04` RV musl+glibc PASS, parser-clean.
+- `la-clock-gettime04-rescout-20260601T192915Z.log`: `clock_gettime04` LA musl+glibc PASS, parser-clean.
+- `clock-gettime04-isolated-rv-la.promotion-candidates.txt`: isolated four-way report; `clock_gettime04` is clean across RV + LA x musl + glibc.
+- `rv-clock-time-regression-20260601T193006Z.log`: RV clock/time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `la-clock-time-regression-20260601T193006Z.log`: LA clock/time regression subset 10 PASS / 0 FAIL, no internal caveats.
+- `clock-time-regression-rv-la.promotion-candidates.txt`: combined four-way regression report; all five rows are clean, with `clock_gettime04` as the only new row relative to the current stable list.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 44, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+
+## legacy clean-tail evidence-only follow-up
+
+No kernel behavior change was required for this follow-up. Three remaining archived clean-tail rows were revalidated as named LTP cases, not as broad stress/locking semantic proof.
+
+Targeted evidence:
+
+- `rv-legacy-clean-tail-scout-20260601T194031Z.log`: `locktests`, `ltpServer`, and `stress` RV musl+glibc PASS, parser-clean.
+- `la-legacy-clean-tail-scout-20260601T194116Z.log`: `locktests`, `ltpServer`, and `stress` LA musl+glibc PASS, parser-clean.
+- `legacy-clean-tail-rv-la.promotion-candidates.txt`: combined four-way report; all three rows are clean across RV + LA x musl + glibc.
+
+Maintenance boundary: these are helper/harness-style LTP binary rows. They may be counted only as the named cases after four-way parser-clean proof; they are not evidence that the kernel has complete stress, lock, or network-server semantics.
+
+At this historical checkpoint, promotion remained blocked: the stable606 candidate bank is now at most 47, still short of +50, and no final stable606 gate has been run. At that time the stable list remained 556 total / 556 unique / 0 duplicate.
+
+## Non-countable follow-up scouts kept visible
+
+Two later scouts remain blockers, not promotion evidence:
+
+- `rv-light-process-scout-20260601T193756Z.log`: 0 PASS / 8 FAIL, internal `TFAIL=5`, `TBROK=3`, `TCONF=1`, timeout matches 1, panic/trap matches 1. `kill10` ended as UNKNOWN with panic/trap, so the batch is not countable.
+- `rv-vfs-fd-remainder-scout-20260601T194216Z.log`: 2 PASS / 16 FAIL, internal `TFAIL=4`, `TBROK=10`, `TCONF=2`; only `readlinkat02` was RV clean.
+- `la-readlinkat02-rescout-20260601T194310Z.log`: LA glibc passed but LA musl failed with one `TFAIL`, so `readlinkat02` is not banked.

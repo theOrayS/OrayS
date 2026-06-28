@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g008_musl_patch_stable.py"
 TARGETS = [
     Path("examples/shell/src/uspace/program_loader.rs"),
-    Path("docs/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"),
-    Path("docs/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"),
+    Path("archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"),
+    Path("archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"),
     Path("scripts/ltp_summary.py"),
     Path("scripts/test_ltp_summary.py"),
 ]
@@ -76,7 +76,7 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
 
     def test_detects_missing_retirement_doc_contract(self) -> None:
         tree = self.make_tree()
-        path = tree / "docs/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"
+        path = tree / "archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/musl-runtime-patch-manifest.md"
         text = path.read_text(encoding="utf-8").replace("runtime byte patching is prohibited", "runtime patching may continue")
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -94,7 +94,7 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
 
     def test_detects_missing_four_combo_gate_doc(self) -> None:
         tree = self.make_tree()
-        path = tree / "docs/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
+        path = tree / "archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
         text = path.read_text(encoding="utf-8").replace("LA64 | glibc", "LA64 | skipped")
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -103,7 +103,7 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
 
     def test_detects_missing_quality_signal_doc_tokens(self) -> None:
         tree = self.make_tree()
-        path = tree / "docs/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
+        path = tree / "archive/docs-pre-review-2026-06-28/ltp-real-semantics-repair-2026-06-07/stable-reproof-gate.md"
         text = path.read_text(encoding="utf-8").replace(
             "TCONF, TBROK, TFAIL, ENOSYS/not implemented, timeout, panic, trap, or prior fail event",
             "generic failure signals",

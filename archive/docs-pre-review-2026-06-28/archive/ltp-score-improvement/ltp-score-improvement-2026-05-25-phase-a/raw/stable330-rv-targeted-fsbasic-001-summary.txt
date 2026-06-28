@@ -1,0 +1,68 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable330-rv-targeted-fsbasic-001.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 10
+- Internal TFAIL/TBROK/TCONF: 11 ({'TBROK': 7, 'TFAIL': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 6
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 5 failed
+- ltp-glibc: 0 passed, 5 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 3533 | 256717 | 256703 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 2485 | 256780 | 256766 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| lseek02 | rv | glibc | ltp-glibc | FAIL | 2 | 3178 | 256745 | 256731 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| lseek02 | rv | musl | ltp-musl | FAIL | 2 | 2976 | 258856 | 256794 | -2062 | 0 | 1 | 0 | 0 | 1 | 0 |
+| mkdir02 | rv | glibc | ltp-glibc | FAIL | 1 | 3267 | 256731 | 256717 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | musl | ltp-musl | FAIL | 2 | 2819 | 256794 | 256780 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 3410 | 256689 | 256682 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 2765 | 256752 | 256745 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| unlink05 | rv | glibc | ltp-glibc | FAIL | 2 | 3046 | 256703 | 256689 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| unlink05 | rv | musl | ltp-musl | FAIL | 2 | 2926 | 256766 | 256752 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 10 (rv:glibc:link02, rv:musl:link02, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:mkdir02, rv:musl:mkdir02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:unlink05, rv:musl:unlink05)
+- internal_tfail: 3 (rv:glibc:link02, rv:musl:link02, rv:glibc:mkdir02)
+- internal_tbrok: 7 (rv:glibc:lseek02, rv:musl:lseek02, rv:musl:mkdir02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:unlink05, rv:musl:unlink05)
+- timeout: 0
+- enosys: 6 (rv:glibc:link02, rv:musl:link02, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:unlink05, rv:musl:unlink05)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:lseek02
+- ltp-musl:mkdir02
+- ltp-musl:link02
+- ltp-musl:unlink05
+- ltp-musl:rename01
+- ltp-glibc:lseek02
+- ltp-glibc:mkdir02
+- ltp-glibc:link02
+- ltp-glibc:unlink05
+- ltp-glibc:rename01
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 5
+- Internal: {'TBROK': 4, 'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: lseek02, mkdir02, link02, unlink05, rename01
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 5
+- Internal: {'TBROK': 3, 'TFAIL': 3}
+- timeout: 0
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: lseek02, mkdir02, link02, unlink05, rename01

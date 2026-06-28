@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "date": "2026-05-25",
+  "target": "stable350",
+  "stableCases": {
+    "total": 350,
+    "unique": 350,
+    "duplicates": 0,
+    "kill02Present": false,
+    "abs01Present": true,
+    "artifact": "docs/ltp-score-improvement-2026-05-25-phase-a/stable350-live.cases"
+  },
+  "finalGates": {
+    "rv": {
+      "summary": "docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-final-002-summary.txt",
+      "markerPrefix": "docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-final-002-marker-prefix.txt",
+      "passLtpCase": 700,
+      "failLtpCase": 0,
+      "ltpMusl": {
+        "passed": 350,
+        "failed": 0
+      },
+      "ltpGlibc": {
+        "passed": 350,
+        "failed": 0
+      },
+      "internalTfail": 0,
+      "internalTbrok": 0,
+      "knownTconf": "read02 only",
+      "timeout": 0,
+      "enosys": 0,
+      "panicTrap": 0,
+      "badMarkerLines": 0
+    },
+    "la": {
+      "summary": "docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-final-002-summary.txt",
+      "markerPrefix": "docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-final-002-marker-prefix.txt",
+      "passLtpCase": 700,
+      "failLtpCase": 0,
+      "ltpMusl": {
+        "passed": 350,
+        "failed": 0
+      },
+      "ltpGlibc": {
+        "passed": 350,
+        "failed": 0
+      },
+      "internalTfail": 0,
+      "internalTbrok": 0,
+      "knownTconf": "read02 only",
+      "timeout": 0,
+      "enosys": 0,
+      "panicTrap": 0,
+      "badMarkerLines": 0
+    }
+  },
+  "ltpSemantics": {
+    "fakePass": false,
+    "caseNameHardcode": false,
+    "failLaundering": false,
+    "timeoutAsPass": false,
+    "read02TconfDisclosed": true,
+    "wrapperSuccessUsedAlone": false
+  },
+  "verification": {
+    "status": "passed",
+    "commands": [
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv",
+      "python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-final-002.log",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la",
+      "python3 -B scripts/ltp_summary.py docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-la-final-002.log",
+      "cargo fmt --all -- --check",
+      "make A=examples/shell ARCH=riscv64",
+      "make all"
+    ],
+    "notRun": [
+      "CARGO_HOME=$PWD/cargo-home CARGO_NET_OFFLINE=true PATH=$PWD/tools/bin:$PATH make all",
+      "make clippy",
+      "make unittest_no_fail_fast"
+    ],
+    "evidence": "RV/LA final stable summaries and marker-prefix scans: raw/stable350-rv-final-002-summary.txt, raw/stable350-la-final-002-summary.txt, raw/stable350-rv-final-002-marker-prefix.txt, raw/stable350-la-final-002-marker-prefix.txt; build/format gates passed."
+  },
+  "aiSlopCleaner": {
+    "status": "passed",
+    "evidence": "docs/ltp-score-improvement-2026-05-25-phase-a/final-gate-ai-slop-cleaner-report.md"
+  },
+  "codeReview": {
+    "recommendation": "APPROVE",
+    "architectStatus": "CLEAR",
+    "evidence": "docs/ltp-score-improvement-2026-05-25-phase-a/final-gate-code-review-report.md"
+  }
+}

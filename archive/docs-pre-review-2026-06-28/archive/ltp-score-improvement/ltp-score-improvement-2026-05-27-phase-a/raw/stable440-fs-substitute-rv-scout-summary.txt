@@ -1,0 +1,86 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable440-fs-substitute-rv-scout.log`
+
+- PASS LTP CASE: 2
+- FAIL LTP CASE: 18
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 1 passed, 9 failed
+- ltp-glibc: 1 passed, 9 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fs_inod01 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_inod01 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms01 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms01 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms02 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms02 | rv | musl | ltp-musl | FAIL | -1 | 2 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms03 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms03 | rv | musl | ltp-musl | FAIL | -1 | 2 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms04 | rv | glibc | ltp-glibc | FAIL | -1 | 7 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms04 | rv | musl | ltp-musl | FAIL | -1 | 6 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms05 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms05 | rv | musl | ltp-musl | FAIL | -1 | 2 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms06 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms06 | rv | musl | ltp-musl | FAIL | -1 | 2 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| openfile01 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| openfile01 | rv | musl | ltp-musl | FAIL | -1 | 1 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| stream02 | rv | glibc | ltp-glibc | PASS | 0 | 1828 | 256796 | 256789 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stream02 | rv | musl | ltp-musl | PASS | 0 | 1308 | 258851 | 256796 | -2055 | 0 | 0 | 0 | 0 | 0 | 0 |
+| writetest01 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 256789 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| writetest01 | rv | musl | ltp-musl | FAIL | -1 | 2 | 256796 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:glibc:stream02, rv:musl:stream02)
+- pass_with_tconf: 0
+- fail_wrapper: 18 (rv:glibc:fs_inod01, rv:musl:fs_inod01, rv:glibc:fs_perms01, rv:musl:fs_perms01, rv:glibc:fs_perms02, rv:musl:fs_perms02, rv:glibc:fs_perms03, rv:musl:fs_perms03, rv:glibc:fs_perms04, rv:musl:fs_perms04, rv:glibc:fs_perms05, rv:musl:fs_perms05, rv:glibc:fs_perms06, rv:musl:fs_perms06, rv:glibc:openfile01, rv:musl:openfile01, rv:glibc:writetest01, rv:musl:writetest01)
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:fs_perms04
+- ltp-musl:fs_perms05
+- ltp-musl:fs_perms06
+- ltp-musl:fs_perms01
+- ltp-musl:fs_perms02
+- ltp-musl:fs_perms03
+- ltp-musl:openfile01
+- ltp-musl:writetest01
+- ltp-musl:fs_inod01
+- ltp-glibc:fs_perms04
+- ltp-glibc:fs_perms05
+- ltp-glibc:fs_perms06
+- ltp-glibc:fs_perms01
+- ltp-glibc:fs_perms02
+- ltp-glibc:fs_perms03
+- ltp-glibc:openfile01
+- ltp-glibc:writetest01
+- ltp-glibc:fs_inod01
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 9
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: fs_perms04, fs_perms05, fs_perms06, fs_perms01, fs_perms02, fs_perms03, openfile01, writetest01, fs_inod01
+
+### ltp-glibc
+- PASS: 1
+- FAIL: 9
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: fs_perms04, fs_perms05, fs_perms06, fs_perms01, fs_perms02, fs_perms03, openfile01, writetest01, fs_inod01

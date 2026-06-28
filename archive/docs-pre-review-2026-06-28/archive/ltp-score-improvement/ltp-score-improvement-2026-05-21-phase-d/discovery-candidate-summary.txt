@@ -1,0 +1,9 @@
+LTP Discovery+Stats summary (2026-05-24)
+stable_source_count=75
+candidate_count=46
+selected_batch_count=16
+selected_batch=getpgid01,getsid01,getrusage02,gettimeofday02,gettid02,getgroups01,getresuid01,getresuid02,getresuid03,getresgid01,getresgid02,getresgid03,sched_getparam01,sched_getscheduler01,sched_getscheduler02,waitpid01
+expected_per_arch_pass_markers=32
+expected_combined_pass_markers=64
+promotion_gate=RV+LA x musl+glibc PASS with zero TFAIL/TBROK/TCONF, timeout, ENOSYS, panic/trap
+guardrails=do not mutate .omx/ultragoal from worker lane; do not promote from stale evidence; keep read02 TCONF transparent; timeout is failure signal

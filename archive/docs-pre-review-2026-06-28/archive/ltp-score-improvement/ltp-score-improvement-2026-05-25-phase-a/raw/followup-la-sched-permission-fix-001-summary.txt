@@ -1,0 +1,56 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/followup-la-sched-permission-fix-001.log`
+
+- PASS LTP CASE: 12
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 6 passed, 0 failed
+- ltp-glibc: 6 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| sched_getparam03 | la | glibc | ltp-glibc | PASS | 0 | 4423 | 187941 | 187911 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getparam03 | la | musl | ltp-musl | PASS | 0 | 3259 | 192251 | 192227 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam04 | la | glibc | ltp-glibc | PASS | 0 | 4240 | 187911 | 187881 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam04 | la | musl | ltp-musl | PASS | 0 | 3073 | 192227 | 192203 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam05 | la | glibc | ltp-glibc | PASS | 0 | 5838 | 192163 | 188019 | -4144 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setparam05 | la | musl | ltp-musl | PASS | 0 | 3163 | 194403 | 192315 | -2088 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler01 | la | glibc | ltp-glibc | PASS | 0 | 6141 | 188019 | 187989 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler01 | la | musl | ltp-musl | PASS | 0 | 2776 | 192315 | 192291 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler02 | la | glibc | ltp-glibc | PASS | 0 | 4893 | 187989 | 187941 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler02 | la | musl | ltp-musl | PASS | 0 | 2799 | 192291 | 192251 | -40 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority02 | la | glibc | ltp-glibc | PASS | 0 | 5122 | 187881 | 187833 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority02 | la | musl | ltp-musl | PASS | 0 | 2564 | 192203 | 192163 | -40 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 12 (la:glibc:sched_getparam03, la:musl:sched_getparam03, la:glibc:sched_setparam04, la:musl:sched_setparam04, la:glibc:sched_setparam05, la:musl:sched_setparam05, la:glibc:sched_setscheduler01, la:musl:sched_setscheduler01, la:glibc:sched_setscheduler02, la:musl:sched_setscheduler02, la:glibc:setpriority02, la:musl:setpriority02)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 6
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

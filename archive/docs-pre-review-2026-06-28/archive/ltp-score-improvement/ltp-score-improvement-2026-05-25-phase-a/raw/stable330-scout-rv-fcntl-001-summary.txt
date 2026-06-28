@@ -1,0 +1,54 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable330-scout-rv-fcntl-001.log`
+
+- PASS LTP CASE: 2
+- FAIL LTP CASE: 8
+- Internal TFAIL/TBROK/TCONF: 507 ({'TFAIL': 503, 'TBROK': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fcntl05 | rv | musl | ltp-musl | FAIL | 1 | 1836 | 258856 | 256794 | -2062 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05_64 | rv | musl | ltp-musl | FAIL | 1 | 2389 | 256794 | 256780 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | rv | musl | ltp-musl | FAIL | 2 | 2244 | 256780 | 256773 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl07_64 | rv | musl | ltp-musl | FAIL | 2 | 3009 | 256773 | 256766 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl11 | rv | musl | ltp-musl | FAIL | 1 | 1564 | 256766 | 256752 | -14 | 75 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11_64 | rv | musl | ltp-musl | FAIL | 1 | 2680 | 256752 | 256738 | -14 | 75 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | musl | ltp-musl | PASS | 0 | 2243 | 256738 | 256717 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12_64 | rv | musl | ltp-musl | PASS | 0 | 2750 | 256717 | 256696 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | musl | ltp-musl | FAIL | 1 | 2471 | 256696 | 256682 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13_64 | rv | musl | ltp-musl | FAIL | 1 | 2445 | 256682 | 256668 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| fcntl14 | rv | musl | ltp-musl | UNKNOWN |  |  | 256668 |  |  | 345 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 2 (rv:musl:fcntl12, rv:musl:fcntl12_64)
+- pass_with_tconf: 0
+- fail_wrapper: 8 (rv:musl:fcntl05, rv:musl:fcntl05_64, rv:musl:fcntl07, rv:musl:fcntl07_64, rv:musl:fcntl11, rv:musl:fcntl11_64, rv:musl:fcntl13, rv:musl:fcntl13_64)
+- internal_tfail: 7 (rv:musl:fcntl05, rv:musl:fcntl05_64, rv:musl:fcntl11, rv:musl:fcntl11_64, rv:musl:fcntl13, rv:musl:fcntl13_64, rv:musl:fcntl14)
+- internal_tbrok: 2 (rv:musl:fcntl07, rv:musl:fcntl07_64)
+- timeout: 0
+- enosys: 2 (rv:musl:fcntl07, rv:musl:fcntl07_64)
+- panic_trap: 0
+- unknown: 1 (rv:musl:fcntl14)
+
+## FAIL LTP CASE
+- ltp-musl:fcntl05
+- ltp-musl:fcntl05_64
+- ltp-musl:fcntl07
+- ltp-musl:fcntl07_64
+- ltp-musl:fcntl11
+- ltp-musl:fcntl11_64
+- ltp-musl:fcntl13
+- ltp-musl:fcntl13_64
+
+## Groups
+### ltp-musl
+- PASS: 2
+- FAIL: 8
+- Internal: {'TFAIL': 503, 'TBROK': 4}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: fcntl05, fcntl05_64, fcntl07, fcntl07_64, fcntl11, fcntl11_64, fcntl13, fcntl13_64

@@ -1,7 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=sched_getattr02,sched_getscheduler02 LTP_CASE_TIMEOUT_SECS=60 ./run-eval.sh rv
-started_at: 2026-05-24T09:43:11+08:00
-cases: sched_getattr02,sched_getscheduler02
-finished_at: 2026-05-24T09:45:36+08:00
-status: 0
-log: docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-sched-known-clean-rv-20260524T094311+0800.log
-summary: docs/ltp-score-improvement-2026-05-24-phase-a/target-sched-known-clean-rv-summary.txt

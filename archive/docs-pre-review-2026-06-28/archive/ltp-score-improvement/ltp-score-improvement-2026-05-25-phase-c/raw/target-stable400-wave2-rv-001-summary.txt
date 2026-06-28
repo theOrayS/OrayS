@@ -1,0 +1,53 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-wave2-rv-001.log`
+
+- PASS LTP CASE: 1
+- FAIL LTP CASE: 8
+- Internal TFAIL/TBROK/TCONF: 8 ({'TBROK': 8})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 1
+- panic/trap matches: 1
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| access04 | rv | musl | ltp-musl | FAIL | 2 | 5508 | 258855 | 256800 | -2055 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod06 | rv | musl | ltp-musl | FAIL | 2 | 3965 | 256800 | 256793 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| chmod07 | rv | musl | ltp-musl | FAIL | 2 | 3907 | 256793 | 256779 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod02 | rv | musl | ltp-musl | FAIL | 2 | 3802 | 256779 | 256765 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod06 | rv | musl | ltp-musl | FAIL | 2 | 3881 | 256765 | 256758 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe02 | rv | musl | ltp-musl | UNKNOWN |  |  | 256716 |  |  | 0 | 0 | 0 | 0 | 0 | 1 |
+| readlinkat02 | rv | musl | ltp-musl | PASS | 0 | 3548 | 256744 | 256730 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename04 | rv | musl | ltp-musl | FAIL | 6 | 3951 | 256730 | 256723 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename05 | rv | musl | ltp-musl | FAIL | 6 | 3473 | 256723 | 256716 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx01 | rv | musl | ltp-musl | FAIL | 2 | 3853 | 256758 | 256744 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+
+## Categories
+- pass_clean: 1 (rv:musl:readlinkat02)
+- pass_with_tconf: 0
+- fail_wrapper: 8 (rv:musl:access04, rv:musl:chmod06, rv:musl:chmod07, rv:musl:fchmod02, rv:musl:fchmod06, rv:musl:rename04, rv:musl:rename05, rv:musl:statx01)
+- internal_tfail: 0
+- internal_tbrok: 8 (rv:musl:access04, rv:musl:chmod06, rv:musl:chmod07, rv:musl:fchmod02, rv:musl:fchmod06, rv:musl:rename04, rv:musl:rename05, rv:musl:statx01)
+- timeout: 0
+- enosys: 1 (rv:musl:statx01)
+- panic_trap: 1 (rv:musl:pipe02)
+- unknown: 1 (rv:musl:pipe02)
+
+## FAIL LTP CASE
+- ltp-musl:access04
+- ltp-musl:chmod06
+- ltp-musl:chmod07
+- ltp-musl:fchmod02
+- ltp-musl:fchmod06
+- ltp-musl:statx01
+- ltp-musl:rename04
+- ltp-musl:rename05
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 8
+- Internal: {'TBROK': 8}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 1
+- Fail cases: access04, chmod06, chmod07, fchmod02, fchmod06, statx01, rename04, rename05

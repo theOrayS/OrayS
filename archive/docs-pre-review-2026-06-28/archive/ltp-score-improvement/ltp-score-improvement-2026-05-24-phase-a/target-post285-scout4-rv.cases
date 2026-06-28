@@ -1,0 +1,1 @@
+getcwd03,getcwd04,getdents01,getdents02,gethostid01,getrusage04,getxattr01,getxattr02,getxattr03,getxattr04,getxattr05,sethostname01,sethostname02,sethostname03,setpgid03,setpriority01,nice01,nice02,kill01,kill02,pause01,alarm01,nanosleep01,clock_nanosleep01,sbrk01,prctl01,umask03

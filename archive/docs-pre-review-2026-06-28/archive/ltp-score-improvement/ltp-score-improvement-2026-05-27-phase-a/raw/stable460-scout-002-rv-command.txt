@@ -1,0 +1,1 @@
+OSCOMP_TEST_GROUPS=ltp LTP_CASES='read03 write04 writev03 fcntl14 fcntl14_64 fcntl17 fcntl17_64 fcntl18 fcntl18_64 fcntl19 fcntl19_64 fcntl20 fcntl20_64 fcntl21 fcntl21_64 fcntl22 fcntl22_64 fcntl24 fcntl24_64 fcntl25 fcntl25_64 fcntl26 fcntl26_64 fcntl27 fcntl27_64 pselect01 pselect01_64 poll02' LTP_CASE_TIMEOUT_SECS=60 timeout 90m ./run-eval.sh rv

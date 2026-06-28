@@ -1,0 +1,10 @@
+dup202
+faccessat01
+mkdirat01
+openat01
+pipe04
+pipe05
+pread01
+pwrite01
+sysinfo01
+unlinkat01

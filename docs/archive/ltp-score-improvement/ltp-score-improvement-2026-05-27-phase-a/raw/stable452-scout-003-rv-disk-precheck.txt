@@ -1,7 +1,0 @@
-# disk precheck
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/vda2        59G   21G   36G  37% /
-/dev/vda2        59G   21G   36G  37% /
-
-# codex
-1.4G	/root/.codex

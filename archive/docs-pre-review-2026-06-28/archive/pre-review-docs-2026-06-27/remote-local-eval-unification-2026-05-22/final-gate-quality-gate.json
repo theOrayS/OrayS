@@ -1,0 +1,29 @@
+{
+  "aiSlopCleaner": {
+    "status": "passed",
+    "evidence": "docs/remote-local-eval-unification-2026-05-22/final-gate-ai-slop-cleaner-report.md"
+  },
+  "verification": {
+    "status": "passed",
+    "commands": [
+      "make -n all",
+      "make -n kernel-la",
+      "cargo fmt --all -- --check",
+      "make all",
+      "./run-eval.sh la",
+      "./run-eval.sh",
+      "python3 scripts/ltp_summary.py docs/remote-local-eval-unification-2026-05-22/run-eval-la.log",
+      "python3 scripts/ltp_summary.py docs/remote-local-eval-unification-2026-05-22/run-eval-rv.log",
+      "post-cleaner: cargo fmt --all -- --check",
+      "post-cleaner: make -n all",
+      "post-cleaner: make -n kernel-la",
+      "post-cleaner: make all"
+    ],
+    "evidence": "make all passed; local LA/RV eval passed; LA/RV LTP suite summaries both musl/glibc 157 passed, 0 failed, 0 timed out"
+  },
+  "codeReview": {
+    "recommendation": "APPROVE",
+    "architectStatus": "CLEAR",
+    "evidence": "docs/remote-local-eval-unification-2026-05-22/final-gate-code-review-report.md"
+  }
+}

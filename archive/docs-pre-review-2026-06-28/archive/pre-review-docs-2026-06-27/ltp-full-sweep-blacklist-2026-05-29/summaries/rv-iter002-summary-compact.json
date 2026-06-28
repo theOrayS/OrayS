@@ -1,0 +1,177 @@
+{
+  "case_matrix_count": 1108,
+  "closure": {
+    "closed": true,
+    "exit_meta": "RUN_META exit_code=2 end=2026-05-29T14:35:03Z",
+    "last_done": "ns-udpserver",
+    "last_run": "oom01",
+    "open_writers": []
+  },
+  "enosys": 190,
+  "fail_count": 814,
+  "failed_code_counts": {
+    "-1": 3,
+    "1": 145,
+    "126": 1,
+    "127": 2,
+    "128": 1,
+    "134": 4,
+    "137": 16,
+    "139": 7,
+    "2": 191,
+    "22": 1,
+    "3": 8,
+    "32": 338,
+    "33": 7,
+    "34": 6,
+    "36": 4,
+    "4": 1,
+    "5": 1,
+    "6": 78
+  },
+  "internal": {
+    "TBROK": 296,
+    "TCONF": 451,
+    "TFAIL": 1362
+  },
+  "panic_trap": 0,
+  "pass_count": 293,
+  "raw_counts": {
+    "FAIL_markers": 1107,
+    "FAIL_nonzero_wrapper_fail": 814,
+    "FAIL_status0_wrapper_pass_candidates": 293,
+    "PASS_markers": 0,
+    "RUN": 1108,
+    "SKIP_markers": 0,
+    "TIMEOUT_markers": 16,
+    "incomplete_cases": 1,
+    "incomplete_unique": [
+      "oom01"
+    ]
+  },
+  "sha256": "1a1d2ebdc680e1bec848733d5427dea3e30477602b79915b7310659fbb4a2b3c",
+  "source": "python3 scripts/ltp_summary.py --json /root/oskernel2026-orays/target/ltp-full-sweep-blacklist-2026-05-29/raw/rv-iter002.log (full JSON not committed; compacted here)",
+  "timeout_cases": [
+    {
+      "case": "clock_gettime01",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "clock_nanosleep01",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "fork13",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "fork14",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "fs_inod",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "ftest03",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "ftest07",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "futex_wait03",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "futex_wait05",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "futex_wake03",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "getrusage04",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "inode02",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "kill10",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "kill12",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "mmap3",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    },
+    {
+      "case": "nptl01",
+      "code": 137,
+      "group": "ltp-musl",
+      "status": "FAIL",
+      "timeouts": 1
+    }
+  ],
+  "timeouts": 16,
+  "unknown_cases": [
+    {
+      "case": "oom01",
+      "code": null,
+      "group": "ltp-musl"
+    }
+  ],
+  "worker_meta": []
+}

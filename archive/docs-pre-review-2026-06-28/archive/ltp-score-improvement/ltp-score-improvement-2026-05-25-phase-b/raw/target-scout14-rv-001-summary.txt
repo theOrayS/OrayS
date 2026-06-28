@@ -1,0 +1,99 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-scout14-rv-001.log`
+
+- PASS LTP CASE: 5
+- FAIL LTP CASE: 23
+- Internal TFAIL/TBROK/TCONF: 336 ({'TBROK': 5, 'TFAIL': 331})
+- timeout matches: 5
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 3 passed, 11 failed
+- ltp-glibc: 2 passed, 12 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fork10 | rv | glibc | ltp-glibc | PASS | 0 | 3016 | 246418 | 246390 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork10 | rv | musl | ltp-musl | PASS | 0 | 2599 | 256702 | 256674 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fork13 | rv | glibc | ltp-glibc | FAIL | 137 | 61429 | 246390 | 241154 | -5236 | 0 | 0 | 0 | 1 | 0 | 0 |
+| fork13 | rv | musl | ltp-musl | FAIL | 137 | 61331 | 256674 | 251032 | -5642 | 0 | 0 | 0 | 1 | 0 | 0 |
+| fork14 | rv | glibc | ltp-glibc | FAIL | 137 | 64029 | 241154 | 240909 | -245 | 0 | 0 | 0 | 1 | 0 | 0 |
+| fork14 | rv | musl | ltp-musl | FAIL | 137 | 63015 | 251032 | 250787 | -245 | 0 | 0 | 0 | 1 | 0 | 0 |
+| kill12 | rv | glibc | ltp-glibc | PASS | 0 | 17527 | 246523 | 246425 | -98 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill12 | rv | musl | ltp-musl | PASS | 0 | 16948 | 258855 | 256709 | -2146 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill13 | rv | glibc | ltp-glibc | FAIL | 2 | 3090 | 246425 | 246418 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| kill13 | rv | musl | ltp-musl | FAIL | 2 | 2633 | 256709 | 256702 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap13 | rv | glibc | ltp-glibc | FAIL | 1 | 2846 | 240762 | 240748 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| mmap13 | rv | musl | ltp-musl | FAIL | 1 | 2503 | 250640 | 250626 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| mmap14 | rv | glibc | ltp-glibc | FAIL | 1 | 2990 | 240748 | 240741 | -7 | 1 | 0 | 0 | 0 | 0 | 0 |
+| mmap14 | rv | musl | ltp-musl | FAIL | 1 | 2332 | 250626 | 246523 | -4103 | 1 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction03 | rv | glibc | ltp-glibc | FAIL | 1 | 3110 | 240909 | 240902 | -7 | 155 | 0 | 0 | 0 | 0 | 0 |
+| rt_sigaction03 | rv | musl | ltp-musl | FAIL | 1 | 2196 | 250787 | 250780 | -7 | 150 | 0 | 0 | 0 | 0 | 0 |
+| sigaltstack01 | rv | glibc | ltp-glibc | FAIL | 1 | 2844 | 240783 | 240776 | -7 | 1 | 0 | 0 | 0 | 1 | 0 |
+| sigaltstack01 | rv | musl | ltp-musl | FAIL | 1 | 2319 | 250661 | 250654 | -7 | 1 | 0 | 0 | 0 | 1 | 0 |
+| sigaltstack02 | rv | glibc | ltp-glibc | FAIL | 1 | 3213 | 240776 | 240762 | -14 | 2 | 0 | 0 | 0 | 2 | 0 |
+| sigaltstack02 | rv | musl | ltp-musl | PASS | 0 | 2448 | 250654 | 250640 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sigpending02 | rv | glibc | ltp-glibc | FAIL | 1 | 3172 | 240902 | 240888 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sigpending02 | rv | musl | ltp-musl | FAIL | 1 | 2450 | 250780 | 250766 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sigrelse01 | rv | glibc | ltp-glibc | FAIL | 137 | 61502 | 240888 | 240874 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| sigrelse01 | rv | musl | ltp-musl | FAIL | 2 | 2584 | 250766 | 250752 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| sigwait01 | rv | glibc | ltp-glibc | FAIL | 1 | 3052 | 240874 | 240846 | -28 | 2 | 0 | 0 | 0 | 0 | 0 |
+| sigwait01 | rv | musl | ltp-musl | FAIL | 3 | 2550 | 250752 | 250724 | -28 | 2 | 1 | 0 | 0 | 0 | 0 |
+| sigwaitinfo01 | rv | glibc | ltp-glibc | FAIL | 1 | 3831 | 240846 | 240783 | -63 | 6 | 0 | 0 | 0 | 0 | 0 |
+| sigwaitinfo01 | rv | musl | ltp-musl | FAIL | 1 | 2834 | 250724 | 250661 | -63 | 6 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 5 (rv:glibc:fork10, rv:musl:fork10, rv:glibc:kill12, rv:musl:kill12, rv:musl:sigaltstack02)
+- pass_with_tconf: 0
+- fail_wrapper: 23 (rv:glibc:fork13, rv:musl:fork13, rv:glibc:fork14, rv:musl:fork14, rv:glibc:kill13, rv:musl:kill13, rv:glibc:mmap13, rv:musl:mmap13, rv:glibc:mmap14, rv:musl:mmap14, rv:glibc:rt_sigaction03, rv:musl:rt_sigaction03, rv:glibc:sigaltstack01, rv:musl:sigaltstack01, rv:glibc:sigaltstack02, rv:glibc:sigpending02, rv:musl:sigpending02, rv:glibc:sigrelse01, rv:musl:sigrelse01, rv:glibc:sigwait01, rv:musl:sigwait01, rv:glibc:sigwaitinfo01, rv:musl:sigwaitinfo01)
+- internal_tfail: 15 (rv:glibc:mmap13, rv:musl:mmap13, rv:glibc:mmap14, rv:musl:mmap14, rv:glibc:rt_sigaction03, rv:musl:rt_sigaction03, rv:glibc:sigaltstack01, rv:musl:sigaltstack01, rv:glibc:sigaltstack02, rv:glibc:sigpending02, rv:musl:sigpending02, rv:glibc:sigwait01, rv:musl:sigwait01, rv:glibc:sigwaitinfo01, rv:musl:sigwaitinfo01)
+- internal_tbrok: 4 (rv:glibc:kill13, rv:musl:kill13, rv:musl:sigrelse01, rv:musl:sigwait01)
+- timeout: 5 (rv:glibc:fork13, rv:musl:fork13, rv:glibc:fork14, rv:musl:fork14, rv:glibc:sigrelse01)
+- enosys: 3 (rv:glibc:sigaltstack01, rv:musl:sigaltstack01, rv:glibc:sigaltstack02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:kill13
+- ltp-musl:fork13
+- ltp-musl:fork14
+- ltp-musl:rt_sigaction03
+- ltp-musl:sigpending02
+- ltp-musl:sigrelse01
+- ltp-musl:sigwait01
+- ltp-musl:sigwaitinfo01
+- ltp-musl:sigaltstack01
+- ltp-musl:mmap13
+- ltp-musl:mmap14
+- ltp-glibc:kill13
+- ltp-glibc:fork13
+- ltp-glibc:fork14
+- ltp-glibc:rt_sigaction03
+- ltp-glibc:sigpending02
+- ltp-glibc:sigrelse01
+- ltp-glibc:sigwait01
+- ltp-glibc:sigwaitinfo01
+- ltp-glibc:sigaltstack01
+- ltp-glibc:sigaltstack02
+- ltp-glibc:mmap13
+- ltp-glibc:mmap14
+
+## Groups
+### ltp-musl
+- PASS: 3
+- FAIL: 11
+- Internal: {'TBROK': 4, 'TFAIL': 162}
+- timeout: 2
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: kill13, fork13, fork14, rt_sigaction03, sigpending02, sigrelse01, sigwait01, sigwaitinfo01, sigaltstack01, mmap13, mmap14
+
+### ltp-glibc
+- PASS: 2
+- FAIL: 12
+- Internal: {'TBROK': 1, 'TFAIL': 169}
+- timeout: 3
+- ENOSYS/not implemented: 3
+- panic/trap: 0
+- Fail cases: kill13, fork13, fork14, rt_sigaction03, sigpending02, sigrelse01, sigwait01, sigwaitinfo01, sigaltstack01, sigaltstack02, mmap13, mmap14

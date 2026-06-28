@@ -1,6 +1,0 @@
-command: RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img OSCOMP_TEST_GROUPS=ltp LTP_CASES=link02,rename01,unlink05,mkdir02,statfs01,statvfs01,fstatfs01,readlinkat01,readlinkat02,symlinkat01,ftruncate03,statfs02 LTP_CASE_TIMEOUT_SECS=25 ./run-eval.sh rv
-started_at: 2026-05-24T09:29:37+08:00
-cases: link02,rename01,unlink05,mkdir02,statfs01,statvfs01,fstatfs01,readlinkat01,readlinkat02,symlinkat01,ftruncate03,statfs02
-aborted_at: 2026-05-24T09:36:39+08:00
-trusted: false
-abort_reason: leader guardrail prohibits parallel run-eval/QEMU evidence due shared /tmp/arceos-sdcard-*.run.qcow2 names

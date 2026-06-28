@@ -1,6 +1,0 @@
-unlink05
-pipe02
-dup05
-sendfile07
-sendfile07_64
-stream02

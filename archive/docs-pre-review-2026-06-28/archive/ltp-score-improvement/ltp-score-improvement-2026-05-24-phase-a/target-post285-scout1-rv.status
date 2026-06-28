@@ -1,0 +1,4 @@
+command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=dup201\,dup202\,dup203\,dup204\,dup205\,dup206\,fcntl24\,fcntl25\,fcntl26\,fstat01\,lstat02\,stat03\,symlink02\,readlink02\,umask02\,unlink01\,rmdir02\,mkdir01\,truncate01\,truncate02\ LTP_CASE_TIMEOUT_SECS=60\ ./run-eval.sh\ rv
+exit=0
+log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post285-scout1-rv-20260524T155114+0800.log
+cases=dup201,dup202,dup203,dup204,dup205,dup206,fcntl24,fcntl25,fcntl26,fstat01,lstat02,stat03,symlink02,readlink02,umask02,unlink01,rmdir02,mkdir01,truncate01,truncate02

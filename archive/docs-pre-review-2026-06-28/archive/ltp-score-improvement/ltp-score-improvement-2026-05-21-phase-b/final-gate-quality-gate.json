@@ -1,0 +1,129 @@
+{
+  "date": "2026-05-22",
+  "stable_cases_before": 44,
+  "stable_cases_after": 63,
+  "new_cases": [
+    "alarm02",
+    "alarm03",
+    "clock_gettime02",
+    "gettimeofday01",
+    "time01",
+    "times01",
+    "kill03",
+    "rt_sigaction01",
+    "sigaction01",
+    "proc01",
+    "exit01",
+    "exit02",
+    "exit_group01",
+    "getpgrp01",
+    "gettid01",
+    "uname01",
+    "getrlimit01",
+    "getrusage01",
+    "sched_yield01"
+  ],
+  "final_commands": {
+    "cargo_fmt_status": "0",
+    "run_eval_la_status": "0",
+    "run_eval_rv_status": "0"
+  },
+  "la_ltp": {
+    "pass": 126,
+    "fail": 0,
+    "internal": {
+      "TCONF": 4
+    },
+    "timeouts_total_log_matches": 10,
+    "ltp_categories": {
+      "enosys": 0,
+      "fail_wrapper": 0,
+      "internal_tbrok": 0,
+      "internal_tfail": 0,
+      "panic_trap": 0,
+      "pass_clean": 124,
+      "pass_with_tconf": 2,
+      "timeout": 0,
+      "unknown": 0
+    },
+    "suites": [
+      {
+        "failed": 0,
+        "group": "ltp-musl",
+        "passed": 63,
+        "timed_out": 0
+      },
+      {
+        "failed": 0,
+        "group": "ltp-glibc",
+        "passed": 63,
+        "timed_out": 0
+      }
+    ]
+  },
+  "rv_ltp": {
+    "pass": 126,
+    "fail": 0,
+    "internal": {
+      "TCONF": 4
+    },
+    "timeouts_total_log_matches": 10,
+    "ltp_categories": {
+      "enosys": 0,
+      "fail_wrapper": 0,
+      "internal_tbrok": 0,
+      "internal_tfail": 0,
+      "panic_trap": 0,
+      "pass_clean": 124,
+      "pass_with_tconf": 2,
+      "timeout": 0,
+      "unknown": 0
+    },
+    "suites": [
+      {
+        "failed": 0,
+        "group": "ltp-musl",
+        "passed": 63,
+        "timed_out": 0
+      },
+      {
+        "failed": 0,
+        "group": "ltp-glibc",
+        "passed": 63,
+        "timed_out": 0
+      }
+    ]
+  },
+  "guardrails": {
+    "no_case_name_hardcoded_pass": true,
+    "no_real_failure_silent_skip": true,
+    "timeout_counted_separately": true,
+    "summary_not_exit_code_only": true
+  },
+  "promotion_candidate_report": {
+    "candidate_count": 62,
+    "blocked_count": 26
+  },
+  "aiSlopCleaner": {
+    "status": "passed",
+    "evidence": "No-op anti-slop scan passed; see docs/ltp-score-improvement-2026-05-22/final-gate-ai-slop-cleaner-report.md. No fake PASS, skips, new dependencies, or abstractions added."
+  },
+  "verification": {
+    "status": "passed",
+    "commands": [
+      "cargo fmt --all -- --check",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=8 make run-rv ARCH=riscv64 SMP=1 MEM=1G RV_TESTSUITE_IMG=\"$PWD/sdcard-rv.img\"",
+      "OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=8 make run-la ARCH=loongarch64 SMP=1 MEM=1G LA_TESTSUITE_IMG=\"$PWD/sdcard-la.img\"",
+      "./run-eval.sh la 2>&1 | tee output_la.md",
+      "./run-eval.sh 2>&1 | tee output_rv.md",
+      "python3 -B scripts/ltp_summary.py output_la.md",
+      "python3 -B scripts/ltp_summary.py output_rv.md"
+    ],
+    "evidence": "fmt=0, targeted stable-63 LA/RV=0, final run-eval LA/RV=0, final summaries show LA/RV 126 PASS / 0 FAIL and ltp-musl/ltp-glibc 63/0 with LTP timeout/ENOSYS/panic-trap 0."
+  },
+  "codeReview": {
+    "recommendation": "APPROVE",
+    "architectStatus": "CLEAR",
+    "evidence": "Final code review approved; see docs/ltp-score-improvement-2026-05-22/final-gate-code-review-report.md."
+  }
+}

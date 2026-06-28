@@ -1,0 +1,21 @@
+# LTP promotion-candidate report
+
+- Inputs: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/worker4-fd-vector-vfs-rv-001.log`, `docs/ltp-score-improvement-2026-05-26-phase-a/raw/worker4-fd-vector-vfs-la-001.log`
+- Required arches: la, rv
+- Required libcs: glibc, musl
+- Required arch/libc combos: 4
+- Promotion candidates: 4
+- Blocked/incomplete cases: 1
+
+## Candidates
+| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |
+| --- | --- | ---: | ---: |
+| preadv01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7870 | -2064 |
+| preadv02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8721 | -21 |
+| pwritev01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8178 | -21 |
+| pwritev02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6462 | -21 |
+
+## Blocked or incomplete
+| Case | Reason |
+| --- | --- |
+| unlink07 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |

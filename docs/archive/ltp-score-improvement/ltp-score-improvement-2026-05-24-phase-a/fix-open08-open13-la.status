@@ -1,4 +1,0 @@
-command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=open08\,open13\ LTP_CASE_TIMEOUT_SECS=90\ ./run-eval.sh\ la
-exit=0
-log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-open08-open13-la-20260524T153517+0800.log
-cases=open08,open13

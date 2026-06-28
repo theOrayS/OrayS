@@ -1,0 +1,72 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable452-clean14-la-confirm.log`
+
+- PASS LTP CASE: 28
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 14 passed, 0 failed
+- ltp-glibc: 14 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fchown01 | la | glibc | ltp-glibc | PASS | 0 | 2303 | 187811 | 187790 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown01 | la | musl | ltp-musl | PASS | 0 | 1265 | 192186 | 192170 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown02 | la | glibc | ltp-glibc | PASS | 0 | 2041 | 187790 | 187769 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown02 | la | musl | ltp-musl | PASS | 0 | 1068 | 192170 | 192154 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown03 | la | glibc | ltp-glibc | PASS | 0 | 2297 | 187769 | 187748 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown03 | la | musl | ltp-musl | PASS | 0 | 1223 | 192154 | 192138 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown05 | la | glibc | ltp-glibc | PASS | 0 | 2689 | 187748 | 187727 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown05 | la | musl | ltp-musl | PASS | 0 | 1519 | 192138 | 192122 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat01 | la | glibc | ltp-glibc | PASS | 0 | 2454 | 187727 | 187715 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat01 | la | musl | ltp-musl | PASS | 0 | 1496 | 192122 | 192114 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock06 | la | glibc | ltp-glibc | PASS | 0 | 2532 | 192114 | 187997 | -4117 | 0 | 0 | 0 | 0 | 0 | 0 |
+| flock06 | la | musl | ltp-musl | PASS | 0 | 1653 | 194394 | 192330 | -2064 | 0 | 0 | 0 | 0 | 0 | 0 |
+| llseek02 | la | glibc | ltp-glibc | PASS | 0 | 2213 | 187997 | 187976 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| llseek02 | la | musl | ltp-musl | PASS | 0 | 1435 | 192330 | 192314 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| llseek03 | la | glibc | ltp-glibc | PASS | 0 | 2623 | 187976 | 187955 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| llseek03 | la | musl | ltp-musl | PASS | 0 | 1622 | 192314 | 192298 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresgid04 | la | glibc | ltp-glibc | PASS | 0 | 2076 | 187955 | 187943 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresgid04 | la | musl | ltp-musl | PASS | 0 | 1140 | 192298 | 192290 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid04 | la | glibc | ltp-glibc | PASS | 0 | 2331 | 187943 | 187913 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid04 | la | musl | ltp-musl | PASS | 0 | 1315 | 192290 | 192266 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid05 | la | glibc | ltp-glibc | PASS | 0 | 2235 | 187913 | 187892 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setresuid05 | la | musl | ltp-musl | PASS | 0 | 1500 | 192266 | 192250 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid05 | la | glibc | ltp-glibc | PASS | 0 | 2371 | 187892 | 187862 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid05 | la | musl | ltp-musl | PASS | 0 | 1300 | 192250 | 192226 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid06 | la | glibc | ltp-glibc | PASS | 0 | 2228 | 187862 | 187841 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid06 | la | musl | ltp-musl | PASS | 0 | 1129 | 192226 | 192210 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid07 | la | glibc | ltp-glibc | PASS | 0 | 2516 | 187841 | 187811 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid07 | la | musl | ltp-musl | PASS | 0 | 1564 | 192210 | 192186 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 28 (la:glibc:fchown01, la:musl:fchown01, la:glibc:fchown02, la:musl:fchown02, la:glibc:fchown03, la:musl:fchown03, la:glibc:fchown05, la:musl:fchown05, la:glibc:fchownat01, la:musl:fchownat01, la:glibc:flock06, la:musl:flock06, la:glibc:llseek02, la:musl:llseek02, la:glibc:llseek03, la:musl:llseek03, la:glibc:setresgid04, la:musl:setresgid04, la:glibc:setresuid04, la:musl:setresuid04, la:glibc:setresuid05, la:musl:setresuid05, la:glibc:setreuid05, la:musl:setreuid05, la:glibc:setreuid06, la:musl:setreuid06, la:glibc:setreuid07, la:musl:setreuid07)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 14
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 14
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

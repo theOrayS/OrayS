@@ -1,0 +1,16 @@
+# stable706 key validation artifact checksums
+# Generated: 2026-06-02T22:32:50+08:00
+fafceb109b413468959986590de51cd88a0708e902d52e095085fbceac055518  target/ltp-1000-milestone-04-stable706/rv-stable706-new50-final-gate-20260602T221318+0800.log
+56a457246ebcfdab6bea44dcdd889aaa0721021445ad8b98e34979390bcc8ffd  target/ltp-1000-milestone-04-stable706/rv-stable706-new50-final-gate-20260602T221318+0800.log.summary.txt
+a6461a2aa3e031d13edc6a377d7fe660a6a4d294982506f8638031720a36528d  target/ltp-1000-milestone-04-stable706/rv-stable706-new50-final-gate-20260602T221318+0800.log.promotion-rv.md
+f9ef2994a4bdbd5c6b5888ae776e0127b6acf18519fd9e57afaad41719e23c15  target/ltp-1000-milestone-04-stable706/la-stable706-new50-final-gate-20260602T222043+0800.log
+51ddd6d8fdb41e5de2bc56d117a0d9e25359c54c79ba727ca0055816e0d8d92f  target/ltp-1000-milestone-04-stable706/la-stable706-new50-final-gate-20260602T222043+0800.log.summary.txt
+38d1b297a4697bafec211a3fd8c7d4afe2e5910190819ced28e00b04ff54b5f6  target/ltp-1000-milestone-04-stable706/la-stable706-new50-final-gate-20260602T222043+0800.log.promotion-la.md
+f8f7d37c3725640aee514cfd800aa49a5646bcf3e7ca6f111050d18b4d51be8c  target/ltp-1000-milestone-04-stable706/rv-stable706-adjacent-regression8-20260602T222823+0800.log
+26f17449cf4a83ccb916e3343f93e908c449cfa2cdc1a20302953b8df201189c  target/ltp-1000-milestone-04-stable706/rv-stable706-adjacent-regression8-20260602T222823+0800.log.summary.txt
+368f8f2dc92d435c36faaab93ac24c9457f0ee3aa7a1426d19f4c48a9ad13b7d  target/ltp-1000-milestone-04-stable706/la-stable706-adjacent-regression8-20260602T223016+0800.log
+a2a3fd3f55cb4cf1526b2761c8c0891b76e15604dd100f8fd1f7940e00736ff1  target/ltp-1000-milestone-04-stable706/la-stable706-adjacent-regression8-20260602T223016+0800.log.summary.txt
+20eda119a17a5c1ea56cf7e839b99ca4c197d93076fd62386ef8d7581901298e  target/ltp-1000-milestone-04-stable706/rv-stable706-final-gate-20260602T205711+0800.log
+59c2a6b59bbed0c4277841e2f0c3b169c80df84e0b70f922c6790b10b9e6e095  target/ltp-1000-milestone-04-stable706/rv-stable706-final-gate-20260602T205711+0800.log.summary.txt
+805f05e72f554f78dbdf120359024d7f188254a31b17cc10da2388e8d37372b5  target/ltp-1000-milestone-04-stable706/rv-stable706-clock-copy-finalfix-20260602T221137+0800.log
+08b8bc799c73dc29a11b57d334c00861dcd4aaf7d23de684630f3f0e208f87f6  target/ltp-1000-milestone-04-stable706/rv-stable706-clock-copy-finalfix-20260602T221137+0800.log.summary.txt

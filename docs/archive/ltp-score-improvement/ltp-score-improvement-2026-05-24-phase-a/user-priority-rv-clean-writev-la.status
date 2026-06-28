@@ -1,7 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=writev05,writev06,writev07 LTP_CASE_TIMEOUT_SECS=90 ./run-eval.sh la
-started_at: 2026-05-24T09:58:14+08:00
-cases: writev05,writev06,writev07
-finished_at: 2026-05-24T10:00:57+08:00
-status: 0
-log: docs/ltp-score-improvement-2026-05-24-phase-a/raw/user-priority-rv-clean-writev-la-20260524T095814+0800.log
-summary: docs/ltp-score-improvement-2026-05-24-phase-a/user-priority-rv-clean-writev-la-summary.txt

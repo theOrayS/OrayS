@@ -1,0 +1,294 @@
+# LTP summary: `/root/oskernel2026-orays/docs/ltp-score-improvement-2026-05-22-phase-d/raw/stable200-wave1-rv.log`
+
+- PASS LTP CASE: 22
+- FAIL LTP CASE: 112
+- Internal TFAIL/TBROK/TCONF: 1376 ({'TFAIL': 1333, 'TBROK': 39, 'TCONF': 4})
+- timeout matches: 5
+- ENOSYS/not implemented matches: 8
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 9 passed, 58 failed
+- ltp-glibc: 13 passed, 54 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| clock_getres02 | rv | glibc | ltp-glibc | FAIL | -1 | 64 | 240089 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_getres02 | rv | musl | ltp-musl | FAIL | -1 | 11 | 242308 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| clock_gettime01 | rv | glibc | ltp-glibc | FAIL | 137 | 20929 | 240103 | 240089 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| clock_gettime01 | rv | musl | ltp-musl | FAIL | 137 | 20241 | 242322 | 242308 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| close08 | rv | glibc | ltp-glibc | FAIL | -1 | 13 | 240278 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| close08 | rv | musl | ltp-musl | FAIL | -1 | 7 | 242497 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| close09 | rv | glibc | ltp-glibc | FAIL | -1 | 10 | 240278 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| close09 | rv | musl | ltp-musl | FAIL | -1 | 3 | 242497 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | glibc | ltp-glibc | FAIL | 1 | 1955 | 241517 | 241503 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl05 | rv | musl | ltp-musl | FAIL | 1 | 933 | 251928 | 251914 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl06 | rv | glibc | ltp-glibc | FAIL | -1 | 8 | 241503 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl06 | rv | musl | ltp-musl | FAIL | -1 | 8 | 251914 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl07 | rv | glibc | ltp-glibc | FAIL | 2 | 1507 | 241503 | 241496 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl07 | rv | musl | ltp-musl | FAIL | 2 | 905 | 251914 | 251907 | -7 | 0 | 2 | 0 | 0 | 1 | 0 |
+| fcntl11 | rv | glibc | ltp-glibc | FAIL | 1 | 2376 | 241496 | 241482 | -14 | 75 | 0 | 0 | 0 | 0 | 0 |
+| fcntl11 | rv | musl | ltp-musl | FAIL | 1 | 924 | 251907 | 251893 | -14 | 75 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | glibc | ltp-glibc | FAIL | 5 | 2112 | 241482 | 241461 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl12 | rv | musl | ltp-musl | FAIL | 5 | 1060 | 251893 | 251872 | -21 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | glibc | ltp-glibc | FAIL | 1 | 1212 | 241461 | 241447 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| fcntl13 | rv | musl | ltp-musl | FAIL | 1 | 1002 | 251872 | 251858 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| fcntl14 | rv | glibc | ltp-glibc | FAIL | 1 | 14167 | 241447 | 240432 | -1015 | 361 | 0 | 0 | 0 | 0 | 0 |
+| fcntl14 | rv | musl | ltp-musl | FAIL | 1 | 11170 | 251858 | 242651 | -9207 | 361 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15 | rv | glibc | ltp-glibc | FAIL | 1 | 2993 | 240432 | 240390 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl15 | rv | musl | ltp-musl | FAIL | 1 | 1344 | 242651 | 242609 | -42 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl17 | rv | glibc | ltp-glibc | FAIL | 1 | 3612 | 240390 | 240362 | -28 | 6 | 0 | 0 | 0 | 0 | 0 |
+| fcntl17 | rv | musl | ltp-musl | FAIL | 1 | 1106 | 242609 | 242581 | -28 | 7 | 0 | 0 | 0 | 0 | 0 |
+| fcntl18 | rv | glibc | ltp-glibc | FAIL | 1 | 2616 | 240362 | 240348 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| fcntl18 | rv | musl | ltp-musl | FAIL | 1 | 997 | 242581 | 242567 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| fcntl19 | rv | glibc | ltp-glibc | FAIL | 1 | 3363 | 240348 | 240334 | -14 | 37 | 0 | 0 | 0 | 0 | 0 |
+| fcntl19 | rv | musl | ltp-musl | FAIL | 1 | 961 | 242567 | 242553 | -14 | 37 | 0 | 0 | 0 | 0 | 0 |
+| fcntl20 | rv | glibc | ltp-glibc | FAIL | 1 | 3117 | 240334 | 240320 | -14 | 45 | 0 | 0 | 0 | 0 | 0 |
+| fcntl20 | rv | musl | ltp-musl | FAIL | 1 | 1083 | 242553 | 242539 | -14 | 45 | 0 | 0 | 0 | 0 | 0 |
+| fcntl21 | rv | glibc | ltp-glibc | FAIL | 1 | 6272 | 240320 | 240306 | -14 | 81 | 0 | 0 | 0 | 0 | 0 |
+| fcntl21 | rv | musl | ltp-musl | FAIL | 1 | 1081 | 242539 | 242525 | -14 | 81 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 4610 | 240159 | 240152 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs01 | rv | musl | ltp-musl | FAIL | 6 | 957 | 242378 | 242371 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fstatfs02 | rv | glibc | ltp-glibc | PASS | 0 | 6547 | 240152 | 240124 | -28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatfs02 | rv | musl | ltp-musl | FAIL | 1 | 958 | 242371 | 242343 | -28 | 1 | 0 | 0 | 0 | 0 | 0 |
+| fstatvfs01 | rv | glibc | ltp-glibc | FAIL | -1 | 24 | 240103 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatvfs01 | rv | musl | ltp-musl | FAIL | -1 | 15 | 242322 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatvfs02 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 240103 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fstatvfs02 | rv | musl | ltp-musl | FAIL | -1 | 1 | 242322 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate02 | rv | glibc | ltp-glibc | FAIL | -1 | 4 | 240103 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate02 | rv | musl | ltp-musl | FAIL | -1 | 4 | 242322 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups02 | rv | glibc | ltp-glibc | FAIL | -1 | 6 | 242182 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups02 | rv | musl | ltp-musl | FAIL | -1 | 8 | 256689 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | glibc | ltp-glibc | FAIL | 3 | 1559 | 242203 | 242182 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpgid01 | rv | musl | ltp-musl | FAIL | 3 | 1263 | 256710 | 256689 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpriority03 | rv | glibc | ltp-glibc | FAIL | -1 | 2 | 242182 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpriority03 | rv | musl | ltp-musl | FAIL | -1 | 4 | 256689 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrusage02 | rv | glibc | ltp-glibc | PASS | 0 | 1285 | 242119 | 242098 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage02 | rv | musl | ltp-musl | PASS | 0 | 1018 | 256626 | 256605 | -21 | 0 | 0 | 1 | 0 | 0 | 0 |
+| getrusage03 | rv | glibc | ltp-glibc | FAIL | 2 | 1284 | 242098 | 242084 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| getrusage03 | rv | musl | ltp-musl | FAIL | 2 | 1025 | 256605 | 252495 | -4110 | 0 | 1 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | glibc | ltp-glibc | PASS | 0 | 13398 | 242084 | 242070 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday02 | rv | musl | ltp-musl | FAIL | 137 | 20192 | 252495 | 252481 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| gettimeofday03 | rv | glibc | ltp-glibc | FAIL | -1 | 16 | 242070 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| gettimeofday03 | rv | musl | ltp-musl | FAIL | -1 | 38 | 252481 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link01 | rv | glibc | ltp-glibc | FAIL | -1 | 10 | 240264 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link01 | rv | musl | ltp-musl | FAIL | -1 | 4 | 242483 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 6343 | 240264 | 240250 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 1011 | 242483 | 242469 | -14 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link03 | rv | glibc | ltp-glibc | FAIL | -1 | 25 | 240250 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| link03 | rv | musl | ltp-musl | FAIL | -1 | 7 | 242469 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| linkat01 | rv | glibc | ltp-glibc | FAIL | 2 | 7028 | 240250 | 240243 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| linkat01 | rv | musl | ltp-musl | FAIL | 2 | 1106 | 242469 | 242462 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| linkat02 | rv | glibc | ltp-glibc | FAIL | 6 | 5001 | 240243 | 240236 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| linkat02 | rv | musl | ltp-musl | FAIL | 6 | 938 | 242462 | 242455 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| lseek02 | rv | glibc | ltp-glibc | FAIL | 2 | 3033 | 240278 | 240264 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| lseek02 | rv | musl | ltp-musl | FAIL | 2 | 1008 | 242497 | 242483 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| lseek03 | rv | glibc | ltp-glibc | FAIL | -1 | 37 | 240264 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek03 | rv | musl | ltp-musl | FAIL | -1 | 19 | 242483 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| open04 | rv | glibc | ltp-glibc | PASS | 0 | 2875 | 242238 | 242224 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open04 | rv | musl | ltp-musl | PASS | 0 | 2453 | 256745 | 256731 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open05 | rv | glibc | ltp-glibc | FAIL | -1 | 22 | 240306 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| open05 | rv | musl | ltp-musl | FAIL | -1 | 8 | 242525 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| open06 | rv | glibc | ltp-glibc | FAIL | 2 | 3062 | 240306 | 240292 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| open06 | rv | musl | ltp-musl | FAIL | 2 | 950 | 242525 | 242511 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| openat02 | rv | glibc | ltp-glibc | FAIL | 2 | 3273 | 240292 | 240278 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat02 | rv | musl | ltp-musl | FAIL | 2 | 1017 | 242511 | 242497 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| pipe02 | rv | glibc | ltp-glibc | PASS | 0 | 2567 | 241580 | 241559 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe02 | rv | musl | ltp-musl | FAIL | 3 | 969 | 251991 | 251970 | -21 | 1 | 1 | 0 | 0 | 0 | 0 |
+| pipe07 | rv | glibc | ltp-glibc | FAIL | 2 | 2282 | 241559 | 241545 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe07 | rv | musl | ltp-musl | FAIL | 2 | 855 | 251970 | 251956 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pipe08 | rv | glibc | ltp-glibc | PASS | 0 | 1955 | 241545 | 241531 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe08 | rv | musl | ltp-musl | FAIL | 1 | 935 | 251956 | 251942 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| pipe11 | rv | glibc | ltp-glibc | FAIL | 137 | 20586 | 241531 | 241517 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| pipe11 | rv | musl | ltp-musl | FAIL | 137 | 20219 | 251942 | 251928 | -14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| prlimit01 | rv | glibc | ltp-glibc | FAIL | -1 | 24 | 241895 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit01 | rv | musl | ltp-musl | FAIL | -1 | 8 | 252306 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit02 | rv | glibc | ltp-glibc | FAIL | -1 | 4 | 241895 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit02 | rv | musl | ltp-musl | FAIL | -1 | 3 | 252306 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 2758 | 240236 | 240229 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 1003 | 242455 | 242448 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename02 | rv | glibc | ltp-glibc | FAIL | -1 | 17 | 240229 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename02 | rv | musl | ltp-musl | FAIL | -1 | 8 | 242448 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| renameat01 | rv | glibc | ltp-glibc | FAIL | 6 | 4538 | 240229 | 240222 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| renameat01 | rv | musl | ltp-musl | FAIL | 6 | 885 | 242448 | 242441 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| renameat02 | rv | glibc | ltp-glibc | FAIL | -1 | 52 | 240222 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| renameat02 | rv | musl | ltp-musl | FAIL | -1 | 8 | 242441 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getscheduler02 | rv | glibc | ltp-glibc | PASS | 0 | 1418 | 242224 | 242203 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getscheduler02 | rv | musl | ltp-musl | PASS | 0 | 910 | 256731 | 256710 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setgroups01 | rv | glibc | ltp-glibc | PASS | 0 | 2796 | 242308 | 242294 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setgroups01 | rv | musl | ltp-musl | PASS | 0 | 1039 | 258863 | 256801 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setgroups02 | rv | glibc | ltp-glibc | PASS | 0 | 1323 | 242294 | 242280 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setgroups02 | rv | musl | ltp-musl | PASS | 0 | 1137 | 256801 | 256787 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority01 | rv | glibc | ltp-glibc | PASS | 0 | 1739 | 242182 | 242154 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setpriority01 | rv | musl | ltp-musl | PASS | 0 | 1123 | 256689 | 256661 | -28 | 0 | 0 | 1 | 0 | 0 | 0 |
+| setpriority02 | rv | glibc | ltp-glibc | FAIL | 1 | 1252 | 242154 | 242119 | -35 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setpriority02 | rv | musl | ltp-musl | FAIL | 1 | 1066 | 256661 | 256626 | -35 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | glibc | ltp-glibc | FAIL | -1 | 5 | 242119 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | musl | ltp-musl | FAIL | -1 | 5 | 256626 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid01 | rv | glibc | ltp-glibc | PASS | 0 | 1632 | 242280 | 242266 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setreuid01 | rv | musl | ltp-musl | PASS | 0 | 916 | 256787 | 256773 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit01 | rv | glibc | ltp-glibc | FAIL | 1 | 2766 | 242070 | 241909 | -161 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit01 | rv | musl | ltp-musl | FAIL | 1 | 1358 | 252481 | 252320 | -161 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit03 | rv | glibc | ltp-glibc | FAIL | 1 | 1994 | 241909 | 241895 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit03 | rv | musl | ltp-musl | FAIL | 1 | 1085 | 252320 | 252306 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setuid01 | rv | glibc | ltp-glibc | PASS | 0 | 1212 | 242266 | 242252 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setuid01 | rv | musl | ltp-musl | PASS | 0 | 1140 | 256773 | 256759 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 7770 | 240222 | 240215 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs01 | rv | musl | ltp-musl | FAIL | 6 | 939 | 242441 | 242434 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statfs02 | rv | glibc | ltp-glibc | FAIL | 1 | 6078 | 240215 | 240159 | -56 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statfs02 | rv | musl | ltp-musl | FAIL | 1 | 1111 | 242434 | 242378 | -56 | 2 | 0 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | glibc | ltp-glibc | FAIL | 6 | 5087 | 240124 | 240117 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs01 | rv | musl | ltp-musl | FAIL | 6 | 974 | 242343 | 242336 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statvfs02 | rv | glibc | ltp-glibc | FAIL | 1 | 2972 | 240117 | 240103 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statvfs02 | rv | musl | ltp-musl | FAIL | 1 | 952 | 242336 | 242322 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statx02 | rv | glibc | ltp-glibc | PASS | 0 | 1173 | 242252 | 242238 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| statx02 | rv | musl | ltp-musl | PASS | 0 | 961 | 256759 | 256745 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| truncate01 | rv | glibc | ltp-glibc | FAIL | -1 | 11 | 240103 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| truncate01 | rv | musl | ltp-musl | FAIL | -1 | 3 | 242322 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| waitpid01 | rv | glibc | ltp-glibc | FAIL | 1 | 3524 | 241895 | 241580 | -315 | 32 | 0 | 0 | 0 | 0 | 0 |
+| waitpid01 | rv | musl | ltp-musl | FAIL | 1 | 2493 | 252306 | 251991 | -315 | 40 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 18 (rv:glibc:fstatfs02, rv:glibc:gettimeofday02, rv:glibc:open04, rv:musl:open04, rv:glibc:pipe02, rv:glibc:pipe08, rv:glibc:sched_getscheduler02, rv:musl:sched_getscheduler02, rv:glibc:setgroups01, rv:musl:setgroups01, rv:glibc:setgroups02, rv:musl:setgroups02, rv:glibc:setreuid01, rv:musl:setreuid01, rv:glibc:setuid01, rv:musl:setuid01, rv:glibc:statx02, rv:musl:statx02)
+- pass_with_tconf: 4 (rv:glibc:getrusage02, rv:musl:getrusage02, rv:glibc:setpriority01, rv:musl:setpriority01)
+- fail_wrapper: 112 (rv:glibc:clock_getres02, rv:musl:clock_getres02, rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:glibc:close08, rv:musl:close08, rv:glibc:close09, rv:musl:close09, rv:glibc:fcntl05, rv:musl:fcntl05, rv:glibc:fcntl06, rv:musl:fcntl06, rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fcntl11, rv:musl:fcntl11, rv:glibc:fcntl12, rv:musl:fcntl12, rv:glibc:fcntl13, rv:musl:fcntl13, rv:glibc:fcntl14, rv:musl:fcntl14, rv:glibc:fcntl15, rv:musl:fcntl15, rv:glibc:fcntl17, rv:musl:fcntl17, rv:glibc:fcntl18, rv:musl:fcntl18, rv:glibc:fcntl19, rv:musl:fcntl19, rv:glibc:fcntl20, rv:musl:fcntl20, rv:glibc:fcntl21, rv:musl:fcntl21, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:musl:fstatfs02, rv:glibc:fstatvfs01, rv:musl:fstatvfs01, rv:glibc:fstatvfs02, rv:musl:fstatvfs02, rv:glibc:ftruncate02, rv:musl:ftruncate02, rv:glibc:getgroups02, rv:musl:getgroups02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:getpriority03, rv:musl:getpriority03, rv:glibc:getrusage03, rv:musl:getrusage03, rv:musl:gettimeofday02, rv:glibc:gettimeofday03, rv:musl:gettimeofday03, rv:glibc:link01, rv:musl:link01, rv:glibc:link02, rv:musl:link02, rv:glibc:link03, rv:musl:link03, rv:glibc:linkat01, rv:musl:linkat01, rv:glibc:linkat02, rv:musl:linkat02, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:lseek03, rv:musl:lseek03, rv:glibc:open05, rv:musl:open05, rv:glibc:open06, rv:musl:open06, rv:glibc:openat02, rv:musl:openat02, rv:musl:pipe02, rv:glibc:pipe07, rv:musl:pipe07, rv:musl:pipe08, rv:glibc:pipe11, rv:musl:pipe11, rv:glibc:prlimit01, rv:musl:prlimit01, rv:glibc:prlimit02, rv:musl:prlimit02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename02, rv:musl:rename02, rv:glibc:renameat01, rv:musl:renameat01, rv:glibc:renameat02, rv:musl:renameat02, rv:glibc:setpriority02, rv:musl:setpriority02, rv:glibc:setpriority03, rv:musl:setpriority03, rv:glibc:setrlimit01, rv:musl:setrlimit01, rv:glibc:setrlimit03, rv:musl:setrlimit03, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statfs02, rv:musl:statfs02, rv:glibc:statvfs01, rv:musl:statvfs01, rv:glibc:statvfs02, rv:musl:statvfs02, rv:glibc:truncate01, rv:musl:truncate01, rv:glibc:waitpid01, rv:musl:waitpid01)
+- internal_tfail: 41 (rv:glibc:fcntl05, rv:musl:fcntl05, rv:glibc:fcntl11, rv:musl:fcntl11, rv:glibc:fcntl12, rv:musl:fcntl12, rv:glibc:fcntl13, rv:musl:fcntl13, rv:glibc:fcntl14, rv:musl:fcntl14, rv:glibc:fcntl15, rv:musl:fcntl15, rv:glibc:fcntl17, rv:musl:fcntl17, rv:glibc:fcntl18, rv:musl:fcntl18, rv:glibc:fcntl19, rv:musl:fcntl19, rv:glibc:fcntl20, rv:musl:fcntl20, rv:glibc:fcntl21, rv:musl:fcntl21, rv:musl:fstatfs02, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:link02, rv:musl:link02, rv:musl:pipe02, rv:musl:pipe08, rv:glibc:setpriority02, rv:musl:setpriority02, rv:glibc:setrlimit01, rv:musl:setrlimit01, rv:glibc:setrlimit03, rv:musl:setrlimit03, rv:glibc:statfs02, rv:musl:statfs02, rv:glibc:statvfs02, rv:musl:statvfs02, rv:glibc:waitpid01, rv:musl:waitpid01)
+- internal_tbrok: 29 (rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:fstatfs01, rv:musl:fstatfs01, rv:glibc:getpgid01, rv:musl:getpgid01, rv:glibc:getrusage03, rv:musl:getrusage03, rv:glibc:linkat01, rv:musl:linkat01, rv:glibc:linkat02, rv:musl:linkat02, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:open06, rv:musl:open06, rv:glibc:openat02, rv:musl:openat02, rv:musl:pipe02, rv:glibc:pipe07, rv:musl:pipe07, rv:glibc:rename01, rv:musl:rename01, rv:glibc:renameat01, rv:musl:renameat01, rv:glibc:statfs01, rv:musl:statfs01, rv:glibc:statvfs01, rv:musl:statvfs01)
+- timeout: 5 (rv:glibc:clock_gettime01, rv:musl:clock_gettime01, rv:musl:gettimeofday02, rv:glibc:pipe11, rv:musl:pipe11)
+- enosys: 8 (rv:glibc:fcntl07, rv:musl:fcntl07, rv:glibc:link02, rv:musl:link02, rv:glibc:lseek02, rv:musl:lseek02, rv:glibc:open06, rv:musl:open06)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getpgid01
+- ltp-musl:getgroups02
+- ltp-musl:getpriority03
+- ltp-musl:setpriority02
+- ltp-musl:setpriority03
+- ltp-musl:getrusage03
+- ltp-musl:gettimeofday02
+- ltp-musl:gettimeofday03
+- ltp-musl:setrlimit01
+- ltp-musl:setrlimit03
+- ltp-musl:prlimit01
+- ltp-musl:prlimit02
+- ltp-musl:waitpid01
+- ltp-musl:pipe02
+- ltp-musl:pipe07
+- ltp-musl:pipe08
+- ltp-musl:pipe11
+- ltp-musl:fcntl05
+- ltp-musl:fcntl06
+- ltp-musl:fcntl07
+- ltp-musl:fcntl11
+- ltp-musl:fcntl12
+- ltp-musl:fcntl13
+- ltp-musl:fcntl14
+- ltp-musl:fcntl15
+- ltp-musl:fcntl17
+- ltp-musl:fcntl18
+- ltp-musl:fcntl19
+- ltp-musl:fcntl20
+- ltp-musl:fcntl21
+- ltp-musl:open05
+- ltp-musl:open06
+- ltp-musl:openat02
+- ltp-musl:close08
+- ltp-musl:close09
+- ltp-musl:lseek02
+- ltp-musl:lseek03
+- ltp-musl:link01
+- ltp-musl:link02
+- ltp-musl:link03
+- ltp-musl:linkat01
+- ltp-musl:linkat02
+- ltp-musl:rename01
+- ltp-musl:rename02
+- ltp-musl:renameat01
+- ltp-musl:renameat02
+- ltp-musl:statfs01
+- ltp-musl:statfs02
+- ltp-musl:fstatfs01
+- ltp-musl:fstatfs02
+- ltp-musl:statvfs01
+- ltp-musl:statvfs02
+- ltp-musl:fstatvfs01
+- ltp-musl:fstatvfs02
+- ltp-musl:truncate01
+- ltp-musl:ftruncate02
+- ltp-musl:clock_gettime01
+- ltp-musl:clock_getres02
+- ltp-glibc:getpgid01
+- ltp-glibc:getgroups02
+- ltp-glibc:getpriority03
+- ltp-glibc:setpriority02
+- ltp-glibc:setpriority03
+- ltp-glibc:getrusage03
+- ltp-glibc:gettimeofday03
+- ltp-glibc:setrlimit01
+- ltp-glibc:setrlimit03
+- ltp-glibc:prlimit01
+- ltp-glibc:prlimit02
+- ltp-glibc:waitpid01
+- ltp-glibc:pipe07
+- ltp-glibc:pipe11
+- ltp-glibc:fcntl05
+- ltp-glibc:fcntl06
+- ltp-glibc:fcntl07
+- ltp-glibc:fcntl11
+- ltp-glibc:fcntl12
+- ltp-glibc:fcntl13
+- ltp-glibc:fcntl14
+- ltp-glibc:fcntl15
+- ltp-glibc:fcntl17
+- ltp-glibc:fcntl18
+- ltp-glibc:fcntl19
+- ltp-glibc:fcntl20
+- ltp-glibc:fcntl21
+- ltp-glibc:open05
+- ltp-glibc:open06
+- ltp-glibc:openat02
+- ltp-glibc:close08
+- ltp-glibc:close09
+- ltp-glibc:lseek02
+- ltp-glibc:lseek03
+- ltp-glibc:link01
+- ltp-glibc:link02
+- ltp-glibc:link03
+- ltp-glibc:linkat01
+- ltp-glibc:linkat02
+- ltp-glibc:rename01
+- ltp-glibc:rename02
+- ltp-glibc:renameat01
+- ltp-glibc:renameat02
+- ltp-glibc:statfs01
+- ltp-glibc:statfs02
+- ltp-glibc:fstatfs01
+- ltp-glibc:statvfs01
+- ltp-glibc:statvfs02
+- ltp-glibc:fstatvfs01
+- ltp-glibc:fstatvfs02
+- ltp-glibc:truncate01
+- ltp-glibc:ftruncate02
+- ltp-glibc:clock_gettime01
+- ltp-glibc:clock_getres02
+
+## Groups
+### ltp-musl
+- PASS: 9
+- FAIL: 58
+- Internal: {'TFAIL': 673, 'TBROK': 20, 'TCONF': 2}
+- timeout: 3
+- ENOSYS/not implemented: 4
+- panic/trap: 0
+- Fail cases: getpgid01, getgroups02, getpriority03, setpriority02, setpriority03, getrusage03, gettimeofday02, gettimeofday03, setrlimit01, setrlimit03, prlimit01, prlimit02, waitpid01, pipe02, pipe07, pipe08, pipe11, fcntl05, fcntl06, fcntl07, fcntl11, fcntl12, fcntl13, fcntl14, fcntl15, fcntl17, fcntl18, fcntl19, fcntl20, fcntl21, open05, open06, openat02, close08, close09, lseek02, lseek03, link01, link02, link03, linkat01, linkat02, rename01, rename02, renameat01, renameat02, statfs01, statfs02, fstatfs01, fstatfs02, statvfs01, statvfs02, fstatvfs01, fstatvfs02, truncate01, ftruncate02, clock_gettime01, clock_getres02
+
+### ltp-glibc
+- PASS: 13
+- FAIL: 54
+- Internal: {'TFAIL': 660, 'TBROK': 19, 'TCONF': 2}
+- timeout: 2
+- ENOSYS/not implemented: 4
+- panic/trap: 0
+- Fail cases: getpgid01, getgroups02, getpriority03, setpriority02, setpriority03, getrusage03, gettimeofday03, setrlimit01, setrlimit03, prlimit01, prlimit02, waitpid01, pipe07, pipe11, fcntl05, fcntl06, fcntl07, fcntl11, fcntl12, fcntl13, fcntl14, fcntl15, fcntl17, fcntl18, fcntl19, fcntl20, fcntl21, open05, open06, openat02, close08, close09, lseek02, lseek03, link01, link02, link03, linkat01, linkat02, rename01, rename02, renameat01, renameat02, statfs01, statfs02, fstatfs01, statvfs01, statvfs02, fstatvfs01, fstatvfs02, truncate01, ftruncate02, clock_gettime01, clock_getres02

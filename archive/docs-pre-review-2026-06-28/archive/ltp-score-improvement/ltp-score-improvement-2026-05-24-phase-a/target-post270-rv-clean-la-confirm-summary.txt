@@ -1,0 +1,52 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-rv-clean-la-confirm-20260524T131247+0800.log`
+
+- PASS LTP CASE: 8
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 0 failed
+- ltp-glibc: 4 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fcntl23 | la | glibc | ltp-glibc | PASS | 0 | 5638 | 192295 | 192283 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23 | la | musl | ltp-musl | PASS | 0 | 2436 | 192348 | 192340 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01_16 | la | glibc | ltp-glibc | PASS | 0 | 7497 | 192283 | 192262 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getegid01_16 | la | musl | ltp-musl | PASS | 0 | 3003 | 192340 | 192324 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open09 | la | glibc | ltp-glibc | PASS | 0 | 6137 | 192316 | 192295 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open09 | la | musl | ltp-musl | PASS | 0 | 3051 | 194412 | 192348 | -2064 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr02 | la | glibc | ltp-glibc | PASS | 0 | 5788 | 192262 | 192250 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr02 | la | musl | ltp-musl | PASS | 0 | 2940 | 192324 | 192316 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (la:glibc:fcntl23, la:musl:fcntl23, la:glibc:getegid01_16, la:musl:getegid01_16, la:glibc:open09, la:musl:open09, la:glibc:sched_getattr02, la:musl:sched_getattr02)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

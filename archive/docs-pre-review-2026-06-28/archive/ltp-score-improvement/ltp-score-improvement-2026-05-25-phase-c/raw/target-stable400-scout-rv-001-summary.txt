@@ -1,0 +1,90 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-c/raw/target-stable400-scout-rv-001.log`
+
+- PASS LTP CASE: 6
+- FAIL LTP CASE: 18
+- Internal TFAIL/TBROK/TCONF: 16 ({'TBROK': 14, 'TFAIL': 2})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 2 passed, 10 failed
+- ltp-glibc: 4 passed, 8 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| chmod05 | rv | glibc | ltp-glibc | PASS | 0 | 4044 | 252480 | 252466 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod05 | rv | musl | ltp-musl | FAIL | 2 | 3393 | 258855 | 256793 | -2062 | 0 | 1 | 0 | 0 | 0 | 0 |
+| fchmod05 | rv | glibc | ltp-glibc | PASS | 0 | 3615 | 252466 | 252452 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod05 | rv | musl | ltp-musl | FAIL | 2 | 3225 | 256793 | 256779 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftest06 | rv | glibc | ltp-glibc | FAIL | 4 | 6665 | 252389 | 252326 | -63 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest06 | rv | musl | ltp-musl | FAIL | 4 | 5005 | 256716 | 252557 | -4159 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest09 | rv | glibc | ltp-glibc | FAIL | -1 | 29 | 252326 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest09 | rv | musl | ltp-musl | FAIL | -1 | 6 | 252557 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| inode02 | rv | glibc | ltp-glibc | PASS | 0 | 83878 | 252326 | 252144 | -182 | 0 | 0 | 0 | 0 | 0 | 0 |
+| inode02 | rv | musl | ltp-musl | PASS | 0 | 70819 | 252557 | 252480 | -77 | 0 | 0 | 0 | 0 | 0 | 0 |
+| openat02 | rv | glibc | ltp-glibc | FAIL | 2 | 4305 | 252438 | 252424 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat02 | rv | musl | ltp-musl | FAIL | 2 | 2720 | 256765 | 256751 | -14 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat03 | rv | glibc | ltp-glibc | FAIL | 2 | 3983 | 252424 | 252417 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openat03 | rv | musl | ltp-musl | FAIL | 2 | 3005 | 256751 | 256744 | -7 | 0 | 2 | 0 | 0 | 0 | 0 |
+| openfile01 | rv | glibc | ltp-glibc | FAIL | -1 | 24 | 252326 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| openfile01 | rv | musl | ltp-musl | FAIL | -1 | 1 | 252557 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | glibc | ltp-glibc | PASS | 0 | 3829 | 252452 | 252438 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | rv | musl | ltp-musl | PASS | 0 | 3172 | 256779 | 256765 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 3402 | 252417 | 252410 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 3555 | 256744 | 256737 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename03 | rv | glibc | ltp-glibc | FAIL | 6 | 3991 | 252410 | 252403 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename03 | rv | musl | ltp-musl | FAIL | 6 | 3322 | 256737 | 256730 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| statx03 | rv | glibc | ltp-glibc | FAIL | 1 | 4289 | 252403 | 252389 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| statx03 | rv | musl | ltp-musl | FAIL | 1 | 3069 | 256730 | 256716 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 6 (rv:glibc:chmod05, rv:glibc:fchmod05, rv:glibc:inode02, rv:musl:inode02, rv:glibc:readlinkat02, rv:musl:readlinkat02)
+- pass_with_tconf: 0
+- fail_wrapper: 18 (rv:musl:chmod05, rv:musl:fchmod05, rv:glibc:ftest06, rv:musl:ftest06, rv:glibc:ftest09, rv:musl:ftest09, rv:glibc:openat02, rv:musl:openat02, rv:glibc:openat03, rv:musl:openat03, rv:glibc:openfile01, rv:musl:openfile01, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename03, rv:musl:rename03, rv:glibc:statx03, rv:musl:statx03)
+- internal_tfail: 2 (rv:glibc:statx03, rv:musl:statx03)
+- internal_tbrok: 10 (rv:musl:chmod05, rv:musl:fchmod05, rv:glibc:openat02, rv:musl:openat02, rv:glibc:openat03, rv:musl:openat03, rv:glibc:rename01, rv:musl:rename01, rv:glibc:rename03, rv:musl:rename03)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:chmod05
+- ltp-musl:fchmod05
+- ltp-musl:openat02
+- ltp-musl:openat03
+- ltp-musl:rename01
+- ltp-musl:rename03
+- ltp-musl:statx03
+- ltp-musl:ftest06
+- ltp-musl:ftest09
+- ltp-musl:openfile01
+- ltp-glibc:openat02
+- ltp-glibc:openat03
+- ltp-glibc:rename01
+- ltp-glibc:rename03
+- ltp-glibc:statx03
+- ltp-glibc:ftest06
+- ltp-glibc:ftest09
+- ltp-glibc:openfile01
+
+## Groups
+### ltp-musl
+- PASS: 2
+- FAIL: 10
+- Internal: {'TBROK': 8, 'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: chmod05, fchmod05, openat02, openat03, rename01, rename03, statx03, ftest06, ftest09, openfile01
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 8
+- Internal: {'TBROK': 6, 'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: openat02, openat03, rename01, rename03, statx03, ftest06, ftest09, openfile01

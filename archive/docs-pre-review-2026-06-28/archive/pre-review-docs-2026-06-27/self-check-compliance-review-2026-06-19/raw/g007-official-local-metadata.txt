@@ -1,0 +1,7 @@
+run_root=/root/oskernel-eval-runs/g007-official-local-20260619-110459
+started_at=2026-06-19T11:04:59+08:00
+repo=/root/oskernel2026-orays
+branch=fix/self-check-compliance-20260618
+head=52a4df9113f8c0bffacd17b0b033220f1b40688b
+autotest_head=d0a208e88634e03520f0a03a319733af6a71aad4
+docker=missing

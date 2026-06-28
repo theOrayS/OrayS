@@ -1,0 +1,35 @@
+# LTP promotion-candidate report
+
+- Inputs: `docs/ltp-score-improvement-2026-05-22/rv-time-signal-basic.log`, `docs/ltp-score-improvement-2026-05-22/la-time-signal-clean9.log`
+- Required arches: la, rv
+- Required libcs: glibc, musl
+- Required arch/libc combos: 4
+- Promotion candidates: 9
+- Blocked/incomplete cases: 10
+
+## Candidates
+| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |
+| --- | --- | ---: | ---: |
+| alarm02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2118 | -2064 |
+| alarm03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2123 | -4126 |
+| clock_gettime02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2065 | -21 |
+| gettimeofday01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2234 | -21 |
+| kill03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2051 | -21 |
+| rt_sigaction01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 3051 | -12 |
+| sigaction01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2178 | -12 |
+| time01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2176 | -21 |
+| times01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 2002 | -21 |
+
+## Blocked or incomplete
+| Case | Reason |
+| --- | --- |
+| clock_getres01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=8; rv:musl:ltp-musl TCONF=8 |
+| clock_gettime01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc timeout=1/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| kill02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc timeout=1/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| nanosleep01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc timeout=1/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| nanosleep02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| pause01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc timeout=1/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| rt_sigprocmask01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| sigpending02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| sigprocmask01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| sigsuspend01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |

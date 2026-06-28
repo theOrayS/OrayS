@@ -1,0 +1,1 @@
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=unlink05\,pipe02\,dup05\,sendfile07\,sendfile07_64\,stream02 LTP_CASE_TIMEOUT_SECS=90 timeout 100m ./run-eval.sh la

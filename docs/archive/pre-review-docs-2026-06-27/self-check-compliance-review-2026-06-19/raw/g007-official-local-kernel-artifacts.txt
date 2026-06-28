@@ -1,2 +1,0 @@
--rwxr-xr-x 1 root root 2.7M Jun 19 11:06 kernel-la
--rwxr-xr-x 1 root root 1.8M Jun 19 11:05 kernel-rv

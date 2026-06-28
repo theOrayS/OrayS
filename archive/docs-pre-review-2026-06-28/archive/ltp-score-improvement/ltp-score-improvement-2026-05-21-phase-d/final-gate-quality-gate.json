@@ -1,0 +1,93 @@
+{
+  "aiSlopCleaner": {
+    "evidence": "docs/ltp-score-improvement-2026-05-24/final-gate-ai-slop-cleaner-report.md",
+    "status": "passed"
+  },
+  "codeReview": {
+    "architectStatus": "CLEAR",
+    "evidence": "docs/ltp-score-improvement-2026-05-24/final-gate-code-review-report.md",
+    "recommendation": "APPROVE",
+    "status": "passed"
+  },
+  "finalReport": "docs/ltp-score-improvement-2026-05-24/final-gate-report.md",
+  "final_ltp": {
+    "la": {
+      "enosys": 0,
+      "fail": 0,
+      "internal": {
+        "TCONF": 4
+      },
+      "ltp_glibc": "85/0",
+      "ltp_musl": "85/0",
+      "panic_trap": 0,
+      "pass": 170,
+      "timeout": 0
+    },
+    "rv": {
+      "enosys": 0,
+      "fail": 0,
+      "internal": {
+        "TCONF": 4
+      },
+      "ltp_glibc": "85/0",
+      "ltp_musl": "85/0",
+      "panic_trap": 0,
+      "pass": 170,
+      "timeout": 0
+    }
+  },
+  "guardrails": {
+    "case_name_hardcoded_success": false,
+    "fake_pass": false,
+    "read02_tconf_transparent": true,
+    "silent_skip": false,
+    "timeout_counted_as_pass": false
+  },
+  "knownNonLtpObservation": "Full outputs contain non-LTP iperf end: fail markers; not counted in stable LTP gate and reported transparently.",
+  "promoted_cases": [
+    "getresuid01",
+    "getresuid02",
+    "getresuid03",
+    "getresgid01",
+    "getresgid02",
+    "getresgid03",
+    "getsid01",
+    "rt_sigaction02",
+    "sched_getscheduler01",
+    "uname04"
+  ],
+  "rawFinalOutputs": {
+    "la": "docs/ltp-score-improvement-2026-05-24/final-gate-output-la.md",
+    "rv": "docs/ltp-score-improvement-2026-05-24/final-gate-output-rv.md"
+  },
+  "remoteSync": {
+    "evidence": "docs/ltp-score-improvement-2026-05-24/remote-sync-status-after.txt",
+    "preservedRemoteMapping": true,
+    "remote": "/root/oskernel2026-orays-remote",
+    "status": "synced-scoped-files"
+  },
+  "stable_case_count_per_libc_per_arch": 85,
+  "status": "passed",
+  "verification": {
+    "cargo_fmt_check": "exit=0",
+    "commands": [
+      "cargo fmt --all -- --check",
+      "./run-eval.sh la 2>&1 | tee output_la.md",
+      "./run-eval.sh 2>&1 | tee output_rv.md",
+      "python3 -B scripts/ltp_summary.py output_la.md",
+      "python3 -B scripts/ltp_summary.py output_rv.md",
+      "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile scripts/ltp_summary.py",
+      "git -C /root/oskernel2026-orays-remote diff --check",
+      "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile /root/oskernel2026-orays-remote/scripts/ltp_summary.py"
+    ],
+    "evidence": "docs/ltp-score-improvement-2026-05-24/final-gate-report.md; docs/ltp-score-improvement-2026-05-24/final-gate-summary-extract.txt",
+    "ltp_summary_la": "exit=0",
+    "ltp_summary_rv": "exit=0",
+    "py_compile_ltp_summary": "exit=0",
+    "remote_diff_check": "exit=0",
+    "remote_py_compile": "exit=0",
+    "run_eval_la": "exit=0",
+    "run_eval_rv": "exit=0",
+    "status": "passed"
+  }
+}

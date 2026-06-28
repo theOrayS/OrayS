@@ -1,1 +1,0 @@
-sched_getscheduler02,sched_getparam01,getpgid01,getgroups01,gettid02,waitpid01,gettimeofday02,getrusage02,getpriority01,getpriority02,setpriority01,setpriority02,waitpid03

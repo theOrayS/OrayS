@@ -1,5 +1,0 @@
-command: OSCOMP_TEST_GROUPS=ltp LTP_CASES=access01,access03 ./run-eval.sh la
-started_at: 2026-05-22T04:33:28Z
-run_eval_exit: 0
-tee_exit: 0
-finished_at: 2026-05-22T04:34:08Z

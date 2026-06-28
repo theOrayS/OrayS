@@ -1,7 +1,0 @@
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-[omx:team] worker startup resolution: model=gpt-5.5 thinking_level=high source=explicit
-Error: failed to create worker pane 6: no space for new pane

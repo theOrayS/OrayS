@@ -1,0 +1,1171 @@
+# Milestone 03 stable656 targeted cases
+# Unit: LTP case name. This file records scout/fix/regression rows; only rows listed under
+# final stable656 section are promoted stable cases; earlier rows include scout/fix/regression history.
+
+## RV G009 mm/futex scout run 2026-06-02
+mmap05
+munmap01
+mmap10_1
+mmap13
+vma02
+futex_wait03
+
+## RV VFS/process scout run 2026-06-02
+openat02
+openat03
+mknod07
+mknodat02
+rename03
+rename04
+rename05
+nice04
+clone04
+sched_rr_get_interval03
+sched_setaffinity01
+setpriority01
+signal01
+creat07
+fsync02
+kill10
+nice05
+
+## RV G009 mixed safe scout run 2026-06-02
+fsync02
+nice05
+mincore03
+shmat1
+futex_wait01
+futex_wait05
+
+## RV full-sweep divergence/high-yield scout run 2026-06-02
+readlinkat02
+atof01
+fptest01
+fptest02
+epoll_create02
+diotest4
+select02
+execve05
+
+## Targeted repair / confirmation rows
+sched_setaffinity01
+futex_wait01
+readlinkat02
+# readlinkat02 root-cause audit: LA musl wrapper boundary; non-promotable without libc/test-side change.
+fsync02
+openat02
+futex_wait03
+futex_wait05
+clone04
+# clone04 singleton rescout: RV glibc PASS, RV musl TBROK/SIGSEGV; non-promotable libc-wrapper boundary until fixed.
+mmap05
+munmap01
+# mmap05/munmap01 sync-SIGSEGV targeted run: munmap01 four-way clean; mmap05 RV-clean but LA TFAIL, non-promotable.
+mmap05
+munmap01
+# LA mmap05/munmap01 explicit-TLB-flush experiment: munmap01 remains clean; mmap05 remains LA TFAIL.
+mmap05
+# LA mmap05 temporary instrumentation: post-mprotect page-table query shows READ|USER, but protected access still produced no SIGSEGV; non-promotable.
+
+## Closed arch-sweep mining rows
+# Unit remains LTP case. The closed RV/LA arch matrices were mined as a whole;
+# the not-stable four-way-clean filter was empty, so no additional case names are listed here.
+
+## Adjacent stable regression subset for sched_setaffinity01 fix
+sched_getaffinity01
+sched_setparam01
+sched_setparam02
+sched_setparam03
+sched_setparam04
+sched_setparam05
+sched_setscheduler01
+sched_setscheduler02
+sched_setscheduler03
+setpriority02
+
+## Adjacent stable regression subset for generic_statfs capacity clamp
+statfs02
+fstatfs02
+fstatfs02_64
+statfs02_64
+statfs03
+statfs03_64
+statvfs02
+
+
+## Adjacent sync-SIGSEGV regression subset for munmap01 candidate
+mmap01
+mmap02
+mmap03
+mmap04
+mmap09
+mmap12
+signal03
+sigaction01
+rt_sigaction01
+rt_sigprocmask01
+sigprocmask01
+waitpid04
+
+## Adjacent timer/futex regression subset for precise timed-wait fix
+futex_wait01
+futex_wait02
+futex_wait03
+futex_wait04
+futex_wait05
+futex_wake01
+proc01
+waitpid04
+nanosleep01
+clock_nanosleep02
+
+## Four-way clean candidate pool (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+munmap01
+sched_setaffinity01
+
+## Promotion result
+# 0 promoted in this checkpoint.
+# Reason: only 14 new four-way-clean unique candidates are currently available, below the +50 milestone gate.
+
+## File-backed mmap SIGBUS-on-EOF targeted proof
+mmap13
+# mmap13 SIGBUS proof: RV/LA x musl/glibc clean after generic beyond-EOF mmap range tracking; not promoted until +50 batch.
+
+## Adjacent mmap/SIGBUS regression subset
+mmap01
+mmap02
+mmap03
+mmap04
+mmap09
+mmap12
+signal03
+sigaction01
+rt_sigaction01
+rt_sigprocmask01
+sigprocmask01
+waitpid04
+
+## Four-way clean candidate pool after mmap13 SIGBUS repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+sched_setaffinity01
+
+
+## Sparse large-file openat02 targeted proof
+openat02
+# openat02 proof: RV/LA x musl/glibc clean after generic sparse logical-size/data handling for large-file holes; not promoted until +50 batch.
+
+## Adjacent VFS/FD regression subset for openat02 sparse-largefile repair
+openat01
+lseek01
+lseek02
+pread02
+pwrite02
+pwrite04
+ftruncate01
+truncate02
+read01
+write01
+write03
+# read02 was also run once in a 12-case RV observation shard, but it emits existing O_DIRECT TCONF and is not counted as parser-clean regression evidence.
+
+## Four-way clean candidate pool after openat02 sparse-largefile repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+
+## O_TMPFILE/openat03 blocker validation
+openat03
+# Rejected O_TMPFILE/linkat emulation: RV openat03 panic/trap in deep nested-directory phase; not promotable.
+# Retained generic unsupported gate: RV/LA x musl/glibc deterministic TCONF/wrapper FAIL with zero timeout/ENOSYS/panic/trap; not promotable.
+
+## Four-way clean candidate pool after openat03 unsupported-gate validation (unchanged; not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+
+## Signal/poll proc-state targeted proof
+signal01
+# signal01 proof: RV/LA x musl/glibc clean after generic sleeping-state reporting for rt_sigsuspend/ppoll waiters; not promoted until +50 batch.
+
+## Adjacent signal/poll/proc regression subset for signal01 wait-state repair
+signal02
+signal03
+signal04
+signal05
+sigaction01
+rt_sigaction01
+sigprocmask01
+rt_sigprocmask01
+ppoll01
+pselect01
+poll02
+waitpid04
+
+## Four-way clean candidate pool after signal01 wait-state repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+signal01
+
+
+## mincore03 mincore/mlock targeted proof
+mincore03
+# mincore03 proof: RV/LA x musl/glibc clean after generic mincore lazy-VMA validity/residency handling and mlock mapped-range prefault; not promoted until +50 batch.
+
+## Adjacent mincore/mlock/mmap regression subset for mincore03
+mincore01
+mlock01
+mlock03
+mlock04
+munlock01
+mlockall01
+mmap01
+mmap02
+mmap03
+mmap04
+
+## Four-way clean candidate pool after mincore03 mincore/mlock repair (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore03
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+signal01
+
+## epoll_create02 singleton blocker confirmation
+epoll_create02
+# RV singleton: musl wrapper FAIL with TFAIL/ENOSYS; glibc wrapper PASS with old-ABI TCONF.
+# LA singleton: both libcs wrapper PASS but old-ABI TCONF remains. Non-promotable.
+
+## Four-way clean candidate pool after epoll_create02 blocker confirmation (unchanged; not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore03
+mmap13
+munmap01
+openat02
+sched_setaffinity01
+signal01
+
+
+## RV G009 mm/mlock/mmap scout run 2026-06-02
+mincore02
+mincore04
+mlock02
+mlock05
+mlock201
+mlock202
+mlock203
+mlockall02
+mlockall03
+munlock02
+munlockall01
+mprotect01
+mprotect02
+mprotect03
+mprotect04
+mmap08
+mmap16
+mmap18
+mmap20
+# Scout result: mincore02/mincore04/mprotect02/mprotect04 RV-clean; remaining rows retain parser-visible TFAIL/TBROK/TCONF and are blocker evidence only.
+
+## LA G009 clean4 confirmation run 2026-06-02
+mincore02
+mincore04
+mprotect02
+mprotect04
+# LA result: all four rows are musl+glibc parser-clean; combined RV/LA matrix makes them future candidates, not stable promotions yet.
+
+## Four-way clean candidate pool after G009 clean4 confirmation (not yet promoted)
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+sched_setaffinity01
+signal01
+
+## Promotion result after G009 clean4 confirmation
+# 0 promoted in this checkpoint.
+# Reason: only 14 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## RV statfs01-family device-acquire blocker scout 2026-06-02
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+# RV result: all four cases fail both musl and glibc with parser-visible TBROK from LTP device setup (`No free devices found` / `Failed to acquire device`).
+# LA was not run because RV did not satisfy the promotion gate.
+
+## Promotion result after statfs01-family RV scout
+# 0 promoted in this checkpoint.
+# Historical note: before the later LTP device/NAME_MAX repair, statfs01/fstatfs01/fstatfs01_64/statvfs01 were RV parser-unclean setup blockers and the clean candidate pool remained 14/50.
+
+## RV VFS-C mknod/rename device-acquire blocker scout 2026-06-02
+mknod07
+mknodat02
+rename03
+rename04
+rename05
+# RV result: all five cases fail both musl and glibc with parser-visible TBROK from LTP device setup (`No free devices found` / `Failed to acquire device`).
+# LA was not run because RV did not satisfy the promotion gate.
+
+## Promotion result after VFS-C mknod/rename RV scout
+# 0 promoted in this checkpoint.
+# Historical note: before the later LTP device/NAME_MAX repair, mknod07/mknodat02/rename03/rename04/rename05 were RV parser-unclean setup blockers and the clean candidate pool remained 14/50.
+
+## LTP device/NAME_MAX repair retests 2026-06-02
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+mknod07
+mknodat02
+rename03
+rename04
+rename05
+# Enumeration-only RV retest still failed setup. After global LTP_DEV and NAME_MAX=63, statfs01/fstatfs01/fstatfs01_64/statvfs01/rename05 became RV-clean; mknod07/mknodat02 remain TCONF, rename03/rename04 remain TFAIL.
+
+## LA LTP device clean5 confirmation 2026-06-02
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+rename05
+# LA result: all five rows are musl+glibc parser-clean; combined RV/LA matrix makes them future candidates, not stable promotions yet.
+
+## Adjacent regression subset for global LTP_DEV and NAME_MAX=63
+chdir01
+pathconf01
+fpathconf01
+# RV and LA x musl/glibc parser-clean after the wrapper/device/NAME_MAX changes.
+
+## Four-way clean candidate pool after LTP device/NAME_MAX clean5 confirmation (not yet promoted)
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Promotion result after LTP device/NAME_MAX clean5 confirmation
+# 0 promoted in this checkpoint.
+# Reason: 19 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## RV FD/fcntl scout 2026-06-02
+fcntl15
+fcntl17
+fcntl24
+fcntl25
+fcntl26
+fcntl27
+fcntl31
+fcntl34
+fcntl37
+fcntl38
+fcntl39
+fcntl11_64
+# RV result: fcntl15/fcntl11_64 are musl+glibc parser-clean; remaining fcntl rows retain timeout/TCONF/TFAIL/TBROK blocker evidence.
+
+## LA FD/fcntl clean2 confirmation 2026-06-02
+fcntl15
+fcntl11_64
+# LA result: both rows are musl+glibc parser-clean; combined RV/LA matrix makes them future candidates, not stable promotions yet.
+
+## Four-way clean candidate pool after FD/fcntl clean2 confirmation (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Promotion result after FD/fcntl clean2 confirmation
+# 0 promoted in this checkpoint.
+# Reason: 21 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## RV VFS/path/link/statx scout 2026-06-02
+link01
+link02
+link03
+link04
+link05
+linkat01
+linkat02
+rename01
+rename02
+renameat01
+renameat02
+stat03
+stat03_64
+statx01
+statx04
+statx05
+getdents01
+getdents02
+unlink01
+readlink03
+writev03
+chmod02
+readlink02
+# RV result: 0 parser-clean promotion candidates. statx01/getdents02 wrapper-PASS but contain parser-visible TCONF; remaining rows are FAIL/TCONF/TFAIL/ENOSYS/setup or missing-binary blockers.
+
+## Rename inode metadata targeted confirmation 2026-06-02
+rename01
+rename05
+# RV and LA x musl/glibc parser-clean after generic rename metadata/inode migration; rename05 is an adjacent already-clean regression row.
+
+## Rename01 singleton four-way clean proof 2026-06-02
+rename01
+# Singleton RV/LA x musl/glibc parser-clean logs are used in the clean22 combined report so rename05 is not double-counted.
+
+## Four-way clean candidate pool after rename01 inode confirmation (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Promotion result after rename01 inode confirmation
+# 0 promoted in this checkpoint.
+# Reason: 22 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## Rename directory replacement targeted proof
+rename01
+rename03
+rename04
+rename05
+# RV/LA x musl/glibc parser-clean after generic axfs rename source/destination type handling.
+
+## Clean-only statfs/rename05 retarget for combined report hygiene
+statfs01
+fstatfs01
+fstatfs01_64
+statvfs01
+rename05
+# RV clean-only retarget avoids mixing old rename03/rename04 TFAIL history into the clean24 promotion-candidate report.
+
+## Four-way clean candidate pool after rename03/rename04 repair (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+statfs01
+statvfs01
+
+## Stat/readlink path traversal targeted proof
+readlink03
+stat03
+stat03_64
+# RV fixed run is parser-clean for all three cases; LA is parser-clean only for stat03/stat03_64. readlink03 remains blocked by LA musl TFAIL and is not counted.
+
+## Stat/readlink adjacent stable regression subset
+stat01
+stat02
+stat01_64
+stat02_64
+lstat01
+lstat01_64
+fstatat01
+readlink01
+readlinkat01
+openat01
+rename14
+# RV and LA x musl/glibc parser-clean after the nonrecursive parent-search fix.
+
+## Four-way clean candidate pool after stat03/stat03_64 path repair (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after stat03/stat03_64 path repair
+# 0 promoted in this checkpoint.
+# Reason: 26 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## mmap20/munlock02 targeted proof
+mmap08
+mmap20
+mlock02
+munlock02
+# Initial RV run is repair history only: mmap20 and munlock02 are clean, mmap08 and mlock02 remain blocked.
+
+## mmap20/munlock02 clean targeted proof
+mmap20
+munlock02
+# RV and LA x musl/glibc parser-clean after generic mmap flag/fd validation and munlock range validation.
+
+## mmap/munlock adjacent regression subset
+mmap01
+mmap02
+mmap03
+mmap04
+mmap09
+mmap12
+mmap13
+munmap01
+munlock01
+mincore02
+mincore03
+mincore04
+mprotect02
+mprotect04
+# RV and LA x musl/glibc parser-clean; used as regression evidence, not as extra candidate-count input.
+
+## Four-way clean candidate pool after mmap20/munlock02 repair (not yet promoted)
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mprotect02
+mprotect04
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+stat03
+stat03_64
+statfs01
+statvfs01
+mmap20
+munlock02
+
+## Promotion result after mmap20/munlock02 repair
+# 0 promoted in this checkpoint.
+# Reason: 28 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+
+## epoll_create1 targeted proof
+epoll_create1_01
+epoll_create1_02
+# RV and LA x musl/glibc parser-clean after generic __NR_epoll_create1 support and FD_CLOEXEC/unknown-flag validation.
+
+## epoll_create1 adjacent FD/flag regression subset
+close01
+fcntl01
+fcntl05
+dup01
+pipe2_01
+poll01
+# RV and LA x musl/glibc parser-clean; used as regression evidence, not as extra candidate-count input.
+
+## epoll_create02 blocker evidence
+epoll_create02
+# Not promoted: musl epoll_create(size) reaches the kernel as valid epoll_create1(0), so invalid legacy size cannot be proven at the syscall boundary without breaking epoll_create1_01.
+
+## Four-way clean candidate pool after epoll_create1 repair (not yet promoted)
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+signal01
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after epoll_create1 repair
+# 0 promoted in this checkpoint.
+# Reason: 30 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+
+## clock_adjtime/sigaltstack/shmt04 targeted proof
+adjtimex01
+adjtimex03
+sigaltstack02
+shmt04
+# RV and LA x musl/glibc parser-clean after generic clock_adjtime dispatch, sigaltstack state/errno handling, and existing SysV shm evidence.
+
+## clock_adjtime/sigaltstack adjacent time/signal regression subset
+clock_gettime02
+clock_nanosleep02
+nanosleep01
+rt_sigaction01
+rt_sigprocmask01
+sigaction01
+sigprocmask01
+# RV and LA x musl/glibc parser-clean; regression evidence only.
+
+## Four-way clean candidate pool after clock_adjtime/sigaltstack repair (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after clock_adjtime/sigaltstack repair
+# 0 promoted in this checkpoint.
+# Reason: 34 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+
+## shmat04 IPC_STAT ABI targeted proof
+shmat04
+shmt04
+# RV and LA x musl/glibc parser-clean after generic shmctl(IPC_STAT) Linux 64-bit shmid_ds copy-size repair.
+
+## shmat04 SysV shm adjacent regression subset
+shmt04
+# Revalidated with shmat04 on RV and LA; shmt04 was already clean and remains parser-clean.
+
+## Four-way clean candidate pool after shmat04 IPC_STAT ABI repair (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+
+## Promotion result after shmat04 IPC_STAT ABI repair
+# 0 promoted in this checkpoint.
+# Reason: 35 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## time/timer RV scout and LA clean3 confirmation
+clock_getres01
+clock_gettime01
+clock_gettime03
+clock_nanosleep01
+clock_nanosleep03
+clock_settime03
+nanosleep02
+getitimer02
+setitimer01
+setitimer02
+times03
+timerfd01
+timerfd02
+timerfd04
+timerfd_create01
+timerfd_gettime01
+timerfd_settime01
+timerfd_settime02
+timer_delete01
+timer_delete02
+timer_getoverrun01
+timer_gettime01
+timer_settime01
+timer_settime02
+timer_settime03
+# LA confirmation reran only RV-clean candidates: getitimer02,setitimer02,times03.
+
+## Four-way clean candidate pool after time/timer clean3 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after time/timer clean3 evidence
+# 0 promoted in this checkpoint.
+# Reason: 38 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## VFS/path simple RV scout and LA lstat clean2 confirmation
+utime01
+utime02
+utime03
+utime04
+utime05
+utime06
+utime07
+utimes01
+utimensat01
+lstat02
+lstat02_64
+fstat02
+fstat02_64
+getcwd03
+getcwd04
+unlink09
+symlink03
+rmdir02
+mkdir02
+mkdir03
+mkdir09
+mkdirat02
+# LA confirmation reran only RV-clean candidates: lstat02,lstat02_64.
+
+## Four-way clean candidate pool after lstat clean2 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+lstat02
+lstat02_64
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after lstat clean2 evidence
+# 0 promoted in this checkpoint.
+# Reason: 40 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## FD/VFS/IO RV scout and LA open clean2 confirmation
+chmod04
+chdir02
+getcwd05
+open05
+open07
+open11
+open12
+open14
+open15
+open16
+close08
+read03
+write04
+write07
+write08
+readv03
+# LA confirmation reran only RV-clean candidates: open07,open12.
+
+## Four-way clean candidate pool after open clean2 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+lstat02
+lstat02_64
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+open07
+open12
+openat02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after open clean2 evidence
+# 0 promoted in this checkpoint.
+# Reason: 42 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+## signal/wait RV scout and LA pause clean2 confirmation
+alarm01
+pause01
+pause02
+kill01
+kill04
+kill05
+sigaction03
+sigaction04
+sigaction05
+sigpending02
+sigprocmask02
+sigsuspend02
+sigwait01
+waitpid02
+waitpid05
+waitpid14
+waitpid15
+waitpid16
+waitpid17
+waitpid18
+waitpid19
+# LA confirmation reran only RV-clean candidates: pause01,pause02.
+
+## Four-way clean candidate pool after pause clean2 evidence (not yet promoted)
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+lstat02
+lstat02_64
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+open07
+open12
+openat02
+pause01
+pause02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+times03
+
+## Promotion result after pause clean2 evidence
+# 0 promoted in this checkpoint.
+# Reason: 44 new four-way-clean unique candidates are available, below the +50 stable656 gate.
+
+
+## Final stable656 promoted new50 cases
+adjtimex01
+adjtimex03
+epoll_create1_01
+epoll_create1_02
+fcntl11_64
+fcntl15
+fstatfs01
+fstatfs01_64
+fsync02
+futex_wait01
+futex_wait03
+futex_wait05
+getitimer02
+lstat02
+lstat02_64
+mincore02
+mincore03
+mincore04
+mmap13
+mmap20
+mprotect02
+mprotect04
+munlock02
+munmap01
+open07
+open12
+openat02
+pause01
+pause02
+rename01
+rename03
+rename04
+rename05
+sched_setaffinity01
+setitimer02
+shmat04
+shmt04
+signal01
+sigaltstack02
+stat03
+stat03_64
+statfs01
+statvfs01
+utime01
+utime02
+utime03
+utime04
+utime05
+utime06
+utime07

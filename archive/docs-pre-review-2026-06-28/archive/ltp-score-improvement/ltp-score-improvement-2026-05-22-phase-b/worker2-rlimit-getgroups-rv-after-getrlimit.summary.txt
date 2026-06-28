@@ -1,0 +1,58 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-22-phase-b/worker2-rlimit-getgroups-rv-after-getrlimit.log`
+
+- PASS LTP CASE: 6
+- FAIL LTP CASE: 2
+- Internal TFAIL/TBROK/TCONF: 2 ({'TFAIL': 2})
+- timeout matches: 1
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 3 passed, 1 failed
+- ltp-glibc: 3 passed, 1 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| getgroups01 | rv | glibc | ltp-glibc | PASS | 0 | 4226 | 244338 | 244331 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups01 | rv | musl | ltp-musl | PASS | 0 | 3764 | 258863 | 256808 | -2055 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit03 | rv | glibc | ltp-glibc | PASS | 0 | 3596 | 244331 | 244317 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| getrlimit03 | rv | musl | ltp-musl | PASS | 0 | 2125 | 256808 | 256794 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit01 | rv | glibc | ltp-glibc | FAIL | 1 | 4338 | 244317 | 244156 | -161 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit01 | rv | musl | ltp-musl | FAIL | 137 | 23616 | 256794 | 244352 | -12442 | 1 | 0 | 0 | 1 | 0 | 0 |
+| setrlimit02 | rv | glibc | ltp-glibc | PASS | 0 | 3910 | 244156 | 244142 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| setrlimit02 | rv | musl | ltp-musl | PASS | 0 | 3432 | 244352 | 244338 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 6 (rv:glibc:getgroups01, rv:musl:getgroups01, rv:glibc:getrlimit03, rv:musl:getrlimit03, rv:glibc:setrlimit02, rv:musl:setrlimit02)
+- pass_with_tconf: 0
+- fail_wrapper: 2 (rv:glibc:setrlimit01, rv:musl:setrlimit01)
+- internal_tfail: 2 (rv:glibc:setrlimit01, rv:musl:setrlimit01)
+- internal_tbrok: 0
+- timeout: 1 (rv:musl:setrlimit01)
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:setrlimit01
+- ltp-glibc:setrlimit01
+
+## Groups
+### ltp-musl
+- PASS: 3
+- FAIL: 1
+- Internal: {'TFAIL': 1}
+- timeout: 1
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: setrlimit01
+
+### ltp-glibc
+- PASS: 3
+- FAIL: 1
+- Internal: {'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: setrlimit01

@@ -1,4 +1,0 @@
-command=OSCOMP_TEST_GROUPS=ltp\ LTP_CASES=getcwd02\,readv02\,writev01\,writev05\,writev06\,writev07\,waitid01\,waitid02\,waitid03\,waitid04\ LTP_CASE_TIMEOUT_SECS=90\ ./run-eval.sh\ la
-exit=0
-log=docs/ltp-score-improvement-2026-05-24-phase-a/raw/priority-vector-wait-getcwd-la-20260524T154252+0800.log
-cases=getcwd02,readv02,writev01,writev05,writev06,writev07,waitid01,waitid02,waitid03,waitid04

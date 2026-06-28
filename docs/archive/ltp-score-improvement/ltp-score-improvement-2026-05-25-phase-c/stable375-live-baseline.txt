@@ -1,3 +1,0 @@
-total=375 unique=375 duplicates=0
-first10=['access01', 'brk01', 'chdir01', 'clone01', 'close01', 'dup01', 'fcntl01', 'fcntl02', 'fork01', 'getpid01']
-last10=['stream03', 'stream04', 'stream05', 'abort01', 'poll01', 'fork05', 'fork10', 'kill11', 'kill12', 'mem02']

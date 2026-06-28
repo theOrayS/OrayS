@@ -1,0 +1,60 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/preadv2-pwritev2-la-001.log`
+
+- PASS LTP CASE: 16
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 8 passed, 0 failed
+- ltp-glibc: 8 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| preadv201 | la | glibc | ltp-glibc | PASS | 0 | 4460 | 192223 | 192202 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv201 | la | musl | ltp-musl | PASS | 0 | 2596 | 194399 | 192335 | -2064 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv201_64 | la | glibc | ltp-glibc | PASS | 0 | 5357 | 192202 | 192181 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv201_64 | la | musl | ltp-musl | PASS | 0 | 3393 | 192335 | 192319 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202 | la | glibc | ltp-glibc | PASS | 0 | 5206 | 192181 | 192160 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202 | la | musl | ltp-musl | PASS | 0 | 3360 | 192319 | 192303 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202_64 | la | glibc | ltp-glibc | PASS | 0 | 6608 | 192160 | 192139 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| preadv202_64 | la | musl | ltp-musl | PASS | 0 | 3452 | 192303 | 192287 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201 | la | glibc | ltp-glibc | PASS | 0 | 6722 | 192139 | 192118 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201 | la | musl | ltp-musl | PASS | 0 | 3743 | 192287 | 192271 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201_64 | la | glibc | ltp-glibc | PASS | 0 | 5886 | 192118 | 192097 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev201_64 | la | musl | ltp-musl | PASS | 0 | 3391 | 192271 | 192255 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202 | la | glibc | ltp-glibc | PASS | 0 | 4549 | 192097 | 192076 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202 | la | musl | ltp-musl | PASS | 0 | 3327 | 192255 | 192239 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202_64 | la | glibc | ltp-glibc | PASS | 0 | 5082 | 192076 | 192055 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pwritev202_64 | la | musl | ltp-musl | PASS | 0 | 3475 | 192239 | 192223 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 16 (la:glibc:preadv201, la:musl:preadv201, la:glibc:preadv201_64, la:musl:preadv201_64, la:glibc:preadv202, la:musl:preadv202, la:glibc:preadv202_64, la:musl:preadv202_64, la:glibc:pwritev201, la:musl:pwritev201, la:glibc:pwritev201_64, la:musl:pwritev201_64, la:glibc:pwritev202, la:musl:pwritev202, la:glibc:pwritev202_64, la:musl:pwritev202_64)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 8
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 8
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

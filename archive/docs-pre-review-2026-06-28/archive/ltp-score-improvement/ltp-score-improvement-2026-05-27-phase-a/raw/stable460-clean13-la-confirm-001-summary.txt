@@ -1,0 +1,74 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-27-phase-a/raw/stable460-clean13-la-confirm-001.log`
+
+- PASS LTP CASE: 25
+- FAIL LTP CASE: 1
+- Internal TFAIL/TBROK/TCONF: 1 ({'TFAIL': 1})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 12 passed, 1 failed
+- ltp-glibc: 13 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fchown05 | la | glibc | ltp-glibc | PASS | 0 | 2262 | 192146 | 192125 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchown05 | la | musl | ltp-musl | PASS | 0 | 1603 | 194394 | 192330 | -2064 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat01 | la | glibc | ltp-glibc | PASS | 0 | 2518 | 192125 | 192113 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchownat01 | la | musl | ltp-musl | PASS | 0 | 1511 | 192330 | 192322 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl18 | la | glibc | ltp-glibc | PASS | 0 | 2255 | 192113 | 192092 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl18 | la | musl | ltp-musl | PASS | 0 | 1602 | 192322 | 192306 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl18_64 | la | glibc | ltp-glibc | PASS | 0 | 2452 | 192092 | 192071 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl18_64 | la | musl | ltp-musl | PASS | 0 | 1797 | 192306 | 192290 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | la | glibc | ltp-glibc | PASS | 0 | 12791 | 192050 | 192002 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kill02 | la | musl | ltp-musl | PASS | 0 | 11805 | 192274 | 192234 | -40 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod02 | la | glibc | ltp-glibc | PASS | 0 | 2482 | 191951 | 191930 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod02 | la | musl | ltp-musl | PASS | 0 | 1637 | 192194 | 192178 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod05 | la | glibc | ltp-glibc | PASS | 0 | 2500 | 191930 | 191918 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod05 | la | musl | ltp-musl | PASS | 0 | 1627 | 192178 | 192170 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod06 | la | glibc | ltp-glibc | PASS | 0 | 2366 | 191918 | 191906 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod06 | la | musl | ltp-musl | PASS | 0 | 1460 | 192170 | 192162 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod08 | la | glibc | ltp-glibc | PASS | 0 | 2483 | 191906 | 191894 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknod08 | la | musl | ltp-musl | PASS | 0 | 1711 | 192162 | 192154 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknodat01 | la | glibc | ltp-glibc | PASS | 0 | 2283 | 191894 | 191882 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mknodat01 | la | musl | ltp-musl | PASS | 0 | 1793 | 192154 | 192146 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | la | glibc | ltp-glibc | PASS | 0 | 2635 | 192002 | 191981 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlinkat02 | la | musl | ltp-musl | FAIL | 1 | 1622 | 192234 | 192218 | -16 | 1 | 0 | 0 | 0 | 0 | 0 |
+| rename14 | la | glibc | ltp-glibc | PASS | 0 | 8142 | 191981 | 191951 | -30 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename14 | la | musl | ltp-musl | PASS | 0 | 6677 | 192218 | 192194 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| syscall01 | la | glibc | ltp-glibc | PASS | 0 | 2940 | 192071 | 192050 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| syscall01 | la | musl | ltp-musl | PASS | 0 | 1487 | 192290 | 192274 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 25 (la:glibc:fchown05, la:musl:fchown05, la:glibc:fchownat01, la:musl:fchownat01, la:glibc:fcntl18, la:musl:fcntl18, la:glibc:fcntl18_64, la:musl:fcntl18_64, la:glibc:kill02, la:musl:kill02, la:glibc:mknod02, la:musl:mknod02, la:glibc:mknod05, la:musl:mknod05, la:glibc:mknod06, la:musl:mknod06, la:glibc:mknod08, la:musl:mknod08, la:glibc:mknodat01, la:musl:mknodat01, la:glibc:readlinkat02, la:glibc:rename14, la:musl:rename14, la:glibc:syscall01, la:musl:syscall01)
+- pass_with_tconf: 0
+- fail_wrapper: 1 (la:musl:readlinkat02)
+- internal_tfail: 1 (la:musl:readlinkat02)
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:readlinkat02
+
+## Groups
+### ltp-musl
+- PASS: 12
+- FAIL: 1
+- Internal: {'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: readlinkat02
+
+### ltp-glibc
+- PASS: 13
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

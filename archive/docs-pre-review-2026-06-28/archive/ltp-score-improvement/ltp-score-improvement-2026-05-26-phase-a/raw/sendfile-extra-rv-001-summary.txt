@@ -1,0 +1,57 @@
+# sendfile-extra-rv-001
+
+cases=sendfile06,sendfile06_64,sendfile08,sendfile08_64
+run-eval rc=0
+
+# LTP summary: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/sendfile-extra-rv-001.log`
+
+- PASS LTP CASE: 8
+- FAIL LTP CASE: 0
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 4 passed, 0 failed
+- ltp-glibc: 4 passed, 0 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| sendfile06 | rv | glibc | ltp-glibc | PASS | 0 | 4485 | 256748 | 256734 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile06 | rv | musl | ltp-musl | PASS | 0 | 4929 | 258852 | 256790 | -2062 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile06_64 | rv | glibc | ltp-glibc | PASS | 0 | 5040 | 256734 | 256720 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile06_64 | rv | musl | ltp-musl | PASS | 0 | 4966 | 256790 | 256776 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile08 | rv | glibc | ltp-glibc | PASS | 0 | 3559 | 256720 | 256706 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile08 | rv | musl | ltp-musl | PASS | 0 | 2379 | 256776 | 256762 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile08_64 | rv | glibc | ltp-glibc | PASS | 0 | 5604 | 256706 | 256692 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sendfile08_64 | rv | musl | ltp-musl | PASS | 0 | 4155 | 256762 | 256748 | -14 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 8 (rv:glibc:sendfile06, rv:musl:sendfile06, rv:glibc:sendfile06_64, rv:musl:sendfile06_64, rv:glibc:sendfile08, rv:musl:sendfile08, rv:glibc:sendfile08_64, rv:musl:sendfile08_64)
+- pass_with_tconf: 0
+- fail_wrapper: 0
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## Groups
+### ltp-musl
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+
+### ltp-glibc
+- PASS: 4
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

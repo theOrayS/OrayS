@@ -1,0 +1,3 @@
+# stable460-la-final-gate-002 command
+date=2026-05-28T02:51:00+08:00
+OSCOMP_TEST_GROUPS=ltp LTP_CASES=stable LTP_CASE_TIMEOUT_SECS=90 timeout 140m ./run-eval.sh la

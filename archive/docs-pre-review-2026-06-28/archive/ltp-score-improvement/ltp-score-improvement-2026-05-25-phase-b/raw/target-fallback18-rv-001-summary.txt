@@ -1,0 +1,108 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-b/raw/target-fallback18-rv-001.log`
+
+- PASS LTP CASE: 12
+- FAIL LTP CASE: 24
+- Internal TFAIL/TBROK/TCONF: 16 ({'TFAIL': 4, 'TBROK': 8, 'TCONF': 4})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 2
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 6 passed, 12 failed
+- ltp-glibc: 6 passed, 12 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fs_perms01 | rv | glibc | ltp-glibc | FAIL | -1 | 6 | 252432 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms01 | rv | musl | ltp-musl | FAIL | -1 | 20 | 258855 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms02 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 252432 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms02 | rv | musl | ltp-musl | FAIL | -1 | 8 | 258855 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms03 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 252432 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms03 | rv | musl | ltp-musl | FAIL | -1 | 20 | 258855 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms04 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 252432 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms04 | rv | musl | ltp-musl | FAIL | -1 | 4 | 258855 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms05 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 252432 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms05 | rv | musl | ltp-musl | FAIL | -1 | 6 | 258855 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms06 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 252432 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| fs_perms06 | rv | musl | ltp-musl | FAIL | -1 | 8 | 258855 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest01 | rv | glibc | ltp-glibc | PASS | 0 | 9196 | 252432 | 252383 | -49 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest01 | rv | musl | ltp-musl | PASS | 0 | 8915 | 258855 | 252662 | -6193 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest02 | rv | glibc | ltp-glibc | PASS | 0 | 6196 | 252383 | 252327 | -56 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest02 | rv | musl | ltp-musl | PASS | 0 | 3776 | 252662 | 252606 | -56 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest03 | rv | glibc | ltp-glibc | PASS | 0 | 36625 | 252327 | 252278 | -49 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest03 | rv | musl | ltp-musl | PASS | 0 | 33275 | 252606 | 252557 | -49 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest04 | rv | glibc | ltp-glibc | PASS | 0 | 14187 | 252278 | 252236 | -42 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftest04 | rv | musl | ltp-musl | PASS | 0 | 13883 | 252557 | 252515 | -42 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap10 | rv | glibc | ltp-glibc | PASS | 0 | 3909 | 252222 | 252174 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap10 | rv | musl | ltp-musl | PASS | 0 | 3099 | 252501 | 252453 | -48 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap10_1 | rv | glibc | ltp-glibc | FAIL | -1 | 22 | 252174 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap10_1 | rv | musl | ltp-musl | FAIL | -1 | 15 | 252453 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rwtest01 | rv | glibc | ltp-glibc | FAIL | -1 | 23 | 252236 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rwtest01 | rv | musl | ltp-musl | FAIL | -1 | 15 | 252515 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rwtest02 | rv | glibc | ltp-glibc | FAIL | -1 | 21 | 252236 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| rwtest02 | rv | musl | ltp-musl | FAIL | -1 | 3 | 252515 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| stream01 | rv | glibc | ltp-glibc | PASS | 0 | 3217 | 252236 | 252229 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stream01 | rv | musl | ltp-musl | PASS | 0 | 3523 | 252515 | 252508 | -7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stream02 | rv | glibc | ltp-glibc | FAIL | 1 | 2906 | 252229 | 252222 | -7 | 2 | 0 | 0 | 0 | 1 | 0 |
+| stream02 | rv | musl | ltp-musl | FAIL | 1 | 2647 | 252508 | 252501 | -7 | 2 | 0 | 0 | 0 | 1 | 0 |
+| vma01 | rv | glibc | ltp-glibc | FAIL | 2 | 3619 | 252174 | 252160 | -14 | 0 | 4 | 0 | 0 | 0 | 0 |
+| vma01 | rv | musl | ltp-musl | FAIL | 2 | 3192 | 252453 | 252439 | -14 | 0 | 4 | 0 | 0 | 0 | 0 |
+| vma02 | rv | glibc | ltp-glibc | FAIL | 32 | 3517 | 252160 | 252153 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+| vma02 | rv | musl | ltp-musl | FAIL | 32 | 2473 | 252439 | 252432 | -7 | 0 | 0 | 2 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 12 (rv:glibc:ftest01, rv:musl:ftest01, rv:glibc:ftest02, rv:musl:ftest02, rv:glibc:ftest03, rv:musl:ftest03, rv:glibc:ftest04, rv:musl:ftest04, rv:glibc:mmap10, rv:musl:mmap10, rv:glibc:stream01, rv:musl:stream01)
+- pass_with_tconf: 0
+- fail_wrapper: 24 (rv:glibc:fs_perms01, rv:musl:fs_perms01, rv:glibc:fs_perms02, rv:musl:fs_perms02, rv:glibc:fs_perms03, rv:musl:fs_perms03, rv:glibc:fs_perms04, rv:musl:fs_perms04, rv:glibc:fs_perms05, rv:musl:fs_perms05, rv:glibc:fs_perms06, rv:musl:fs_perms06, rv:glibc:mmap10_1, rv:musl:mmap10_1, rv:glibc:rwtest01, rv:musl:rwtest01, rv:glibc:rwtest02, rv:musl:rwtest02, rv:glibc:stream02, rv:musl:stream02, rv:glibc:vma01, rv:musl:vma01, rv:glibc:vma02, rv:musl:vma02)
+- internal_tfail: 2 (rv:glibc:stream02, rv:musl:stream02)
+- internal_tbrok: 2 (rv:glibc:vma01, rv:musl:vma01)
+- timeout: 0
+- enosys: 2 (rv:glibc:stream02, rv:musl:stream02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:fs_perms01
+- ltp-musl:fs_perms02
+- ltp-musl:fs_perms03
+- ltp-musl:fs_perms04
+- ltp-musl:fs_perms05
+- ltp-musl:fs_perms06
+- ltp-musl:rwtest01
+- ltp-musl:rwtest02
+- ltp-musl:stream02
+- ltp-musl:mmap10_1
+- ltp-musl:vma01
+- ltp-musl:vma02
+- ltp-glibc:fs_perms01
+- ltp-glibc:fs_perms02
+- ltp-glibc:fs_perms03
+- ltp-glibc:fs_perms04
+- ltp-glibc:fs_perms05
+- ltp-glibc:fs_perms06
+- ltp-glibc:rwtest01
+- ltp-glibc:rwtest02
+- ltp-glibc:stream02
+- ltp-glibc:mmap10_1
+- ltp-glibc:vma01
+- ltp-glibc:vma02
+
+## Groups
+### ltp-musl
+- PASS: 6
+- FAIL: 12
+- Internal: {'TFAIL': 2, 'TBROK': 4, 'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: fs_perms01, fs_perms02, fs_perms03, fs_perms04, fs_perms05, fs_perms06, rwtest01, rwtest02, stream02, mmap10_1, vma01, vma02
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 12
+- Internal: {'TFAIL': 2, 'TBROK': 4, 'TCONF': 2}
+- timeout: 0
+- ENOSYS/not implemented: 1
+- panic/trap: 0
+- Fail cases: fs_perms01, fs_perms02, fs_perms03, fs_perms04, fs_perms05, fs_perms06, rwtest01, rwtest02, stream02, mmap10_1, vma01, vma02

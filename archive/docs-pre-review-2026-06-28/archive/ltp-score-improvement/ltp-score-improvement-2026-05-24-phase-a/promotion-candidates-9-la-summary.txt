@@ -1,0 +1,63 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/promotion-candidates-9-la-20260524T145109+0800.log`
+
+- PASS LTP CASE: 14
+- FAIL LTP CASE: 1
+- Internal TFAIL/TBROK/TCONF: 1 ({'TFAIL': 1})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 8 passed, 1 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| dup207 | la | glibc | ltp-glibc | PASS | 0 | 6887 | 186925 | 186904 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup207 | la | musl | ltp-musl | PASS | 0 | 3130 | 192300 | 192284 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23 | la | glibc | ltp-glibc | PASS | 0 | 6864 | 191108 | 187000 | -4108 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fcntl23 | la | musl | ltp-musl | PASS | 0 | 4183 | 194412 | 192356 | -2056 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open09 | la | glibc | ltp-glibc | PASS | 0 | 7102 | 187000 | 186979 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open09 | la | musl | ltp-musl | PASS | 0 | 4851 | 192356 | 192340 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe12 | la | glibc | ltp-glibc | PASS | 0 | 6548 | 186967 | 186946 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe12 | la | musl | ltp-musl | PASS | 0 | 2755 | 192332 | 192316 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe13 | la | musl | ltp-musl | PASS | 0 | 29805 | 192260 | 191132 | -1128 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe2_01 | la | glibc | ltp-glibc | PASS | 0 | 5375 | 186946 | 186925 | -21 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe2_01 | la | musl | ltp-musl | PASS | 0 | 2844 | 192316 | 192300 | -16 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe2_04 | la | glibc | ltp-glibc | UNKNOWN |  |  | 186904 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| pipe2_04 | la | musl | ltp-musl | PASS | 0 | 3662 | 192284 | 192260 | -24 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr02 | la | glibc | ltp-glibc | PASS | 0 | 7425 | 186979 | 186967 | -12 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr02 | la | musl | ltp-musl | PASS | 0 | 4684 | 192340 | 192332 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getscheduler02 | la | musl | ltp-musl | FAIL | 1 | 3479 | 191132 | 191108 | -24 | 1 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 14 (la:glibc:dup207, la:musl:dup207, la:glibc:fcntl23, la:musl:fcntl23, la:glibc:open09, la:musl:open09, la:glibc:pipe12, la:musl:pipe12, la:musl:pipe13, la:glibc:pipe2_01, la:musl:pipe2_01, la:musl:pipe2_04, la:glibc:sched_getattr02, la:musl:sched_getattr02)
+- pass_with_tconf: 0
+- fail_wrapper: 1 (la:musl:sched_getscheduler02)
+- internal_tfail: 1 (la:musl:sched_getscheduler02)
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 1 (la:glibc:pipe2_04)
+
+## FAIL LTP CASE
+- ltp-musl:sched_getscheduler02
+
+## Groups
+### ltp-musl
+- PASS: 8
+- FAIL: 1
+- Internal: {'TFAIL': 1}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sched_getscheduler02
+
+### ltp-glibc
+- PASS: 6
+- FAIL: 0
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0

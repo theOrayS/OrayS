@@ -1,0 +1,446 @@
+# LTP promotion-candidate report
+
+- Inputs: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/baseline-smoke-rv-access01-set_tid_address01-20260524T092733+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/baseline-stable250-rv-20260524T091545+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-dup207-la-20260524T134301+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-dup207-rv-20260524T134008+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-iovec-pipe-dup-la-20260524T140042+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-iovec-pipe-dup-rv-20260524T135648+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-iovec-readv-writev-la-20260524T100714+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-iovec-readv-writev-rv-20260524T100427+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe13-la-20260524T142855+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe2-04-la-20260524T142436+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe2-04-rv-20260524T140653+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe2-04-rv-20260524T141212+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe2-04-rv-20260524T141621+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-pipe2-04-rv-20260524T142120+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-preadv-pwritev-la-20260524T112414+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-preadv-pwritev-rv-20260524T111011+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-preadv-pwritev-rv2-20260524T112114+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitid-la-20260524T101630+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitid-rv-20260524T101240+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitid-rv-20260524T101338+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitpid01-rv-20260524T102047+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitpid01-rv-20260524T102451+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitpid01-signal-rv-20260524T140405+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/fix-waitpid01-signal-rv-20260524T142856+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable270-la-aggregate-20260524T120322+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/stable270-rv-aggregate-20260524T112750+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-batch-a-rv-20260524T093843+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-batch-b-fstime-rv-20260524T102743+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-clock-rusage-rv-20260524T105500+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-fcntl-extra-rv-20260524T110244+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-kill-signal-rv-20260524T103449+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-pipe-followup-rv-20260524T142437+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch1-rv-20260524T125344+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch2-uid16-rv-20260524T125902+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch3-rv-20260524T130305+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch4-fcntl-rv-20260524T130633+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch5-mixed-rv-20260524T131542+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch6-legacy-fs-rv-20260524T132733+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-rv-clean-la-confirm-20260524T131247+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-sched-known-clean-la-20260524T094600+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-sched-known-clean-rv-20260524T094311+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-time-light-rv-20260524T105849+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-time-signal-extra-rv-20260524T104831+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-vector-extra-rv-20260524T110544+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-waitid-extended-rv-20260524T103129+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-waitid-kill-la-confirm-20260524T104354+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/user-priority-ae-rv-20260524T094947+0800.log`, `docs/ltp-score-improvement-2026-05-24-phase-a/raw/user-priority-rv-clean-writev-la-20260524T095814+0800.log`
+- Required arches: la, rv
+- Required libcs: glibc, musl
+- Required arch/libc combos: 4
+- Promotion candidates: 261
+- Blocked/incomplete cases: 169
+
+## Candidates
+| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |
+| --- | --- | ---: | ---: |
+| access01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl, rv:musl:ltp-musl | 54834 | -2872 |
+| access03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6341 | -57 |
+| alarm02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5166 | -21 |
+| alarm03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6365 | -30 |
+| alarm06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 9599 | -21 |
+| brk01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8535 | -30 |
+| brk02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5708 | -30 |
+| chdir01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8763 | -21 |
+| chmod01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5806 | -30 |
+| chmod03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6040 | -21 |
+| clock_gettime02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5933 | -21 |
+| clone01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 9830 | -30 |
+| close01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8885 | -21 |
+| close02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5505 | -4110 |
+| creat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6149 | -21 |
+| creat03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5706 | -21 |
+| dup01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8745 | -21 |
+| dup02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5731 | -4112 |
+| dup03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6607 | -21 |
+| dup04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6278 | -21 |
+| dup06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5841 | -21 |
+| dup07 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6292 | -21 |
+| dup201 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5050 | -21 |
+| dup202 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5884 | -21 |
+| dup203 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5832 | -21 |
+| dup204 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5586 | -21 |
+| dup205 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6494 | -21 |
+| dup206 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6551 | -21 |
+| dup3_01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6342 | -21 |
+| dup3_02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6949 | -21 |
+| exit01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5005 | -21 |
+| exit02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5798 | -30 |
+| exit_group01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5246 | -32 |
+| faccessat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6638 | -21 |
+| faccessat02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6431 | -21 |
+| faccessat201 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6349 | -21 |
+| faccessat202 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5609 | -21 |
+| fchmod01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4928 | -21 |
+| fchmod03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6820 | -21 |
+| fchmod04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6572 | -21 |
+| fchmodat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6981 | -21 |
+| fcntl01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 9332 | -12 |
+| fcntl01_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5318 | -12 |
+| fcntl02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 9561 | -21 |
+| fcntl02_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6435 | -21 |
+| fcntl03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5920 | -21 |
+| fcntl03_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5625 | -21 |
+| fcntl04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5851 | -21 |
+| fcntl04_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5867 | -21 |
+| fcntl08 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6145 | -21 |
+| fcntl08_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5675 | -21 |
+| fcntl09 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5931 | -12 |
+| fcntl09_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6274 | -12 |
+| fcntl10 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6276 | -12 |
+| fcntl10_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5669 | -12 |
+| fcntl16 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5553 | -12 |
+| fcntl16_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6583 | -12 |
+| fcntl23 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5638 | -12 |
+| fcntl29 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6718 | -21 |
+| fcntl29_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6211 | -21 |
+| fork01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 9145 | -30 |
+| fstatat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6088 | -12 |
+| ftruncate01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5328 | -21 |
+| ftruncate01_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6312 | -21 |
+| getcwd01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5587 | -21 |
+| getdomainname01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6116 | -21 |
+| getegid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6188 | -21 |
+| getegid01_16 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7497 | -21 |
+| getegid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6228 | -21 |
+| getegid02_16 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5960 | -21 |
+| geteuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6215 | -21 |
+| geteuid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5821 | -21 |
+| getgid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5438 | -21 |
+| getgid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6363 | -21 |
+| getgroups01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8593 | -12 |
+| getgroups03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7357 | -12 |
+| gethostname01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5349 | -21 |
+| getpagesize01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5932 | -21 |
+| getpgid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6274 | -21 |
+| getpgrp01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5994 | -21 |
+| getpid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 48279 | -921 |
+| getpid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6316 | -30 |
+| getppid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5680 | -21 |
+| getppid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6381 | -30 |
+| getpriority01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6216 | -21 |
+| getpriority02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6285 | -21 |
+| getrandom01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6115 | -21 |
+| getrandom02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6055 | -21 |
+| getrandom03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5706 | -21 |
+| getrandom04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5433 | -21 |
+| getrandom05 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5180 | -21 |
+| getresgid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5802 | -12 |
+| getresgid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5655 | -12 |
+| getresgid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4797 | -12 |
+| getresuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5815 | -12 |
+| getresuid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6007 | -12 |
+| getresuid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5405 | -12 |
+| getrlimit01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6399 | -21 |
+| getrlimit02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5684 | -21 |
+| getrlimit03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6175 | -21 |
+| getrusage01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6237 | -21 |
+| getsid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5281 | -30 |
+| getsid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5663 | -21 |
+| gettid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5118 | -21 |
+| gettimeofday01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6017 | -21 |
+| getuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5732 | -21 |
+| getuid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6098 | -21 |
+| kill03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5432 | -21 |
+| kill06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6910 | -75 |
+| kill07 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7624 | -22 |
+| kill08 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7774 | -66 |
+| kill09 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8000 | -21 |
+| lseek01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5169 | -21 |
+| lstat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5210 | -21 |
+| lstat01_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6804 | -21 |
+| mkdirat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6248 | -12 |
+| mlock01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6367 | -21 |
+| mlock03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5956 | -21 |
+| mlock04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6625 | -21 |
+| mmap01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8341 | -21 |
+| mmap02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6928 | -21 |
+| mmap03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6363 | -12 |
+| munlock01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6541 | -21 |
+| open01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8202 | -21 |
+| open02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6117 | -21 |
+| open03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5667 | -21 |
+| open04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 10609 | -21 |
+| open09 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6137 | -2064 |
+| openat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6108 | -21 |
+| personality01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 11587 | -183 |
+| personality02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6391 | -21 |
+| pipe01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8029 | -21 |
+| pipe03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5839 | -21 |
+| pipe04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6686 | -30 |
+| pipe05 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5360 | -12 |
+| pipe06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5947 | -21 |
+| pipe09 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6162 | -30 |
+| pipe10 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5936 | -30 |
+| pipe11 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 25196 | -651 |
+| pipe14 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5853 | -21 |
+| pread01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6462 | -21 |
+| pread01_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6199 | -21 |
+| proc01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5667 | -12 |
+| pwrite01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7030 | -21 |
+| pwrite01_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5850 | -21 |
+| pwrite03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4680 | -21 |
+| pwrite03_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5977 | -21 |
+| read01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 8892 | -21 |
+| read04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5351 | -8208 |
+| readlink01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5458 | -30 |
+| readv01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5824 | -21 |
+| rmdir01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5448 | -21 |
+| rt_sigaction01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7587 | -12 |
+| rt_sigaction02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5650 | -12 |
+| rt_sigprocmask01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6548 | -12 |
+| rt_sigprocmask02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6401 | -12 |
+| rt_sigsuspend01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7189 | -21 |
+| sched_get_priority_max01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5089 | -21 |
+| sched_get_priority_max02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6456 | -21 |
+| sched_get_priority_min01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6130 | -21 |
+| sched_get_priority_min02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6115 | -21 |
+| sched_getaffinity01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5283 | -21 |
+| sched_getattr02 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 6382 | -2056 |
+| sched_getparam01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8041 | -66 |
+| sched_getscheduler01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6215 | -30 |
+| sched_rr_get_interval01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6945 | -30 |
+| sched_rr_get_interval02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7068 | -30 |
+| sched_setparam01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6073 | -30 |
+| sched_setparam02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6206 | -30 |
+| sched_setparam03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7287 | -48 |
+| sched_setscheduler03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7924 | -84 |
+| sched_yield01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5236 | -12 |
+| set_tid_address01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7600 | -65548 |
+| setegid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6070 | -21 |
+| setegid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6366 | -21 |
+| setfsgid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7034 | -21 |
+| setfsgid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5954 | -21 |
+| setfsuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7240 | -21 |
+| setfsuid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5750 | -21 |
+| setfsuid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5991 | -21 |
+| setfsuid04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6387 | -30 |
+| setgid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6110 | -21 |
+| setgid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6424 | -21 |
+| setgid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5910 | -21 |
+| setgroups01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5792 | -21 |
+| setgroups02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6113 | -16400 |
+| setpgid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5730 | -21 |
+| setpgid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5561 | -21 |
+| setpgrp01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6078 | -21 |
+| setpgrp02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5973 | -30 |
+| setpriority02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6679 | -48 |
+| setregid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6505 | -21 |
+| setregid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6675 | -21 |
+| setregid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6754 | -30 |
+| setregid04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7172 | -21 |
+| setresgid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5962 | -12 |
+| setresgid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6415 | -21 |
+| setresgid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5855 | -21 |
+| setresuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6910 | -21 |
+| setresuid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6110 | -21 |
+| setresuid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6257 | -21 |
+| setreuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5822 | -21 |
+| setreuid02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5791 | -21 |
+| setreuid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5114 | -21 |
+| setreuid04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6602 | -30 |
+| setrlimit01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8925 | -210 |
+| setrlimit02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6787 | -21 |
+| setrlimit03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6597 | -21 |
+| setuid01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6546 | -21 |
+| setuid04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6768 | -30 |
+| sigaction01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4397 | -12 |
+| sigaction02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5176 | -12 |
+| sighold02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6665 | -30 |
+| signal02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6124 | -21 |
+| signal03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6864 | -21 |
+| signal04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6758 | -21 |
+| sigprocmask01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5535 | -12 |
+| sigsuspend01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7454 | -21 |
+| stat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7792 | -21 |
+| stat01_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5637 | -21 |
+| stat02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5924 | -21 |
+| stat02_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6445 | -21 |
+| statx02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6222 | -21 |
+| symlink01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4943 | -12 |
+| sysinfo01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6406 | -12 |
+| sysinfo02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5556 | -12 |
+| time01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6467 | -21 |
+| times01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5581 | -21 |
+| truncate02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5709 | -21 |
+| truncate02_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6171 | -21 |
+| umask01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6166 | -21 |
+| uname01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 4932 | -21 |
+| uname02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7639 | -21 |
+| uname04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6093 | -21 |
+| unlinkat01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5440 | -21 |
+| wait01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7026 | -21 |
+| wait02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6658 | -30 |
+| wait402 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5851 | -21 |
+| wait403 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6112 | -21 |
+| waitid05 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7093 | -2072 |
+| waitid06 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7020 | -30 |
+| waitid09 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 6933 | -30 |
+| waitid11 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 7036 | -30 |
+| waitpid03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 11264 | -246 |
+| waitpid04 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5999 | -21 |
+| waitpid06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8577 | -102 |
+| waitpid07 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8575 | -102 |
+| waitpid08 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8978 | -102 |
+| waitpid09 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5973 | -39 |
+| waitpid10 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 56390 | -1002 |
+| waitpid11 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8393 | -102 |
+| waitpid12 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 8793 | -102 |
+| waitpid13 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 9670 | -102 |
+| write01 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 10649 | -57358 |
+| write02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5675 | -21 |
+| write03 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6677 | -21 |
+| write06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6051 | -21 |
+| writev02 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5984 | -12 |
+| writev05 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 6878 | -2056 |
+| writev06 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 6807 | -12 |
+| writev07 | la:glibc:ltp-glibc, la:glibc:ltp-glibc, la:musl:ltp-musl, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:glibc:ltp-glibc, rv:musl:ltp-musl, rv:musl:ltp-musl | 6640 | -21 |
+
+## Blocked or incomplete
+| Case | Reason |
+| --- | --- |
+| access02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=4/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=4/event-failures=1/status=FAIL |
+| access04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| alarm01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| alarm05 | missing la:glibc, la:musl; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| alarm07 | missing la:glibc, la:musl; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| chmod05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| clock_getres01 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TCONF=8 |
+| clock_getres02 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| clock_gettime01 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| clock_gettime03 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| clock_gettime04 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=6/event-failures=1/status=FAIL |
+| clock_gettime05 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| clock_nanosleep01 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=3/TCONF=2/timeout=1/event-failures=1/status=FAIL |
+| clock_nanosleep02 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=6/event-failures=1/status=FAIL |
+| close08 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| close09 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| close_range01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| close_range02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=9/TBROK=1/ENOSYS=8/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| dup05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| dup08 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| dup09 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| dup207 | rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| fcntl05 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| fcntl06 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| fcntl07 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TBROK=2/ENOSYS=1/event-failures=1/status=FAIL |
+| fcntl11 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=75/event-failures=1/status=FAIL |
+| fcntl12 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| fcntl13 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=3/event-failures=1/status=FAIL |
+| fcntl14 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl status=UNKNOWN |
+| fcntl17 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=6/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=7/event-failures=1/status=FAIL |
+| fcntl18 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=4/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=4/event-failures=1/status=FAIL |
+| fcntl19 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=37/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=37/event-failures=1/status=FAIL |
+| fcntl20 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=45/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=45/event-failures=1/status=FAIL |
+| fcntl21 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=80/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=81/event-failures=1/status=FAIL |
+| fcntl22 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/event-failures=1/status=FAIL |
+| fcntl24 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| fcntl25 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| fcntl26 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| fcntl27 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/event-failures=1/status=FAIL |
+| fstat02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| ftruncate04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| futimesat01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| getcwd02 | missing la:glibc, la:musl; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| geteuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| getgid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| getgroups01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| getgroups02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| gethostname02 | missing la:glibc, la:musl; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| getitimer01 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TFAIL=16/ENOSYS=6/event-failures=1/status=FAIL |
+| getitimer02 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| getpgid01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/TBROK=1/event-failures=1/status=FAIL |
+| getpriority03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| getresgid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| getresuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| getrusage02 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TCONF=1 |
+| getrusage03 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| gettid02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL |
+| gettimeofday02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc status=UNKNOWN; rv:musl:ltp-musl status=UNKNOWN; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| gettimeofday03 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| getuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| kill02 | missing la:glibc, la:musl; rv:musl:ltp-musl TFAIL=1/timeout=1/event-failures=1/status=FAIL |
+| kill05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/TBROK=1/event-failures=1/status=FAIL |
+| kill10 | missing la:glibc, la:musl; rv:glibc:ltp-glibc timeout=1/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| kill11 | missing la:glibc, la:musl; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| kill12 | missing la:glibc, la:musl; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| kill13 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| link01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| link02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |
+| link03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| link04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=14/ENOSYS=14/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=14/ENOSYS=14/event-failures=1/status=FAIL |
+| link05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |
+| linkat01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/ENOSYS=1/event-failures=1/status=FAIL |
+| linkat02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| lseek03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| lseek04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| lseek05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| mmap04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| mmap05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| mmap06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| mprotect01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=3/event-failures=1/status=FAIL |
+| mprotect02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| munmap01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| nanosleep01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=6/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=6/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=6/event-failures=1/status=FAIL |
+| open05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| open06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| open07 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| open08 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=3/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=3/event-failures=1/status=FAIL |
+| open10 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=3/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| open11 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| open12 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| open13 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=3/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=3/ENOSYS=1/event-failures=1/status=FAIL |
+| openat02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| openat03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| openat201 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| openat202 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| openat203 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| pause01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc status=UNKNOWN; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| pipe12 | rv:glibc:ltp-glibc TFAIL=1/TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/TBROK=1/event-failures=1/status=FAIL |
+| pipe13 | rv:glibc:ltp-glibc timeout=1/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| pipe2_01 | rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| pipe2_02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| pipe2_04 | rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TFAIL=2/TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/TBROK=2/event-failures=1/status=FAIL |
+| pread02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/event-failures=1/status=FAIL |
+| pread03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| pread04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| preadv01_64 | rv:musl:ltp-musl TFAIL=3/ENOSYS=3/event-failures=1/status=FAIL |
+| preadv02_64 | rv:glibc:ltp-glibc TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=8/ENOSYS=8/event-failures=1/status=FAIL |
+| prlimit01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| prlimit02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| pwrite02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| pwrite04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| pwritev01_64 | rv:musl:ltp-musl TFAIL=3/ENOSYS=3/event-failures=1/status=FAIL |
+| pwritev02_64 | rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl status=UNKNOWN |
+| read02 | la:glibc:ltp-glibc TCONF=2; la:musl:ltp-musl TCONF=2; rv:glibc:ltp-glibc TCONF=2; rv:musl:ltp-musl TCONF=2 |
+| read03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| read05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| read06 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| readlink02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| readlink03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=4/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=4/event-failures=1/status=FAIL |
+| readv02 | rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| readv03 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| readv04 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| readv05 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| rename01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rename02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| rename03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| rename04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| renameat01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=2/event-failures=1/status=FAIL |
+| renameat02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| sched_getscheduler02 | la:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| setfsgid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| setfsuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| setgid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| setpriority03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| setregid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| setresgid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=2/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=2/event-failures=1/status=FAIL |
+| setresuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| setreuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| setsid01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=3; rv:musl:ltp-musl TFAIL=2 |
+| setuid01_16 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| statx01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| statx03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=3/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=3/event-failures=1/status=FAIL |
+| statx04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| statx05 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| sysinfo03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| timer_create01 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| timer_delete01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| timer_gettime01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| timer_settime01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| times03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=6/event-failures=1/status=FAIL; rv:musl:ltp-musl timeout=1/event-failures=1/status=FAIL |
+| unlink01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc event-failures=1/status=FAIL; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| utime01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| utime02 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| utimes01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| wait401 | rv:musl:ltp-musl status=UNKNOWN |
+| waitid01 | rv:glibc:ltp-glibc TFAIL=5/TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=5/TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| waitid02 | rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |
+| waitid03 | rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |
+| waitid04 | rv:glibc:ltp-glibc TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/ENOSYS=1/event-failures=1/status=FAIL |
+| waitid07 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=5/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=5/event-failures=1/status=FAIL |
+| waitid08 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=10/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=10/event-failures=1/status=FAIL |
+| waitid10 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/event-failures=1/status=FAIL |
+| waitpid01 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TFAIL=20/event-failures=1/status=FAIL; rv:glibc:ltp-glibc TFAIL=32/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=40/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=40/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=40/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=40/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=40/event-failures=1/status=FAIL |
+| write04 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TBROK=1/ENOSYS=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TBROK=1/ENOSYS=1/event-failures=1/status=FAIL |
+| write05 | missing la:glibc, la:musl; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| writev01 | rv:glibc:ltp-glibc TFAIL=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TFAIL=1/event-failures=1/status=FAIL |
+| writev03 | missing la:glibc, la:musl; rv:glibc:ltp-glibc TCONF=1/event-failures=1/status=FAIL; rv:musl:ltp-musl TCONF=1/event-failures=1/status=FAIL |
+| writev04 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |
+| writev08 | missing la:glibc, la:musl, rv:glibc; rv:musl:ltp-musl event-failures=1/status=FAIL |

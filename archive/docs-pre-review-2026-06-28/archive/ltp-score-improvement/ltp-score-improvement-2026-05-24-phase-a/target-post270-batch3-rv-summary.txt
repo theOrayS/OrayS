@@ -1,0 +1,108 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-post270-batch3-rv-20260524T130305+0800.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 30
+- Internal TFAIL/TBROK/TCONF: 0 ({})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 15 failed
+- ltp-glibc: 0 passed, 15 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| dup08 | rv | glibc | ltp-glibc | FAIL | -1 | 4 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup08 | rv | musl | ltp-musl | FAIL | -1 | 6 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup09 | rv | glibc | ltp-glibc | FAIL | -1 | 4 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| dup09 | rv | musl | ltp-musl | FAIL | -1 | 9 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups02 | rv | glibc | ltp-glibc | FAIL | -1 | 7 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getgroups02 | rv | musl | ltp-musl | FAIL | -1 | 21 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpriority03 | rv | glibc | ltp-glibc | FAIL | -1 | 15 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| getpriority03 | rv | musl | ltp-musl | FAIL | -1 | 10 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek04 | rv | glibc | ltp-glibc | FAIL | -1 | 8 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek04 | rv | musl | ltp-musl | FAIL | -1 | 5 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek05 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| lseek05 | rv | musl | ltp-musl | FAIL | -1 | 2 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread03 | rv | glibc | ltp-glibc | FAIL | -1 | 5 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread03 | rv | musl | ltp-musl | FAIL | -1 | 5 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread04 | rv | glibc | ltp-glibc | FAIL | -1 | 11 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| pread04 | rv | musl | ltp-musl | FAIL | -1 | 4 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit01 | rv | glibc | ltp-glibc | FAIL | -1 | 5 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit01 | rv | musl | ltp-musl | FAIL | -1 | 15 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit02 | rv | glibc | ltp-glibc | FAIL | -1 | 3 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| prlimit02 | rv | musl | ltp-musl | FAIL | -1 | 5 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| read05 | rv | glibc | ltp-glibc | FAIL | -1 | 2 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| read05 | rv | musl | ltp-musl | FAIL | -1 | 7 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| read06 | rv | glibc | ltp-glibc | FAIL | -1 | 1 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| read06 | rv | musl | ltp-musl | FAIL | -1 | 4 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink02 | rv | glibc | ltp-glibc | FAIL | -1 | 9 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink02 | rv | musl | ltp-musl | FAIL | -1 | 21 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | glibc | ltp-glibc | FAIL | -1 | 5 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| setpriority03 | rv | musl | ltp-musl | FAIL | -1 | 47 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink01 | rv | glibc | ltp-glibc | FAIL | -1 | 4 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+| unlink01 | rv | musl | ltp-musl | FAIL | -1 | 4 | 258860 |  |  | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 30 (rv:glibc:dup08, rv:musl:dup08, rv:glibc:dup09, rv:musl:dup09, rv:glibc:getgroups02, rv:musl:getgroups02, rv:glibc:getpriority03, rv:musl:getpriority03, rv:glibc:lseek04, rv:musl:lseek04, rv:glibc:lseek05, rv:musl:lseek05, rv:glibc:pread03, rv:musl:pread03, rv:glibc:pread04, rv:musl:pread04, rv:glibc:prlimit01, rv:musl:prlimit01, rv:glibc:prlimit02, rv:musl:prlimit02, rv:glibc:read05, rv:musl:read05, rv:glibc:read06, rv:musl:read06, rv:glibc:readlink02, rv:musl:readlink02, rv:glibc:setpriority03, rv:musl:setpriority03, rv:glibc:unlink01, rv:musl:unlink01)
+- internal_tfail: 0
+- internal_tbrok: 0
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:getgroups02
+- ltp-musl:getpriority03
+- ltp-musl:setpriority03
+- ltp-musl:prlimit01
+- ltp-musl:prlimit02
+- ltp-musl:dup08
+- ltp-musl:dup09
+- ltp-musl:lseek04
+- ltp-musl:lseek05
+- ltp-musl:pread03
+- ltp-musl:pread04
+- ltp-musl:read05
+- ltp-musl:read06
+- ltp-musl:readlink02
+- ltp-musl:unlink01
+- ltp-glibc:getgroups02
+- ltp-glibc:getpriority03
+- ltp-glibc:setpriority03
+- ltp-glibc:prlimit01
+- ltp-glibc:prlimit02
+- ltp-glibc:dup08
+- ltp-glibc:dup09
+- ltp-glibc:lseek04
+- ltp-glibc:lseek05
+- ltp-glibc:pread03
+- ltp-glibc:pread04
+- ltp-glibc:read05
+- ltp-glibc:read06
+- ltp-glibc:readlink02
+- ltp-glibc:unlink01
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 15
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: getgroups02, getpriority03, setpriority03, prlimit01, prlimit02, dup08, dup09, lseek04, lseek05, pread03, pread04, read05, read06, readlink02, unlink01
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 15
+- Internal: {}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: getgroups02, getpriority03, setpriority03, prlimit01, prlimit02, dup08, dup09, lseek04, lseek05, pread03, pread04, read05, read06, readlink02, unlink01

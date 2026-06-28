@@ -1,0 +1,87 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-24-phase-a/raw/target-batch-a-rv-20260524T093843+0800.log`
+
+- PASS LTP CASE: 1
+- FAIL LTP CASE: 19
+- Internal TFAIL/TBROK/TCONF: 27 ({'TBROK': 13, 'TFAIL': 14})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 1 passed, 9 failed
+- ltp-glibc: 0 passed, 10 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| dup05 | rv | glibc | ltp-glibc | FAIL | 2 | 3295 | 256663 | 256649 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| dup05 | rv | musl | ltp-musl | FAIL | 2 | 3153 | 256799 | 256785 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fstat02 | rv | glibc | ltp-glibc | FAIL | 2 | 4699 | 256593 | 256579 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| fstat02 | rv | musl | ltp-musl | FAIL | 2 | 3035 | 256729 | 256715 | -14 | 0 | 1 | 0 | 0 | 1 | 0 |
+| ftruncate04 | rv | glibc | ltp-glibc | FAIL | 2 | 3774 | 256579 | 256572 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | musl | ltp-musl | FAIL | 2 | 2920 | 256715 | 256708 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| gettid02 | rv | glibc | ltp-glibc | FAIL | 2 | 3788 | 256687 | 256663 | -24 | 0 | 1 | 0 | 0 | 0 | 0 |
+| gettid02 | rv | musl | ltp-musl | PASS | 0 | 3758 | 258862 | 256799 | -2063 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mmap04 | rv | glibc | ltp-glibc | FAIL | 2 | 4646 | 256572 | 256558 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| mmap04 | rv | musl | ltp-musl | FAIL | 2 | 2521 | 256708 | 256694 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pread02 | rv | glibc | ltp-glibc | FAIL | 1 | 3471 | 256649 | 256635 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| pread02 | rv | musl | ltp-musl | FAIL | 1 | 2293 | 256785 | 256771 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| pwrite02 | rv | glibc | ltp-glibc | FAIL | 2 | 4877 | 256635 | 256621 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pwrite02 | rv | musl | ltp-musl | FAIL | 2 | 3303 | 256771 | 256757 | -14 | 0 | 1 | 0 | 0 | 0 | 0 |
+| pwrite04 | rv | glibc | ltp-glibc | FAIL | 1 | 4221 | 256621 | 256607 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| pwrite04 | rv | musl | ltp-musl | FAIL | 1 | 2827 | 256757 | 256743 | -14 | 1 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | glibc | ltp-glibc | FAIL | 5 | 4649 | 256607 | 256593 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| readlink03 | rv | musl | ltp-musl | FAIL | 5 | 2704 | 256743 | 256729 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| sysinfo03 | rv | glibc | ltp-glibc | FAIL | 2 | 3995 | 256558 | 256551 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| sysinfo03 | rv | musl | ltp-musl | FAIL | 2 | 2643 | 256694 | 256687 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 1 (rv:musl:gettid02)
+- pass_with_tconf: 0
+- fail_wrapper: 19 (rv:glibc:dup05, rv:musl:dup05, rv:glibc:fstat02, rv:musl:fstat02, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:gettid02, rv:glibc:mmap04, rv:musl:mmap04, rv:glibc:pread02, rv:musl:pread02, rv:glibc:pwrite02, rv:musl:pwrite02, rv:glibc:pwrite04, rv:musl:pwrite04, rv:glibc:readlink03, rv:musl:readlink03, rv:glibc:sysinfo03, rv:musl:sysinfo03)
+- internal_tfail: 6 (rv:glibc:pread02, rv:musl:pread02, rv:glibc:pwrite04, rv:musl:pwrite04, rv:glibc:readlink03, rv:musl:readlink03)
+- internal_tbrok: 13 (rv:glibc:dup05, rv:musl:dup05, rv:glibc:fstat02, rv:musl:fstat02, rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:gettid02, rv:glibc:mmap04, rv:musl:mmap04, rv:glibc:pwrite02, rv:musl:pwrite02, rv:glibc:sysinfo03, rv:musl:sysinfo03)
+- timeout: 0
+- enosys: 4 (rv:glibc:dup05, rv:musl:dup05, rv:glibc:fstat02, rv:musl:fstat02)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:dup05
+- ltp-musl:pread02
+- ltp-musl:pwrite02
+- ltp-musl:pwrite04
+- ltp-musl:readlink03
+- ltp-musl:fstat02
+- ltp-musl:ftruncate04
+- ltp-musl:mmap04
+- ltp-musl:sysinfo03
+- ltp-glibc:gettid02
+- ltp-glibc:dup05
+- ltp-glibc:pread02
+- ltp-glibc:pwrite02
+- ltp-glibc:pwrite04
+- ltp-glibc:readlink03
+- ltp-glibc:fstat02
+- ltp-glibc:ftruncate04
+- ltp-glibc:mmap04
+- ltp-glibc:sysinfo03
+
+## Groups
+### ltp-musl
+- PASS: 1
+- FAIL: 9
+- Internal: {'TBROK': 6, 'TFAIL': 7}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: dup05, pread02, pwrite02, pwrite04, readlink03, fstat02, ftruncate04, mmap04, sysinfo03
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 10
+- Internal: {'TBROK': 7, 'TFAIL': 7}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: gettid02, dup05, pread02, pwrite02, pwrite04, readlink03, fstat02, ftruncate04, mmap04, sysinfo03

@@ -1,0 +1,56 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-21/la-g104-umask-open-symlink.log`
+
+- PASS LTP CASE: 4
+- FAIL LTP CASE: 2
+- Internal TFAIL/TBROK/TCONF: 8 ({'TBROK': 8})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 2 passed, 1 failed
+- ltp-glibc: 2 passed, 1 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| open02 | la | glibc | ltp-glibc | PASS | 0 | 1735 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open02 | la | musl | ltp-musl | PASS | 0 | 913 | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | la | glibc | ltp-glibc | FAIL | 2 | 1784 | 0 | 4 | 0 | 0 | 0 | 0 |
+| symlink01 | la | musl | ltp-musl | FAIL | 2 | 923 | 0 | 4 | 0 | 0 | 0 | 0 |
+| umask01 | la | glibc | ltp-glibc | PASS | 0 | 1851 | 0 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | la | musl | ltp-musl | PASS | 0 | 1074 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 4 (la:glibc:open02, la:musl:open02, la:glibc:umask01, la:musl:umask01)
+- pass_with_tconf: 0
+- fail_wrapper: 2 (la:glibc:symlink01, la:musl:symlink01)
+- internal_tfail: 0
+- internal_tbrok: 2 (la:glibc:symlink01, la:musl:symlink01)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:symlink01
+- ltp-glibc:symlink01
+
+## Groups
+### ltp-musl
+- PASS: 2
+- FAIL: 1
+- Internal: {'TBROK': 4}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: symlink01
+
+### ltp-glibc
+- PASS: 2
+- FAIL: 1
+- Internal: {'TBROK': 4}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: symlink01

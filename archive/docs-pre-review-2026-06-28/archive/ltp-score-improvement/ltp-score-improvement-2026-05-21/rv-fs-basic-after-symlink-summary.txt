@@ -1,0 +1,96 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-21/rv-fs-basic-after-symlink.log`
+
+- PASS LTP CASE: 20
+- FAIL LTP CASE: 14
+- Internal TFAIL/TBROK/TCONF: 2055 ({'TFAIL': 2050, 'TBROK': 5})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 4
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 10 passed, 7 failed
+- ltp-glibc: 10 passed, 7 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| chmod01 | rv | glibc | ltp-glibc | PASS | 0 | 908 | 0 | 0 | 0 | 0 | 0 | 0 |
+| chmod01 | rv | musl | ltp-musl | PASS | 0 | 716 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat01 | rv | glibc | ltp-glibc | PASS | 0 | 855 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat01 | rv | musl | ltp-musl | PASS | 0 | 1010 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat03 | rv | glibc | ltp-glibc | PASS | 0 | 901 | 0 | 0 | 0 | 0 | 0 | 0 |
+| creat03 | rv | musl | ltp-musl | PASS | 0 | 726 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod01 | rv | glibc | ltp-glibc | PASS | 0 | 848 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fchmod01 | rv | musl | ltp-musl | PASS | 0 | 611 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate01 | rv | glibc | ltp-glibc | PASS | 0 | 945 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ftruncate01 | rv | musl | ltp-musl | PASS | 0 | 575 | 0 | 0 | 0 | 0 | 0 | 0 |
+| link02 | rv | glibc | ltp-glibc | FAIL | 1 | 889 | 1 | 0 | 0 | 0 | 1 | 0 |
+| link02 | rv | musl | ltp-musl | FAIL | 1 | 947 | 1 | 0 | 0 | 0 | 1 | 0 |
+| lstat01 | rv | glibc | ltp-glibc | PASS | 0 | 926 | 0 | 0 | 0 | 0 | 0 | 0 |
+| lstat01 | rv | musl | ltp-musl | PASS | 0 | 907 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | glibc | ltp-glibc | FAIL | 1 | 823 | 2 | 0 | 0 | 0 | 0 | 0 |
+| mkdir02 | rv | musl | ltp-musl | FAIL | 2 | 665 | 0 | 1 | 0 | 0 | 0 | 0 |
+| open02 | rv | glibc | ltp-glibc | FAIL | 1 | 918 | 1 | 0 | 0 | 0 | 0 | 0 |
+| open02 | rv | musl | ltp-musl | FAIL | 1 | 692 | 1 | 0 | 0 | 0 | 0 | 0 |
+| open03 | rv | glibc | ltp-glibc | PASS | 0 | 887 | 0 | 0 | 0 | 0 | 0 | 0 |
+| open03 | rv | musl | ltp-musl | PASS | 0 | 602 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink01 | rv | glibc | ltp-glibc | PASS | 0 | 860 | 0 | 0 | 0 | 0 | 0 | 0 |
+| readlink01 | rv | musl | ltp-musl | PASS | 0 | 626 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rename01 | rv | glibc | ltp-glibc | FAIL | 6 | 830 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rename01 | rv | musl | ltp-musl | FAIL | 6 | 722 | 0 | 1 | 0 | 0 | 0 | 0 |
+| rmdir01 | rv | glibc | ltp-glibc | PASS | 0 | 797 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rmdir01 | rv | musl | ltp-musl | PASS | 0 | 832 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat02 | rv | glibc | ltp-glibc | PASS | 0 | 1090 | 0 | 0 | 0 | 0 | 0 | 0 |
+| stat02 | rv | musl | ltp-musl | PASS | 0 | 895 | 0 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | rv | glibc | ltp-glibc | FAIL | 1 | 927 | 1 | 0 | 0 | 0 | 0 | 0 |
+| symlink01 | rv | musl | ltp-musl | FAIL | 1 | 741 | 1 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | rv | glibc | ltp-glibc | FAIL | 1 | 1249 | 1021 | 0 | 0 | 0 | 0 | 0 |
+| umask01 | rv | musl | ltp-musl | FAIL | 1 | 1051 | 1021 | 0 | 0 | 0 | 0 | 0 |
+| unlink05 | rv | glibc | ltp-glibc | FAIL | 2 | 832 | 0 | 1 | 0 | 0 | 1 | 0 |
+| unlink05 | rv | musl | ltp-musl | FAIL | 2 | 709 | 0 | 1 | 0 | 0 | 1 | 0 |
+
+## Categories
+- pass_clean: 20 (rv:glibc:chmod01, rv:musl:chmod01, rv:glibc:creat01, rv:musl:creat01, rv:glibc:creat03, rv:musl:creat03, rv:glibc:fchmod01, rv:musl:fchmod01, rv:glibc:ftruncate01, rv:musl:ftruncate01, rv:glibc:lstat01, rv:musl:lstat01, rv:glibc:open03, rv:musl:open03, rv:glibc:readlink01, rv:musl:readlink01, rv:glibc:rmdir01, rv:musl:rmdir01, rv:glibc:stat02, rv:musl:stat02)
+- pass_with_tconf: 0
+- fail_wrapper: 14 (rv:glibc:link02, rv:musl:link02, rv:glibc:mkdir02, rv:musl:mkdir02, rv:glibc:open02, rv:musl:open02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:symlink01, rv:musl:symlink01, rv:glibc:umask01, rv:musl:umask01, rv:glibc:unlink05, rv:musl:unlink05)
+- internal_tfail: 9 (rv:glibc:link02, rv:musl:link02, rv:glibc:mkdir02, rv:glibc:open02, rv:musl:open02, rv:glibc:symlink01, rv:musl:symlink01, rv:glibc:umask01, rv:musl:umask01)
+- internal_tbrok: 5 (rv:musl:mkdir02, rv:glibc:rename01, rv:musl:rename01, rv:glibc:unlink05, rv:musl:unlink05)
+- timeout: 0
+- enosys: 4 (rv:glibc:link02, rv:musl:link02, rv:glibc:unlink05, rv:musl:unlink05)
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:open02
+- ltp-musl:mkdir02
+- ltp-musl:link02
+- ltp-musl:symlink01
+- ltp-musl:unlink05
+- ltp-musl:rename01
+- ltp-musl:umask01
+- ltp-glibc:open02
+- ltp-glibc:mkdir02
+- ltp-glibc:link02
+- ltp-glibc:symlink01
+- ltp-glibc:unlink05
+- ltp-glibc:rename01
+- ltp-glibc:umask01
+
+## Groups
+### ltp-musl
+- PASS: 10
+- FAIL: 7
+- Internal: {'TFAIL': 1024, 'TBROK': 3}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: open02, mkdir02, link02, symlink01, unlink05, rename01, umask01
+
+### ltp-glibc
+- PASS: 10
+- FAIL: 7
+- Internal: {'TFAIL': 1026, 'TBROK': 2}
+- timeout: 0
+- ENOSYS/not implemented: 2
+- panic/trap: 0
+- Fail cases: open02, mkdir02, link02, symlink01, unlink05, rename01, umask01

@@ -1,0 +1,7 @@
+# df after image copies 2026-06-19T11:06:58+08:00
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda2        59G   49G  7.8G  87% /
+/dev/vda2        59G   49G  7.8G  87% /
+/dev/vda2        59G   49G  7.8G  87% /
+3.3G	/root/oskernel-eval-runs/g007-official-local-20260619-110459/sdcard-la.img
+3.0G	/root/oskernel-eval-runs/g007-official-local-20260619-110459/sdcard-rv.img

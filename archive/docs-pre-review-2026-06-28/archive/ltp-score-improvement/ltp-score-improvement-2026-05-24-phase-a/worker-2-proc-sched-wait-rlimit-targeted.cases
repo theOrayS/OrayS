@@ -1,0 +1,8 @@
+sched_getscheduler02
+getpgid01
+getgroups02
+setpriority01
+getrusage02
+prlimit01
+prlimit02
+waitpid01

@@ -1,0 +1,116 @@
+# LTP summary: `docs/ltp-score-improvement-2026-05-25-phase-a/raw/stable350-rv-discovery-metadata-time-001.log`
+
+- PASS LTP CASE: 0
+- FAIL LTP CASE: 34
+- Internal TFAIL/TBROK/TCONF: 53 ({'TFAIL': 29, 'TCONF': 4, 'TBROK': 20})
+- timeout matches: 0
+- ENOSYS/not implemented matches: 0
+- panic/trap matches: 0
+
+## Suite summaries
+- ltp-musl: 0 passed, 17 failed
+- ltp-glibc: 0 passed, 17 failed
+
+## Case matrix
+| Case | Arch | Libc | Group | Status | Code | Runtime ms | Free frames before | Free frames after cleanup | Free frames delta | TFAIL | TBROK | TCONF | timeout | ENOSYS | panic/trap |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ftruncate04 | rv | glibc | ltp-glibc | FAIL | 2 | 1840 | 256553 | 256546 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04 | rv | musl | ltp-musl | FAIL | 2 | 1603 | 256722 | 256715 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04_64 | rv | glibc | ltp-glibc | FAIL | 2 | 3183 | 256546 | 256539 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| ftruncate04_64 | rv | musl | ltp-musl | FAIL | 2 | 2172 | 256715 | 256708 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| lstat02 | rv | glibc | ltp-glibc | FAIL | 1 | 2242 | 256581 | 256567 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| lstat02 | rv | musl | ltp-musl | FAIL | 1 | 2586 | 256750 | 256736 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| lstat02_64 | rv | glibc | ltp-glibc | FAIL | 1 | 3326 | 256567 | 256553 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| lstat02_64 | rv | musl | ltp-musl | FAIL | 1 | 2410 | 256736 | 256722 | -14 | 3 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr01 | rv | glibc | ltp-glibc | FAIL | 134 | 2913 | 256638 | 256630 | -8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sched_getattr01 | rv | musl | ltp-musl | FAIL | 1 | 2376 | 258854 | 256799 | -2055 | 1 | 0 | 0 | 0 | 0 | 0 |
+| sched_setscheduler04 | rv | glibc | ltp-glibc | FAIL | 32 | 3123 | 256630 | 256609 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| sched_setscheduler04 | rv | musl | ltp-musl | FAIL | 32 | 2605 | 256799 | 256778 | -21 | 0 | 0 | 2 | 0 | 0 | 0 |
+| stat03 | rv | glibc | ltp-glibc | FAIL | 1 | 2720 | 256609 | 256595 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| stat03 | rv | musl | ltp-musl | FAIL | 1 | 1571 | 256778 | 256764 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| stat03_64 | rv | glibc | ltp-glibc | FAIL | 1 | 3316 | 256595 | 256581 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| stat03_64 | rv | musl | ltp-musl | FAIL | 1 | 2817 | 256764 | 256750 | -14 | 2 | 0 | 0 | 0 | 0 | 0 |
+| utime01 | rv | glibc | ltp-glibc | FAIL | 6 | 3261 | 256539 | 256532 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime01 | rv | musl | ltp-musl | FAIL | 6 | 3022 | 256708 | 256701 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime02 | rv | glibc | ltp-glibc | FAIL | 6 | 3196 | 256532 | 256525 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime02 | rv | musl | ltp-musl | FAIL | 6 | 3308 | 256701 | 256694 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime03 | rv | glibc | ltp-glibc | FAIL | 6 | 3007 | 256525 | 256518 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime03 | rv | musl | ltp-musl | FAIL | 6 | 2400 | 256694 | 256687 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime04 | rv | glibc | ltp-glibc | FAIL | 6 | 3400 | 256518 | 256511 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime04 | rv | musl | ltp-musl | FAIL | 6 | 2528 | 256687 | 256680 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime05 | rv | glibc | ltp-glibc | FAIL | 6 | 3249 | 256511 | 256504 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime05 | rv | musl | ltp-musl | FAIL | 6 | 2507 | 256680 | 256673 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime06 | rv | glibc | ltp-glibc | FAIL | 2 | 3201 | 256504 | 256497 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime06 | rv | musl | ltp-musl | FAIL | 2 | 2540 | 256673 | 256666 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utime07 | rv | glibc | ltp-glibc | FAIL | 1 | 3283 | 256497 | 256483 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| utime07 | rv | musl | ltp-musl | FAIL | 1 | 2456 | 256666 | 256652 | -14 | 4 | 0 | 0 | 0 | 0 | 0 |
+| utimensat01 | rv | glibc | ltp-glibc | FAIL | 6 | 3087 | 256483 | 256476 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utimensat01 | rv | musl | ltp-musl | FAIL | 6 | 2538 | 256652 | 256645 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utimes01 | rv | glibc | ltp-glibc | FAIL | 2 | 3002 | 256476 | 256469 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+| utimes01 | rv | musl | ltp-musl | FAIL | 2 | 2462 | 256645 | 256638 | -7 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+## Categories
+- pass_clean: 0
+- pass_with_tconf: 0
+- fail_wrapper: 34 (rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:ftruncate04_64, rv:musl:ftruncate04_64, rv:glibc:lstat02, rv:musl:lstat02, rv:glibc:lstat02_64, rv:musl:lstat02_64, rv:glibc:sched_getattr01, rv:musl:sched_getattr01, rv:glibc:sched_setscheduler04, rv:musl:sched_setscheduler04, rv:glibc:stat03, rv:musl:stat03, rv:glibc:stat03_64, rv:musl:stat03_64, rv:glibc:utime01, rv:musl:utime01, rv:glibc:utime02, rv:musl:utime02, rv:glibc:utime03, rv:musl:utime03, rv:glibc:utime04, rv:musl:utime04, rv:glibc:utime05, rv:musl:utime05, rv:glibc:utime06, rv:musl:utime06, rv:glibc:utime07, rv:musl:utime07, rv:glibc:utimensat01, rv:musl:utimensat01, rv:glibc:utimes01, rv:musl:utimes01)
+- internal_tfail: 11 (rv:glibc:lstat02, rv:musl:lstat02, rv:glibc:lstat02_64, rv:musl:lstat02_64, rv:musl:sched_getattr01, rv:glibc:stat03, rv:musl:stat03, rv:glibc:stat03_64, rv:musl:stat03_64, rv:glibc:utime07, rv:musl:utime07)
+- internal_tbrok: 20 (rv:glibc:ftruncate04, rv:musl:ftruncate04, rv:glibc:ftruncate04_64, rv:musl:ftruncate04_64, rv:glibc:utime01, rv:musl:utime01, rv:glibc:utime02, rv:musl:utime02, rv:glibc:utime03, rv:musl:utime03, rv:glibc:utime04, rv:musl:utime04, rv:glibc:utime05, rv:musl:utime05, rv:glibc:utime06, rv:musl:utime06, rv:glibc:utimensat01, rv:musl:utimensat01, rv:glibc:utimes01, rv:musl:utimes01)
+- timeout: 0
+- enosys: 0
+- panic_trap: 0
+- unknown: 0
+
+## FAIL LTP CASE
+- ltp-musl:sched_getattr01
+- ltp-musl:sched_setscheduler04
+- ltp-musl:stat03
+- ltp-musl:stat03_64
+- ltp-musl:lstat02
+- ltp-musl:lstat02_64
+- ltp-musl:ftruncate04
+- ltp-musl:ftruncate04_64
+- ltp-musl:utime01
+- ltp-musl:utime02
+- ltp-musl:utime03
+- ltp-musl:utime04
+- ltp-musl:utime05
+- ltp-musl:utime06
+- ltp-musl:utime07
+- ltp-musl:utimensat01
+- ltp-musl:utimes01
+- ltp-glibc:sched_getattr01
+- ltp-glibc:sched_setscheduler04
+- ltp-glibc:stat03
+- ltp-glibc:stat03_64
+- ltp-glibc:lstat02
+- ltp-glibc:lstat02_64
+- ltp-glibc:ftruncate04
+- ltp-glibc:ftruncate04_64
+- ltp-glibc:utime01
+- ltp-glibc:utime02
+- ltp-glibc:utime03
+- ltp-glibc:utime04
+- ltp-glibc:utime05
+- ltp-glibc:utime06
+- ltp-glibc:utime07
+- ltp-glibc:utimensat01
+- ltp-glibc:utimes01
+
+## Groups
+### ltp-musl
+- PASS: 0
+- FAIL: 17
+- Internal: {'TFAIL': 15, 'TCONF': 2, 'TBROK': 10}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sched_getattr01, sched_setscheduler04, stat03, stat03_64, lstat02, lstat02_64, ftruncate04, ftruncate04_64, utime01, utime02, utime03, utime04, utime05, utime06, utime07, utimensat01, utimes01
+
+### ltp-glibc
+- PASS: 0
+- FAIL: 17
+- Internal: {'TCONF': 2, 'TFAIL': 14, 'TBROK': 10}
+- timeout: 0
+- ENOSYS/not implemented: 0
+- panic/trap: 0
+- Fail cases: sched_getattr01, sched_setscheduler04, stat03, stat03_64, lstat02, lstat02_64, ftruncate04, ftruncate04_64, utime01, utime02, utime03, utime04, utime05, utime06, utime07, utimensat01, utimes01

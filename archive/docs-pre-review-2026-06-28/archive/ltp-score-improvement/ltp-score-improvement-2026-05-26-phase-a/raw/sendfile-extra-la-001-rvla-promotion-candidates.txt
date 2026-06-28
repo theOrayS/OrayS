@@ -1,0 +1,19 @@
+# LTP promotion-candidate report
+
+- Inputs: `docs/ltp-score-improvement-2026-05-26-phase-a/raw/sendfile-extra-rv-001.log`, `docs/ltp-score-improvement-2026-05-26-phase-a/raw/sendfile-extra-la-001.log`
+- Required arches: la, rv
+- Required libcs: glibc, musl
+- Required arch/libc combos: 4
+- Promotion candidates: 4
+- Blocked/incomplete cases: 0
+
+## Candidates
+| Case | Clean combos | Max runtime ms | Min free-frames delta after cleanup |
+| --- | --- | ---: | ---: |
+| sendfile06 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 5729 | -2064 |
+| sendfile06_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6588 | -21 |
+| sendfile08 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 6195 | -21 |
+| sendfile08_64 | la:glibc:ltp-glibc, la:musl:ltp-musl, rv:glibc:ltp-glibc, rv:musl:ltp-musl | 7787 | -21 |
+
+## Blocked or incomplete
+- None
