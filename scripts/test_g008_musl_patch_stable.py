@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g008_musl_patch_stable.py"
 TARGETS = [
-    Path("examples/shell/src/uspace/program_loader.rs"),
+    Path("user/shell/src/uspace/program_loader.rs"),
     Path("scripts/fixtures/g008-musl-patch-stable/musl-runtime-patch-manifest.md"),
     Path("scripts/fixtures/g008-musl-patch-stable/stable-reproof-gate.md"),
     Path("scripts/ltp_summary.py"),
@@ -46,7 +46,7 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
 
     def test_detects_reintroduced_runtime_patch_function(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/program_loader.rs"
+        path = tree / "user/shell/src/uspace/program_loader.rs"
         text = path.read_text(encoding="utf-8")
         text += "\nfn patch_riscv_musl_syscall_stubs(image: &mut [u8]) { let _ = image; }\n"
         path.write_text(text, encoding="utf-8")
@@ -56,7 +56,7 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
 
     def test_detects_reintroduced_symbol_lookup(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/program_loader.rs"
+        path = tree / "user/shell/src/uspace/program_loader.rs"
         text = path.read_text(encoding="utf-8")
         text += "\nfn find_dynsym_file_offset() {}\n"
         path.write_text(text, encoding="utf-8")
@@ -66,7 +66,7 @@ class G008MuslPatchStableGuardTest(unittest.TestCase):
 
     def test_detects_reintroduced_rx_patch_area(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/program_loader.rs"
+        path = tree / "user/shell/src/uspace/program_loader.rs"
         text = path.read_text(encoding="utf-8")
         text += "\nfn reserve_elf_rx_patch_area() {}\n"
         path.write_text(text, encoding="utf-8")

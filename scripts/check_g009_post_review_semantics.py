@@ -40,7 +40,7 @@ def function_block(text: str, name: str) -> str:
 
 def scan_stdio_close(root: Path) -> list[str]:
     api_text = read(root / "api/arceos_posix_api/src/imp/fd_ops.rs")
-    fd_text = read(root / "examples/shell/src/uspace/fd_table.rs")
+    fd_text = read(root / "user/shell/src/uspace/fd_table.rs")
     block = function_block(api_text, "sys_close")
     is_stdio = function_block(fd_text, "is_stdio")
     findings: list[str] = []
@@ -63,9 +63,9 @@ def scan_stdio_close(root: Path) -> list[str]:
 
 
 def scan_block_device(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/fd_table.rs")
-    metadata = read(root / "examples/shell/src/uspace/metadata.rs")
-    linux_abi = read(root / "examples/shell/src/uspace/linux_abi.rs")
+    text = read(root / "user/shell/src/uspace/fd_table.rs")
+    metadata = read(root / "user/shell/src/uspace/metadata.rs")
+    linux_abi = read(root / "user/shell/src/uspace/linux_abi.rs")
     findings: list[str] = []
     for token in ("status_flags", "offset: Arc<Mutex<u64>>", "storage: Arc<Mutex<Vec<u8>>>"):
         if token not in text:
@@ -130,7 +130,7 @@ def scan_socket_stat(root: Path) -> list[str]:
 
 
 def scan_adjtimex(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/time_abi.rs")
+    text = read(root / "user/shell/src/uspace/time_abi.rs")
     block = function_block(text, "sys_adjtimex")
     clock_block = function_block(text, "clock_now_duration")
     findings: list[str] = []
@@ -151,7 +151,7 @@ def scan_adjtimex(root: Path) -> list[str]:
 
 
 def scan_file_lease(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/fd_table.rs")
+    text = read(root / "user/shell/src/uspace/fd_table.rs")
     findings: list[str] = []
     if re.search(r"^\s+lease_type:\s*Arc<", text, re.M):
         findings.append("F_SETLEASE must not be a per-FD private field with fake readback")
@@ -171,7 +171,7 @@ def scan_file_lease(root: Path) -> list[str]:
 
 
 def scan_synthetic_pid1_state(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/resource_sched.rs")
+    text = read(root / "user/shell/src/uspace/resource_sched.rs")
     findings: list[str] = []
     impl_start = text.find("impl UserProcessRef")
     impl_end = text.find("pub(super) fn sys_getpriority", impl_start)

@@ -17,11 +17,11 @@ TARGETS = [
     Path("api/arceos_posix_api/src/imp/fs.rs"),
     Path("api/arceos_posix_api/src/imp/net.rs"),
     Path("ulib/axlibc/src/net.rs"),
-    Path("examples/shell/src/uspace/fd_table.rs"),
-    Path("examples/shell/src/uspace/linux_abi.rs"),
-    Path("examples/shell/src/uspace/metadata.rs"),
-    Path("examples/shell/src/uspace/time_abi.rs"),
-    Path("examples/shell/src/uspace/resource_sched.rs"),
+    Path("user/shell/src/uspace/fd_table.rs"),
+    Path("user/shell/src/uspace/linux_abi.rs"),
+    Path("user/shell/src/uspace/metadata.rs"),
+    Path("user/shell/src/uspace/time_abi.rs"),
+    Path("user/shell/src/uspace/resource_sched.rs"),
 ]
 
 
@@ -63,7 +63,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_numeric_stdio_ioctl_fake(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "matches!(\n            self.entry(fd),\n            Ok(FdEntry::Stdin(_) | FdEntry::Stdout(_) | FdEntry::Stderr(_))\n        )",
@@ -76,7 +76,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_block_write_bitbucket(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace("FdEntry::BlockDevice(dev) => dev.write(src),", "FdEntry::BlockDevice(_) => Ok(src.len()),")
         path.write_text(text, encoding="utf-8")
@@ -86,7 +86,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_block_capacity_mismatch(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "let size: u64 = SYNTHETIC_BLOCK_DEVICE_SIZE;",
@@ -140,7 +140,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_adjtimex_uid_gate(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/time_abi.rs"
+        path = tree / "user/shell/src/uspace/time_abi.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace("!can_set_system_time(process)", "process.uid() != 0")
         path.write_text(text, encoding="utf-8")
@@ -150,7 +150,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_clock_tai_ignoring_adjtimex_tai(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/time_abi.rs"
+        path = tree / "user/shell/src/uspace/time_abi.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "general::CLOCK_TAI => Ok(adjusted_wall_time_with_extra_ns(\n            TIME_DISCIPLINE.tai.load(Ordering::Acquire) as i128 * NSEC_PER_SEC,\n        )),",
@@ -164,7 +164,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_per_fd_fake_lease_state(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace("offset: Arc<Mutex<u64>>,", "offset: Arc<Mutex<u64>>,\n    lease_type: Arc<Mutex<u32>>,")
         text = text.replace("file_lease_type(file) as i32", "*file.lease_type.lock() as i32")
@@ -175,7 +175,7 @@ class G009PostReviewSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_synthetic_pid1_noop_success(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/resource_sched.rs"
+        path = tree / "user/shell/src/uspace/resource_sched.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "UserProcessRef::InitProcess => {\n                SYNTHETIC_INIT_NICE.store(clamp_nice(nice), Ordering::Release)\n            }",

@@ -91,7 +91,7 @@ def scan(root: Path) -> list[str]:
     ]:
         require(token not in mounts, findings, detail)
 
-    cmd = read(root, "examples/shell/src/cmd.rs")
+    cmd = read(root, "user/shell/src/cmd.rs")
     selected_ltp = function_block(cmd, "selected_ltp_cases")
     run_ltp = function_block(cmd, "run_ltp_suite")
     official = function_block(cmd, "selected_official_test_groups")

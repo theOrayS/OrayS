@@ -90,7 +90,7 @@ Ok(0)
 
     def test_fd_table_high_risk_ok_unit_is_flagged(self) -> None:
         findings = guard.scan_fd_table_fake_success(
-            Path("examples/shell/src/uspace/fd_table.rs"),
+            Path("user/shell/src/uspace/fd_table.rs"),
             """
 pub(super) fn fallocate_zero_range(&mut self) -> Result<(), LinuxError> {
     match self.entry_mut(fd)? {
@@ -107,7 +107,7 @@ pub(super) fn fallocate_zero_range(&mut self) -> Result<(), LinuxError> {
 
     def test_fd_table_same_pattern_outside_high_risk_function_is_allowed(self) -> None:
         findings = guard.scan_fd_table_fake_success(
-            Path("examples/shell/src/uspace/fd_table.rs"),
+            Path("user/shell/src/uspace/fd_table.rs"),
             """
 pub(super) fn close_range_for_process(&mut self) -> Result<(), LinuxError> {
     match self.entry_mut(fd)? {

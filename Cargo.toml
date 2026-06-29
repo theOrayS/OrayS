@@ -25,11 +25,7 @@ members = [
     "ulib/axstd",
     "ulib/axlibc",
 
-    "examples/helloworld",
-    "examples/helloworld-myplat",
-    "examples/httpclient",
-    "examples/httpserver",
-    "examples/shell",
+    "user/shell",
 ]
 exclude = ["vendor/rust-fatfs", "vendor/smoltcp"]
 

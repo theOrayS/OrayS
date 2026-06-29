@@ -13,10 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g006_synthetic_capabilities.py"
 TARGETS = [
-    Path("examples/shell/src/uspace/synthetic_fs.rs"),
-    Path("examples/shell/src/uspace/fd_table.rs"),
-    Path("examples/shell/src/uspace/metadata.rs"),
-    Path("examples/shell/src/uspace/linux_abi.rs"),
+    Path("user/shell/src/uspace/synthetic_fs.rs"),
+    Path("user/shell/src/uspace/fd_table.rs"),
+    Path("user/shell/src/uspace/metadata.rs"),
+    Path("user/shell/src/uspace/linux_abi.rs"),
 ]
 
 
@@ -45,7 +45,7 @@ class G006SyntheticCapabilityGuardTest(unittest.TestCase):
 
     def test_detects_ltp_cmdline_marker(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/synthetic_fs.rs"
+        path = tree / "user/shell/src/uspace/synthetic_fs.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             'b"root=/dev/vda rw console=ttyS0\\n"',
@@ -58,7 +58,7 @@ class G006SyntheticCapabilityGuardTest(unittest.TestCase):
 
     def test_detects_linux_abi_ltp_marker(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/linux_abi.rs"
+        path = tree / "user/shell/src/uspace/linux_abi.rs"
         path.write_text(
             path.read_text(encoding="utf-8") + "\n// LTP-aware sizing marker must not be reintroduced.\n",
             encoding="utf-8",
@@ -69,7 +69,7 @@ class G006SyntheticCapabilityGuardTest(unittest.TestCase):
 
     def test_detects_extra_block_device_alias(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             'const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda"];',
@@ -82,7 +82,7 @@ class G006SyntheticCapabilityGuardTest(unittest.TestCase):
 
     def test_detects_unbacked_config_comment(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/synthetic_fs.rs"
+        path = tree / "user/shell/src/uspace/synthetic_fs.rs"
         text = path.read_text(encoding="utf-8").replace(
             "implemented Linux ABI surfaces",
             "LTP feature probes",

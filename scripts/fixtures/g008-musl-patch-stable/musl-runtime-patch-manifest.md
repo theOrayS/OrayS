@@ -17,7 +17,7 @@ Any future repair must be validated at the syscall/API boundary instead of by bi
 
 ## Retired source surface
 
-`examples/shell/src/uspace/program_loader.rs` no longer carries musl patch manifests, symbol-offset lookup helpers, executable-segment patch-area reservations, or architecture-specific `patch_*_musl_*` functions.  Reintroducing any of those helpers should fail `scripts/check_g008_musl_patch_stable.py` until a non-binary-rewrite design is reviewed.
+`user/shell/src/uspace/program_loader.rs` no longer carries musl patch manifests, symbol-offset lookup helpers, executable-segment patch-area reservations, or architecture-specific `patch_*_musl_*` functions.  Reintroducing any of those helpers should fail `scripts/check_g008_musl_patch_stable.py` until a non-binary-rewrite design is reviewed.
 
 ## Replacement rule
 

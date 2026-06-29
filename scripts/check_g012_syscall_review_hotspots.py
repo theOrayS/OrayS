@@ -127,7 +127,7 @@ def require_syslog_state_actions_privileged(findings: list[str], syslog: str) ->
 
 def scan_user_trace(root: Path) -> list[str]:
     findings: list[str] = []
-    mod = read(root, "examples/shell/src/uspace/mod.rs")
+    mod = read(root, "user/shell/src/uspace/mod.rs")
     macro_match = re.search(r"macro_rules!\s+user_trace\s*\{(?P<body>.*?)\n\}", mod, re.S)
     if not macro_match:
         findings.append("uspace mod: missing central user_trace macro")
@@ -136,15 +136,15 @@ def scan_user_trace(root: Path) -> list[str]:
         if "=> {};" in body or "format_args" not in body:
             findings.append("uspace mod: user_trace macro must not be an empty shell")
     for rel in (
-        "examples/shell/src/uspace/futex.rs",
-        "examples/shell/src/uspace/signal_abi.rs",
-        "examples/shell/src/uspace/memory_map.rs",
-        "examples/shell/src/uspace/process_lifecycle.rs",
-        "examples/shell/src/uspace/task_context.rs",
+        "user/shell/src/uspace/futex.rs",
+        "user/shell/src/uspace/signal_abi.rs",
+        "user/shell/src/uspace/memory_map.rs",
+        "user/shell/src/uspace/process_lifecycle.rs",
+        "user/shell/src/uspace/task_context.rs",
     ):
         if "macro_rules! user_trace" in read(root, rel):
             findings.append(f"{rel}: local empty user_trace macro must not shadow central trace")
-    block = rust_function_block(read(root, "examples/shell/src/uspace/user_memory.rs"), "log_read_cstr_efault")
+    block = rust_function_block(read(root, "user/shell/src/uspace/user_memory.rs"), "log_read_cstr_efault")
     require_tokens(
         findings,
         block,
@@ -158,7 +158,7 @@ def scan_user_trace(root: Path) -> list[str]:
 
 def scan_high_hotspots(root: Path) -> list[str]:
     findings: list[str] = []
-    mount = read(root, "examples/shell/src/uspace/mount_abi.rs")
+    mount = read(root, "user/shell/src/uspace/mount_abi.rs")
     resolve = rust_function_block(mount, "resolve_mount_source")
     require_tokens(
         findings,
@@ -177,7 +177,7 @@ def scan_high_hotspots(root: Path) -> list[str]:
     if re.search(r'"vfat"[\s\S]*?Ok\("/"\.into\(\)\)', resolve):
         findings.append("mount_abi: block-filesystem mount still aliases to root")
 
-    fd = read(root, "examples/shell/src/uspace/fd_table.rs")
+    fd = read(root, "user/shell/src/uspace/fd_table.rs")
     fsync = rust_function_block(fd, "sys_fsync")
     require_tokens(
         findings,
@@ -214,7 +214,7 @@ def scan_high_hotspots(root: Path) -> list[str]:
 
 def scan_medium_hotspots(root: Path) -> list[str]:
     findings: list[str] = []
-    sysinfo = read(root, "examples/shell/src/uspace/system_info.rs")
+    sysinfo = read(root, "user/shell/src/uspace/system_info.rs")
     syslog = rust_function_block(sysinfo, "sys_syslog")
     if "PrivilegedNoop" in sysinfo:
         findings.append("sys_syslog still has a PrivilegedNoop action")
@@ -273,7 +273,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     )
     require_syslog_state_actions_privileged(findings, syslog)
 
-    time = read(root, "examples/shell/src/uspace/time_abi.rs")
+    time = read(root, "user/shell/src/uspace/time_abi.rs")
     process_times = rust_function_block(time, "process_times")
     if "elapsed / 2" in process_times or "saturating_sub(user_ticks)" in process_times:
         findings.append("process_times still fabricates a half user/system split")
@@ -307,7 +307,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
         ),
     )
 
-    sched = read(root, "examples/shell/src/uspace/resource_sched.rs")
+    sched = read(root, "user/shell/src/uspace/resource_sched.rs")
     sched_param_accepts = rust_function_block(sched, "sched_param_accepts_policy")
     require_tokens(
         findings,
@@ -355,7 +355,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
     if "scheduled with the normal nice-based priority" in sched:
         findings.append("SCHED_DEADLINE comment still admits normal-priority fake success")
 
-    memory = read(root, "examples/shell/src/uspace/memory_map.rs")
+    memory = read(root, "user/shell/src/uspace/memory_map.rs")
     require_tokens(
         findings,
         memory,
@@ -379,7 +379,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
                 "record_mmap_sigbus_ranges",
             ),
         )
-    futex = read(root, "examples/shell/src/uspace/futex.rs")
+    futex = read(root, "user/shell/src/uspace/futex.rs")
     wake_requeue = rust_function_block(futex, "wake_requeue_addr_checked")
     require_tokens(
         findings,
@@ -404,7 +404,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
         ),
     )
 
-    lifecycle = read(root, "examples/shell/src/uspace/process_lifecycle.rs")
+    lifecycle = read(root, "user/shell/src/uspace/process_lifecycle.rs")
     require_tokens(
         findings,
         lifecycle,
@@ -424,7 +424,7 @@ def scan_medium_hotspots(root: Path) -> list[str]:
             "Ok(Some((child_pid, status, child_rusage)))",
         ),
     )
-    registry = read(root, "examples/shell/src/uspace/task_registry.rs")
+    registry = read(root, "user/shell/src/uspace/task_registry.rs")
     unregister = rust_function_block(registry, "unregister_user_task_with_runtime")
     require_tokens(
         findings,
@@ -442,8 +442,8 @@ def scan_medium_hotspots(root: Path) -> list[str]:
             "unregister_user_task_with_runtime removes the live task before committing completed runtime"
         )
 
-    linux_abi = read(root, "examples/shell/src/uspace/linux_abi.rs")
-    process_abi = read(root, "examples/shell/src/uspace/process_abi.rs")
+    linux_abi = read(root, "user/shell/src/uspace/linux_abi.rs")
+    process_abi = read(root, "user/shell/src/uspace/process_abi.rs")
     if "LINUX_PERSONALITY_MASK" in linux_abi or "LINUX_PERSONALITY_MASK" in process_abi:
         findings.append("personality must not silently mask/accept arbitrary persona values")
     require_tokens(

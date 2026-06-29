@@ -5,7 +5,7 @@ Scope: final Phase 8 gate after fake-success cleanup.
 
 ## Live stable baseline
 
-`examples/shell/src/cmd.rs::LTP_STABLE_CASES` was re-read during G008:
+`user/shell/src/cmd.rs::LTP_STABLE_CASES` was re-read during G008:
 
 | Metric | Value |
 | --- | ---: |

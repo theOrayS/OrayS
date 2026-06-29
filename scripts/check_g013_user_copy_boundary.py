@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT_REL = Path("api/arceos_posix_api/src")
 UTILS_REL = ROOT_REL / "utils.rs"
 IMP_REL = ROOT_REL / "imp"
-SHELL_USPACE_REL = Path("examples/shell/src/uspace")
+SHELL_USPACE_REL = Path("user/shell/src/uspace")
 SHELL_SYSCALL_DISPATCH_REL = SHELL_USPACE_REL / "syscall_dispatch.rs"
 
 HELPER_TOKENS = (

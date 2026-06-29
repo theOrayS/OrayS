@@ -15,7 +15,7 @@ GUARD = ROOT / "scripts/check_selfcheck_compliance_fixes.py"
 TARGETS = [
     Path("Cargo.toml"),
     Path("kernel/fs/axfs/src/mounts.rs"),
-    Path("examples/shell/src/cmd.rs"),
+    Path("user/shell/src/cmd.rs"),
     Path("api/arceos_posix_api/src/utils.rs"),
     Path("api/arceos_posix_api/src/imp/pthread/mutex.rs"),
     Path("api/arceos_posix_api/src/imp/task.rs"),
@@ -64,7 +64,7 @@ class SelfCheckComplianceGuardTest(unittest.TestCase):
         tree = self.make_tree()
         self.mutate(
             tree,
-            "examples/shell/src/cmd.rs",
+            "user/shell/src/cmd.rs",
             'Err(format!(\n        "invalid LTP_CASES selection \'{spec}\': no valid cases parsed"\n    ))',
             'Ok((String::from("core"), ltp_cases_from_slice(LTP_CORE_CASES)?))',
         )
@@ -91,7 +91,7 @@ class SelfCheckComplianceGuardTest(unittest.TestCase):
         tree = self.make_tree()
         self.mutate(
             tree,
-            "examples/shell/src/cmd.rs",
+            "user/shell/src/cmd.rs",
             "if !missing_groups.is_empty() || !disabled_groups.is_empty() {",
             "if false && (!missing_groups.is_empty() || !disabled_groups.is_empty()) {",
         )

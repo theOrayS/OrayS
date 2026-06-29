@@ -15,7 +15,7 @@ GUARD = ROOT / "scripts/check_g013_user_copy_boundary.py"
 TARGETS = [
     Path("api/arceos_posix_api/src/utils.rs"),
     Path("api/arceos_posix_api/src/imp"),
-    Path("examples/shell/src/uspace/syscall_dispatch.rs"),
+    Path("user/shell/src/uspace/syscall_dispatch.rs"),
 ]
 
 
@@ -125,7 +125,7 @@ class G013UserCopyBoundaryGuardTest(unittest.TestCase):
 
     def test_detects_shell_syscall_dispatch_path_shim(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        path = tree / "user/shell/src/uspace/syscall_dispatch.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "let ret = match syscall_num {",
@@ -139,7 +139,7 @@ class G013UserCopyBoundaryGuardTest(unittest.TestCase):
 
     def test_detects_shell_syscall_dispatch_user_copy_shim(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        path = tree / "user/shell/src/uspace/syscall_dispatch.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "let ret = match syscall_num {",
@@ -153,7 +153,7 @@ class G013UserCopyBoundaryGuardTest(unittest.TestCase):
 
     def test_detects_shell_syscall_dispatch_route_rewrite(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        path = tree / "user/shell/src/uspace/syscall_dispatch.rs"
         text = path.read_text(encoding="utf-8").replace(
             "general::__NR_openat => sys_openat(process, tf.arg0(), tf.arg1(), tf.arg2(), tf.arg3())",
             "general::__NR_openat => sys_openat(process, tf.arg0(), 0, tf.arg2(), tf.arg3())",

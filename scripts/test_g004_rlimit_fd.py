@@ -190,7 +190,7 @@ pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
 
     def test_shell_prlimit_invalid_resource_success_is_flagged(self) -> None:
         findings = guard.scan_shell_resource(
-            Path("examples/shell/src/uspace/resource_sched.rs"),
+            Path("user/shell/src/uspace/resource_sched.rs"),
             r'''
 pub(super) fn sys_prlimit64(process: &UserProcess, pid: i32, resource: u32, new_limit: usize, old_limit: usize) -> isize {
     if !resource_is_valid(resource) {
@@ -206,7 +206,7 @@ pub(super) fn sys_prlimit64(process: &UserProcess, pid: i32, resource: u32, new_
 
     def test_shell_prlimit_einval_is_allowed(self) -> None:
         findings = guard.scan_shell_resource(
-            Path("examples/shell/src/uspace/resource_sched.rs"),
+            Path("user/shell/src/uspace/resource_sched.rs"),
             r'''
 pub(super) fn sys_prlimit64(process: &UserProcess, pid: i32, resource: u32, new_limit: usize, old_limit: usize) -> isize {
     if !resource_is_valid(resource) {
@@ -222,7 +222,7 @@ pub(super) fn sys_prlimit64(process: &UserProcess, pid: i32, resource: u32, new_
 
     def test_shell_fd_table_capacity_capped_at_default_nofile_is_flagged(self) -> None:
         findings = guard.scan_shell_fd_table(
-            Path("examples/shell/src/uspace/fd_table.rs"),
+            Path("user/shell/src/uspace/fd_table.rs"),
             r'''
 use super::linux_abi::{DEFAULT_NOFILE_LIMIT, RLIMIT_NOFILE_RESOURCE};
 const FD_TABLE_LIMIT: usize = DEFAULT_NOFILE_LIMIT as usize;
@@ -275,7 +275,7 @@ impl FdTable {
 
     def test_shell_fd_table_nr_open_capacity_and_soft_clamp_are_allowed(self) -> None:
         findings = guard.scan_shell_fd_table(
-            Path("examples/shell/src/uspace/fd_table.rs"),
+            Path("user/shell/src/uspace/fd_table.rs"),
             r'''
 use super::linux_abi::{NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE};
 const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;
@@ -333,7 +333,7 @@ impl FdTable {
 
     def test_shell_fcntl_ok_zero_fallback_is_flagged(self) -> None:
         findings = guard.scan_shell_fd_table(
-            Path("examples/shell/src/uspace/fd_table.rs"),
+            Path("user/shell/src/uspace/fd_table.rs"),
             r'''
 use super::linux_abi::{NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE};
 const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;
@@ -375,7 +375,7 @@ impl FdTable {
 
     def test_shell_fcntl_fd_state_and_errno_fallback_are_allowed(self) -> None:
         findings = guard.scan_shell_fd_table(
-            Path("examples/shell/src/uspace/fd_table.rs"),
+            Path("user/shell/src/uspace/fd_table.rs"),
             r'''
 use super::linux_abi::{NR_OPEN_LIMIT, RLIMIT_NOFILE_RESOURCE};
 const FD_TABLE_LIMIT: usize = NR_OPEN_LIMIT as usize;

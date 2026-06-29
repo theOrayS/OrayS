@@ -64,7 +64,7 @@ def rust_function_names(text: str) -> set[str]:
 
 def scan_busybox_runtime_boundary(root: Path) -> list[str]:
     findings: list[str] = []
-    cmd = read(root / "examples/shell/src/cmd.rs")
+    cmd = read(root / "user/shell/src/cmd.rs")
     runtime_wrappers = function_block(cmd, "ensure_runtime_busybox_wrappers")
     suite_runtime_wrappers = function_block(cmd, "prepare_suite_runtime_busybox_wrappers")
     autorun_body = function_body(cmd, "maybe_run_official_tests")
@@ -78,9 +78,9 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
         "LTP_BUSYBOX_APPLETS",
     ):
         if token not in cmd:
-            findings.append(f"examples/shell/src/cmd.rs: missing filesystem-visible busybox wrapper support token {token}")
+            findings.append(f"user/shell/src/cmd.rs: missing filesystem-visible busybox wrapper support token {token}")
     if not runtime_wrappers:
-        findings.append("examples/shell/src/cmd.rs: missing ensure_runtime_busybox_wrappers")
+        findings.append("user/shell/src/cmd.rs: missing ensure_runtime_busybox_wrappers")
     else:
         wrapper_dir_loop = (
             'for dir in [suite_dir, "/bin", "/usr/bin"]' in runtime_wrappers
@@ -92,33 +92,33 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
         )
         if not wrapper_dir_loop:
             findings.append(
-                "examples/shell/src/cmd.rs: runtime busybox support must attempt real wrapper files for suite/bin/usr-bin paths"
+                "user/shell/src/cmd.rs: runtime busybox support must attempt real wrapper files for suite/bin/usr-bin paths"
             )
         for token in required_wrapper_tokens:
             if token not in runtime_wrappers:
                 findings.append(
-                    "examples/shell/src/cmd.rs: runtime busybox support must create real wrapper files for suite/bin/usr-bin paths"
+                    "user/shell/src/cmd.rs: runtime busybox support must create real wrapper files for suite/bin/usr-bin paths"
                 )
                 break
     if not suite_runtime_wrappers:
-        findings.append("examples/shell/src/cmd.rs: missing suite-level runtime busybox wrapper preparation helper")
+        findings.append("user/shell/src/cmd.rs: missing suite-level runtime busybox wrapper preparation helper")
     elif (
         'let suite_busybox = join_path(suite_dir, "busybox")' not in suite_runtime_wrappers
         or "ltp_helper_busybox_path(suite_dir, &suite_busybox)" not in suite_runtime_wrappers
         or "ensure_runtime_busybox_wrappers(suite_dir, &wrapper_busybox)" not in suite_runtime_wrappers
     ):
         findings.append(
-            "examples/shell/src/cmd.rs: suite-level wrapper preparation must derive the suite busybox and create real runtime wrapper files"
+            "user/shell/src/cmd.rs: suite-level wrapper preparation must derive the suite busybox and create real runtime wrapper files"
         )
     if not autorun_body or "ensure_runtime_busybox_wrappers(suite_dir, &wrapper_busybox)" not in autorun_body:
         if "prepare_suite_runtime_busybox_wrappers(suite_dir)" not in autorun_body:
-            findings.append("examples/shell/src/cmd.rs: official autorun must prepare real busybox wrapper files before executing suites")
+            findings.append("user/shell/src/cmd.rs: official autorun must prepare real busybox wrapper files before executing suites")
     for runner_name, runner_body in (("run_busybox_suite", busybox_runner), ("run_ltp_suite", ltp_runner)):
         if not runner_body:
-            findings.append(f"examples/shell/src/cmd.rs: missing {runner_name}")
+            findings.append(f"user/shell/src/cmd.rs: missing {runner_name}")
         elif "prepare_suite_runtime_busybox_wrappers(suite_dir)" not in runner_body:
             findings.append(
-                f"examples/shell/src/cmd.rs: {runner_name} must enforce real busybox wrapper preparation instead of relying on outer autorun order"
+                f"user/shell/src/cmd.rs: {runner_name} must enforce real busybox wrapper preparation instead of relying on outer autorun order"
             )
 
     forbidden_uspace_tokens = {
@@ -136,10 +136,10 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
         "busybox_applet_supported": "runtime path/VFS layer must not classify applet names for hidden fallback",
     }
     for rel in (
-        Path("examples/shell/src/uspace/runtime_paths.rs"),
-        Path("examples/shell/src/uspace/process_lifecycle.rs"),
-        Path("examples/shell/src/uspace/fd_table.rs"),
-        Path("examples/shell/src/uspace/program_loader.rs"),
+        Path("user/shell/src/uspace/runtime_paths.rs"),
+        Path("user/shell/src/uspace/process_lifecycle.rs"),
+        Path("user/shell/src/uspace/fd_table.rs"),
+        Path("user/shell/src/uspace/program_loader.rs"),
     ):
         text = read(root / rel)
         for token, detail in forbidden_uspace_tokens.items():
@@ -149,7 +149,7 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
 
 
 def scan_cmd_rs(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/cmd.rs")
+    text = read(root / "user/shell/src/cmd.rs")
     findings: list[str] = []
     env_block = function_block(text, "ltp_case_env")
     autorun_body = function_body(text, "maybe_run_official_tests")
@@ -177,28 +177,28 @@ def scan_cmd_rs(root: Path) -> list[str]:
     }
     for function_name in sorted(function_names & forbidden_functions):
         findings.append(
-            f"examples/shell/src/cmd.rs: forbidden suite/script-specific helper still defined: {function_name}"
+            f"user/shell/src/cmd.rs: forbidden suite/script-specific helper still defined: {function_name}"
         )
     for token in forbidden_runner_rewrite_tokens:
         if token in text:
-            findings.append(f"examples/shell/src/cmd.rs: suite/script-specific rewrite token is forbidden: {token}")
+            findings.append(f"user/shell/src/cmd.rs: suite/script-specific rewrite token is forbidden: {token}")
     if re.search(r"\|\|\s*line\s*==\s*\"", text) or re.search(r"line\s*==\s*\"[^\"]+\"", text):
-        findings.append("examples/shell/src/cmd.rs: runner success must not special-case literal command lines")
+        findings.append("user/shell/src/cmd.rs: runner success must not special-case literal command lines")
     if "skip unscored test group" in text or "musl-only" in text:
-        findings.append("examples/shell/src/cmd.rs: runner must not skip official groups based on score-only/musl-only policy")
+        findings.append("user/shell/src/cmd.rs: runner must not skip official groups based on score-only/musl-only policy")
     if re.search(r'group\s*==\s*"libctest"\s*&&\s*suite_dir\s*!=\s*"/musl"', text):
-        findings.append("examples/shell/src/cmd.rs: libctest must run for every discovered libc suite instead of score-aware skipping")
+        findings.append("user/shell/src/cmd.rs: libctest must run for every discovered libc suite instead of score-aware skipping")
     if not autorun_body:
-        findings.append("examples/shell/src/cmd.rs: missing maybe_run_official_tests")
+        findings.append("user/shell/src/cmd.rs: missing maybe_run_official_tests")
     else:
         if 'if group == "libctest"' not in autorun_body or "run_libctest_suite(&suite_dir, &cwd)" not in autorun_body:
-            findings.append("examples/shell/src/cmd.rs: libctest dispatch must run the generic libctest suite for each discovered suite directory")
+            findings.append("user/shell/src/cmd.rs: libctest dispatch must run the generic libctest suite for each discovered suite directory")
         if "available_groups: BTreeSet<String>" not in autorun_body or "missing_groups" not in autorun_body:
-            findings.append("examples/shell/src/cmd.rs: selected official groups must be checked against discovered scripts")
+            findings.append("user/shell/src/cmd.rs: selected official groups must be checked against discovered scripts")
         if "if !missing_groups.is_empty() || !disabled_groups.is_empty()" not in autorun_body:
-            findings.append("examples/shell/src/cmd.rs: unknown or disabled selected official groups must fail visibly")
+            findings.append("user/shell/src/cmd.rs: unknown or disabled selected official groups must fail visibly")
         if "official test group filter matched no available groups" not in autorun_body:
-            findings.append("examples/shell/src/cmd.rs: selected official groups must fail if no scripts are available")
+            findings.append("user/shell/src/cmd.rs: selected official groups must fail if no scripts are available")
         suite_dir_policy = re.compile(
             r'(?:suite_dir(?:\.as_str\(\))?\s*(?:==|!=)\s*"/(?:musl|glibc)")|'
             r'(?:"/(?:musl|glibc)"\s*(?:==|!=)\s*suite_dir(?:\.as_str\(\))?)'
@@ -210,50 +210,50 @@ def scan_cmd_rs(root: Path) -> list[str]:
                 continue
             window = "\n".join(autorun_lines[idx : idx + 10])
             if "continue;" in window and "run_libctest_suite" not in window:
-                findings.append("examples/shell/src/cmd.rs: libctest dispatch must not conditionally continue/skip discovered suites")
+                findings.append("user/shell/src/cmd.rs: libctest dispatch must not conditionally continue/skip discovered suites")
             if suite_dir_policy.search(window):
-                findings.append("examples/shell/src/cmd.rs: libctest dispatch must not branch on fixed musl/glibc suite directory policy")
+                findings.append("user/shell/src/cmd.rs: libctest dispatch must not branch on fixed musl/glibc suite directory policy")
             if score_policy.search(window):
-                findings.append("examples/shell/src/cmd.rs: libctest dispatch must not encode score-only or musl-only policy")
+                findings.append("user/shell/src/cmd.rs: libctest dispatch must not encode score-only or musl-only policy")
     if not copy_block:
-        findings.append("examples/shell/src/cmd.rs: missing copy_script_file")
+        findings.append("user/shell/src/cmd.rs: missing copy_script_file")
     elif (
         "src.ends_with" in copy_block
         or '"$file"' in copy_block
         or "rewrite_ltp_case_line" in copy_block
         or copy_block.count("rewrite_script_line") != 1
     ):
-        findings.append("examples/shell/src/cmd.rs: copy_script_file must stay generic and must not branch on script names or LTP $file patterns")
+        findings.append("user/shell/src/cmd.rs: copy_script_file must stay generic and must not branch on script names or LTP $file patterns")
     if unstaged_block and 'group == "ltp"' in unstaged_block:
-        findings.append("examples/shell/src/cmd.rs: unstaged script preparation must not inject LTP-only rewrites")
+        findings.append("user/shell/src/cmd.rs: unstaged script preparation must not inject LTP-only rewrites")
     if not env_block:
-        findings.append("examples/shell/src/cmd.rs: missing ltp_case_env")
+        findings.append("user/shell/src/cmd.rs: missing ltp_case_env")
     else:
         if '"chdir01"' in env_block or "chdir01" in env_block:
-            findings.append("examples/shell/src/cmd.rs: ltp_case_env must not special-case chdir01")
+            findings.append("user/shell/src/cmd.rs: ltp_case_env must not special-case chdir01")
         if "needs_case_resource_helper" not in env_block:
-            findings.append("examples/shell/src/cmd.rs: ltp_case_env must be driven by generic helper/device capability")
+            findings.append("user/shell/src/cmd.rs: ltp_case_env must be driven by generic helper/device capability")
         if "LTP_SINGLE_FS_TYPE=tmpfs" not in env_block or "LTP_DEV_FS_TYPE=tmpfs" not in env_block:
-            findings.append("examples/shell/src/cmd.rs: helper-backed filesystem env boundary is missing")
+            findings.append("user/shell/src/cmd.rs: helper-backed filesystem env boundary is missing")
     if not run_dir_block:
-        findings.append("examples/shell/src/cmd.rs: missing prepare_ltp_case_run_dir")
+        findings.append("user/shell/src/cmd.rs: missing prepare_ltp_case_run_dir")
     elif "needs_case_resource_helper" not in run_dir_block:
-        findings.append("examples/shell/src/cmd.rs: run-dir selection must reuse generic helper detection")
+        findings.append("user/shell/src/cmd.rs: run-dir selection must reuse generic helper detection")
     if not helper_cases_block:
-        findings.append("examples/shell/src/cmd.rs: missing ltp_resource_helper_cases")
+        findings.append("user/shell/src/cmd.rs: missing ltp_resource_helper_cases")
     else:
         if "split_once('_')" in helper_cases_block or 'split_once("_")' in helper_cases_block:
             findings.append(
-                "examples/shell/src/cmd.rs: ltp_resource_helper_cases must not split helper names at the first underscore; underscore case names need selected-case prefix matching"
+                "user/shell/src/cmd.rs: ltp_resource_helper_cases must not split helper names at the first underscore; underscore case names need selected-case prefix matching"
             )
         if "strip_prefix(case" not in helper_cases_block or "helper_suffix.starts_with('_')" not in helper_cases_block:
             findings.append(
-                "examples/shell/src/cmd.rs: ltp_resource_helper_cases must preserve the generic {case}_ helper boundary for selected cases"
+                "user/shell/src/cmd.rs: ltp_resource_helper_cases must preserve the generic {case}_ helper boundary for selected cases"
             )
     if "PASS LTP CASE" in text:
-        findings.append("examples/shell/src/cmd.rs: runner must not emit PASS LTP CASE wrapper records that can hide later TCONF/TBROK/TFAIL/timeout evidence")
+        findings.append("user/shell/src/cmd.rs: runner must not emit PASS LTP CASE wrapper records that can hide later TCONF/TBROK/TFAIL/timeout evidence")
     if re.search(r"if\s+case\s*==\s*\"chdir01\"", text):
-        findings.append("examples/shell/src/cmd.rs: case-name branch for chdir01 is forbidden")
+        findings.append("user/shell/src/cmd.rs: case-name branch for chdir01 is forbidden")
     return findings
 
 

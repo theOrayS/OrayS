@@ -35,19 +35,19 @@ def function_block(text: str, name: str) -> str:
 
 
 def scan_time(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/time_abi.rs")
+    text = read(root / "user/shell/src/uspace/time_abi.rs")
     findings: list[str] = []
     parse_block = function_block(text, "parse_posix_timer_notify")
     setitimer_block = function_block(text, "sys_setitimer")
     if not parse_block:
-        findings.append("examples/shell/src/uspace/time_abi.rs: missing parse_posix_timer_notify")
+        findings.append("user/shell/src/uspace/time_abi.rs: missing parse_posix_timer_notify")
     else:
         if "SIGEV_THREAD" not in parse_block or "Err(LinuxError::EINVAL)" not in parse_block:
             findings.append("timer_create raw SIGEV_THREAD must fail with EINVAL instead of creating a silent timer")
         if "Accept it as a non-delivering" in parse_block or re.search(r"SIGEV_THREAD[\s\S]{0,240}Ok\(PosixTimerNotify::None\)", parse_block):
             findings.append("timer_create still accepts SIGEV_THREAD as non-delivering fake success")
     if not setitimer_block:
-        findings.append("examples/shell/src/uspace/time_abi.rs: missing sys_setitimer")
+        findings.append("user/shell/src/uspace/time_abi.rs: missing sys_setitimer")
     else:
         required = [
             "itimer_clock_micros(process, which)",
@@ -69,8 +69,8 @@ def scan_time(root: Path) -> list[str]:
 
 
 def scan_mempolicy(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/memory_policy.rs")
-    dispatch = read(root / "examples/shell/src/uspace/syscall_dispatch.rs")
+    text = read(root / "user/shell/src/uspace/memory_policy.rs")
+    dispatch = read(root / "user/shell/src/uspace/syscall_dispatch.rs")
     findings: list[str] = []
     if "fn nodemask_is_empty" not in text or "fn default_policy_only" not in text:
         findings.append("memory policy must validate default-only state with nodemask contents")
@@ -95,14 +95,14 @@ def scan_mempolicy(root: Path) -> list[str]:
 
 
 def scan_socket(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/fd_socket.rs")
+    text = read(root / "user/shell/src/uspace/fd_socket.rs")
     findings: list[str] = []
     recvmsg_block = function_block(text, "sys_recvmsg_bridge")
     sockopt_block = function_block(text, "socket_option_supported")
     setsockopt_block = function_block(text, "sys_setsockopt_bridge")
     getsockopt_block = function_block(text, "sys_getsockopt_bridge")
     if not recvmsg_block:
-        findings.append("examples/shell/src/uspace/fd_socket.rs: missing sys_recvmsg_bridge")
+        findings.append("user/shell/src/uspace/fd_socket.rs: missing sys_recvmsg_bridge")
     else:
         for token in ("capped_iovec_write_len", "validate_iovec_write", "scatter_iovec_bytes_to_user", "msg_value.msg_controllen = 0"):
             if token not in recvmsg_block and token not in text:

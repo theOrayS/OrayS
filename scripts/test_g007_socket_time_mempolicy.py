@@ -14,16 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g007_socket_time_mempolicy.py"
 TARGETS = [
     Path("api/arceos_posix_api/src/imp/net.rs"),
-    Path("examples/shell/src/uspace/fd_socket.rs"),
+    Path("user/shell/src/uspace/fd_socket.rs"),
     Path("kernel/net/axnet/src/smoltcp_impl/mod.rs"),
     Path("kernel/net/axnet/src/smoltcp_impl/tcp.rs"),
     Path("kernel/net/axnet/src/smoltcp_impl/udp.rs"),
     Path("kernel/net/axnet/src/smoltcp_impl/loopback.rs"),
     Path("kernel/net/axnet/src/smoltcp_impl/udp_loopback.rs"),
     Path("kernel/net/axnet/src/smoltcp_impl/listen_table.rs"),
-    Path("examples/shell/src/uspace/time_abi.rs"),
-    Path("examples/shell/src/uspace/memory_policy.rs"),
-    Path("examples/shell/src/uspace/syscall_dispatch.rs"),
+    Path("user/shell/src/uspace/time_abi.rs"),
+    Path("user/shell/src/uspace/memory_policy.rs"),
+    Path("user/shell/src/uspace/syscall_dispatch.rs"),
 ]
 
 
@@ -52,7 +52,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
 
     def test_detects_sigev_thread_fake_success(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/time_abi.rs"
+        path = tree / "user/shell/src/uspace/time_abi.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "value if value == general::SIGEV_THREAD as i32 => Err(LinuxError::EINVAL),",
@@ -65,7 +65,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
 
     def test_detects_itimer_virtual_prof_rejection(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/time_abi.rs"
+        path = tree / "user/shell/src/uspace/time_abi.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "    interval_cell.store(interval_us, Ordering::Release);",
@@ -82,7 +82,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
 
     def test_detects_recvmsg_first_iov_only(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_socket.rs"
+        path = tree / "user/shell/src/uspace/fd_socket.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "let receive_len = capped_iovec_write_len(&iov_entries);",
@@ -95,7 +95,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
 
     def test_detects_sockopt_unbacked_advertisement(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_socket.rs"
+        path = tree / "user/shell/src/uspace/fd_socket.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "    } else {\n        neg_errno_code(setsockopt_unsupported_errno_code(level_i32))\n    }",
@@ -190,7 +190,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
 
     def test_detects_mempolicy_ignored_mode(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/memory_policy.rs"
+        path = tree / "user/shell/src/uspace/memory_policy.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "match default_policy_only(process, mode, nodemask, maxnode) {\n        Ok(()) => 0,\n        Err(err) => neg_errno(err),\n    }",
@@ -204,7 +204,7 @@ class G007SocketTimeMempolicyGuardTest(unittest.TestCase):
 
     def test_detects_missing_mbind_flags_dispatch(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/syscall_dispatch.rs"
+        path = tree / "user/shell/src/uspace/syscall_dispatch.rs"
         text = path.read_text(encoding="utf-8")
         old = """general::__NR_mbind => sys_mbind(
             process,

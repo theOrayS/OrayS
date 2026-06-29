@@ -1,0 +1,420 @@
+<mxfile host="app.diagrams.net" modified="2026-06-22T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="orays-syscall-abi" name="01 Syscall 与 ABI">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="s_title" value="OrayS Syscall 与 Linux ABI 兼容路径" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="335" y="25" width="530" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_user" value="Linux 用户程序 / LTP case&#xa;musl / glibc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="440" y="90" width="320" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_trap" value="用户态 syscall trap&#xa;TrapFrame 参数传递" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="440" y="190" width="320" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_dispatch" value="syscall_dispatch.rs&#xa;register_trap_handler(SYSCALL)&#xa;按 linux_raw_sys::__NR_* 分发" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="440" y="290" width="320" height="82" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_modules" value="uspace ABI 子模块&#xa;fd_table / memory_map / process_lifecycle&#xa;signal_abi / futex / sysv_shm / fd_socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="440" y="410" width="320" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_kernel" value="内核服务模块&#xa;axtask / axmm / axfs / axnet / axsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="440" y="540" width="320" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_ret" value="返回用户态&#xa;写回返回值 / errno / 信号递交检查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="440" y="650" width="320" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_posix" value="api/arceos_posix_api&#xa;POSIX helper&#xa;LinuxError / LinuxResult" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="410" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_note" value="未知 syscall 统一返回 ENOSYS；用户指针访问集中由 user_memory.rs 处理。" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="830" y="410" width="250" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="s_user" target="s_trap">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="s_trap" target="s_dispatch">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="s_dispatch" target="s_modules">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="s_modules" target="s_kernel">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="s_kernel" target="s_ret">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="s_posix" target="s_modules">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-memory" name="02 内存管理">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="m_title" value="OrayS 内存管理与地址空间路径" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="370" y="25" width="460" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_sys" value="Linux 内存 syscall&#xa;brk / mmap / mprotect / munmap / mremap" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_proc" value="UserProcess 内存状态&#xa;brk / mmap_ranges / shared mmap cache&#xa;mlock / SIGBUS range" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="200" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_aspace" value="axmm::AddrSpace&#xa;虚拟地址范围 / MemorySet / PageTable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="325" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_backend" value="映射后端 Backend&#xa;Linear / Alloc / Shared" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="440" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_paging" value="页表与物理页&#xa;page_table_multiarch / global_allocator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="550" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_fault" value="缺页路径&#xa;handle_page_fault&#xa;lazy allocation / COW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="325" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_usercopy" value="用户指针访问&#xa;validate_user_read/write&#xa;fault_in_user_range" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="325" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="m_sys" target="m_proc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="m_proc" target="m_aspace">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="m_aspace" target="m_backend">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="m_backend" target="m_paging">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="m_fault" target="m_aspace">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="m_usercopy" target="m_aspace">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-task-process" name="03 任务与进程">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="t_title" value="OrayS 任务调度与用户进程生命周期" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="350" y="25" width="500" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_start" value="程序启动入口&#xa;run_user_program / execve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_userproc" value="UserProcess&#xa;PID / FD / 地址空间 / 信号 / 子进程 / rlimit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="195" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_task" value="axtask::TaskInner&#xa;任务状态 / 内核栈 / TaskExt / affinity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="315" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_sched" value="RunQueue + Scheduler&#xa;sched-fifo / sched-rr / sched-cfs&#xa;yield / block / preempt / exit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="430" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_context" value="上下文切换&#xa;TaskContext / TrapFrame / UspaceContext&#xa;enter_uspace / 返回用户态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="555" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_wait" value="等待与唤醒&#xa;WaitQueue / timer / futex / poll" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="430" width="240" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_smp" value="SMP 启动&#xa;start_secondary_cpus&#xa;axipi / per-CPU run queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="430" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="t_start" target="t_userproc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="t_userproc" target="t_task">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="t_task" target="t_sched">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="t_sched" target="t_context">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="t_wait" target="t_sched">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="t_smp" target="t_sched">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-fd-vfs" name="04 FD 与文件系统">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="f_title" value="OrayS 文件描述符与 VFS 路径" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="390" y="25" width="420" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_sys" value="文件相关 syscall&#xa;openat / read / write / fcntl / poll / epoll" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_table" value="ProcessFdTable&#xa;fd 分配 / close / dup / flags / CLOEXEC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="200" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_entry" value="FdEntry 类型集合&#xa;普通文件 / 目录 / pipe / socket&#xa;epoll / eventfd / timerfd / signalfd / pidfd" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="315" width="360" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_vfs" value="axfs VFS&#xa;File / Directory / OpenOptions / VfsNode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="450" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_backend" value="文件系统后端&#xa;ext4 / FAT / devfs / ramfs / synthetic / procfs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="565" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_meta" value="metadata.rs&#xa;stat / statx / xattr / link / chmod / chown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="450" width="240" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_io" value="I/O 扩展&#xa;sendfile / splice / tee / copy_file_range" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="450" width="240" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="f_sys" target="f_table">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="f_table" target="f_entry">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="f_entry" target="f_vfs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="f_vfs" target="f_backend">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="f_meta" target="f_vfs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="f_io" target="f_entry">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-ipc-shm" name="05 IPC 与共享内存">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="i_title" value="OrayS IPC 与 System V 共享内存生命周期" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="300" y="25" width="600" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_create" value="sys_shmget&#xa;分配页 / 初始化 SysvShmSegment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_active" value="活动表 table()&#xa;可被 shmget / shmat / IPC_STAT 查找" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="200" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_attach" value="sys_shmat&#xa;权限检查 / map_linear / attach_count++&#xa;记录 UserProcess::shm_attachments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="310" width="360" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_rmid" value="sys_shmctl(IPC_RMID)&#xa;立即从活动表移除 shmid" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="440" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_removed" value="removed_segments()&#xa;仍有 attach 时保留 backing pages&#xa;不允许新的 shmat 查找" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="550" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_free" value="最后一次 shmdt / 进程退出&#xa;attach_count-- 到 0&#xa;free_segment -> dealloc_pages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="675" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_other" value="其他 IPC&#xa;pipe / POSIX mq / SysV msg / SysV sem / socketpair" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="310" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_exit" value="进程生命周期闭环&#xa;fork retain_attachments&#xa;teardown release_process_attachments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="675" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="i_create" target="i_active">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="i_active" target="i_attach">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="i_attach" target="i_rmid">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="i_rmid" target="i_removed">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="i_removed" target="i_free">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="i_exit" target="i_free">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-network" name="06 网络模块">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="n_title" value="OrayS 网络与 Socket 桥接路径" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="390" y="25" width="420" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_sys" value="Linux socket syscall&#xa;socket / bind / connect / accept / sendmsg / recvmsg" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_fd" value="fd_socket.rs&#xa;Linux socket option / local socket / TCP UDP bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="205" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_axnet" value="kernel/net/axnet&#xa;TcpSocket / UdpSocket / dns_query / poll_interfaces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="320" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_stack" value="smoltcp 协议栈&#xa;interface poll / TCP / UDP / DNS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="440" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_driver" value="axdriver + VirtIO net&#xa;MMIO on RV / PCI on LA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="550" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_qemu" value="QEMU user-mode netdev&#xa;评测网络环境" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="660" width="360" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_wait" value="阻塞与轮询&#xa;poll / epoll / WaitQueue / timer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="320" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_scope" value="当前重点&#xa;IPv4 / TCP / UDP / local socket&#xa;IPv6 需按测试确认" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="320" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="n_sys" target="n_fd">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="n_fd" target="n_axnet">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="n_axnet" target="n_stack">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="n_stack" target="n_driver">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="n_driver" target="n_qemu">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="n_wait" target="n_axnet">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-hal-driver" name="07 HAL 与驱动">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="h_title" value="OrayS 硬件抽象、平台配置与驱动探测" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="540" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_kernel" value="内核模块调用硬件能力&#xa;runtime / task / mm / fs / net / driver" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_axhal" value="kernel/arch/axhal&#xa;trap / IRQ / timer / console / paging / context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="205" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_axcpu" value="axcpu&#xa;TrapFrame / TaskContext / UspaceContext&#xa;架构 CPU 细节" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="325" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_axplat" value="axplat-* + axconfig&#xa;平台 TOML / 启动地址 / 中断控制器 / 总线 / 内存布局" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="450" width="360" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_bus" value="总线与驱动探测&#xa;MMIO on RISC-V / PCI on LoongArch&#xa;DriverProbe / register_*_driver" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="580" width="360" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_devices" value="设备对象&#xa;virtio-blk / virtio-net / virtio-gpu&#xa;ramdisk / sdhci / ixgbe" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="710" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_feat" value="feature 裁剪&#xa;smp / irq / paging / tls / uspace / driver feature" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="450" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_arch" value="支持路径&#xa;x86_64 / AArch64&#xa;RISC-V64 / LoongArch64" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="450" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="h_kernel" target="h_axhal">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="h_axhal" target="h_axcpu">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="h_axcpu" target="h_axplat">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="h_axplat" target="h_bus">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="h_bus" target="h_devices">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="h_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="h_feat" target="h_axplat">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="orays-build-eval" name="08 构建与评测">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="b_title" value="OrayS 构建、QEMU 运行与 LTP 证据链" style="text;html=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="330" y="25" width="540" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_make" value="Makefile&#xa;kernel-rv / kernel-la / all" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_build" value="test_build&#xa;RV: wrapper bin -> kernel-rv&#xa;LA: ELF -> kernel-la" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="200" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_run" value="run-eval.sh / make run-*&#xa;检查 QEMU / qemu-img / sdcard 镜像&#xa;创建 qcow2 运行副本" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="325" width="360" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_qemu" value="QEMU 平台路径&#xa;RV: virt + MMIO VirtIO&#xa;LA: qemu-virt + PCI VirtIO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="455" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_ltp" value="examples/shell LTP runner&#xa;LTP_STABLE_CASES / blacklist / all-minus-blacklist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="580" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_summary" value="scripts/ltp_summary.py&#xa;PASS/FAIL / TFAIL / TBROK / TCONF&#xa;timeout / ENOSYS / panic-trap" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="420" y="700" width="360" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_remote" value="远程评测配置&#xa;configs/remote-eval&#xa;LA 远程平台以该配置为准" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="90" y="455" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_docs" value="证据文档&#xa;docs/ 阶段报告 / summaries&#xa;不把 blacklist case 计为通过" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="870" y="700" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="b_make" target="b_build">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#82b366" edge="1" parent="1" source="b_build" target="b_run">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="b_run" target="b_qemu">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#d6b656" edge="1" parent="1" source="b_qemu" target="b_ltp">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#b85450" edge="1" parent="1" source="b_ltp" target="b_summary">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="b_remote" target="b_qemu">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#666666" edge="1" parent="1" source="b_summary" target="b_docs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

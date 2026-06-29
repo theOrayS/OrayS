@@ -61,7 +61,7 @@ def rust_const_names(text: str) -> set[str]:
     )
 
 def scan_program_loader(root: Path) -> list[str]:
-    path = root / "examples/shell/src/uspace/program_loader.rs"
+    path = root / "user/shell/src/uspace/program_loader.rs"
     text = read(path)
     findings: list[str] = []
     function_names = rust_function_names(text)

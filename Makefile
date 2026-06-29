@@ -56,7 +56,7 @@ OUT_CONFIG ?= $(PWD)/.axconfig.toml
 UIMAGE ?= n
 
 # Kernel build options
-KERNEL_APP ?= examples/shell
+KERNEL_APP ?= user/shell
 KERNEL_FEATURES ?= alloc,paging,irq,multitask,fs,net,rtc
 KERNEL_RV_FEATURES ?= $(KERNEL_FEATURES)
 KERNEL_LA_FEATURES ?= $(KERNEL_FEATURES)
@@ -180,7 +180,7 @@ endif
 # The official evaluator runs `make` / `make all` without passing `A`.
 # Default the top-level app to the same entry used by the submission kernels so
 # the parse-time APP existence check below does not depend on non-submission demo
-# examples such as `examples/helloworld`.
+# deleted demo applications.
 A ?= $(KERNEL_APP)
 APP ?= $(A)
 FEATURES ?=

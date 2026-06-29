@@ -147,7 +147,7 @@ def scan_pipe_nonblocking_semantics(root: Path) -> list[str]:
     signal = read(root / "api/arceos_posix_api/src/signal.rs")
     pipe = read(root / "api/arceos_posix_api/src/imp/pipe.rs")
     unistd = read(root / "ulib/axlibc/c/unistd.c")
-    shell_uspace = read(root / "examples/shell/src/uspace/mod.rs")
+    shell_uspace = read(root / "user/shell/src/uspace/mod.rs")
     for token in (
         'crate_interface = { version = "0.3", features = ["weak_default"] }',
         "#![feature(linkage)]",
@@ -386,7 +386,7 @@ def scan_axlibc_locale_pwd_env(root: Path) -> list[str]:
 
 
 def scan_scheduler_backend_effect(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/resource_sched.rs")
+    text = read(root / "user/shell/src/uspace/resource_sched.rs")
     findings: list[str] = []
     for token in (
         "fn scheduler_backend_priority",
@@ -472,7 +472,7 @@ def scan_scheduler_backend_effect(root: Path) -> list[str]:
 
 
 def scan_ltp_specific_comments(root: Path) -> list[str]:
-    text = read(root / "examples/shell/src/uspace/fd_table.rs")
+    text = read(root / "user/shell/src/uspace/fd_table.rs")
     findings: list[str] = []
     for token in ("open10", "creat08", "creat09", "LTP's"):
         if token in text:
@@ -483,9 +483,9 @@ def scan_ltp_specific_comments(root: Path) -> list[str]:
 def scan_user_task_exit_cleanup(root: Path) -> list[str]:
     findings: list[str] = []
     task = read(root / "kernel/task/axtask/src/task.rs")
-    lifecycle = read(root / "examples/shell/src/uspace/process_lifecycle.rs")
-    uspace_mod = read(root / "examples/shell/src/uspace/mod.rs")
-    memory_map = read(root / "examples/shell/src/uspace/memory_map.rs")
+    lifecycle = read(root / "user/shell/src/uspace/process_lifecycle.rs")
+    uspace_mod = read(root / "user/shell/src/uspace/mod.rs")
+    memory_map = read(root / "user/shell/src/uspace/memory_map.rs")
 
     for token in (
         "pub fn try_join(&self) -> Option<i32>",

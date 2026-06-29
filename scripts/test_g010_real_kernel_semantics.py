@@ -35,11 +35,11 @@ TARGETS = [
     Path("ulib/axlibc/c/locale.c"),
     Path("ulib/axlibc/c/pwd.c"),
     Path("ulib/axlibc/c/env.c"),
-    Path("examples/shell/src/uspace/mod.rs"),
-    Path("examples/shell/src/uspace/memory_map.rs"),
-    Path("examples/shell/src/uspace/process_lifecycle.rs"),
-    Path("examples/shell/src/uspace/resource_sched.rs"),
-    Path("examples/shell/src/uspace/fd_table.rs"),
+    Path("user/shell/src/uspace/mod.rs"),
+    Path("user/shell/src/uspace/memory_map.rs"),
+    Path("user/shell/src/uspace/process_lifecycle.rs"),
+    Path("user/shell/src/uspace/resource_sched.rs"),
+    Path("user/shell/src/uspace/fd_table.rs"),
 ]
 
 
@@ -228,7 +228,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_missing_host_sigpipe_delivery(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/mod.rs"
+        path = tree / "user/shell/src/uspace/mod.rs"
         text = path.read_text(encoding="utf-8").replace(
             "signal_abi::deliver_user_signal(&entry, linux_abi::SIGPIPE_NUM, ext.process.pid()).is_ok()",
             "false",
@@ -488,7 +488,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_scheduler_readback_only_facade(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/resource_sched.rs"
+        path = tree / "user/shell/src/uspace/resource_sched.rs"
         text = path.read_text(encoding="utf-8").replace(
             "    apply_task_scheduler_state(&entry.task, &entry.process, state);\n",
             "    Ok(())\n",
@@ -501,7 +501,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_setpriority_noncurrent_readback_only(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/resource_sched.rs"
+        path = tree / "user/shell/src/uspace/resource_sched.rs"
         text = self.replace_once(
             path.read_text(encoding="utf-8"),
             "    apply_task_scheduler_state(&entry.task, &entry.process, state);\n",
@@ -514,7 +514,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_scheduler_backend_failure_regression(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/resource_sched.rs"
+        path = tree / "user/shell/src/uspace/resource_sched.rs"
         text = path.read_text(encoding="utf-8").replace(
             "let _ = axtask::set_task_priority(task, scheduler_backend_priority(process, state));",
             "if !axtask::set_task_priority(task, scheduler_backend_priority(process, state)) {\n        return Err(LinuxError::EINVAL);\n    }",
@@ -560,7 +560,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_ltp_case_specific_commentary(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8") + "\n// open10-specific compatibility must not be reintroduced\n"
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)

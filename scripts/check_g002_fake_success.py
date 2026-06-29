@@ -19,7 +19,7 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AXLIBC_C_GLOB = "ulib/axlibc/c/*.c"
 API_IMP_GLOB = "api/arceos_posix_api/src/imp/*.rs"
-FD_TABLE_PATH = Path("examples/shell/src/uspace/fd_table.rs")
+FD_TABLE_PATH = Path("user/shell/src/uspace/fd_table.rs")
 
 HIGH_RISK_FD_FUNCS = {
     "truncate",

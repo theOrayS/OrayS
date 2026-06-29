@@ -20,8 +20,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 API_SYS_PATH = Path("api/arceos_posix_api/src/imp/sys.rs")
 API_RESOURCES_PATH = Path("api/arceos_posix_api/src/imp/resources.rs")
 API_FD_OPS_PATH = Path("api/arceos_posix_api/src/imp/fd_ops.rs")
-SHELL_RESOURCE_PATH = Path("examples/shell/src/uspace/resource_sched.rs")
-SHELL_FD_TABLE_PATH = Path("examples/shell/src/uspace/fd_table.rs")
+SHELL_RESOURCE_PATH = Path("user/shell/src/uspace/resource_sched.rs")
+SHELL_FD_TABLE_PATH = Path("user/shell/src/uspace/fd_table.rs")
 
 FN_RE_TEMPLATE = r"\bfn\s+{name}\s*\("
 MATCH_FALLBACK_OK_ZERO_RE = re.compile(r"_\s*=>\s*(?:return\s+)?Ok\(0\)")

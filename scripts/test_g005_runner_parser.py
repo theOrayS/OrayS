@@ -13,11 +13,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g005_runner_parser.py"
 TARGETS = [
-    Path("examples/shell/src/cmd.rs"),
-    Path("examples/shell/src/uspace/runtime_paths.rs"),
-    Path("examples/shell/src/uspace/process_lifecycle.rs"),
-    Path("examples/shell/src/uspace/fd_table.rs"),
-    Path("examples/shell/src/uspace/program_loader.rs"),
+    Path("user/shell/src/cmd.rs"),
+    Path("user/shell/src/uspace/runtime_paths.rs"),
+    Path("user/shell/src/uspace/process_lifecycle.rs"),
+    Path("user/shell/src/uspace/fd_table.rs"),
+    Path("user/shell/src/uspace/program_loader.rs"),
     Path("Makefile"),
     Path("scripts/ltp_summary.py"),
     Path("scripts/test_ltp_summary.py"),
@@ -62,7 +62,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_chdir01_case_specialization(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = self.replace_once(
             text,
@@ -76,7 +76,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_first_underscore_resource_helper_parse(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = self.replace_once(
             text,
@@ -90,7 +90,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_literal_command_success_override(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = self.replace_once(
             text,
@@ -104,7 +104,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_score_aware_libctest_skip(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             'if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {\n'
@@ -128,7 +128,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_structural_libctest_suite_dir_skip(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             'if DISABLED_OFFICIAL_TEST_GROUPS.contains(&group) {\n'
@@ -154,7 +154,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_unknown_official_group_silent_skip(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8").replace(
             "if !missing_groups.is_empty() || !disabled_groups.is_empty() {",
             "if false && (!missing_groups.is_empty() || !disabled_groups.is_empty()) {",
@@ -167,7 +167,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_suite_specific_script_rewrite_function(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text += '\nfn rewrite_iperf_daemon_server(script: &str) -> String { script.into() }\n'
         path.write_text(text, encoding="utf-8")
@@ -177,7 +177,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_ltp_file_pattern_rewrite(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             ".map(|line| rewrite_script_line(line, busybox_path, rewrite_busybox_path))",
@@ -191,7 +191,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_exact_test_script_name_branch(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8")
         text = text.replace(
             "if raw_script.ends_with('\\n') {",
@@ -205,7 +205,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_pass_ltp_case_wrapper_record(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = path.read_text(encoding="utf-8").replace(
             "FAIL LTP CASE {case} : 0",
             "PASS LTP CASE {case} : 0",
@@ -218,7 +218,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_busybox_execve_magic_fallback(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/process_lifecycle.rs"
+        path = tree / "user/shell/src/uspace/process_lifecycle.rs"
         text = path.read_text(encoding="utf-8") + "\nfn resolve_execve_compat_path() {}\n"
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -227,7 +227,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_busybox_open_alias_magic(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/uspace/fd_table.rs"
+        path = tree / "user/shell/src/uspace/fd_table.rs"
         text = path.read_text(encoding="utf-8") + "\nfn append_busybox_applet_alias_candidates() {}\n"
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -236,7 +236,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = self.replace_once(
             path.read_text(encoding="utf-8"),
             "prepare_suite_runtime_busybox_wrappers(suite_dir)",
@@ -249,7 +249,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_runner_layer_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = self.replace_once(
             path.read_text(encoding="utf-8"),
             "prepare_suite_runtime_busybox_wrappers(suite_dir)",
@@ -262,7 +262,7 @@ class G005RunnerParserGuardTest(unittest.TestCase):
 
     def test_detects_ltp_runner_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
-        path = tree / "examples/shell/src/cmd.rs"
+        path = tree / "user/shell/src/cmd.rs"
         text = self.replace_nth(
             path.read_text(encoding="utf-8"),
             "prepare_suite_runtime_busybox_wrappers(suite_dir)",
