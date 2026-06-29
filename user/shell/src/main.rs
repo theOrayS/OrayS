@@ -32,10 +32,11 @@ const BS: u8 = b'\x08';
 const SPACE: u8 = b' ';
 
 const MAX_CMD_LEN: usize = 256;
+const SHELL_BRAND: &str = "OrayS";
 
 fn print_prompt() {
     print!(
-        "arceos:{}$ ",
+        "{SHELL_BRAND}:{}$ ",
         path_to_str(&std::env::current_dir().unwrap())
     );
     std::io::stdout().flush().unwrap();
@@ -47,6 +48,7 @@ fn run_interactive_shell() {
 
     let mut buf = [0; MAX_CMD_LEN];
     let mut cursor = 0;
+    println!("{SHELL_BRAND} interactive shell");
     cmd::run_cmd("help".as_bytes());
     print_prompt();
 
