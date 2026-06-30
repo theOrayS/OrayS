@@ -73,6 +73,10 @@ def build_html(
     for heading in soup.find_all(["h2", "h3", "h4"]):
         if heading is toc_title:
             continue
+        if heading.name == "h2" and normalized(heading.get_text()) == "摘要":
+            heading["id"] = "abstract"
+            heading["class"] = heading.get("class", []) + ["abstract-title"]
+            continue
         if heading.name == "h2":
             chapter_index += 1
             section_index = 0
