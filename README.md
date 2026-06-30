@@ -37,7 +37,7 @@ Y8.   .8P 88       88.  .88 88.  .88 d8'   .8P
 | --- | --- |
 | 项目文档 PDF | [文档.pdf](docs/orays-project-document(2).pdf) |
 |项目初赛介绍ppt|[项目初赛介绍ppt](docs/orays.pptx) |
-
+|演示视频|[演示视频](docs/演示视频.webm) |
 ## 当前状态
 
 **截至 2026-06-29**：
