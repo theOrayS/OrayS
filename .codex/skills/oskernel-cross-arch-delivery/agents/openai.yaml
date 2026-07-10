@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Cross-Architecture Delivery"
+  short_description: "RV and LA local, remote, and offline delivery checks"
+  default_prompt: "Use $oskernel-cross-arch-delivery to separate local RV/LA evidence from remote submission delivery."

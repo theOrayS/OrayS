@@ -1,68 +1,72 @@
 # Agents Guidelines for ArceOS / OSKernel 2026
 
-本文件是本仓库 agent 的高频入口和目录。它故意保持短小：先读本文件，
-再按任务类型读取 `docs/agent-workflow/` 中的专题文档；不要在每次请求中
-通读所有专题规则。若本文档、专题文档与当前源码/`Makefile`/脚本/实际评测
-结果冲突，以当前仓库事实为准。
+<a id="canonical-project-identity"></a>
+## 项目定位
 
-## 高频硬约束
+本项目是**基于 ArceOS、面向 Linux/POSIX 用户态兼容的模块化操作系统内核**。保留模块化、可裁剪和多架构能力；不宣称是完整 Linux 或无限范围的通用内核。决赛阶段默认质量优先、分数兜底：官方测例和分数是兼容性回归证据，不是架构目标。
 
-- 工作根目录默认是 `/root/oskernel2026-orays`；除非任务明确跨仓库，否则不要在外层目录改动。
-- 假设 worktree 可能已有他人改动；只修改、暂存、提交自己负责的文件，不要 revert 无关改动。
-- 只做任务所需的最小改动；不要顺手大重构、批量格式化、机械重命名或跨子系统清理。
-- 不要编辑生成物或本地证据文件，除非任务明确要求：`kernel-rv`、`kernel-la`、`sdcard-*.img`、`disk*.img`、`output*.md`、`*.log`、`.axconfig.toml`、`build/`、`target/`。
-- 不允许 fake pass：不得硬编码 LTP case 名、路径、进程名或输出；不得伪造 `TPASS`/wrapper PASS；不得修改 testsuite 或 evaluator 脚本来绕过真实失败；不得隐藏 `TCONF`、timeout、`ENOSYS`、panic/trap。
-- `self-check.md` 中的竞赛合规约束是仓库硬红线；若分数、性能或兼容性捷径与这些约束冲突，优先保持真实语义并暴露失败。禁止：
-  - 对某些测试程序名称或二进制特征进行特殊判断。
-  - 对特定 syscall 参数组合、输入数据、目录结构硬编码结果或分支。
-  - 仅针对高分测试集合实现局部功能，而故意忽略通用 Linux/POSIX 语义。
-  - 利用测评系统环境差异、固定路径、固定时间、固定顺序进行投机。
-  - 为通过测试破坏 Linux syscall 兼容语义或内核基本安全边界。
-  - 通过非通用方式绕过真实的进程、内存、文件系统或同步机制。
-  - 以猜测测例、适配测例、硬编码测例为目标的其他投机性实现，或评审委员会认定的违规测试行为。
-  - 牺牲 Linux syscall 主要功能兼容语义来换取速度。
-  - 跳过必要的权限检查、资源检查或错误处理。
-  - 引入在隐藏条件下可能导致内核崩溃或数据错误的实现。
-  - 只对固定测例有效、对一般程序无效的优化。
-  - 其他不符合正确性、通用性和可解释性的优化。
-- 实验分支可用 blacklist 策略探索全量 LTP，但 blacklist 只用于隔离会卡死、炸内存、破坏评测器或明显不适合当前内核模型的用例；被 blacklist 的 case 不能计为通过，也不能作为 stable/promotion 证据。
-- POSIX/Linux 可见语义必须真实：syscall、errno、flag、struct layout、FD、signal、futex、mmap、用户指针 copy-in/copy-out 的变化都要显式说明。
-- 新增依赖、修改 `vendor/`/`cargo-home/`/`tools/bin/`、远程提交配置或架构启动路径时，必须有明确任务理由和对应验证。
-- 运行长构建、QEMU、Docker、vendoring、完整 evaluator 前后，检查 `df -h / /root`；涉及 Codex/OMX 缓存清理时再看 `du -sh /root/.codex`。
-- 完成并验证对源码、文档或持久项目状态的改动后，默认自动创建 Git commit；只暂存 agent 自己的改动。提交信息规则见 `docs/agent-workflow/collaboration-and-delivery.md`。
+<a id="quality-priority-order"></a>
+## 六级质量顺序
 
-## 按需阅读目录
+1. 正确性与诚实语义：通用行为、错误路径、安全边界、失败可见性。
+2. 鲁棒性：资源检查、异常恢复、并发/内存安全、跨条件稳定性。
+3. 架构完整性与可维护性：清晰边界、可解释设计、可测试和可审查实现。
+4. 性能与资源效率：必须建立在真实语义和可复现证据之上。
+5. 实验创新：必须经过隔离、指标、回滚、维护性评审和晋升门。
+6. 官方分数与既有测例：作为回归底线，不作为默认路线图或任务排序器。
 
-| 任务类型 | 读取文件 |
-| --- | --- |
-| 仓库布局、生成物、工作树/磁盘卫生 | `docs/agent-workflow/repo-basics.md` |
-| 构建命令、工具链、CI、选择验证范围 | `docs/agent-workflow/commands-and-validation.md` |
-| 本地 QEMU 与远程提交 `kernel-rv`/`kernel-la` 差异 | `docs/agent-workflow/local-remote-eval.md` |
-| 选择下一批 LTP/score 测例、估算 ROI | `docs/agent-workflow/ltp-selection.md` |
-| 实验性全量 LTP / blacklist sweep | `docs/agent-workflow/commands-and-validation.md`、`docs/agent-workflow/ltp-selection.md`、`docs/agent-workflow/ltp-promotion-and-docs.md`、`docs/agent-workflow/branch-policy.md` |
-| 推广 `LTP_STABLE_CASES`、LTP 报告、阶段文档命名 | `docs/agent-workflow/ltp-promotion-and-docs.md` |
-| Rust/POSIX/ABI/高风险子系统修改边界 | `docs/agent-workflow/coding-boundaries.md` |
-| 分支命名、`score/best`、release/fix/feat/exp 用途 | `docs/agent-workflow/branch-policy.md` |
-| 多 agent 协作、冻结期、交付模板、Lore commit | `docs/agent-workflow/collaboration-and-delivery.md` |
+<a id="bounded-regression-contract"></a>
+## Bounded regression 合同
 
-示例：如果任务是“决定下一步跑哪些测例”，只需再读
-`ltp-selection.md` 和必要的当前 score/log/source；不要重读远程启动、提交模板、
-Rust 风格等无关专题。如果任务是普通文档修改，不需要读取 LTP 选择规则。
+通用语义或架构修复若造成临时回退，进入集成线前必须记录：baseline 与采集时间、量化 delta 与影响范围、通用正确性证据、repo-visible rationale、负责人、期限、rollback/containment、完整失败可见性，以及 release 恢复旧基线或经审查采用等价新基线的闭合方式。过期、无主、无回滚或隐藏失败的例外立即成为 blocker；本合同不得豁免安全、数据完整性、权限/资源检查或真实兼容语义。
 
-## 常用事实入口
+<a id="always-on-invariants"></a>
+## Always-on 不变量
 
-- 当前 stable LTP case 数量：实时读取 `examples/shell/src/cmd.rs::LTP_STABLE_CASES`，不要凭记忆。
-- LoongArch 本地 QEMU 与远程官方评测机的地址映射不同：本地 LA 无串口输出或 0 分不应直接判定为远程 LA 回归。涉及 LA 分数/启动结论时，先区分本地 `run-la`/本地官方 runner 与远程 `make all` 提交构建；远程事实以 `configs/remote-eval/axplat-loongarch64-qemu-virt.toml` 和官方远程评测结果为准。
-- 实验性全量 LTP 入口：当前分支可用 `LTP_CASES=blacklist` / `all-minus-blacklist` / `sweep:blacklist` 从 guest LTP bin 目录枚举全量 case，再扣除默认 blacklist、build-time `LTP_BLACKLIST`、`/ltp_blacklist.txt`、`/tmp/ltp_blacklist.txt`；报告必须列出选择模式、blacklist 来源、跳过数和未闭合 case。
-- LTP 结果真相：优先用 `scripts/ltp_summary.py` 汇总，不要只凭 wrapper 输出肉眼判断。
-- 构建/评测入口：`Makefile`、`run-eval.sh`、`configs/remote-eval/`。
-- 主要路径：`kernel/` runtime/subsystems；`api/arceos_posix_api/` POSIX 边界；`ulib/` 用户库；`examples/shell/` evaluator 集成；`configs/` 平台配置；`scripts/`/`tools/` 构建辅助；`docs/` 进度和报告；`vendor/`/`cargo-home/` 离线依赖。
+- 默认工作根目录是 `/root/oskernel2026-orays`；除非任务明确跨仓库，否则不在外层目录改动。
+- 假设 worktree 已有他人改动；只修改、暂存、提交任务拥有的文件，不覆盖或 revert 无关改动。
+- 只做任务所需的最小改动；不顺手大重构、批量格式化、机械重命名或跨子系统清理。
+- 除非任务明确拥有，不编辑、删除或提交 `kernel-rv`、`kernel-la`、`sdcard-*.img`、`disk*.img`、`output*.md`、`*.log`、`.axconfig.toml`、`build/`、`target/` 等生成物或本地证据。
+- 不允许 fake pass：不伪造 `TPASS`/wrapper PASS，不修改 testsuite/evaluator 绕过失败，不隐藏 `TFAIL`、`TBROK`、`TCONF`、timeout、`ENOSYS`、panic 或 trap。
+- `self-check.md` 的通用语义、基本安全和竞赛合规红线始终有效；分数、性能或兼容性捷径不得弱化它们。
+- 不按测试程序名或二进制特征特殊判断。
+- 不对特定 syscall 参数、输入数据或目录结构硬编码结果或分支。
+- 不只实现高分集合所需的局部行为而故意忽略通用 Linux/POSIX 语义。
+- 不利用评测环境差异、固定路径、固定时间或固定顺序投机。
+- 不为过测破坏 Linux syscall 兼容语义或内核基本安全边界。
+- 不以非通用方式绕过真实的进程、内存、文件系统或同步机制。
+- 不以猜测测例、适配测例或硬编码测例为实现目标。
+- 不牺牲 Linux syscall 主要兼容语义换取速度。
+- 不跳过必要的权限检查、资源检查或错误处理。
+- 不引入在隐藏条件下可能导致内核崩溃或数据错误的实现。
+- 不采用只对固定测例有效、对一般程序无效的优化。
+- 不采用其他不符合正确性、通用性和可解释性的优化。
+- Blacklist 只可隔离会卡死、耗尽资源、破坏评测环境或明确不适用当前内核模型的 case；skip 不算 pass，也不能作为 stable/promotion 证据。
+- Linux/POSIX 可见语义必须真实；syscall、errno、flag、struct layout、FD、signal、futex、mmap、用户指针 copy-in/copy-out 的变化必须显式报告。
+- 新增依赖或修改 `vendor/`、`cargo-home/`、`tools/bin/`、远程配置、平台配置或架构启动路径，必须有明确任务理由和对应验证。
+- 长构建、QEMU、Docker、vendoring、完整 evaluator 前后执行磁盘门；涉及 Codex/OMX 缓存时额外检查其占用和活动状态。
+- 完成且验证的源码、文档或持久项目状态改动默认按 Lore 协议提交；只 stage 自己可安全分离的改动，失败或越权时停止提交并报告。
 
-## 最小执行循环
+<a id="skill-routing"></a>
+## Skill 路由
 
-1. 读取本文件和任务相关专题文档。
-2. 从当前源码、脚本、日志或 LTP source 建立事实；不要用过期记忆替代。
-3. 选择一个最小目标并保持补丁局部。
-4. 运行能证明 claim 的最小验证；失败就修或说明阻塞。
-5. 最终报告列出：改动文件、意图、实际验证、未验证项、用户可见行为变化、syscall/errno/ABI 影响。
-6. 若改动已验证且可安全分离，按 Lore 协议提交并报告 commit SHA。
+- `$oskernel-kernel-engineering`：架构、子系统、Rust/unsafe、Linux/POSIX/ABI、技术债和高风险修改。
+- `$oskernel-validation`：分层构建/测试/QEMU、bounded regression、证据与 claim 边界。
+- `$oskernel-cross-arch-delivery`：RV/LA、本地/远程配置、offline/vendor 和提交产物。
+- `$oskernel-compatibility-evaluation`：专项 LTP/score、stable promotion、blacklist 和评测报告；不替代真实内核语义。
+- `$oskernel-experimental-features`：实验提案、隔离/feature gate、指标、晋升、继续或退役。
+- `$oskernel-collaboration-delivery`：分支、所有权、冻结、review、交付报告、暂存和 Lore commit。
+- `$oskernel-repo-hygiene`：仓库布局、dirty baseline、生成物/证据、磁盘、缓存和安全清理。
+
+只加载当前任务需要的 skill；跨域时由主责 skill 明确 handoff，不复制相邻 runbook。Skill 与当前源码、`Makefile`、脚本、配置或实测冲突时，以当前仓库事实为准。
+
+<a id="minimum-execution-loop"></a>
+## 最小执行闭环
+
+1. **Fact**：读取当前源码、配置、脚本、日志、测试源和 Git 状态，定义目标、证据、边界与停止条件。
+2. **Edit**：选择最小 owned scope，复用现有模式，保持补丁可回滚。
+3. **Verify**：运行能证明 claim 的最小新鲜验证；失败则修复并重跑，风险扩大时再加相邻回归。
+4. **Report**：列出改动文件/意图、行为与 ABI 影响、实际命令和结果、未验证项、风险与回滚。
+5. **Lore**：验证通过且改动可安全分离时，只暂存 owned paths，检查 cached diff，创建 Lore commit 并报告 SHA。
+
+停止前确认：无未处理的任务内错误，失败证据未被隐藏，claim 与验证匹配，残余风险和下一负责人明确。

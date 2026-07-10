@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Validation"
+  short_description: "Layered checks and evidence-backed regression validation"
+  default_prompt: "Use $oskernel-validation to select and run the smallest checks that prove this OSKernel change."

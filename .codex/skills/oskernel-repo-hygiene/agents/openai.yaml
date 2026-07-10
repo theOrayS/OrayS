@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Repository Hygiene"
+  short_description: "Safe worktree, artifact, disk, cache, and cleanup hygiene"
+  default_prompt: "Use $oskernel-repo-hygiene to inspect this worktree and clean only safe reproducible data."

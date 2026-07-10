@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Compatibility Evaluation"
+  short_description: "Evaluate LTP evidence, promotion, and scorer results"
+  default_prompt: "Use $oskernel-compatibility-evaluation to assess this LTP or evaluator evidence without hiding failures."

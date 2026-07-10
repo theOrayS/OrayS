@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Collaboration and Delivery"
+  short_description: "Coordinate ownership, reviews, staging, and Lore delivery"
+  default_prompt: "Use $oskernel-collaboration-delivery to coordinate this change and prepare an evidence-backed Lore commit."

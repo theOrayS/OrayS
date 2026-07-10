@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Experimental Features"
+  short_description: "Gate experimental features from proposal to disposition"
+  default_prompt: "Use $oskernel-experimental-features to define and audit this experiment's isolated, measurable, reversible lifecycle."

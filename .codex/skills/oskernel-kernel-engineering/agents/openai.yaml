@@ -1,0 +1,4 @@
+interface:
+  display_name: "OSKernel Kernel Engineering"
+  short_description: "Engineer kernel architecture and honest POSIX semantics"
+  default_prompt: "Use $oskernel-kernel-engineering to implement or review this kernel-facing change with explicit semantic boundaries and risk evidence."
