@@ -737,6 +737,16 @@ class SuiteRunnerTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
 
+    def test_exit_code_allows_source_diagnostics_that_quote_failure_words(self) -> None:
+        code = (
+            "print('243 | source diagnostic says receive failed'); "
+            "print('5 | source diagnostic mentions error handling')"
+        )
+        result = self.invoke(
+            fixture_manifest([fixture_case(code=code, contract={"type": "exit_code"})])
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_check_contract_requires_explicit_pass_status_line(self) -> None:
         code = "print('documentation mentions PASS without a result')"
         contract = {"type": "check"}

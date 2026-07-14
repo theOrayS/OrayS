@@ -88,6 +88,20 @@ ZERO_EXECUTION_OUTPUT_RE = re.compile(
     r"(?:TEST\s+SUITE|SUITE)\s+IS\s+EMPTY|EMPTY\s+(?:TEST\s+)?SUITE)\b",
     re.I,
 )
+EXIT_CODE_NON_PASS_OUTPUT_RE = re.compile(
+    r"^\s*(?:"
+    r"TCONF|TBROK|TFAIL|ENOSYS|XFAIL|SKIP(?:PED|PING)?|TIMEOUT|TIMED[_ -]?OUT|"
+    r"TIME[_ -]?LIMIT[_ -]?EXCEEDED|DEADLINE EXCEEDED|WATCHDOG EXPIRED|HANG|"
+    r"CRASH|PANIC|FAIL(?:ED|URE|URES)?|ERRORS?|INCOMPLETE|PARTIAL(?:LY EXECUTED)?|"
+    r"FATAL|ABORT(?:ED)?|KILLED|TERMINATED|"
+    r"SIG(?:ABRT|BUS|FPE|HUP|ILL|INT|KILL|QUIT|SEGV|SYS|TERM|TRAP)|"
+    r"SEGMENTATION FAULT|SEGFAULT|ILLEGAL INSTRUCTION|BUS ERROR|CORE DUMPED|"
+    r"UNKNOWN TRAP|UNHANDLED(?: USER)? TRAP|SIGNAL\s+\d+|"
+    r"NOT\s+OK(?:\s+\d+)?(?:\b|\s*-)|TRACEBACK\s+\(MOST RECENT CALL LAST\):|"
+    r"CASE_RESULT\s*:\s*(?:FAIL|ERROR)"
+    r")(?![A-Za-z0-9_])",
+    re.I | re.M,
+)
 UNKNOWN_STATE_OUTPUT_RE = re.compile(
     rf"^(?:(?:{UNKNOWN_STATE_TOKEN_PATTERN})\s*|"
     rf"\[(?:{UNKNOWN_STATE_TOKEN_PATTERN})\](?:\s+.*)?|"
@@ -201,7 +215,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.runtime_binary_patch_prohibition": 9,
     "unit.socket_message_and_buffer_semantics": 10,
     "unit.stat_metadata_semantics": 7,
-    "unit.suite_runner": 130,
+    "unit.suite_runner": 131,
     "unit.synthetic_capability_integrity": 5,
     "unit.syscall_boundary_regressions": 26,
     "unit.test_asset_integrity": 36,
@@ -1125,11 +1139,7 @@ def parse_contract(
     if result_type == "exit_code":
         if UNKNOWN_STATUS_RECORD_RE.search(combined):
             return "INFRA_ERROR", "zero-exit command emitted an unsupported status record", {}
-        if (
-            NON_PASS_OUTPUT_RE.search(combined)
-            or EXPLICIT_FAILURE_OUTPUT_RE.search(combined)
-            or CRASH_OUTPUT_RE.search(combined)
-        ):
+        if EXIT_CODE_NON_PASS_OUTPUT_RE.search(combined):
             return "FAIL", "zero-exit command output contains explicit non-pass evidence", {}
         return "PASS", "child exited zero", {}
     if result_type == "check":
