@@ -281,7 +281,7 @@
       "description": "Evaluation execution and parser static guard fixtures.",
       "command": ["{python}", "-B", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 22},
+      "result_contract": {"type": "unittest", "expected_tests": 23},
       "required_paths": ["{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
     },
     {

@@ -38,12 +38,16 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         bin_dir.mkdir()
         args_log = directory / "make-args.log"
         environment_log = directory / "make-environment.log"
+        bash_environment = directory / "bash-environment.sh"
+        bash_environment.write_text(
+            "make() { printf 'BASH_ENV make function was not removed\\n'; return 0; }\n",
+            encoding="utf-8",
+        )
         make_script = bin_dir / "make"
         make_script.write_text(
             "#!/bin/sh\n"
             "printf '%s\\n' \"$@\" > \"$FAKE_MAKE_ARGS\"\n"
-            "printf 'offline=%s\\nmakeflags=%s\\n' \"${CARGO_NET_OFFLINE-}\" "
-            "\"${MAKEFLAGS-}\" > \"$FAKE_MAKE_ENVIRONMENT\"\n"
+            "env | LC_ALL=C sort > \"$FAKE_MAKE_ENVIRONMENT\"\n"
             "exit \"$FAKE_MAKE_STATUS\"\n",
             encoding="utf-8",
         )
@@ -66,6 +70,15 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 "FAKE_MAKE_STATUS": str(make_status),
                 "CARGO_NET_OFFLINE": "false",
                 "MAKEFLAGS": "-n",
+                "BASH_ENV": str(bash_environment),
+                "ENV": str(bash_environment),
+                "BASH_FUNC_make%%": "() { printf 'exported make function was not removed\\n'; return 0; }",
+                "KERNEL_APP": "untrusted/app",
+                "KERNEL_RV_FEATURES": "untrusted-features",
+                "KERNEL_RV_APP_FEATURES": "untrusted-app-features",
+                "KERNEL_MODE": "debug",
+                "PLAT_CONFIG": "/untrusted/platform.toml",
+                "KERNEL_RV": "/untrusted/kernel-rv",
                 "KERNEL_SMP": "9",
                 "RV_MEM": "9G",
             }
@@ -129,9 +142,20 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertIn("RV_MEM=1G", arguments)
         self.assertFalse(any(value.startswith(("SMP=", "MEM=")) for value in arguments), arguments)
         environment_text = environment_log.read_text(encoding="utf-8")
-        self.assertIn("offline=true", environment_text)
-        self.assertIn("makeflags=", environment_text)
-        self.assertNotIn("makeflags=-n", environment_text)
+        self.assertIn("CARGO_NET_OFFLINE=true", environment_text)
+        for variable in (
+            "MAKEFLAGS",
+            "BASH_ENV",
+            "ENV",
+            "BASH_FUNC_make%%",
+            "KERNEL_APP",
+            "KERNEL_RV_FEATURES",
+            "KERNEL_RV_APP_FEATURES",
+            "KERNEL_MODE",
+            "PLAT_CONFIG",
+            "KERNEL_RV",
+        ):
+            self.assertNotIn(f"{variable}=", environment_text)
 
     def test_official_executor_reserves_125_for_preflight_infrastructure(self) -> None:
         directory, environment, _args_log, _environment_log = self.fake_official_environment()
@@ -196,6 +220,110 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertEqual(summary["result"], "INFRA_ERROR", summary)
         self.assertEqual(summary["cases"][0]["status"], "INFRA_ERROR", summary)
         self.assertNotEqual(summary["cases"][0]["status"], "PASS", summary)
+
+    def test_public_official_entry_ignores_startup_hooks_and_preserves_environment(self) -> None:
+        directory = Path(tempfile.mkdtemp(prefix="official-public-wrapper-fixture-"))
+        self.addCleanup(lambda: shutil.rmtree(directory, ignore_errors=True))
+        bin_dir = directory / "bin"
+        bin_dir.mkdir()
+        args_log = directory / "python-args.log"
+        environment_log = directory / "python-environment.log"
+        hook_marker = directory / "bash-env-ran"
+        bash_environment = directory / "bash-environment.sh"
+        bash_environment.write_text(
+            'printf "hook ran\\n" > "$WRAPPER_HOOK_MARKER"\nexit 0\n',
+            encoding="utf-8",
+        )
+        fake_python = bin_dir / "python3"
+        fake_python.write_text(
+            "#!/bin/sh\n"
+            'printf "%s\\n" "$@" > "$WRAPPER_ARGS_LOG"\n'
+            "printf 'BASH_ENV=%s\\nENV=%s\\nPYTHONPATH=%s\\n' "
+            '"${BASH_ENV-}" "${ENV-}" "${PYTHONPATH-}" '
+            '> "$WRAPPER_ENVIRONMENT_LOG"\n'
+            "exit 37\n",
+            encoding="utf-8",
+        )
+        fake_python.chmod(0o755)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PATH": f"{bin_dir}:{environment.get('PATH', '')}",
+                "BASH_ENV": str(bash_environment),
+                "ENV": "preserved-env-value",
+                "PYTHONPATH": "preserved-python-path",
+                "WRAPPER_ARGS_LOG": str(args_log),
+                "WRAPPER_ENVIRONMENT_LOG": str(environment_log),
+                "WRAPPER_HOOK_MARKER": str(hook_marker),
+            }
+        )
+        result = subprocess.run(
+            [str(ROOT / "run-eval.sh"), "la", "--output-dir", str(directory / "output")],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
+        self.assertFalse(hook_marker.exists(), "root wrapper executed inherited BASH_ENV")
+        self.assertEqual(
+            args_log.read_text(encoding="utf-8").splitlines(),
+            [
+                "-B",
+                "-E",
+                "-s",
+                str(ROOT / "test/run_suite.py"),
+                "--profile",
+                "official",
+                "--arch",
+                "la",
+                "--output-dir",
+                str(directory / "output"),
+            ],
+        )
+        self.assertEqual(
+            environment_log.read_text(encoding="utf-8").splitlines(),
+            [
+                f"BASH_ENV={bash_environment}",
+                "ENV=preserved-env-value",
+                "PYTHONPATH=preserved-python-path",
+            ],
+        )
+
+        python_hook_directory = directory / "python-hook"
+        python_hook_directory.mkdir()
+        python_hook_marker = directory / "python-hook-ran"
+        (python_hook_directory / "sitecustomize.py").write_text(
+            "import os\n"
+            "from pathlib import Path\n"
+            "Path(os.environ['PYTHON_HOOK_MARKER']).write_text('hook ran\\n')\n"
+            "os._exit(0)\n",
+            encoding="utf-8",
+        )
+        real_environment = os.environ.copy()
+        real_environment.update(
+            {
+                "BASH_ENV": str(bash_environment),
+                "ENV": "preserved-env-value",
+                "PYTHONPATH": str(python_hook_directory),
+                "PYTHON_HOOK_MARKER": str(python_hook_marker),
+                "WRAPPER_HOOK_MARKER": str(hook_marker),
+            }
+        )
+        real_result = subprocess.run(
+            [str(ROOT / "run-eval.sh"), "invalid-architecture"],
+            cwd=directory,
+            env=real_environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(real_result.returncode, 2, real_result.stdout + real_result.stderr)
+        self.assertFalse(hook_marker.exists(), "root wrapper executed inherited BASH_ENV")
+        self.assertFalse(python_hook_marker.exists(), "root wrapper imported PYTHONPATH sitecustomize")
 
     def test_detects_chdir01_case_specialization(self) -> None:
         tree = self.make_tree()

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -1142,10 +1143,14 @@ class SuiteRunnerTest(unittest.TestCase):
     def test_child_environment_is_offline_by_default(self) -> None:
         code = (
             "import os; print('offline=' + os.environ.get('CARGO_NET_OFFLINE', '')); "
+            "print('bash_env=' + os.environ.get('BASH_ENV', '')); "
+            "print('shell_functions=' + ','.join(sorted(name for name in os.environ if name.startswith('BASH_FUNC_')))); "
             "print('CASE_RESULT: PASS')"
         )
         environment = os.environ.copy()
         environment["CARGO_NET_OFFLINE"] = "false"
+        environment["BASH_ENV"] = "/tmp/untrusted-bash-env"
+        environment["BASH_FUNC_fake%%"] = "() { return 0; }"
         result = self.invoke(
             fixture_manifest([fixture_case(code=code)]),
             environment=environment,
@@ -1153,6 +1158,8 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         stdout = Path(self.summary()["cases"][0]["stdout_log"]).read_text(encoding="utf-8")
         self.assertIn("offline=true", stdout)
+        self.assertIn("bash_env=\n", stdout)
+        self.assertIn("shell_functions=\n", stdout)
 
     def test_parent_python_optimize_cannot_disable_child_assertions(self) -> None:
         code = (
@@ -1196,6 +1203,8 @@ class SuiteRunnerTest(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertTrue(marker.is_file(), f"{variable} suppressed the recipe")
+                resolved = self.summary()["cases"][0]["required_command_paths"]
+                self.assertEqual(Path(resolved["make"]), Path(shutil.which("make") or "").resolve())
 
     def test_full_all_preserves_each_arch_case_architecture(self) -> None:
         rv = fixture_case("architecture.rv")

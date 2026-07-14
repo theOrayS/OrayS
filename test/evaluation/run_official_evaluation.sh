@@ -24,6 +24,21 @@ export OSCOMP_GROUP_TIMEOUT_CEILING_SECS="${OSCOMP_GROUP_TIMEOUT_CEILING_SECS:-9
 unset MAKEFLAGS MFLAGS GNUMAKEFLAGS
 unset RUSTFLAGS RUSTDOCFLAGS CARGO_ENCODED_RUSTFLAGS
 unset CARGO_BUILD_RUSTC_WRAPPER RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+unset BASH_ENV ENV
+for function_name in make cargo qemu-img qemu-system-riscv64 qemu-system-loongarch64; do
+    if declare -F "$function_name" >/dev/null; then
+        unset -f "$function_name"
+    fi
+done
+unset KERNEL_APP KERNEL_FEATURES KERNEL_RV_FEATURES KERNEL_LA_FEATURES
+unset KERNEL_APP_FEATURES KERNEL_RV_APP_FEATURES KERNEL_LA_APP_FEATURES
+unset KERNEL_MODE KERNEL_LOG PLAT_CONFIG
+unset KERNEL_BUILD_DIR KERNEL_TARGET_DIR KERNEL_RV_OUT_DIR KERNEL_LA_OUT_DIR
+unset KERNEL_RV_CONFIG KERNEL_LA_CONFIG KERNEL_RV_TARGET_DIR KERNEL_LA_TARGET_DIR
+unset KERNEL_RV_AXCONFIG_WRITES KERNEL_LA_AXCONFIG_WRITES KERNEL_RV KERNEL_LA
+unset RV_AUX_DISK LA_AUX_DISK RV_NETDEV_ARGS LA_NETDEV_ARGS LA_HOSTFWD_ARGS
+unset CARGO_HOME CARGO_TARGET_DIR CARGO_BUILD_TARGET RUSTUP_TOOLCHAIN
+unset RUSTC RUSTDOC CARGO RUSTC_BOOTSTRAP
 
 infrastructure_error() {
     printf 'infrastructure error: %s\n' "$1" >&2
@@ -130,14 +145,14 @@ cleanup() {
 trap cleanup EXIT
 
 if [ "$ARCH" = "rv" ]; then
-    if make -C "$REPO_ROOT" run-rv ARCH=riscv64 KERNEL_SMP=1 RV_MEM=1G \
+    if command make -C "$REPO_ROOT" run-rv ARCH=riscv64 KERNEL_SMP=1 RV_MEM=1G \
         RV_TESTSUITE_IMG="$RV_IMG" RV_TESTSUITE_RUN_IMG="$run_image"; then
         status=0
     else
         status=$?
     fi
 else
-    if make -C "$REPO_ROOT" run-la ARCH=loongarch64 KERNEL_SMP=1 LA_MEM=1G \
+    if command make -C "$REPO_ROOT" run-la ARCH=loongarch64 KERNEL_SMP=1 LA_MEM=1G \
         LA_TESTSUITE_IMG="$LA_IMG" LA_TESTSUITE_RUN_IMG="$run_image"; then
         status=0
     else

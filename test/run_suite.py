@@ -197,6 +197,8 @@ UNTRUSTED_PYTHON_ENVIRONMENT = {
     "PYTHONSTARTUP",
 }
 UNTRUSTED_EXECUTION_ENVIRONMENT = {
+    "BASH_ENV",
+    "ENV",
     "CARGO_BUILD_RUSTC_WRAPPER",
     "CARGO_ENCODED_RUSTFLAGS",
     "GNUMAKEFLAGS",
@@ -206,6 +208,41 @@ UNTRUSTED_EXECUTION_ENVIRONMENT = {
     "RUSTC_WORKSPACE_WRAPPER",
     "RUSTDOCFLAGS",
     "RUSTFLAGS",
+    "KERNEL_APP",
+    "KERNEL_FEATURES",
+    "KERNEL_RV_FEATURES",
+    "KERNEL_LA_FEATURES",
+    "KERNEL_APP_FEATURES",
+    "KERNEL_RV_APP_FEATURES",
+    "KERNEL_LA_APP_FEATURES",
+    "KERNEL_MODE",
+    "KERNEL_LOG",
+    "PLAT_CONFIG",
+    "KERNEL_BUILD_DIR",
+    "KERNEL_TARGET_DIR",
+    "KERNEL_RV_OUT_DIR",
+    "KERNEL_LA_OUT_DIR",
+    "KERNEL_RV_CONFIG",
+    "KERNEL_LA_CONFIG",
+    "KERNEL_RV_TARGET_DIR",
+    "KERNEL_LA_TARGET_DIR",
+    "KERNEL_RV_AXCONFIG_WRITES",
+    "KERNEL_LA_AXCONFIG_WRITES",
+    "KERNEL_RV",
+    "KERNEL_LA",
+    "RV_AUX_DISK",
+    "LA_AUX_DISK",
+    "RV_NETDEV_ARGS",
+    "LA_NETDEV_ARGS",
+    "LA_HOSTFWD_ARGS",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "CARGO_BUILD_TARGET",
+    "RUSTUP_TOOLCHAIN",
+    "RUSTC",
+    "RUSTDOC",
+    "CARGO",
+    "RUSTC_BOOTSTRAP",
     *UNTRUSTED_PYTHON_ENVIRONMENT,
 }
 CANONICAL_CHECK_CASE_IDS = (
@@ -251,7 +288,7 @@ CANONICAL_UNIT_CASE_IDS = (
 CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.compliance_regressions": 7,
     "unit.evaluation_failure_report": 6,
-    "unit.evaluation_runner_and_parser_integrity": 22,
+    "unit.evaluation_runner_and_parser_integrity": 23,
     "unit.kernel_state_backed_semantics": 36,
     "unit.libc_stateful_semantics": 9,
     "unit.ltp_result_summary": 18,
@@ -992,10 +1029,13 @@ def _preflight(
     *,
     repo: Path,
     environment: dict[str, str],
-) -> str | None:
+) -> tuple[str | None, dict[str, str]]:
+    resolved_commands: dict[str, str] = {}
     for command in case.get("required_commands", []):
-        if shutil.which(command, path=environment.get("PATH")) is None:
-            return f"required command not found: {command}"
+        resolved = shutil.which(command, path=environment.get("PATH"))
+        if resolved is None:
+            return f"required command not found: {command}", resolved_commands
+        resolved_commands[command] = str(Path(resolved).resolve())
     for requirement in case.get("required_files", []):
         env_name = requirement["environment"]
         value = environment.get(env_name)
@@ -1008,14 +1048,14 @@ def _preflight(
             if not Path(value).is_absolute():
                 value = str((repo / value).resolve())
         if not value:
-            return f"required file variable {env_name} has no value or fallback"
+            return f"required file variable {env_name} has no value or fallback", resolved_commands
         path = Path(value).expanduser().resolve()
         if not path.is_file():
-            return f"required file for {env_name} not found: {path}"
+            return f"required file for {env_name} not found: {path}", resolved_commands
         if not os.access(path, os.R_OK):
-            return f"required file for {env_name} is not readable: {path}"
+            return f"required file for {env_name} is not readable: {path}", resolved_commands
         environment[env_name] = str(path)
-    return None
+    return None, resolved_commands
 
 
 def _command_preflight(argv: list[str], cwd: Path, environment: dict[str, str]) -> str | None:
@@ -1594,8 +1634,9 @@ def run_case(
         environment[name] = expand_value(
             value, repo=repo, output_dir=output_dir, case_output_dir=case_output_dir, arch=arch
         )
-    for name in UNTRUSTED_EXECUTION_ENVIRONMENT:
-        environment.pop(name, None)
+    for name in tuple(environment):
+        if name in UNTRUSTED_EXECUTION_ENVIRONMENT or name.startswith("BASH_FUNC_"):
+            environment.pop(name, None)
     environment["CARGO_NET_OFFLINE"] = "true"
     environment["PYTHONNOUSERSITE"] = "1"
     started = time.monotonic()
@@ -1618,9 +1659,11 @@ def run_case(
         "stdout_log": str(stdout_path),
         "stderr_log": str(stderr_path),
         "details": {},
+        "required_command_paths": {},
     }
 
-    preflight_error = _preflight(case, repo=repo, environment=environment)
+    preflight_error, resolved_commands = _preflight(case, repo=repo, environment=environment)
+    record["required_command_paths"] = resolved_commands
     if preflight_error is None:
         preflight_error = _command_preflight(argv, cwd, environment)
     if preflight_error is None:
