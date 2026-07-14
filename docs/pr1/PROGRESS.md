@@ -13,8 +13,8 @@
 
 | 里程碑 | 状态 | 目标 | 计划提交 |
 |---|---|---|---|
-| M0 | complete | 固化分析、决策、基线和白名单 | `docs(pr1): record analysis and baseline` |
-| M1 | pending | 抽取纯 ABI crate，保留 shell facade | `refactor(linux): extract pure ABI crate` |
+| M0 | complete | 固化分析、决策、基线和白名单 | `1b3dc605 docs(pr1): record analysis and baseline` |
+| M1 | complete | 抽取纯 ABI crate，保留 shell facade | `refactor(linux): extract pure ABI crate`（本里程碑提交） |
 | M2 | pending | 建立通用 typed user-memory 边界和 shell adapter | `refactor(linux): add typed user memory boundary` |
 | M3 | pending | 让既有 user-copy facade 经过 typed adapter | `refactor(linux): route user copy through backend adapter` |
 | M4 | pending | 增加最小 syscall metadata 和静态 guard | `refactor(linux): add syscall boundary metadata` |
@@ -95,7 +95,7 @@ M4 不修改 `syscall_dispatch.rs` 的路由。guard 读取它进行核对。
 ```bash
 cargo fmt --all -- --check
 cargo check --locked --offline -p <new-crate> --target riscv64gc-unknown-none-elf
-cargo check --locked --offline -p <new-crate> --target loongarch64-unknown-none
+cargo check --locked --offline -p <new-crate> --target loongarch64-unknown-none-softfloat
 python3 scripts/check_g006_synthetic_capabilities.py
 python3 scripts/check_g009_post_review_semantics.py
 python3 scripts/check_g012_syscall_review_hotspots.py
@@ -106,6 +106,13 @@ git diff --check
 ```
 
 M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行 PR1 新 guard 及其测试。M5 运行 AGENTS.md 的完整矩阵，并逐项区分 PASS、BASELINE、ENVIRONMENT、REGRESSION。
+
+## M1 checkpoint
+
+- 成功条件：纯 ABI crate 在 host、RISC-V64 与 LoongArch64 均可离线编译；两目标 `-D warnings` clippy 通过；shell facade 保留旧名字；official-feature shell 双架构构建通过；现有 guard 无回归；Cargo.lock 仅出现 path package/edge；没有 syscall、errno、handler、UserProcess、user-copy 或 unsafe 变化。
+- 实际结果：满足上述条件。全局 fmt、LoongArch64 workspace clippy 与 axfs unittest 的非零结果均和 M0 基线一致，未作为 PASS；详见 `VALIDATION.md`。
+- 语义审查：迁移范围只包含纯数值、`AUX_PLATFORM`、`Tms`、`RtcTime` 和 syscall number namespace。地址布局、signal frame/trampoline、synthetic policy、errno helper、`UserTimex` 与所有 handler 均留在 shell。
+- 用户输入完整性：两份未跟踪输入的 SHA-256 仍分别为 `f6fb00c626dccca22ed15d1713ef4a8eb38bdb9d6a028fbd57e12ea8950efabb` 与 `b6b7911b0da05f783366baf444328400b9b93b72494f117e7e78b941a276db75`。
 
 ## Stop 条件映射
 

@@ -1,0 +1,14 @@
+[package]
+name = "orays-linux-abi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Implementation-independent Linux ABI definitions for OrayS"
+
+[features]
+default = []
+
+[dependencies]
+linux-raw-sys = { version = "0.12.1", default-features = false, features = ["general", "no_std"] }

@@ -2,6 +2,40 @@ use axerrno::LinuxError;
 use linux_raw_sys::general;
 use std::string::String;
 
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
+pub use orays_linux_abi::constants::AUX_PLATFORM;
+pub use orays_linux_abi::constants::{
+    ACCESS_MODE_MASK, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, AF_UNIX_DOMAIN, AUX_CLOCK_TICKS,
+    CHOWN_ID_UNCHANGED, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEVFS_MAGIC, EXT4_SUPER_MAGIC,
+    FD_SETSIZE, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID,
+    FILE_MODE_SET_UID, FILE_MODE_STICKY, IOV_MAX, IP_MCAST_JOIN_GROUP_OPT,
+    IP_MCAST_LEAVE_GROUP_OPT, IP_MULTICAST_LOOP_OPT, IP_MULTICAST_TTL_OPT, IP_RECVERR_OPT,
+    IP_TOS_OPT, IP_TTL_OPT, IPPROTO_IP_LEVEL, KERNEL_SIGSET_BYTES, LINUX_EACCES,
+    LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT, LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT,
+    LINUX_ESOCKTNOSUPPORT, LINUX_PERSONALITY_QUERY, O_NOFOLLOW_FLAG, O_PATH_FLAG, PER_LINUX,
+    PERSONALITY_ADDR_COMPAT_LAYOUT, PERSONALITY_ADDR_LIMIT_3GB, PERSONALITY_ADDR_LIMIT_32BIT,
+    PERSONALITY_ADDR_NO_RANDOMIZE, PERSONALITY_FDPIC_FUNCPTRS, PERSONALITY_KNOWN_FLAGS,
+    PERSONALITY_MAX_KNOWN_DOMAIN, PERSONALITY_MMAP_PAGE_ZERO, PERSONALITY_PER_MASK,
+    PERSONALITY_READ_IMPLIES_EXEC, PERSONALITY_SHORT_INODE, PERSONALITY_STICKY_TIMEOUTS,
+    PERSONALITY_UNAME26, PERSONALITY_WHOLE_SECONDS, PIPEFS_MAGIC, PROC_SUPER_MAGIC, RAMFS_MAGIC,
+    RLIMIT_FSIZE_RESOURCE, RLIMIT_NOFILE_RESOURCE, RLIMIT_STACK_RESOURCE, RTC_RD_TIME,
+    SA_NODEFER_FLAG, SEEK_DATA_WHENCE, SEEK_HOLE_WHENCE, SI_TKILL_CODE, SIG_BLOCK_HOW,
+    SIG_SETMASK_HOW, SIG_UNBLOCK_HOW, SIGABRT_NUM, SIGALRM_NUM, SIGCANCEL_NUM, SIGCHLD_NUM,
+    SIGCONT_NUM, SIGFPE_NUM, SIGILL_NUM, SIGINT_NUM, SIGKILL_NUM, SIGPIPE_NUM, SIGPROF_NUM,
+    SIGQUIT_NUM, SIGSEGV_NUM, SIGSTOP_NUM, SIGTERM_NUM, SIGVTALRM_NUM, SO_ACCEPTCONN_OPT,
+    SO_BROADCAST_OPT, SO_DEBUG_OPT, SO_DOMAIN_OPT, SO_DONTROUTE_OPT, SO_ERROR_OPT,
+    SO_KEEPALIVE_OPT, SO_LINGER_OPT, SO_NO_CHECK_OPT, SO_OOBINLINE_OPT, SO_PASSCRED_OPT,
+    SO_PEERCRED_OPT, SO_PRIORITY_OPT, SO_PROTOCOL_OPT, SO_RCVBUF_OPT, SO_RCVBUFFORCE_OPT,
+    SO_RCVTIMEO_OPT, SO_REUSEADDR_OPT, SO_REUSEPORT_OPT, SO_SNDBUF_OPT, SO_SNDBUFFORCE_OPT,
+    SO_SNDTIMEO_OPT, SO_TYPE_OPT, SOL_SOCKET_LEVEL, SS_DISABLE, ST_MODE_BLK, ST_MODE_CHR,
+    ST_MODE_DIR, ST_MODE_FIFO, ST_MODE_FILE, ST_MODE_LNK, ST_MODE_SOCKET, ST_MODE_TYPE_MASK,
+    SYSFS_MAGIC, SYSV_IPC_CREAT, SYSV_IPC_EXCL, SYSV_IPC_INFO, SYSV_IPC_PRIVATE, SYSV_IPC_RMID,
+    SYSV_IPC_SET, SYSV_IPC_STAT, SYSV_SHM_EXEC, SYSV_SHM_HUGETLB, SYSV_SHM_INFO, SYSV_SHM_LOCK,
+    SYSV_SHM_LOCKED, SYSV_SHM_RDONLY, SYSV_SHM_REMAP, SYSV_SHM_RND, SYSV_SHM_STAT,
+    SYSV_SHM_STAT_ANY, SYSV_SHM_UNLOCK, TCP_KEEPCNT_OPT, TCP_KEEPIDLE_OPT, TCP_KEEPINTVL_OPT,
+    TCP_MAXSEG_OPT, TCP_NODELAY_OPT, TMPFS_MAGIC,
+};
+
 pub(super) const USER_ASPACE_BASE: usize = 0x1_0000;
 pub(super) const USER_ASPACE_SIZE: usize = 0x3f_0000_0000;
 pub(super) const USER_STACK_SIZE: usize = 8 * 1024 * 1024;
@@ -20,40 +54,9 @@ pub(super) const MAX_SCRIPT_INTERPRETER_DEPTH: usize = 4;
 // layout semantics.
 pub(super) const TESTSUITE_STAGE_ROOT: &str = "/tmp";
 pub(super) const LEGACY_TESTSUITE_STAGE_ROOT: &str = "/tmp/testsuite";
-pub(super) const AUX_CLOCK_TICKS: usize = 100;
-pub(super) const SEEK_DATA_WHENCE: u32 = 3;
-pub(super) const SEEK_HOLE_WHENCE: u32 = 4;
-
-pub(super) const SIGCHLD_NUM: isize = 17;
-pub(super) const SIGCONT_NUM: i32 = 18;
-pub(super) const SIGINT_NUM: i32 = 2;
-pub(super) const SIGQUIT_NUM: i32 = 3;
-pub(super) const SIGILL_NUM: i32 = 4;
-pub(super) const SIGABRT_NUM: i32 = 6;
-pub(super) const SIGFPE_NUM: i32 = 8;
-pub(super) const SIGKILL_NUM: i32 = 9;
-pub(super) const SIGSEGV_NUM: i32 = 11;
-pub(super) const SIGPIPE_NUM: i32 = 13;
-pub(super) const SIGALRM_NUM: i32 = 14;
-pub(super) const SIGTERM_NUM: i32 = 15;
-pub(super) const SIGSTOP_NUM: i32 = 19;
-pub(super) const SIGVTALRM_NUM: i32 = 26;
-pub(super) const SIGPROF_NUM: i32 = 27;
-pub(super) const SIGCANCEL_NUM: i32 = 33;
-pub(super) const SI_TKILL_CODE: i32 = -6;
-pub(super) const SA_NODEFER_FLAG: u64 = 0x4000_0000;
-pub(super) const KERNEL_SIGSET_BYTES: usize = core::mem::size_of::<u64>();
-pub(super) const SIG_BLOCK_HOW: usize = 0;
-pub(super) const SIG_UNBLOCK_HOW: usize = 1;
-pub(super) const SIG_SETMASK_HOW: usize = 2;
-pub(super) const RLIMIT_STACK_RESOURCE: u32 = 3;
-pub(super) const RLIMIT_FSIZE_RESOURCE: u32 = 1;
-pub(super) const RLIMIT_NOFILE_RESOURCE: u32 = 7;
 pub(super) const DEFAULT_NOFILE_LIMIT: u64 = 1024;
 pub(super) const NR_OPEN_LIMIT: u64 = 1024 * 1024;
 
-pub(super) const FD_SETSIZE: usize = 1024;
-pub(super) const IOV_MAX: usize = 1024;
 pub(super) const BITS_PER_USIZE: usize = usize::BITS as usize;
 pub(super) const FD_SET_WORDS: usize = FD_SETSIZE.div_ceil(BITS_PER_USIZE);
 
@@ -61,158 +64,28 @@ pub(super) const FD_SET_WORDS: usize = FD_SETSIZE.div_ceil(BITS_PER_USIZE);
 pub(super) const RISCV_SIGNAL_SIGSET_RESERVED_BYTES: usize = 120;
 #[cfg(target_arch = "riscv64")]
 pub(super) const RISCV_SIGNAL_FPSTATE_BYTES: usize = 528;
-pub(super) const SS_DISABLE: i32 = 2;
 #[cfg(target_arch = "riscv64")]
 pub(super) const RISCV_SIGTRAMP_CODE: [u32; 3] = [0x08b0_0893, 0x0000_0073, 0x0010_0073];
 #[cfg(target_arch = "loongarch64")]
 pub(super) const LOONGARCH_SIGTRAMP_CODE: [u32; 3] = [0x0282_2c0b, 0x002b_0000, 0x0000_0000];
 
-pub(super) const ST_MODE_DIR: u32 = 0o040000;
-pub(super) const ST_MODE_FILE: u32 = 0o100000;
-pub(super) const ST_MODE_LNK: u32 = 0o120000;
-pub(super) const ST_MODE_CHR: u32 = 0o020000;
-pub(super) const ST_MODE_BLK: u32 = 0o060000;
-pub(super) const ST_MODE_FIFO: u32 = 0o010000;
-pub(super) const ST_MODE_SOCKET: u32 = 0o140000;
-pub(super) const ST_MODE_TYPE_MASK: u32 = 0o170000;
-pub(super) const FILE_MODE_PERMISSION_MASK: u32 = 0o7777;
-pub(super) const FILE_MODE_SET_UID: u32 = 0o4000;
-pub(super) const FILE_MODE_SET_GID: u32 = 0o2000;
-pub(super) const FILE_MODE_STICKY: u32 = 0o1000;
-pub(super) const FILE_MODE_GROUP_EXECUTE: u32 = 0o0010;
-pub(super) const CHOWN_ID_UNCHANGED: u32 = u32::MAX;
-
 pub(super) const STATFS_BLOCK_SIZE: i64 = 4096;
 pub(super) const STATFS_NAME_MAX: i64 = 63;
-pub(super) const EXT4_SUPER_MAGIC: i64 = 0xef53;
-pub(super) const RAMFS_MAGIC: i64 = 0x8584_58f6;
-pub(super) const TMPFS_MAGIC: i64 = 0x0102_1994;
-pub(super) const PROC_SUPER_MAGIC: i64 = 0x9fa0;
-pub(super) const SYSFS_MAGIC: i64 = 0x6265_6572;
-pub(super) const DEVFS_MAGIC: i64 = 0x1373;
-pub(super) const PIPEFS_MAGIC: i64 = 0x5049_5045;
-
-pub(super) const SYSV_IPC_PRIVATE: i32 = 0;
-pub(super) const SYSV_IPC_CREAT: i32 = 0o1000;
-pub(super) const SYSV_IPC_EXCL: i32 = 0o2000;
-pub(super) const SYSV_IPC_RMID: i32 = 0;
-pub(super) const SYSV_IPC_SET: i32 = 1;
-pub(super) const SYSV_IPC_STAT: i32 = 2;
-pub(super) const SYSV_IPC_INFO: i32 = 3;
-pub(super) const SYSV_SHM_HUGETLB: i32 = 0o4000;
-pub(super) const SYSV_SHM_RDONLY: i32 = 0o10000;
-pub(super) const SYSV_SHM_RND: i32 = 0o20000;
-pub(super) const SYSV_SHM_REMAP: i32 = 0o40000;
-pub(super) const SYSV_SHM_EXEC: i32 = 0o100000;
-pub(super) const SYSV_SHM_LOCK: i32 = 11;
-pub(super) const SYSV_SHM_UNLOCK: i32 = 12;
-pub(super) const SYSV_SHM_STAT: i32 = 13;
-pub(super) const SYSV_SHM_INFO: i32 = 14;
-pub(super) const SYSV_SHM_STAT_ANY: i32 = 15;
-pub(super) const SYSV_SHM_LOCKED: u32 = 0o2000;
 pub(super) const SYSV_SHM_MAX_SIZE: usize = 1024 * 1024;
 pub(super) const SYSV_SHM_MAX_SEGMENTS: usize = 128;
 
-pub(super) const O_PATH_FLAG: u32 = 0o10000000;
-pub(super) const O_NOFOLLOW_FLAG: u32 = 0o0400000;
-pub(super) const CLOSE_RANGE_UNSHARE: u32 = 1 << 1;
-pub(super) const CLOSE_RANGE_CLOEXEC: u32 = 1 << 2;
 pub(super) const PROC_SELF_MAPS_PATH: &str = "/proc/self/maps";
 pub(super) const ETC_PASSWD_PATH: &str = "/etc/passwd";
 pub(super) const ETC_GROUP_PATH: &str = "/etc/group";
 
-pub(super) const AF_UNIX_DOMAIN: i32 = 1;
 pub(super) const LOCAL_SOCKET_INO_BASE: u64 = 0x5f00_0000;
-pub(super) const LINUX_EACCES: u32 = 13;
-pub(super) const ACCESS_X_OK: usize = 1;
-pub(super) const ACCESS_W_OK: usize = 2;
-pub(super) const ACCESS_R_OK: usize = 4;
-pub(super) const ACCESS_MODE_MASK: usize = ACCESS_X_OK | ACCESS_W_OK | ACCESS_R_OK;
 pub(super) const DEFAULT_PASSWD_CONTENT: &[u8] =
     b"root:x:0:0:root:/root:/bin/sh\nnobody:x:65534:65534:nobody:/nonexistent:/sbin/nologin\n";
 pub(super) const DEFAULT_GROUP_CONTENT: &[u8] =
     b"root:x:0:\ndaemon:x:1:\nusers:x:100:\nnogroup:x:65534:\n";
-pub(super) const RTC_RD_TIME: u32 = 0x8024_7009;
-
-pub(super) const SOL_SOCKET_LEVEL: i32 = 1;
-pub(super) const SO_DEBUG_OPT: i32 = 1;
-pub(super) const SO_REUSEADDR_OPT: i32 = 2;
-pub(super) const SO_TYPE_OPT: i32 = 3;
-pub(super) const SO_ERROR_OPT: i32 = 4;
-pub(super) const SO_DONTROUTE_OPT: i32 = 5;
-pub(super) const SO_BROADCAST_OPT: i32 = 6;
-pub(super) const SO_SNDBUF_OPT: i32 = 7;
-pub(super) const SO_RCVBUF_OPT: i32 = 8;
-pub(super) const SO_KEEPALIVE_OPT: i32 = 9;
-pub(super) const SO_OOBINLINE_OPT: i32 = 10;
-pub(super) const SO_NO_CHECK_OPT: i32 = 11;
-pub(super) const SO_PRIORITY_OPT: i32 = 12;
-pub(super) const SO_LINGER_OPT: i32 = 13;
-pub(super) const SO_REUSEPORT_OPT: i32 = 15;
-pub(super) const SO_PASSCRED_OPT: i32 = 16;
-pub(super) const SO_RCVTIMEO_OPT: i32 = 20;
-pub(super) const SO_SNDTIMEO_OPT: i32 = 21;
-pub(super) const SO_ACCEPTCONN_OPT: i32 = 30;
-pub(super) const SO_SNDBUFFORCE_OPT: i32 = 32;
-pub(super) const SO_RCVBUFFORCE_OPT: i32 = 33;
-pub(super) const SO_PEERCRED_OPT: i32 = 17;
-pub(super) const SO_PROTOCOL_OPT: i32 = 38;
-pub(super) const SO_DOMAIN_OPT: i32 = 39;
-pub(super) const IPPROTO_IP_LEVEL: i32 = 0;
-pub(super) const IP_TOS_OPT: i32 = 1;
-pub(super) const IP_TTL_OPT: i32 = 2;
-pub(super) const IP_MULTICAST_TTL_OPT: i32 = 33;
-pub(super) const IP_MULTICAST_LOOP_OPT: i32 = 34;
-pub(super) const IP_MCAST_JOIN_GROUP_OPT: i32 = 42;
-pub(super) const IP_MCAST_LEAVE_GROUP_OPT: i32 = 45;
-pub(super) const IP_RECVERR_OPT: i32 = 11;
-pub(super) const TCP_NODELAY_OPT: i32 = 1;
-pub(super) const TCP_MAXSEG_OPT: i32 = 2;
-pub(super) const TCP_KEEPIDLE_OPT: i32 = 4;
-pub(super) const TCP_KEEPINTVL_OPT: i32 = 5;
-pub(super) const TCP_KEEPCNT_OPT: i32 = 6;
 pub(super) const TCP_INFO_COMPAT_SIZE: usize = 256;
 pub(super) const INTERRUPTIBLE_SOCKET_RECV_QUANTUM: core::time::Duration =
     core::time::Duration::from_millis(20);
-// Linux UAPI socket errno values used by both RV64 and LA64 targets here.
-pub(super) const LINUX_ENOPROTOOPT: u32 = 92;
-pub(super) const LINUX_EPROTONOSUPPORT: u32 = 93;
-pub(super) const LINUX_ESOCKTNOSUPPORT: u32 = 94;
-pub(super) const LINUX_EOPNOTSUPP: u32 = 95;
-pub(super) const LINUX_EAFNOSUPPORT: u32 = 97;
-
-pub(super) const LINUX_PERSONALITY_QUERY: usize = 0xffff_ffff;
-pub(super) const PER_LINUX: usize = 0;
-pub(super) const PERSONALITY_PER_MASK: usize = 0x00ff;
-pub(super) const PERSONALITY_MAX_KNOWN_DOMAIN: usize = 0x0010;
-pub(super) const PERSONALITY_UNAME26: usize = 0x002_0000;
-pub(super) const PERSONALITY_ADDR_NO_RANDOMIZE: usize = 0x004_0000;
-pub(super) const PERSONALITY_FDPIC_FUNCPTRS: usize = 0x008_0000;
-pub(super) const PERSONALITY_MMAP_PAGE_ZERO: usize = 0x010_0000;
-pub(super) const PERSONALITY_ADDR_COMPAT_LAYOUT: usize = 0x020_0000;
-pub(super) const PERSONALITY_READ_IMPLIES_EXEC: usize = 0x040_0000;
-pub(super) const PERSONALITY_ADDR_LIMIT_32BIT: usize = 0x080_0000;
-pub(super) const PERSONALITY_SHORT_INODE: usize = 0x100_0000;
-pub(super) const PERSONALITY_WHOLE_SECONDS: usize = 0x200_0000;
-pub(super) const PERSONALITY_STICKY_TIMEOUTS: usize = 0x400_0000;
-pub(super) const PERSONALITY_ADDR_LIMIT_3GB: usize = 0x800_0000;
-pub(super) const PERSONALITY_KNOWN_FLAGS: usize = PERSONALITY_UNAME26
-    | PERSONALITY_ADDR_NO_RANDOMIZE
-    | PERSONALITY_FDPIC_FUNCPTRS
-    | PERSONALITY_MMAP_PAGE_ZERO
-    | PERSONALITY_ADDR_COMPAT_LAYOUT
-    | PERSONALITY_READ_IMPLIES_EXEC
-    | PERSONALITY_ADDR_LIMIT_32BIT
-    | PERSONALITY_SHORT_INODE
-    | PERSONALITY_WHOLE_SECONDS
-    | PERSONALITY_STICKY_TIMEOUTS
-    | PERSONALITY_ADDR_LIMIT_3GB;
-
-#[cfg(target_arch = "riscv64")]
-pub(super) const AUX_PLATFORM: &str = "riscv64";
-#[cfg(target_arch = "loongarch64")]
-pub(super) const AUX_PLATFORM: &str = "loongarch64";
-
 pub(super) fn posix_errno_from_ret(ret: isize) -> LinuxError {
     LinuxError::try_from((-ret) as i32).unwrap_or(LinuxError::EIO)
 }

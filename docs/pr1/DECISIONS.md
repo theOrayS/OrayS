@@ -38,9 +38,11 @@ orays_linux_abi
 M1 保留 `user/shell/src/uspace/linux_abi.rs` 与 `time_abi.rs`。旧的 `uspace/mod.rs` wildcard 不扩散到新 crate；facade 使用显式 allowlist：
 
 ```rust
-pub(super) use orays_linux_abi::constants::{...};
+pub use orays_linux_abi::constants::{...};
 pub(super) use orays_linux_abi::time::{RtcTime, Tms, USER_HZ};
 ```
+
+`linux_abi` facade 位于私有 `uspace` 模块内，因此这里的 `pub use` 不会形成新的 crate 外路径；它只让既有 `use linux_abi::*` 继续获得显式 allowlist 中的名字。采用 `pub(super)` 会对同一组兼容导出产生同等的 unused-import warning，并不能更准确地恢复原有的 wildcard 可见性。`time_abi` 的三个名字原本就是父模块可见，故继续使用 `pub(super)`。没有为兼容 facade 添加 `allow`。
 
 原 shell-only 常量/函数仍在原文件定义。这样所有既有 public/crate-visible 路径继续可用，同时 review 能看到哪些名字越过边界。M2 后导入路径改为 `orays_linux::abi::...`，调用者不变。
 
@@ -108,4 +110,5 @@ PR1 不新增 unsafe block。新通用类型不解引用 raw pointer；byte back
 - 新 path package 导致的 `Cargo.lock` 变化只允许新增 workspace package/dependency edge；逐行审计，禁止 registry 版本变化。
 - 全局 fmt 的既有失败记为 BASELINE，同时对本里程碑 touched Rust 文件单独执行 rustfmt check。
 - LoongArch64 clippy 的 host libclang triple 错误记为 ENVIRONMENT；仍要求 LoongArch64 official-feature shell build 通过。
+- 本机实际安装的裸机目标名是 `loongarch64-unknown-none-softfloat`；直接 crate check/clippy 使用该 target。Makefile 的 `ARCH=loongarch64` 路径仍按仓库配置运行。
 - 每步必须运行现有 G006/G009/G012/G013 guard、双架构 official-feature build、`git diff --check`；M5 再跑完整矩阵。

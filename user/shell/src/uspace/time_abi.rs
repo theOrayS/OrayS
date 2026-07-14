@@ -20,6 +20,8 @@ use super::task_registry::{
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
 
+pub(super) use orays_linux_abi::time::{RtcTime, Tms, USER_HZ};
+
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 static TIME_DISCIPLINE: TimeDisciplineState = TimeDisciplineState::new();
 
@@ -54,7 +56,6 @@ impl TimeDisciplineState {
 }
 
 const NSEC_PER_SEC: i128 = 1_000_000_000;
-pub(super) const USER_HZ: c_long = 100;
 const TIMER_HELPER_KSTACK_SIZE: usize = 16 * 1024;
 const TIMER_HELPER_POLL_US: u64 = 10_000;
 
@@ -182,29 +183,6 @@ impl UserProcess {
         }
         delivered
     }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) struct Tms {
-    pub(super) tms_utime: c_long,
-    pub(super) tms_stime: c_long,
-    pub(super) tms_cutime: c_long,
-    pub(super) tms_cstime: c_long,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) struct RtcTime {
-    tm_sec: i32,
-    tm_min: i32,
-    tm_hour: i32,
-    tm_mday: i32,
-    tm_mon: i32,
-    tm_year: i32,
-    tm_wday: i32,
-    tm_yday: i32,
-    tm_isdst: i32,
 }
 
 #[repr(C)]
