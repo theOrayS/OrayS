@@ -69,6 +69,17 @@ class Pr1LinuxBoundaryGuardTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         self.assert_guard_fails(tree, "reverse/implementation dependency")
 
+    def test_detects_target_specific_reverse_dependency(self) -> None:
+        tree = self.make_tree()
+        path = tree / "api/orays_linux/Cargo.toml"
+        path.write_text(
+            path.read_text(encoding="utf-8")
+            + "\n[target.'cfg(target_arch = \"riscv64\")'.dependencies]\n"
+            + 'arceos-shell = { path = "../../user/shell" }\n',
+            encoding="utf-8",
+        )
+        self.assert_guard_fails(tree, "reverse/implementation dependency")
+
     def test_detects_unsafe_in_boundary_crate(self) -> None:
         tree = self.make_tree()
         path = tree / "api/orays_linux/src/syscall.rs"

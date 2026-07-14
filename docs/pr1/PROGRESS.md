@@ -17,8 +17,8 @@
 | M1 | complete | 抽取纯 ABI crate，保留 shell facade | `940438f7 refactor(linux): extract pure ABI crate` |
 | M2 | complete | 建立通用 typed user-memory 边界和 shell adapter | `7357d56c refactor(linux): add typed user memory boundary` |
 | M3 | complete | 让既有 user-copy facade 经过 typed adapter | `f7d0a5a5 refactor(linux): route user copy through backend adapter` |
-| M4 | complete | 增加最小 syscall metadata 和静态 guard | `refactor(linux): add syscall boundary metadata`（本里程碑提交） |
-| M5 | pending | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`；修复另建提交 |
+| M4 | complete | 增加最小 syscall metadata 和静态 guard | `a5703bfd refactor(linux): add syscall boundary metadata` |
+| M5 | in progress | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`；修复另建提交 |
 
 ## 每个里程碑的文件白名单
 
@@ -88,6 +88,15 @@ M4 不修改 `syscall_dispatch.rs` 的路由。guard 读取它进行核对。
 
 若独立 reviewer 发现必须修复的问题，先在本文件登记独立修复提交和精确文件白名单，再编辑；不 amend 既有里程碑提交，不扩大到 syscall 行为。
 
+### M5-R1（独立审查 minor 收口）
+
+- `api/orays_linux/src/syscall.rs`（仅补充 `SyscallArgs` 的 PR1 非运行时用途说明）
+- `scripts/check_pr1_linux_boundary.py`（依赖方向检查扩展到 target-specific dependency table）
+- `scripts/test_pr1_linux_boundary.py`（增加 target-specific 反向依赖 mutation test）
+- 四份 `docs/pr1/*.md`
+
+成功条件：不改变任何 Rust 行为；guard 同时扫描普通和 target-specific dependency table，新增 mutation test 会证明反向依赖不能藏在 target cfg 中；文档准确区分 PR1 边界链与 shell 仍有的既存 `linux-raw-sys` 直连。修复提交不 amend M4。
+
 ## 里程碑验收门
 
 每个实现里程碑至少执行：
@@ -138,6 +147,18 @@ M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行
 - warning 处置：最初的私有 metadata const table 在首轮 RISC-V64 shell build 中新增 6 个 `dead_code` warning。未添加 `allow`；改为明确的 `#[used] static` audit table 后，RISC-V64 与 LoongArch64 build 都保持原有 12 个 shell warning，无新增 metadata warning。
 - 验证：双架构 official-feature shell build、新 crate host/RISC-V64/LoongArch64 `-D warnings` clippy、RISC-V64 workspace clippy、existing guards、PR1 guard/tests 和排除 axfs 的 workspace tests 通过。全局 fmt、LA workspace clippy 与 axfs FAT unittest 分别保持 BASELINE/ENVIRONMENT/BASELINE；无未解决 M4 regression。
 - 完整性：`syscall_dispatch.rs`、Cargo manifests、`Cargo.lock` 和 5 个既有 user-memory unsafe 均为零 diff；host test 的 `ctypes_gen.rs` 生成副作用已精确恢复；两份未跟踪用户输入 hash 不变。
+
+## M5-R1 checkpoint
+
+- 独立 reviewer 的 blocker/major 均为 0；三个 minor 均已处理：依赖图明确 shell 的既存
+  `linux-raw-sys` 直连，dependency guard 扩展到 target-specific table，并说明 `SyscallArgs`
+  在 PR1 只是六寄存器审计值而非 dispatcher runtime 路径。
+- PR1 guard 当前树 0 findings，15/15 mutation tests 通过；新增 mutation 把反向 shell edge 放进
+  RISC-V64 target dependency table 并确认 guard 拒绝。`orays-linux` host tests 9/9，host、RV、LA
+  的正确 clippy 调用均通过。
+- 两个裸机 target 曾误带 `--all-targets`，因目标没有 `libtest` 返回 101；分类为 INVOCATION，随后
+  去掉该参数重跑均为 0。修复没有改变 Rust 行为、Cargo manifests、lock、dispatcher、handler、
+  errno 或 unsafe。
 
 ## Stop 条件映射
 

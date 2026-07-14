@@ -26,20 +26,24 @@ arceos-shell (feature = uspace)
 
 `uspace` feature 同时开启 `axtask/uspace`、`axstd/fp-simd` 和所有上述可选依赖；`auto-run-tests` 另行开启 `axtask/sched-rr`。因此裸 `APP_FEATURES=uspace` 不是当前完整用户态构建配置，正式双架构构建必须同时使用 `FEATURES=alloc,paging,irq,multitask,fs,net,rtc` 与 `APP_FEATURES=auto-run-tests,uspace`。
 
-M2 已把目标依赖图落实为当前 Cargo graph：
+M2 已把 PR1 新边界的目标依赖链落实为当前 Cargo graph：
 
 ```text
 arceos-shell
-└── orays-linux (optional, activated by shell/uspace)
-    └── orays-linux-abi
-        └── linux-raw-sys (no_std, architecture-selected numbers)
+├── orays-linux (optional, activated by shell/uspace)
+│   └── orays-linux-abi
+│       └── linux-raw-sys (no_std, architecture-selected numbers)
+└── linux-raw-sys (既存直连；未迁移 handler/dispatcher 仍使用)
 ```
 
-两个新 crate 均不得反向依赖 shell；ABI crate 不依赖任何 OrayS kernel crate。
+两个新 crate 均不得反向依赖 shell；ABI crate 不依赖任何 OrayS kernel crate。上图的 shell
+直连不是新边界的反向边，但说明“整个 shell 只依赖 `orays-linux`”尚未实现：当前 24 个
+`user/shell/src/uspace` 文件仍直接引用 `linux_raw_sys`，覆盖 dispatcher、FD、signal、VM、futex、
+time 等未迁移子系统。PR1 非目标禁止一次搬迁这些 handler；后续只能按子系统逐批消除直连。
 
 ## 可能的 dependency cycle
 
-当前没有新 crate，因此没有既存 cycle。以下设计会立即形成或埋下 cycle，均禁止：
+任务起点没有新 crate；M2 后的实际 graph 也没有 cycle。以下设计会立即形成或埋下 cycle，均禁止：
 
 - `orays-linux` 为取得 `UserProcess`、`AddrSpace` 或 handler 而依赖 `arceos-shell`，同时 shell 又依赖 `orays-linux`。
 - `orays-linux-abi` 依赖 `arceos_posix_api`/`axerrno`，而这些 API 未来再使用 ABI crate；即使当前 Cargo 尚未闭环，也破坏叶子 crate 约束。

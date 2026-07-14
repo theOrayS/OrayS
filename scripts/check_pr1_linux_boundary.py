@@ -175,6 +175,12 @@ def dependency_section(manifest: str) -> str:
     return match.group(1) if match else ""
 
 
+def all_dependency_sections(manifest: str) -> str:
+    """Return normal and target-specific dependency table bodies."""
+    pattern = r"(?ms)^\[(?:dependencies|target\.[^\]\r\n]+\.dependencies)\]\s*(.*?)(?=^\[|\Z)"
+    return "\n".join(match.group(1) for match in re.finditer(pattern, manifest))
+
+
 def scan_dependencies(root: Path) -> list[str]:
     findings: list[str] = []
     abi_manifest = read_required(root, ABI_CRATE_REL / "Cargo.toml", findings)
@@ -186,18 +192,21 @@ def scan_dependencies(root: Path) -> list[str]:
     if 'name = "orays-linux"' not in linux_manifest:
         findings.append(f"{LINUX_CRATE_REL / 'Cargo.toml'}: package name must remain orays-linux")
 
-    abi_deps = dependency_section(abi_manifest)
-    linux_deps = dependency_section(linux_manifest)
-    shell_deps = dependency_section(shell_manifest)
-    if not re.search(r"(?m)^linux-raw-sys\s*=", abi_deps):
+    abi_normal_deps = dependency_section(abi_manifest)
+    linux_normal_deps = dependency_section(linux_manifest)
+    shell_normal_deps = dependency_section(shell_manifest)
+    abi_deps = all_dependency_sections(abi_manifest)
+    linux_deps = all_dependency_sections(linux_manifest)
+    shell_deps = all_dependency_sections(shell_manifest)
+    if not re.search(r"(?m)^linux-raw-sys\s*=", abi_normal_deps):
         findings.append("orays-linux-abi: linux-raw-sys must remain its only implementation dependency")
     if len(re.findall(r"(?m)^[-A-Za-z0-9_]+\s*=", abi_deps)) != 1:
         findings.append("orays-linux-abi: unexpected dependency added")
-    if not re.search(r"(?m)^orays-linux-abi\s*=\s*\{\s*workspace\s*=\s*true\s*\}", linux_deps):
+    if not re.search(r"(?m)^orays-linux-abi\s*=\s*\{\s*workspace\s*=\s*true\s*\}", linux_normal_deps):
         findings.append("orays-linux: must depend only on workspace orays-linux-abi")
     if len(re.findall(r"(?m)^[-A-Za-z0-9_]+\s*=", linux_deps)) != 1:
         findings.append("orays-linux: implementation or external dependency added")
-    if not re.search(r"(?m)^orays-linux\s*=\s*\{\s*workspace\s*=\s*true,\s*optional\s*=\s*true\s*\}", shell_deps):
+    if not re.search(r"(?m)^orays-linux\s*=\s*\{\s*workspace\s*=\s*true,\s*optional\s*=\s*true\s*\}", shell_normal_deps):
         findings.append("arceos-shell: missing optional orays-linux dependency")
     if re.search(r"(?m)^orays-linux-abi\s*=", shell_deps) or "dep:orays-linux-abi" in shell_manifest:
         findings.append("arceos-shell: direct ABI dependency bypasses orays-linux")

@@ -19,6 +19,10 @@ impl SyscallNumber {
 }
 
 /// The six raw register arguments supplied by the architecture entry path.
+///
+/// PR1 keeps this as an implementation-independent audit value only. The
+/// existing shell dispatcher remains the sole runtime consumer of trap-frame
+/// arguments and is deliberately not wired through this type yet.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(transparent)]
 pub struct SyscallArgs([usize; MAX_SYSCALL_ARGUMENTS]);

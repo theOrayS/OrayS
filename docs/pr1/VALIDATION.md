@@ -232,6 +232,26 @@
 - test honesty：static mutation tests 证明 guard 对预设漂移有检测能力，但不宣称 syscall runtime PASS。中途 1 个测试断言 regression 与 6 个 warning 均在提交前修复；无未解决 M4 regression。
 - known failures：仅全局 fmt BASELINE、LA workspace clippy ENVIRONMENT 和 axfs unittest BASELINE。
 
+## M5-R1 — independent review minor follow-up
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `python3 scripts/check_pr1_linux_boundary.py` | static | 0 | PASS | 当前树 0 findings；依赖扫描含普通与 target-specific table |
+| `python3 scripts/test_pr1_linux_boundary.py` | mutation tests | 0 | PASS | 15/15；新增 target-specific 反向依赖用例通过 |
+| `python3 -m py_compile scripts/check_pr1_linux_boundary.py scripts/test_pr1_linux_boundary.py` | Python syntax | 0 | PASS | 两个脚本可编译 |
+| `cargo fmt -p orays-linux -- --check` | touched Rust crate | 0 | PASS | `SyscallArgs` 文档变更格式正确 |
+| `cargo test --locked --offline -p orays-linux` | host | 0 | PASS | 9/9 |
+| `cargo clippy --locked --offline -p orays-linux --all-targets -- -D warnings` | host | 0 | PASS | host 全 target 零 warning |
+| 同一命令加 `--target riscv64gc-unknown-none-elf` | RISC-V64 | 101 | INVOCATION | 裸机 target 没有 `libtest`；`--all-targets` 不适用，随后用 library-only 调用重跑 |
+| 同一命令加 `--target loongarch64-unknown-none-softfloat` | LoongArch64 | 101 | INVOCATION | 同上；不是源码错误 |
+| `cargo clippy --locked --offline -p orays-linux --target riscv64gc-unknown-none-elf -- -D warnings` | RISC-V64 | 0 | PASS | library target 零 warning |
+| `cargo clippy --locked --offline -p orays-linux --target loongarch64-unknown-none-softfloat -- -D warnings` | LoongArch64 | 0 | PASS | library target 零 warning |
+| `cargo fmt --all -- --check` | workspace | 1 | BASELINE | 仍只命中 M0 的四个无关文件 |
+| `git diff --check` | worktree | 0 | PASS | 无 whitespace error |
+
+审查修复白名单为 `api/orays_linux/src/syscall.rs`、两个 PR1 guard 脚本及四份 PR1 文档。
+没有 manifest/lock/dispatcher/handler 变化；unsafe 新增、删除、移动均为 0。
+
 ## 后续记录模板
 
 每个里程碑追加：commit SHA、逐条命令/exit/classification、changed files、已知失败、unsafe block 增减/移动、Cargo.lock diff 原因、双架构证据和工作树状态。不得用一次默认 build 代替 uspace official-feature build。
