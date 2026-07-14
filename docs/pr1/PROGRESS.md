@@ -18,7 +18,7 @@
 | M2 | complete | 建立通用 typed user-memory 边界和 shell adapter | `7357d56c refactor(linux): add typed user memory boundary` |
 | M3 | complete | 让既有 user-copy facade 经过 typed adapter | `f7d0a5a5 refactor(linux): route user copy through backend adapter` |
 | M4 | complete | 增加最小 syscall metadata 和静态 guard | `a5703bfd refactor(linux): add syscall boundary metadata` |
-| M5 | in progress | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`；修复另建提交 |
+| M5 | complete | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`（本提交） |
 
 ## 每个里程碑的文件白名单
 
@@ -114,7 +114,7 @@ make A=user/shell ARCH=loongarch64 FEATURES=alloc,paging,irq,multitask,fs,net,rt
 git diff --check
 ```
 
-M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行 PR1 新 guard 及其测试。M5 运行 AGENTS.md 的完整矩阵，并逐项区分 PASS、BASELINE、ENVIRONMENT、REGRESSION。
+M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行 PR1 新 guard 及其测试。M5 运行 AGENTS.md 的完整矩阵，并逐项区分 PASS、BASELINE、ENVIRONMENT、INVOCATION、BOUNDED、REGRESSION。
 
 ## M1 checkpoint
 
@@ -159,6 +159,23 @@ M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行
 - 两个裸机 target 曾误带 `--all-targets`，因目标没有 `libtest` 返回 101；分类为 INVOCATION，随后
   去掉该参数重跑均为 0。修复没有改变 Rust 行为、Cargo manifests、lock、dispatcher、handler、
   errno 或 unsafe。
+
+## M5 final checkpoint
+
+- 完整 diff 自 `e7ad4862` 起共 24 个 tracked 文件、2865 insertions/203 deletions；六个既有本地提交均只含
+  PR1 白名单内容。独立 reviewer 首轮为 0 blocker/0 major/3 minor，`9de38988` 修复后复核为
+  0 blocker/0 major/0 minor。
+- 两个边界 crate 的 host/RV/LA check 与 `-D warnings` clippy 通过；host tests 为 ABI 0 个、Linux
+  9/9。RV workspace clippy 通过；LA workspace clippy 的 host libclang target 错误仍为 ENVIRONMENT。
+  axfs FAT unittest 和全局 fmt 仍为起始提交已复现的 BASELINE；排除 axfs 的 workspace tests 通过。
+- Cargo metadata/tree 无 cycle 或反向边。新边界链为 shell → `orays-linux` → `orays-linux-abi` →
+  `linux-raw-sys`；shell 另有既存直连 `linux-raw-sys`，已准确记录而未伪装成完整迁移。
+- 官方 RV/LA 镜像均通过 `/tmp` qcow2 overlay 进入 `ltp-musl`。60 秒总时限内分别完成 27/23 个
+  case wrapper，再由 timeout 截断；各有一次 `brk01` libc TCONF，起始提交 RV 对照已复现。
+  未宣称完整评测 PASS，详见 `VALIDATION.md`。
+- tracked Rust unsafe block 为起点 501、最终 501；`user_memory.rs` 为 5→5，新边界 crate 为 0。
+  `Cargo.lock` 仅增加两个 path package 和三条 dependency edge，hash 为 `0f7b1d31…`；无 registry 版本或
+  checksum 变化。两份受保护未跟踪输入 hash 不变，未 push、未创建远端 PR。
 
 ## Stop 条件映射
 

@@ -6,9 +6,10 @@
 - `BASELINE`：失败在起始提交可复现，且与 PR1 修改无关。
 - `ENVIRONMENT`：host 工具/target 支持阻止命令执行；不能记为 PASS。
 - `INVOCATION`：调用参数或架构切换状态不构成有效验收；随后必须用正确调用重跑。
+- `BOUNDED`：外层 timeout 按设计终止，但已观察到声明的 smoke marker；不能外推为完整测试 PASS。
 - `REGRESSION`：由 PR1 引入；提交前必须修复或按 stop 条件停止。
 
-日志存于 `/tmp/orays-pr1-baseline/`，不属于仓库交付物。
+日志存于 `/tmp/orays-pr1-baseline/` 与 `/tmp/orays-pr1-final/`，不属于仓库交付物。
 
 ## M0 基线
 
@@ -251,6 +252,85 @@
 
 审查修复白名单为 `api/orays_linux/src/syscall.rs`、两个 PR1 guard 脚本及四份 PR1 文档。
 没有 manifest/lock/dispatcher/handler 变化；unsafe 新增、删除、移动均为 0。
+
+## M5 — final integration validation
+
+### Boundary crates and static tests
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `cargo check --locked --offline -p orays-linux-abi` 及 RV/LA `--target` 变体 | host/RISC-V64/LoongArch64 | 0/0/0 | PASS | `m5-check-abi-{host,rv,la}.log` |
+| `cargo check --locked --offline -p orays-linux` 及 RV/LA `--target` 变体 | host/RISC-V64/LoongArch64 | 0/0/0 | PASS | `m5-check-linux-{host,rv,la}.log` |
+| `cargo clippy --locked --offline -p orays-linux-abi ... -- -D warnings` | host/RISC-V64/LoongArch64 | 0/0/0 | PASS | 三目标零 warning；对应 `m5-clippy-abi-*.log` |
+| `cargo clippy --locked --offline -p orays-linux ... -- -D warnings` | host/RISC-V64/LoongArch64 | 0/0/0 | PASS | 三目标零 warning；正确 cross-target 调用不含 `--all-targets`；对应 `m5-clippy-linux-*.log` |
+| `cargo test --locked --offline -p orays-linux-abi` | host | 0 | PASS | 0 runtime tests，const number/layout assertion 编译；`m5-test-abi.log` |
+| `cargo test --locked --offline -p orays-linux` | host | 0 | PASS | 9/9；`m5-test-linux.log` |
+| `python3 scripts/check_g006_synthetic_capabilities.py` / mutation tests | static | 0/0 | PASS | guard PASS，5/5 tests |
+| `python3 scripts/check_g009_post_review_semantics.py` / mutation tests | static | 0/0 | PASS | guard PASS，15/15 tests |
+| `python3 scripts/check_g012_syscall_review_hotspots.py` | static | 0 | PASS | guard PASS；dispatcher 未修改 |
+| `python3 scripts/test_g012_syscall_review_hotspots.py` | mutation tests | 1 | BASELINE | 25/26；`test_detects_empty_central_user_trace` 在 `git archive e7ad4862` 的精确临时树同样失败；`m5-test-g012-baseline.log` |
+| `python3 scripts/check_g013_user_copy_boundary.py` / mutation tests | static | 0/0 | PASS | guard PASS，13/13 tests |
+| `python3 scripts/check_pr1_linux_boundary.py` / mutation tests | static | 0/0 | PASS | 最终 guard PASS，15/15 tests；target-specific reverse edge 已覆盖 |
+
+### Workspace and architecture integration
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `cargo fmt --all -- --check` | workspace | 1 | BASELINE | 仍只命中 M0 的 POSIX pipe、axfs dev/root、axtask wait_queue 四个文件；`m5-fmt-workspace.log` |
+| 对 PR1 touched Rust 文件执行 `rustfmt --edition 2024 --check` | touched files | 0 | PASS | `m5-fmt-touched.log`；M5-R1 后 `cargo fmt -p orays-linux -- --check` 亦为 0 |
+| `make A=user/shell ARCH=riscv64 FEATURES=alloc,paging,irq,multitask,fs,net,rtc APP_FEATURES=auto-run-tests,uspace build` | RISC-V64 | 0 | PASS | 完整编译/链接/objcopy；既有 12 shell warnings；`m5-build-riscv64.log` |
+| 同一 official-feature build，`ARCH=loongarch64` | LoongArch64 | 0 | PASS | 完整编译/链接/objcopy；既有 12 shell warnings；`m5-build-loongarch64.log` |
+| `make A=user/shell ARCH=riscv64 defconfig && make ARCH=riscv64 A=user/shell` | canonical Make default | 0 | PASS | 根 Makefile 默认 `all` 实际依次构建 RV/LA remote-style kernel；`m5-make-shell-riscv64-default.log` |
+| `make A=user/shell ARCH=loongarch64 defconfig && make ARCH=loongarch64 A=user/shell` | canonical Make default | 0 | PASS | 同一默认 `all` 路径再次从 LA defconfig 验证；`m5-make-shell-loongarch64-default.log` |
+| `make clippy ARCH=riscv64` | RISC-V64 workspace | 0 | PASS | `m5-clippy-riscv64-workspace.log` |
+| `make clippy ARCH=loongarch64` | LoongArch64 workspace | 2 | ENVIRONMENT | axlibc bindgen 的 host libclang 不识别 `loongarch64-unknown-none`，与 M0 相同；`m5-clippy-loongarch64-workspace.log` |
+| `make unittest_no_fail_fast` | host | 2 | BASELINE | axfs FAT `test_devfs_ramfs() failed: NotFound`，与 M0 相同；`m5-unittest-no-fail-fast.log` |
+| `cargo test --locked --offline --workspace --exclude axfs --no-fail-fast -- --nocapture` | host | 0 | PASS | 排除唯一已证明基线失败后 workspace tests 通过；`m5-workspace-exclude-axfs.log` |
+| `make kernel-rv` / `make kernel-la` | local QEMU RV/LA configs | 0/0 | PASS | 本地 QEMU 默认配置的 kernel target 构建通过；`m5-kernel-{rv,la}-official.log` |
+
+### QEMU smoke with official images
+
+官方镜像只作为 qcow2 backing file；运行写入 `/tmp/orays-pr1-final/*.qcow2`，不写源镜像。
+
+| 命令 | 架构 | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| 无 block device 的默认 QEMU probe | RISC-V64 | 0 | INVOCATION | guest panic `No block device found!`；不是 PASS；`m5-qemu-riscv64-boot.log` |
+| 加临时 FAT block、未加 NIC 的 probe | RISC-V64 | 0 | INVOCATION | guest panic `No NIC device found!`；不是 PASS；`m5-qemu-riscv64-smoke.log` |
+| `timeout` + 临时 FAT + VirtIO net 的 shell smoke | RISC-V64 | 124 | BOUNDED | 到达 `OrayS:/$` 后由 timeout 终止；`m5-qemu-riscv64-smoke-net.log` |
+| 同一 shell smoke | LoongArch64 | 124 | BOUNDED | 到达 `OrayS:/$` 后由 timeout 终止；`m5-qemu-loongarch64-smoke.log` |
+| `timeout -k 3s 60s make run-rv RV_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-rv.img RV_TESTSUITE_RUN_IMG=/tmp/orays-pr1-final/m5-official-rv.qcow2` | RISC-V64 | 124 | BOUNDED | 进入 Ext4/net/`ltp-musl`；27 个 case wrapper END，第 28 个 `getegid01` 开始后截断；一条 brk01 libc TCONF；无 TFAIL/TBROK/ENOSYS/非零 summary/panic/trap；`m5-run-rv-official-smoke.log` |
+| `timeout -k 3s 60s make run-la LA_TESTSUITE_IMG=/root/oskernel2026-orays/sdcard-la.img LA_TESTSUITE_RUN_IMG=/tmp/orays-pr1-final/m5-official-la.qcow2` | LoongArch64 | 124 | BOUNDED | 23 个 case wrapper END，第 24 个 `getppid01` 开始后截断；同一 brk01 libc TCONF；其余不利 marker 同样未见；`m5-official-la.log` |
+| `make kernel-rv`（起始提交 `e7ad4862` 的 `git archive` 临时树） | RISC-V64 baseline | 0 | PASS | 精确基线构建；`m5-baseline-kernel-rv.log` |
+| `qemu-img create ...` 后 `timeout -k 3s 25s qemu-system-riscv64 ...`（同一官方 RV backing image） | RISC-V64 baseline | 124 | BOUNDED | 99 个 case wrapper END，第 100 个开始后截断；复现同一 brk01 libc TCONF，syscall variant TPASS；无 TFAIL/TBROK/ENOSYS/非零 summary；`m5-baseline-official-rv.log` |
+
+两次 60 秒命令的时限包含约 43–46 秒增量构建，所以 case 数不能用于跨架构性能比较；也不能把
+截断窗口外的 994-case 列表、glibc 或其他官方组记为通过。
+
+### Dependency, unsafe, lock, and review audit
+
+| 命令/审计 | exit | 分类 | 证据/说明 |
+|---|---:|---|---|
+| `cargo metadata --locked --offline --format-version 1 --no-deps` | 0 | PASS | workspace 含两个 path crate，无解析 cycle |
+| `cargo tree --locked --offline -p orays-linux-abi -e normal` | 0 | PASS | ABI → `linux-raw-sys` |
+| `cargo tree --locked --offline -p orays-linux -e normal` | 0 | PASS | Linux → ABI → `linux-raw-sys` |
+| `cargo tree --locked --offline -p arceos-shell -e normal --features uspace` | 0 | PASS | 同时显示 shell → Linux → ABI 链及 shell 的既存 `linux-raw-sys` 直连；无反向边 |
+| `git diff --check e7ad4862..HEAD` / `git diff --check` | 0/0 | PASS | commit range 与最终 worktree 均无 whitespace error |
+| tracked Rust `unsafe {` inventory | 0 | PASS | 起点 501、最终 501；`user_memory.rs` 5→5；两个 boundary crate 为 0；忽略的 bindgen 输出不计 tracked source |
+| `git diff e7ad4862 -- Cargo.lock` 与 SHA-256 | 0 | PASS | 仅 shell→Linux、Linux→ABI、ABI→`linux-raw-sys` path edge/stanza；15 insertions，无 registry version/checksum 变化；最终 `0f7b1d3135d88d007eca51ab853007a182b5a0d8291808e67d582723cd72c4c8` |
+| `git diff --exit-code e7ad4862..HEAD -- user/shell/src/uspace/syscall_dispatch.rs` | 0 | PASS | dispatcher 零 diff |
+| 两轮独立只读 review | 0 | PASS | 首轮 0 blocker/0 major/3 minor；`9de38988` 后复核 0/0/0 |
+| `sha256sum .codex/CODEX_PR1_GOAL.md docs/pr1-linux-boundary-survey.md` | 0 | PASS | 分别保持 `f6fb00c6…` 与 `b6b7911b…`；未跟踪、未提交 |
+
+### M5 final audit
+
+- PR1 range：24 个 tracked files；2865 insertions/203 deletions。实现提交没有
+  syscall behavior、errno、blocking、signal、process、FD、VM、IPC 或 scheduling 语义修改。
+- commits：`1b3dc605`、`940438f7`、`7357d56c`、`f7d0a5a5`、`a5703bfd`、`9de38988`，再加本次
+  final validation 文档提交；均为本地提交，未 push、未创建远端 PR。
+- generated side effect：host tests 曾改写 `api/arceos_posix_api/src/ctypes_gen.rs`，已用精确补丁恢复；
+  最终 tracked worktree 只允许本次四份 PR1 文档 diff。
+- unresolved PR1 regressions：0。已知非零只有已证明的 BASELINE、ENVIRONMENT、INVOCATION，或按
+  设计 timeout 的 BOUNDED smoke；没有把它们写成完整 PASS。
 
 ## 后续记录模板
 

@@ -156,3 +156,14 @@ guard 有 15 个临时树 mutation test；测试只改复制到 `/tmp` 的树。
 target-specific dependency table，防止用架构 cfg 隐藏反向或实现依赖。它有意采用精确
 token/inventory，因此后续合法迁移必须同时更新实现、guard、测试和决策记录，不能通过放宽检查
 静默扩大边界。它不证明 syscall 运行语义，也不把 static PASS 表述成 QEMU/runtime PASS。
+
+## D-012：M5 runtime 证据边界
+
+M5 使用 `/root/oskernel2026-orays/sdcard-rv.img` 与 `sdcard-la.img` 作为只读 backing file，运行层
+只写 `/tmp` qcow2 overlay。两架构都启动到 Ext4、网络和 `ltp-musl`，但外层 60 秒 timeout 包含
+重编译时间，因此结果只记为 bounded smoke，不宣称 994 case 或完整官方分组通过。
+
+两架构截断窗口都出现一次 `brk01` libc variant 的 `TCONF: brk() not implemented`；同一 case 的
+syscall variant 随后 TPASS。用起始提交 `e7ad4862` 的精确临时副本和同一 RV 镜像复现了相同
+TCONF，故归为 BASELINE，不能隐藏，也不在 PR1 修改 brk 行为。烟测窗口未见 TFAIL、TBROK、
+ENOSYS、非零 case summary、panic 或 trap；这仍不等同未运行部分的结果。
