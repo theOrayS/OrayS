@@ -38,6 +38,7 @@
 
 # General options
 ARCH ?= x86_64
+PYTHON ?= python3
 MYPLAT ?=
 PLAT_CONFIG ?=
 PLATFORM_CONFIG_DIR ?= $(CURDIR)/configs/platforms
@@ -45,7 +46,7 @@ PLATFORM_CONFIG_DIR ?= $(CURDIR)/configs/platforms
 # Keep local QEMU targets (`kernel-la`, `run-la`, `./run-eval.sh la`) on the
 # package default platform config, but build the submission `kernel-la` with the
 # remote LoongArch address map that matches the official evaluator.
-REMOTE_LA_PLAT_CONFIG ?= $(CURDIR)/configs/remote-eval/axplat-loongarch64-qemu-virt.toml
+REMOTE_LA_PLAT_CONFIG ?= $(CURDIR)/test/evaluation/config/loongarch64_submission.toml
 SMP ?=
 MODE ?= release
 LOG ?= warn
@@ -488,6 +489,21 @@ unittest:
 unittest_no_fail_fast:
 	$(call unit_test,--no-fail-fast)
 
+test-list:
+	$(PYTHON) test/run_suite.py --list
+
+test-checks:
+	$(PYTHON) test/run_suite.py --profile checks
+
+test-unit:
+	$(PYTHON) test/run_suite.py --profile unit
+
+test-quick:
+	$(PYTHON) test/run_suite.py --profile quick
+
+test-baseline:
+	$(PYTHON) test/run_suite.py --profile baseline
+
 disk_img:
 ifneq ($(wildcard $(DISK_IMG)),)
 	@printf "$(YELLOW_C)warning$(END_C): disk image \"$(DISK_IMG)\" already exists!\n"
@@ -507,6 +523,7 @@ clean_c::
 .PHONY: all defconfig oldconfig \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
+	test-list test-checks test-unit test-quick test-baseline \
 	disk_img clean clean_c \
 	test_build kernel-rv kernel-la docker-image docker testsuite-sdcard \
 	prepare-rv-testsuite-img prepare-la-testsuite-img run-rv run-la
