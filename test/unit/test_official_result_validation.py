@@ -141,6 +141,14 @@ class OfficialResultValidationTest(unittest.TestCase):
     def test_generic_zero_or_incomplete_execution_markers_are_errors(self) -> None:
         for marker in (
             "NO TESTS RAN",
+            "running 0 tests",
+            "executed 0 tests",
+            "tests run: 0",
+            "collected 0 items",
+            "0 tests collected",
+            "no tests were run",
+            "zero tests were executed",
+            "nothing to run",
             "zero tests executed",
             "ran zero tests",
             "0 cases executed",
@@ -159,6 +167,14 @@ class OfficialResultValidationTest(unittest.TestCase):
             "UNKNOWN STATUS",
             "status unknown",
             "result unknown",
+            "case foo: INCOMPLETE",
+            "case foo: PARTIAL",
+            "case foo: INFRA_ERROR",
+            "case foo: UNEXECUTED",
+            "case foo: DID_NOT_RUN",
+            "case foo: NOT_ATTEMPTED",
+            "test foo: UNKNOWN",
+            "STATUS NOT_RUN",
         ):
             with self.subTest(marker=marker):
                 self.assert_status(
@@ -179,6 +195,20 @@ class OfficialResultValidationTest(unittest.TestCase):
             "timed_out",
             "deadline exceeded",
             "watchdog expired",
+            "deadline_exceeded",
+            "watchdog_expired",
+            "command_timed_out",
+            "timeout_error",
+            "ETIMEDOUT",
+            "signal: 11",
+            "signal=11",
+            "core dump",
+            "IllegalInstruction",
+            "SegmentationFault",
+            "trap 13",
+            "not successful",
+            "exit status 1",
+            "return: 1",
             "TIME_LIMIT_EXCEEDED",
             "not ok 1 - smoke",
         ):
@@ -433,6 +463,28 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         self.assertEqual(result["status"], "ERROR", result)
         self.assertTrue(any(item["kind"] == "official-planned-executed-mismatch" for item in result["errors"]))
 
+    def test_busybox_identity_must_match_trusted_plan(self) -> None:
+        text = group("busybox-musl", "testcase busybox invented command success")
+        result = validator.validate_official_output(
+            text,
+            expected_group_case_counts={"busybox-musl": 1},
+            expected_busybox_cases=["echo expected"],
+        )
+        self.assertEqual(result["status"], "ERROR", result)
+        self.assertTrue(
+            any(item["kind"] == "busybox-case-plan-mismatch" for item in result["errors"]),
+            result,
+        )
+
+    def test_busybox_identity_plan_passes_when_exact(self) -> None:
+        text = group("busybox-musl", "testcase busybox echo expected success")
+        result = validator.validate_official_output(
+            text,
+            expected_group_case_counts={"busybox-musl": 1},
+            expected_busybox_cases=["echo expected"],
+        )
+        self.assertEqual(result["status"], "PASS", result)
+
     def test_prefixed_busybox_result_record_is_malformed(self) -> None:
         self.assert_status(group("busybox-musl", "NOT testcase busybox echo success"), "ERROR")
 
@@ -507,6 +559,40 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         )
         self.assertEqual(result["status"], "ERROR", result)
         self.assertTrue(any(item["kind"] == "official-planned-executed-mismatch" for item in result["errors"]))
+
+    def test_libctest_identity_must_match_trusted_plan(self) -> None:
+        text = group(
+            "libctest-musl",
+            "========== START entry-static.exe invented ==========\n"
+            "Pass!\n"
+            "========== END entry-static.exe invented ==========\n"
+            "libctest cases: 1 passed, 0 failed, 0 timed out",
+        )
+        result = validator.validate_official_output(
+            text,
+            expected_group_case_counts={"libctest-musl": 1},
+            expected_libctest_cases=[("entry-static.exe", "expected")],
+        )
+        self.assertEqual(result["status"], "ERROR", result)
+        self.assertTrue(
+            any(item["kind"] == "libctest-case-plan-mismatch" for item in result["errors"]),
+            result,
+        )
+
+    def test_libctest_identity_plan_passes_when_exact(self) -> None:
+        text = group(
+            "libctest-musl",
+            "========== START entry-static.exe expected ==========\n"
+            "Pass!\n"
+            "========== END entry-static.exe expected ==========\n"
+            "libctest cases: 1 passed, 0 failed, 0 timed out",
+        )
+        result = validator.validate_official_output(
+            text,
+            expected_group_case_counts={"libctest-musl": 1},
+            expected_libctest_cases=[("entry-static.exe", "expected")],
+        )
+        self.assertEqual(result["status"], "PASS", result)
 
     def test_libctest_explicit_official_failure_cannot_pass(self) -> None:
         text = group(
@@ -756,6 +842,10 @@ ltp cases: 2 passed, 0 failed, 0 timed out
             "HANG detected",
             "CRASH detected",
             "PANIC detected",
+            "1 ignored",
+            "test smoke ignored",
+            "NOT_APPLICABLE",
+            "benchmark not selected",
         ):
             with self.subTest(marker=marker):
                 text = group(
@@ -866,6 +956,36 @@ ltp cases: 2 passed, 0 failed, 0 timed out
                 check=False,
             )
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+    def test_tracked_specialized_identity_plan_loads_exact_counts(self) -> None:
+        busybox_cases, libctest_cases = validator.trusted_official_case_plan(
+            Path(__file__).resolve().parents[2]
+        )
+        self.assertEqual(len(busybox_cases), 55)
+        self.assertEqual(len(set(busybox_cases)), 54)
+        self.assertEqual(len(libctest_cases), 217)
+        self.assertEqual(len(set(libctest_cases)), 217)
+
+    def test_specialized_identity_plan_rejects_duplicate_json_keys(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="official-case-plan-") as directory:
+            root = Path(directory)
+            target = root / validator.OFFICIAL_CASE_PLAN_RELATIVE_PATH
+            target.parent.mkdir(parents=True)
+            source = (
+                Path(__file__).resolve().parents[1]
+                / "evaluation"
+                / "official_case_plan.json"
+            ).read_text(encoding="utf-8")
+            target.write_text(
+                source.replace(
+                    '"schema_version": 1,',
+                    '"schema_version": 1,\n  "schema_version": 1,',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "duplicate JSON key"):
+                validator.trusted_official_case_plan(root)
 
     def test_unconsumed_explicit_fail_line_cannot_pass(self) -> None:
         text = group(

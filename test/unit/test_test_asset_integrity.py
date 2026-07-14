@@ -269,13 +269,13 @@ class TestAssetIntegrityTest(unittest.TestCase):
         wrapper.write_text("#!/bin/sh\nexec true\n", encoding="utf-8")
         wrapper.chmod(0o755)
         findings = guard.scan_repo(tree)
-        self.assertTrue(any("does not exec the canonical implementation" in finding for finding in findings), findings)
+        self.assertTrue(any("does not exec the strict canonical profile" in finding for finding in findings), findings)
 
     def test_root_wrapper_with_duplicated_logic_is_detected(self) -> None:
         tree = self.make_tree()
         wrapper = tree / "run-eval.sh"
         wrapper.write_text(
-            "#!/bin/sh\nexec test/evaluation/run_official_evaluation.sh \"$@\"\nmake all\n",
+            "#!/bin/sh\nexec python3 test/run_suite.py --profile official --arch \"$@\"\nmake all\n",
             encoding="utf-8",
         )
         wrapper.chmod(0o755)

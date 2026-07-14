@@ -994,6 +994,30 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("canonical ordered 24-group official plan", result.stderr)
 
+    def test_canonical_official_execution_and_preflight_fields_are_locked(self) -> None:
+        mutations = (
+            ("timeout_seconds", 1),
+            ("required_paths", []),
+            ("required_commands", []),
+            ("required_files", []),
+            ("infrastructure_exit_codes", [2]),
+        )
+        for index, (field, value) in enumerate(mutations):
+            with self.subTest(field=field):
+                self.output_path = self.work / f"official-field-{index}"
+                manifest = json.loads(
+                    (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+                )
+                case = next(
+                    case
+                    for case in manifest["cases"]
+                    if case["id"] == "official.riscv64"
+                )
+                case[field] = value
+                result = self.invoke(manifest)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn(f"canonical official {field}", result.stderr)
+
     def test_canonical_quick_include_graph_cannot_shrink(self) -> None:
         manifest = json.loads((ROOT / "test/suite_manifest.json").read_text(encoding="utf-8"))
         manifest["profiles"]["quick"]["include"] = ["checks"]

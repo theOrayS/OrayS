@@ -35,6 +35,7 @@ CANONICAL_OFFICIAL_CASE_COUNTS = {
     "libctest-glibc": 217,
 }
 CANONICAL_LTP_CASE_LIST = "stable-full"
+OFFICIAL_CASE_PLAN_RELATIVE_PATH = Path("test/evaluation/official_case_plan.json")
 
 
 def normalize_output_text(raw_text: str) -> str:
@@ -76,6 +77,116 @@ def trusted_ltp_stable_cases(repo: Path) -> list[str]:
     if not cases or len(cases) != len(set(cases)):
         raise ValueError("LTP_STABLE_CASES must be non-empty and unique")
     return cases
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def trusted_official_case_plan(
+    repo: Path,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Read exact BusyBox and libctest identities from the tracked snapshot."""
+
+    path = repo / OFFICIAL_CASE_PLAN_RELATIVE_PATH
+    try:
+        payload = json.loads(
+            path.read_text(encoding="utf-8", errors="strict"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"cannot read {OFFICIAL_CASE_PLAN_RELATIVE_PATH}: {error}") from error
+
+    if not isinstance(payload, dict) or set(payload) != {
+        "schema_version",
+        "source_snapshot",
+        "busybox_rows",
+        "libctest_cases",
+    }:
+        raise ValueError("official case plan must use the exact schema-v1 top-level fields")
+    if payload["schema_version"] != 1:
+        raise ValueError("official case plan schema_version must be 1")
+
+    snapshot = payload["source_snapshot"]
+    snapshot_fields = {
+        "captured_date",
+        "architectures",
+        "libc_variants",
+        "busybox_source",
+        "busybox_source_sha256",
+        "busybox_row_count",
+        "busybox_unique_count",
+        "libctest_static_source",
+        "libctest_static_source_sha256",
+        "libctest_dynamic_source",
+        "libctest_dynamic_source_sha256",
+        "libctest_case_count",
+    }
+    if not isinstance(snapshot, dict) or set(snapshot) != snapshot_fields:
+        raise ValueError("official case plan source_snapshot has missing or unknown fields")
+    if snapshot["architectures"] != ["riscv64", "loongarch64"]:
+        raise ValueError("official case plan must cover the RV and LA snapshots")
+    if snapshot["libc_variants"] != ["musl", "glibc"]:
+        raise ValueError("official case plan must cover the musl and glibc snapshots")
+    expected_sources = {
+        "busybox_source": "/musl/busybox_cmd.txt",
+        "libctest_static_source": "/musl/run-static.sh",
+        "libctest_dynamic_source": "/musl/run-dynamic.sh",
+    }
+    for field_name, expected_value in expected_sources.items():
+        if snapshot[field_name] != expected_value:
+            raise ValueError(f"official case plan {field_name} must be {expected_value!r}")
+    if not isinstance(snapshot["captured_date"], str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}", snapshot["captured_date"]
+    ):
+        raise ValueError("official case plan captured_date must be YYYY-MM-DD")
+    for field_name in (
+        "busybox_source_sha256",
+        "libctest_static_source_sha256",
+        "libctest_dynamic_source_sha256",
+    ):
+        if not isinstance(snapshot[field_name], str) or not re.fullmatch(
+            r"[0-9a-f]{64}", snapshot[field_name]
+        ):
+            raise ValueError(f"official case plan {field_name} must be a SHA-256 digest")
+
+    busybox_rows = payload["busybox_rows"]
+    if (
+        not isinstance(busybox_rows, list)
+        or any(not isinstance(row, str) or not row or row != row.strip() for row in busybox_rows)
+    ):
+        raise ValueError("official case plan busybox_rows must be non-empty trimmed strings")
+    if len(busybox_rows) != CANONICAL_OFFICIAL_CASE_COUNTS["busybox-musl"]:
+        raise ValueError("official case plan has the wrong BusyBox row count")
+    if snapshot["busybox_row_count"] != len(busybox_rows):
+        raise ValueError("official case plan BusyBox row metadata does not match its rows")
+    if snapshot["busybox_unique_count"] != len(set(busybox_rows)):
+        raise ValueError("official case plan BusyBox unique-count metadata is inconsistent")
+
+    raw_libctest_cases = payload["libctest_cases"]
+    libctest_cases: list[tuple[str, str]] = []
+    if not isinstance(raw_libctest_cases, list):
+        raise ValueError("official case plan libctest_cases must be a list")
+    for index, entry in enumerate(raw_libctest_cases):
+        if (
+            not isinstance(entry, dict)
+            or set(entry) != {"binary", "case"}
+            or any(not isinstance(entry[field], str) or not entry[field] for field in ("binary", "case"))
+        ):
+            raise ValueError(f"official case plan libctest_cases[{index}] is malformed")
+        libctest_cases.append((entry["binary"], entry["case"]))
+    if len(libctest_cases) != CANONICAL_OFFICIAL_CASE_COUNTS["libctest-musl"]:
+        raise ValueError("official case plan has the wrong libctest case count")
+    if len(libctest_cases) != len(set(libctest_cases)):
+        raise ValueError("official case plan libctest identities must be unique")
+    if snapshot["libctest_case_count"] != len(libctest_cases):
+        raise ValueError("official case plan libctest count metadata is inconsistent")
+    return busybox_rows, libctest_cases
 GROUP_START_RE = re.compile(r"^#### OS COMP TEST GROUP START (.+?) ####$")
 GROUP_END_RE = re.compile(r"^#### OS COMP TEST GROUP END (.+?) ####$")
 OFFICIAL_PASS_RE = re.compile(r"^PASS OFFICIAL TEST GROUP\s+(.+?)\s*:\s*(-?\d+)\s*$")
@@ -107,17 +218,24 @@ FORBIDDEN_STATUS_RE = re.compile(
 TIMEOUT_RE = re.compile(
     r"\b(?:TIMEOUT (?:LTP CASE|OFFICIAL TEST GROUP)|timed out after|timeout reached|"
     r"timeout expired|killed after timeout|command timed out|deadline exceeded|"
-    r"watchdog expired|time[_ -]?limit[_ -]?exceeded|timed[_ -]?out)\b",
+    r"watchdog expired|time[_ -]?limit[_ -]?exceeded|timed[_ -]?out|"
+    r"deadline_exceeded|watchdog_expired|command_timed_out|timeout_error|ETIMEDOUT)\b",
     re.I,
 )
 PANIC_RE = re.compile(
     r"\b(?:kernel panic|panic(?:ked)?|unknown trap|unhandled(?: user)? trap|fatal trap|"
-    r"InstructionNotExist|illegal instruction|segmentation fault|segfault|bus error|"
-    r"core dumped|process crash(?:ed)?|crashed|aborted|killed|terminated|signal\s+\d+|"
+    r"InstructionNotExist|IllegalInstruction|illegal instruction|SegmentationFault|"
+    r"segmentation fault|segfault|bus error|core dump(?:ed)?|process crash(?:ed)?|"
+    r"crashed|aborted|killed|terminated|signal\s*(?::|=|\s)\s*\d+|trap\s*[:=]?\s*\d+|"
     r"SIG(?:ABRT|BUS|FPE|HUP|ILL|INT|KILL|QUIT|SEGV|SYS|TERM|TRAP))\b",
     re.I,
 )
-SKIP_RE = re.compile(r"\[CONTEST\]\[OFFICIAL\]\[SKIP\]|\bofficial test group\b.*\bskip(?:ped)?\b", re.I)
+SKIP_RE = re.compile(
+    r"\[CONTEST\]\[OFFICIAL\]\[SKIP\]|\bofficial test group\b.*\bskip(?:ped)?\b|"
+    r"^\s*(?:\d+\s+ignored|test\s+\S.*\s+ignored|NOT[-_ ]APPLICABLE(?:\s+.*)?|"
+    r".*\bnot selected\b.*)\s*$",
+    re.I,
+)
 INFRA_TEXT_RE = re.compile(
     r"\b(?:busybox shell not found|prepare .+ failed|missing (?:ltp testcase|libctest entry)|"
     r"qemu: terminating on signal)\b",
@@ -131,6 +249,10 @@ UNCONSUMED_FAILURE_RE = re.compile(
     r"\bresult\s*=\s*FAIL(?:ED|URE|URES)?\b)",
     re.I,
 )
+EXPLICIT_NONZERO_RE = re.compile(
+    r"^\s*(?:not successful|exit status\s+[1-9]\d*|return\s*:\s*[1-9]\d*)\s*$",
+    re.I,
+)
 UNKNOWN_STATE_RE = re.compile(
     r"^(?:STATUS|RESULT|STATE|CASE_STATUS)\s*(?:(?::|=)\s*\S.*|\[[^\]]+\](?:\s.*)?)$|"
     r"^(?:NOT[-_ ]RUN|NOT[-_ ]EXECUTED|UNEXECUTED|DID[-_ ]NOT[-_ ]RUN|"
@@ -141,15 +263,25 @@ UNKNOWN_STATE_RE = re.compile(
     r"NOT[-_ ]ATTEMPTED|UNKNOWN(?:[-_ ]STATUS)?|(?:STATUS|RESULT)[-_ ]UNKNOWN|"
     r"UNRESOLVED|UNSUPPORTED|INCONCLUSIVE|INCOMPLETE|PARTIAL(?:LY[-_ ]EXECUTED)?|"
     r"INFRA_ERROR|PENDING|CANCELLED|CANCELED|DISABLED|OMITTED)\](?:\s+.*)?$|"
-    r"^case\s+\S.*:\s*(?:NOT[-_ ]RUN|NOT[-_ ]EXECUTED|UNKNOWN|UNRESOLVED|UNSUPPORTED|"
-    r"INCONCLUSIVE|PENDING|CANCELLED|CANCELED|DISABLED|OMITTED)(?:\s+.*)?$",
+    r"^(?:case|test)\s+\S.*:\s*(?:NOT[-_ ]RUN|NOT[-_ ]EXECUTED|UNEXECUTED|"
+    r"DID[-_ ]NOT[-_ ]RUN|NOT[-_ ]ATTEMPTED|UNKNOWN|UNRESOLVED|UNSUPPORTED|"
+    r"INCONCLUSIVE|INCOMPLETE|PARTIAL|INFRA_ERROR|PENDING|CANCELLED|CANCELED|"
+    r"DISABLED|OMITTED|NOT[-_ ]APPLICABLE)(?:\s+.*)?$|"
+    r"^(?:STATUS|RESULT|STATE|CASE_STATUS)\s+(?:NOT[-_ ]RUN|NOT[-_ ]EXECUTED|"
+    r"UNEXECUTED|DID[-_ ]NOT[-_ ]RUN|NOT[-_ ]ATTEMPTED|UNKNOWN|UNRESOLVED|"
+    r"UNSUPPORTED|INCONCLUSIVE|INCOMPLETE|PARTIAL|INFRA_ERROR|PENDING|"
+    r"CANCELLED|CANCELED|DISABLED|OMITTED|NOT[-_ ]APPLICABLE)\s*$",
     re.I,
 )
 ZERO_EXECUTION_RE = re.compile(
     r"\b(?:NO\s+(?:TESTS?|CASES?)\s+(?:RAN|RUN|EXECUTED)|"
     r"(?:0|ZERO)\s+(?:TESTS?|CASES?)\s+(?:RAN|RUN|EXECUTED)|"
     r"RAN\s+(?:0|ZERO)\s+(?:TESTS?|CASES?)|NO\s+RUNNABLE\s+(?:TESTS?|CASES?)|"
-    r"(?:TEST\s+SUITE|SUITE)\s+IS\s+EMPTY|EMPTY\s+(?:TEST\s+)?SUITE)\b",
+    r"(?:TEST\s+SUITE|SUITE)\s+IS\s+EMPTY|EMPTY\s+(?:TEST\s+)?SUITE|"
+    r"(?:RUNNING|EXECUTED|COLLECTED)\s+(?:0|ZERO)\s+(?:TESTS?|CASES?|ITEMS?)|"
+    r"(?:TESTS?|CASES?)\s+RUN\s*:\s*(?:0|ZERO)|"
+    r"(?:0|ZERO)\s+(?:TESTS?|CASES?|ITEMS?)\s+(?:WERE\s+)?(?:RUN|EXECUTED|COLLECTED)|"
+    r"NO\s+(?:TESTS?|CASES?)\s+WERE\s+(?:RUN|EXECUTED)|NOTHING\s+TO\s+RUN)\b",
     re.I,
 )
 TRUSTED_BUILD_STDERR_RE = re.compile(
@@ -455,7 +587,10 @@ def _validate_ltp(
     }
 
 
-def _validate_busybox(group: Group) -> tuple[list[dict[str, str]], dict[str, int]]:
+def _validate_busybox(
+    group: Group,
+    expected_cases: list[str] | None = None,
+) -> tuple[list[dict[str, str]], dict[str, int]]:
     results = [
         (match.group(1), match.group(2).lower())
         for line in group.lines
@@ -473,6 +608,27 @@ def _validate_busybox(group: Group) -> tuple[list[dict[str, str]], dict[str, int
                 group.label,
             )
         )
+    observed_cases = [case for case, _status in results]
+    if expected_cases is not None and observed_cases != expected_cases:
+        mismatch_index = next(
+            (
+                index
+                for index, (observed, expected) in enumerate(zip(observed_cases, expected_cases))
+                if observed != expected
+            ),
+            min(len(observed_cases), len(expected_cases)),
+        )
+        observed = observed_cases[mismatch_index] if mismatch_index < len(observed_cases) else "<missing>"
+        expected = expected_cases[mismatch_index] if mismatch_index < len(expected_cases) else "<none>"
+        issues.append(
+            issue(
+                "busybox-case-plan-mismatch",
+                f"case sequence diverges at index {mismatch_index}: expected {expected!r}, "
+                f"observed {observed!r}; expected {len(expected_cases)} identities, "
+                f"observed {len(observed_cases)}",
+                group.label,
+            )
+        )
     if passed + failed == 0:
         issues.append(issue("busybox-empty", "busybox group contains no case results", group.label))
     if failed:
@@ -480,7 +636,10 @@ def _validate_busybox(group: Group) -> tuple[list[dict[str, str]], dict[str, int
     return issues, {"executed_cases": passed + failed, "passed_cases": passed, "failed_cases": failed}
 
 
-def _validate_libctest(group: Group) -> tuple[list[dict[str, str]], dict[str, int]]:
+def _validate_libctest(
+    group: Group,
+    expected_cases: list[tuple[str, str]] | None = None,
+) -> tuple[list[dict[str, str]], dict[str, int]]:
     summary_records = [
         (index, tuple(int(value) for value in match.groups()))
         for index, line in enumerate(group.lines)
@@ -494,9 +653,11 @@ def _validate_libctest(group: Group) -> tuple[list[dict[str, str]], dict[str, in
     observed_failed = 0
     starts = 0
     seen_cases: set[tuple[str, str]] = set()
+    started_cases: list[tuple[str, str]] = []
     for line in group.lines:
         if match := LIBCTEST_START_RE.fullmatch(line):
             started_case = (match.group(1), match.group(2))
+            started_cases.append(started_case)
             if current is not None:
                 issues.append(
                     issue(
@@ -542,6 +703,26 @@ def _validate_libctest(group: Group) -> tuple[list[dict[str, str]], dict[str, in
                 issues.append(issue("libctest-missing-result", f"case {current} ended without Pass!/FAIL", group.label))
             current = None
             current_terminal = None
+    if expected_cases is not None and started_cases != expected_cases:
+        mismatch_index = next(
+            (
+                index
+                for index, (observed, expected) in enumerate(zip(started_cases, expected_cases))
+                if observed != expected
+            ),
+            min(len(started_cases), len(expected_cases)),
+        )
+        observed = started_cases[mismatch_index] if mismatch_index < len(started_cases) else "<missing>"
+        expected = expected_cases[mismatch_index] if mismatch_index < len(expected_cases) else "<none>"
+        issues.append(
+            issue(
+                "libctest-case-plan-mismatch",
+                f"case sequence diverges at index {mismatch_index}: expected {expected!r}, "
+                f"observed {observed!r}; expected {len(expected_cases)} identities, "
+                f"observed {len(started_cases)}",
+                group.label,
+            )
+        )
     if current is not None:
         issues.append(issue("libctest-missing-end", f"case {current} did not emit its end marker", group.label))
     if len(summaries) != 1:
@@ -641,6 +822,7 @@ def _validate_generic(group: Group) -> tuple[list[dict[str, str]], dict[str, int
             or SKIP_RE.search(line)
             or PANIC_RE.search(line)
             or UNCONSUMED_FAILURE_RE.search(line)
+            or EXPLICIT_NONZERO_RE.search(line)
             for line in trailing_lines
         )
         if pass_index != terminal_index and not trailing_has_failure:
@@ -667,6 +849,8 @@ def validate_official_output(
     expected_group_case_counts: dict[str, int] | None = None,
     expected_ltp_case_list: str | None = None,
     expected_ltp_cases: list[str] | None = None,
+    expected_busybox_cases: list[str] | None = None,
+    expected_libctest_cases: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Return a strict PASS/FAIL/ERROR result for captured official output."""
 
@@ -707,6 +891,32 @@ def validate_official_output(
             issue("official-ltp-case-plan", "expected LTP case identities must be non-empty and unique")
         )
         expected_ltp_cases = None
+    if expected_busybox_cases is not None and (
+        not isinstance(expected_busybox_cases, list)
+        or not expected_busybox_cases
+        or any(not isinstance(case, str) or not case for case in expected_busybox_cases)
+    ):
+        structural_errors.append(
+            issue("official-busybox-case-plan", "expected BusyBox identities must be non-empty strings")
+        )
+        expected_busybox_cases = None
+    if expected_libctest_cases is not None and (
+        not isinstance(expected_libctest_cases, list)
+        or not expected_libctest_cases
+        or any(
+            not isinstance(case, (list, tuple))
+            or len(case) != 2
+            or any(not isinstance(value, str) or not value for value in case)
+            for case in expected_libctest_cases
+        )
+        or len(expected_libctest_cases) != len(set(map(tuple, expected_libctest_cases)))
+    ):
+        structural_errors.append(
+            issue("official-libctest-case-plan", "expected libctest identities must be non-empty and unique pairs")
+        )
+        expected_libctest_cases = None
+    elif expected_libctest_cases is not None:
+        expected_libctest_cases = [tuple(case) for case in expected_libctest_cases]
 
     if not isinstance(case_count_plan, dict):
         structural_errors.append(
@@ -853,6 +1063,8 @@ def validate_official_output(
             failures.append(issue("panic-or-trap", f"{source}: {line.strip()}"))
         if UNCONSUMED_FAILURE_RE.search(line) and not _protocol_record_kinds(line):
             failures.append(issue("explicit-failure", f"{source}: {line.strip()}"))
+        if EXPLICIT_NONZERO_RE.search(line):
+            failures.append(issue("explicit-nonzero", f"{source}: {line.strip()}"))
 
     for line in [*outside_lines, *stderr_lines]:
         if OFFICIAL_FAIL_RE.search(line):
@@ -871,9 +1083,9 @@ def validate_official_output(
         if group.label.startswith("ltp-"):
             group_issues, counts = _validate_ltp(group, expected_ltp_cases)
         elif group.label.startswith("busybox-"):
-            group_issues, counts = _validate_busybox(group)
+            group_issues, counts = _validate_busybox(group, expected_busybox_cases)
         elif group.label.startswith("libctest-"):
-            group_issues, counts = _validate_libctest(group)
+            group_issues, counts = _validate_libctest(group, expected_libctest_cases)
         else:
             group_issues, counts = _validate_generic(group)
 
@@ -1007,8 +1219,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(error))
     try:
         expected_ltp_cases = trusted_ltp_stable_cases(Path(__file__).resolve().parents[2])
+        expected_busybox_cases, expected_libctest_cases = trusted_official_case_plan(
+            Path(__file__).resolve().parents[2]
+        )
     except (OSError, ValueError) as error:
-        parser.error(f"cannot load trusted LTP plan: {error}")
+        parser.error(f"cannot load trusted official case plan: {error}")
     result = validate_official_output(
         stdout,
         stderr,
@@ -1016,6 +1231,8 @@ def main(argv: list[str] | None = None) -> int:
         expected_group_case_counts=CANONICAL_OFFICIAL_CASE_COUNTS,
         expected_ltp_case_list=CANONICAL_LTP_CASE_LIST,
         expected_ltp_cases=expected_ltp_cases,
+        expected_busybox_cases=expected_busybox_cases,
+        expected_libctest_cases=expected_libctest_cases,
     )
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))

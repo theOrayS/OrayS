@@ -1,0 +1,950 @@
+{
+  "schema_version": 1,
+  "source_snapshot": {
+    "captured_date": "2026-07-14",
+    "architectures": [
+      "riscv64",
+      "loongarch64"
+    ],
+    "libc_variants": [
+      "musl",
+      "glibc"
+    ],
+    "busybox_source": "/musl/busybox_cmd.txt",
+    "busybox_source_sha256": "e970e5ecf547980a7d2b3dd5ac2b1552115186055f3e44196550c0ba3356d623",
+    "busybox_row_count": 55,
+    "busybox_unique_count": 54,
+    "libctest_static_source": "/musl/run-static.sh",
+    "libctest_static_source_sha256": "e5b3c32ab076829618deb78ca7343f546862c7e7fa35b6a43ab25f64b1e4574a",
+    "libctest_dynamic_source": "/musl/run-dynamic.sh",
+    "libctest_dynamic_source_sha256": "cefc0e2b28751728cf1314d39ac589d3cb255b85b3bd5fbd9a0d6874d571b80d",
+    "libctest_case_count": 217
+  },
+  "busybox_rows": [
+    "echo \"#### independent command test\"",
+    "ash -c exit",
+    "sh -c exit",
+    "basename /aaa/bbb",
+    "cal",
+    "clear",
+    "date",
+    "df",
+    "dirname /aaa/bbb",
+    "dmesg",
+    "du",
+    "expr 1 + 1",
+    "false",
+    "true",
+    "which ls",
+    "uname",
+    "uptime",
+    "printf \"abc\\n\"",
+    "ps",
+    "pwd",
+    "free",
+    "hwclock",
+    "sh -c 'sleep 5' & ./busybox kill $!",
+    "ls",
+    "sleep 1",
+    "echo \"#### file opration test\"",
+    "touch test.txt",
+    "echo \"hello world\" > test.txt",
+    "cat test.txt",
+    "cut -c 3 test.txt",
+    "od test.txt",
+    "head test.txt",
+    "tail test.txt",
+    "hexdump -C test.txt",
+    "md5sum test.txt",
+    "echo \"ccccccc\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "echo \"aaaaaaa\" >> test.txt",
+    "echo \"2222222\" >> test.txt",
+    "echo \"1111111\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "sort test.txt | ./busybox uniq",
+    "stat test.txt",
+    "strings test.txt",
+    "wc test.txt",
+    "[ -f test.txt ]",
+    "more test.txt",
+    "rm test.txt",
+    "mkdir test_dir",
+    "mv test_dir test",
+    "rmdir test",
+    "grep hello busybox_cmd.txt",
+    "cp busybox_cmd.txt busybox_cmd.bak",
+    "rm busybox_cmd.bak",
+    "find -name \"busybox_cmd.txt\""
+  ],
+  "libctest_cases": [
+    {
+      "binary": "entry-static.exe",
+      "case": "argv"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "basename"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "clocale_mbfuncs"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "clock_gettime"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "dirname"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "env"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fdopen"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fnmatch"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fscanf"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fwscanf"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "iconv_open"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "inet_pton"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "mbc"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "memstream"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_cancel_points"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_cancel"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_cond"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_tsd"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "qsort"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "random"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "search_hsearch"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "search_insque"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "search_lsearch"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "search_tsearch"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "setjmp"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "snprintf"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "socket"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "sscanf"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "sscanf_long"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "stat"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strftime"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string_memcpy"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string_memmem"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string_memset"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string_strchr"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string_strcspn"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "string_strstr"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strptime"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strtod"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strtod_simple"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strtof"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strtol"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strtold"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "swprintf"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "tgmath"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "time"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "tls_align"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "udiv"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "ungetc"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "utime"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "wcsstr"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "wcstol"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "daemon_failure"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "dn_expand_empty"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "dn_expand_ptr_0"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fflush_exit"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fgets_eof"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fgetwc_buffering"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "fpclassify_invalid_ld80"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "ftello_unflushed_append"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "getpwnam_r_crash"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "getpwnam_r_errno"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "iconv_roundtrips"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "inet_ntop_v4mapped"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "inet_pton_empty_last_field"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "iswspace_null"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "lrand48_signextend"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "lseek_large"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "malloc_0"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "mbsrtowcs_overflow"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "memmem_oob_read"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "memmem_oob"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "mkdtemp_failure"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "mkstemp_failure"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "printf_1e9_oob"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "printf_fmt_g_round"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "printf_fmt_g_zeros"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "printf_fmt_n"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_robust_detach"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_cancel_sem_wait"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_cond_smasher"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_condattr_setclock"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_exit_cancel"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_once_deadlock"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "pthread_rwlock_ebusy"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "putenv_doublefree"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "regex_backref_0"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "regex_bracket_icase"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "regex_ere_backref"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "regex_escaped_high_byte"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "regex_negated_range"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "regexec_nosub"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "rewind_clear_error"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "rlimit_open_files"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "scanf_bytes_consumed"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "scanf_match_literal_eof"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "scanf_nullbyte_char"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "setvbuf_unget"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "sigprocmask_internal"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "sscanf_eof"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "statvfs"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "strverscmp"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "syscall_sign_extend"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "uselocale_0"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "wcsncpy_read_overflow"
+    },
+    {
+      "binary": "entry-static.exe",
+      "case": "wcsstr_false_negative"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "argv"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "basename"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "clocale_mbfuncs"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "clock_gettime"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "dirname"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "dlopen"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "env"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fdopen"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fnmatch"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fscanf"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fwscanf"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "iconv_open"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "inet_pton"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "mbc"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "memstream"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_cancel_points"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_cancel"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_cond"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_tsd"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "qsort"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "random"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "search_hsearch"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "search_insque"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "search_lsearch"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "search_tsearch"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "sem_init"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "setjmp"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "snprintf"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "socket"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "sscanf"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "sscanf_long"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "stat"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strftime"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string_memcpy"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string_memmem"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string_memset"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string_strchr"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string_strcspn"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "string_strstr"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strptime"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strtod"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strtod_simple"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strtof"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strtol"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strtold"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "swprintf"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "tgmath"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "time"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "tls_init"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "tls_local_exec"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "udiv"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "ungetc"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "utime"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "wcsstr"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "wcstol"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "daemon_failure"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "dn_expand_empty"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "dn_expand_ptr_0"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fflush_exit"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fgets_eof"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fgetwc_buffering"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "fpclassify_invalid_ld80"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "ftello_unflushed_append"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "getpwnam_r_crash"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "getpwnam_r_errno"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "iconv_roundtrips"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "inet_ntop_v4mapped"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "inet_pton_empty_last_field"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "iswspace_null"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "lrand48_signextend"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "lseek_large"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "malloc_0"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "mbsrtowcs_overflow"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "memmem_oob_read"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "memmem_oob"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "mkdtemp_failure"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "mkstemp_failure"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "printf_1e9_oob"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "printf_fmt_g_round"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "printf_fmt_g_zeros"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "printf_fmt_n"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_robust_detach"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_cond_smasher"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_condattr_setclock"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_exit_cancel"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_once_deadlock"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "pthread_rwlock_ebusy"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "putenv_doublefree"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "regex_backref_0"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "regex_bracket_icase"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "regex_ere_backref"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "regex_escaped_high_byte"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "regex_negated_range"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "regexec_nosub"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "rewind_clear_error"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "rlimit_open_files"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "scanf_bytes_consumed"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "scanf_match_literal_eof"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "scanf_nullbyte_char"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "setvbuf_unget"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "sigprocmask_internal"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "sscanf_eof"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "statvfs"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "strverscmp"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "syscall_sign_extend"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "tls_get_new_dtv"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "uselocale_0"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "wcsncpy_read_overflow"
+    },
+    {
+      "binary": "entry-dynamic.exe",
+      "case": "wcsstr_false_negative"
+    }
+  ]
+}

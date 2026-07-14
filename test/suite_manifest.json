@@ -281,7 +281,7 @@
       "description": "Evaluation execution and parser static guard fixtures.",
       "command": ["{python}", "-B", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 18},
+      "result_contract": {"type": "unittest", "expected_tests": 22},
       "required_paths": ["{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
     },
     {
@@ -329,7 +329,7 @@
       "description": "Strict official group and testcase lifecycle fixtures.",
       "command": ["{python}", "-B", "{repo}/test/unit/test_official_result_validation.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 100},
+      "result_contract": {"type": "unittest", "expected_tests": 106},
       "required_paths": ["{repo}/test/unit/test_official_result_validation.py"], "required_commands": []
     },
     {
@@ -377,7 +377,7 @@
       "description": "Manifest and runner lifecycle integration fixtures.",
       "command": ["{python}", "-B", "{repo}/test/unit/test_suite_runner.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 131},
+      "result_contract": {"type": "unittest", "expected_tests": 132},
       "required_paths": ["{repo}/test/unit/test_suite_runner.py"], "required_commands": []
     },
     {
@@ -503,7 +503,10 @@
           "libctest-glibc": 217
         }
       },
-      "required_paths": ["{repo}/test/evaluation/run_official_evaluation.sh"],
+      "required_paths": [
+        "{repo}/test/evaluation/run_official_evaluation.sh",
+        "{repo}/test/evaluation/official_case_plan.json"
+      ],
       "required_commands": ["make", "cargo", "qemu-img", "qemu-system-riscv64"],
       "required_files": [
         {
@@ -517,9 +520,20 @@
         "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
         "OSCOMP_TEST_GROUPS": "all",
         "OSCOMP_SKIP_TEST_GROUPS": "none",
-        "LTP_CASES": "stable-full"
+        "LTP_CASES": "stable-full",
+        "LTP_BLACKLIST": "",
+        "LTP_BLACKLIST_FILE": "",
+        "LTP_BLACKLIST_COMMON_FILE": "",
+        "LTP_BLACKLIST_RV_FILE": "",
+        "LTP_BLACKLIST_LA_FILE": "",
+        "LTP_BLACKLIST_RV": "",
+        "LTP_BLACKLIST_RISCV64": "",
+        "LTP_BLACKLIST_LA": "",
+        "LTP_BLACKLIST_LOONGARCH64": "",
+        "LTP_CASE_TIMEOUT_SECS": "180",
+        "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },
-      "infrastructure_exit_codes": [2]
+      "infrastructure_exit_codes": [125]
     },
     {
       "id": "official.loongarch64",
@@ -546,7 +560,10 @@
           "libctest-glibc": 217
         }
       },
-      "required_paths": ["{repo}/test/evaluation/run_official_evaluation.sh"],
+      "required_paths": [
+        "{repo}/test/evaluation/run_official_evaluation.sh",
+        "{repo}/test/evaluation/official_case_plan.json"
+      ],
       "required_commands": ["make", "cargo", "qemu-img", "qemu-system-loongarch64"],
       "required_files": [
         {
@@ -560,9 +577,20 @@
         "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
         "OSCOMP_TEST_GROUPS": "all",
         "OSCOMP_SKIP_TEST_GROUPS": "none",
-        "LTP_CASES": "stable-full"
+        "LTP_CASES": "stable-full",
+        "LTP_BLACKLIST": "",
+        "LTP_BLACKLIST_FILE": "",
+        "LTP_BLACKLIST_COMMON_FILE": "",
+        "LTP_BLACKLIST_RV_FILE": "",
+        "LTP_BLACKLIST_LA_FILE": "",
+        "LTP_BLACKLIST_RV": "",
+        "LTP_BLACKLIST_RISCV64": "",
+        "LTP_BLACKLIST_LA": "",
+        "LTP_BLACKLIST_LOONGARCH64": "",
+        "LTP_CASE_TIMEOUT_SECS": "180",
+        "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },
-      "infrastructure_exit_codes": [2]
+      "infrastructure_exit_codes": [125]
     }
   ]
 }

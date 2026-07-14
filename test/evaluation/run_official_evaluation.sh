@@ -4,14 +4,31 @@ set -euo pipefail
 ARCH="${1:-rv}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-TESTSUITE_DIR="${TESTSUITE_DIR:-$REPO_ROOT/../testsuits-for-oskernel}"
-RV_IMG="${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}"
-LA_IMG="${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}"
-OUTPUT_DIR="${ORAYS_TEST_OUTPUT_DIR:-$REPO_ROOT/test/output/official}"
+CALLER_DIR="$PWD"
+
+absolute_path() {
+    case "$1" in
+        /*) printf '%s\n' "$1" ;;
+        *) printf '%s/%s\n' "$CALLER_DIR" "$1" ;;
+    esac
+}
+
+TESTSUITE_DIR="$(absolute_path "${TESTSUITE_DIR:-$REPO_ROOT/../testsuits-for-oskernel}")"
+RV_IMG="$(absolute_path "${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}")"
+LA_IMG="$(absolute_path "${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}")"
+OUTPUT_DIR="$(absolute_path "${ORAYS_TEST_OUTPUT_DIR:-$REPO_ROOT/test/output/official}")"
 
 export PATH="$HOME/.cargo/bin:$PATH"
-export CARGO_NET_OFFLINE="${CARGO_NET_OFFLINE:-true}"
+export CARGO_NET_OFFLINE=true
 export OSCOMP_GROUP_TIMEOUT_CEILING_SECS="${OSCOMP_GROUP_TIMEOUT_CEILING_SECS:-900}"
+unset MAKEFLAGS MFLAGS GNUMAKEFLAGS
+unset RUSTFLAGS RUSTDOCFLAGS CARGO_ENCODED_RUSTFLAGS
+unset CARGO_BUILD_RUSTC_WRAPPER RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+
+infrastructure_error() {
+    printf 'infrastructure error: %s\n' "$1" >&2
+    exit 125
+}
 
 usage() {
     printf 'Usage: %s [rv|la]\n' "$0" >&2
@@ -29,7 +46,7 @@ need_cmd() {
 }
 
 need_file() {
-    if [ ! -f "$1" ]; then
+    if [ ! -f "$1" ] || [ ! -r "$1" ]; then
         printf 'infrastructure error: official evaluation image not found: %s\n' "$1" >&2
         printf 'set %s or TESTSUITE_DIR to a readable local image; no download is attempted\n' "$2" >&2
         return 1
@@ -42,11 +59,13 @@ append_ltp_blacklist_files() {
     local file
     [ -n "$value" ] || return 0
     for file in $value; do
-        if [ ! -f "$file" ]; then
-            printf 'infrastructure error: %s names a missing blacklist file: %s\n' "$var_name" "$file" >&2
-            exit 2
+        if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+            infrastructure_error "$var_name names a missing or unreadable blacklist file: $file"
         fi
-        LTP_BLACKLIST="${LTP_BLACKLIST:+$LTP_BLACKLIST$'\n'}$(cat "$file")"
+        if ! blacklist_content="$(cat -- "$file")"; then
+            infrastructure_error "cannot read blacklist file named by $var_name: $file"
+        fi
+        LTP_BLACKLIST="${LTP_BLACKLIST:+$LTP_BLACKLIST$'\n'}$blacklist_content"
     done
     export LTP_BLACKLIST
 }
@@ -64,7 +83,7 @@ compose_ltp_blacklist_files() {
 
 if [ "$#" -gt 1 ] || { [ "$ARCH" != "rv" ] && [ "$ARCH" != "la" ]; }; then
     usage
-    exit 2
+    exit 125
 fi
 
 if ! command -v cargo >/dev/null 2>&1; then
@@ -96,11 +115,11 @@ else
         missing=1
     fi
 fi
-[ "$missing" -eq 0 ] || exit 2
+[ "$missing" -eq 0 ] || exit 125
 
 if ! mkdir -p "$OUTPUT_DIR"; then
     printf 'infrastructure error: cannot create official output directory: %s\n' "$OUTPUT_DIR" >&2
-    exit 2
+    exit 125
 fi
 
 compose_ltp_blacklist_files "$ARCH"
@@ -111,14 +130,14 @@ cleanup() {
 trap cleanup EXIT
 
 if [ "$ARCH" = "rv" ]; then
-    if make -C "$REPO_ROOT" run-rv ARCH=riscv64 SMP=1 MEM=1G \
+    if make -C "$REPO_ROOT" run-rv ARCH=riscv64 KERNEL_SMP=1 RV_MEM=1G \
         RV_TESTSUITE_IMG="$RV_IMG" RV_TESTSUITE_RUN_IMG="$run_image"; then
         status=0
     else
         status=$?
     fi
 else
-    if make -C "$REPO_ROOT" run-la ARCH=loongarch64 SMP=1 MEM=1G \
+    if make -C "$REPO_ROOT" run-la ARCH=loongarch64 KERNEL_SMP=1 LA_MEM=1G \
         LA_TESTSUITE_IMG="$LA_IMG" LA_TESTSUITE_RUN_IMG="$run_image"; then
         status=0
     else

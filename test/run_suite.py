@@ -27,6 +27,7 @@ from evaluation.validate_official_results import (
     TRUSTED_BUILD_STDERR_RE,
     first_unsupported_output_character,
     normalize_output_text,
+    trusted_official_case_plan,
     trusted_ltp_stable_cases,
     validate_official_output,
 )
@@ -140,6 +141,53 @@ CANONICAL_OFFICIAL_ENVIRONMENT = {
     "OSCOMP_TEST_GROUPS": "all",
     "OSCOMP_SKIP_TEST_GROUPS": "none",
     "LTP_CASES": CANONICAL_LTP_CASE_LIST,
+    "LTP_BLACKLIST": "",
+    "LTP_BLACKLIST_FILE": "",
+    "LTP_BLACKLIST_COMMON_FILE": "",
+    "LTP_BLACKLIST_RV_FILE": "",
+    "LTP_BLACKLIST_LA_FILE": "",
+    "LTP_BLACKLIST_RV": "",
+    "LTP_BLACKLIST_RISCV64": "",
+    "LTP_BLACKLIST_LA": "",
+    "LTP_BLACKLIST_LOONGARCH64": "",
+    "LTP_CASE_TIMEOUT_SECS": "180",
+    "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900",
+}
+CANONICAL_OFFICIAL_EXECUTION = {
+    "rv": {
+        "timeout_seconds": 21600,
+        "required_paths": [
+            "{repo}/test/evaluation/run_official_evaluation.sh",
+            "{repo}/test/evaluation/official_case_plan.json",
+        ],
+        "required_commands": ["make", "cargo", "qemu-img", "qemu-system-riscv64"],
+        "required_files": [
+            {
+                "environment": "RV_TESTSUITE_IMG",
+                "directory_environment": "TESTSUITE_DIR",
+                "basename": "sdcard-rv.img",
+                "fallback": "{repo}/../testsuits-for-oskernel/sdcard-rv.img",
+            }
+        ],
+        "infrastructure_exit_codes": [125],
+    },
+    "la": {
+        "timeout_seconds": 21600,
+        "required_paths": [
+            "{repo}/test/evaluation/run_official_evaluation.sh",
+            "{repo}/test/evaluation/official_case_plan.json",
+        ],
+        "required_commands": ["make", "cargo", "qemu-img", "qemu-system-loongarch64"],
+        "required_files": [
+            {
+                "environment": "LA_TESTSUITE_IMG",
+                "directory_environment": "TESTSUITE_DIR",
+                "basename": "sdcard-la.img",
+                "fallback": "{repo}/../testsuits-for-oskernel/sdcard-la.img",
+            }
+        ],
+        "infrastructure_exit_codes": [125],
+    },
 }
 UNTRUSTED_PYTHON_ENVIRONMENT = {
     "PYTHONHOME",
@@ -203,19 +251,19 @@ CANONICAL_UNIT_CASE_IDS = (
 CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.compliance_regressions": 7,
     "unit.evaluation_failure_report": 6,
-    "unit.evaluation_runner_and_parser_integrity": 18,
+    "unit.evaluation_runner_and_parser_integrity": 22,
     "unit.kernel_state_backed_semantics": 36,
     "unit.libc_stateful_semantics": 9,
     "unit.ltp_result_summary": 18,
     "unit.memory_policy_semantics": 3,
     "unit.no_fake_success": 10,
-    "unit.official_result_validation": 100,
+    "unit.official_result_validation": 106,
     "unit.posix_state_integrity": 15,
     "unit.rlimit_and_fd_semantics": 13,
     "unit.runtime_binary_patch_prohibition": 9,
     "unit.socket_message_and_buffer_semantics": 10,
     "unit.stat_metadata_semantics": 7,
-    "unit.suite_runner": 131,
+    "unit.suite_runner": 132,
     "unit.synthetic_capability_integrity": 5,
     "unit.syscall_boundary_regressions": 26,
     "unit.test_asset_integrity": 36,
@@ -765,6 +813,10 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                     f"case {case_id} must invoke its exact canonical baseline command"
                 )
         live_ltp_count = len(_live_ltp_stable_cases(repo))
+        try:
+            trusted_official_case_plan(repo)
+        except (OSError, ValueError) as error:
+            raise ManifestError(f"cannot load trusted official identity plan: {error}") from error
         expected_ltp_counts = {
             CANONICAL_OFFICIAL_CASE_COUNTS["ltp-musl"],
             CANONICAL_OFFICIAL_CASE_COUNTS["ltp-glibc"],
@@ -808,6 +860,12 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                 raise ManifestError(
                     f"case {case_id} must invoke the canonical official wrapper for {architecture}"
                 )
+            execution = CANONICAL_OFFICIAL_EXECUTION[architecture]
+            for field, expected_value in execution.items():
+                if case.get(field, []) != expected_value:
+                    raise ManifestError(
+                        f"case {case_id} must preserve canonical official {field}={expected_value!r}"
+                    )
     return manifest
 
 
@@ -1482,7 +1540,10 @@ def parse_contract(
     if result_type == "official":
         try:
             expected_ltp_cases = _live_ltp_stable_cases(repository_root())
-        except ManifestError as error:
+            expected_busybox_cases, expected_libctest_cases = trusted_official_case_plan(
+                repository_root()
+            )
+        except (ManifestError, OSError, ValueError) as error:
             return "INFRA_ERROR", str(error), {}
         validation = validate_official_output(
             stdout,
@@ -1491,6 +1552,8 @@ def parse_contract(
             expected_group_case_counts=contract.get("expected_group_case_counts"),
             expected_ltp_case_list=case.get("environment", {}).get("LTP_CASES"),
             expected_ltp_cases=expected_ltp_cases,
+            expected_busybox_cases=expected_busybox_cases,
+            expected_libctest_cases=expected_libctest_cases,
         )
         if validation["status"] == "PASS":
             return "PASS", "all official groups completed with explicit success", validation

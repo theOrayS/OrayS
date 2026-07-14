@@ -16,6 +16,7 @@ CANONICAL_REQUIRED = (
     Path("test/run_suite.py"),
     Path("test/suite_manifest.json"),
     Path("test/evaluation/run_official_evaluation.sh"),
+    Path("test/evaluation/official_case_plan.json"),
     Path("test/evaluation/validate_official_results.py"),
     Path("test/evaluation/summarize_ltp_results.py"),
     Path("test/evaluation/report_evaluation_failures.py"),
@@ -306,8 +307,13 @@ def scan_required_files(root: Path) -> list[str]:
         if wrapper.stat().st_mode & 0o111 == 0:
             findings.append("root official compatibility wrapper is not executable")
         text = wrapper.read_text(encoding="utf-8")
-        if "test/evaluation/run_official_evaluation.sh" not in text or "exec " not in text:
-            findings.append("root official compatibility wrapper does not exec the canonical implementation")
+        if (
+            "test/run_suite.py" not in text
+            or "--profile official" not in text
+            or "--arch" not in text
+            or "exec " not in text
+        ):
+            findings.append("root official compatibility wrapper does not exec the strict canonical profile")
         if re.search(r"\b(?:make|qemu-system|qemu-img)\b", text):
             findings.append("root official compatibility wrapper contains duplicated evaluation logic")
     canonical_wrapper = root / "test/evaluation/run_official_evaluation.sh"

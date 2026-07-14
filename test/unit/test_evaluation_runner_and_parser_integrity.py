@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -25,6 +27,51 @@ TARGETS = [
 
 
 class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
+    def fake_official_environment(
+        self,
+        *,
+        make_status: int = 0,
+    ) -> tuple[Path, dict[str, str], Path, Path]:
+        directory = Path(tempfile.mkdtemp(prefix="official-wrapper-fixture-"))
+        self.addCleanup(lambda: shutil.rmtree(directory, ignore_errors=True))
+        bin_dir = directory / "bin"
+        bin_dir.mkdir()
+        args_log = directory / "make-args.log"
+        environment_log = directory / "make-environment.log"
+        make_script = bin_dir / "make"
+        make_script.write_text(
+            "#!/bin/sh\n"
+            "printf '%s\\n' \"$@\" > \"$FAKE_MAKE_ARGS\"\n"
+            "printf 'offline=%s\\nmakeflags=%s\\n' \"${CARGO_NET_OFFLINE-}\" "
+            "\"${MAKEFLAGS-}\" > \"$FAKE_MAKE_ENVIRONMENT\"\n"
+            "exit \"$FAKE_MAKE_STATUS\"\n",
+            encoding="utf-8",
+        )
+        make_script.chmod(0o755)
+        for command in ("cargo", "qemu-img", "qemu-system-riscv64"):
+            path = bin_dir / command
+            path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            path.chmod(0o755)
+        image = directory / "images/sdcard-rv.img"
+        image.parent.mkdir()
+        image.write_bytes(b"fixture")
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PATH": f"{bin_dir}:{environment['PATH']}",
+                "RV_TESTSUITE_IMG": "images/sdcard-rv.img",
+                "ORAYS_TEST_OUTPUT_DIR": "out",
+                "FAKE_MAKE_ARGS": str(args_log),
+                "FAKE_MAKE_ENVIRONMENT": str(environment_log),
+                "FAKE_MAKE_STATUS": str(make_status),
+                "CARGO_NET_OFFLINE": "false",
+                "MAKEFLAGS": "-n",
+                "KERNEL_SMP": "9",
+                "RV_MEM": "9G",
+            }
+        )
+        return directory, environment, args_log, environment_log
+
     def make_tree(self) -> Path:
         tmp = Path(tempfile.mkdtemp(prefix="evaluation-runner-and-parser-guard-"))
         self.addCleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
@@ -59,6 +106,96 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         result = self.run_guard(ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("PASS", result.stdout)
+
+    def test_official_executor_absolutizes_paths_and_fixes_consumed_resources(self) -> None:
+        directory, environment, args_log, environment_log = self.fake_official_environment()
+        result = subprocess.run(
+            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        arguments = args_log.read_text(encoding="utf-8").splitlines()
+        self.assertIn(f"RV_TESTSUITE_IMG={directory}/images/sdcard-rv.img", arguments)
+        self.assertTrue(
+            any(value.startswith(f"RV_TESTSUITE_RUN_IMG={directory}/out/") for value in arguments),
+            arguments,
+        )
+        self.assertIn("KERNEL_SMP=1", arguments)
+        self.assertIn("RV_MEM=1G", arguments)
+        self.assertFalse(any(value.startswith(("SMP=", "MEM=")) for value in arguments), arguments)
+        environment_text = environment_log.read_text(encoding="utf-8")
+        self.assertIn("offline=true", environment_text)
+        self.assertIn("makeflags=", environment_text)
+        self.assertNotIn("makeflags=-n", environment_text)
+
+    def test_official_executor_reserves_125_for_preflight_infrastructure(self) -> None:
+        directory, environment, _args_log, _environment_log = self.fake_official_environment()
+        (directory / "images/sdcard-rv.img").unlink()
+        result = subprocess.run(
+            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 125, result.stdout + result.stderr)
+        self.assertIn("infrastructure error", result.stderr)
+
+    def test_official_executor_preserves_make_exit_two_as_test_failure(self) -> None:
+        directory, environment, _args_log, _environment_log = self.fake_official_environment(
+            make_status=2
+        )
+        result = subprocess.run(
+            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+    def test_public_official_entry_cannot_pass_explicit_guest_failure(self) -> None:
+        directory, environment, _args_log, _environment_log = self.fake_official_environment()
+        fake_make = directory / "bin/make"
+        fake_make.write_text(
+            "#!/bin/sh\n"
+            "printf '%s\\n' "
+            "'#### OS COMP TEST GROUP START demo-musl ####' "
+            "'FAIL OFFICIAL TEST GROUP demo-musl : 7' "
+            "'#### OS COMP TEST GROUP END demo-musl ####'\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        fake_make.chmod(0o755)
+        output_dir = directory / "suite-output"
+        result = subprocess.run(
+            [
+                str(ROOT / "run-eval.sh"),
+                "rv",
+                "--output-dir",
+                str(output_dir),
+            ],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(summary["result"], "INFRA_ERROR", summary)
+        self.assertEqual(summary["cases"][0]["status"], "INFRA_ERROR", summary)
+        self.assertNotEqual(summary["cases"][0]["status"], "PASS", summary)
 
     def test_detects_chdir01_case_specialization(self) -> None:
         tree = self.make_tree()
