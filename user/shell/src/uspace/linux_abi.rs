@@ -3,8 +3,8 @@ use linux_raw_sys::general;
 use std::string::String;
 
 #[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
-pub use orays_linux_abi::constants::AUX_PLATFORM;
-pub use orays_linux_abi::constants::{
+pub use orays_linux::abi::constants::AUX_PLATFORM;
+pub use orays_linux::abi::constants::{
     ACCESS_MODE_MASK, ACCESS_R_OK, ACCESS_W_OK, ACCESS_X_OK, AF_UNIX_DOMAIN, AUX_CLOCK_TICKS,
     CHOWN_ID_UNCHANGED, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, DEVFS_MAGIC, EXT4_SUPER_MAGIC,
     FD_SETSIZE, FILE_MODE_GROUP_EXECUTE, FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID,

@@ -7,6 +7,8 @@ use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
 use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, VirtAddr};
+use orays_linux::backend::UserMemoryBackend;
+use orays_linux::user::{Read, UserRange, Write};
 use std::string::String;
 use std::vec::Vec;
 
@@ -292,6 +294,36 @@ pub(super) fn write_user_bytes(
         .map_err(|_| LinuxError::EFAULT)?;
     perf_counters::record_user_copy_write(bytes.len());
     Ok(())
+}
+
+struct ProcessUserMemory<'a> {
+    process: &'a UserProcess,
+}
+
+impl UserMemoryBackend for ProcessUserMemory<'_> {
+    type Error = LinuxError;
+
+    fn validate_read(&self, range: UserRange<Read>) -> Result<(), Self::Error> {
+        validate_user_read(self.process, range.start().get(), range.len())
+    }
+
+    fn validate_write(&self, range: UserRange<Write>) -> Result<(), Self::Error> {
+        validate_user_write(self.process, range.start().get(), range.len())
+    }
+
+    fn read_bytes(&self, src: UserRange<Read>, dst: &mut [u8]) -> Result<(), Self::Error> {
+        if src.len() != dst.len() {
+            return Err(LinuxError::EINVAL);
+        }
+        read_user_bytes_into(self.process, src.start().get(), dst)
+    }
+
+    fn write_bytes(&self, dst: UserRange<Write>, src: &[u8]) -> Result<(), Self::Error> {
+        if dst.len() != src.len() {
+            return Err(LinuxError::EINVAL);
+        }
+        write_user_bytes(self.process, dst.start().get(), src)
+    }
 }
 
 pub(super) fn user_io_buffer(len: usize) -> Result<Vec<u8>, LinuxError> {

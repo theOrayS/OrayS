@@ -87,6 +87,57 @@
 - `Cargo.lock`：仅给 `arceos-shell` 增加 `orays-linux-abi` edge，并新增 `orays-linux-abi 0.2.0` path package stanza；没有 registry package、版本、checksum 变化。M1 当前 SHA-256 为 `a624e5cdf24e13202a4fb3fec70da957973f557a361d9d5b43335da1b5ab45b3`。
 - known failures：仅 M0 已证明的全局 fmt、LoongArch workspace clippy 环境问题和 axfs unittest；没有 PR1 regression。
 
+## M2 — typed user-memory boundary and shell adapter
+
+### Focused crate checks
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `cargo check --offline -p orays-linux` | host | 0 | PASS | 生成新 path-package lock stanza；crate 为 `no_std` 且只解析 ABI 依赖 |
+| `cargo check --locked --offline -p orays-linux --all-features --target riscv64gc-unknown-none-elf` | RISC-V64 | 0 | PASS | typed types、trait 和 `alloc=[]` feature 编译通过 |
+| `cargo check --locked --offline -p orays-linux --all-features --target loongarch64-unknown-none-softfloat` | LoongArch64 | 0 | PASS | 同一 API 在 LA target 编译通过 |
+| `cargo clippy --locked --offline -p orays-linux --all-features -- -D warnings` | host | 0 | PASS | 新 crate 零 clippy warning |
+| `cargo clippy --locked --offline -p orays-linux --all-features --target riscv64gc-unknown-none-elf -- -D warnings` | RISC-V64 | 0 | PASS | 新 crate 零 clippy warning |
+| `cargo clippy --locked --offline -p orays-linux --all-features --target loongarch64-unknown-none-softfloat -- -D warnings` | LoongArch64 | 0 | PASS | 新 crate 零 clippy warning |
+| `cargo test --locked --offline -p orays-linux` | host | 0 | PASS | 5 passed：range/null/overflow/ZST、typed slice、fake backend read/write/bounds/mismatch |
+
+### Integration matrix
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `cargo fmt --all -- --check` | workspace | 1 | BASELINE | 仍只报告 M0 的 4 个无关文件 |
+| `rustfmt --edition 2024 --check api/orays_linux/src/lib.rs api/orays_linux/src/user.rs api/orays_linux/src/backend.rs user/shell/src/uspace/linux_abi.rs user/shell/src/uspace/time_abi.rs user/shell/src/uspace/user_memory.rs` | touched Rust files | 0 | PASS | M2 Rust diff 格式正确 |
+| `python3 scripts/check_g006_synthetic_capabilities.py` | static | 0 | PASS | synthetic policy 未迁移 |
+| `python3 scripts/check_g009_post_review_semantics.py` | static | 0 | PASS | semantic guard 无 finding |
+| `python3 scripts/check_g012_syscall_review_hotspots.py` | static | 0 | PASS | dispatcher/handler 未修改 |
+| `python3 scripts/check_g013_user_copy_boundary.py` | static | 0 | PASS | 既有 user-copy 调用纪律未回归 |
+| `make A=user/shell ARCH=riscv64 FEATURES=alloc,paging,irq,multitask,fs,net,rtc APP_FEATURES=auto-run-tests,uspace build` | RISC-V64 | 0 | PASS | 最终 M2 源码 official-feature build 通过 |
+| `make A=user/shell ARCH=loongarch64 FEATURES=alloc,paging,irq,multitask,fs,net,rtc APP_FEATURES=auto-run-tests,uspace build`（未先 defconfig） | LoongArch64 | 2 | INVOCATION | Makefile 检测到上一条 RV `.axconfig`；运行 `make A=user/shell ARCH=loongarch64 defconfig` 后重跑 |
+| 同一 LA build（首次代码重跑） | LoongArch64 | 2 | REGRESSION | compile-only constructor HRTB 证明触发 `E0308`；删除证明后同命令通过 |
+| `make A=user/shell ARCH=loongarch64 defconfig` 后同一 LA build（最终源码） | LoongArch64 | 0 | PASS | facade、adapter 与 LA cfg 完整编译/链接/objcopy |
+| `make A=user/shell ARCH=riscv64 defconfig` 后同一 RV build（最终源码） | RISC-V64 | 0 | PASS | facade、adapter 与 RV cfg 完整编译/链接/objcopy |
+| `make clippy ARCH=riscv64` | RISC-V64 workspace | 0 | PASS | 最终 M2 源码通过；保留既有 warnings，并新增一个诚实的未构造 adapter 过渡 warning |
+| `make A=user/shell ARCH=loongarch64 defconfig` 后 `make clippy ARCH=loongarch64` | LoongArch64 workspace | 2 | ENVIRONMENT | 与 M0/M1 相同：axlibc bindgen 的 host libclang 不识别 `loongarch64-unknown-none` |
+| `make unittest_no_fail_fast` | host | 2 | BASELINE | 与 M0/M1 相同：axfs FAT `test_devfs_ramfs() failed: NotFound` |
+| `cargo test --locked --offline --workspace --exclude axfs --no-fail-fast -- --nocapture` | host | 0 | PASS | 其余 workspace 测试通过，并实际运行 `orays-linux` 的 5 个测试 |
+| `cargo metadata --locked --offline --format-version 1 --no-deps` | dependency graph | 0 | PASS | 两个新 package 与 feature 均可离线解析，无 cycle |
+| `cargo tree --locked --offline -p orays-linux -e normal` | dependency graph | 0 | PASS | `orays-linux -> orays-linux-abi -> linux-raw-sys` |
+| `cargo tree --locked --offline -p arceos-shell -e normal --features uspace` | dependency graph | 0 | PASS | 精确显示 `arceos-shell -> orays-linux -> orays-linux-abi` |
+| `rg -n 'orays-linux-abi\|orays_linux_abi' user/shell/Cargo.toml user/shell/src` | shell direct edge | 1 | PASS | 无匹配；shell 已移除 ABI 直连。命令包装 `|| true` 时 shell exit 为 0，`rg` 自身的无匹配语义为 1 |
+| `git diff --check` | worktree | 0 | PASS | 无 whitespace error |
+| `git diff --exit-code -- api/arceos_posix_api/src/ctypes_gen.rs` | generated source | 0 | PASS | host tests 的 packed epoll 改写已精确恢复，M2 不包含该文件 |
+| `sha256sum .codex/CODEX_PR1_GOAL.md docs/pr1-linux-boundary-survey.md` | user inputs | 0 | PASS | 两个 hash 与任务起点一致 |
+
+### M2 audit
+
+- changed files：`Cargo.toml`、`Cargo.lock`、`api/orays_linux/Cargo.toml`、`api/orays_linux/src/{lib,user,backend}.rs`、`user/shell/Cargo.toml`、`user/shell/src/uspace/{linux_abi,time_abi,user_memory}.rs`、本目录的进度/决策/验证文档。
+- dependency：最终链已建立；`orays-linux` 只依赖 ABI crate，ABI crate 只依赖 `linux-raw-sys`，两者均不依赖 shell、UserProcess 或任何 OrayS implementation crate。
+- handler/semantics：adapter 在 M2 未构造，所有现有 helper body 与 handler 调用点保持不变；UserProcess 仍由 shell 所有。
+- typed boundary：range 是 half-open，检查 `start + len`；slice 还检查 `len * size_of::<T>()`。零长度在任意整数地址有效，非零 null 留给 backend 判定，和现有 zero-length 行为一致。
+- unsafe delta：新增 0、删除 0、移动 0；新 crate 使用 `#![forbid(unsafe_code)]`。既有 `T: Copy` value-copy unsafe 未修改。
+- `Cargo.lock`：shell edge 从 `orays-linux-abi` 替换为 `orays-linux`，新增 `orays-linux 0.2.0` path package stanza，后者只列 `orays-linux-abi`；没有 registry package、版本或 checksum 变化。M2 SHA-256 为 `0f7b1d3135d88d007eca51ab853007a182b5a0d8291808e67d582723cd72c4c8`。
+- known failures：全局 fmt、LA workspace clippy 与 axfs unittest 均为已证明基线；中途 `E0308` 是 M2 regression，已修复并由双架构最终 build 证明。无未解决 PR1 regression。
+
 ## 后续记录模板
 
 每个里程碑追加：commit SHA、逐条命令/exit/classification、changed files、已知失败、unsafe block 增减/移动、Cargo.lock diff 原因、双架构证据和工作树状态。不得用一次默认 build 代替 uspace official-feature build。

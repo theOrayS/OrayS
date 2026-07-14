@@ -20,7 +20,7 @@ use super::task_registry::{
 use super::user_memory::{read_user_value, write_user_value};
 use super::{UserProcess, neg_errno};
 
-pub(super) use orays_linux_abi::time::{RtcTime, Tms, USER_HZ};
+pub(super) use orays_linux::abi::time::{RtcTime, Tms, USER_HZ};
 
 static REALTIME_OFFSET_NS: AtomicI64 = AtomicI64::new(0);
 static TIME_DISCIPLINE: TimeDisciplineState = TimeDisciplineState::new();

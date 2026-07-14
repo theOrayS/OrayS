@@ -56,7 +56,7 @@ pub(super) use orays_linux_abi::time::{RtcTime, Tms, USER_HZ};
 - `UserRange<A>`：起点和字节长度，构造时检查 `start + len` 溢出；`A` 是访问 marker。
 - `UserPtr<T, A>`：typed address + `PhantomData`，不检查用户映射、不实现 `Deref`。
 - `UserSlice<T, A>`：typed pointer + element count，构造时检查 `len * size_of::<T>()` 与地址端点。
-- sealed marker `Read`、`Write`，以及必要时的 `ReadWrite` 组合；marker 不承载运行时状态。
+- sealed marker `Read`、`Write`；marker 不承载运行时状态。PR1 当前没有同时要求双向权限的通用调用，因此不提前增加 `ReadWrite`。
 
 零长度 range 允许任意地址（包括 0），以保持现有 zero-length syscall 行为；非零 null 是否 EFAULT 由 shell backend 的既有验证决定。类型层只拒绝算术溢出，不自行发明 errno、对齐或映射语义。
 
@@ -77,9 +77,11 @@ pub trait UserMemoryBackend {
 }
 ```
 
-长度不匹配由 trait contract 明确为调用方错误，shell adapter 只用等长 slice 调用。关联错误类型避免 `orays-linux -> axerrno/arceos_posix_api` 依赖。
+长度不匹配由 trait contract 明确要求 backend 拒绝；M2 shell adapter 防御性返回 `LinuxError::EINVAL`。该分支在 M2 不可从 syscall 到达，M3 只构造与 slice 等长的 range，因此不改变既有 errno。关联错误类型避免 `orays-linux -> axerrno/arceos_posix_api` 依赖。
 
 shell 定义私有 `ProcessUserMemory<'a> { process: &'a UserProcess }` 并实现 trait；adapter 委托给 `user_memory.rs` 中保留的 raw backend primitive。M3 再让旧 facade 构造 typed range 并调用 adapter。`UserProcess` 不实现通用 trait 本身，避免把广泛方法面暴露为公共接口。
+
+M2 刻意不构造 adapter，因此 shell 会新增一个明确的 transitional dead-code warning。没有用 `allow` 隐藏它；M3 将通过真实 facade 使用消除该 warning。相比为了消除 warning 而提前改动 handler 可达路径，这一提交边界更容易审查和回滚。
 
 ## D-006：用户拷贝桥接顺序
 

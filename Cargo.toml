@@ -21,6 +21,7 @@ members = [
     "api/axfeat",
     "api/arceos_api",
     "api/arceos_posix_api",
+    "api/orays_linux",
     "api/orays_linux_abi",
 
     "ulib/axstd",
@@ -47,6 +48,7 @@ axlibc = { path = "ulib/axlibc" }
 
 arceos_api = { path = "api/arceos_api" }
 arceos_posix_api = { path = "api/arceos_posix_api" }
+orays-linux = { path = "api/orays_linux" }
 orays-linux-abi = { path = "api/orays_linux_abi" }
 axfeat = { path = "api/axfeat" }
 

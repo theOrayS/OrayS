@@ -14,8 +14,8 @@
 | 里程碑 | 状态 | 目标 | 计划提交 |
 |---|---|---|---|
 | M0 | complete | 固化分析、决策、基线和白名单 | `1b3dc605 docs(pr1): record analysis and baseline` |
-| M1 | complete | 抽取纯 ABI crate，保留 shell facade | `refactor(linux): extract pure ABI crate`（本里程碑提交） |
-| M2 | pending | 建立通用 typed user-memory 边界和 shell adapter | `refactor(linux): add typed user memory boundary` |
+| M1 | complete | 抽取纯 ABI crate，保留 shell facade | `940438f7 refactor(linux): extract pure ABI crate` |
+| M2 | complete | 建立通用 typed user-memory 边界和 shell adapter | `refactor(linux): add typed user memory boundary`（本里程碑提交） |
 | M3 | pending | 让既有 user-copy facade 经过 typed adapter | `refactor(linux): route user copy through backend adapter` |
 | M4 | pending | 增加最小 syscall metadata 和静态 guard | `refactor(linux): add syscall boundary metadata` |
 | M5 | pending | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`；修复另建提交 |
@@ -113,6 +113,14 @@ M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行
 - 实际结果：满足上述条件。全局 fmt、LoongArch64 workspace clippy 与 axfs unittest 的非零结果均和 M0 基线一致，未作为 PASS；详见 `VALIDATION.md`。
 - 语义审查：迁移范围只包含纯数值、`AUX_PLATFORM`、`Tms`、`RtcTime` 和 syscall number namespace。地址布局、signal frame/trampoline、synthetic policy、errno helper、`UserTimex` 与所有 handler 均留在 shell。
 - 用户输入完整性：两份未跟踪输入的 SHA-256 仍分别为 `f6fb00c626dccca22ed15d1713ef4a8eb38bdb9d6a028fbd57e12ea8950efabb` 与 `b6b7911b0da05f783366baf444328400b9b93b72494f117e7e78b941a276db75`。
+
+## M2 checkpoint
+
+- 成功条件：`orays-linux` 是 `no_std`、无 unsafe、只依赖 `orays-linux-abi`；提供 checked `UserAddr`/`UserRange`/`UserPtr`/`UserSlice`、sealed `Read`/`Write` marker 和 byte backend trait；shell adapter 编译但现有 helper/handler 尚不改道；host 单测及两目标 `-D warnings` clippy 通过；Cargo graph 为最终单向链。
+- 实际结果：满足上述条件。5 个单测覆盖零长度/null、地址溢出、长度乘法溢出、ZST、读写 marker、fake backend bounds 与 slice 长度不匹配。两架构 official-feature shell build 和 RISC-V workspace clippy 通过；LA workspace clippy、全局 fmt、axfs unittest 与 M0 基线一致。
+- 行为边界：typed constructor 只验证整数算术；非零 null、映射权限、fault-in、brk、partial-copy 与 LinuxError 仍完全由 shell 原实现负责。M2 adapter 尚未被 syscall 路径构造，因而不会改变返回值或 fault 行为。
+- 已处理回归：为抑制临时 dead-code warning 加入的高阶 constructor 类型证明在 LA build 触发 `E0308`；立即删除该脆弱证明，保留诚实的单个过渡期 `ProcessUserMemory is never constructed` warning。M3 实际接入 adapter 后该 warning 应自然消失，不添加 `allow`。
+- 用户输入完整性：两份未跟踪输入 hash 仍与任务起点一致。
 
 ## Stop 条件映射
 
