@@ -182,6 +182,56 @@
 - Cargo.lock：0 byte diff，SHA-256 保持 `0f7b1d3135d88d007eca51ab853007a182b5a0d8291808e67d582723cd72c4c8`。
 - known failures：仅三项已证明非 PR1 失败（全局 fmt BASELINE、LA workspace clippy ENVIRONMENT、axfs unittest BASELINE）；无 M3 regression。
 
+## M4 — syscall audit metadata and PR1 static guard
+
+### Focused checks and implementation iterations
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `rg --files vendor/linux-raw-sys/src` | source lookup | 2 | INVOCATION | 依赖不是 vendored 目录；只读查找无副作用，随后从 Cargo registry 实际路径核对 target-selected number 模块 |
+| `cargo test --locked --offline -p orays-linux` | host | 0 | PASS | 9 passed；原 5 个 user/backend 测试及新增 4 个 syscall identity/availability/alias/六参数上限测试 |
+| `cargo clippy --locked --offline -p orays-linux --all-features -- -D warnings` | host | 0 | PASS | metadata model 零 warning |
+| `cargo clippy --locked --offline -p orays-linux --all-features --target riscv64gc-unknown-none-elf -- -D warnings` | RISC-V64 | 0 | PASS | target-selected ABI number namespace与 metadata model 编译通过 |
+| `cargo clippy --locked --offline -p orays-linux --all-features --target loongarch64-unknown-none-softfloat -- -D warnings` | LoongArch64 | 0 | PASS | legacy number import 和通用 model 编译通过 |
+| `rustfmt --edition 2024 --check api/orays_linux/src/lib.rs api/orays_linux/src/syscall.rs user/shell/src/uspace/mod.rs user/shell/src/uspace/syscall_metadata.rs` | touched Rust files | 0 | PASS | M4 Rust diff 格式正确 |
+| `python3 scripts/check_pr1_linux_boundary.py` | static | 0 | PASS | 当前树 0 findings；最终源码重复执行仍通过 |
+| `python3 scripts/test_pr1_linux_boundary.py`（首次） | mutation tests | 1 | REGRESSION | 13/14 通过；反向依赖 test 期待字符串与 guard 的准确诊断不一致，属于新测试断言缺陷，不是产品代码失败 |
+| 同一 mutation test（修正断言后） | mutation tests | 0 | PASS | 14/14 通过；最终 `#[used] static` table 后再次重复执行仍为 14/14 |
+| `make A=user/shell ARCH=riscv64 defconfig` 后 official-feature build（首次） | RISC-V64 | 0 | REGRESSION | 编译成功，但私有 const metadata table 新增 6 个 dead-code warning；未用 `allow` 掩盖，改为有意保留的 `#[used] static` table |
+| 同一 RISC-V64 official-feature build（最终源码） | RISC-V64 | 0 | PASS | 完整编译/链接/objcopy；恢复为原有 12 个 shell warning，无 metadata warning |
+| `make A=user/shell ARCH=loongarch64 defconfig` 后 official-feature build（最终源码） | LoongArch64 | 0 | PASS | 完整编译/链接/objcopy；原有 12 个 shell warning，无 metadata warning |
+
+### Milestone matrix
+
+| 命令 | 架构/target | exit | 分类 | 证据/说明 |
+|---|---|---:|---|---|
+| `cargo fmt --all -- --check` | workspace | 1 | BASELINE | 仍且只报告 M0 的 4 个无关文件：POSIX pipe、axfs dev/root、axtask wait_queue |
+| `python3 scripts/check_g006_synthetic_capabilities.py` | static | 0 | PASS | 0 findings |
+| `python3 scripts/check_g009_post_review_semantics.py` | static | 0 | PASS | 0 findings |
+| `python3 scripts/check_g012_syscall_review_hotspots.py` | static | 0 | PASS | 0 findings；dispatcher 为零 diff |
+| `python3 scripts/check_g013_user_copy_boundary.py` | static | 0 | PASS | 0 findings |
+| `make clippy ARCH=riscv64`（先 RV defconfig） | RISC-V64 workspace | 0 | PASS | workspace clippy 通过；无新增 PR1 warning/error |
+| `make clippy ARCH=loongarch64`（先 LA defconfig） | LoongArch64 workspace | 2 | ENVIRONMENT | 与 M0–M3 相同：`axlibc` bindgen 的 host libclang 报 unknown target triple `loongarch64-unknown-none` |
+| `make unittest_no_fail_fast` | host | 2 | BASELINE | 与 M0–M3 相同：axfs FAT `test_devfs_ramfs() failed: NotFound`；其余 axfs targets 继续运行 |
+| `cargo test --locked --offline --workspace --exclude axfs --no-fail-fast -- --nocapture` | host | 0 | PASS | 其余 workspace 全部通过，含 `orays-linux` 9 tests |
+| `cargo metadata --locked --offline --format-version 1 --no-deps` | dependency graph | 0 | PASS | M4 无 manifest/lock 变化，offline/locked 解析通过 |
+| `cargo tree --locked --offline -p arceos-shell -e normal --features uspace` | dependency graph | 0 | PASS | `arceos-shell -> orays-linux -> orays-linux-abi -> linux-raw-sys` |
+| combined integrity wrapper with over-escaped `rg` unsafe pattern | invocation | 1 | INVOCATION | wrapper 把反斜杠重复传给 `rg`，报 repetition quantifier；无仓库副作用，随即用下一条 POSIX character class pattern 重跑 |
+| `test "$(rg -n 'unsafe[[:space:]]*\{' user/shell/src/uspace/user_memory.rs \| wc -l)" -eq 5` | unsafe audit | 0 | PASS | 精确确认 M4 后仍为同 5 个 unsafe block |
+| `git diff --check` | worktree | 0 | PASS | 无 whitespace error |
+| `git diff --exit-code -- Cargo.lock user/shell/src/uspace/syscall_dispatch.rs api/arceos_posix_api/src/ctypes_gen.rs` | protected sources | 0 | PASS | M4 不改 lock/dispatcher；host test 的 packed epoll 生成副作用已精确恢复 |
+| `sha256sum Cargo.lock .codex/CODEX_PR1_GOAL.md docs/pr1-linux-boundary-survey.md` | integrity | 0 | PASS | lock 为 M2 hash `0f7b1d31…`；两份用户输入仍为 `f6fb00c6…`/`b6b7911b…` |
+
+### M4 audit
+
+- changed files：`api/orays_linux/src/{lib,syscall}.rs`、`user/shell/src/uspace/{mod,syscall_metadata}.rs`、`scripts/{check,test}_pr1_linux_boundary.py` 与四份 `docs/pr1/*.md`。
+- executable behavior：`syscall_dispatch.rs`、所有 handler、TrapFrame 参数读取、errno/return、watchdog/accounting/restart 路径均为零 diff。metadata 只保存 number/name/count/availability/handler-name/alias/audit-id，不含可调用 handler。
+- target facts：RV 与 LA 都登记 clone/fsync/fdatasync；RV rlimit 使用 general 163/164，LA 使用已抽取 legacy 163/164；poll 只在现有 non-RV/non-AArch64/non-LA cfg 登记。guard 对 LA clone 的 arg3/arg4 交换做源码核对。
+- dependency/ABI：manifest 和 lock 为零 diff；最终链不变，无 cycle。ABI number 与 `Tms`/`RtcTime` layout assertions 由 guard 再冻结。
+- unsafe delta：新增 0、删除 0、移动 0；两个边界 crate 继续 `forbid(unsafe_code)`；`user_memory.rs` 仍为同 5 个 audited unsafe fingerprint。
+- test honesty：static mutation tests 证明 guard 对预设漂移有检测能力，但不宣称 syscall runtime PASS。中途 1 个测试断言 regression 与 6 个 warning 均在提交前修复；无未解决 M4 regression。
+- known failures：仅全局 fmt BASELINE、LA workspace clippy ENVIRONMENT 和 axfs unittest BASELINE。
+
 ## 后续记录模板
 
 每个里程碑追加：commit SHA、逐条命令/exit/classification、changed files、已知失败、unsafe block 增减/移动、Cargo.lock diff 原因、双架构证据和工作树状态。不得用一次默认 build 代替 uspace official-feature build。

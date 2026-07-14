@@ -95,10 +95,13 @@ M4 在 `orays-linux::syscall` 定义：
 
 - `SyscallNumber(u32)`
 - `SyscallArgs([usize; 6])`
-- `SyscallAvailability`（all/riscv64/loongarch64）
-- `SyscallMeta { number, name, argument_count, availability, alias_of }`
+- `SyscallArchitecture`（riscv64/aarch64/loongarch64/other）
+- `SyscallAvailability`（all/only/except）
+- `SyscallMeta { number, name, argument_count, availability, handler, alias_of, audit_id }`
 
-模型允许同号 alias，但 guard 必须区分“声明 alias”与“意外重复”。shell 只为架构敏感的 clone、poll、legacy get/setrlimit 建立边界 metadata，并由静态 guard 与现有 dispatcher 源码互相核对。PR1 不把 match 生成自 metadata、不移动 handler identity、不改 routing/accounting/watchdog/restart 逻辑。
+模型允许同号 alias，但 guard 必须区分“同一 handler 的显式 alias”与“意外重复”。shell 为 clone、共享 `sys_fsync` 的 fsync/fdatasync、poll 架构排除，以及 RISC-V64/LoongArch64 的 get/setrlimit 建立小型 audit table；`handler` 只是稳定字符串标识，不能调用函数。`audit_id` 把必须人工关注的参数顺序、cfg、legacy number 或共享 handler 关系显式命名。
+
+metadata table 使用 `#[used] static` 表达“即使当前无 runtime consumer 也有意保留的审计声明”。这不是 warning `allow`；双架构构建证明它不会新增 dead-code warning。静态 guard 将声明和现有 dispatcher 源码互相核对。PR1 不把 match 生成自 metadata、不移动 handler identity、不改 routing/accounting/watchdog/restart 逻辑。
 
 ## D-008：unsafe 与 UserPod
 
@@ -133,3 +136,14 @@ adapter 的 raw read/write primitive 是模块私有函数，避免 typed facade
 shell 模块，未新增、删除或移入通用 crate。M4 static guard 将固化 M3 caller inventory、raw
 primitive 的模块私有性和 unsafe 边界；在此之前，D-006 与本决策即为禁止新增 legacy caller
 的 review policy。
+
+## D-011：PR1 静态 guard 的冻结范围
+
+`scripts/check_pr1_linux_boundary.py` 是源代码审计门，不是运行时实现。它冻结：
+
+- manifest 的单向依赖，以及两个边界 crate 的 `no_std`/`forbid(unsafe_code)`；
+- M1 的 syscall 关键号与 time ABI size/alignment/offset assertion；
+- M3 legacy helper 的 occurrences/files inventory、raw primitive 私有性和 5 个 unsafe fingerprint；
+- M4 metadata 字段、target table、alias/重复号规则，以及 dispatcher 的 clone 参数顺序、poll cfg、fsync/fdatasync handler 和 rlimit 号/handler。
+
+guard 有 14 个临时树 mutation test；测试只改复制到 `/tmp` 的树。它有意采用精确 token/inventory，因此后续合法迁移必须同时更新实现、guard、测试和决策记录，不能通过放宽检查静默扩大边界。它不证明 syscall 运行语义，也不把 static PASS 表述成 QEMU/runtime PASS。

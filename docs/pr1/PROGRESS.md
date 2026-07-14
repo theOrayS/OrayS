@@ -16,8 +16,8 @@
 | M0 | complete | 固化分析、决策、基线和白名单 | `1b3dc605 docs(pr1): record analysis and baseline` |
 | M1 | complete | 抽取纯 ABI crate，保留 shell facade | `940438f7 refactor(linux): extract pure ABI crate` |
 | M2 | complete | 建立通用 typed user-memory 边界和 shell adapter | `7357d56c refactor(linux): add typed user memory boundary` |
-| M3 | complete | 让既有 user-copy facade 经过 typed adapter | `refactor(linux): route user copy through backend adapter`（本里程碑提交） |
-| M4 | pending | 增加最小 syscall metadata 和静态 guard | `refactor(linux): add syscall boundary metadata` |
+| M3 | complete | 让既有 user-copy facade 经过 typed adapter | `f7d0a5a5 refactor(linux): route user copy through backend adapter` |
+| M4 | complete | 增加最小 syscall metadata 和静态 guard | `refactor(linux): add syscall boundary metadata`（本里程碑提交） |
 | M5 | pending | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`；修复另建提交 |
 
 ## 每个里程碑的文件白名单
@@ -130,6 +130,14 @@ M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行
 - 测试边界：`orays-linux` 的 5 个 host 测试覆盖整数 overflow、null 不由类型层擅自拒绝、零长度、typed slice 和 marker/backend contract。仓库没有可独立构造的 shell `UserProcess`/`AddrSpace` fixture；跨页、只读映射写和 partial-copy 不能在不伪造 backend 语义的情况下新增真实 host regression test，因此保留原实现并用双架构真实 shell build 验证编译路径，原因记录在分析与验证文档。
 - 验证：RISC-V64/LoongArch64 official-feature shell build、RISC-V64 workspace clippy、new-crate 三目标 `-D warnings`、existing guards、workspace excluding axfs tests 均通过。全局 fmt、LA workspace clippy 与 axfs FAT unittest 分别保持 BASELINE/ENVIRONMENT/BASELINE；无未解决 PR1 regression。
 - 完整性：Cargo graph 和 M2 lock hash `0f7b1d31…` 不变；host test 的 `ctypes_gen.rs` 生成副作用已精确恢复；两份未跟踪用户输入 hash 不变。
+
+## M4 checkpoint
+
+- 成功条件：`orays-linux` 提供不执行 handler 的最小 syscall identity/metadata 类型；shell metadata 只描述既有架构敏感路由和明确 alias；dispatcher 源码、syscall 号、参数顺序与 handler 保持不变；新 guard 能拒绝依赖反转、ABI number/layout 漂移、legacy user-copy 调用面增长、unsafe 扩散及 metadata/dispatcher 不一致。
+- 实际结果：满足上述条件。新增 4 个 `orays-linux` 单测后共 9 个通过；PR1 guard 当前树 0 findings，14 个 mutation test 全部通过。metadata 覆盖 clone、共享 `sys_fsync` handler 的 fsync/fdatasync、非三主架构 poll cfg、RISC-V64 通用 rlimit 号和 LoongArch64 legacy 163/164；它不参与执行或生成 match。
+- warning 处置：最初的私有 metadata const table 在首轮 RISC-V64 shell build 中新增 6 个 `dead_code` warning。未添加 `allow`；改为明确的 `#[used] static` audit table 后，RISC-V64 与 LoongArch64 build 都保持原有 12 个 shell warning，无新增 metadata warning。
+- 验证：双架构 official-feature shell build、新 crate host/RISC-V64/LoongArch64 `-D warnings` clippy、RISC-V64 workspace clippy、existing guards、PR1 guard/tests 和排除 axfs 的 workspace tests 通过。全局 fmt、LA workspace clippy 与 axfs FAT unittest 分别保持 BASELINE/ENVIRONMENT/BASELINE；无未解决 M4 regression。
+- 完整性：`syscall_dispatch.rs`、Cargo manifests、`Cargo.lock` 和 5 个既有 user-memory unsafe 均为零 diff；host test 的 `ctypes_gen.rs` 生成副作用已精确恢复；两份未跟踪用户输入 hash 不变。
 
 ## Stop 条件映射
 

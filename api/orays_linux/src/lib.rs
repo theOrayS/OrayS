@@ -9,4 +9,5 @@
 pub use orays_linux_abi as abi;
 
 pub mod backend;
+pub mod syscall;
 pub mod user;

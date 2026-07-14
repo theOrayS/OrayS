@@ -116,6 +116,28 @@ backend 结果冒充 shell 行为证明：整数 null/overflow/type marker 由 `
 adapter 路径由 RISC-V64/LoongArch64 official-feature shell build 覆盖；fault/brk/cross-page 原函数
 body 和 5 个 unsafe 表达式保持原位。运行时映射语义测试留作需要可构造地址空间 fixture 的审计后续。
 
+## M4 syscall metadata 与静态边界状态
+
+`orays-linux::syscall` 现提供纯描述类型：`SyscallNumber(u32)`、六寄存器 `SyscallArgs`、
+`SyscallArchitecture`、`SyscallAvailability` 与 `SyscallMeta`。字段不包含函数指针、backend、
+`UserProcess` 或 errno；handler 仅是供审计比对的字符串，因而不能执行或改变路由。
+
+shell 的 `syscall_metadata.rs` 刻意只登记最小 hotspot，而不是复制 231-entry dispatcher：
+
+| metadata | target/cfg | 现有 dispatcher 事实 |
+|---|---|---|
+| clone | all；guard 分别看 RV/LA | number 220；LoongArch64 交换 arg3/arg4 |
+| fsync/fdatasync | all | number 82/83；都调用 `sys_fsync`，后者显式 alias 前者 |
+| poll | 非 riscv64/aarch64/loongarch64 | 与现有排除 cfg 完全相同 |
+| get/setrlimit | riscv64 | 通用 number 163/164 |
+| get/setrlimit | loongarch64 | legacy constant 163/164 |
+
+`syscall_dispatch.rs` 在 M4 为零 diff，仍是唯一可执行来源；metadata 不生成 match。PR1 静态 guard
+同时核对上述 route、M1 ABI number/layout、M3 caller inventory/raw visibility/unsafe fingerprint 和
+crate 依赖方向。14 个 mutation test 证明检查会拒绝反向依赖、boundary unsafe、legacy caller 增长、
+raw visibility/unsafe 扩散、metadata handler/table/alias 漂移、LoongArch clone/rlimit 漂移，以及 ABI
+number/layout assertion 删除。static guard 只能证明源码边界，没有把它冒充 runtime syscall 证明。
+
 ## unsafe 边界与 UserPod 风险
 
 基线扫描约有 501 个 `unsafe` block（第一方约 379、shell uspace 68、`user_memory.rs` 5）。PR1 不以总量清理为目标，也不移动现有 unsafe 出 shell。
