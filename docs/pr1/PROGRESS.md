@@ -15,8 +15,8 @@
 |---|---|---|---|
 | M0 | complete | 固化分析、决策、基线和白名单 | `1b3dc605 docs(pr1): record analysis and baseline` |
 | M1 | complete | 抽取纯 ABI crate，保留 shell facade | `940438f7 refactor(linux): extract pure ABI crate` |
-| M2 | complete | 建立通用 typed user-memory 边界和 shell adapter | `refactor(linux): add typed user memory boundary`（本里程碑提交） |
-| M3 | pending | 让既有 user-copy facade 经过 typed adapter | `refactor(linux): route user copy through backend adapter` |
+| M2 | complete | 建立通用 typed user-memory 边界和 shell adapter | `7357d56c refactor(linux): add typed user memory boundary` |
+| M3 | complete | 让既有 user-copy facade 经过 typed adapter | `refactor(linux): route user copy through backend adapter`（本里程碑提交） |
 | M4 | pending | 增加最小 syscall metadata 和静态 guard | `refactor(linux): add syscall boundary metadata` |
 | M5 | pending | 完整验证、独立审查、必要的后续修复与收口 | `docs(pr1): record final validation`；修复另建提交 |
 
@@ -121,6 +121,15 @@ M2 起同时运行 `cargo test --locked --offline -p orays-linux`；M4 起运行
 - 行为边界：typed constructor 只验证整数算术；非零 null、映射权限、fault-in、brk、partial-copy 与 LinuxError 仍完全由 shell 原实现负责。M2 adapter 尚未被 syscall 路径构造，因而不会改变返回值或 fault 行为。
 - 已处理回归：为抑制临时 dead-code warning 加入的高阶 constructor 类型证明在 LA build 触发 `E0308`；立即删除该脆弱证明，保留诚实的单个过渡期 `ProcessUserMemory is never constructed` warning。M3 实际接入 adapter 后该 warning 应自然消失，不添加 `allow`。
 - 用户输入完整性：两份未跟踪输入 hash 仍与任务起点一致。
+
+## M3 checkpoint
+
+- 成功条件：raw `usize` 到 checked typed range 的转换集中在一个入口；旧 validate/fault/read/write facade 名称、签名和 caller 不变但实际经过 shell adapter；fault-in、brk、mapping permission、跨页、perf 计数和 `EFAULT`/`ENOMEM` 顺序保持；5 个既有 unsafe 不增删、不移动；双架构 official-feature build 通过；remaining legacy callers 有精确 inventory。
+- 实际结果：满足上述条件。M3 只修改 `user_memory.rs` 和四份 PR1 文档；adapter 已真实构造，M2 的 transitional dead-code warning 自然消失。`read_user_bytes` 保持 validate → allocation → raw read 顺序；其他 byte facade 构造与 slice 等长的 `UserRange<Read/Write>` 后委托 adapter。handler、dispatcher、UserProcess、Cargo manifests 和 `Cargo.lock` 均未修改。
+- caller/unsafe：`read_user_value<T: Copy>` 为 92 occurrences/17 files，`write_user_value<T: Copy>` 为 118/18，`read_cstr` 为 46/6；其余 facade 的完整计数见 `ANALYSIS_SUMMARY.md`。`user_memory.rs` 仍为 5 个 unsafe，diff 未触及其表达式或所属函数。M4 guard 将机器固化这些边界；M3 起 review policy 禁止增加调用点。
+- 测试边界：`orays-linux` 的 5 个 host 测试覆盖整数 overflow、null 不由类型层擅自拒绝、零长度、typed slice 和 marker/backend contract。仓库没有可独立构造的 shell `UserProcess`/`AddrSpace` fixture；跨页、只读映射写和 partial-copy 不能在不伪造 backend 语义的情况下新增真实 host regression test，因此保留原实现并用双架构真实 shell build 验证编译路径，原因记录在分析与验证文档。
+- 验证：RISC-V64/LoongArch64 official-feature shell build、RISC-V64 workspace clippy、new-crate 三目标 `-D warnings`、existing guards、workspace excluding axfs tests 均通过。全局 fmt、LA workspace clippy 与 axfs FAT unittest 分别保持 BASELINE/ENVIRONMENT/BASELINE；无未解决 PR1 regression。
+- 完整性：Cargo graph 和 M2 lock hash `0f7b1d31…` 不变；host test 的 `ctypes_gen.rs` 生成副作用已精确恢复；两份未跟踪用户输入 hash 不变。
 
 ## Stop 条件映射
 

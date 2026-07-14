@@ -6,9 +6,9 @@
 
 PR1 只建立架构边界，不改变 syscall 返回值、errno、阻塞、信号、进程、FD、VM、IPC 或调度语义；`UserProcess`、现有 handler 和 dispatcher 的控制流继续由 `arceos-shell` 所有。不得借抽取修复既有语义问题，也不得新增外部依赖或 unsafe。
 
-## 当前依赖图
+## 基线与当前依赖图
 
-当前 Linux 兼容实现没有独立边界，依赖从 `arceos-shell::uspace` 直接扇出：
+任务起点的 Linux 兼容实现没有独立边界，依赖从 `arceos-shell::uspace` 直接扇出：
 
 ```text
 arceos-shell (feature = uspace)
@@ -26,7 +26,7 @@ arceos-shell (feature = uspace)
 
 `uspace` feature 同时开启 `axtask/uspace`、`axstd/fp-simd` 和所有上述可选依赖；`auto-run-tests` 另行开启 `axtask/sched-rr`。因此裸 `APP_FEATURES=uspace` 不是当前完整用户态构建配置，正式双架构构建必须同时使用 `FEATURES=alloc,paging,irq,multitask,fs,net,rtc` 与 `APP_FEATURES=auto-run-tests,uspace`。
 
-目标依赖图为：
+M2 已把目标依赖图落实为当前 Cargo graph：
 
 ```text
 arceos-shell
@@ -84,6 +84,37 @@ M1 的 allowlist 是纯数字/字符串常量以及 `Tms`、`RtcTime`。ABI crat
 - `read_user_value`、`write_user_value`、`read_user_bytes`、`write_user_bytes`、`read_cstr` 被大量 handler 使用。M3 只让现有 facade 的实现经过 typed adapter，不批量改 handler 签名。
 - dispatcher 当前匹配 231 个 `general::__NR_*` 名称；LoongArch64 另有 163/164 legacy rlimit，并在 clone 路由交换第三、第四参数。上述控制流不可由 metadata 替换。
 - `runtime_compat` 的 13 个 build.rs 生成 `SYS_*` 常量是独立路径，不纳入本 PR。
+
+## M3 user-copy 桥接状态
+
+M3 没有修改任何 handler 或旧 facade 签名。所有从 raw `usize` 进入新边界的转换集中在
+`user_memory.rs::typed_user_range`；`validate_user_read/write`、`fault_in_user_read/write`、
+`read_user_bytes`、`read_user_bytes_into` 和 `write_user_bytes` 由 shell 私有
+`ProcessUserMemory` adapter 接受 typed `UserRange<Read/Write>`，adapter 再调用保留原语义的
+raw primitive。`read_user_bytes` 特意维持“先 fault/权限检查、再尝试分配、最后读取”的顺序，
+因此没有交换 `EFAULT` 与 `ENOMEM` 的优先级。
+
+remaining legacy caller inventory（`rg -w`，计数包含 helper 定义和 import）如下；M4 guard
+将把这些计数、raw primitive 可见范围和 5 个既有 unsafe 表达式固化，禁止调用面意外增长：
+
+| helper | occurrences | files | PR1 处置 |
+|---|---:|---:|---|
+| `validate_user_read` | 20 | 6 | facade 保留，内部 typed bridge |
+| `validate_user_write` | 48 | 10 | facade 保留，内部 typed bridge |
+| `fault_in_user_read` | 5 | 2 | facade 保留，委托 typed validate |
+| `fault_in_user_write` | 3 | 1 | facade 保留，委托 typed validate |
+| `read_user_bytes_into` | 10 | 3 | facade 保留，内部 typed bridge |
+| `read_user_bytes` | 34 | 11 | facade 保留，内部 typed bridge |
+| `write_user_bytes` | 46 | 12 | facade 保留，内部 typed bridge |
+| `read_user_value<T: Copy>` | 92 | 17 | legacy high-risk primitive，PR1 不泛化 |
+| `write_user_value<T: Copy>` | 118 | 18 | legacy high-risk primitive，PR1 不泛化 |
+| `read_cstr` | 46 | 6 | chunk/fault/brk 语义继续留在 shell |
+
+现有测试基础设施没有可独立构造的 `UserProcess`/`AddrSpace` fixture，因而不能在不复制或伪造
+backend 语义的前提下为跨页、只读映射写和 partial-copy 增加真实 host 单测。PR1 不用 fake
+backend 结果冒充 shell 行为证明：整数 null/overflow/type marker 由 `orays-linux` 单测覆盖，真实
+adapter 路径由 RISC-V64/LoongArch64 official-feature shell build 覆盖；fault/brk/cross-page 原函数
+body 和 5 个 unsafe 表达式保持原位。运行时映射语义测试留作需要可构造地址空间 fixture 的审计后续。
 
 ## unsafe 边界与 UserPod 风险
 

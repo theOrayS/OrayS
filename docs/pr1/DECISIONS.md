@@ -114,3 +114,22 @@ PR1 不新增 unsafe block。新通用类型不解引用 raw pointer；byte back
 - LoongArch64 clippy 的 host libclang triple 错误记为 ENVIRONMENT；仍要求 LoongArch64 official-feature shell build 通过。
 - 本机实际安装的裸机目标名是 `loongarch64-unknown-none-softfloat`；直接 crate check/clippy 使用该 target。Makefile 的 `ARCH=loongarch64` 路径仍按仓库配置运行。
 - 每步必须运行现有 G006/G009/G012/G013 guard、双架构 official-feature build、`git diff --check`；M5 再跑完整矩阵。
+
+## D-010：M3 raw/typed 桥接与错误顺序
+
+M3 只在 `user_memory.rs` 内切换旧 facade 的实现，不改调用者。唯一的 raw address constructor
+是 `typed_user_range<A>`；它只把 `start + len` 溢出映射为既有 `LinuxError::EFAULT`，null、
+mapping permission、brk、grow-down、lazy population 和 page fault 仍由 shell raw backend 判定。
+零长度 facade 继续在原位置提前成功，允许任意整数地址。
+
+adapter 的 raw read/write primitive 是模块私有函数，避免 typed facade 和 trait 实现互相递归。
+`read_user_bytes` 不直接调用会再次 fault-in 的 `read_bytes`：它先通过 adapter validate，随后按
+原顺序分配，再调用已经验证的 raw read。这保留原有 `EFAULT` 先于 `ENOMEM` 的可观察顺序，
+也避免重复 fault/perf 计数。`read_user_bytes_into` 和 `write_user_bytes` 则构造与 slice 精确等长
+的 range 后调用 adapter；因此 trait 的 defensive `EINVAL` 长度不匹配分支仍不可从旧 syscall
+路径到达。
+
+`fault_in_user_range`、`read_cstr`、generic value copy 和所有 5 个 unsafe 表达式继续位于原
+shell 模块，未新增、删除或移入通用 crate。M4 static guard 将固化 M3 caller inventory、raw
+primitive 的模块私有性和 unsafe 边界；在此之前，D-006 与本决策即为禁止新增 legacy caller
+的 review policy。
