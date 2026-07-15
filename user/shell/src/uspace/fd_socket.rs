@@ -1,6 +1,6 @@
 use core::cmp;
 use core::ffi::c_void;
-use core::mem::size_of;
+use core::mem::{align_of, offset_of, size_of};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
 
@@ -17,7 +17,7 @@ use std::vec::Vec;
 use super::fd_pipe::PipeEndpoint;
 use super::fd_table::{FdEntry, resolve_dirfd_path};
 use super::linux_abi::{
-    AF_UNIX_DOMAIN, INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IP_MCAST_JOIN_GROUP_OPT,
+    AF_UNIX_DOMAIN, INTERRUPTIBLE_SOCKET_RECV_QUANTUM, IOV_MAX, IP_MCAST_JOIN_GROUP_OPT,
     IP_MCAST_LEAVE_GROUP_OPT, IPPROTO_IP_LEVEL, LINUX_EAFNOSUPPORT, LINUX_ENOPROTOOPT,
     LINUX_EOPNOTSUPP, LINUX_EPROTONOSUPPORT, LINUX_ESOCKTNOSUPPORT, LOCAL_SOCKET_INO_BASE,
     SO_ACCEPTCONN_OPT, SO_DOMAIN_OPT, SO_ERROR_OPT, SO_PEERCRED_OPT, SO_PROTOCOL_OPT,
@@ -70,7 +70,9 @@ const LOCAL_SOCKET_MAX_BUFFER_SIZE: usize = 64 * 1024;
 const LOCAL_SOCKET_BLOCK_QUANTUM: Duration = Duration::from_millis(1);
 const SOCKET_ADDR_STORAGE_MAX: usize = 128;
 const SOCKET_OPTLEN_MAX: usize = TCP_INFO_COMPAT_SIZE;
+const MSG_OOB_FLAG: i32 = 0x1;
 const MSG_ERRQUEUE_FLAG: i32 = 0x2000;
+const MSG_NOSIGNAL_FLAG: i32 = 0x4000;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum LocalSocketBufferStatus {
@@ -130,6 +132,34 @@ struct LinuxMsghdr {
     msg_control: *mut c_void,
     msg_controllen: usize,
     msg_flags: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct LinuxMmsghdr {
+    msg_hdr: LinuxMsghdr,
+    msg_len: u32,
+}
+
+const _: () = {
+    assert!(size_of::<LinuxMsghdr>() == 56);
+    assert!(align_of::<LinuxMsghdr>() == 8);
+    assert!(offset_of!(LinuxMsghdr, msg_name) == 0);
+    assert!(offset_of!(LinuxMsghdr, msg_namelen) == 8);
+    assert!(offset_of!(LinuxMsghdr, msg_iov) == 16);
+    assert!(offset_of!(LinuxMsghdr, msg_iovlen) == 24);
+    assert!(offset_of!(LinuxMsghdr, msg_control) == 32);
+    assert!(offset_of!(LinuxMsghdr, msg_controllen) == 40);
+    assert!(offset_of!(LinuxMsghdr, msg_flags) == 48);
+    assert!(size_of::<LinuxMmsghdr>() == 64);
+    assert!(align_of::<LinuxMmsghdr>() == 8);
+    assert!(offset_of!(LinuxMmsghdr, msg_hdr) == 0);
+    assert!(offset_of!(LinuxMmsghdr, msg_len) == 56);
+};
+
+enum SendSocketEntry {
+    Inet(SocketEntry),
+    Local(LocalSocketEntry),
 }
 
 #[repr(C)]
@@ -967,6 +997,16 @@ pub(super) fn insert_local_socket_pair_entries(
 pub(super) fn is_local_socket_fd(process: &UserProcess, fd: usize) -> Result<bool, LinuxError> {
     let table = process.fds.lock();
     Ok(matches!(table.entry(fd as i32)?, FdEntry::LocalSocket(_)))
+}
+
+fn send_socket_entry(process: &UserProcess, fd: usize) -> Result<SendSocketEntry, LinuxError> {
+    let table = process.fds.lock();
+    match table.entry(fd as i32)? {
+        FdEntry::Socket(socket) => Ok(SendSocketEntry::Inet(socket.clone())),
+        FdEntry::LocalSocket(socket) => Ok(SendSocketEntry::Local(socket.duplicate())),
+        FdEntry::Path(_) => Err(LinuxError::EBADF),
+        _ => Err(LinuxError::ENOTSOCK),
+    }
 }
 
 pub(super) fn socket_addr_call<F>(
@@ -2001,68 +2041,148 @@ pub(super) fn sys_sendmsg_bridge(
         Ok(msg) => msg,
         Err(err) => return neg_errno(err),
     };
-    if msg.msg_iovlen > 1024 {
-        return neg_errno(LinuxError::EMSGSIZE);
-    }
-    let iov_entries = match read_iovec_entries(process, msg.msg_iov as usize, msg.msg_iovlen) {
-        Ok(entries) => entries,
+    let socket = match send_socket_entry(process, fd) {
+        Ok(socket) => socket,
         Err(err) => return neg_errno(err),
     };
+    match send_one_message(process, &socket, &msg, flags as i32) {
+        Ok(n) => n as isize,
+        Err(err) => neg_errno(err),
+    }
+}
+
+fn send_one_message(
+    process: &UserProcess,
+    socket: &SendSocketEntry,
+    msg: &LinuxMsghdr,
+    flags: i32,
+) -> Result<usize, LinuxError> {
+    if msg.msg_iovlen > IOV_MAX {
+        return Err(LinuxError::EMSGSIZE);
+    }
+    let iov_entries = read_iovec_entries(process, msg.msg_iov as usize, msg.msg_iovlen)?;
     let mut bytes = Vec::new();
     for entry in iov_entries {
         let base = entry.iov_base as usize;
         let len = (entry.iov_len as usize).min(MAX_USER_IO_CHUNK);
-        if let Err(err) = validate_user_read(process, base, len) {
-            return neg_errno(err);
-        }
+        validate_user_read(process, base, len)?;
         if len == 0 {
             continue;
         }
         let start = bytes.len();
-        if bytes.try_reserve_exact(len).is_err() {
-            return neg_errno(LinuxError::ENOMEM);
-        }
+        bytes
+            .try_reserve_exact(len)
+            .map_err(|_| LinuxError::ENOMEM)?;
         bytes.resize(start + len, 0);
-        if let Err(err) = read_user_bytes_into(process, base, &mut bytes[start..start + len]) {
-            return neg_errno(err);
+        read_user_bytes_into(process, base, &mut bytes[start..start + len])?;
+    }
+
+    match socket {
+        SendSocketEntry::Local(socket) => {
+            validate_local_send_flags(flags)?;
+            socket.write(process, &bytes)
+        }
+        SendSocketEntry::Inet(socket) if msg.msg_name.is_null() => {
+            // SAFETY: `bytes` is an owned buffer readable for exactly `bytes.len()` bytes.
+            posix_ret_usize(unsafe {
+                arceos_posix_api::sys_send(
+                    socket.posix_fd,
+                    bytes.as_ptr() as *const c_void,
+                    bytes.len(),
+                    flags,
+                )
+            })
+        }
+        SendSocketEntry::Inet(socket) => {
+            let addrlen = msg.msg_namelen as usize;
+            let addr_bytes = read_socket_addr_from_user(process, msg.msg_name as usize, addrlen)?;
+            // SAFETY: `bytes` and `addr_bytes` are owned buffers readable for the lengths
+            // passed to the backend, and the sockaddr copy was validated during copy-in.
+            posix_ret_usize(unsafe {
+                arceos_posix_api::sys_sendto(
+                    socket.posix_fd,
+                    bytes.as_ptr() as *const c_void,
+                    bytes.len(),
+                    flags,
+                    addr_bytes.as_ptr() as *const posix_ctypes::sockaddr,
+                    addrlen as posix_ctypes::socklen_t,
+                )
+            })
         }
     }
-    if matches!(is_local_socket_fd(process, fd), Ok(true)) {
-        return match process.fds.lock().write(process, fd as i32, &bytes, None) {
-            Ok(n) => n as isize,
-            Err(err) => neg_errno(err),
-        };
-    }
-    let socket = socket_entry_or_return!(process, fd);
-    let ret = if msg.msg_name.is_null() {
-        unsafe {
-            arceos_posix_api::sys_send(
-                socket.posix_fd,
-                bytes.as_ptr() as *const c_void,
-                bytes.len(),
-                flags as i32,
-            )
-        }
+}
+
+fn validate_local_send_flags(flags: i32) -> Result<(), LinuxError> {
+    if flags & !(MSG_OOB_FLAG | MSG_NOSIGNAL_FLAG) != 0 || flags & MSG_OOB_FLAG != 0 {
+        Err(LinuxError::EOPNOTSUPP)
     } else {
-        let addrlen = msg.msg_namelen as usize;
-        let addr_bytes = match read_socket_addr_from_user(process, msg.msg_name as usize, addrlen) {
-            Ok(bytes) => bytes,
-            Err(err) => return neg_errno(err),
-        };
-        unsafe {
-            arceos_posix_api::sys_sendto(
-                socket.posix_fd,
-                bytes.as_ptr() as *const c_void,
-                bytes.len(),
-                flags as i32,
-                addr_bytes.as_ptr() as *const posix_ctypes::sockaddr,
-                addrlen as posix_ctypes::socklen_t,
-            )
-        }
+        Ok(())
+    }
+}
+
+pub(super) fn sys_sendmmsg_bridge(
+    process: &UserProcess,
+    fd: usize,
+    msgvec: usize,
+    vlen: usize,
+    flags: usize,
+) -> isize {
+    let socket = match send_socket_entry(process, fd) {
+        Ok(socket) => socket,
+        Err(err) => return neg_errno(err),
     };
-    match posix_ret_usize(ret) {
-        Ok(n) => n as isize,
-        Err(err) => neg_errno(err),
+    // Linux accepts an unsigned-int vlen and silently caps it to UIO_MAXIOV.
+    let vlen = (vlen as u32 as usize).min(IOV_MAX);
+    if vlen == 0 {
+        return 0;
+    }
+    let array_len = match vlen.checked_mul(size_of::<LinuxMmsghdr>()) {
+        Some(len) => len,
+        None => return neg_errno(LinuxError::EINVAL),
+    };
+    if msgvec.checked_add(array_len).is_none() {
+        return neg_errno(LinuxError::EFAULT);
+    }
+
+    let mut completed = 0usize;
+    for index in 0..vlen {
+        let offset = match index.checked_mul(size_of::<LinuxMmsghdr>()) {
+            Some(offset) => offset,
+            None => return sendmmsg_partial_result(completed, LinuxError::EINVAL),
+        };
+        let msg_addr = match msgvec.checked_add(offset) {
+            Some(addr) => addr,
+            None => return sendmmsg_partial_result(completed, LinuxError::EFAULT),
+        };
+        let msg = match read_user_value::<LinuxMmsghdr>(process, msg_addr) {
+            Ok(msg) => msg,
+            Err(err) => return sendmmsg_partial_result(completed, err),
+        };
+        let sent = match send_one_message(process, &socket, &msg.msg_hdr, flags as i32) {
+            Ok(sent) => sent,
+            Err(err) => return sendmmsg_partial_result(completed, err),
+        };
+        let msg_len = match u32::try_from(sent) {
+            Ok(msg_len) => msg_len,
+            Err(_) => return sendmmsg_partial_result(completed, LinuxError::EINVAL),
+        };
+        let msg_len_addr = match msg_addr.checked_add(offset_of!(LinuxMmsghdr, msg_len)) {
+            Some(addr) => addr,
+            None => return sendmmsg_partial_result(completed, LinuxError::EFAULT),
+        };
+        if let Err(err) = write_user_bytes(process, msg_len_addr, &msg_len.to_ne_bytes()) {
+            return sendmmsg_partial_result(completed, err);
+        }
+        completed += 1;
+    }
+    completed as isize
+}
+
+fn sendmmsg_partial_result(completed: usize, err: LinuxError) -> isize {
+    if completed == 0 {
+        neg_errno(err)
+    } else {
+        completed as isize
     }
 }
 
