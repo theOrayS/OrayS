@@ -405,6 +405,7 @@ OFFICIAL_BLACKLIST_ENVIRONMENT = (
     "LTP_BLACKLIST_LOONGARCH64",
 )
 OFFICIAL_CALLER_ENVIRONMENT = (
+    "ORAYS_WORKSPACE_ROOT",
     "TESTSUITE_DIR",
     "RV_TESTSUITE_IMG",
     "LA_TESTSUITE_IMG",
@@ -424,7 +425,7 @@ CANONICAL_OFFICIAL_EXECUTION = {
                 "environment": "RV_TESTSUITE_IMG",
                 "directory_environment": "TESTSUITE_DIR",
                 "basename": "sdcard-rv.img",
-                "fallback": "{repo}/../testsuits-for-oskernel/sdcard-rv.img",
+                "fallback": "{repo}/../sdcard-rv.img",
             }
         ],
         "infrastructure_exit_codes": [125],
@@ -441,7 +442,7 @@ CANONICAL_OFFICIAL_EXECUTION = {
                 "environment": "LA_TESTSUITE_IMG",
                 "directory_environment": "TESTSUITE_DIR",
                 "basename": "sdcard-la.img",
-                "fallback": "{repo}/../testsuits-for-oskernel/sdcard-la.img",
+                "fallback": "{repo}/../sdcard-la.img",
             }
         ],
         "infrastructure_exit_codes": [125],
@@ -2727,6 +2728,8 @@ def child_environment(
         for name in OFFICIAL_CALLER_ENVIRONMENT:
             if name in os.environ:
                 environment[name] = os.environ[name]
+        if "TESTSUITE_DIR" not in environment and environment.get("ORAYS_WORKSPACE_ROOT"):
+            environment["TESTSUITE_DIR"] = environment["ORAYS_WORKSPACE_ROOT"]
     return environment, None
 
 

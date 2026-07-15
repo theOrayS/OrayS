@@ -184,10 +184,11 @@ reserves `checks`, `unit`, `quick`, and `baseline`: an alternate manifest may
 use only non-reserved fixture profile names. `--manifest` remains available for
 integrity tests, but its output cannot masquerade as a canonical profile verdict.
 
-Alternatively, set `TESTSUITE_DIR` to a directory containing
-`sdcard-rv.img` and `sdcard-la.img`. If neither override is present, the runner
-checks the repository sibling `../testsuits-for-oskernel/`. Image absence is an
-infrastructure error and no download is attempted.
+Alternatively, set `ORAYS_WORKSPACE_ROOT` or `TESTSUITE_DIR` to a directory
+containing `sdcard-rv.img` and `sdcard-la.img`. If no override is present, the
+runner checks the repository parent directory. The architecture-specific image
+variables have highest priority. Image absence is an infrastructure error and no
+download is attempted.
 
 The low-level Makefile does not quote every image/overlay expansion. To prevent
 paths from becoming Make or shell syntax, the official adapter accepts only

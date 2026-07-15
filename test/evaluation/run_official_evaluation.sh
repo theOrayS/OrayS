@@ -13,7 +13,8 @@ absolute_path() {
     esac
 }
 
-TESTSUITE_DIR="$(absolute_path "${TESTSUITE_DIR:-$REPO_ROOT/../testsuits-for-oskernel}")"
+ORAYS_WORKSPACE_ROOT="$(absolute_path "${ORAYS_WORKSPACE_ROOT:-$REPO_ROOT/..}")"
+TESTSUITE_DIR="$(absolute_path "${TESTSUITE_DIR:-$ORAYS_WORKSPACE_ROOT}")"
 RV_IMG="$(absolute_path "${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}")"
 LA_IMG="$(absolute_path "${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}")"
 OUTPUT_DIR="$(absolute_path "${ORAYS_TEST_OUTPUT_DIR:-$REPO_ROOT/test/output/official}")"
@@ -66,7 +67,7 @@ reject_make_expansion_value() {
 usage() {
     printf 'Usage: %s [rv|la]\n' "$0" >&2
     printf 'Image overrides: RV_TESTSUITE_IMG=/path/sdcard-rv.img or LA_TESTSUITE_IMG=/path/sdcard-la.img\n' >&2
-    printf 'Shared image directory: TESTSUITE_DIR=/path/to/testsuits-for-oskernel\n' >&2
+    printf 'Workspace/image directory overrides: ORAYS_WORKSPACE_ROOT=/path or TESTSUITE_DIR=/path\n' >&2
     printf 'Output directory: ORAYS_TEST_OUTPUT_DIR=/path/to/output\n' >&2
     printf 'Optional blacklist files: LTP_BLACKLIST_FILE/LTP_BLACKLIST_COMMON_FILE plus the architecture-specific file\n' >&2
 }

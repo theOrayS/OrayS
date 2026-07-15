@@ -1357,6 +1357,18 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertIn("canonical ordered 24-group official plan", result.stderr)
 
     def test_canonical_official_execution_and_preflight_fields_are_locked(self) -> None:
+        canonical_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        for case_id, expected_fallback in (
+            ("official.riscv64", "{repo}/../sdcard-rv.img"),
+            ("official.loongarch64", "{repo}/../sdcard-la.img"),
+        ):
+            case = next(
+                case for case in canonical_manifest["cases"] if case["id"] == case_id
+            )
+            self.assertEqual(case["required_files"][0]["fallback"], expected_fallback)
+
         mutations = (
             ("timeout_seconds", 1),
             ("required_paths", []),
@@ -2366,6 +2378,30 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertIn("remote_ltp=\n", stdout)
         self.assertIn("ambient=\n", stdout)
         self.assertIn("shell_functions=\n", stdout)
+
+        workspace_override = str(self.work / "official-workspace")
+        previous_workspace = os.environ.get("ORAYS_WORKSPACE_ROOT")
+        previous_testsuite = os.environ.get("TESTSUITE_DIR")
+        try:
+            os.environ["ORAYS_WORKSPACE_ROOT"] = workspace_override
+            os.environ.pop("TESTSUITE_DIR", None)
+            official_environment, error = runner_implementation.child_environment(
+                canonical_official_case(), repo=ROOT, cwd=ROOT
+            )
+            self.assertIsNone(error)
+            self.assertEqual(
+                official_environment["ORAYS_WORKSPACE_ROOT"], workspace_override
+            )
+            self.assertEqual(official_environment["TESTSUITE_DIR"], workspace_override)
+        finally:
+            if previous_workspace is None:
+                os.environ.pop("ORAYS_WORKSPACE_ROOT", None)
+            else:
+                os.environ["ORAYS_WORKSPACE_ROOT"] = previous_workspace
+            if previous_testsuite is None:
+                os.environ.pop("TESTSUITE_DIR", None)
+            else:
+                os.environ["TESTSUITE_DIR"] = previous_testsuite
 
     def test_parent_python_optimize_cannot_disable_child_assertions(self) -> None:
         code = (

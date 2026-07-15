@@ -277,6 +277,47 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                     "untrusted MAKEFILES injection was loaded",
                 )
 
+        workspace = directory / "workspace"
+        copied_repo = workspace / "repo"
+        copied_executor = copied_repo / "test/evaluation/run_official_evaluation.sh"
+        copied_executor.parent.mkdir(parents=True)
+        shutil.copy2(ROOT / "test/evaluation/run_official_evaluation.sh", copied_executor)
+        for image_name in ("sdcard-rv.img", "sdcard-la.img"):
+            (workspace / image_name).write_bytes(b"parent-default-fixture")
+        default_environment = environment.copy()
+        for name in (
+            "ORAYS_WORKSPACE_ROOT",
+            "TESTSUITE_DIR",
+            "RV_TESTSUITE_IMG",
+            "LA_TESTSUITE_IMG",
+        ):
+            default_environment.pop(name, None)
+        default_environment["ORAYS_TEST_OUTPUT_DIR"] = str(directory / "parent-default-out")
+        for arch, image_variable in (
+            ("rv", "RV_TESTSUITE_IMG"),
+            ("la", "LA_TESTSUITE_IMG"),
+        ):
+            with self.subTest(parent_default_arch=arch):
+                result = subprocess.run(
+                    [str(copied_executor), arch],
+                    cwd=directory,
+                    env=default_environment,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                image_argument = next(
+                    value
+                    for value in args_log.read_text(encoding="utf-8").splitlines()
+                    if value.startswith(f"{image_variable}=")
+                )
+                self.assertEqual(
+                    Path(image_argument.split("=", 1)[1]).resolve(),
+                    workspace / f"sdcard-{arch}.img",
+                )
+
     def test_official_executor_reserves_125_for_preflight_infrastructure(self) -> None:
         directory, environment, args_log, _environment_log = self.fake_official_environment()
         (directory / "images/sdcard-rv.img").unlink()
@@ -909,6 +950,20 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("stable-plus-blacklist", result.stdout)
+
+        image_tree = self.make_tree()
+        image_makefile = image_tree / "Makefile"
+        image_makefile.write_text(
+            self.replace_once(
+                image_makefile.read_text(encoding="utf-8"),
+                "RV_TESTSUITE_IMG ?= $(ORAYS_WORKSPACE_ROOT)/sdcard-rv.img",
+                "RV_TESTSUITE_IMG ?= /tmp/fixed-rv.img",
+            ),
+            encoding="utf-8",
+        )
+        image_result = self.run_guard(image_tree)
+        self.assertNotEqual(image_result.returncode, 0)
+        self.assertIn("repository-parent workspace root", image_result.stdout)
 
     def test_detects_missing_promotion_mode_blocker(self) -> None:
         tree = self.make_tree()

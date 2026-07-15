@@ -677,7 +677,7 @@
           "environment": "RV_TESTSUITE_IMG",
           "directory_environment": "TESTSUITE_DIR",
           "basename": "sdcard-rv.img",
-          "fallback": "{repo}/../testsuits-for-oskernel/sdcard-rv.img"
+          "fallback": "{repo}/../sdcard-rv.img"
         }
       ],
       "environment": {
@@ -724,7 +724,7 @@
           "environment": "LA_TESTSUITE_IMG",
           "directory_environment": "TESTSUITE_DIR",
           "basename": "sdcard-la.img",
-          "fallback": "{repo}/../testsuits-for-oskernel/sdcard-la.img"
+          "fallback": "{repo}/../sdcard-la.img"
         }
       ],
       "environment": {

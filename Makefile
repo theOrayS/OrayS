@@ -127,9 +127,10 @@ REMOTE_SKIP_OFFICIAL_TEST_GROUPS ?= libctest-glibc
 # nominal in-kernel timeout. Remote builds need a ceiling at least that high;
 # the local/default 300s ceiling remains available for quick scouting runs.
 REMOTE_GROUP_TIMEOUT_CEILING_SECS ?= 900
-TESTSUITE_DIR ?= $(abspath $(CURDIR)/../testsuits-for-oskernel)
-RV_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-rv.img
-LA_TESTSUITE_IMG ?= $(TESTSUITE_DIR)/sdcard-la.img
+ORAYS_WORKSPACE_ROOT ?= $(abspath $(CURDIR)/..)
+TESTSUITE_DIR ?= $(ORAYS_WORKSPACE_ROOT)/testsuits-for-oskernel
+RV_TESTSUITE_IMG ?= $(ORAYS_WORKSPACE_ROOT)/sdcard-rv.img
+LA_TESTSUITE_IMG ?= $(ORAYS_WORKSPACE_ROOT)/sdcard-la.img
 RV_TESTSUITE_RUN_IMG ?= /tmp/arceos-sdcard-rv.run.qcow2
 LA_TESTSUITE_RUN_IMG ?= /tmp/arceos-sdcard-la.run.qcow2
 RV_AUX_DISK ?= $(CURDIR)/disk.img

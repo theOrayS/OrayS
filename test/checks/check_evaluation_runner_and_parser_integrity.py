@@ -264,6 +264,18 @@ def scan_makefile(root: Path) -> list[str]:
         findings.append("Makefile: REMOTE_LTP_CASES default must be stable")
     if re.search(r"^REMOTE_LTP_CASES\s*\?=\s*stable-plus-blacklist\s*$", text, re.MULTILINE):
         findings.append("Makefile: stable-plus-blacklist must not be the remote default")
+    required_parent_image_defaults = (
+        r"^ORAYS_WORKSPACE_ROOT\s*\?=\s*\$\(abspath \$\(CURDIR\)/\.\.\)\s*$",
+        r"^RV_TESTSUITE_IMG\s*\?=\s*\$\(ORAYS_WORKSPACE_ROOT\)/sdcard-rv\.img\s*$",
+        r"^LA_TESTSUITE_IMG\s*\?=\s*\$\(ORAYS_WORKSPACE_ROOT\)/sdcard-la\.img\s*$",
+    )
+    if any(
+        re.search(pattern, text, re.MULTILINE) is None
+        for pattern in required_parent_image_defaults
+    ):
+        findings.append(
+            "Makefile: official image defaults must use the repository-parent workspace root"
+        )
     return findings
 
 
