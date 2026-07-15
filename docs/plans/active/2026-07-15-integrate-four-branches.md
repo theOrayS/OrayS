@@ -47,7 +47,8 @@
 - [x] 在 `7eaf3c1c...` 上真实执行最终 quick、baseline、RV official、LA official 和 full：quick 45/45、baseline 57/57 PASS；RV/LA official 均 `INFRA_ERROR`；full 59/59 completed、57 PASS + 2 INFRA_ERROR。
 - [ ] 上述全部 canonical gate 明确 PASS；当前外部 BusyBox duplicate plan 和真实 official 语义失败仍阻断。
 - [x] 完成第一次独立只读 reviewer 审查：0 Blocker、1 Major、1 Minor；未把已知门禁 non-pass 计作 review finding。
-- [ ] 关闭 reviewer Major（semantic smoke unsafe 契约）与 Minor（本计划状态），重跑双架构 smoke 和最终 full，并完成 follow-up review。
+- [x] 提交 reviewer 的 semantic-smoke unsafe 契约与本计划状态窄修复 `e115f916ed7cc816ebe6c0504fc3348be4da91ee`；fresh clean/stable RV64、LA64 `evidence-runtime` 均 1/1 PASS。
+- [ ] 在 post-repair 文档提交上重跑最终 full，并由同一 reviewer follow-up 确认 Major/Minor 处置。
 - [ ] 重新 fetch 并确认 `origin/main` 未从初始基线漂移。
 - [ ] 安全推广/推送，或给出不夸大的 `BLOCKED` / `FAILED` 终态。
 
@@ -57,7 +58,7 @@
 - axfs 失败来自已过期测试仍依赖早先删除的固定 `/dev/foo/bar` 假节点。曾尝试在生产 `RootDirectory` 路由前全局 canonicalize 路径，但它会改变 `..` 穿越 mount 边界的既有语义，已完整撤回；最终只让测试使用真实 `/dev/zero`，没有恢复假能力或改变生产路由。
 - 两架构 trusted BusyBox plan 均为 55 行、54 个唯一身份；每个 libc group 都产生一条 duplicate error。必须受控修正外部计划并重新 snapshot，不能弱化去重约束或原地改 backing image。
 - full RV 保留 117、LA 保留 156 条真实 failure record；RV cyclictest-musl 另有明确 900 s timeout/exit 137。外部 plan 修正也不会自动关闭这些生产语义失败。
-- 独立 reviewer 发现 PR3 semantic smoke 的新增 unsafe 缺少代码级不变量/调用者责任/测试依据。当前正在补契约注释；修复后仍须真实双架构 smoke 与 full，不能用旧 PASS 代替。
+- 独立 reviewer 发现 PR3 semantic smoke 的新增 unsafe 缺少代码级不变量/调用者责任/测试依据。契约修复已提交，fresh 双架构 smoke 已真实 PASS；仍须重跑 full 并完成 follow-up review，不能用旧 PASS 代替。
 - official/full 单次运行时间长；中断目录不是 verdict，必须保留并明确标记。最终 full 已完成一次，不因 reviewer 修复重跑而删除。
 
 ## 验证合同
