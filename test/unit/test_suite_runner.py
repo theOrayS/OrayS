@@ -1615,10 +1615,12 @@ class SuiteRunnerTest(unittest.TestCase):
             check=False,
         )
         self.assertEqual(harness_result.returncode, 0, harness_result.stderr)
-        self.assertIn(
-            "UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1",
-            harness_result.stderr,
+        binding_line = (
+            "UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1"
         )
+        harness_lines = harness_result.stderr.splitlines()
+        self.assertEqual(harness_lines.count(binding_line), 1)
+        self.assertIn(".", harness_lines)
 
         positive_semantics_sources = (
             valid_source.replace(
@@ -1967,33 +1969,71 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertIn("IMPORT-FD-MARKER", import_fd_result.stderr)
         self.assertIn("side-effect free", import_fd_result.stderr)
 
+        relay_pid_path = self.work / "harness-signal-relay.pids"
         signal_source = valid_source.replace(
             "import unittest\n",
-            "import unittest\nimport os\nimport signal\nimport sys\n",
+            "import unittest\nimport os\nimport pathlib\nimport signal\nimport sys\n",
         ).replace(
             "        self.assertTrue(True)",
             "        print('stdout-before-signal', flush=True)\n"
             "        print('stderr-before-signal', file=sys.stderr, flush=True)\n"
             "        os.write(1, b'fd-stdout-before-signal\\n')\n"
             "        os.write(2, b'fd-stderr-before-signal\\n')\n"
+            "        relay_children = pathlib.Path(\n"
+            "            f'/proc/{os.getpid()}/task/{os.getpid()}/children'\n"
+            "        ).read_text(encoding='utf-8')\n"
+            f"        pathlib.Path({str(relay_pid_path)!r}).write_text(\n"
+            "            relay_children, encoding='utf-8'\n"
+            "        )\n"
             "        os.kill(os.getpid(), signal.SIGTERM)",
         )
         signal_path = self.work / "harness-signal.py"
         signal_path.write_text(signal_source, encoding="utf-8")
-        signal_result = subprocess.run(
-            [*harness_command, str(signal_path)],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
-            check=False,
+        signal_case = fixture_case(
+            "fixture.signal_harness",
+            contract={
+                "type": "unittest",
+                "expected_tests": 1,
+                "identity_binding": True,
+            },
         )
-        self.assertNotEqual(signal_result.returncode, 0)
-        self.assertIn("stdout-before-signal", signal_result.stdout)
-        self.assertIn("stderr-before-signal", signal_result.stderr)
-        self.assertIn("fd-stdout-before-signal", signal_result.stdout)
-        self.assertIn("fd-stderr-before-signal", signal_result.stderr)
-        self.assertNotIn("UNITTEST_BINDING:", signal_result.stderr)
+        signal_case["command"] = [*harness_command, str(signal_path)]
+        self.output_path = self.work / "harness-signal-output"
+        signal_result = self.invoke(fixture_manifest([signal_case]))
+        self.assertEqual(
+            signal_result.returncode,
+            2,
+            signal_result.stdout + signal_result.stderr,
+        )
+        signal_summary = self.summary()
+        self.assertEqual(signal_summary["result"], "INFRA_ERROR")
+        self.assertEqual(
+            (
+                signal_summary["planned_count"],
+                signal_summary["executed_count"],
+                signal_summary["completed_count"],
+            ),
+            (1, 1, 1),
+        )
+        self.assertEqual(signal_summary["totals"]["INFRA_ERROR"], 1)
+        self.assertEqual(signal_summary["totals"]["PASS"], 0)
+        signal_record = signal_summary["cases"][0]
+        self.assertTrue(signal_record["executed"])
+        self.assertEqual(signal_record["status"], "INFRA_ERROR")
+        self.assertEqual(signal_record["return_code"], -signal.SIGTERM)
+        self.assertIn("descendant processes", signal_record["result"])
+        self.assertEqual(signal_record["details"]["surviving_descendant_count"], 2)
+        signal_stdout = Path(signal_record["stdout_log"]).read_text(encoding="utf-8")
+        signal_stderr = Path(signal_record["stderr_log"]).read_text(encoding="utf-8")
+        self.assertIn("stdout-before-signal", signal_stdout)
+        self.assertIn("stderr-before-signal", signal_stderr)
+        self.assertIn("fd-stdout-before-signal", signal_stdout)
+        self.assertIn("fd-stderr-before-signal", signal_stderr)
+        self.assertNotIn("UNITTEST_BINDING:", signal_stdout + signal_stderr)
+        relay_pids = [int(pid) for pid in relay_pid_path.read_text().split()]
+        self.assertEqual(len(relay_pids), 2)
+        for relay_pid in relay_pids:
+            self.assertFalse(Path(f"/proc/{relay_pid}").exists())
 
     def test_canonical_baseline_command_cannot_be_replaced_by_true(self) -> None:
         manifest = json.loads((ROOT / "test/suite_manifest.json").read_text(encoding="utf-8"))
@@ -2555,6 +2595,63 @@ class SuiteRunnerTest(unittest.TestCase):
         )
         self.assertEqual(bound_result.returncode, 0, bound_result.stdout + bound_result.stderr)
         self.assertEqual(self.summary()["cases"][0]["details"]["executed_tests"], 1)
+
+        self.output_path = self.work / "glued-binding-output"
+        glued_code = (
+            "import sys; "
+            "sys.stderr.write('.UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1\\n'); "
+            "print('Ran 1 test in 0.001s', file=sys.stderr); print('OK', file=sys.stderr)"
+        )
+        glued_result = self.invoke(
+            fixture_manifest([fixture_case(code=glued_code, contract=bound_contract)])
+        )
+        self.assertEqual(glued_result.returncode, 2)
+        self.assertIn("binding record", self.summary()["cases"][0]["result"])
+
+        e2e_module = self.work / "identity-bound-e2e.py"
+        e2e_module.write_text(
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_assertion(self):\n"
+            "        self.assertTrue(True)\n"
+            "if __name__ == '__main__':\n"
+            "    unittest.main()\n",
+            encoding="utf-8",
+        )
+        e2e_case = fixture_case(contract=bound_contract)
+        e2e_case["command"] = [
+            sys.executable,
+            "-I",
+            "-S",
+            "-B",
+            "-X",
+            "pycache_prefix=/dev/null",
+            str(UNITTEST_HARNESS),
+            str(e2e_module),
+        ]
+        self.output_path = self.work / "identity-bound-e2e-output"
+        e2e_result = self.invoke(fixture_manifest([e2e_case]))
+        self.assertEqual(e2e_result.returncode, 0, e2e_result.stdout + e2e_result.stderr)
+        self.assertEqual(self.summary()["cases"][0]["status"], "PASS")
+
+        duplicate_module = self.work / "identity-bound-duplicate.py"
+        duplicate_module.write_text(
+            "import sys\n"
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_assertion(self):\n"
+            "        print('UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1', file=sys.stderr)\n"
+            "        self.assertTrue(True)\n"
+            "if __name__ == '__main__':\n"
+            "    unittest.main()\n",
+            encoding="utf-8",
+        )
+        duplicate_case = json.loads(json.dumps(e2e_case))
+        duplicate_case["command"][-1] = str(duplicate_module)
+        self.output_path = self.work / "identity-bound-duplicate-output"
+        duplicate_result = self.invoke(fixture_manifest([duplicate_case]))
+        self.assertEqual(duplicate_result.returncode, 2)
+        self.assertIn("found 2", self.summary()["cases"][0]["result"])
 
         self.output_path = self.work / "missing-binding-output"
         missing_result = self.invoke(

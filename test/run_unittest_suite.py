@@ -830,6 +830,7 @@ def execute_bound_suite(
                 and self.wasSuccessful()
                 and audit.complete()
             ):
+                self.stream.writeln()
                 self.stream.writeln(
                     "UNITTEST_BINDING: "
                     f"planned={expected_count} started={len(self.started_ids)} "
