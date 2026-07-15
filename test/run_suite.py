@@ -373,16 +373,148 @@ CARGO_TEST_RESULT_RE = re.compile(
 CARGO_TEST_CASE_RE = re.compile(
     r"^test\s+(?P<name>.+?)\s+\.\.\.\s+(?P<status>ok|ignored|FAILED)\s*$"
 )
+CARGO_TEST_EXPECTED_PANIC_CASE_RE = re.compile(
+    r"^(?P<identity>.+?) - should panic(?: with message .+)?$"
+)
+CARGO_TEST_BENIGN_OPTION_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])--no-fail-fast(?![A-Za-z0-9_-])"
+)
+CARGO_TEST_PANIC_HEADER_RE = re.compile(
+    r"^thread '(?P<identity>[^']+)' panicked at .+:$"
+)
+CARGO_TEST_PANIC_NOTE_RE = re.compile(
+    r"^note: run with `RUST_BACKTRACE=(?:1|full)` environment variable to display a backtrace$"
+)
 CARGO_TEST_SIGNATURE_RE = re.compile(r"^(?:running\b.*\btests?\b|test result:)", re.I)
 CARGO_TEST_CASE_SIGNATURE_RE = re.compile(r"^test\s+.+?\s+\.\.\.\s+\S.*$", re.I)
 CARGO_TEST_ALLOWED_STDOUT_EPILOGUE_RE = re.compile(
     r"^make(?:\[\d+\])?: Leaving directory ['`].+['`]$"
 )
+CARGO_TEST_IDENTITY_UNITTEST_PROGRESS_RE = re.compile(r"^\.+$")
+CARGO_TEST_UNITTEST_SEPARATOR = "-" * 70
+CARGO_TEST_EXPECTED_PANIC_MAX_REPORT_LINES = 32
 TOKEN_RE = re.compile(r"\{[a-z_]+\}")
 ALLOWED_TOKENS = {"{repo}", "{python}", "{output_dir}", "{case_output_dir}", "{arch}"}
 TERMINATION_GRACE_SECONDS = 1.0
 PR_SET_CHILD_SUBREAPER = 36
 _SUBREAPER_ENABLED = False
+
+
+def cargo_test_stderr_after_identity_unittests(
+    stderr: str,
+) -> tuple[str, list[int]]:
+    """Account for exact successful identity-bound unittest blocks on stderr."""
+
+    stderr_lines = stderr.splitlines()
+    retained: list[str] = []
+    accounted: list[int] = []
+    index = 0
+    block_line_count = 7
+    while index < len(stderr_lines):
+        if index + block_line_count > len(stderr_lines):
+            retained.append(stderr_lines[index])
+            index += 1
+            continue
+
+        block = stderr_lines[index : index + block_line_count]
+        progress = CARGO_TEST_IDENTITY_UNITTEST_PROGRESS_RE.fullmatch(block[0])
+        binding = UNITTEST_BINDING_RE.fullmatch(block[1])
+        summary = UNITTEST_COUNT_RE.fullmatch(block[4])
+        if progress is None or binding is None or summary is None:
+            retained.append(stderr_lines[index])
+            index += 1
+            continue
+
+        binding_counts = tuple(int(value) for value in binding.groups())
+        planned = binding_counts[0]
+        if not (
+            planned > 0
+            and len(block[0]) == planned
+            and all(value == planned for value in binding_counts)
+            and block[2] == ""
+            and block[3] == CARGO_TEST_UNITTEST_SEPARATOR
+            and int(summary.group(1)) == planned
+            and block[5] == ""
+            and block[6] == "OK"
+        ):
+            retained.append(stderr_lines[index])
+            index += 1
+            continue
+
+        accounted.append(planned)
+        index += block_line_count
+
+    return "\n".join(retained), accounted
+
+
+def cargo_test_stderr_after_expected_panics(
+    stdout_lines: list[str], stderr: str
+) -> tuple[str, list[str]]:
+    """Account for bounded libtest reports from successful ``should_panic`` cases."""
+
+    expected_counts: dict[str, int] = {}
+    for line in stdout_lines:
+        case_match = CARGO_TEST_CASE_RE.fullmatch(line)
+        if case_match is None or case_match.group("status") != "ok":
+            continue
+        expected_match = CARGO_TEST_EXPECTED_PANIC_CASE_RE.fullmatch(
+            case_match.group("name")
+        )
+        if expected_match is None:
+            continue
+        identity = expected_match.group("identity")
+        expected_counts[identity] = expected_counts.get(identity, 0) + 1
+
+    stderr_lines = stderr.splitlines()
+    retained: list[str] = []
+    accounted: list[str] = []
+    index = 0
+    while index < len(stderr_lines):
+        header = CARGO_TEST_PANIC_HEADER_RE.fullmatch(stderr_lines[index])
+        identity = header.group("identity") if header is not None else None
+        if identity is None or expected_counts.get(identity, 0) <= 0:
+            retained.append(stderr_lines[index])
+            index += 1
+            continue
+
+        note_index: int | None = None
+        report_limit = min(
+            len(stderr_lines),
+            index + 1 + CARGO_TEST_EXPECTED_PANIC_MAX_REPORT_LINES,
+        )
+        for candidate_index in range(index + 1, report_limit):
+            candidate = stderr_lines[candidate_index]
+            if CARGO_TEST_PANIC_NOTE_RE.fullmatch(candidate):
+                note_index = candidate_index
+                break
+            if (
+                CARGO_TEST_PANIC_HEADER_RE.fullmatch(candidate) is not None
+                or TRUSTED_BUILD_STDERR_RE.fullmatch(candidate) is not None
+            ):
+                break
+        if note_index is None:
+            retained.append(stderr_lines[index])
+            index += 1
+            continue
+
+        report_body = "\n".join(stderr_lines[index + 1 : note_index])
+        if (
+            UNKNOWN_STATUS_RECORD_RE.search(report_body)
+            or NON_PASS_OUTPUT_RE.search(report_body)
+            or EXPLICIT_FAILURE_OUTPUT_RE.search(report_body)
+            or CRASH_OUTPUT_RE.search(report_body)
+        ):
+            retained.append(stderr_lines[index])
+            index += 1
+            continue
+
+        expected_counts[identity] -= 1
+        accounted.append(identity)
+        index = note_index + 1
+
+    return "\n".join(retained), accounted
+
+
 CANONICAL_OFFICIAL_ENVIRONMENT = {
     "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
     "OSCOMP_TEST_GROUPS": "all",
@@ -2424,6 +2556,12 @@ def parse_contract(
     if result_type == "cargo_test":
         stdout_lines = stdout.splitlines()
         lines = stdout_lines
+        classified_stderr, accounted_identity_unittests = (
+            cargo_test_stderr_after_identity_unittests(stderr)
+        )
+        classified_stderr, accounted_expected_panics = (
+            cargo_test_stderr_after_expected_panics(stdout_lines, classified_stderr)
+        )
         stderr_protocol_records = [
             line
             for line in stderr.splitlines()
@@ -2463,14 +2601,16 @@ def parse_contract(
             and CARGO_TEST_CASE_RE.fullmatch(line) is None
         )
         non_protocol_text = stdout_non_protocol_text + (
-            ("\n" if stdout_non_protocol_text and stderr else "") + stderr
+            ("\n" if stdout_non_protocol_text and classified_stderr else "")
+            + classified_stderr
         )
         if UNKNOWN_STATUS_RECORD_RE.search(non_protocol_text):
             return "INFRA_ERROR", "cargo test output contains an unsupported status record", {}
+        failure_scan_text = CARGO_TEST_BENIGN_OPTION_RE.sub("", non_protocol_text)
         if (
-            NON_PASS_OUTPUT_RE.search(non_protocol_text)
-            or EXPLICIT_FAILURE_OUTPUT_RE.search(non_protocol_text)
-            or CRASH_OUTPUT_RE.search(non_protocol_text)
+            NON_PASS_OUTPUT_RE.search(failure_scan_text)
+            or EXPLICIT_FAILURE_OUTPUT_RE.search(failure_scan_text)
+            or CRASH_OUTPUT_RE.search(failure_scan_text)
         ):
             return "FAIL", "cargo test output contains explicit non-pass evidence", {}
         aggregate_planned = 0
@@ -2580,7 +2720,7 @@ def parse_contract(
             )
         unexpected_stderr = [
             line
-            for line in stderr.splitlines()
+            for line in classified_stderr.splitlines()
             if line.strip() and TRUSTED_BUILD_STDERR_RE.fullmatch(line) is None
         ]
         if unexpected_stderr:
@@ -2593,6 +2733,8 @@ def parse_contract(
             "block_count": block_count,
             "planned_tests": aggregate_planned,
             "executed_tests": aggregate_executed,
+            "accounted_identity_unittests": accounted_identity_unittests,
+            "accounted_expected_panics": accounted_expected_panics,
         }
     if result_type == "case_result":
         if UNKNOWN_STATUS_RECORD_RE.search(combined):

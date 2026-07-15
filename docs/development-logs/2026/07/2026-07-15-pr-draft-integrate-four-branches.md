@@ -595,6 +595,74 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
   mapping, production unsafe, syscall/ABI/errno behavior, or test method count was
   changed. The next step is a scoped commit followed by fresh clean quick/baseline.
 
+## 2026-07-15T13:25:29Z - first baseline repair committed
+
+- Commit `1c0e3ba0396fcd9d8dde2ef6bb1cfc34e32647f5`
+  (`test: repair baseline evidence contracts`) contains the reviewed narrow repair,
+  four bounded format corrections, this plan, and this log.
+- Cached/committed whitespace checks passed; the post-commit worktree was clean.
+  No push, main promotion, dependency, lockfile, repository toolchain, image, generated
+  evidence, blacklist, unsafe, ABI, or errno change occurred.
+
+## 2026-07-15T13:31:17Z - clean repair-candidate quick passed
+
+- Candidate: clean/stable `1c0e3ba0396fcd9d8dde2ef6bb1cfc34e32647f5`;
+  start/final commit match, both dirty flags are false, and provenance stability is true.
+- Canonical quick exited 0 / `PASS` in 280.783039 s with
+  planned/executed/completed 45/45/45, PASS 45, and every non-pass bucket 0.
+- Summary: `test/output/integration-1c0e3ba0-quick-1/summary.json`.
+  This closes quick only; it is not baseline, official, full, review, or promotion proof.
+
+## 2026-07-15T13:43:51Z - clean repair-candidate baseline retained one failure
+
+- Candidate and provenance are the same clean/stable `1c0e3ba0...`; canonical baseline
+  exited 1 / `FAIL` in 716.422999 s with planned/executed/completed 57/57/57,
+  PASS 56, FAIL 1, and all other buckets 0.
+- All seven non-pass cases from `05b12326` now pass. The sole remaining case is
+  `baseline.workspace_unit_tests`; its child exited 0, but the strict cargo contract
+  returned `cargo test output contains explicit non-pass evidence`.
+- The first concrete match was the raw `panicked` report from the successful Rust
+  `metadata_rejects_more_than_six_arguments - should panic ... ok` lifecycle identity.
+  That is still a real baseline FAIL; a zero child exit did not override the parser.
+- Summary: `test/output/integration-1c0e3ba0-baseline-1/summary.json`.
+
+## 2026-07-15T14:09:32Z - layered cargo-contract repair focused validation
+
+- Reclassifying the retained raw baseline logs after each bounded fix exposed all
+  layers hidden behind the same generic result string; no old verdict was rewritten:
+  1. the successful `should_panic` case emitted its expected raw panic report;
+  2. Makefile command echo contained the option `--no-fail-fast`;
+  3. the PR2 prerequisite emitted an exact successful identity-bound Python unittest
+     block on stderr;
+  4. block 49 contained a real ignored axns doctest with an outdated two-argument macro
+     example. In-memory replay changing only that lifecycle to executed `ok` then
+     classified the retained log as 55 blocks / 73 tests PASS.
+- The cargo parser now records, without altering raw logs, only:
+  - exact identity-bound unittest blocks whose dots, planned/started/executed/stopped,
+    `Ran N tests`, separator, and terminal `OK` all agree and are positive;
+  - a bounded panic report whose thread identity exactly equals one successful
+    `- should panic ... ok` lifecycle and whose body contains no unknown/non-pass,
+    failure, timeout, crash, or extra panic marker;
+  - the exact command-option token `--no-fail-fast` during failure-word scanning.
+  Every unmatched line remains available to the original fail-closed classifiers.
+- Existing method
+  `test_cargo_test_accepts_trusted_build_diagnostics_on_stderr` now includes positive
+  fixtures plus mutations for count mismatch, inserted TCONF/TBROK/TFAIL/ENOSYS,
+  timeout, unknown status, ordinary failure, and extra panic before/after the bounded
+  report. All mutations remain nonzero; no method-count or manifest-count change was
+  used.
+- The axns Linux/macOS examples now use the real three-argument macro form and are no
+  longer marked `ignore`; `cargo test -p axns --doc -- --nocapture` exits 0 with
+  2 passed, 0 failed, 0 ignored.
+- Final focused evidence on the exact dirty worktree:
+  - the affected parser unit method: 1/1, including all subcases;
+  - complete suite-runner identity-bound regression:
+    planned/started/executed/stopped 133/133/133/133, `Ran 133 tests`, exit 0,
+    193.694 s;
+  - `git diff --check`: exit 0.
+- These are focused dirty-worktree results, not a canonical baseline PASS. The repair
+  still requires a scoped commit followed by fresh clean quick and baseline runs.
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -632,12 +700,15 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 | `integration-764211c5-quick-1` | canonical quick | common / governance commit | 1 | FAIL | 515.911347 s | 42 PASS, 2 FAIL, 1 TIMEOUT; `test/output/integration-764211c5-quick-1/summary.json` |
 | `integration-05b12326-quick-1` | canonical quick | common / clean `05b12326` | 0 | PASS | 279.598694 s | 45/45 PASS; stable provenance; `test/output/integration-05b12326-quick-1/summary.json` |
 | `integration-05b12326-baseline-1` | canonical baseline | host + RV64 + LA64 / clean `05b12326` | 2 | INFRA_ERROR | 890.07075 s | 50 PASS, 6 FAIL, 1 INFRA_ERROR; `test/output/integration-05b12326-baseline-1/summary.json` |
+| `integration-1c0e3ba0-quick-1` | canonical quick | common / clean `1c0e3ba0` | 0 | PASS | 280.783039 s | 45/45 PASS; stable provenance; `test/output/integration-1c0e3ba0-quick-1/summary.json` |
+| `integration-1c0e3ba0-baseline-1` | canonical baseline | host + RV64 + LA64 / clean `1c0e3ba0` | 1 | FAIL | 716.422999 s | 56 PASS, 1 FAIL; workspace cargo contract; stable provenance; `test/output/integration-1c0e3ba0-baseline-1/summary.json` |
 | `qemu-setup-764211c5` | supervised source build + independent `--verify-only` | RISC-V64 + LoongArch64 toolchain | 0 | PASS | 分项 | exact 9.2.4 versions, fixed source/stamp and binary SHA-256 values |
 | pre-commit focused PR3 suites | 33+75+27+9+41+26+36+133+23+8+7 methods/checks | host | 0 | PASS | 分项 | 外部 journal checkpoint 2026-07-15T11:58:16Z |
 | pre-commit raw LA smoke | supervised exact QEMU 9.2.4 | LA64 | 0 | PASS | 分项 | 外部 ignored build evidence |
 | pre-commit raw RV smoke | supervised QEMU 6.2.0 | RV64 | 0 | BLOCKED | 分项 | markers complete，但版本不满足 required contract |
 | dirty-baseline-repair-focused | units + fmt + host/RV64/LA64 clippy + semantic evidence/aggregate | host + RV64 + LA64 | 0 | PASS | 分项 | 定向复验；不是 canonical verdict；`build/pr3-evidence/required/semantic-evidence-v1.json` |
-| pending | canonical quick on newly committed repair candidate | common |  | BLOCKED |  | 尚未提交/执行 |
+| dirty-cargo-contract-focused | parser positive/mutation fixtures + exact runner regression + axns doctest | host | 0 | PASS | 193.694 s + 分项 | 133/133 runner；axns 2 passed/0 ignored；不是 canonical verdict |
+| pending | canonical quick on newly committed cargo-contract candidate | common |  | BLOCKED |  | 尚未提交/执行 |
 | pending | canonical baseline on the same candidate | RV64 + LA64 |  | BLOCKED |  | 尚未执行 |
 | pending | canonical official RV | RISC-V64 |  | BLOCKED |  | 尚未执行 |
 | pending | canonical official LA | LoongArch64 |  | BLOCKED |  | 尚未执行 |
@@ -663,15 +734,16 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 ## 已知限制
 
 - suite merge commit 上 clean quick 的 RR skipped-task aging 检查真实失败。
-- `05b12326` baseline 的 axfs、rustfmt、host/RV/LA clippy 与 evidence
-  non-pass 已完成窄修复和定向验证，但仍需新 clean HEAD 的 canonical rerun。
+- `05b12326` baseline 的七个 non-pass 已由 clean `1c0e3ba0` baseline 关闭；
+  `1c0e3ba0` 又保留了一个 workspace cargo-contract FAIL。其 parser/doctest
+  修复已有正反例与 133/133 定向验证，但仍需新 clean HEAD 的 canonical rerun。
 - 当前官方 image plan 的 BusyBox duplicate identity 可能使 official gate 成为外部输入 blocker。
 - RV required semantic evidence 尚缺 exact QEMU 9.2.4 的 canonical post-commit run。
 - 尚无独立 reviewer 或人类可解释性确认。
 
 ## 后续工作
 
-提交已审计的 baseline repair；按 quick、baseline、RV official、LA official、full 顺序运行并检查 summary；只修复真实且在任务范围内的缺陷；独立审查；必要时从头重跑；最后重新 fetch 并决定推广或 BLOCKED/FAILED。
+提交已审计的 cargo-contract/doctest repair；按 quick、baseline、RV official、LA official、full 顺序运行并检查 summary；只修复真实且在任务范围内的缺陷；独立审查；必要时从头重跑；最后重新 fetch 并决定推广或 BLOCKED/FAILED。
 
 ## 回滚方式
 
@@ -679,4 +751,4 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 
 # 10. 最终摘要
 
-当前状态为 Draft：四个来源 merge、governance 与 CI coverage 修复已完成且 ancestry 明确。clean `05b12326` quick 已通过；其首次 baseline 的 6 FAIL + 1 INFRA_ERROR 已如实保留并完成窄修复/定向复验，但新的 clean canonical quick/baseline 尚未运行。official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。
+当前状态为 Draft：四个来源 merge、governance 与 CI coverage 修复已完成且 ancestry 明确。clean `1c0e3ba0` quick 已通过；其 baseline 如实保留 56 PASS + 1 FAIL。该 workspace cargo-contract FAIL 的全部分层输入已定位，parser/doctest 窄修复通过正反例、133/133 runner 与 2/2 doctest 定向复验，但尚未提交，也没有新的 clean canonical verdict。official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。

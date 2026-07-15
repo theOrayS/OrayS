@@ -2892,6 +2892,108 @@ class SuiteRunnerTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+        self.output_path = self.work / "cargo-identity-unittest"
+        identity_unittest = (
+            "import sys; "
+            "print('..', file=sys.stderr); "
+            "print('UNITTEST_BINDING: planned=2 started=2 executed=2 stopped=2', file=sys.stderr); "
+            "print('', file=sys.stderr); print('-' * 70, file=sys.stderr); "
+            "print('Ran 2 tests in 0.01s', file=sys.stderr); "
+            "print('', file=sys.stderr); print('OK', file=sys.stderr); "
+            "print('cargo test -p demo --no-fail-fast'); "
+            "print('running 1 test'); print('test demo ... ok'); "
+            "print('test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s')"
+        )
+        result = self.invoke(
+            fixture_manifest(
+                [fixture_case(code=identity_unittest, contract={"type": "cargo_test"})]
+            )
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.summary()["cases"][0]["details"]["accounted_identity_unittests"],
+            [2],
+        )
+
+        identity_nonpass_mutations = (
+            ("started=2", "started=1"),
+            (
+                "print('', file=sys.stderr); print('OK', file=sys.stderr);",
+                "print('', file=sys.stderr); print('TFAIL hidden', file=sys.stderr); print('OK', file=sys.stderr);",
+            ),
+            ("--no-fail-fast", "--no-fail-fast failure"),
+        )
+        for index, (old, new) in enumerate(identity_nonpass_mutations):
+            with self.subTest(identity_nonpass_mutation=(old, new)):
+                self.output_path = self.work / f"cargo-identity-unittest-bad-{index}"
+                result = self.invoke(
+                    fixture_manifest(
+                        [
+                            fixture_case(
+                                code=identity_unittest.replace(old, new),
+                                contract={"type": "cargo_test"},
+                            )
+                        ]
+                    )
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        self.output_path = self.work / "cargo-expected-panic"
+        expected_panic = (
+            "import sys; "
+            "print(\"thread 'demo::rejects_invalid_input' panicked at demo.rs:1:1:\", file=sys.stderr); "
+            "print('invalid input', file=sys.stderr); "
+            "print('note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace', file=sys.stderr); "
+            "print('running 1 test'); "
+            "print('test demo::rejects_invalid_input - should panic ... ok'); "
+            "print('test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s')"
+        )
+        result = self.invoke(
+            fixture_manifest(
+                [fixture_case(code=expected_panic, contract={"type": "cargo_test"})]
+            )
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.summary()["cases"][0]["details"]["accounted_expected_panics"],
+            ["demo::rejects_invalid_input"],
+        )
+
+        injected_nonpass = (
+            ("TCONF unavailable", "before-note"),
+            ("TBROK setup failed", "before-note"),
+            ("TFAIL mismatch", "before-note"),
+            ("ENOSYS unsupported", "before-note"),
+            ("TIMEOUT expired", "before-note"),
+            ("STATUS: UNKNOWN", "before-note"),
+            ("error: test failed", "before-note"),
+            ("panic: extra", "before-note"),
+            ("panic: extra", "after-note"),
+        )
+        for index, (extra_stderr, position) in enumerate(injected_nonpass):
+            with self.subTest(extra_stderr=extra_stderr, position=position):
+                self.output_path = self.work / f"cargo-expected-panic-extra-{index}"
+                anchor = (
+                    "print('note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace', file=sys.stderr);"
+                    if position == "before-note"
+                    else "print('running 1 test');"
+                )
+                code_with_extra = expected_panic.replace(
+                    anchor,
+                    f"print({extra_stderr!r}, file=sys.stderr); {anchor}",
+                )
+                result = self.invoke(
+                    fixture_manifest(
+                        [
+                            fixture_case(
+                                code=code_with_extra,
+                                contract={"type": "cargo_test"},
+                            )
+                        ]
+                    )
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_cargo_test_unaccounted_or_nonpass_stderr_cannot_pass(self) -> None:
         for index, stderr_line in enumerate(
             (

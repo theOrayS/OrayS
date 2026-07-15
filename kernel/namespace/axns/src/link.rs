@@ -24,11 +24,11 @@ pub mod linux {
     ///
     /// # Generated Items
     /// - A static variable `RES` of type `$ty`, initialized with `$default`.
-    /// - A function `res_ptr()` that returns a raw pointer to the resource as `*const u8`.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// def_static_resource!(u32, 0);
+    /// ```rust
+    /// use axns::def_static_resource;
+    /// def_static_resource!(RES, u32, 0);
     /// ```
     #[macro_export]
     macro_rules! def_static_resource {
@@ -72,11 +72,11 @@ pub mod macho {
     ///
     /// # Generated Items
     /// - A static variable `RES` of type `$ty`, initialized with `$default`.
-    /// - A function `res_ptr()` that returns a raw pointer to the resource as `*const u8`.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// def_static_resource!(u32, 0);
+    /// ```rust
+    /// use axns::def_static_resource;
+    /// def_static_resource!(RES, u32, 0);
     /// ```
     macro_rules! def_static_resource {
         (RES, $ty: ty, $default: expr) => {
