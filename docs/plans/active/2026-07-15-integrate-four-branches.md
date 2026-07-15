@@ -38,6 +38,8 @@
 - [x] 显式 merge PR3：`03269960bb440e45f6e97999c20532cb3977c9be`。
 - [x] 完成并提交 workflow governance 安装：`764211c5c221d7c64d57a658eac05fe7c5cee38c`。
 - [x] 构建并校验双 target QEMU 9.2.4；固定源码 SHA-256 与安装戳、两个 target 版本及二进制摘要均已复核。
+- [x] 在 clean/stable `05b123266fe3695bc660c2cd281a56d2ac44ccea` 上完成首次 post-repair quick：45/45 PASS；随后首次 baseline 如实得到 50 PASS、6 FAIL、1 INFRA_ERROR。
+- [x] 对首次 baseline 的七个 non-pass 完成窄修复与 dirty-worktree 定向复验；host/RV64/LA64 clippy、workspace unit、三架构 semantic-evidence shard 与 aggregate 均真实退出 0，但这些结果不是 canonical verdict。
 - [ ] 在最终候选 HEAD 上依次通过 quick、baseline、RV official、LA official 和 full。
 - [ ] 完成独立只读 reviewer 审查，清零 blocker/major finding，并在必要修复后从头重跑门禁。
 - [ ] 重新 fetch 并确认 `origin/main` 未从初始基线漂移。
@@ -46,7 +48,8 @@
 ## 已知风险
 
 - 统一套件首次 clean quick 在 suite merge commit 上真实失败：RR skipped-task aging 守卫及其 current-tree 单测均非 PASS。
-- 历史 baseline 记录有 axfs `test_devfs_ramfs()` 的 `NotFound`、四个 rustfmt 漂移和 clippy 问题；必须在最终 HEAD 重新证明，不能沿用旧结论。
+- clean `05b12326` baseline 的七个 non-pass 已逐项归因并完成定向修复；仍必须在新 clean/stable HEAD 重新运行完整 quick 与 baseline，不能把 dirty-worktree 复验外推成 canonical PASS。
+- axfs 失败来自已过期测试仍依赖早先删除的固定 `/dev/foo/bar` 假节点。曾尝试在生产 `RootDirectory` 路由前全局 canonicalize 路径，但它会改变 `..` 穿越 mount 边界的既有语义，已完整撤回；最终只让测试使用真实 `/dev/zero`，没有恢复假能力或改变生产路由。
 - 当前官方镜像的 BusyBox 计划含重复身份；若最终 official parser 仍拒绝，属于镜像/计划 blocker，不能弱化去重约束。
 - RV 宿主默认 QEMU 为 6.2.0；required evidence 必须使用从固定源码构建并校验的双 target QEMU 9.2.4。
 - official/full 单次运行时间长；中断目录不是 verdict，必须保留并明确标记。
@@ -72,6 +75,7 @@ RV_TESTSUITE_IMG="$RV_TESTSUITE_IMG" LA_TESTSUITE_IMG="$LA_TESTSUITE_IMG" python
 - PR1/PR2 通过窄边界适配与 feature-invariant spin lock 合并，不移动 `UserProcess`，不改变公共 pipe mutex 类型。
 - unified suite 与 PR3 收敛到一个 manifest/runner；PR3 evidence 是 canonical runner 下的专用 adapter，不建立第二套顶层框架。
 - governance 单独提交，避免把策略安装混入来源 merge。
+- host 默认 clippy 仅排除无法在 x86 host target 表达的 `arceos-shell`；显式 RV64/LA64 clippy 仍覆盖该 crate。LA64 使用临时 PATH 指向经能力探针确认的 clang 21，不修改仓库工具链或系统默认 clang。
 - 只有最终所有门禁和独立审查都明确 PASS 才允许推广；任何不可修复的外部输入问题保持 Draft/BLOCKED。
 
 ## 回滚

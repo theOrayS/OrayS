@@ -213,6 +213,11 @@ class ManifestTests(unittest.TestCase):
         self.assertIn("infra.competition-workflow-tests", ids)
         self.assertIn("smoke.rv64.abi", ids)
         self.assertIn("smoke.la64.abi", ids)
+        cases = {case["id"]: case for case in manifest["expanded_cases"]}
+        self.assertNotIn("min_tests", cases["infra.competition-workflow"]["classifier"])
+        self.assertEqual(
+            cases["infra.competition-workflow-tests"]["classifier"]["min_tests"], 1
+        )
 
     def test_unknown_field_fails_closed(self) -> None:
         document = copy.deepcopy(self.document)

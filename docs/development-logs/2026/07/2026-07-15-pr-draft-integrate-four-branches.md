@@ -9,7 +9,7 @@ authors:
   - "Codex primary agent (AI-assisted integration operator)"
 reviewers: []
 base_commit: "921171ac1ef5c85ab5a7cd1882dd40e1471b79f0"
-head_commit: "03269960bb440e45f6e97999c20532cb3977c9be"
+head_commit: null
 capability_domains:
   - linux-abi-boundary
   - file-object-event-core
@@ -43,7 +43,7 @@ capability_domains:
 
 - [x] 四个来源 tip 都以独立 no-ff merge parent 保留且 ancestry 可验证。
 - [x] 最终测试所有权唯一落在 `test/`，59 个 case 可显式列出。
-- [ ] workflow governance 独立提交且文档完整。
+- [x] workflow governance 独立提交且文档完整。
 - [ ] 最终候选 HEAD 的 quick、baseline、RV official、LA official、full 均明确 PASS。
 - [ ] 独立只读 reviewer 的 blocker/major finding 清零。
 - [ ] 最终远端 freshness、安全推广和推送完成。
@@ -418,7 +418,7 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
   baseline defects, exact QEMU 9.2.4 dual-target evidence, both official image runs,
   full gate, independent review, remote freshness, and safe promotion.
 
-+## 2026-07-15T12:18:35Z - governance reconciliation and focused validation completed
+## 2026-07-15T12:18:35Z - governance reconciliation and focused validation completed
 
 - Installed the starter PR template and development-log README/template without
   overwriting any prior repository log. Added concise README files for active/completed
@@ -513,6 +513,88 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 - This proves the required emulator toolchain is available; it is not itself a
   semantic-evidence or official-suite PASS. Those runs remain pending.
 
+## 2026-07-15T12:41:34Z - clean repaired-candidate quick passed
+
+- Candidate: clean/stable commit
+  `05b123266fe3695bc660c2cd281a56d2ac44ccea`; start/final revisions match,
+  both dirty flags are false, and provenance stability is true.
+- Canonical command used profile `quick` and the new output directory
+  `test/output/integration-05b12326-quick-1`.
+- Result: exit 0 / `PASS`, duration 279.598694 s;
+  planned/executed/completed 45/45/45, PASS 45, every non-pass bucket 0.
+- This closes only the earlier CI-coverage and resource-contention quick findings;
+  it is not baseline, official, full, review, or promotion evidence.
+
+## 2026-07-15T12:57:59Z - first clean baseline completed non-passing
+
+- Candidate and provenance: the same clean/stable `05b123266fe...`; canonical
+  output directory `test/output/integration-05b12326-baseline-1`.
+- Result: exit 2 / `INFRA_ERROR`, duration 890.07075 s;
+  planned/executed/completed 57/56/57; PASS 50, FAIL 6, INFRA_ERROR 1;
+  TIMEOUT/CRASH/NOT_RUN/unknown all 0.
+- Explicit non-pass cases:
+  - `evidence.host`: the static competition guard emitted its valid one-line PASS,
+    but its manifest incorrectly also required a unittest count;
+  - `evidence.aggregate`: downstream non-pass because host evidence was incomplete;
+  - `baseline.cargo_format`: four pre-recorded rustfmt drifts;
+  - `baseline.workspace_unit_tests`: axfs FAT integration test still addressed the
+    deliberately removed fake `/dev/foo/bar` node and returned `NotFound`;
+  - `baseline.clippy_default`: x86 host lint attempted the target-only shell and
+    failed on 42 architecture-specific fields/imports;
+  - `baseline.clippy_riscv64`: child exit 0, but the runner mistook clippy source
+    display `5408 ~ ... timeout ...` for runtime timeout evidence;
+  - `baseline.clippy_loongarch64`: INFRA_ERROR because host clang 14 lacked the
+    required LoongArch frontend target.
+- Positive RV64/LA64 semantic evidence and kernel/submission builds in this run do
+  not override the seven non-pass cases.
+
+## 2026-07-15T13:22:08Z - baseline repair batch focused validation completed
+
+- Narrow contract repairs:
+  - removed `min_tests` only from the static competition guard classifier; its
+    unittest companion retains `min_tests: 1`, with existing exact-bound tests;
+  - accepted clippy's `~` source-display marker in the bounded exit-code parser and
+    added the observed line to an existing parser test without weakening real
+    timeout/failure detection;
+  - excluded `arceos-shell` only from default host workspace clippy; both explicit
+    RV64 and LA64 clippy commands continue to lint it;
+  - applied rustfmt only to the four reported drift areas;
+  - replaced the stale axfs test's deleted fake `/dev/foo/bar` dependency with the
+    real `/dev/zero` node and a mount-normalization path that does not require fake
+    capabilities. Production `RootDirectory` behavior is unchanged.
+- Rejected approach: an initial production-side attempt canonicalized every path
+  before mount selection. Focused tests showed that this changes existing `..`
+  traversal across mount boundaries, so the production change was fully removed;
+  no form of that semantic broadening is present in the reviewed diff.
+- Tool capability work was kept outside the repository. clang 14 and Ubuntu clang
+  15 both lacked a LoongArch backend. clang 21.1.8 was then installed on the host;
+  `-print-targets` lists `loongarch64`, and an empty C translation unit with
+  `--target=loongarch64-unknown-none -fsyntax-only` exits 0. The temporary PATH
+  shim resolves to `/usr/bin/clang-21`, SHA-256
+  `82481792aef943c1750ae5fd71e5a5737212741337debd0fe5d28bd82dd018e9`;
+  the system default compiler and repository toolchain files were not changed.
+- Focused validation on the dirty repair worktree, all exit 0 unless explicitly
+  described otherwise:
+  - suite-runner unit suite 133/133; competition workflow unit suite 33/33;
+    semantic-evidence unit suite 75/75;
+  - `make unittest_no_fail_fast`, including axfs FAT `/dev/zero` behavior and
+    executable axfile regressions;
+  - `cargo fmt --all -- --check`;
+  - `make clippy`, `make clippy ARCH=riscv64`, and clang-21-backed
+    `make clippy ARCH=loongarch64`;
+  - current-manifest host 8/8, RV64 3/3, and LA64 3/3 semantic-evidence cases,
+    including both exact-QEMU ABI smokes; aggregate 14/14 and report rendering;
+  - competition semantic-evidence guard and test-asset integrity guard, both
+    PASS with 0 findings.
+- The first aggregate attempt after changing the manifest exited 2 because the
+  existing RV64/LA64 results had the old manifest identity. That fail-closed stale
+  result was retained; both architecture shards were regenerated before aggregate
+  subsequently passed. None of these dirty-worktree checks is called a canonical
+  profile verdict.
+- No dependency, `Cargo.lock`, repository toolchain, image, blacklist, status
+  mapping, production unsafe, syscall/ABI/errno behavior, or test method count was
+  changed. The next step is a scoped commit followed by fresh clean quick/baseline.
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -548,12 +630,15 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 |---|---|---|---:|---|---:|---|
 | `integration-suite-126e21a4-quick-1` | canonical quick | common / suite merge commit | 1 | FAIL | 259.665 s | `test/output/integration-suite-126e21a4-quick-1/summary.json` |
 | `integration-764211c5-quick-1` | canonical quick | common / governance commit | 1 | FAIL | 515.911347 s | 42 PASS, 2 FAIL, 1 TIMEOUT; `test/output/integration-764211c5-quick-1/summary.json` |
+| `integration-05b12326-quick-1` | canonical quick | common / clean `05b12326` | 0 | PASS | 279.598694 s | 45/45 PASS; stable provenance; `test/output/integration-05b12326-quick-1/summary.json` |
+| `integration-05b12326-baseline-1` | canonical baseline | host + RV64 + LA64 / clean `05b12326` | 2 | INFRA_ERROR | 890.07075 s | 50 PASS, 6 FAIL, 1 INFRA_ERROR; `test/output/integration-05b12326-baseline-1/summary.json` |
 | `qemu-setup-764211c5` | supervised source build + independent `--verify-only` | RISC-V64 + LoongArch64 toolchain | 0 | PASS | 分项 | exact 9.2.4 versions, fixed source/stamp and binary SHA-256 values |
 | pre-commit focused PR3 suites | 33+75+27+9+41+26+36+133+23+8+7 methods/checks | host | 0 | PASS | 分项 | 外部 journal checkpoint 2026-07-15T11:58:16Z |
 | pre-commit raw LA smoke | supervised exact QEMU 9.2.4 | LA64 | 0 | PASS | 分项 | 外部 ignored build evidence |
 | pre-commit raw RV smoke | supervised QEMU 6.2.0 | RV64 | 0 | BLOCKED | 分项 | markers complete，但版本不满足 required contract |
-| pending | canonical quick on repaired candidate | common |  | BLOCKED |  | QEMU build 已释放主机；clean rerun 待执行 |
-| pending | canonical baseline | RV64 + LA64 |  | BLOCKED |  | exact QEMU 9.2.4 准备后执行 |
+| dirty-baseline-repair-focused | units + fmt + host/RV64/LA64 clippy + semantic evidence/aggregate | host + RV64 + LA64 | 0 | PASS | 分项 | 定向复验；不是 canonical verdict；`build/pr3-evidence/required/semantic-evidence-v1.json` |
+| pending | canonical quick on newly committed repair candidate | common |  | BLOCKED |  | 尚未提交/执行 |
+| pending | canonical baseline on the same candidate | RV64 + LA64 |  | BLOCKED |  | 尚未执行 |
 | pending | canonical official RV | RISC-V64 |  | BLOCKED |  | 尚未执行 |
 | pending | canonical official LA | LoongArch64 |  | BLOCKED |  | 尚未执行 |
 | pending | canonical full all | RV64 + LA64 |  | BLOCKED |  | 尚未执行 |
@@ -578,14 +663,15 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 ## 已知限制
 
 - suite merge commit 上 clean quick 的 RR skipped-task aging 检查真实失败。
-- 历史 axfs、rustfmt、clippy 基线失败需要在最终 HEAD 重新诊断并诚实处理。
+- `05b12326` baseline 的 axfs、rustfmt、host/RV/LA clippy 与 evidence
+  non-pass 已完成窄修复和定向验证，但仍需新 clean HEAD 的 canonical rerun。
 - 当前官方 image plan 的 BusyBox duplicate identity 可能使 official gate 成为外部输入 blocker。
 - RV required semantic evidence 尚缺 exact QEMU 9.2.4 的 canonical post-commit run。
 - 尚无独立 reviewer 或人类可解释性确认。
 
 ## 后续工作
 
-完成治理提交；构建/校验双 target QEMU；按 quick、baseline、RV official、LA official、full 顺序运行并检查 summary；只修复真实且在任务范围内的缺陷；独立审查；必要时从头重跑；最后重新 fetch 并决定推广或 BLOCKED/FAILED。
+提交已审计的 baseline repair；按 quick、baseline、RV official、LA official、full 顺序运行并检查 summary；只修复真实且在任务范围内的缺陷；独立审查；必要时从头重跑；最后重新 fetch 并决定推广或 BLOCKED/FAILED。
 
 ## 回滚方式
 
@@ -593,4 +679,4 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 
 # 10. 最终摘要
 
-当前状态为 Draft：四个来源 merge 与 governance 提交已完成且 ancestry 明确。首次 post-governance clean quick 如实失败；required CI coverage 窄修复已提交，双 target QEMU 9.2.4 工具链已校验，但尚未 clean rerun。最终 baseline/official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。
+当前状态为 Draft：四个来源 merge、governance 与 CI coverage 修复已完成且 ancestry 明确。clean `05b12326` quick 已通过；其首次 baseline 的 6 FAIL + 1 INFRA_ERROR 已如实保留并完成窄修复/定向复验，但新的 clean canonical quick/baseline 尚未运行。official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。

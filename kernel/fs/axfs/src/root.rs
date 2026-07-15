@@ -3,11 +3,11 @@
 //! TODO: it doesn't work very well if the mount points have containment relationships.
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use axerrno::{ax_err, AxError, AxResult};
+use axerrno::{AxError, AxResult, ax_err};
 use axfs_vfs::{
     VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeRef, VfsNodeType, VfsOps, VfsResult,
 };
-use axns::{def_resource, ResArc};
+use axns::{ResArc, def_resource};
 use axsync::Mutex;
 use core::array;
 use lazyinit::LazyInit;

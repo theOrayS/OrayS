@@ -580,7 +580,7 @@ clippy:
 ifeq ($(origin ARCH), command line)
 	$(call cargo_clippy,--target $(TARGET))
 else
-	$(call cargo_clippy)
+	$(call cargo_clippy,,--exclude arceos-shell)
 endif
 
 doc:

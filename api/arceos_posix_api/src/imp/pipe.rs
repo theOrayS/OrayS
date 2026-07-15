@@ -10,7 +10,7 @@ use axsync::Mutex;
 #[cfg(feature = "multitask")]
 use axtask::WaitQueue;
 
-use super::fd_ops::{add_file_like, close_file_like, FileLike};
+use super::fd_ops::{FileLike, add_file_like, close_file_like};
 use crate::ctypes;
 
 #[derive(Copy, Clone, PartialEq)]

@@ -67,8 +67,7 @@ impl Disk {
             return Ok(());
         }
         self.flush()?;
-        self.dev
-            .read_block(self.block_id, &mut self.write_buffer)?;
+        self.dev.read_block(self.block_id, &mut self.write_buffer)?;
         self.write_buffer_block_id = self.block_id;
         self.write_buffer_dirty = true;
         Ok(())
@@ -94,8 +93,7 @@ impl Disk {
             if self.write_buffer_dirty && self.write_buffer_block_id == self.block_id {
                 buf[..count].copy_from_slice(&self.write_buffer[start..start + count]);
             } else {
-                self.dev
-                    .read_block(self.block_id, &mut self.read_buffer)?;
+                self.dev.read_block(self.block_id, &mut self.read_buffer)?;
                 buf[..count].copy_from_slice(&self.read_buffer[start..start + count]);
             }
 

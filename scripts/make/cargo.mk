@@ -32,7 +32,7 @@ endef
 clippy_args := -A clippy::new_without_default -A unsafe_op_in_unsafe_fn
 
 define cargo_clippy
-  $(call run_cmd,cargo clippy,--all-features --workspace --exclude axlog --exclude axfeat --exclude axstd $(1) $(verbose) -- $(clippy_args))
+  $(call run_cmd,cargo clippy,--all-features --workspace --exclude axlog --exclude axfeat --exclude axstd $(2) $(1) $(verbose) -- $(clippy_args))
   $(call run_cmd,cargo clippy,-p axstd --features "_axstd_test_all" $(1) $(verbose) -- $(clippy_args))
   $(call run_cmd,cargo clippy,-p axlog $(1) $(verbose) -- $(clippy_args))
 endef

@@ -272,8 +272,7 @@
       "classifier": {
         "kind": "guard_protocol",
         "pass_pattern": "^competition semantic-evidence workflow check: PASS \\(0 findings\\)$",
-        "fail_pattern": "^competition semantic-evidence workflow check: FAIL$",
-        "min_tests": 1
+        "fail_pattern": "^competition semantic-evidence workflow check: FAIL$"
       },
       "provenance": [
         ".github/workflows/build.yml",

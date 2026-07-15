@@ -284,7 +284,7 @@ EXIT_CODE_UNAMBIGUOUS_PROTOCOL_RE = re.compile(
     re.I,
 )
 EXIT_CODE_SOURCE_DISPLAY_LINE_RE = re.compile(
-    r"^\s*(?:\d+\s+(?:\||[+-])(?:\s|\|)|\|\s*(?:[|^]|$))"
+    r"^\s*(?:\d+\s+(?:\||[+\-~])(?:\s|\|)|\|\s*(?:[|^]|$))"
 )
 EXIT_CODE_WARNING_LINE_RE = re.compile(r"^\s*warning\s*:", re.I)
 EXIT_CODE_BUILD_PROGRESS_LINE_RE = re.compile(

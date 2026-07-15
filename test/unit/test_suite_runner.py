@@ -1058,6 +1058,7 @@ class SuiteRunnerTest(unittest.TestCase):
             "print('5 | source diagnostic mentions error handling'); "
             "print('308 | sys_epoll_wait(epfd, maxevents, timeout)'); "
             "print('309 | let timeout = request.timeout'); "
+            "print('5408 ~ && let Some(timeout) = file.object().next_timeout()'); "
             "print('command was aborted? no'); "
             "print('error count: 0'); "
             "print('failed attempts: 0'); "
