@@ -493,6 +493,26 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 - Remaining risks: clean quick rerun, baseline repair loop,
   exact QEMU evidence, official/full gates, independent review, and promotion.
 
+## 2026-07-15T12:34:57Z - CI repair committed and exact dual-target QEMU verified
+
+- CI repair commit: `761da910e8573e0f428846ce15c1fa863759d219`
+  (`ci: restore file-object Rust regression coverage`); the worktree was clean
+  immediately after commit.
+- The supervised source build completed with exit 0, followed by an independent
+  `bash test/evidence/setup_qemu.sh --verify-only
+  /tmp/orays-pr3-qemu-9.2.4 build/qemu-source` exit 0.
+- Both installed binaries report exactly `QEMU emulator version 9.2.4`:
+  - RISC-V64 SHA-256:
+    `00bf7520524a45d38508fe65a5b8f476b2db0c693a4d9e89547e2a9e38178878`;
+  - LoongArch64 SHA-256:
+    `2b1fead12bd7c7116fa10db04b5bcd8da4c2ac4f64b8c0f9a4ca436457cb6353`.
+- The installation stamp records the fixed source archive SHA-256
+  `f3cc1c4eabfdb288218ac3e33763dbe9e276d8bc890b867a2335d58de2ddd39a`,
+  size 134782772 bytes, target list
+  `riscv64-softmmu,loongarch64-softmmu`, and the fail-closed configure profile.
+- This proves the required emulator toolchain is available; it is not itself a
+  semantic-evidence or official-suite PASS. Those runs remain pending.
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -528,10 +548,11 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 |---|---|---|---:|---|---:|---|
 | `integration-suite-126e21a4-quick-1` | canonical quick | common / suite merge commit | 1 | FAIL | 259.665 s | `test/output/integration-suite-126e21a4-quick-1/summary.json` |
 | `integration-764211c5-quick-1` | canonical quick | common / governance commit | 1 | FAIL | 515.911347 s | 42 PASS, 2 FAIL, 1 TIMEOUT; `test/output/integration-764211c5-quick-1/summary.json` |
+| `qemu-setup-764211c5` | supervised source build + independent `--verify-only` | RISC-V64 + LoongArch64 toolchain | 0 | PASS | 分项 | exact 9.2.4 versions, fixed source/stamp and binary SHA-256 values |
 | pre-commit focused PR3 suites | 33+75+27+9+41+26+36+133+23+8+7 methods/checks | host | 0 | PASS | 分项 | 外部 journal checkpoint 2026-07-15T11:58:16Z |
 | pre-commit raw LA smoke | supervised exact QEMU 9.2.4 | LA64 | 0 | PASS | 分项 | 外部 ignored build evidence |
 | pre-commit raw RV smoke | supervised QEMU 6.2.0 | RV64 | 0 | BLOCKED | 分项 | markers complete，但版本不满足 required contract |
-| pending | canonical quick on final candidate | common |  | BLOCKED |  | 治理提交后执行 |
+| pending | canonical quick on repaired candidate | common |  | BLOCKED |  | QEMU build 已释放主机；clean rerun 待执行 |
 | pending | canonical baseline | RV64 + LA64 |  | BLOCKED |  | exact QEMU 9.2.4 准备后执行 |
 | pending | canonical official RV | RISC-V64 |  | BLOCKED |  | 尚未执行 |
 | pending | canonical official LA | LoongArch64 |  | BLOCKED |  | 尚未执行 |
@@ -572,4 +593,4 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 
 # 10. 最终摘要
 
-当前状态为 Draft：四个来源 merge 与 governance 提交已完成且 ancestry 明确。首次 post-governance clean quick 如实失败；本提交包含的 required CI coverage 窄修复已通过 focused tests，但尚未 clean rerun。最终 baseline/official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。
+当前状态为 Draft：四个来源 merge 与 governance 提交已完成且 ancestry 明确。首次 post-governance clean quick 如实失败；required CI coverage 窄修复已提交，双 target QEMU 9.2.4 工具链已校验，但尚未 clean rerun。最终 baseline/official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。

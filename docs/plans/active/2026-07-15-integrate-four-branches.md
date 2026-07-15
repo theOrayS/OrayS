@@ -37,7 +37,7 @@
 - [x] 显式 merge统一测试套件：`126e21a402dc773b1057fcb83f204d11b62d3a4b`。
 - [x] 显式 merge PR3：`03269960bb440e45f6e97999c20532cb3977c9be`。
 - [x] 完成并提交 workflow governance 安装：`764211c5c221d7c64d57a658eac05fe7c5cee38c`。
-- [ ] 构建并校验双 target QEMU 9.2.4。
+- [x] 构建并校验双 target QEMU 9.2.4；固定源码 SHA-256 与安装戳、两个 target 版本及二进制摘要均已复核。
 - [ ] 在最终候选 HEAD 上依次通过 quick、baseline、RV official、LA official 和 full。
 - [ ] 完成独立只读 reviewer 审查，清零 blocker/major finding，并在必要修复后从头重跑门禁。
 - [ ] 重新 fetch 并确认 `origin/main` 未从初始基线漂移。
