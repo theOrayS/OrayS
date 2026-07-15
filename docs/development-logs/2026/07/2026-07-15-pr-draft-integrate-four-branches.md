@@ -1,15 +1,15 @@
 ---
 title: "PR draft: integrate four OrayS branches"
 date_started: 2026-07-15
-date_completed: null
-status: draft
+date_completed: 2026-07-15
+status: blocked
 pr: null
 branch: "integration/four-prs-20260715"
 authors:
   - "Codex primary agent (AI-assisted integration operator)"
 reviewers: []
 base_commit: "921171ac1ef5c85ab5a7cd1882dd40e1471b79f0"
-head_commit: null
+head_commit: "7eaf3c1c1e164115de4c41cbf0f2f569d621e875"
 capability_domains:
   - linux-abi-boundary
   - file-object-event-core
@@ -44,7 +44,8 @@ capability_domains:
 - [x] 四个来源 tip 都以独立 no-ff merge parent 保留且 ancestry 可验证。
 - [x] 最终测试所有权唯一落在 `test/`，59 个 case 可显式列出。
 - [x] workflow governance 独立提交且文档完整。
-- [ ] 最终候选 HEAD 的 quick、baseline、RV official、LA official、full 均明确 PASS。
+- [x] 最终候选 HEAD 的 quick、baseline、RV official、LA official、full 均已真实执行并保留证据。
+- [ ] 上述五个 canonical gate 均明确 PASS（RV、LA、full 当前为 `INFRA_ERROR`）。
 - [ ] 独立只读 reviewer 的 blocker/major finding 清零。
 - [ ] 最终远端 freshness、安全推广和推送完成。
 
@@ -663,6 +664,86 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 - These are focused dirty-worktree results, not a canonical baseline PASS. The repair
   still requires a scoped commit followed by fresh clean quick and baseline runs.
 
+## 2026-07-15T14:12:22Z - cargo evidence contract repaired and clean gates passed
+
+- Commit `0c6c2f58afad9a83b3be74da78a0e539e0a43fe3` contains the reviewed
+  identity-bound cargo/unittest/expected-panic repair and the executable axns doctest.
+- Clean/stable quick passed 45/45 in 289.904906 s; clean/stable baseline passed 57/57
+  in 771.339618 s. Their summary SHA-256 values are respectively
+  `69b0079310482c75ccea773bb381c7d7ff96a6c78fffcbdc2feb322381b16012` and
+  `544d35e388217950a73099b4886e88a1da1733b9dbc2c68f34f140d0601b333f`.
+- The first official RV launch failed honestly before guest boot because the original
+  exact QEMU 9.2.4 smoke build lacked the required `user` netdev. A second external
+  QEMU 9.2.4 prefix was built from the same pinned source archive with system libslirp;
+  both target binaries, `qemu-img`, version and backend inventory were verified without
+  changing repository source or the fixed PR3-smoke profile.
+- The next RV run completed all 24 guest groups and normal shutdown but remained
+  `INFRA_ERROR`: strict parsing first exposed normal ANSI controls. Immutable-log replay
+  then drove a generic fail-closed repair; old summaries were not rewritten.
+
+## 2026-07-15T16:30:57Z - structured official output repair committed
+
+- Commit `7eaf3c1c1e164115de4c41cbf0f2f569d621e875` recognizes only bounded ANSI
+  clear/style sequences while retaining printable failure payload and rejecting
+  malformed controls. Contextual scanning distinguishes benign diagnostics from real
+  TFAIL/TBROK/TCONF/ENOSYS/nonzero/timeout/panic/trap evidence.
+- The generic producer owns exactly one group frame and emits PASS only after child
+  status 0. Nonzero/timeout/launch/preparation/malformed-frame outcomes remain failing;
+  specialized LTP, BusyBox and libctest producers were not weakened. No testcase,
+  group, input or host-path-specific success rule was added.
+- Exact focused checks before commit: official parser 106/106, suite runner 133/133,
+  evaluator-integrity mutations 23/23, static guard 0 findings, repository rustfmt,
+  diff check, and both architecture kernel builds all passed.
+
+## 2026-07-15T16:36:27Z - final-candidate quick and baseline passed
+
+- On clean/stable `7eaf3c1c...`, quick passed 45/45 in 295.325320 s; summary SHA-256
+  `5bac5095f9527a29709d30c44134fb81e1be5b955a43c0a9357f43174410d846`.
+- The same candidate baseline passed 57/57 in 826.131206 s; summary SHA-256
+  `a9b11b36182e64e2b092df47eda799aef279c9390f0ab5538237d23204af812c`.
+- Both runs record matching start/final commit, clean start/final status, and stable
+  provenance. Neither result was extrapolated to official/full.
+
+## 2026-07-15T18:17:30Z - final-candidate official RV completed non-passing
+
+- All 24/24 guest groups ran and the guest shut down normally; child status was 0.
+  Canonical runner exit 2 / `INFRA_ERROR`, 4956.178130 s, because strict semantic
+  parsing returned `ERROR`.
+- Exactly two structural errors identify the duplicate BusyBox plan row
+  `echo "bbbbbbb" >> test.txt`, once per libc group. Additionally 112 semantic failure
+  records preserve forbidden statuses, LTP internals, timeout, panic/trap, libctest and
+  an explicit cyclictest-musl group failure.
+- Aggregates: LTP musl 981/19/0, LTP glibc 987/13/0, libctest musl 217/0,
+  libctest glibc 179/38 with 2 timed-out entries; cyclictest-musl exited 137 after an
+  explicit 900 s timeout. Summary SHA-256:
+  `5d95f5b8dd3c3e5210e1dd178557486774a9225961f49bbf8225d17fa0d7a5c2`.
+
+## 2026-07-15T19:40:50Z - final-candidate official LA completed non-passing
+
+- All 24/24 guest groups ran and the guest shut down normally; child status was 0.
+  Canonical runner exit 2 / `INFRA_ERROR`, 4880.545466 s, again with the same two
+  duplicate BusyBox structural errors plus 158 preserved semantic failure records.
+- Aggregates: LTP musl 975/25/0, LTP glibc 984/16/0, libctest musl 217/0,
+  libctest glibc 179/38 with 2 timed-out entries. Both cyclictest groups returned
+  status-bound PASS. Summary SHA-256:
+  `551f1e3dd221d3b14cd498aa6b322c9fa0bf6258a5f2805d888f1f88d6e70d9b`.
+
+## 2026-07-15T22:34:19Z - exact full/all gate completed and promotion blocked
+
+- Exact full/all on clean/stable `7eaf3c1c...` ran 59/59 cases in 10194.568365 s:
+  57 PASS and 2 `INFRA_ERROR`; exit 2. Start/final commit and dirty inventories match,
+  and `runner_provenance_stable` is true.
+- Both official cases again completed 24/24 groups and normal shutdown. Full-run RV
+  retained 2 structural errors + 117 failures (LTP musl 981/19/0, glibc 985/15/0,
+  cyclictest-musl timeout); LA retained 2 structural errors + 156 failures (LTP musl
+  975/25/0, glibc 984/16/0, both cyclictest groups PASS).
+- Summary SHA-256 is
+  `1c8906d0b2e4fafbdbb69e9396b8b655156c633aa8f32b1661bef604bc51202a`.
+  The run left no overlay. Both image hashes equal their preflight values, and both
+  immutable guest logs end in normal architecture-specific shutdown markers.
+- Required promotion conditions are false. `main` must remain unchanged; the safe
+  terminal state is `BLOCKED`, not a parser waiver, image mutation, or fake PASS.
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -692,7 +773,23 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 | RISC-V64 | `sdcard-rv.img` | `4336475432728e485bc52f54f0b8ef06910e84d7c425fbba49361a4065cccb99` | 用户提供的 canonical official backing image，只读 |
 | LoongArch64 | `sdcard-la.img` | `1aa79d03cf41e2a80ae4ed43771101c1e67ec8db41c3c20b77792fe6b1b85b50` | 用户提供的 canonical official backing image，只读 |
 
-当前测试结果（最终候选门禁尚未开始；下表不会把定向或旧提交证据写成最终 PASS）：
+最终候选 evidence HEAD 为完整
+`7eaf3c1c1e164115de4c41cbf0f2f569d621e875`。五个最终 run 均使用
+`PYTHONDONTWRITEBYTECODE=1`、`PYTHONPYCACHEPREFIX=/dev/null`、
+`PYTHONNOUSERSITE=1`、`LIBCLANG_PATH=/usr/lib/llvm-21/lib`，以及 external
+QEMU 9.2.4 / clang-21 shim 的固定 PATH；official/full 另显式设置
+`RV_TESTSUITE_IMG=/root/sdcard-rv.img` 与
+`LA_TESTSUITE_IMG=/root/sdcard-la.img`。summary 中保留的精确参数为：
+
+```text
+/usr/bin/python3 -I -S -B -X pycache_prefix=/dev/null /root/oskernel2026-orays/test/run_suite.py --profile quick --output-dir test/output/integration-7eaf3c1c-quick-1
+/usr/bin/python3 -I -S -B -X pycache_prefix=/dev/null /root/oskernel2026-orays/test/run_suite.py --profile baseline --output-dir test/output/integration-7eaf3c1c-baseline-1
+/usr/bin/python3 -I -S -B -X pycache_prefix=/dev/null /root/oskernel2026-orays/test/run_suite.py --profile official --arch rv --output-dir test/output/integration-7eaf3c1c-official-rv-1
+/usr/bin/python3 -I -S -B -X pycache_prefix=/dev/null /root/oskernel2026-orays/test/run_suite.py --profile official --arch la --output-dir test/output/integration-7eaf3c1c-official-la-1
+/usr/bin/python3 -I -S -B -X pycache_prefix=/dev/null /root/oskernel2026-orays/test/run_suite.py --profile full --arch all --output-dir test/output/integration-7eaf3c1c-full-all-1
+```
+
+测试结果（保留首次失败；定向或旧提交证据不替代最终 clean-HEAD gate）：
 
 | Run ID | 命令 | 架构/目标 | 退出码 | 结果 | 耗时 | 原始证据 |
 |---|---|---|---:|---|---:|---|
@@ -708,13 +805,18 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 | pre-commit raw RV smoke | supervised QEMU 6.2.0 | RV64 | 0 | BLOCKED | 分项 | markers complete，但版本不满足 required contract |
 | dirty-baseline-repair-focused | units + fmt + host/RV64/LA64 clippy + semantic evidence/aggregate | host + RV64 + LA64 | 0 | PASS | 分项 | 定向复验；不是 canonical verdict；`build/pr3-evidence/required/semantic-evidence-v1.json` |
 | dirty-cargo-contract-focused | parser positive/mutation fixtures + exact runner regression + axns doctest | host | 0 | PASS | 193.694 s + 分项 | 133/133 runner；axns 2 passed/0 ignored；不是 canonical verdict |
-| pending | canonical quick on newly committed cargo-contract candidate | common |  | BLOCKED |  | 尚未提交/执行 |
-| pending | canonical baseline on the same candidate | RV64 + LA64 |  | BLOCKED |  | 尚未执行 |
-| pending | canonical official RV | RISC-V64 |  | BLOCKED |  | 尚未执行 |
-| pending | canonical official LA | LoongArch64 |  | BLOCKED |  | 尚未执行 |
-| pending | canonical full all | RV64 + LA64 |  | BLOCKED |  | 尚未执行 |
+| `integration-0c6c2f58-quick-1` | canonical quick | common / clean `0c6c2f58` | 0 | PASS | 289.904906 s | 45/45；summary SHA-256 `69b00793...6012` |
+| `integration-0c6c2f58-baseline-1` | canonical baseline | host + RV64 + LA64 / clean `0c6c2f58` | 0 | PASS | 771.339618 s | 57/57；summary SHA-256 `544d35e3...33f` |
+| `integration-0c6c2f58-official-rv-1` | canonical official RV | RISC-V64 | 1 | FAIL | 48.819969 s | exact QEMU lacked `user` netdev；guest 未启动；summary SHA-256 `2bcb26cc...097` |
+| `integration-0c6c2f58-official-rv-2` | canonical official RV | RISC-V64 | 2 | INFRA_ERROR | 3962.030039 s | 24/24 groups + normal shutdown；ANSI strict parser blocker；summary SHA-256 `156958cd...c1` |
+| `integration-7eaf3c1c-quick-1` | canonical quick | common / clean `7eaf3c1c` | 0 | PASS | 295.325320 s | 45/45；summary SHA-256 `5bac5095...d846` |
+| `integration-7eaf3c1c-baseline-1` | canonical baseline | host + RV64 + LA64 / clean `7eaf3c1c` | 0 | PASS | 826.131206 s | 57/57；summary SHA-256 `a9b11b36...812c` |
+| `integration-7eaf3c1c-official-rv-1` | canonical official | RISC-V64 / clean `7eaf3c1c` | 2 | INFRA_ERROR | 4956.178130 s | 24/24 + shutdown；2 structural + 112 semantic failures；summary SHA-256 `5d95f5b8...a5c2` |
+| `integration-7eaf3c1c-official-la-1` | canonical official | LoongArch64 / clean `7eaf3c1c` | 2 | INFRA_ERROR | 4880.545466 s | 24/24 + shutdown；2 structural + 158 semantic failures；summary SHA-256 `551f1e3d...0d9b` |
+| `integration-7eaf3c1c-full-all-1` | canonical full | RV64 + LA64 / clean `7eaf3c1c` | 2 | INFRA_ERROR | 10194.568365 s | 59/59：57 PASS + 2 INFRA_ERROR；summary SHA-256 `1c8906d0...1202a` |
 
-结果状态只使用 `PASS`、`FAIL`、`ERROR`、`TIMEOUT`、`BLOCKED`、`SKIPPED`。上表将在每次 clean-HEAD canonical run 后追加；首次失败不会被删除。
+`INFRA_ERROR` 是 canonical runner 的原始 fail-closed 状态；不得重标为 PASS。
+首次失败与非 canonical 探测均保留，后续成功不会改写旧 verdict。
 
 # 8. 最终审查
 
@@ -733,17 +835,25 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 
 ## 已知限制
 
-- suite merge commit 上 clean quick 的 RR skipped-task aging 检查真实失败。
-- `05b12326` baseline 的七个 non-pass 已由 clean `1c0e3ba0` baseline 关闭；
-  `1c0e3ba0` 又保留了一个 workspace cargo-contract FAIL。其 parser/doctest
-  修复已有正反例与 133/133 定向验证，但仍需新 clean HEAD 的 canonical rerun。
-- 当前官方 image plan 的 BusyBox duplicate identity 可能使 official gate 成为外部输入 blocker。
-- RV required semantic evidence 尚缺 exact QEMU 9.2.4 的 canonical post-commit run。
-- 尚无独立 reviewer 或人类可解释性确认。
+- 最终 quick 45/45 与 baseline 57/57 已关闭早期 RR、cargo-contract 和 evidence
+  基线失败；旧 run 的失败仍保留，不能被后来 PASS 改写。
+- 两份 official image 中的 tracked BusyBox plan 都有 55 行但仅 54 个唯一身份：
+  `echo "bbbbbbb" >> test.txt` 重复两次。每个 libc group 都因此产生一条
+  `busybox-duplicate-case`，这是需要外部计划修正并有意识重新 snapshot 的阻断；
+  本集成不得弱化 duplicate 检测或直接修改 trusted backing image。
+- 即使外部计划修正，生产语义仍非通过：full RV 保留 117 条 failure record，
+  full LA 保留 156 条，涵盖 LTP TFAIL/TBROK/nonzero/timeout/panic-trap、
+  libctest-glibc 失败；RV cyclictest-musl 还明确 900 s timeout/exit 137。
+- 独立 RV run 的 LTP glibc 为 987/13，full RV 为 985/15；该差异需要在后续
+  生产修复和重复运行中诊断，不能挑选更绿色的一次作为完成证据。
+- 独立只读 AI reviewer 尚待执行；人类负责人也尚未确认可独立解释和调试。
 
 ## 后续工作
 
-提交已审计的 cargo-contract/doctest repair；按 quick、baseline、RV official、LA official、full 顺序运行并检查 summary；只修复真实且在任务范围内的缺陷；独立审查；必要时从头重跑；最后重新 fetch 并决定推广或 BLOCKED/FAILED。
+先完成独立只读审查并处置 blocker/major finding；修正外部 BusyBox plan 后，
+通过受控 provenance 流程重新生成两架构 backing image。随后按失败记录修复真实
+内核/libc 语义和 RV cyclictest 超时，重新运行 quick、baseline、RV official、
+LA official、full/all。只有所有项目明确 PASS 且远端仍新鲜时才能另行推广 main。
 
 ## 回滚方式
 
@@ -751,4 +861,11 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 
 # 10. 最终摘要
 
-当前状态为 Draft：四个来源 merge、governance 与 CI coverage 修复已完成且 ancestry 明确。clean `1c0e3ba0` quick 已通过；其 baseline 如实保留 56 PASS + 1 FAIL。该 workspace cargo-contract FAIL 的全部分层输入已定位，parser/doctest 窄修复通过正反例、133/133 runner 与 2/2 doctest 定向复验，但尚未提交，也没有新的 clean canonical verdict。official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。
+当前状态为 `blocked`。四个来源以独立 no-ff merge 保留，workflow governance、
+CI coverage、cargo evidence contract 和 generic official framing 均已提交并通过
+定向复验。clean `7eaf3c1c...` quick 为 45/45 PASS，baseline 为 57/57 PASS；
+但 RV/LA official 均为 `INFRA_ERROR`，full/all 为 59/59 completed、57 PASS +
+2 INFRA_ERROR。两架构都有不可变 trusted BusyBox plan 重复项和大量真实语义
+失败，RV 另有 cyclictest-musl 900 s timeout。因此 `main` 不得移动或推送；
+本日志不宣称 ready/merged/PROMOTED，待独立审查后只允许安全保留 integration
+分支和精确阻断报告。
