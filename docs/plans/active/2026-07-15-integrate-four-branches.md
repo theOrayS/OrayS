@@ -42,19 +42,23 @@
 - [x] 对首次 baseline 的七个 non-pass 完成窄修复与 dirty-worktree 定向复验；host/RV64/LA64 clippy、workspace unit、三架构 semantic-evidence shard 与 aggregate 均真实退出 0，但这些结果不是 canonical verdict。
 - [x] 在 clean/stable `1c0e3ba0396fcd9d8dde2ef6bb1cfc34e32647f5` 上完成 canonical quick：45/45 PASS；同提交 baseline 如实保留 56 PASS、1 FAIL。
 - [x] 对该 baseline 的 cargo 结果合同完成 fail-closed 聚焦修复：精确记账 identity-bound unittest、同名 `should_panic` 和 `--no-fail-fast` 选项，同时用反例证明额外 failure/panic/TCONF/TBROK/TFAIL/ENOSYS/timeout/unknown 仍非通过；并把唯一 ignored axns doctest 改为真实 2/2 执行。最终 dirty-worktree runner 回归 133/133，但不是 canonical verdict。
-- [ ] 在最终候选 HEAD 上依次通过 quick、baseline、RV official、LA official 和 full。
-- [ ] 完成独立只读 reviewer 审查，清零 blocker/major finding，并在必要修复后从头重跑门禁。
+- [x] 提交 cargo-contract 修复 `0c6c2f58afad9a83b3be74da78a0e539e0a43fe3`，并在 clean/stable HEAD 上取得 quick 45/45、baseline 57/57 PASS。
+- [x] 提交 generic fail-closed official framing 修复 `7eaf3c1c1e164115de4c41cbf0f2f569d621e875`，parser 仍保留 TFAIL/TBROK/TCONF/ENOSYS/nonzero/timeout/panic/trap，且没有 testcase/group/path 特化。
+- [x] 在 `7eaf3c1c...` 上真实执行最终 quick、baseline、RV official、LA official 和 full：quick 45/45、baseline 57/57 PASS；RV/LA official 均 `INFRA_ERROR`；full 59/59 completed、57 PASS + 2 INFRA_ERROR。
+- [ ] 上述全部 canonical gate 明确 PASS；当前外部 BusyBox duplicate plan 和真实 official 语义失败仍阻断。
+- [x] 完成第一次独立只读 reviewer 审查：0 Blocker、1 Major、1 Minor；未把已知门禁 non-pass 计作 review finding。
+- [ ] 关闭 reviewer Major（semantic smoke unsafe 契约）与 Minor（本计划状态），重跑双架构 smoke 和最终 full，并完成 follow-up review。
 - [ ] 重新 fetch 并确认 `origin/main` 未从初始基线漂移。
 - [ ] 安全推广/推送，或给出不夸大的 `BLOCKED` / `FAILED` 终态。
 
 ## 已知风险
 
-- 统一套件首次 clean quick 在 suite merge commit 上真实失败：RR skipped-task aging 守卫及其 current-tree 单测均非 PASS。
-- clean `05b12326` baseline 的七个 non-pass 已由 `1c0e3ba0` clean rerun 关闭；该次 rerun 又诚实暴露 workspace cargo 合同 FAIL。最先命中的是合法 `should_panic` 的原始 stderr；逐层重分类又揭示 `--no-fail-fast` 命令回显、嵌套 identity-bound unittest 成功块和一个真实 ignored doctest。当前修复均有正反例，但仍须提交后在新 clean/stable HEAD 重跑完整 quick/baseline，不能外推 dirty 结果。
+- 统一套件首次 quick、早期 baseline 与 cargo-contract 的真实失败均保留在开发日志；它们已由后续 clean quick/baseline 关闭，但旧 verdict 不被重写。
 - axfs 失败来自已过期测试仍依赖早先删除的固定 `/dev/foo/bar` 假节点。曾尝试在生产 `RootDirectory` 路由前全局 canonicalize 路径，但它会改变 `..` 穿越 mount 边界的既有语义，已完整撤回；最终只让测试使用真实 `/dev/zero`，没有恢复假能力或改变生产路由。
-- 当前官方镜像的 BusyBox 计划含重复身份；若最终 official parser 仍拒绝，属于镜像/计划 blocker，不能弱化去重约束。
-- RV 宿主默认 QEMU 为 6.2.0；required evidence 必须使用从固定源码构建并校验的双 target QEMU 9.2.4。
-- official/full 单次运行时间长；中断目录不是 verdict，必须保留并明确标记。
+- 两架构 trusted BusyBox plan 均为 55 行、54 个唯一身份；每个 libc group 都产生一条 duplicate error。必须受控修正外部计划并重新 snapshot，不能弱化去重约束或原地改 backing image。
+- full RV 保留 117、LA 保留 156 条真实 failure record；RV cyclictest-musl 另有明确 900 s timeout/exit 137。外部 plan 修正也不会自动关闭这些生产语义失败。
+- 独立 reviewer 发现 PR3 semantic smoke 的新增 unsafe 缺少代码级不变量/调用者责任/测试依据。当前正在补契约注释；修复后仍须真实双架构 smoke 与 full，不能用旧 PASS 代替。
+- official/full 单次运行时间长；中断目录不是 verdict，必须保留并明确标记。最终 full 已完成一次，不因 reviewer 修复重跑而删除。
 
 ## 验证合同
 
