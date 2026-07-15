@@ -28,9 +28,10 @@ pub mod config {
 
 /// POSIX C types.
 #[rustfmt::skip]
-#[path = "./ctypes_gen.rs"]
 #[allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals, clippy::upper_case_acronyms, missing_docs)]
-pub mod ctypes;
+pub mod ctypes {
+    include!(concat!(env!("OUT_DIR"), "/ctypes_gen.rs"));
+}
 
 pub use signal::PosixSignalIf;
 

@@ -12,11 +12,17 @@ handled as wrapper pass while internal LTP signals remain visible.
 from __future__ import annotations
 
 import argparse
-import datetime as _dt
+import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+
+from evaluator_protocol import parse_evaluator_bytes
+
+
+MAX_EVALUATOR_LOG_BYTES = 64 * 1024 * 1024
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 GROUP_START_RE = re.compile(r"#### OS COMP TEST GROUP START (.+?) ####")
@@ -65,25 +71,21 @@ class LtpCase:
     enosys: bool = False
     panic: bool = False
     evidence: list[str] = field(default_factory=list)
+    state: str = "error"
 
     @property
     def failed(self) -> bool:
-        return (
-            self.timed_out
-            or self.panic
-            or self.enosys
-            or bool(self.internal & {"TFAIL", "TBROK"})
-            or (self.code is not None and self.code != 0)
-        )
+        return self.state in {"fail", "error", "timeout"}
 
     @property
     def tconf_only(self) -> bool:
-        return not self.failed and "TCONF" in self.internal
+        return self.state == "skipped"
 
 
 @dataclass
 class LogReport:
     path: Path
+    protocol: dict = field(default_factory=dict)
     ltp_cases: dict[tuple[str, str], LtpCase] = field(default_factory=dict)
     ltp_manifests: list[str] = field(default_factory=list)
     ltp_summaries: list[str] = field(default_factory=list)
@@ -96,6 +98,8 @@ class LogReport:
     panic_lines: list[str] = field(default_factory=list)
     enosys_lines: list[str] = field(default_factory=list)
     official_libctest: list[OfficialLibctestJudge] = field(default_factory=list)
+    official_judge_status: str = "not-requested"
+    official_judge_errors: list[str] = field(default_factory=list)
 
 
 def clean(line: str) -> str:
@@ -103,18 +107,61 @@ def clean(line: str) -> str:
 
 
 def bullet_escape(text: str, limit: int = 220) -> str:
-    text = text.replace("|", "\\|").strip()
+    text = (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("`", "\\`")
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .strip()
+    )
     if len(text) > limit:
         return text[: limit - 3] + "..."
     return text
 
 
+def read_log_bytes(path: Path) -> bytes:
+    if not path.is_file():
+        raise ValueError(f"not a regular evaluator log: {path}")
+    size = path.stat().st_size
+    if size > MAX_EVALUATOR_LOG_BYTES:
+        raise ValueError(
+            f"evaluator log exceeds limit ({size} > {MAX_EVALUATOR_LOG_BYTES} bytes): {path}"
+        )
+    try:
+        return path.read_bytes()
+    except MemoryError as exc:
+        raise ValueError(f"cannot allocate memory for evaluator log: {path}") from exc
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def parse_log(path: Path) -> LogReport:
-    report = LogReport(path=path)
+    raw_bytes = read_log_bytes(path)
+    protocol = parse_evaluator_bytes(raw_bytes)
+    report = LogReport(path=path, protocol=protocol)
     current_group = "ungrouped"
     current_ltp: LtpCase | None = None
 
-    for raw in path.read_text(errors="replace").splitlines():
+    for raw in raw_bytes.decode("latin-1").splitlines():
         line = clean(raw)
         if match := GROUP_START_RE.search(line):
             current_group = match.group(1)
@@ -193,6 +240,37 @@ def parse_log(path: Path) -> LogReport:
             else:
                 report.panic_lines.append(f"{current_group}: {line.strip()}")
 
+    legacy_cases = report.ltp_cases
+    protocol_cases: dict[tuple[str, str], LtpCase] = {}
+    for item in protocol["cases"]:
+        key = (item["group"], item["case"])
+        legacy = legacy_cases.get(key)
+        signals = item["signals"]
+        markers = {
+            marker
+            for marker in ("TFAIL", "TBROK", "TCONF")
+            if signals.get(marker, 0)
+        }
+        evidence = [] if legacy is None else legacy.evidence
+        if item["state"] != "pass":
+            evidence = [
+                *evidence,
+                f"protocol state={item['state']} run_line={item['run_line']} result_line={item['result_line']}",
+            ]
+        protocol_cases[key] = LtpCase(
+            group=item["group"],
+            name=item["case"],
+            code=item["code"],
+            timed_out=item["timed_out"],
+            timeout_secs=item["timeout_seconds"],
+            runtime_ms=None if legacy is None else legacy.runtime_ms,
+            internal=markers,
+            enosys=bool(signals.get("enosys")),
+            panic=bool(signals.get("panic_trap")),
+            evidence=evidence,
+            state=item["state"],
+        )
+    report.ltp_cases = protocol_cases
     return report
 
 
@@ -219,7 +297,7 @@ def parse_libctest_passes(text: str) -> dict[str, int]:
 def parse_libctest_baseline(judge_file: Path) -> dict[str, int]:
     """Extract the official libctest baseline embedded in a judge script."""
 
-    text = judge_file.read_text(errors="replace")
+    text = judge_file.read_text(encoding="utf-8")
     match = re.search(r'libctest_baseline\s*=\s*"""(.*?)"""', text, re.S)
     if not match:
         return {}
@@ -231,7 +309,7 @@ def extract_group_sections(path: Path) -> dict[str, str]:
 
     sections: dict[str, list[str]] = {}
     current_group: str | None = None
-    for raw in path.read_text(errors="replace").splitlines():
+    for raw in read_log_bytes(path).decode("latin-1").splitlines():
         line = clean(raw)
         if match := GROUP_START_RE.search(line):
             current_group = match.group(1)
@@ -247,17 +325,31 @@ def extract_group_sections(path: Path) -> dict[str, str]:
 def attach_official_libctest_judge(report: LogReport, judge_dir: Path) -> None:
     """Attach section-scoped official libctest judge results when judges exist."""
 
+    report.official_judge_status = "complete"
     sections = extract_group_sections(report.path)
+    applicable = 0
     for group, judge_name in (
         ("libctest-musl", "judge_libctest-musl.py"),
         ("libctest-glibc", "judge_libctest-glibc.py"),
     ):
         section = sections.get(group)
         judge_file = judge_dir / judge_name
-        if section is None or not judge_file.is_file():
+        if section is None:
             continue
-        baseline = parse_libctest_baseline(judge_file)
+        applicable += 1
+        if not judge_file.is_file():
+            report.official_judge_status = "error"
+            report.official_judge_errors.append(f"missing judge file: {judge_file.name}")
+            continue
+        try:
+            baseline = parse_libctest_baseline(judge_file)
+        except (OSError, UnicodeError) as exc:
+            report.official_judge_status = "error"
+            report.official_judge_errors.append(f"cannot parse {judge_file.name}: {exc}")
+            continue
         if not baseline:
+            report.official_judge_status = "error"
+            report.official_judge_errors.append(f"empty baseline: {judge_file.name}")
             continue
         observed = parse_libctest_passes(section)
         failed = sorted(key for key in baseline if key not in observed)
@@ -269,6 +361,8 @@ def attach_official_libctest_judge(report: LogReport, judge_dir: Path) -> None:
                 failed=failed,
             )
         )
+    if applicable == 0 and report.official_judge_status == "complete":
+        report.official_judge_status = "not-applicable"
 
 
 def ltp_failed_cases(report: LogReport) -> list[LtpCase]:
@@ -291,11 +385,10 @@ def write_section_list(lines: list[str], title: str, rows: Iterable[str], empty:
 
 
 def render_markdown(reports: list[LogReport]) -> str:
-    now = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
     lines: list[str] = [
         "# OSKernel 官方评测未通过用例记录",
         "",
-        f"生成时间：{now}",
+        "本文件由所列原始日志确定性生成；相同输入会得到逐字节相同的报告。",
         "",
         "说明：本报告由 evaluator 原始日志只读生成；非零退出、TIMEOUT、libctest/busybox fail、官方组 FAIL、LTP TFAIL/TBROK 均列为未通过；LTP TCONF 单独列为配置性未通过/跳过。",
         "若传入官方 judge 目录，libctest 会额外按官方 `judge_libctest-*.py` 的 section-scoped `START ...` + literal `Pass!` 规则列出缺失/未 Pass 项；这会暴露 wrapper 未运行但官方 baseline 计分的 case。",
@@ -303,19 +396,25 @@ def render_markdown(reports: list[LogReport]) -> str:
         "",
         "## 汇总",
         "",
-        "| 日志 | LTP失败 | LTP TCONF-only | libctest失败(日志) | libctest失败(官方judge) | busybox失败 | 官方组非零退出 | autorun故障 | 官方组超时 | panic/trap | ENOSYS/not implemented |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| 日志 | protocol state | integrity diagnostics | LTP失败 | LTP TCONF-only | libctest失败(日志) | libctest失败(官方judge) | busybox失败 | 官方组非零退出 | autorun故障 | 官方组超时 | panic/trap | ENOSYS/not implemented |",
+        "| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for report in reports:
         lines.append(
             "| "
             + " | ".join(
                 [
-                    bullet_escape(str(report.path)),
+                    bullet_escape(report.path.name),
+                    report.protocol["state"],
+                    str(len(report.protocol["diagnostics"])),
                     str(len(ltp_failed_cases(report))),
                     str(len(ltp_tconf_cases(report))),
                     str(len(report.libctest_failures)),
-                    str(sum(item.failed_count for item in report.official_libctest)),
+                    (
+                        str(sum(item.failed_count for item in report.official_libctest))
+                        if report.official_judge_status == "complete"
+                        else f"N/A ({report.official_judge_status})"
+                    ),
                     str(len(report.busybox_failures)),
                     str(len(report.group_failures)),
                     str(len(report.autorun_failures)),
@@ -329,8 +428,25 @@ def render_markdown(reports: list[LogReport]) -> str:
     lines.append("")
 
     for report in reports:
-        lines.append(f"## {report.path}")
+        lines.append(f"## {bullet_escape(report.path.name)}")
         lines.append("")
+        lines.append(f"- Protocol state: **{report.protocol['state'].upper()}**")
+        lines.append(f"- Protocol diagnostics: {len(report.protocol['diagnostics'])}")
+        lines.append(f"- Raw size: {report.protocol['size_bytes']} bytes")
+        lines.append(f"- Raw SHA-256: `{report.protocol['raw_sha256']}`")
+        lines.append(f"- Official judge status: {report.official_judge_status}")
+        lines.append("")
+        if report.protocol["diagnostics"]:
+            write_section_list(
+                lines,
+                "Evaluator protocol integrity errors",
+                (
+                    f"line {item['line']}: {item['code']} - {item['detail']}"
+                    for item in report.protocol["diagnostics"]
+                ),
+            )
+        if report.official_judge_errors:
+            write_section_list(lines, "Official judge provenance errors", report.official_judge_errors)
         if report.ltp_manifests:
             write_section_list(lines, "LTP case list", report.ltp_manifests)
         if report.ltp_summaries:
@@ -371,7 +487,10 @@ def render_markdown(reports: list[LogReport]) -> str:
         else:
             for case in tconf:
                 evidence = "; ".join(case.evidence[:2])
-                lines.append(f"- `{case.group}` `{case.name}`: {bullet_escape(evidence)}")
+                lines.append(
+                    f"- {bullet_escape(case.group)} / {bullet_escape(case.name)}: "
+                    f"{bullet_escape(evidence)}"
+                )
         lines.append("")
 
         write_section_list(lines, "libctest 失败", report.libctest_failures)
@@ -401,16 +520,71 @@ def main() -> int:
         default=None,
         help="optional official /root/autotest-for-oskernel/kernel/judge directory for section-scoped libctest baseline parsing",
     )
+    parser.add_argument(
+        "--require-clean",
+        action="store_true",
+        help="return 1 for valid non-pass evidence and 2 for malformed/provenance errors",
+    )
     args = parser.parse_args()
 
-    reports = [parse_log(path) for path in args.logs]
+    output_resolved = args.output.resolve()
+    for input_path in args.logs:
+        same_path = output_resolved == input_path.resolve()
+        try:
+            same_file = args.output.exists() and input_path.exists() and args.output.samefile(
+                input_path
+            )
+        except OSError:
+            same_file = False
+        if same_path or same_file:
+            parser.error("output must not overwrite an evaluator input log")
+
+    # Remove only this renderer's owned output before reading any evidence.  A
+    # missing, oversized, or malformed input must never leave a stale green
+    # report from an earlier invocation in place.
+    try:
+        args.output.unlink(missing_ok=True)
+    except OSError as exc:
+        parser.error(f"cannot remove stale output {args.output}: {exc}")
+
+    reports = []
+    for path in args.logs:
+        try:
+            reports.append(parse_log(path))
+        except (OSError, ValueError, MemoryError) as exc:
+            parser.error(f"cannot read {path}: {exc}")
     if args.judge_dir is not None:
-        for report in reports:
-            attach_official_libctest_judge(report, args.judge_dir)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(render_markdown(reports))
+        if not args.judge_dir.is_dir():
+            for report in reports:
+                report.official_judge_status = "error"
+                report.official_judge_errors.append(
+                    "requested judge directory is unavailable"
+                )
+        else:
+            for report in reports:
+                attach_official_libctest_judge(report, args.judge_dir)
+    try:
+        atomic_write_text(args.output, render_markdown(reports))
+    except OSError as exc:
+        parser.error(f"cannot write {args.output}: {exc}")
     print(f"wrote {args.output}")
-    return 0
+    integrity_error = any(report.protocol["diagnostics"] for report in reports)
+    provenance_error = any(report.official_judge_status == "error" for report in reports)
+    if integrity_error or provenance_error:
+        return 2
+    nonpass = any(
+        report.protocol["state"] != "pass"
+        or report.libctest_failures
+        or report.busybox_failures
+        or report.group_failures
+        or report.group_timeouts
+        or report.autorun_failures
+        or report.panic_lines
+        or report.enosys_lines
+        or any(item.failed_count for item in report.official_libctest)
+        for report in reports
+    )
+    return 1 if args.require_clean and nonpass else 0
 
 
 if __name__ == "__main__":

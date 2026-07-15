@@ -23,6 +23,12 @@ mod uspace;
 #[cfg(feature = "use-ramfs")]
 mod ramfs;
 
+#[cfg(all(
+    feature = "semantic-smoke",
+    any(target_arch = "riscv64", target_arch = "loongarch64")
+))]
+mod semantic_smoke;
+
 use std::io::prelude::*;
 
 const LF: u8 = b'\n';
@@ -87,8 +93,24 @@ fn run_interactive_shell() {
 
 #[cfg_attr(feature = "axstd", unsafe(no_mangle))]
 fn main() {
-    #[cfg(feature = "auto-run-tests")]
+    #[cfg(all(
+        feature = "semantic-smoke",
+        any(target_arch = "riscv64", target_arch = "loongarch64")
+    ))]
+    semantic_smoke::run();
+
+    #[cfg(all(
+        feature = "auto-run-tests",
+        not(all(
+            feature = "semantic-smoke",
+            any(target_arch = "riscv64", target_arch = "loongarch64")
+        ))
+    ))]
     cmd::maybe_run_official_tests();
 
+    #[cfg(not(all(
+        feature = "semantic-smoke",
+        any(target_arch = "riscv64", target_arch = "loongarch64")
+    )))]
     run_interactive_shell();
 }

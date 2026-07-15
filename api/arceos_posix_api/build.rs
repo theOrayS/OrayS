@@ -1,5 +1,6 @@
 fn main() {
     use std::io::Write;
+    use std::path::Path;
 
     fn gen_pthread_mutex(out_file: &str) -> std::io::Result<()> {
         let mut output = Vec::new();
@@ -21,8 +22,9 @@ typedef struct {{
         Ok(())
     }
 
-    fn gen_c_to_rust_bindings(in_file: &str, out_file: &str) {
+    fn gen_c_to_rust_bindings(in_file: &str, out_file: &Path, checked_in: &Path) {
         println!("cargo:rerun-if-changed={in_file}");
+        println!("cargo:rerun-if-changed={}", checked_in.display());
 
         let allow_types = [
             "stat",
@@ -75,19 +77,21 @@ typedef struct {{
         let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
 
         // Some evaluator environments still ship libclang versions that do not
-        // know the LoongArch target triple. The generated POSIX constants and
-        // ABI structs are checked in, so keep that known-good file instead of
-        // failing the whole LoongArch kernel build before QEMU can run.
+        // know the LoongArch target triple. Copy the checked-in fallback into
+        // OUT_DIR instead of ever rewriting a tracked source file.
         if target_arch == "loongarch64" {
-            if std::path::Path::new(out_file).is_file() {
-                println!(
-                    "cargo:warning=using checked-in {out_file}; libclang may not support target {target}"
-                );
-                return;
-            }
-            panic!(
-                "cannot generate {out_file} for {target}: checked-in bindings are missing and this libclang may not support LoongArch"
+            std::fs::copy(checked_in, out_file).unwrap_or_else(|err| {
+                panic!(
+                    "cannot copy checked-in {} to {} for {target}: {err}",
+                    checked_in.display(),
+                    out_file.display()
+                )
+            });
+            println!(
+                "cargo:warning=using checked-in {}; libclang may not support target {target}",
+                checked_in.display()
             );
+            return;
         }
 
         let mut builder = bindgen::Builder::default()
@@ -119,5 +123,10 @@ typedef struct {{
     }
 
     gen_pthread_mutex("../../ulib/axlibc/include/ax_pthread_mutex.h").unwrap();
-    gen_c_to_rust_bindings("ctypes.h", "src/ctypes_gen.rs");
+    let out_dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
+    gen_c_to_rust_bindings(
+        "ctypes.h",
+        &out_dir.join("ctypes_gen.rs"),
+        Path::new("src/ctypes_gen.rs"),
+    );
 }

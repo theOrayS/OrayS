@@ -1,150 +1,159 @@
 name: Build CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FIXED_RUST_TOOLCHAIN: nightly-2025-05-20
 
 jobs:
   clippy:
-    runs-on: ubuntu-latest
+    name: Clippy (${{ matrix.arch }}, ${{ matrix.lane }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: ${{ matrix.lane == 'moving-nightly-observational' }}
     strategy:
       fail-fast: false
       matrix:
         arch: [x86_64, riscv64, aarch64, loongarch64]
-        rust-toolchain: [nightly, nightly-2025-05-20]
+        lane: [fixed-required, moving-nightly-observational]
     env:
-      RUSTUP_TOOLCHAIN: ${{ matrix.rust-toolchain }}
+      RUSTUP_TOOLCHAIN: ${{ matrix.lane == 'fixed-required' && 'nightly-2025-05-20' || 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust-toolchain }}
-        components: rust-src, clippy, rustfmt
-        targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
-    - name: Check rust version
-      run: rustc --version --verbose
-    - name: Check code format
-      if: ${{ matrix.arch == 'x86_64' }}
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: cargo fmt --all -- --check
-    - name: Clippy for the default target
-      if: ${{ matrix.arch == 'x86_64' }}
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make clippy
-    - name: Clippy for ${{ matrix.arch }}
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make clippy ARCH=${{ matrix.arch }}
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+          components: rust-src, clippy, rustfmt
+          targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
+      - name: Check Rust version
+        run: rustc --version --verbose
+      - name: Check code format
+        if: ${{ matrix.arch == 'x86_64' }}
+        run: cargo fmt --all -- --check
+      - name: Clippy for the default target
+        if: ${{ matrix.arch == 'x86_64' }}
+        run: make clippy
+      - name: Clippy for ${{ matrix.arch }}
+        run: make clippy ARCH=${{ matrix.arch }}
 
   build:
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.arch }}, ${{ matrix.lane }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: ${{ matrix.lane == 'moving-nightly-observational' }}
     strategy:
       fail-fast: false
       matrix:
         arch: [x86_64, riscv64, aarch64, loongarch64]
-        rust-toolchain: [nightly, nightly-2025-05-20]
+        lane: [fixed-required, moving-nightly-observational]
     env:
-      RUSTUP_TOOLCHAIN: ${{ matrix.rust-toolchain }}
+      RUSTUP_TOOLCHAIN: ${{ matrix.lane == 'fixed-required' && 'nightly-2025-05-20' || 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust-toolchain }}
-        components: rust-src, llvm-tools
-        targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
-    - uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: cargo-bin-cache-${{ matrix.rust-toolchain }}
-        cache-targets: false
-    - name: Build shell
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make ARCH=${{ matrix.arch }} A=user/shell
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+          components: rust-src, llvm-tools
+          targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          shared-key: cargo-bin-cache-${{ env.RUSTUP_TOOLCHAIN }}
+          cache-targets: false
+      - name: Build shell
+        run: make ARCH=${{ matrix.arch }} A=user/shell build
 
   build-for-other-platforms:
-    runs-on: ubuntu-latest
+    name: Other platforms (${{ matrix.lane }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: ${{ matrix.lane == 'moving-nightly-observational' }}
     strategy:
       fail-fast: false
       matrix:
-        rust-toolchain: [nightly, nightly-2025-05-20]
+        lane: [fixed-required, moving-nightly-observational]
     env:
-      RUSTUP_TOOLCHAIN: ${{ matrix.rust-toolchain }}
+      RUSTUP_TOOLCHAIN: ${{ matrix.lane == 'fixed-required' && 'nightly-2025-05-20' || 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust-toolchain }}
-        components: rust-src, llvm-tools
-        targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
-    - uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: cargo-bin-cache-${{ matrix.rust-toolchain }}
-        cache-targets: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+          components: rust-src, llvm-tools
+          targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          shared-key: cargo-bin-cache-${{ env.RUSTUP_TOOLCHAIN }}
+          cache-targets: false
+      - name: Build shell for x86_64-pc-oslab
+        run: make PLAT_CONFIG=$(pwd)/configs/custom/x86_64-pc-oslab.toml A=user/shell FEATURES=page-alloc-4g,driver-ramdisk build
+      - name: Setup aarch64-raspi4
+        run: |
+          git checkout .
+          make MYPLAT=axplat-aarch64-raspi defconfig
+          CARGO_HOME="$PWD/cargo-home" cargo add --offline --path vendor/cargo/axplat-aarch64-raspi -p arceos-shell -F smp
+          echo "extern crate axplat_aarch64_raspi;" >> user/shell/src/main.rs
+      - name: Build shell for aarch64-raspi4
+        run: make MYPLAT=axplat-aarch64-raspi A=user/shell FEATURES=page-alloc-4g,driver-bcm2835-sdhci BUS=mmio build
+      - name: Setup aarch64-bsta1000b
+        run: |
+          git checkout .
+          make MYPLAT=axplat-aarch64-bsta1000b defconfig
+          CARGO_HOME="$PWD/cargo-home" cargo add --offline --path vendor/cargo/axplat-aarch64-bsta1000b -p arceos-shell -F smp
+          echo "extern crate axplat_aarch64_bsta1000b;" >> user/shell/src/main.rs
+      - name: Build shell for aarch64-bsta1000b
+        run: make MYPLAT=axplat-aarch64-bsta1000b A=user/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio build
+      - name: Setup aarch64-phytium-pi
+        run: |
+          git checkout .
+          make MYPLAT=axplat-aarch64-phytium-pi defconfig
+          CARGO_HOME="$PWD/cargo-home" cargo add --offline --path vendor/cargo/axplat-aarch64-phytium-pi -p arceos-shell -F smp
+          echo "extern crate axplat_aarch64_phytium_pi;" >> user/shell/src/main.rs
+      - name: Build shell for aarch64-phytium-pi
+        run: make MYPLAT=axplat-aarch64-phytium-pi A=user/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio build
 
-    # Test custom config file
-    - name: Build shell for x86_64-pc-oslab
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make PLAT_CONFIG=$(pwd)/configs/custom/x86_64-pc-oslab.toml A=user/shell FEATURES=page-alloc-4g,driver-ramdisk
-
-    # Test platform `aarch64-raspi4`
-    - name: Setup aarch64-raspi4
-      run: |
-        git checkout .
-        make MYPLAT=axplat-aarch64-raspi defconfig
-        cargo axplat add axplat-aarch64-raspi -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
-        echo "extern crate axplat_aarch64_raspi;" >> user/shell/src/main.rs
-    - name: Build shell for aarch64-raspi4
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-raspi A=user/shell FEATURES=page-alloc-4g,driver-bcm2835-sdhci BUS=mmio
-
-    # Test platform `aarch64-bsta1000b`
-    - name: Setup aarch64-bsta1000b
-      run: |
-        git checkout .
-        make MYPLAT=axplat-aarch64-bsta1000b defconfig
-        cargo axplat add axplat-aarch64-bsta1000b -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
-        echo "extern crate axplat_aarch64_bsta1000b;" >> user/shell/src/main.rs
-    - name: Build shell for aarch64-bsta1000b
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-bsta1000b A=user/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio
-
-    # Test platform `aarch64-phytium-pi`
-    - name: Setup aarch64-phytium-pi
-      run: |
-        git checkout .
-        make MYPLAT=axplat-aarch64-phytium-pi defconfig
-        cargo axplat add axplat-aarch64-phytium-pi -p arceos-shell -F smp --git https://github.com/arceos-org/axhal_crates.git
-        echo "extern crate axplat_aarch64_phytium_pi;" >> user/shell/src/main.rs
-    - name: Build shell for aarch64-phytium-pi
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make MYPLAT=axplat-aarch64-phytium-pi A=user/shell FEATURES=page-alloc-4g,driver-ramdisk BUS=mmio
-
-  # Necessary checks for macOS builds
   build-for-macos:
-    runs-on: macos-latest
+    name: macOS (${{ matrix.lane }})
+    runs-on: macos-14
+    timeout-minutes: 60
+    continue-on-error: ${{ matrix.lane == 'moving-nightly-observational' }}
     strategy:
       fail-fast: false
       matrix:
-        rust-toolchain: [nightly, nightly-2025-05-20]
+        lane: [fixed-required, moving-nightly-observational]
     env:
-      RUSTUP_TOOLCHAIN: ${{ matrix.rust-toolchain }}
+      RUSTUP_TOOLCHAIN: ${{ matrix.lane == 'fixed-required' && 'nightly-2025-05-20' || 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust-toolchain }}
-        components: rust-src, clippy, llvm-tools
-        targets: x86_64-unknown-none
-    - uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: cargo-bin-cache-${{ matrix.rust-toolchain }}
-        cache-targets: false
-    - name: Clippy for the default target
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make clippy
-
-    - name: Build shell
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make A=user/shell
-
-    # Test for other platforms
-    - run: make PLATFORM=x86_64-pc-oslab defconfig
-    - name: Build shell for x86_64-pc-oslab
-      continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
-      run: make PLATFORM=x86_64-pc-oslab A=user/shell FEATURES=page-alloc-4g,driver-ramdisk
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+          components: rust-src, clippy, llvm-tools
+          targets: x86_64-unknown-none
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          shared-key: cargo-bin-cache-${{ env.RUSTUP_TOOLCHAIN }}
+          cache-targets: false
+      - name: Clippy for the default target
+        run: make clippy
+      - name: Build shell
+        run: make A=user/shell build
+      - run: make PLATFORM=x86_64-pc-oslab defconfig
+      - name: Build shell for x86_64-pc-oslab
+        run: make PLATFORM=x86_64-pc-oslab A=user/shell FEATURES=page-alloc-4g,driver-ramdisk build

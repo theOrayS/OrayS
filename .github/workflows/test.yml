@@ -1,54 +1,285 @@
 name: Test CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  qemu-version: 9.2.4
-  rust-toolchain: nightly-2025-05-20
-  arceos-apps: '7ad6143'
+  FIXED_RUST_TOOLCHAIN: nightly-2025-05-20
+  QEMU_VERSION: 9.2.4
+  QEMU_SOURCE_SHA256: f3cc1c4eabfdb288218ac3e33763dbe9e276d8bc890b867a2335d58de2ddd39a
+  QEMU_SOURCE_CACHE: ${{ github.workspace }}/build/qemu-source
+  ARCEOS_APPS_REVISION: 7ad614304878ce17d5f5883350f7d7231a75247a
 
 jobs:
   unit-test:
-    runs-on: ubuntu-latest
+    name: Unit tests (required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ env.rust-toolchain }}
-    - name: Run unit tests
-      run: make unittest_no_fail_fast
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
+      - name: Run unit tests
+        run: make unittest_no_fail_fast
 
-  app-test:
-    runs-on: ${{ matrix.os }}
+  pr3-infrastructure:
+    name: PR3 infrastructure + host evidence (required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
+      - name: Validate manifest and generated schema
+        run: |
+          python3 scripts/semantic_evidence.py validate --manifest scripts/semantic_evidence_manifest.json
+          python3 scripts/semantic_evidence.py schema --check scripts/semantic_evidence_schema.v1.json
+      - name: Collect required host evidence
+        run: |
+          python3 scripts/semantic_evidence.py run \
+            --manifest scripts/semantic_evidence_manifest.json \
+            --output build/pr3-evidence/host \
+            --arch host
+      - name: Upload host evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr3-host-evidence
+          path: build/pr3-evidence/host
+          if-no-files-found: error
+          retention-days: 14
+
+  pr3-qemu-baseline:
+    name: PR3 QEMU 9.2.4 source baseline (required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Install QEMU build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            ninja-build pkg-config libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev
+      - name: Restore exact QEMU source cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: build/qemu-source/qemu-9.2.4.tar.xz
+          key: pr3-qemu-source-9.2.4-f3cc1c4eabfdb288-v2
+      - name: Build pinned QEMU from verified source
+        env:
+          QEMU_BUILD_JOBS: 2
+          QEMU_PREFIX: ${{ runner.temp }}/orays-pr3-qemu-9.2.4
+        run: |
+          mkdir -p build/pr3-qemu-artifact
+          python3 scripts/semantic_evidence.py supervise \
+            --timeout 4800 \
+            --log build/pr3-qemu-artifact/setup.log \
+            -- bash scripts/setup_qemu_pr3.sh "$QEMU_PREFIX" "$QEMU_SOURCE_CACHE"
+      - name: Package verified QEMU preserving executable modes
+        env:
+          QEMU_PREFIX: ${{ runner.temp }}/orays-pr3-qemu-9.2.4
+        run: |
+          mkdir -p build/pr3-qemu-artifact
+          tar -C "$QEMU_PREFIX" -czf build/pr3-qemu-artifact/qemu-9.2.4.tar.gz .
+          sha256sum build/pr3-qemu-artifact/qemu-9.2.4.tar.gz > build/pr3-qemu-artifact/qemu-9.2.4.tar.gz.sha256
+      - name: Upload verified QEMU
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr3-qemu-9.2.4-linux-x64
+          path: build/pr3-qemu-artifact
+          if-no-files-found: error
+          retention-days: 1
+
+  pr3-runtime:
+    name: ${{ matrix.check_name }}
+    needs: pr3-qemu-baseline
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        include:
+          - arch: riscv64
+            target: riscv64gc-unknown-none-elf
+            artifact: pr3-rv64-evidence
+            output: rv64
+            check_name: PR3 RV64 fixed build + runtime smoke (required)
+          - arch: loongarch64
+            target: loongarch64-unknown-none-softfloat
+            artifact: pr3-la64-evidence
+            output: la64
+            check_name: PR3 LA64 fixed build + runtime smoke (required)
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
+          components: rust-src, llvm-tools
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          shared-key: pr3-${{ matrix.arch }}-${{ env.FIXED_RUST_TOOLCHAIN }}
+          cache-targets: false
+      - name: Download verified QEMU
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr3-qemu-9.2.4-linux-x64
+          path: build/pr3-qemu-artifact
+      - name: Install QEMU runtime prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libfdt1 libglib2.0-0t64 libpixman-1-0 zlib1g
+      - name: Verify and expose QEMU
+        env:
+          QEMU_PREFIX: ${{ runner.temp }}/orays-pr3-qemu-9.2.4
+        run: |
+          mkdir -p "$QEMU_PREFIX"
+          sha256sum --check build/pr3-qemu-artifact/qemu-9.2.4.tar.gz.sha256
+          tar --no-same-owner -C "$QEMU_PREFIX" -xzf build/pr3-qemu-artifact/qemu-9.2.4.tar.gz
+          bash scripts/setup_qemu_pr3.sh --verify-only "$QEMU_PREFIX" "$QEMU_SOURCE_CACHE"
+          echo "$QEMU_PREFIX/bin" >> "$GITHUB_PATH"
+      - name: Collect fixed build and runtime evidence
+        run: |
+          python3 scripts/semantic_evidence.py run \
+            --manifest scripts/semantic_evidence_manifest.json \
+            --output build/pr3-evidence/${{ matrix.output }} \
+            --arch ${{ matrix.arch }}
+      - name: Upload architecture evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/pr3-evidence/${{ matrix.output }}
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve QEMU producer conclusion
+        if: ${{ always() }}
+        run: test "${{ needs.pr3-qemu-baseline.result }}" = success
+
+  pr3-required-aggregate:
+    name: PR3 required aggregate
+    if: ${{ always() }}
+    needs: [pr3-infrastructure, pr3-runtime]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Download host evidence
+        if: ${{ always() }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr3-host-evidence
+          path: build/pr3-shards/host
+      - name: Download RV64 evidence
+        if: ${{ always() }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr3-rv64-evidence
+          path: build/pr3-shards/rv64
+      - name: Download LA64 evidence
+        if: ${{ always() }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr3-la64-evidence
+          path: build/pr3-shards/la64
+      - name: Merge and validate complete required evidence
+        if: ${{ always() }}
+        run: |
+          python3 scripts/semantic_evidence.py merge \
+            --manifest scripts/semantic_evidence_manifest.json \
+            --output build/pr3-evidence/required \
+            --shard build/pr3-shards/host/semantic-evidence-v1.json \
+            --shard build/pr3-shards/rv64/semantic-evidence-v1.json \
+            --shard build/pr3-shards/la64/semantic-evidence-v1.json
+      - name: Render canonical JUnit, offline HTML, and matrix
+        if: ${{ always() }}
+        run: |
+          python3 scripts/render_semantic_evidence.py \
+            --manifest scripts/semantic_evidence_manifest.json \
+            --input build/pr3-evidence/required/semantic-evidence-v1.json \
+            --output build/pr3-evidence/required/reports
+      - name: Upload aggregate evidence and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr3-required-semantic-evidence
+          path: build/pr3-evidence/required
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish concise evidence summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## PR3 required semantic evidence"
+            echo
+            echo "- Host producer: \`${{ needs.pr3-infrastructure.result }}\`"
+            echo "- Architecture producers: \`${{ needs.pr3-runtime.result }}\`"
+            echo "- Artifact: \`pr3-required-semantic-evidence\` (canonical JSON, JUnit XML, offline HTML, matrix, raw logs)"
+            echo "- Run artifacts: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve producer conclusions
+        if: ${{ always() }}
+        run: |
+          test "${{ needs.pr3-infrastructure.result }}" = success
+          test "${{ needs.pr3-runtime.result }}" = success
+
+  app-test:
+    name: Application tests (${{ matrix.arch }}, fixed-required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
         arch: [x86_64, riscv64, aarch64, loongarch64]
     env:
       RUSTUP_TOOLCHAIN: nightly-2025-05-20
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ env.rust-toolchain }}
-        components: rust-src, llvm-tools
-        targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
-    - uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: cargo-bin-cache-${{ env.rust-toolchain }}
-        cache-targets: false
-    - uses: arceos-org/setup-qemu@v1
-      with:
-        version: ${{ env.qemu-version }}
-        arch_list: x86_64,aarch64,riscv64,loongarch64
-    - uses: arceos-org/setup-musl@v1
-      with:
-        arch: ${{ matrix.arch }}
-    - name: Run app tests
-      run: |
-        make disk_img
-        git clone https://github.com/arceos-org/arceos-apps.git
-        cd arceos-apps && git reset --hard ${{ env.arceos-apps }} && cd ..
-        make -C arceos-apps chaxroot AX_ROOT=$(pwd)
-        make -C arceos-apps test ARCH=${{ matrix.arch }}
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
+          components: rust-src, llvm-tools
+          targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          shared-key: cargo-bin-cache-${{ env.FIXED_RUST_TOOLCHAIN }}
+          cache-targets: false
+      - uses: arceos-org/setup-qemu@fca28917fa0d17dfdb5a1df9f3e433ffa1b85e3a
+        with:
+          version: ${{ env.QEMU_VERSION }}
+          arch_list: x86_64,aarch64,riscv64,loongarch64
+      - uses: arceos-org/setup-musl@8f7b5b3b546261a1e502f6502e0e133e1e227443
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Run external application tests
+        run: |
+          make disk_img
+          git clone https://github.com/arceos-org/arceos-apps.git
+          git -C arceos-apps checkout --detach "$ARCEOS_APPS_REVISION"
+          make -C arceos-apps chaxroot AX_ROOT=$(pwd)
+          make -C arceos-apps test ARCH=${{ matrix.arch }}

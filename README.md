@@ -38,14 +38,16 @@ Y8.   .8P 88       88.  .88 88.  .88 d8'   .8P
 | 项目文档 PDF | [文档.pdf](docs/orays-project-document(2).pdf) |
 |项目初赛介绍ppt|[项目初赛介绍ppt](docs/orays.pptx) |
 |演示视频|[演示视频](docs/演示视频.webm) |
+| PR3 语义证据与双架构 CI | [可信 semantic-evidence 流程](docs/pr3-semantic-evidence.md) |
 ## 当前状态
 
 **截至 2026-06-29**：
 
 - 完成 **531 次项目提交**
 - syscall dispatcher 已注册 **231 个唯一 Linux syscall 编号**
-- 建立 **12 个合规静态守卫及 12 个对应单元测试脚本**，用于检查 fake pass、
-  用户指针、runner parser、FD/资源限制和 syscall 语义回归。
+- 建立 **13 个编号合规静态守卫及 self-check 守卫**，每个守卫都有对应 mutation
+  tests，用于检查 fake pass、用户指针、runner parser、FD/资源限制、工作流和 syscall
+  语义回归。
 
 #### 核心功能实现
 
@@ -129,6 +131,25 @@ make kernel-la
 make A=user/shell ARCH=riscv64 build
 make A=user/shell ARCH=loongarch64 build
 ```
+
+PR3 的固定构建、仓库内 QEMU runtime smoke 和证据报告使用以下入口：
+
+```bash
+make pr3-manifest-check
+make pr3-infrastructure-tests
+make pr3-evidence-rv
+make pr3-evidence-la
+make pr3-evidence-required
+```
+
+RV64/LA64 required evidence 会在启动前检查 `PATH` 中对应 QEMU 的版本；只有
+`QEMU emulator version 9.2.4` 可进入 required runtime case，其他版本会明确
+`blocked`。固定源码、校验和与本地准备命令见下述文档。
+
+`make pr3-evidence-required` 生成 canonical JSON，并从该 JSON 派生 JUnit XML、
+离线 HTML 和 Markdown matrix。证据等级、固定 QEMU 9.2.4 准备方式、CI required
+check 名称及 official image 边界见
+[PR3 semantic-evidence 文档](docs/pr3-semantic-evidence.md)。
 
 ## 运行方式
 

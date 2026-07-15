@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / "scripts/check_g010_real_kernel_semantics.py"
 TARGETS = [
+    Path("Cargo.toml"),
     Path("api/arceos_posix_api/Cargo.toml"),
     Path("api/arceos_posix_api/src/imp/fd_ops.rs"),
     Path("api/arceos_posix_api/src/imp/fs.rs"),
@@ -25,9 +26,10 @@ TARGETS = [
     Path("kernel/task/axtask/src/api.rs"),
     Path("kernel/task/axtask/src/run_queue.rs"),
     Path("kernel/task/axtask/src/task.rs"),
-    Path("vendor/cargo/axsched/src/cfs.rs"),
-    Path("vendor/cargo/axsched/src/round_robin.rs"),
-    Path("vendor/cargo/axsched/src/fifo.rs"),
+    Path("vendor/axsched/src/cfs.rs"),
+    Path("vendor/axsched/src/round_robin.rs"),
+    Path("vendor/axsched/src/fifo.rs"),
+    Path("vendor/axsched/src/tests.rs"),
     Path("ulib/axlibc/include/stdio.h"),
     Path("ulib/axlibc/c/stdio.c"),
     Path("ulib/axlibc/c/syslog.c"),
@@ -490,7 +492,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/resource_sched.rs"
         text = path.read_text(encoding="utf-8").replace(
-            "    apply_task_scheduler_state(&entry.task, &entry.process, state);\n",
+            "    apply_task_scheduler_state(current.as_task_ref(), process, state);\n",
             "    Ok(())\n",
             1,
         )
@@ -512,6 +514,19 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("non-current live targets", result.stdout)
 
+    def test_detects_setpriority_process_leader_readback_only(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/resource_sched.rs"
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "        apply_process_scheduler_state_to_live_tasks(&entry.process, state);\n",
+            "",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("non-current process leaders", result.stdout)
+
     def test_detects_scheduler_backend_failure_regression(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/resource_sched.rs"
@@ -527,7 +542,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_cfs_priority_without_rekey(self) -> None:
         tree = self.make_tree()
-        path = tree / "vendor/cargo/axsched/src/cfs.rs"
+        path = tree / "vendor/axsched/src/cfs.rs"
         text = path.read_text(encoding="utf-8")
         start = text.index("    fn set_priority(&mut self, task: &Self::SchedItem, prio: isize) -> bool {")
         end = text.index("\n    }\n}", start) + len("\n    }")
@@ -546,7 +561,7 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
 
     def test_detects_rr_priority_false_stub(self) -> None:
         tree = self.make_tree()
-        path = tree / "vendor/cargo/axsched/src/round_robin.rs"
+        path = tree / "vendor/axsched/src/round_robin.rs"
         text = path.read_text(encoding="utf-8")
         start = text.index("    fn set_priority(&mut self, task: &Self::SchedItem, prio: isize) -> bool {")
         end = text.index("\n    }\n}", start) + len("\n    }")
@@ -557,6 +572,56 @@ class G010RealKernelSemanticsGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("round_robin", result.stdout)
+
+    def test_detects_unreviewed_axsched_dependency_path(self) -> None:
+        tree = self.make_tree()
+        path = tree / "Cargo.toml"
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            'axsched = { path = "vendor/axsched" }',
+            'axsched = { path = "vendor/cargo/axsched" }',
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reviewed vendor/axsched", result.stdout)
+
+    def test_detects_rr_remaining_slice_ownership_regression(self) -> None:
+        tree = self.make_tree()
+        path = tree / "vendor/axsched/src/round_robin.rs"
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "self.ready_queue.push_front(prev)",
+            "self.ready_queue.push_back(prev)",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ready-task ownership", result.stdout)
+
+    def test_detects_reintroduced_rr_aging_path(self) -> None:
+        tree = self.make_tree()
+        path = tree / "vendor/axsched/src/round_robin.rs"
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\n// skipped_rounds regression\n",
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("rejected intrusive-list/aging", result.stdout)
+
+    def test_detects_missing_rr_safety_regression_test(self) -> None:
+        tree = self.make_tree()
+        path = tree / "vendor/axsched/src/tests.rs"
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "fn rr_preempted_task_keeps_remaining_slice_at_front()",
+            "fn removed_rr_remaining_slice_test()",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing RR safety test", result.stdout)
 
     def test_detects_ltp_case_specific_commentary(self) -> None:
         tree = self.make_tree()

@@ -402,19 +402,40 @@ def scan_scheduler_backend_effect(root: Path) -> list[str]:
     ):
         if token not in text:
             findings.append(f"sched_set* must affect current axtask scheduler priority, not only readback state; missing {token}")
+    live_apply = rust_function_block(text, "apply_process_scheduler_state_to_live_tasks")
+    if "apply_task_scheduler_state(current.as_task_ref(), process, state)" not in live_apply:
+        findings.append("scheduler backend state must reach the current live task")
+    if "apply_task_scheduler_state(&entry.task, &entry.process, state)" not in live_apply:
+        findings.append("process scheduler state must reach non-current live targets")
     setter = rust_function_block(text, "set_sched_target_state")
-    if "apply_task_scheduler_state(current.as_task_ref(), process, state)" not in setter:
+    if not any(
+        token in setter
+        for token in (
+            "apply_task_scheduler_state(current.as_task_ref(), process, state)",
+            "apply_process_scheduler_state_to_live_tasks(process, state)",
+        )
+    ):
         findings.append("set_sched_target_state must apply scheduler backend state for current task")
     if "apply_task_scheduler_state(&entry.task, &entry.process, state)" not in setter:
         findings.append("set_sched_target_state must apply scheduler backend state for non-current live targets")
+    if "apply_process_scheduler_state_to_live_tasks(&entry.process, state)" not in setter:
+        findings.append(
+            "set_sched_target_state must apply scheduler backend state for non-current process leaders"
+        )
     backend = rust_function_block(text, "apply_task_scheduler_state")
     if "Err(LinuxError::EINVAL)" in backend or "return Err" in backend:
         findings.append("scheduler backend priority hook must be best-effort; unsupported FIFO/RR backends must not regress accepted sched_set* calls")
     task_api = read(root / "kernel/task/axtask/src/api.rs")
     run_queue = read(root / "kernel/task/axtask/src/run_queue.rs")
-    cfs = read(root / "vendor/cargo/axsched/src/cfs.rs")
-    rr = read(root / "vendor/cargo/axsched/src/round_robin.rs")
-    fifo = read(root / "vendor/cargo/axsched/src/fifo.rs")
+    cfs = read(root / "vendor/axsched/src/cfs.rs")
+    rr = read(root / "vendor/axsched/src/round_robin.rs")
+    fifo = read(root / "vendor/axsched/src/fifo.rs")
+    rr_tests = read(root / "vendor/axsched/src/tests.rs")
+    workspace = read(root / "Cargo.toml")
+    if 'axsched = { path = "vendor/axsched" }' not in workspace:
+        findings.append(
+            "workspace must bind axsched to the reviewed vendor/axsched implementation"
+        )
     if "pub fn set_task_priority(task: &AxTaskRef, prio: isize) -> bool" not in task_api:
         findings.append("axtask must expose target-task priority updates for non-current scheduler syscalls")
     if "pub(crate) fn set_task_priority(&mut self, task: &AxTaskRef, prio: isize) -> bool" not in run_queue:
@@ -429,16 +450,16 @@ def scan_scheduler_backend_effect(root: Path) -> list[str]:
     ):
         if token not in cfs:
             findings.append(f"CFS set_priority must remove/reinsert queued tasks so ready_queue keys stay valid; missing {token}")
-    for rel, scheduler_text in (
-        ("vendor/cargo/axsched/src/round_robin.rs", rr),
-        ("vendor/cargo/axsched/src/fifo.rs", fifo),
+    for rel, scheduler_text, removal_token in (
+        ("vendor/axsched/src/round_robin.rs", rr, "self.ready_queue.remove(index)"),
+        ("vendor/axsched/src/fifo.rs", fifo, "cursor.remove_current()"),
     ):
         for token in (
             "priority: AtomicIsize",
             "fn priority(&self) -> isize",
             "fn set_priority(&self, prio: isize)",
             "fn pop_highest_priority",
-            "cursor.remove_current()",
+            removal_token,
             "task.set_priority(prio)",
             "valid_backend_priority(prio)",
         ):
@@ -447,19 +468,52 @@ def scan_scheduler_backend_effect(root: Path) -> list[str]:
         if "fn set_priority(&mut self, _task" in scheduler_text and "\n        false\n" in scheduler_text:
             findings.append(f"{rel}: set_priority must not be a false-only stub")
     for token in (
-        "skipped_rounds: AtomicUsize",
-        "fn scheduling_class(&self) -> isize",
-        "fn effective_priority(&self) -> isize",
-        "fn scheduling_key(&self) -> (isize, isize)",
-        "NORMAL_SCHEDULING_CLASS",
-        "REALTIME_BACKEND_PRIORITY_MAX",
-        "fn note_skipped_round(&self)",
-        "fn reset_skipped_rounds(&self)",
-        "selected.reset_skipped_rounds();",
-        "task.note_skipped_round();",
+        "use alloc::collections::VecDeque;",
+        "ready_queue: VecDeque<Arc<RRTask<T, MAX_TIME_SLICE>>>",
+        ".position(|queued| Arc::ptr_eq(queued, task))?",
+        "if prev.time_slice() > 0 && preempt",
+        "self.ready_queue.push_front(prev)",
+        "prev.reset_time_slice();",
+        "self.ready_queue.push_back(prev)",
     ):
         if token not in rr:
-            findings.append(f"vendor/cargo/axsched/src/round_robin.rs: RR backend must age skipped lower-priority tasks to avoid starvation; missing {token}")
+            findings.append(
+                "vendor/axsched/src/round_robin.rs: RR backend must preserve "
+                f"ready-task ownership and remaining slices; missing {token}"
+            )
+    for token in ("skipped_rounds", "use linked_list_r4l", "GetLinks for RRTask"):
+        if token in rr:
+            findings.append(
+                "vendor/axsched/src/round_robin.rs: rejected intrusive-list/aging "
+                f"RR path was reintroduced: {token}"
+            )
+    for name, tokens in (
+        (
+            "rr_preempted_task_keeps_remaining_slice_at_front",
+            (
+                "scheduler.task_tick(&next);",
+                "scheduler.put_prev_task(next, true);",
+                "preempted RR task with remaining slice should stay ahead",
+            ),
+        ),
+        (
+            "rr_realtime_priority_preempts_normal_tasks",
+            (
+                "scheduler.set_priority(&realtime, -120)",
+                "scheduler.set_priority(&normal, -20)",
+                "runnable RT/deadline task should outrank normal tasks",
+            ),
+        ),
+    ):
+        block = rust_function_block(rr_tests, name)
+        if not block:
+            findings.append(f"vendor/axsched/src/tests.rs: missing RR safety test {name}")
+            continue
+        for token in tokens:
+            if token not in block:
+                findings.append(
+                    f"vendor/axsched/src/tests.rs: RR safety test {name} missing {token}"
+                )
     for token in (
         "BACKEND_RT_BASE_PRIORITY",
         "BACKEND_IDLE_PRIORITY",

@@ -66,8 +66,8 @@ class G012SyscallReviewHotspotGuardTest(unittest.TestCase):
         path = tree / "user/shell/src/uspace/mod.rs"
         path.write_text(
             path.read_text(encoding="utf-8").replace(
-                "let _ = core::format_args!($($arg)*);",
-                "",
+                "Some(_) => println!($($arg)*),",
+                "Some(_) => {},",
                 1,
             ),
             encoding="utf-8",

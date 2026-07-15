@@ -19,6 +19,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from evaluator_protocol import parse_evaluator_bytes
+
+
+MAX_EVALUATOR_LOG_BYTES = 64 * 1024 * 1024
+
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 GROUP_START_RE = re.compile(r"#### OS COMP TEST GROUP START (.+?) ####")
 GROUP_END_RE = re.compile(r"#### OS COMP TEST GROUP END (.+?) ####")
@@ -50,6 +55,33 @@ SUITE_SUMMARY_RE = re.compile(
 
 def strip_ansi(text: str) -> str:
     return ANSI_RE.sub("", text)
+
+
+def markdown_escape(value: object) -> str:
+    """Render untrusted evaluator fields as a single Markdown text fragment."""
+
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("`", "\\`")
+        .replace("\r", " ")
+        .replace("\n", " ")
+    )
+
+
+def stable_path_labels(paths: list[Path]) -> list[str]:
+    """Return deterministic report labels without exposing parent directories."""
+
+    names = [path.name or "input" for path in paths]
+    if len(set(names)) == len(names):
+        return names
+    # Prefix every label when any basename repeats.  Indexing only the repeated
+    # basename could collide with a real basename such as ``evaluator.log#1``.
+    return [f"input-{index}:{name}" for index, name in enumerate(names, 1)]
 
 
 def infer_arch(path: Path) -> str:
@@ -243,6 +275,46 @@ def parse_log(text: str) -> dict[str, Any]:
     return summary
 
 
+def parse_log_bytes(data: bytes) -> dict[str, Any]:
+    """Parse raw evaluator bytes and attach the strict shared protocol result.
+
+    The legacy counters remain available for compatibility, but all gate and
+    promotion decisions use ``protocol``.  latin-1 is a lossless one-byte
+    adapter for the legacy display parser; unlike ``errors=ignore`` it cannot
+    delete a byte and turn a malformed status into zero.
+    """
+
+    protocol = parse_evaluator_bytes(data)
+    try:
+        summary = parse_log(data.decode("latin-1"))
+    except (ValueError, OverflowError, MemoryError) as exc:
+        summary = parse_log("")
+        protocol["diagnostics"].append(
+            {
+                "code": "legacy_numeric_field_error",
+                "line": 0,
+                "detail": f"legacy compatibility counters rejected numeric field: {exc}",
+            }
+        )
+        protocol["state"] = "error"
+    summary["protocol"] = protocol
+    return summary
+
+
+def read_log_bytes(path: Path) -> bytes:
+    if not path.is_file():
+        raise ValueError(f"not a regular evaluator log: {path}")
+    size = path.stat().st_size
+    if size > MAX_EVALUATOR_LOG_BYTES:
+        raise ValueError(
+            f"evaluator log exceeds limit ({size} > {MAX_EVALUATOR_LOG_BYTES} bytes): {path}"
+        )
+    try:
+        return path.read_bytes()
+    except MemoryError as exc:
+        raise ValueError(f"cannot allocate memory for evaluator log: {path}") from exc
+
+
 def remove_case_records(records: list[dict[str, Any]], group: str, case: str) -> list[dict[str, Any]]:
     return [
         record
@@ -262,13 +334,12 @@ def reconcile_timeout_statuses(summary: dict[str, Any]) -> None:
     """
 
     for detail in summary["case_details"].values():
-        if not detail["timeouts"] or detail["status"] != "PASS":
+        if not detail["timeouts"]:
             continue
         group = detail["group"]
         case = detail["case"]
         detail["status"] = "TIMEOUT"
         summary["pass_cases"] = remove_case_records(summary["pass_cases"], group, case)
-        summary["case_events"] = remove_case_records(summary["case_events"], group, case)
         if group in summary["groups"]:
             summary["groups"][group]["pass_cases"] = remove_case_records(
                 summary["groups"][group]["pass_cases"], group, case
@@ -276,6 +347,13 @@ def reconcile_timeout_statuses(summary: dict[str, Any]) -> None:
 
 
 def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
+    protocol = summary.get("protocol")
+    protocol_cases = (
+        {(item["group"], item["case"]): item for item in protocol["cases"]}
+        if protocol is not None
+        else {}
+    )
+
     def compact_group(group: dict[str, Any]) -> dict[str, Any]:
         return {
             "pass_count": len(group["pass_cases"]),
@@ -296,12 +374,28 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
         summary["case_details"].values(), key=lambda item: (item["case"], item["group"])
     ):
         libc = infer_libc(detail["group"])
+        protocol_case = protocol_cases.get((detail["group"], detail["case"]))
+        protocol_status = protocol_case["state"] if protocol_case is not None else None
+        semantic_status = (
+            {
+                "pass": "PASS",
+                "fail": "FAIL",
+                "error": "ERROR",
+                "timeout": "TIMEOUT",
+                "skipped": "SKIPPED",
+                "blocked": "BLOCKED",
+            }[protocol_status]
+            if protocol_status is not None
+            else detail["status"] or "UNKNOWN"
+        )
         row = {
             "case": detail["case"],
             "arch": arch,
             "libc": libc,
             "group": detail["group"],
-            "status": detail["status"] or "UNKNOWN",
+            "status": semantic_status,
+            "protocol_state": protocol_status,
+            "protocol_signals": protocol_case["signals"] if protocol_case is not None else None,
             "code": detail["code"],
             "internal": dict(detail["internal"]),
             "timeouts": detail["timeouts"],
@@ -374,6 +468,18 @@ def compact(summary: dict[str, Any], arch: str = "unknown") -> dict[str, Any]:
         "case_matrix_rows": rows,
         "case_matrix": matrix,
         "categories": categories,
+        "protocol": (
+            None
+            if protocol is None
+            else {
+                "schema_version": protocol["schema_version"],
+                "raw_sha256": protocol["raw_sha256"],
+                "size_bytes": protocol["size_bytes"],
+                "state": protocol["state"],
+                "diagnostics": protocol["diagnostics"],
+                "global_signals": protocol["global_signals"],
+            }
+        ),
     }
 
 
@@ -402,6 +508,12 @@ def row_problem_markers(row: dict[str, Any]) -> list[str]:
             problems.append(f"{label}={count}")
     if row["status"] != "PASS":
         problems.append(f"status={row['status']}")
+    protocol_overall_state = row.get("protocol_overall_state")
+    if protocol_overall_state not in (None, "pass"):
+        problems.append(f"protocol-overall={protocol_overall_state}")
+    protocol_diagnostics = int(row.get("protocol_diagnostics", 0))
+    if protocol_diagnostics:
+        problems.append(f"protocol-diagnostics={protocol_diagnostics}")
     promotion_mode_blocker = row.get("promotion_mode_blocker")
     if promotion_mode_blocker:
         problems.append(promotion_mode_blocker)
@@ -410,7 +522,7 @@ def row_problem_markers(row: dict[str, Any]) -> list[str]:
 
 def promotion_mode_blocker(case_list: dict[str, Any] | None) -> str | None:
     if not case_list:
-        return None
+        return "missing-case-list"
     mode = str(case_list.get("name") or "").strip()
     lowered = mode.lower()
     blocked_tokens = ("blacklist", "sweep:", "all-minus-blacklist")
@@ -422,6 +534,15 @@ def promotion_mode_blocker(case_list: dict[str, Any] | None) -> str | None:
 def promotion_report(
     rows: list[dict[str, Any]], required_arches: set[str], required_libcs: set[str]
 ) -> dict[str, Any]:
+    if not required_arches or not required_libcs:
+        raise ValueError("promotion arches and libcs must both be non-empty")
+    unknown_arches = required_arches - {"rv", "la"}
+    unknown_libcs = required_libcs - {"musl", "glibc"}
+    if unknown_arches or unknown_libcs:
+        raise ValueError(
+            "unsupported promotion axes: "
+            + ", ".join(sorted(unknown_arches | unknown_libcs))
+        )
     required_combos = {(arch, libc) for arch in required_arches for libc in required_libcs}
     by_case: dict[str, dict[tuple[str, str], list[dict[str, Any]]]] = {}
     for row in rows:
@@ -429,10 +550,30 @@ def promotion_report(
 
     candidates = []
     blocked = []
+    if not by_case:
+        blocked.append(
+            {
+                "case": "<no-cases-observed>",
+                "missing": [
+                    {"arch": arch, "libc": libc}
+                    for arch, libc in sorted(required_combos)
+                ],
+                "blockers": [],
+            }
+        )
     for case, combos in sorted(by_case.items()):
         missing = sorted(required_combos - set(combos))
         blockers = []
         for arch, libc in sorted(required_combos & set(combos)):
+            if len(combos[(arch, libc)]) != 1:
+                blockers.append(
+                    {
+                        "arch": arch,
+                        "libc": libc,
+                        "group": ",".join(sorted(row["group"] for row in combos[(arch, libc)])),
+                        "reasons": [f"duplicate-combo={len(combos[(arch, libc)])}"],
+                    }
+                )
             for row in combos[(arch, libc)]:
                 problems = row_problem_markers(row)
                 if problems:
@@ -498,20 +639,27 @@ def promotion_rows(raw_summary: dict[str, Any], data: dict[str, Any], arch: str)
         if event["status"] != "PASS"
     )
     rows = []
+    protocol = raw_summary.get("protocol")
     for row in data["case_matrix_rows"]:
         item = dict(row)
         item["event_failures"] = event_failures[(row["case"], row["arch"], row["libc"])]
         item["promotion_mode_blocker"] = promotion_mode_blocker(row.get("case_list"))
+        item["protocol_overall_state"] = protocol["state"] if protocol is not None else "error"
+        item["protocol_diagnostics"] = (
+            len(protocol["diagnostics"]) if protocol is not None else 1
+        )
         rows.append(item)
     return rows
 
 
-def render_promotion_markdown(report: dict[str, Any], paths: list[Path]) -> str:
+def render_promotion_markdown(report: dict[str, Any], input_labels: list[str]) -> str:
     lines = ["# LTP promotion-candidate report", ""]
     lines += [
-        "- Inputs: " + ", ".join(f"`{path}`" for path in paths),
-        "- Required arches: " + ", ".join(report["required_arches"]),
-        "- Required libcs: " + ", ".join(report["required_libcs"]),
+        "- Inputs: " + ", ".join(markdown_escape(label) for label in input_labels),
+        "- Required arches: "
+        + ", ".join(markdown_escape(item) for item in report["required_arches"]),
+        "- Required libcs: "
+        + ", ".join(markdown_escape(item) for item in report["required_libcs"]),
         f"- Required arch/libc combos: {report['required_combo_count']}",
         f"- Promotion candidates: {report['candidate_count']}",
         f"- Blocked/incomplete cases: {report['blocked_count']}",
@@ -526,7 +674,9 @@ def render_promotion_markdown(report: dict[str, Any], paths: list[Path]) -> str:
         lines.append("| --- | --- | ---: | ---: |")
         for item in report["candidates"]:
             combos = ", ".join(
-                f"{combo['arch']}:{combo['libc']}:{combo['group']}"
+                markdown_escape(
+                    f"{combo['arch']}:{combo['libc']}:{combo['group']}"
+                )
                 for combo in item["combos"]
             )
             max_runtime = "" if item["max_runtime_ms"] is None else str(item["max_runtime_ms"])
@@ -535,7 +685,10 @@ def render_promotion_markdown(report: dict[str, Any], paths: list[Path]) -> str:
                 if item["min_free_frames_delta_after_cleanup"] is None
                 else str(item["min_free_frames_delta_after_cleanup"])
             )
-            lines.append(f"| {item['case']} | {combos} | {max_runtime} | {min_delta} |")
+            lines.append(
+                f"| {markdown_escape(item['case'])} | {combos} | "
+                f"{max_runtime} | {min_delta} |"
+            )
     else:
         lines.append("- None")
     lines.append("")
@@ -556,14 +709,24 @@ def render_promotion_markdown(report: dict[str, Any], paths: list[Path]) -> str:
                     f"{blocker['arch']}:{blocker['libc']}:{blocker['group']} "
                     + "/".join(blocker["reasons"])
                 )
-            lines.append(f"| {item['case']} | {'; '.join(reasons)} |")
+            lines.append(
+                f"| {markdown_escape(item['case'])} | "
+                f"{markdown_escape('; '.join(reasons))} |"
+            )
     else:
         lines.append("- None")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_markdown(path: Path, data: dict[str, Any]) -> str:
-    lines = [f"# LTP summary: `{path}`", ""]
+def render_markdown(input_label: str, data: dict[str, Any]) -> str:
+    lines = [f"# LTP summary: {markdown_escape(input_label)}", ""]
+    if data.get("protocol") is not None:
+        protocol = data["protocol"]
+        lines += [
+            f"- Overall protocol state: **{protocol['state'].upper()}**",
+            f"- Protocol diagnostics: {len(protocol['diagnostics'])}",
+            f"- Raw SHA-256: `{protocol['raw_sha256']}`",
+        ]
     lines += [
         f"- Wrapper PASS (code 0): {data['pass_count']}",
         f"- Wrapper FAIL (nonzero/timeout): {data['fail_count']}",
@@ -577,15 +740,21 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
         lines.append("## Case-list manifests")
         for item in data["case_list_manifests"]:
             lines.append(
-                "- {group}: `{name}` ({case_count} cases, timeout {timeout_secs}s)".format(
-                    **item
+                "- {group}: {name} ({case_count} cases, timeout {timeout_secs}s)".format(
+                    group=markdown_escape(item["group"]),
+                    name=markdown_escape(item["name"]),
+                    case_count=item["case_count"],
+                    timeout_secs=item["timeout_secs"],
                 )
             )
         lines.append("")
     if data["suite_summaries"]:
         lines.append("## Suite summaries")
         for item in data["suite_summaries"]:
-            lines.append(f"- {item['group']}: {item['passed']} passed, {item['failed']} failed")
+            lines.append(
+                f"- {markdown_escape(item['group'])}: {item['passed']} passed, "
+                f"{item['failed']} failed"
+            )
         lines.append("")
     if data["case_matrix_rows"]:
         lines.append("## Case matrix")
@@ -609,11 +778,11 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
             )
             lines.append(
                 "| {case} | {arch} | {libc} | {group} | {status} | {code} | {runtime_ms} | {before_free} | {after_cleanup_free} | {free_delta} | {tfail} | {tbrok} | {tconf} | {timeout} | {enosys} | {panic} |".format(
-                    case=row["case"],
-                    arch=row["arch"],
-                    libc=row["libc"],
-                    group=row["group"],
-                    status=row["status"],
+                    case=markdown_escape(row["case"]),
+                    arch=markdown_escape(row["arch"]),
+                    libc=markdown_escape(row["libc"]),
+                    group=markdown_escape(row["group"]),
+                    status=markdown_escape(row["status"]),
                     code=code,
                     runtime_ms=runtime_ms,
                     before_free=before_free,
@@ -631,16 +800,20 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
     if data.get("categories"):
         lines.append("## Categories")
         for name, cases in data["categories"].items():
-            lines.append(f"- {name}: {len(cases)}" + (f" ({', '.join(cases)})" if cases else ""))
+            escaped_cases = ", ".join(markdown_escape(case) for case in cases)
+            lines.append(
+                f"- {markdown_escape(name)}: {len(cases)}"
+                + (f" ({escaped_cases})" if cases else "")
+            )
         lines.append("")
     if data["fail_cases"]:
         lines.append("## FAIL LTP CASE")
         for case in data["fail_cases"]:
-            lines.append(f"- {case}")
+            lines.append(f"- {markdown_escape(case)}")
         lines.append("")
     lines.append("## Groups")
     for name, group in data["groups"].items():
-        lines.append(f"### {name}")
+        lines.append(f"### {markdown_escape(name)}")
         lines.append(f"- PASS: {group['pass_count']}")
         lines.append(f"- FAIL: {group['fail_count']}")
         lines.append(f"- Internal: {group['internal']}")
@@ -648,7 +821,10 @@ def render_markdown(path: Path, data: dict[str, Any]) -> str:
         lines.append(f"- ENOSYS/not implemented: {group['enosys']}")
         lines.append(f"- panic/trap: {group['panic_trap']}")
         if group["fail_cases"]:
-            lines.append(f"- Fail cases: {', '.join(group['fail_cases'])}")
+            lines.append(
+                "- Fail cases: "
+                + ", ".join(markdown_escape(case) for case in group["fail_cases"])
+            )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -675,6 +851,11 @@ def main() -> int:
         default="musl,glibc",
         help="Comma-separated required libc variants for --promotion-candidates (default: musl,glibc)",
     )
+    parser.add_argument(
+        "--require-clean",
+        action="store_true",
+        help="Return nonzero unless every input is structurally valid and semantically pass",
+    )
     args = parser.parse_args()
 
     if not args.promotion_candidates and len(args.log) != 1:
@@ -683,32 +864,81 @@ def main() -> int:
     summaries = []
     for path in args.log:
         arch = infer_arch(path)
-        raw_summary = parse_log(path.read_text(errors="ignore"))
+        try:
+            raw_summary = parse_log_bytes(read_log_bytes(path))
+        except (OSError, ValueError, MemoryError) as exc:
+            parser.error(f"cannot read {path}: {exc}")
         summaries.append((path, raw_summary, compact(raw_summary, arch), arch))
+    input_labels = stable_path_labels([path for path, _raw, _data, _arch in summaries])
+
+    protocol_results = [raw_summary["protocol"] for _path, raw_summary, _data, _arch in summaries]
+    has_integrity_error = any(result["diagnostics"] for result in protocol_results)
+    has_nonpass = any(result["state"] != "pass" for result in protocol_results)
 
     if args.promotion_candidates:
+        provenance_errors = []
+        raw_arches: dict[str, list[tuple[str, str]]] = {}
+        for index, (_path, raw_summary, _data, arch) in enumerate(summaries):
+            raw_sha256 = raw_summary["protocol"]["raw_sha256"]
+            raw_arches.setdefault(raw_sha256, []).append((arch, input_labels[index]))
+        for raw_sha256, bindings in sorted(raw_arches.items()):
+            arches = {arch for arch, _label in bindings}
+            if len(arches) > 1:
+                provenance_errors.append(
+                    "identical raw evaluator bytes were assigned to different architectures "
+                    f"({raw_sha256}: "
+                    + ", ".join(f"{arch}={label}" for arch, label in bindings)
+                    + ")"
+                )
         rows = [
             row
             for _path, raw_summary, data, arch in summaries
             for row in promotion_rows(raw_summary, data, arch)
         ]
-        report = promotion_report(
-            rows,
-            parse_csv_set(args.promotion_arches),
-            parse_csv_set(args.promotion_libcs),
-        )
+        try:
+            report = promotion_report(
+                rows,
+                parse_csv_set(args.promotion_arches),
+                parse_csv_set(args.promotion_libcs),
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        if provenance_errors:
+            report["candidates"] = []
+            report["candidate_count"] = 0
+            report["blocked"].append(
+                {
+                    "case": "<architecture-provenance>",
+                    "missing": [],
+                    "blockers": [
+                        {
+                            "arch": "cross-arch",
+                            "libc": "all",
+                            "group": "raw-log-binding",
+                            "reasons": provenance_errors,
+                        }
+                    ],
+                }
+            )
+            report["blocked_count"] = len(report["blocked"])
+            has_integrity_error = True
         if args.json:
             print(json.dumps(report, indent=2, sort_keys=True))
         else:
-            print(render_promotion_markdown(report, [path for path, _raw, _data, _arch in summaries]), end="")
-        return 0
+            print(render_promotion_markdown(report, input_labels), end="")
+        if has_integrity_error:
+            return 2
+        promotion_nonpass = has_nonpass or bool(report["blocked_count"])
+        return 1 if args.require_clean and promotion_nonpass else 0
 
     path, _raw_summary, data, _arch = summaries[0]
     if args.json:
         print(json.dumps(data, indent=2, sort_keys=True))
     else:
-        print(render_markdown(path, data), end="")
-    return 0
+        print(render_markdown(input_labels[0], data), end="")
+    if has_integrity_error:
+        return 2
+    return 1 if args.require_clean and has_nonpass else 0
 
 
 if __name__ == "__main__":

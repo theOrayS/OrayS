@@ -1,0 +1,1078 @@
+{
+  "$defs": {
+    "artifact_reference": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source": {
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "path",
+        "size_bytes",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "capability": {
+      "additionalProperties": false,
+      "dependentSchemas": {
+        "required_version": {
+          "properties": {
+            "kind": {
+              "const": "tool"
+            }
+          }
+        }
+      },
+      "properties": {
+        "external": {
+          "type": "boolean"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "tool",
+            "executable",
+            "path",
+            "env"
+          ]
+        },
+        "required_version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "value": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "value",
+        "external"
+      ],
+      "type": "object"
+    },
+    "case": {
+      "additionalProperties": false,
+      "properties": {
+        "architectures": {
+          "items": {
+            "enum": [
+              "host",
+              "riscv64",
+              "loongarch64"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "artifacts": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "category": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "classifier": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "exit_code"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "fail_pattern": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "guard_protocol"
+                },
+                "min_tests": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "pass_pattern": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "pass_pattern",
+                "fail_pattern"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "boot_marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "fatal_patterns": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "kind": {
+                  "const": "marker_protocol"
+                },
+                "ordered_markers": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "kind",
+                "ordered_markers",
+                "fatal_patterns",
+                "boot_marker"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "command": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "depends_on": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "environment": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
+          "type": "object"
+        },
+        "evidence_level": {
+          "enum": [
+            "declared",
+            "static_checked",
+            "built",
+            "booted",
+            "runtime_semantic"
+          ]
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "required",
+            "observational"
+          ]
+        },
+        "provenance": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "requires": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "runner_id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "maximum": 21600,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "title": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "category",
+        "architectures",
+        "runner_id",
+        "evidence_level",
+        "policy",
+        "timeout_seconds",
+        "requires",
+        "depends_on",
+        "command",
+        "classifier",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "inventory": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "check_glob": {
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+          "type": "string"
+        },
+        "expected_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "python_guard_pairs"
+        },
+        "policy": {
+          "enum": [
+            "required",
+            "observational"
+          ]
+        },
+        "requires": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "runner_id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "test_glob": {
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "maximum": 21600,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "check_glob",
+        "test_glob",
+        "runner_id",
+        "category",
+        "policy",
+        "timeout_seconds",
+        "requires",
+        "expected_ids"
+      ],
+      "type": "object"
+    },
+    "manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "type": "array"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/case"
+          },
+          "type": "array"
+        },
+        "inventories": {
+          "items": {
+            "$ref": "#/$defs/inventory"
+          },
+          "type": "array"
+        },
+        "runners": {
+          "items": {
+            "$ref": "#/$defs/runner"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "suite_id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "suite_id",
+        "capabilities",
+        "runners",
+        "inventories",
+        "cases"
+      ],
+      "type": "object"
+    },
+    "process": {
+      "additionalProperties": false,
+      "properties": {
+        "cleanup_complete": {
+          "type": "boolean"
+        },
+        "cleanup_diagnostics": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kill_sent": {
+          "type": "boolean"
+        },
+        "reaped": {
+          "type": "boolean"
+        },
+        "residual_processes_killed": {
+          "type": "boolean"
+        },
+        "signal": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "spawn_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spawned": {
+          "type": "boolean"
+        },
+        "term_sent": {
+          "type": "boolean"
+        },
+        "timed_out": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "spawned",
+        "exit_code",
+        "signal",
+        "timed_out",
+        "residual_processes_killed",
+        "cleanup_complete",
+        "cleanup_diagnostics",
+        "term_sent",
+        "kill_sent",
+        "reaped",
+        "spawn_error"
+      ],
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/result_case"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "manifest": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+              "type": "string"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "suite_id": {
+              "pattern": "^[a-z0-9][a-z0-9._-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema_version",
+            "suite_id",
+            "sha256",
+            "path"
+          ],
+          "type": "object"
+        },
+        "repository": {
+          "additionalProperties": false,
+          "properties": {
+            "content_sha256": {
+              "pattern": "^(?:unknown|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            "dirty": {
+              "type": "boolean"
+            },
+            "revision": {
+              "pattern": "^(?:unknown|[0-9a-f]{40})$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "revision",
+            "dirty",
+            "content_sha256"
+          ],
+          "type": "object"
+        },
+        "run": {
+          "additionalProperties": false,
+          "properties": {
+            "duration_seconds": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "ended_at": {
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            },
+            "expected_instances": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "repository_before": {
+              "additionalProperties": false,
+              "properties": {
+                "content_sha256": {
+                  "pattern": "^(?:unknown|[0-9a-f]{64})$",
+                  "type": "string"
+                },
+                "dirty": {
+                  "type": "boolean"
+                },
+                "revision": {
+                  "pattern": "^(?:unknown|[0-9a-f]{40})$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "revision",
+                "dirty",
+                "content_sha256"
+              ],
+              "type": "object"
+            },
+            "selected_case_count": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "selection": {
+              "additionalProperties": false,
+              "properties": {
+                "complete_required": {
+                  "type": "boolean"
+                },
+                "complete_suite": {
+                  "type": "boolean"
+                },
+                "full_instance_count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "full_required_instance_count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "included_dependency_instances": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "requested_instances": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "requested_instances",
+                "included_dependency_instances",
+                "full_instance_count",
+                "full_required_instance_count",
+                "complete_suite",
+                "complete_required"
+              ],
+              "type": "object"
+            },
+            "started_at": {
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "started_at",
+            "ended_at",
+            "duration_seconds",
+            "repository_before",
+            "selected_case_count",
+            "expected_instances",
+            "selection"
+          ],
+          "type": "object"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "summary": {
+          "additionalProperties": false,
+          "properties": {
+            "policies": {
+              "additionalProperties": false,
+              "properties": {
+                "observational": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "required": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "required",
+                "observational"
+              ],
+              "type": "object"
+            },
+            "required_nonpass": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "states": {
+              "additionalProperties": false,
+              "properties": {
+                "blocked": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "error": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "fail": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "pass": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "skipped": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "timeout": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "pass",
+                "fail",
+                "error",
+                "timeout",
+                "blocked",
+                "skipped"
+              ],
+              "type": "object"
+            },
+            "total": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total",
+            "states",
+            "policies",
+            "required_nonpass"
+          ],
+          "type": "object"
+        },
+        "tools": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sha256": {
+                "anyOf": [
+                  {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "path",
+              "version",
+              "sha256"
+            ],
+            "type": "object"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema_version",
+        "manifest",
+        "repository",
+        "tools",
+        "run",
+        "cases",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "result_case": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "enum": [
+            "host",
+            "riscv64",
+            "loongarch64"
+          ]
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/artifact_reference"
+          },
+          "type": "array"
+        },
+        "case_id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "category": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "command": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "cwd": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "duration_seconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "ended_at": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "type": "string"
+        },
+        "logs": {
+          "additionalProperties": false,
+          "properties": {
+            "raw": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "size_bytes": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "size_bytes",
+                "sha256"
+              ],
+              "type": "object"
+            },
+            "stderr": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    "size_bytes": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "size_bytes",
+                    "sha256"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "stdout": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    "size_bytes": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "size_bytes",
+                    "sha256"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "stdout",
+            "stderr",
+            "raw"
+          ],
+          "type": "object"
+        },
+        "observed_evidence": {
+          "oneOf": [
+            {
+              "enum": [
+                "declared",
+                "static_checked",
+                "built",
+                "booted",
+                "runtime_semantic"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy": {
+          "enum": [
+            "required",
+            "observational"
+          ]
+        },
+        "process": {
+          "$ref": "#/$defs/process"
+        },
+        "provenance": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason_code": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "started_at": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "pass",
+            "fail",
+            "error",
+            "timeout",
+            "blocked",
+            "skipped"
+          ]
+        },
+        "target_evidence": {
+          "enum": [
+            "declared",
+            "static_checked",
+            "built",
+            "booted",
+            "runtime_semantic"
+          ]
+        },
+        "title": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "title",
+        "category",
+        "architecture",
+        "policy",
+        "target_evidence",
+        "observed_evidence",
+        "state",
+        "reason_code",
+        "reason",
+        "command",
+        "cwd",
+        "started_at",
+        "ended_at",
+        "duration_seconds",
+        "process",
+        "artifacts",
+        "logs",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "runner": {
+      "additionalProperties": false,
+      "properties": {
+        "classifier_kind": {
+          "enum": [
+            "exit_code",
+            "guard_protocol",
+            "marker_protocol"
+          ]
+        },
+        "combine_output": {
+          "type": "boolean"
+        },
+        "grace_seconds": {
+          "maximum": 30,
+          "minimum": 0.1,
+          "type": "number"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "process"
+        },
+        "max_evidence": {
+          "enum": [
+            "declared",
+            "static_checked",
+            "built",
+            "booted",
+            "runtime_semantic"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "classifier_kind",
+        "max_evidence",
+        "combine_output",
+        "grace_seconds"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://orays.invalid/schemas/semantic-evidence-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/manifest"
+    },
+    {
+      "$ref": "#/$defs/result"
+    }
+  ],
+  "title": "OrayS semantic evidence manifest or canonical result v1",
+  "x-orays-enums": {
+    "architectures": [
+      "host",
+      "riscv64",
+      "loongarch64"
+    ],
+    "evidence_levels": [
+      "declared",
+      "static_checked",
+      "built",
+      "booted",
+      "runtime_semantic"
+    ],
+    "policies": [
+      "required",
+      "observational"
+    ],
+    "result_states": [
+      "pass",
+      "fail",
+      "error",
+      "timeout",
+      "blocked",
+      "skipped"
+    ]
+  }
+}

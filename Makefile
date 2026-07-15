@@ -81,6 +81,25 @@ KERNEL_RV_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x4000_0000
 KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
+PR3_SMOKE_BUILD_DIR ?= $(CURDIR)/build/pr3-smoke
+PR3_SMOKE_KERNEL_FEATURES ?= alloc,paging,irq,multitask,fs,net,driver-ramdisk
+PR3_SMOKE_APP_FEATURES ?= semantic-smoke
+PR3_SMOKE_RV_KERNEL ?= $(PR3_SMOKE_BUILD_DIR)/kernel-rv
+PR3_SMOKE_LA_KERNEL ?= $(PR3_SMOKE_BUILD_DIR)/kernel-la
+PR3_SMOKE_RV_OUT_DIR ?= $(PR3_SMOKE_BUILD_DIR)/riscv64
+PR3_SMOKE_LA_OUT_DIR ?= $(PR3_SMOKE_BUILD_DIR)/loongarch64
+PR3_SMOKE_RV_CONFIG ?= $(PR3_SMOKE_BUILD_DIR)/riscv64.axconfig.toml
+PR3_SMOKE_LA_CONFIG ?= $(PR3_SMOKE_BUILD_DIR)/loongarch64.axconfig.toml
+PR3_SMOKE_RV_TARGET_DIR ?= $(PR3_SMOKE_BUILD_DIR)/target/riscv64
+PR3_SMOKE_LA_TARGET_DIR ?= $(PR3_SMOKE_BUILD_DIR)/target/loongarch64
+PR3_SEMANTIC_MANIFEST ?= $(CURDIR)/scripts/semantic_evidence_manifest.json
+PR3_SMOKE_RV_EVIDENCE_DIR ?= $(PR3_SMOKE_BUILD_DIR)/evidence-rv64
+PR3_SMOKE_LA_EVIDENCE_DIR ?= $(PR3_SMOKE_BUILD_DIR)/evidence-la64
+PR3_EVIDENCE_DIR ?= $(CURDIR)/build/pr3-evidence
+PR3_HOST_EVIDENCE_DIR ?= $(PR3_EVIDENCE_DIR)/host
+PR3_RV_EVIDENCE_DIR ?= $(PR3_EVIDENCE_DIR)/rv64
+PR3_LA_EVIDENCE_DIR ?= $(PR3_EVIDENCE_DIR)/la64
+PR3_REQUIRED_EVIDENCE_DIR ?= $(PR3_EVIDENCE_DIR)/required
 # Remote official evaluation invokes `make` / `make all` with no extra args.
 # Default to the trusted stable LTP list so the full non-LTP surface plus both
 # libc LTP passes can finish inside the remote scorer.  Broader sweep modes stay
@@ -137,6 +156,7 @@ export PATH := $(VENDOR_BIN):$(CURDIR)/tools/bin:$(PATH)
 
 SCRIPT_AXCONFIG_GEN := $(CURDIR)/scripts/axconfig-gen.py
 SCRIPT_RUST_OBJCOPY := $(CURDIR)/scripts/rust-objcopy.sh
+SCRIPT_RUST_LLD := $(CURDIR)/scripts/rust-lld.sh
 SCRIPT_CARGO_AXPLAT := $(CURDIR)/scripts/cargo-axplat.sh
 
 ifneq ($(wildcard $(SCRIPT_AXCONFIG_GEN)),)
@@ -146,6 +166,13 @@ else ifneq ($(wildcard $(VENDOR_BIN)/axconfig-gen),)
 else
   AXCONFIG_GEN ?= axconfig-gen
 endif
+
+ifneq ($(wildcard $(SCRIPT_RUST_LLD)),)
+  RUST_LLD ?= $(SCRIPT_RUST_LLD)
+else
+  RUST_LLD ?= rust-lld
+endif
+export RUST_LLD
 
 ifneq ($(wildcard $(SCRIPT_RUST_OBJCOPY)),)
   RUST_OBJCOPY ?= sh $(SCRIPT_RUST_OBJCOPY)
@@ -264,7 +291,7 @@ CROSS_COMPILE ?= $(ARCH)-linux-musl-
 CC := $(CROSS_COMPILE)gcc
 AR := $(CROSS_COMPILE)ar
 RANLIB := $(CROSS_COMPILE)ranlib
-LD := rust-lld -flavor gnu
+LD := $(RUST_LLD) -flavor gnu
 
 OBJDUMP ?= rust-objdump -d --print-imm-hex --x86-asm-syntax=intel
 OBJCOPY ?= $(RUST_OBJCOPY) --binary-architecture=$(ARCH)
@@ -391,7 +418,7 @@ test_build:
 ifeq ($(ARCH),riscv64)
 	@mkdir -p $(dir $(KERNEL_RV))
 	$(RUST_OBJCOPY) -I binary -O elf64-littleriscv --rename-section .data=.text,alloc,load,readonly,code $(KERNEL_RV_BIN) $(KERNEL_RV_WRAP_OBJ)
-	rust-lld -flavor gnu -m elf64lriscv -T scripts/make/riscv64-kernel-wrap.lds $(KERNEL_RV_WRAP_OBJ) -o $(KERNEL_RV)
+	$(RUST_LLD) -flavor gnu -m elf64lriscv -T scripts/make/riscv64-kernel-wrap.lds $(KERNEL_RV_WRAP_OBJ) -o $(KERNEL_RV)
 else ifeq ($(ARCH),loongarch64)
 	@mkdir -p $(dir $(KERNEL_LA))
 	cp $(KERNEL_LA_ELF) $(KERNEL_LA)
@@ -416,6 +443,128 @@ kernel-la:
 		OUT_DIR=$(KERNEL_LA_OUT_DIR) \
 		OUT_CONFIG=$(KERNEL_LA_CONFIG) \
 		TARGET_DIR=$(KERNEL_LA_TARGET_DIR)
+
+pr3-smoke-kernel-rv:
+	$(MAKE) test_build ARCH=riscv64 BUS=mmio \
+		KERNEL_FEATURES="$(PR3_SMOKE_KERNEL_FEATURES)" \
+		APP_FEATURES="$(PR3_SMOKE_APP_FEATURES)" \
+		AXCONFIG_WRITES="$(KERNEL_RV_AXCONFIG_WRITES)" \
+		KERNEL_BUILD_DIR=$(PR3_SMOKE_BUILD_DIR) \
+		KERNEL_RV=$(PR3_SMOKE_RV_KERNEL) \
+		OUT_DIR=$(PR3_SMOKE_RV_OUT_DIR) \
+		OUT_CONFIG=$(PR3_SMOKE_RV_CONFIG) \
+		TARGET_DIR=$(PR3_SMOKE_RV_TARGET_DIR)
+
+pr3-smoke-kernel-la:
+	$(MAKE) test_build ARCH=loongarch64 BUS=pci \
+		KERNEL_FEATURES="$(PR3_SMOKE_KERNEL_FEATURES)" \
+		APP_FEATURES="$(PR3_SMOKE_APP_FEATURES)" \
+		AXCONFIG_WRITES="$(KERNEL_LA_AXCONFIG_WRITES)" \
+		KERNEL_BUILD_DIR=$(PR3_SMOKE_BUILD_DIR) \
+		KERNEL_LA=$(PR3_SMOKE_LA_KERNEL) \
+		OUT_DIR=$(PR3_SMOKE_LA_OUT_DIR) \
+		OUT_CONFIG=$(PR3_SMOKE_LA_CONFIG) \
+		TARGET_DIR=$(PR3_SMOKE_LA_TARGET_DIR)
+
+pr3-smoke-run-rv-raw:
+	@test "$$PR3_EVIDENCE_SUPERVISED" = 1 || { \
+		printf '%s\n' 'refusing unsupervised QEMU; use make pr3-smoke-rv' >&2; exit 2; \
+	}
+	@test -s "$(PR3_SMOKE_RV_KERNEL)" || { \
+		printf 'missing PR3 RV64 smoke kernel: %s\n' "$(PR3_SMOKE_RV_KERNEL)" >&2; exit 2; \
+	}
+	@test -x "$$PR3_QEMU_RV_BIN" || { \
+		printf '%s\n' 'missing supervisor-resolved PR3_QEMU_RV_BIN' >&2; exit 2; \
+	}
+	"$$PR3_QEMU_RV_BIN" -machine virt -kernel $(PR3_SMOKE_RV_KERNEL) \
+		-m 1G -display none -serial stdio -monitor none -smp 1 \
+		-device virtio-net-device,netdev=net -netdev hubport,id=net,hubid=0 \
+		-bios default -no-reboot
+
+pr3-smoke-run-la-raw:
+	@test "$$PR3_EVIDENCE_SUPERVISED" = 1 || { \
+		printf '%s\n' 'refusing unsupervised QEMU; use make pr3-smoke-la' >&2; exit 2; \
+	}
+	@test -s "$(PR3_SMOKE_LA_KERNEL)" || { \
+		printf 'missing PR3 LA64 smoke kernel: %s\n' "$(PR3_SMOKE_LA_KERNEL)" >&2; exit 2; \
+	}
+	@test -x "$$PR3_QEMU_LA_BIN" || { \
+		printf '%s\n' 'missing supervisor-resolved PR3_QEMU_LA_BIN' >&2; exit 2; \
+	}
+	"$$PR3_QEMU_LA_BIN" -machine virt -kernel $(PR3_SMOKE_LA_KERNEL) \
+		-m 1G -display none -serial stdio -monitor none -smp 1 \
+		-device virtio-net-pci,netdev=net -netdev hubport,id=net,hubid=0 \
+		-no-reboot
+
+pr3-smoke-rv:
+	python3 scripts/semantic_evidence.py run \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--output $(PR3_SMOKE_RV_EVIDENCE_DIR) \
+		--case smoke.rv64.abi
+
+pr3-smoke-la:
+	python3 scripts/semantic_evidence.py run \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--output $(PR3_SMOKE_LA_EVIDENCE_DIR) \
+		--case smoke.la64.abi
+
+pr3-manifest-check:
+	python3 scripts/semantic_evidence.py validate --manifest $(PR3_SEMANTIC_MANIFEST)
+	python3 scripts/semantic_evidence.py schema --check scripts/semantic_evidence_schema.v1.json
+
+pr3-infrastructure-tests:
+	python3 scripts/test_semantic_evidence.py -v
+	python3 scripts/test_evaluator_protocol.py -v
+	python3 scripts/test_ltp_summary.py -v
+	python3 scripts/test_eval_failure_report.py -v
+	python3 scripts/test_run_eval.py -v
+	python3 scripts/test_setup_qemu_pr3.py -v
+	python3 scripts/check_g014_pr3_workflow.py
+	python3 scripts/test_g014_pr3_workflow.py -v
+
+pr3-evidence-host:
+	python3 scripts/semantic_evidence.py run \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--output $(PR3_HOST_EVIDENCE_DIR) \
+		--arch host
+
+pr3-evidence-rv:
+	python3 scripts/semantic_evidence.py run \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--output $(PR3_RV_EVIDENCE_DIR) \
+		--arch riscv64
+
+pr3-evidence-la:
+	python3 scripts/semantic_evidence.py run \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--output $(PR3_LA_EVIDENCE_DIR) \
+		--arch loongarch64
+
+pr3-render-required:
+	python3 scripts/render_semantic_evidence.py \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--input $(PR3_REQUIRED_EVIDENCE_DIR)/semantic-evidence-v1.json \
+		--output $(PR3_REQUIRED_EVIDENCE_DIR)/reports
+
+pr3-evidence-required:
+	@set +e; \
+	status=0; \
+	for target in pr3-evidence-host pr3-evidence-rv pr3-evidence-la; do \
+		$(MAKE) "$$target"; rc=$$?; \
+		if [ "$$rc" -gt "$$status" ]; then status=$$rc; fi; \
+	done; \
+	python3 scripts/semantic_evidence.py merge \
+		--manifest $(PR3_SEMANTIC_MANIFEST) \
+		--output $(PR3_REQUIRED_EVIDENCE_DIR) \
+		--shard $(PR3_HOST_EVIDENCE_DIR)/semantic-evidence-v1.json \
+		--shard $(PR3_RV_EVIDENCE_DIR)/semantic-evidence-v1.json \
+		--shard $(PR3_LA_EVIDENCE_DIR)/semantic-evidence-v1.json; \
+	rc=$$?; if [ "$$rc" -gt "$$status" ]; then status=$$rc; fi; \
+	if [ -f $(PR3_REQUIRED_EVIDENCE_DIR)/semantic-evidence-v1.json ]; then \
+		$(MAKE) pr3-render-required; rc=$$?; \
+		if [ "$$rc" -gt "$$status" ]; then status=$$rc; fi; \
+	fi; \
+	exit "$$status"
 
 docker-image:
 	docker build -t $(DOCKER_IMAGE) -f Dockerfile .
@@ -497,7 +646,7 @@ endif
 
 clean: clean_c
 	rm -rf $(APP)/*.bin $(APP)/*.elf $(OUT_CONFIG)
-	rm -rf $(KERNEL_BUILD_DIR) $(KERNEL_RV) $(KERNEL_LA)
+	rm -rf $(KERNEL_BUILD_DIR) $(PR3_SMOKE_BUILD_DIR) $(PR3_EVIDENCE_DIR) $(KERNEL_RV) $(KERNEL_LA)
 	cargo clean
 
 clean_c::
@@ -509,4 +658,8 @@ clean_c::
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
 	disk_img clean clean_c \
 	test_build kernel-rv kernel-la docker-image docker testsuite-sdcard \
-	prepare-rv-testsuite-img prepare-la-testsuite-img run-rv run-la
+	prepare-rv-testsuite-img prepare-la-testsuite-img run-rv run-la \
+	pr3-smoke-kernel-rv pr3-smoke-kernel-la \
+	pr3-smoke-run-rv-raw pr3-smoke-run-la-raw pr3-smoke-rv pr3-smoke-la \
+	pr3-manifest-check pr3-infrastructure-tests pr3-evidence-host \
+	pr3-evidence-rv pr3-evidence-la pr3-render-required pr3-evidence-required
