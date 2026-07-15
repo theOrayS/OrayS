@@ -7,21 +7,24 @@ A nonzero result below remains non-passing even when all planned cases completed
 
 All timestamps copied from runner summaries are UTC.
 
-Status at this documentation revision: implementation and focused regression
-validation are complete, while the final commit-attributed profiles and the two
-explicit user-supplied RV/LA image runs are pending. Older completed runs below
-are retained only as historical blocker evidence and are not represented as
-results of the current uncommitted code. The final evidence update replaces
-this status after running from a clean commit.
+Status at this documentation revision: implementation commit
+`b34881941843892d6e7907a976a7306c80f94f16` has complete clean-worktree quick,
+cwd-independent quick, baseline, and RISC-V64 official evidence. Quick and
+baseline remain honestly non-passing because of unchanged production failures
+and one host capability error. The complete RISC-V64 run is an infrastructure
+error because its raw stdout contains a NUL byte. A LoongArch64 run was
+interrupted by an execution-environment transition, and its clean retry was
+then stopped at the operator's request; neither incomplete directory is a
+verdict or PASS. Older completed runs below are retained only as historical
+blocker evidence and are not represented as current final evidence.
 
 ## Revision boundary
 
 - Unchanged production baseline:
   `921171ac1ef5c85ab5a7cd1882dd40e1471b79f0` (`origin/main` and `HEAD` before
   the first tracked migration edit).
-- Six logical migration/framework commits currently precede the final review
-  hardening commit; their exact IDs and all later evidence commits are recorded
-  in the final evidence update and handoff.
+- Eight logical migration/framework and review-hardening commits precede this
+  final evidence report. Their exact IDs and subjects are recorded below.
 - Earlier local profile evidence used runner commit `d11586c9`; earlier long
   official runs used `07fce567`. Those runs predate the current identity-binding,
   lifecycle, UTF-8, isolation, and provenance hardening and therefore cannot be
@@ -58,8 +61,11 @@ Every version command below exited 0 on 2026-07-15:
 | `git --version` | Git 2.34.1 |
 
 The two locally supplied raw ext4 official images were each exactly
-4,294,967,296 bytes and readable. No image was downloaded or modified in place;
-the adapter ran a unique qcow2 overlay and removed it at exit.
+4,294,967,296 bytes and readable. No image was downloaded or modified in place.
+The completed RISC-V64 adapter run used a unique qcow2 overlay and removed it at
+exit. The interrupted LoongArch64 attempts left two 196,672-byte ignored qcow2
+overlays under their generated output directories; they are neither tracked nor
+result evidence, and the base image remains untouched.
 
 ## Legacy pre-edit baseline
 
@@ -152,6 +158,116 @@ nonzero embedded result, startup-hook early exit, or planned/executed mismatch
 cannot be counted as PASS. New static wrapper rules have both the current-tree
 positive fixture and mutations for missing, non-executable, non-delegating,
 policy-bearing, and duplicated-logic entrypoints.
+
+## Logical implementation commits
+
+The test-only branch contains these reviewable commits after the unchanged
+baseline. The final documentation commit that contains this report necessarily
+follows the tested implementation commit; the handoff records its exact hash
+because a commit cannot embed its own content-dependent hash.
+
+| Commit | Subject |
+| --- | --- |
+| `ed3e95c7` | `test: unify local test infrastructure` |
+| `6910752f` | `test: harden zero-exit result classification` |
+| `94a87c28` | `test: close official evaluation trust gaps` |
+| `07fce567` | `test: isolate official build environment` |
+| `bf841332` | `test: preserve official entry compatibility` |
+| `d11586c9` | `docs: document unified local test suite` |
+| `706c761d` | `test: close final evidence integrity gaps` |
+| `b3488194` | `test: fix unittest binding and signal fixture ownership` |
+
+## Final clean commit-attributed profile evidence
+
+Every completed row below ran with starting and final runner commit
+`b34881941843892d6e7907a976a7306c80f94f16`, clean starting and final porcelain
+status, and `runner_provenance_stable: true`. The explicit environment prevents
+nested Python bytecode caches from becoming executable test inputs. Evidence
+paths are relative and ignored.
+
+| Exact portable command | Duration | Complete totals | Exit/result | Evidence |
+| --- | ---: | --- | --- | --- |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/dev/null PYTHONNOUSERSITE=1 python3 -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile quick --output-dir test/output/final-quick-b3488194` | 252.765473 s | 36/36 executed/completed; 34 PASS, 2 FAIL, 0 INFRA | 1 / FAIL | `test/output/final-quick-b3488194/summary.json` |
+| `cd /tmp && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/dev/null PYTHONNOUSERSITE=1 python3 -I -S -B -X pycache_prefix=/dev/null <worktree>/test/run_suite.py --profile quick --output-dir <worktree>/test/output/final-quick-cwd-b3488194` | 253.627179 s | 36/36 executed/completed; 34 PASS, 2 FAIL, 0 INFRA | 1 / FAIL | `test/output/final-quick-cwd-b3488194/summary.json` |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/dev/null PYTHONNOUSERSITE=1 python3 -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile baseline --output-dir test/output/final-baseline-b3488194` | 451.608015 s | 44 planned/completed, 43 executed; 38 PASS, 5 FAIL, 1 INFRA | 2 / INFRA_ERROR | `test/output/final-baseline-b3488194/summary.json` |
+| `RV_TESTSUITE_IMG=<OFFICIAL_IMAGE_DIR>/sdcard-rv.img PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/dev/null PYTHONNOUSERSITE=1 python3 -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile official --arch rv --output-dir test/output/final-official-rv-b3488194` | 3544.815866 s | 1/1/1 planned/executed/completed; 0 PASS, 1 INFRA | 2 / INFRA_ERROR | `test/output/final-official-rv-b3488194/summary.json` |
+
+Both quick runs have the same two explicit failures and no timeout, crash,
+infrastructure error, unknown state, or not-run case. In each run,
+`unit.suite_runner` independently completed all 133 exact runtime-bound methods
+and returned PASS. This closes the post-commit integration failure in which a
+binding record had been attached to unittest progress output and an intentionally
+signalled harness fixture had leaked its two relay zombies to the outer runner.
+
+### Current quick failure details
+
+- `check.kernel_state_backed_semantics` exits 1 and reports ten missing RR
+  skipped-task aging contracts in `vendor/axsched/src/round_robin.rs`.
+- `unit.kernel_state_backed_semantics` runs 36 methods; 35 pass and the
+  current-tree assertion fails on the same ten contracts.
+
+Changing scheduler production behavior, deleting the assertion, or suppressing
+the finding is outside the test-only scope. The two results therefore remain
+FAIL. The cwd-independent run reproduces the same result rather than a path or
+discovery error.
+
+### Current baseline details
+
+The baseline repeats those two quick failures and adds these explicit outcomes:
+
+| Case | Executed/status | Exit | Duration | Cause or result |
+| --- | --- | ---: | ---: | --- |
+| `baseline.cargo_format` | yes / FAIL | 1 | 1.983321 s | existing rustfmt drift |
+| `baseline.workspace_unit_tests` | yes / FAIL | 2 | 1.181599 s | axfs `test_fatfs`: `test_devfs_ramfs()` returned `NotFound` |
+| `baseline.clippy_default` | yes / FAIL | 2 | 4.992822 s | existing `arceos-shell` cross-architecture compile errors |
+| `baseline.clippy_riscv64` | yes / PASS | 0 | recorded in summary | complete success |
+| `baseline.clippy_loongarch64` | no / INFRA_ERROR | n/a | 0.431435 s | the resolved host clang rejects `loongarch64-unknown-none`; the unavailable capability is not execution |
+| `baseline.kernel_riscv64` | yes / PASS | 0 | recorded in summary | complete success |
+| `baseline.kernel_loongarch64` | yes / PASS | 0 | recorded in summary | complete success |
+| `baseline.submission_build` | yes / PASS | 0 | recorded in summary | complete success |
+
+The one unexecuted capability-gated case explains why planned/completed are
+44/44 while executed is 43. It is an infrastructure error, not a skip or PASS.
+
+### Current official RISC-V64 result
+
+The clean current RISC-V64 run reached guest shutdown and returned child exit 0,
+but strict result validation produced `INFRA_ERROR` and suite exit 2:
+
+- planned/executed/completed: 1/1/1; PASS 0, INFRA_ERROR 1;
+- case duration 3544.716743 s;
+- strict reason: `captured output is malformed: stdout contains unsupported
+  output character U+0000`;
+- 2,378,016-byte stdout contains exactly one NUL at byte offset 3918;
+- stderr contains 12,230 bytes and no NUL;
+- raw framing contains 24/24 group START/END markers.
+
+The complete group framing and zero child exit prove that the local path ran;
+they do not override malformed capture or the real failures inside the groups.
+This is not official PASS.
+
+### Current LoongArch64 attempt boundary
+
+There is no completed current-code LoongArch64 verdict. Two generated directories
+are deliberately excluded from result tables:
+
+1. `test/output/final-official-la-b3488194/summary.json` started clean at
+   `2026-07-15T07:58:05.262355Z`, but an execution-environment transition
+   terminated its process namespace. Its summary remains `RUNNING` with no
+   final commit/status fields. The 2,383,396-byte stdout stops at 15 group START
+   and 14 group END markers.
+2. `test/output/final-official-la-retry-b3488194/summary.json` started clean at
+   `2026-07-15T09:03:27.041051Z`. The operator then requested that this path no
+   longer be run, so the waiting shell/session was interrupted and returned 130.
+   Its summary itself remains `RUNNING`; the 7,477-byte stdout has 1 group START
+   and 0 group END markers.
+
+Neither incomplete summary has an executed/completed case, final provenance, or
+exit verdict. They are interruption diagnostics only, never official evidence.
+The locally available image remains known and readable, but the operator's
+explicit stop instruction supersedes further execution in this handoff. The
+older completed LA run below remains useful blocker history, not current-code
+validation.
 
 ## Earlier pre-hardening local profile evidence
 
@@ -299,17 +415,40 @@ fixed and revalidated include:
    toolchains cannot be attested by a text parser. They are documented as a
    trusted-host boundary; a process exit 0 without a fresh complete
    `summary.json` is not sufficient PASS evidence.
+7. The first clean post-hardening quick run showed that the unittest harness
+   wrote its identity binding immediately after verbosity dots, so the strict
+   complete-line parser correctly found zero records. The producer now ends the
+   progress line first. Glued, duplicated, forged, and true harness-to-runner
+   cases lock the boundary in
+   `test/run_unittest_suite.py::execute_bound_suite` and
+   `test/unit/test_suite_runner.py::SuiteRunnerTest.test_unittest_exact_count_and_plain_ok_pass`.
+8. The signal fixture originally killed the harness while its two stdout/stderr
+   relay children were still alive, leaving adopted zombies for the outer
+   canonical runner. The fixture now runs that abnormal harness through a
+   nested real runner that owns and reaps both relays. It records the two child
+   PIDs, proves both disappear, asserts aggregate 1/1/1 with 0 PASS and 1 INFRA,
+   preserves `return_code == -SIGTERM`, and does not relax the outer survivor
+   rule. The regression is in
+   `test/unit/test_suite_runner.py::SuiteRunnerTest.test_canonical_unittest_expected_count_cannot_be_lowered`;
+   the strict outer ownership checks remain in `test/run_suite.py::_case_related_pids`
+   and `test/run_suite.py::run_case`.
 
-A final read-only diff review is run after this report is drafted. Its disposition
-and affected reruns are added before the report commit.
+The final read-only review found no high- or medium-risk issue after those fixes.
+Its only low-risk diagnostic observation is that the simultaneous signal-plus-
+survivor record preserves `return_code=-15` but leaves the optional `signal`
+field unset while its human-readable result emphasizes descendants. This cannot
+produce PASS, the negative return code is asserted, and the canonical outer
+133-method case plus both clean quick runs passed. No production or result
+classification change was made for that non-blocking presentation issue.
 
 ## External and document-production blockers
 
 - The full external Docker evaluator is unavailable because the `docker`
   command is missing.
 - No evaluator `kernel.zip` or official compressed image artifact is present in
-  the worktree. The locally available raw RV/LA images were run as documented;
-  missing optional external packaging is not reported as PASS.
+  the worktree. The locally available raw RV image was run to completion. The
+  raw LA path was interrupted and then stopped at the operator's request as
+  documented above; neither incomplete attempt is reported as PASS.
 - No network fetch is attempted to manufacture the missing environment.
 - The checked-in project PDF is treated as a production snapshot and was not
   silently regenerated. This host lacks `google-chrome`/Chromium, `pdftotext`,
@@ -333,5 +472,29 @@ and affected reruns are added before the report commit.
 - Operator-owned `AGENTS.md`, `CODEX_TEST_SUITE_GOAL.md`, and `.codex/` are not
   edited or committed.
 
-Final `git diff --check`, scope scans, tracked-output checks, commit list, and
-worktree status are recorded after the final review and report commit.
+## Final static and scope audit
+
+After drafting the current evidence report:
+
+- `bash -n run-eval.sh test/run_official_suite.sh test/evaluation/run_official_evaluation.sh`
+  exited 0;
+- `test/checks/check_test_asset_integrity.py` reported PASS with 0 findings;
+- the exact identity harness ran all 36 methods in
+  `test/unit/test_test_asset_integrity.py`: 36 PASS;
+- `test/run_suite.py --list` exited 0 and validated 46 registered cases;
+- `git diff --check` passed;
+- `git ls-files` found no legacy `scripts/check_g*`, `scripts/test_g*`, legacy
+  selfcheck unit, legacy LTP-summary unit, or legacy evaluation-reporter
+  implementation;
+- the historical-sequence-ID scan found no forbidden token under canonical
+  `/test` outside the audit-only migration map;
+- no success-masking shell or Python execution construct exists in canonical
+  executable test sources;
+- diffs for operator controls and `.github/` are empty;
+- the only tracked path under `test/output/` is its two-line `.gitignore`;
+- no repository-local `__pycache__` directory exists.
+
+Before the report commit, `git status --short` contains only the two final
+documentation changes. The exact clean post-commit status and report commit hash
+are recorded in the final handoff; embedding a commit's own hash in its contents
+is impossible.
