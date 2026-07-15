@@ -102,7 +102,7 @@
     {
       "id": "check.compliance_regressions",
       "description": "Aggregate compliance regression guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_compliance_regressions.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_compliance_regressions.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -112,7 +112,7 @@
     {
       "id": "check.evaluation_runner_and_parser_integrity",
       "description": "Evaluation execution and result parser integrity guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_evaluation_runner_and_parser_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_evaluation_runner_and_parser_integrity.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -122,7 +122,7 @@
     {
       "id": "check.kernel_state_backed_semantics",
       "description": "Kernel state-backed compatibility semantics guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_kernel_state_backed_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_kernel_state_backed_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -132,7 +132,7 @@
     {
       "id": "check.libc_stateful_semantics",
       "description": "Stateful libc operation guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_libc_stateful_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_libc_stateful_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -142,7 +142,7 @@
     {
       "id": "check.memory_policy_semantics",
       "description": "Memory policy semantics guard split from the legacy broad check.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_memory_policy_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_memory_policy_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -152,7 +152,7 @@
     {
       "id": "check.no_fake_success",
       "description": "Fake-success and required-input integrity guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_no_fake_success.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_no_fake_success.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -162,7 +162,7 @@
     {
       "id": "check.posix_state_integrity",
       "description": "Observable POSIX state integrity guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_posix_state_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_posix_state_integrity.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -172,7 +172,7 @@
     {
       "id": "check.rlimit_and_fd_semantics",
       "description": "Resource limit, sysconf, fcntl, and descriptor state guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_rlimit_and_fd_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_rlimit_and_fd_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -182,7 +182,7 @@
     {
       "id": "check.runtime_binary_patch_prohibition",
       "description": "Runtime binary rewriting prohibition guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_runtime_binary_patch_prohibition.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_runtime_binary_patch_prohibition.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -192,7 +192,7 @@
     {
       "id": "check.socket_message_and_buffer_semantics",
       "description": "Socket message and buffer semantics guard split from the legacy broad check.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_socket_message_and_buffer_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_socket_message_and_buffer_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -202,7 +202,7 @@
     {
       "id": "check.stat_metadata_semantics",
       "description": "Stat and lstat metadata semantics guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_stat_metadata_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_stat_metadata_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -212,7 +212,7 @@
     {
       "id": "check.synthetic_capability_integrity",
       "description": "Synthetic capability claim integrity guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_synthetic_capability_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_synthetic_capability_integrity.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -222,7 +222,7 @@
     {
       "id": "check.syscall_boundary_regressions",
       "description": "High-risk syscall boundary regression guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_syscall_boundary_regressions.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_syscall_boundary_regressions.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -232,7 +232,7 @@
     {
       "id": "check.test_asset_integrity",
       "description": "Canonical registration, naming, compatibility, and output hygiene check.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_test_asset_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_test_asset_integrity.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -242,7 +242,7 @@
     {
       "id": "check.timer_semantics",
       "description": "Timer semantics guard split from the legacy broad check.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_timer_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_timer_semantics.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -252,7 +252,7 @@
     {
       "id": "check.user_memory_copy_boundaries",
       "description": "User pointer copy-in and copy-out boundary guard.",
-      "command": ["{python}", "-B", "{repo}/test/checks/check_user_memory_copy_boundaries.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_user_memory_copy_boundaries.py"],
       "cwd": "{repo}",
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
@@ -263,162 +263,162 @@
     {
       "id": "unit.compliance_regressions",
       "description": "Compliance guard unit fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_compliance_regressions.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 7},
-      "required_paths": ["{repo}/test/unit/test_compliance_regressions.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"], "required_commands": []
     },
     {
       "id": "unit.evaluation_failure_report",
-      "description": "Evaluation failure reporter integrity fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_evaluation_failure_report.py"],
+      "description": "Paired-stream evaluation failure reporter and strict LTP lifecycle fixtures.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_failure_report.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 6},
-      "required_paths": ["{repo}/test/unit/test_evaluation_failure_report.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 8, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_failure_report.py", "{repo}/test/evaluation/report_evaluation_failures.py", "{repo}/test/evaluation/parse_official_results.py"], "required_commands": []
     },
     {
       "id": "unit.evaluation_runner_and_parser_integrity",
       "description": "Evaluation execution and parser static guard fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 23},
-      "required_paths": ["{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 23, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
     },
     {
       "id": "unit.kernel_state_backed_semantics",
       "description": "Kernel state-backed semantics guard fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_kernel_state_backed_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_kernel_state_backed_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 36},
-      "required_paths": ["{repo}/test/unit/test_kernel_state_backed_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 36, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_kernel_state_backed_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.libc_stateful_semantics",
       "description": "Stateful libc semantics guard fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_libc_stateful_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_libc_stateful_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9},
-      "required_paths": ["{repo}/test/unit/test_libc_stateful_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_libc_stateful_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.ltp_result_summary",
       "description": "LTP summary, promotion, and strict lifecycle fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_ltp_result_summary.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_ltp_result_summary.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 18},
-      "required_paths": ["{repo}/test/unit/test_ltp_result_summary.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 20, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_ltp_result_summary.py"], "required_commands": []
     },
     {
       "id": "unit.memory_policy_semantics",
       "description": "Memory policy semantics positive and negative fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_memory_policy_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_memory_policy_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 3},
-      "required_paths": ["{repo}/test/unit/test_memory_policy_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 3, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_memory_policy_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.no_fake_success",
       "description": "Fake-success and missing-input guard fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_no_fake_success.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_no_fake_success.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 10},
-      "required_paths": ["{repo}/test/unit/test_no_fake_success.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 10, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_no_fake_success.py"], "required_commands": []
     },
     {
       "id": "unit.official_result_validation",
       "description": "Strict official group and testcase lifecycle fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_official_result_validation.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_official_result_validation.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 106},
-      "required_paths": ["{repo}/test/unit/test_official_result_validation.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 106, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_official_result_validation.py"], "required_commands": []
     },
     {
       "id": "unit.posix_state_integrity",
       "description": "Observable POSIX state integrity fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_posix_state_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_posix_state_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 15},
-      "required_paths": ["{repo}/test/unit/test_posix_state_integrity.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 15, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_posix_state_integrity.py"], "required_commands": []
     },
     {
       "id": "unit.rlimit_and_fd_semantics",
       "description": "Resource limit and descriptor semantics fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_rlimit_and_fd_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_rlimit_and_fd_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 13},
-      "required_paths": ["{repo}/test/unit/test_rlimit_and_fd_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 13, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_rlimit_and_fd_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.runtime_binary_patch_prohibition",
       "description": "Runtime binary rewriting prohibition fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9},
-      "required_paths": ["{repo}/test/unit/test_runtime_binary_patch_prohibition.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"], "required_commands": []
     },
     {
       "id": "unit.socket_message_and_buffer_semantics",
       "description": "Socket message and buffer semantics fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 10},
-      "required_paths": ["{repo}/test/unit/test_socket_message_and_buffer_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 10, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.stat_metadata_semantics",
       "description": "Stat metadata semantics fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_stat_metadata_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_stat_metadata_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 7},
-      "required_paths": ["{repo}/test/unit/test_stat_metadata_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_stat_metadata_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.suite_runner",
       "description": "Manifest and runner lifecycle integration fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_suite_runner.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_suite_runner.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 133},
-      "required_paths": ["{repo}/test/unit/test_suite_runner.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 133, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_suite_runner.py"], "required_commands": []
     },
     {
       "id": "unit.synthetic_capability_integrity",
       "description": "Synthetic capability integrity fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_synthetic_capability_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_synthetic_capability_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 5},
-      "required_paths": ["{repo}/test/unit/test_synthetic_capability_integrity.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 5, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_synthetic_capability_integrity.py"], "required_commands": []
     },
     {
       "id": "unit.syscall_boundary_regressions",
       "description": "Syscall boundary regression fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_syscall_boundary_regressions.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_syscall_boundary_regressions.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 26},
-      "required_paths": ["{repo}/test/unit/test_syscall_boundary_regressions.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 26, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_syscall_boundary_regressions.py"], "required_commands": []
     },
     {
       "id": "unit.test_asset_integrity",
       "description": "Canonical registration and naming integrity fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_test_asset_integrity.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_test_asset_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 36},
-      "required_paths": ["{repo}/test/unit/test_test_asset_integrity.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 36, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_test_asset_integrity.py"], "required_commands": []
     },
     {
       "id": "unit.timer_semantics",
       "description": "Timer semantics positive and negative fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_timer_semantics.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_timer_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 3},
-      "required_paths": ["{repo}/test/unit/test_timer_semantics.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 3, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_timer_semantics.py"], "required_commands": []
     },
     {
       "id": "unit.user_memory_copy_boundaries",
       "description": "User-memory copy boundary fixtures.",
-      "command": ["{python}", "-B", "{repo}/test/unit/test_user_memory_copy_boundaries.py"],
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_user_memory_copy_boundaries.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 13},
-      "required_paths": ["{repo}/test/unit/test_user_memory_copy_boundaries.py"], "required_commands": []
+      "result_contract": {"type": "unittest", "expected_tests": 13, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_user_memory_copy_boundaries.py"], "required_commands": []
     },
 
     {
@@ -426,7 +426,7 @@
       "description": "Workspace Rust formatting check.",
       "command": ["cargo", "fmt", "--all", "--", "--check"],
       "cwd": "{repo}", "timeout_seconds": 600,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": true}, "required_paths": [], "required_commands": ["cargo"]
     },
     {
       "id": "baseline.workspace_unit_tests",
@@ -440,42 +440,43 @@
       "description": "Existing default workspace clippy target.",
       "command": ["make", "-C", "{repo}", "clippy"],
       "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
     },
     {
       "id": "baseline.clippy_riscv64",
       "description": "RISC-V64 workspace clippy target.",
       "command": ["make", "-C", "{repo}", "clippy", "ARCH=riscv64"],
       "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
     },
     {
       "id": "baseline.clippy_loongarch64",
       "description": "LoongArch64 workspace clippy target.",
       "command": ["make", "-C", "{repo}", "clippy", "ARCH=loongarch64"],
       "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo", "clang"],
+      "required_capabilities": ["clang.target.loongarch64-unknown-none"]
     },
     {
       "id": "baseline.kernel_riscv64",
       "description": "RISC-V64 local official kernel test-build.",
       "command": ["make", "-C", "{repo}", "kernel-rv"],
       "cwd": "{repo}", "timeout_seconds": 3600,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
     },
     {
       "id": "baseline.kernel_loongarch64",
       "description": "LoongArch64 local official kernel test-build.",
       "command": ["make", "-C", "{repo}", "kernel-la"],
       "cwd": "{repo}", "timeout_seconds": 3600,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
     },
     {
       "id": "baseline.submission_build",
       "description": "Existing dual-architecture submission build target.",
       "command": ["make", "-C", "{repo}", "all"],
       "cwd": "{repo}", "timeout_seconds": 5400,
-      "result_contract": {"type": "exit_code"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
     },
 
     {

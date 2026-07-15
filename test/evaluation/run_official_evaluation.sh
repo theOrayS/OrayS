@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
 
 ARCH="${1:-rv}"
@@ -18,10 +18,12 @@ RV_IMG="$(absolute_path "${RV_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-rv.img}")"
 LA_IMG="$(absolute_path "${LA_TESTSUITE_IMG:-$TESTSUITE_DIR/sdcard-la.img}")"
 OUTPUT_DIR="$(absolute_path "${ORAYS_TEST_OUTPUT_DIR:-$REPO_ROOT/test/output/official}")"
 
-export PATH="$HOME/.cargo/bin:$PATH"
 export CARGO_NET_OFFLINE=true
+export PYTHONNOUSERSITE=1
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPYCACHEPREFIX=/dev/null
 export OSCOMP_GROUP_TIMEOUT_CEILING_SECS="${OSCOMP_GROUP_TIMEOUT_CEILING_SECS:-900}"
-unset MAKEFLAGS MFLAGS GNUMAKEFLAGS
+unset MAKE MAKEFILES MAKEFLAGS MAKEOVERRIDES MFLAGS GNUMAKEFLAGS
 unset RUSTFLAGS RUSTDOCFLAGS CARGO_ENCODED_RUSTFLAGS
 unset CARGO_BUILD_RUSTC_WRAPPER RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
 unset BASH_ENV ENV
@@ -43,6 +45,22 @@ unset RUSTC RUSTDOC CARGO RUSTC_BOOTSTRAP
 infrastructure_error() {
     printf 'infrastructure error: %s\n' "$1" >&2
     exit 125
+}
+
+validate_make_path() {
+    local name="$1"
+    local value="$2"
+    if [[ ! "$value" =~ ^/[A-Za-z0-9._/+=,@:%-]+$ ]]; then
+        infrastructure_error "$name is not a safe absolute path for Make: $value"
+    fi
+}
+
+reject_make_expansion_value() {
+    local name="$1"
+    local value="$2"
+    if [[ "$value" == *'$'* ]]; then
+        infrastructure_error "$name contains a dollar sign that Make could expand"
+    fi
 }
 
 usage() {
@@ -101,6 +119,14 @@ if [ "$#" -gt 1 ] || { [ "$ARCH" != "rv" ] && [ "$ARCH" != "la" ]; }; then
     exit 125
 fi
 
+validate_make_path REPO_ROOT "$REPO_ROOT"
+validate_make_path OUTPUT_DIR "$OUTPUT_DIR"
+if [ "$ARCH" = "rv" ]; then
+    validate_make_path RV_TESTSUITE_IMG "$RV_IMG"
+else
+    validate_make_path LA_TESTSUITE_IMG "$LA_IMG"
+fi
+
 if ! command -v cargo >/dev/null 2>&1; then
     if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
         # shellcheck disable=SC1091
@@ -138,21 +164,52 @@ if ! mkdir -p "$OUTPUT_DIR"; then
 fi
 
 compose_ltp_blacklist_files "$ARCH"
+for variable in \
+    PATH HOME LTP_BLACKLIST LTP_BLACKLIST_RV LTP_BLACKLIST_RISCV64 \
+    LTP_BLACKLIST_LA LTP_BLACKLIST_LOONGARCH64 LTP_CASES \
+    LTP_CASE_TIMEOUT_SECS OSCOMP_TEST_GROUPS OSCOMP_SKIP_TEST_GROUPS \
+    OSCOMP_GROUP_TIMEOUT_CEILING_SECS; do
+    if [[ -v "$variable" ]]; then
+        reject_make_expansion_value "$variable" "${!variable}"
+    fi
+done
 run_image="$OUTPUT_DIR/sdcard-${ARCH}.$$.run.qcow2"
 cleanup() {
     rm -f -- "$run_image"
 }
 trap cleanup EXIT
 
+make_environment=(
+    "PATH=$PATH"
+    "HOME=$HOME"
+    "PWD=$REPO_ROOT"
+    "LC_ALL=C"
+    "CARGO_NET_OFFLINE=true"
+    "PYTHONNOUSERSITE=1"
+    "PYTHONDONTWRITEBYTECODE=1"
+    "PYTHONPYCACHEPREFIX=/dev/null"
+)
+for variable in \
+    LTP_BLACKLIST LTP_BLACKLIST_RV LTP_BLACKLIST_RISCV64 \
+    LTP_BLACKLIST_LA LTP_BLACKLIST_LOONGARCH64 LTP_CASES \
+    LTP_CASE_TIMEOUT_SECS OSCOMP_TEST_GROUPS OSCOMP_SKIP_TEST_GROUPS \
+    OSCOMP_GROUP_TIMEOUT_CEILING_SECS; do
+    if [[ -v "$variable" ]]; then
+        make_environment+=("$variable=${!variable}")
+    fi
+done
+
 if [ "$ARCH" = "rv" ]; then
-    if command make -C "$REPO_ROOT" run-rv ARCH=riscv64 KERNEL_SMP=1 RV_MEM=1G \
+    if command /usr/bin/env -i "${make_environment[@]}" make \
+        -C "$REPO_ROOT" run-rv ARCH=riscv64 KERNEL_SMP=1 RV_MEM=1G \
         RV_TESTSUITE_IMG="$RV_IMG" RV_TESTSUITE_RUN_IMG="$run_image"; then
         status=0
     else
         status=$?
     fi
 else
-    if command make -C "$REPO_ROOT" run-la ARCH=loongarch64 KERNEL_SMP=1 LA_MEM=1G \
+    if command /usr/bin/env -i "${make_environment[@]}" make \
+        -C "$REPO_ROOT" run-la ARCH=loongarch64 KERNEL_SMP=1 LA_MEM=1G \
         LA_TESTSUITE_IMG="$LA_IMG" LA_TESTSUITE_RUN_IMG="$run_image"; then
         status=0
     else

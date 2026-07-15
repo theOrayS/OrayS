@@ -30,18 +30,27 @@ A case can be considered trusted stable only after all four combinations are pre
 The parser command for promotion review is:
 
 ```bash
-python3 test/evaluation/summarize_ltp_results.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc <rv-log> <la-log>
+python3 -I -S -B -X pycache_prefix=/dev/null test/evaluation/summarize_ltp_results.py --promotion-candidates --promotion-arches rv,la --promotion-libcs musl,glibc --stderr-log <rv-stderr-log> --stderr-log <la-stderr-log> --process-exit-code <rv-evaluator-exit-code> --process-exit-code <la-evaluator-exit-code> <rv-stdout-log> <la-stdout-log>
 ```
 
-The default parser settings already require `rv,la` and `musl,glibc`; the explicit flags are shown to make reports auditable.
+The parser requires the exact full sets `rv,la` and `musl,glibc`; nonempty subsets are scouting, not stable promotion evidence, and are rejected. The explicit flags are shown to make reports auditable.
+Each stdout input must have its captured stderr companion and the corresponding evaluator process exit code. Omitting either is an input error, not clean promotion evidence; a nonzero process exit blocks promotion.
 
 ## Hard blockers
 
 A result is not promotion evidence if any of these appear in the parser row, group, or report:
 
 - missing RV/LA or musl/glibc combination;
+- empty or unknown promotion dimension, including an empty architecture/libc Cartesian product;
+- a non-canonical LTP group label; matrix evidence must come from exact `ltp-musl` and `ltp-glibc` groups;
 - non-stable selection mode such as blacklist, score-blacklist, all-minus-blacklist, sweep:blacklist, stable-plus-blacklist, or stable-plus-all-minus-blacklist;
 - TCONF, TBROK, TFAIL, ENOSYS/not implemented, timeout, panic, trap, or prior fail event;
+- any such quality signal outside an LTP group (signals inside a non-LTP group remain outside this LTP-only verdict);
+- invalid UTF-8, unsupported controls, or malformed group/protocol framing;
+- a missing, duplicate, or out-of-order START/RUN/result/Pass!/END case lifecycle;
+- a missing or duplicate case-list manifest, or a planned/executed mismatch;
+- a missing, duplicate, late, or mismatched LTP summary;
+- an input lifecycle validation status of `ERROR` or `FAIL`;
 - status0-only result without parser-clean case evidence;
 - synthetic `/proc`, `/dev`, `/etc`, config, metadata, or userdb probe-only success;
 - named LTP case/path/process special handling;

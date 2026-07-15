@@ -116,6 +116,12 @@ def scan_docs(root: Path) -> list[str]:
         "--promotion-candidates",
         "--promotion-arches rv,la",
         "--promotion-libcs musl,glibc",
+        "python3 -I -S -B -X pycache_prefix=/dev/null",
+        "--stderr-log <rv-stderr-log>",
+        "--stderr-log <la-stderr-log>",
+        "--process-exit-code <rv-evaluator-exit-code>",
+        "--process-exit-code <la-evaluator-exit-code>",
+        "exact full sets `rv,la` and `musl,glibc`",
         "TCONF",
         "TBROK",
         "TFAIL",
@@ -124,6 +130,13 @@ def scan_docs(root: Path) -> list[str]:
         "panic",
         "trap",
         "prior fail event",
+        "empty or unknown promotion dimension",
+        "outside an LTP group",
+        "invalid UTF-8",
+        "START/RUN/result/Pass!/END",
+        "planned/executed mismatch",
+        "missing, duplicate, late, or mismatched LTP summary",
+        "`ERROR` or `FAIL`",
         "status0-only result",
         "named LTP case/path/process special handling",
         "does not add or remove entries from `LTP_STABLE_CASES`",
@@ -147,6 +160,7 @@ def scan_parser_gate(root: Path) -> list[str]:
             findings.append(f"ltp_summary: promotion mode blocker missing token {token}")
     for test_name in (
         "test_promotion_candidate_requires_four_way_clean_matrix",
+        "test_promotion_candidate_requires_complete_lifecycle",
         "test_promotion_candidate_blocks_missing_arch_libc_combo",
         "test_promotion_candidate_blocks_pass_with_internal_tconf",
         "test_promotion_candidate_blocks_blacklist_selection_mode",
@@ -158,13 +172,23 @@ def scan_parser_gate(root: Path) -> list[str]:
         'self.assertEqual(report["candidate_count"], 1)',
         'self.assertEqual(len(report["candidates"][0]["combos"]), 4)',
         'self.assertEqual(report["blocked"][0]["missing"], [{"arch": "la", "libc": "glibc"}])',
-        'self.assertEqual(blocker["reasons"], ["TCONF=1"])',
+        '"TCONF=1" in candidate["reasons"]',
         'selection-mode=stable-plus-all-minus-blacklist',
-        'self.assertEqual(reasons, ["event-failures=1"])',
+        'self.assertIn("event-failures=1", reasons)',
+        'self.assertIn("strict-malformed-protocol-record", outside_reasons)',
     ]
     for token in required_test_contracts:
         if token not in tests:
             findings.append(f"test_ltp_summary: weakened promotion gate assertion/token: {token}")
+    for token in (
+        "validation=data[\"strict_validation\"]",
+        'item["strict_case_binding"]',
+        'if args.strict or args.promotion_candidates or stderr_path is not None:',
+        "validate_promotion_dimensions",
+        'stderr_path=str(stderr_path)',
+    ):
+        if token not in summary:
+            findings.append(f"ltp_summary: missing mandatory lifecycle binding token: {token}")
     return findings
 
 

@@ -9,9 +9,35 @@ skip, or the absence of a failure substring into PASS.
 
 from __future__ import annotations
 
+import sys as _bootstrap_sys
+
+if __name__ == "__main__" and (
+    not _bootstrap_sys.flags.isolated
+    or not _bootstrap_sys.flags.no_site
+    or not _bootstrap_sys.flags.dont_write_bytecode
+    or _bootstrap_sys.pycache_prefix != "/dev/null"
+):
+    import os as _bootstrap_os
+
+    _bootstrap_os.execv(
+        _bootstrap_sys.executable,
+        [
+            _bootstrap_sys.executable,
+            "-I",
+            "-S",
+            "-B",
+            "-X",
+            "pycache_prefix=/dev/null",
+            _bootstrap_os.path.abspath(_bootstrap_sys.argv[0]),
+            *_bootstrap_sys.argv[1:],
+        ],
+    )
+
 import argparse
+import hashlib
 import json
 import re
+import stat
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +62,157 @@ CANONICAL_OFFICIAL_CASE_COUNTS = {
 }
 CANONICAL_LTP_CASE_LIST = "stable-full"
 OFFICIAL_CASE_PLAN_RELATIVE_PATH = Path("test/evaluation/official_case_plan.json")
+ARCH_TOKEN_RE = re.compile(
+    r"(?<![a-z0-9])(rv|riscv|riscv64|la|loongarch|loongarch64)(?![a-z0-9])",
+    re.IGNORECASE,
+)
+ARCH_ALIASES = {
+    "rv": "rv",
+    "riscv": "rv",
+    "riscv64": "rv",
+    "la": "la",
+    "loongarch": "la",
+    "loongarch64": "la",
+}
+
+
+def infer_capture_arch_tokens(path: Path) -> set[str]:
+    """Return exact, separator-delimited architecture tokens in a capture name."""
+
+    return {ARCH_ALIASES[token.lower()] for token in ARCH_TOKEN_RE.findall(path.name)}
+
+
+def capture_source_key(path: Path, stream: str) -> str:
+    """Return the case-sensitive source key shared by paired capture streams."""
+
+    raw_name = path.name
+    lowered_name = raw_name.lower()
+    if stream == "stdout":
+        if lowered_name.endswith(".stderr.log"):
+            raise ValueError(f"stdout capture path has stderr suffix: {path}")
+        suffix = ".stdout.log" if lowered_name.endswith(".stdout.log") else ".log"
+    elif stream == "stderr":
+        suffix = ".stderr.log"
+    else:
+        raise ValueError(f"unknown capture stream: {stream}")
+    if not lowered_name.endswith(suffix):
+        raise ValueError(f"{stream} capture filename must end with {suffix}: {path}")
+    key = raw_name[: -len(suffix)]
+    if not key:
+        raise ValueError(f"{stream} capture filename has an empty source key: {path}")
+    return key
+
+
+def validate_capture_input_pairs(
+    stdout_paths: list[Path],
+    stderr_paths: list[Path],
+    required_arches: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Bind stdout/stderr captures by path, source key, identity, and architecture.
+
+    With ``required_arches=None``, architecture-free names are accepted, but if
+    either stream names an architecture then both must name the same single
+    architecture.  Promotion callers pass the exact required architecture set.
+    """
+
+    if len(stdout_paths) != len(stderr_paths):
+        raise ValueError("requires exactly one stderr capture for each stdout capture")
+    if not stdout_paths:
+        raise ValueError("capture input pair list must not be empty")
+
+    resolved_paths: set[Path] = set()
+    file_identities: set[tuple[int, int]] = set()
+    observed_arches: set[str] = set()
+    pairs: list[dict[str, Any]] = []
+    for stdout_path, stderr_path in zip(stdout_paths, stderr_paths):
+        try:
+            stdout_resolved = stdout_path.resolve()
+            stderr_resolved = stderr_path.resolve()
+        except OSError as error:
+            raise ValueError(f"cannot resolve capture input path: {error}") from error
+
+        for resolved in (stdout_resolved, stderr_resolved):
+            if resolved in resolved_paths:
+                raise ValueError(f"capture inputs must reference unique files: {resolved}")
+            resolved_paths.add(resolved)
+            try:
+                file_status = resolved.stat()
+            except OSError as error:
+                raise ValueError(f"cannot stat capture input {resolved}: {error}") from error
+            if not stat.S_ISREG(file_status.st_mode):
+                raise ValueError(f"capture input is not a regular file: {resolved}")
+            identity = (file_status.st_dev, file_status.st_ino)
+            if identity in file_identities:
+                raise ValueError(
+                    f"capture inputs must not alias the same physical file: {resolved}"
+                )
+            file_identities.add(identity)
+
+        if stdout_resolved.parent != stderr_resolved.parent:
+            raise ValueError(
+                "stdout/stderr companions must be in the same resolved directory: "
+                f"{stdout_path} + {stderr_path}"
+            )
+        stdout_key = capture_source_key(stdout_path, "stdout")
+        stderr_key = capture_source_key(stderr_path, "stderr")
+        if stdout_key != stderr_key:
+            raise ValueError(
+                "stdout/stderr companions must have the same case-sensitive source key: "
+                f"{stdout_key!r} != {stderr_key!r}"
+            )
+
+        stdout_arches = infer_capture_arch_tokens(stdout_path)
+        stderr_arches = infer_capture_arch_tokens(stderr_path)
+        if len(stdout_arches) > 1 or len(stderr_arches) > 1:
+            raise ValueError(
+                "capture filenames must not identify multiple architectures: "
+                f"{stdout_path} + {stderr_path}"
+            )
+        arch: str | None
+        if required_arches is not None:
+            if len(stdout_arches) != 1 or len(stderr_arches) != 1:
+                raise ValueError(
+                    "promotion capture filenames must each identify exactly one rv or la "
+                    f"architecture: {stdout_path} + {stderr_path}"
+                )
+            arch = next(iter(stdout_arches))
+            if stderr_arches != {arch}:
+                raise ValueError(
+                    "stdout/stderr companions identify different architectures: "
+                    f"{stdout_path} + {stderr_path}"
+                )
+            if arch not in required_arches:
+                raise ValueError(f"capture architecture {arch} is not in the required matrix")
+            if arch in observed_arches:
+                raise ValueError(f"capture inputs contain more than one pair for architecture {arch}")
+            observed_arches.add(arch)
+        elif stdout_arches or stderr_arches:
+            if len(stdout_arches) != 1 or stdout_arches != stderr_arches:
+                raise ValueError(
+                    "stdout/stderr companions must identify the same single architecture: "
+                    f"{stdout_path} + {stderr_path}"
+                )
+            arch = next(iter(stdout_arches))
+        else:
+            arch = None
+
+        pairs.append(
+            {
+                "pair_id": f"{arch or 'capture'}:{stdout_key}",
+                "source_key": stdout_key,
+                "arch": arch,
+                "stdout_path": stdout_path,
+                "stderr_path": stderr_path,
+                "stdout_resolved_path": stdout_resolved,
+                "stderr_resolved_path": stderr_resolved,
+            }
+        )
+
+    if required_arches is not None and observed_arches != required_arches:
+        raise ValueError(
+            "capture inputs must provide exactly one stdout/stderr pair for each required architecture"
+        )
+    return pairs
 
 
 def normalize_output_text(raw_text: str) -> str:
@@ -212,7 +389,7 @@ LIBCTEST_SUMMARY_RE = re.compile(
 )
 FORBIDDEN_STATUS_RE = re.compile(
     r"\b(TCONF|TBROK|TFAIL|ENOSYS|XFAIL|SKIP(?:PED)?|TIMEOUT|TIMED[_ -]?OUT|"
-    r"TIME[_ -]?LIMIT[_ -]?EXCEEDED|HANG|CRASH|PANIC|ERROR|FAIL(?:ED|URE|URES)?)\b",
+    r"TIME[_ -]?LIMIT[_ -]?EXCEEDED|HANG|CRASH|PANIC|ERROR)\b",
     re.I,
 )
 TIMEOUT_RE = re.compile(
@@ -249,8 +426,20 @@ UNCONSUMED_FAILURE_RE = re.compile(
     r"\bresult\s*=\s*FAIL(?:ED|URE|URES)?\b)",
     re.I,
 )
+GENERIC_SUBTEST_FAILURE_RE = re.compile(
+    r"^\s*=+\s*(?:"
+    r"(?:iperf|netperf|cyclictest)\b.*\bend\s*:\s*fail|"
+    r"kill\s+\S+\s*:\s*fail(?:\s*,.*)?"
+    r")\s*=+\s*$",
+    re.I,
+)
 EXPLICIT_NONZERO_RE = re.compile(
-    r"^\s*(?:not successful|exit status\s+[1-9]\d*|return\s*:\s*[1-9]\d*)\s*$",
+    r"^\s*(?:not successful|exit status\s+[1-9]\d*|return\s*:\s*[1-9]\d*|"
+    r"autorun:\s+.+\s+exited with status\s+[1-9]\d*|"
+    r"warning:\s+(?:(?:subprocess|command)(?:\s+.*?)?\s+"
+    r"(?:(?:exited|failed)\s+with\s+(?:exit\s+)?(?:status|code)|"
+    r"returned(?:\s+(?:status|code))?)\s*[:=]?\s*[1-9]\d*|"
+    r"qemu(?:\s+.*?)?\s+exit (?:status|code)\s*[:=]?\s*[1-9]\d*))\s*$",
     re.I,
 )
 UNKNOWN_STATE_RE = re.compile(
@@ -304,7 +493,16 @@ PROTOCOL_SIGNATURE_RE = re.compile(
     r"\bRUN LTP CASE\b|\b(?:PASS|FAIL) LTP CASE\b|"
     r"\btestcase busybox\b|"
     r"=+\s+(?:START|END)\s+\S+\s+\S+\s+=+|"
-    r"\bFAIL libctest\b|\blibctest cases:|\bPass!\s*$",
+    r"\bFAIL libctest\b|\blibctest cases:|\bPass!",
+    re.I,
+)
+LTP_PROTOCOL_SIGNATURE_RE = re.compile(
+    r"\bltp case list:|\bltp cases:|\bRUN LTP CASE\b|"
+    r"\b(?:PASS|FAIL) LTP CASE\b|=+\s+(?:START|END)\s+ltp\b",
+    re.I,
+)
+GROUP_PROTOCOL_SIGNATURE_RE = re.compile(
+    r"OS COMP TEST GROUP\s+(?:START|END)",
     re.I,
 )
 STRICT_PROTOCOL_PATTERNS = (
@@ -584,6 +782,23 @@ def _validate_ltp(
         "result_cases": len(results),
         "passed_cases": sum(code == 0 for _name, code in results),
         "failed_cases": sum(code != 0 for _name, code in results),
+        "summary": (
+            {
+                "passed": summaries[0][0],
+                "failed": summaries[0][1],
+                "timed_out": summaries[0][2],
+            }
+            if len(summaries) == 1
+            else None
+        ),
+        "cases": [
+            {
+                "case": name,
+                "code": code,
+                "events": event_sequences.get(name, []),
+            }
+            for name, code in results
+        ],
     }
 
 
@@ -822,6 +1037,7 @@ def _validate_generic(group: Group) -> tuple[list[dict[str, str]], dict[str, int
             or SKIP_RE.search(line)
             or PANIC_RE.search(line)
             or UNCONSUMED_FAILURE_RE.search(line)
+            or GENERIC_SUBTEST_FAILURE_RE.fullmatch(line)
             or EXPLICIT_NONZERO_RE.search(line)
             for line in trailing_lines
         )
@@ -1063,6 +1279,8 @@ def validate_official_output(
             failures.append(issue("panic-or-trap", f"{source}: {line.strip()}"))
         if UNCONSUMED_FAILURE_RE.search(line) and not _protocol_record_kinds(line):
             failures.append(issue("explicit-failure", f"{source}: {line.strip()}"))
+        if GENERIC_SUBTEST_FAILURE_RE.fullmatch(line):
+            failures.append(issue("generic-subtest-failure", f"{source}: {line.strip()}"))
         if EXPLICIT_NONZERO_RE.search(line):
             failures.append(issue("explicit-nonzero", f"{source}: {line.strip()}"))
 
@@ -1205,17 +1423,235 @@ def validate_official_output(
     }
 
 
+def validate_ltp_output(stdout: str, stderr: str = "") -> dict[str, Any]:
+    """Strictly validate only LTP groups while preserving global input framing.
+
+    This scoped API is intended for promotion evidence.  It does not load or
+    require the canonical 24-group official plan, but malformed global group
+    framing, unsupported controls, and LTP protocol records outside an LTP
+    group remain integrity errors.
+    """
+
+    text = normalize_output_text(stdout)
+    stderr_text = normalize_output_text(stderr)
+    scope_errors: list[dict[str, str]] = []
+    scope_failures: list[dict[str, str]] = []
+    for source, cleaned_text in (("stdout", text), ("stderr", stderr_text)):
+        if invalid_character := first_unsupported_output_character(cleaned_text):
+            scope_errors.append(
+                issue(
+                    "invalid-output-control",
+                    f"{source} contains unsupported output character "
+                    f"U+{ord(invalid_character):04X}",
+                )
+            )
+
+    groups: list[Group] = []
+    current: Group | None = None
+    outside_lines: list[str] = []
+    group_labels: set[str] = set()
+    for line in text.splitlines():
+        if match := GROUP_START_RE.fullmatch(line):
+            label = match.group(1)
+            if current is not None:
+                scope_errors.append(
+                    issue(
+                        "nested-group",
+                        f"group {label} started before {current.label} ended",
+                        current.label,
+                    )
+                )
+                continue
+            current = Group(label)
+            groups.append(current)
+            if label in group_labels:
+                scope_errors.append(
+                    issue("duplicate-group", f"group {label} ran more than once", label)
+                )
+            group_labels.add(label)
+            continue
+        if match := GROUP_END_RE.fullmatch(line):
+            label = match.group(1)
+            if current is None:
+                scope_errors.append(
+                    issue("unmatched-group-end", f"group end without start: {label}", label)
+                )
+            elif current.label != label:
+                scope_errors.append(
+                    issue(
+                        "mismatched-group-end",
+                        f"started {current.label} but ended {label}",
+                        current.label,
+                    )
+                )
+                current = None
+            else:
+                current = None
+            continue
+        if current is None:
+            outside_lines.append(line)
+        else:
+            current.lines.append(line)
+
+    if current is not None:
+        scope_errors.append(
+            issue("missing-group-end", "group did not emit its end marker", current.label)
+        )
+
+    ltp_groups = [group for group in groups if group.label.startswith("ltp-")]
+    if not ltp_groups:
+        scope_errors.append(issue("zero-ltp-groups", "no LTP test groups executed"))
+
+    ltp_protocol_kinds = {
+        "ltp-list",
+        "ltp-start",
+        "ltp-run",
+        "ltp-result",
+        "ltp-end",
+        "ltp-summary",
+    }
+    for line in outside_lines:
+        kinds = _protocol_record_kinds(line)
+        if PROTOCOL_SIGNATURE_RE.search(line) and not kinds:
+            scope_errors.append(issue("malformed-protocol-record", line.strip()))
+        elif kinds & ltp_protocol_kinds:
+            scope_errors.append(issue("ltp-record-outside-group", line.strip()))
+        elif kinds:
+            scope_errors.append(
+                issue("protocol-record-outside-ltp-group", line.strip())
+            )
+        if kinds:
+            continue
+        if UNKNOWN_STATE_RE.search(line) and not UNCONSUMED_FAILURE_RE.search(line):
+            scope_errors.append(issue("unknown-status-outside-ltp-group", line.strip()))
+        if ZERO_EXECUTION_RE.search(line):
+            scope_errors.append(issue("zero-execution-outside-ltp-group", line.strip()))
+        markers = FORBIDDEN_STATUS_RE.findall(line)
+        for marker in markers:
+            scope_failures.append(
+                issue("forbidden-status-outside-ltp-group", marker.upper())
+            )
+        if TIMEOUT_RE.search(line) and not any(marker.upper() == "TIMEOUT" for marker in markers):
+            scope_failures.append(issue("timeout-outside-ltp-group", line.strip()))
+        if SKIP_RE.search(line) and not any(marker.upper().startswith("SKIP") for marker in markers):
+            scope_failures.append(issue("skip-outside-ltp-group", line.strip()))
+        if PANIC_RE.search(line) and not any(marker.upper() == "PANIC" for marker in markers):
+            scope_failures.append(issue("panic-or-trap-outside-ltp-group", line.strip()))
+        if UNCONSUMED_FAILURE_RE.search(line):
+            scope_failures.append(issue("explicit-failure-outside-ltp-group", line.strip()))
+        if EXPLICIT_NONZERO_RE.search(line):
+            scope_failures.append(issue("explicit-nonzero-outside-ltp-group", line.strip()))
+        if INFRA_TEXT_RE.search(line):
+            scope_errors.append(issue("runtime-infrastructure-outside-ltp-group", line.strip()))
+    for group in groups:
+        if group.label.startswith("ltp-"):
+            continue
+        family = (
+            "busybox" if group.label.startswith("busybox-")
+            else "libctest" if group.label.startswith("libctest-")
+            else "generic"
+        )
+        allowed_protocols = {
+            "busybox": {"official-pass", "official-fail", "busybox-result"},
+            "libctest": {
+                "official-pass",
+                "official-fail",
+                "libctest-start",
+                "libctest-end",
+                "libctest-fail",
+                "libctest-summary",
+            },
+            "generic": {"official-pass", "official-fail"},
+        }[family]
+        for line in group.lines:
+            kinds = _protocol_record_kinds(line)
+            if PROTOCOL_SIGNATURE_RE.search(line) and not kinds:
+                scope_errors.append(
+                    issue("malformed-protocol-record", line.strip(), group.label)
+                )
+            elif kinds and not kinds & allowed_protocols:
+                scope_errors.append(
+                    issue(
+                        "unexpected-protocol-record-in-non-ltp-group",
+                        line.strip(),
+                        group.label,
+                    )
+                )
+            for pattern in (OFFICIAL_PASS_RE, OFFICIAL_FAIL_RE):
+                match = pattern.fullmatch(line)
+                if match is not None and match.group(1) != group.label:
+                    scope_errors.append(
+                        issue(
+                            "protocol-group-label-mismatch",
+                            f"record names {match.group(1)} inside {group.label}",
+                            group.label,
+                        )
+                    )
+
+    scoped_lines: list[str] = []
+    for group in ltp_groups:
+        scoped_lines.append(f"#### OS COMP TEST GROUP START {group.label} ####")
+        scoped_lines.extend(group.lines)
+        scoped_lines.append(f"#### OS COMP TEST GROUP END {group.label} ####")
+    validation = validate_official_output("\n".join(scoped_lines), stderr_text)
+    for finding in scope_errors:
+        if finding not in validation["errors"]:
+            validation["errors"].append(finding)
+    for finding in scope_failures:
+        if finding not in validation["failures"]:
+            validation["failures"].append(finding)
+    validation["error_count"] = len(validation["errors"])
+    validation["failure_count"] = len(validation["failures"])
+    if validation["errors"]:
+        validation["status"] = "ERROR"
+    elif validation["failures"]:
+        validation["status"] = "FAIL"
+    validation["validation_scope"] = "ltp"
+    return validation
+
+
+def apply_process_exit_code(validation: dict[str, Any], process_exit_code: int) -> None:
+    """Bind the captured evaluator return code into an existing validation."""
+
+    validation["process_exit_code"] = process_exit_code
+    if process_exit_code == 0:
+        return
+    finding = issue(
+        "evaluator-process-nonzero",
+        f"captured evaluator process exited with status {process_exit_code}",
+    )
+    if finding not in validation["failures"]:
+        validation["failures"].append(finding)
+    validation["failure_count"] = len(validation["failures"])
+    if validation["status"] == "PASS":
+        validation["status"] = "FAIL"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stdout", required=True, type=Path, help="captured evaluator stdout")
-    parser.add_argument("--stderr", type=Path, help="captured evaluator stderr")
+    parser.add_argument(
+        "--stderr",
+        required=True,
+        type=Path,
+        help="captured evaluator stderr companion",
+    )
+    parser.add_argument(
+        "--process-exit-code",
+        required=True,
+        type=int,
+        help="actual evaluator process return code associated with the capture pair",
+    )
     parser.add_argument("--json", action="store_true", help="emit machine-readable validation")
     args = parser.parse_args(argv)
 
     try:
-        stdout = args.stdout.read_text(encoding="utf-8", errors="strict")
-        stderr = args.stderr.read_text(encoding="utf-8", errors="strict") if args.stderr else ""
-    except (OSError, UnicodeDecodeError) as error:
+        pair = validate_capture_input_pairs([args.stdout], [args.stderr])[0]
+        stdout_raw = args.stdout.read_bytes()
+        stderr_raw = args.stderr.read_bytes()
+        stdout = stdout_raw.decode("utf-8", errors="strict")
+        stderr = stderr_raw.decode("utf-8", errors="strict")
+    except (OSError, UnicodeDecodeError, ValueError) as error:
         parser.error(str(error))
     try:
         expected_ltp_cases = trusted_ltp_stable_cases(Path(__file__).resolve().parents[2])
@@ -1234,6 +1670,21 @@ def main(argv: list[str] | None = None) -> int:
         expected_busybox_cases=expected_busybox_cases,
         expected_libctest_cases=expected_libctest_cases,
     )
+    result["input_evidence"] = {
+        "pair_id": pair["pair_id"],
+        "source_key": pair["source_key"],
+        "arch": pair["arch"],
+        "stdout_path": str(args.stdout),
+        "stderr_path": str(args.stderr),
+        "stdout_resolved_path": str(pair["stdout_resolved_path"]),
+        "stderr_resolved_path": str(pair["stderr_resolved_path"]),
+        "stdout_size_bytes": len(stdout_raw),
+        "stderr_size_bytes": len(stderr_raw),
+        "stdout_sha256": hashlib.sha256(stdout_raw).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr_raw).hexdigest(),
+        "process_exit_code": args.process_exit_code,
+    }
+    apply_process_exit_code(result, args.process_exit_code)
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
@@ -1241,6 +1692,13 @@ def main(argv: list[str] | None = None) -> int:
             f"official result validation: {result['status']} "
             f"({result['group_count']} groups, {result['failure_count']} failures, "
             f"{result['error_count']} integrity errors)"
+        )
+        evidence = result["input_evidence"]
+        print(
+            "input evidence: "
+            f"pair={evidence['pair_id']} process_exit_code={evidence['process_exit_code']} "
+            f"stdout_sha256={evidence['stdout_sha256']} "
+            f"stderr_sha256={evidence['stderr_sha256']}"
         )
         for item in result["errors"] + result["failures"]:
             location = f" [{item['group']}]" if "group" in item else ""

@@ -79,6 +79,19 @@ class TestAssetIntegrityTest(unittest.TestCase):
         findings = guard.scan_repo(tree)
         self.assertTrue(any("historical sequence ID" in finding for finding in findings), findings)
 
+        for relative_path in ("test/README.md", "test/docs/migration_map.md"):
+            with self.subTest(non_utf8_path=relative_path):
+                non_utf8_tree = self.make_tree()
+                (non_utf8_tree / relative_path).write_bytes(b"canonical text\xff\n")
+                non_utf8_findings = guard.scan_repo(non_utf8_tree)
+                self.assertTrue(
+                    any(
+                        "canonical test asset is not valid UTF-8" in finding
+                        for finding in non_utf8_findings
+                    ),
+                    non_utf8_findings,
+                )
+
     def test_underscored_historical_id_in_canonical_filename_is_detected(self) -> None:
         tree = self.make_tree()
         historical_suffix = "g" + "099"
@@ -176,6 +189,35 @@ class TestAssetIntegrityTest(unittest.TestCase):
         findings = guard.scan_repo(tree)
         self.assertTrue(any("exactly one Python implementation path" in finding for finding in findings), findings)
 
+        isolated_tree = self.make_tree()
+        isolated_path, isolated_manifest = self.load_tree_manifest(isolated_tree)
+        isolated_manifest["cases"][0]["command"].remove("-I")  # type: ignore[index]
+        self.write_tree_manifest(isolated_path, isolated_manifest)
+        isolated_findings = guard.scan_repo(isolated_tree)
+        self.assertTrue(
+            any("isolated safe-path Python execution" in finding for finding in isolated_findings),
+            isolated_findings,
+        )
+
+        harness_tree = self.make_tree()
+        harness_path, harness_manifest = self.load_tree_manifest(harness_tree)
+        unit_id = harness_manifest["profiles"]["unit"]["cases"][0]  # type: ignore[index]
+        unit_case = next(
+            case
+            for case in harness_manifest["cases"]  # type: ignore[union-attr]
+            if case["id"] == unit_id
+        )
+        unit_case["command"].remove("-S")
+        self.write_tree_manifest(harness_path, harness_manifest)
+        harness_findings = guard.scan_repo(harness_tree)
+        self.assertTrue(
+            any(
+                "isolated identity-binding unittest harness" in finding
+                for finding in harness_findings
+            ),
+            harness_findings,
+        )
+
     def test_registration_with_two_python_paths_is_detected(self) -> None:
         tree = self.make_tree()
         path, manifest = self.load_tree_manifest(tree)
@@ -239,7 +281,9 @@ class TestAssetIntegrityTest(unittest.TestCase):
     def test_missing_canonical_asset_is_detected(self) -> None:
         for relative_path in (
             "test/evaluation/report_evaluation_failures.py",
+            "test/evaluation/parse_official_results.py",
             "test/run_official_suite.sh",
+            "test/run_unittest_suite.py",
         ):
             with self.subTest(path=relative_path):
                 tree = self.make_tree()
@@ -354,6 +398,14 @@ class TestAssetIntegrityTest(unittest.TestCase):
         findings = guard.scan_repo(tree)
         self.assertIn("canonical local suite runner is not executable", findings)
 
+        harness_tree = self.make_tree()
+        (harness_tree / "test/run_unittest_suite.py").chmod(0o644)
+        harness_findings = guard.scan_repo(harness_tree)
+        self.assertIn(
+            "canonical identity-binding unittest runner is not executable",
+            harness_findings,
+        )
+
     def test_check_contract_downgrade_is_detected(self) -> None:
         tree = self.make_tree()
         path, manifest = self.load_tree_manifest(tree)
@@ -371,6 +423,22 @@ class TestAssetIntegrityTest(unittest.TestCase):
         self.write_tree_manifest(path, manifest)
         findings = guard.scan_repo(tree)
         self.assertTrue(any("must use unittest result contract" in finding for finding in findings), findings)
+
+        binding_tree = self.make_tree()
+        binding_path, binding_manifest = self.load_tree_manifest(binding_tree)
+        binding_unit_id = binding_manifest["profiles"]["unit"]["cases"][0]  # type: ignore[index]
+        binding_case = next(
+            case
+            for case in binding_manifest["cases"]  # type: ignore[union-attr]
+            if case["id"] == binding_unit_id
+        )
+        del binding_case["result_contract"]["identity_binding"]
+        self.write_tree_manifest(binding_path, binding_manifest)
+        binding_findings = guard.scan_repo(binding_tree)
+        self.assertTrue(
+            any("exact runtime identity binding" in finding for finding in binding_findings),
+            binding_findings,
+        )
 
     def test_official_contract_downgrade_is_detected(self) -> None:
         tree = self.make_tree()

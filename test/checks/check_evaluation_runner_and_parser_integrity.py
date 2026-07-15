@@ -277,6 +277,21 @@ def scan_ltp_summary(root: Path) -> list[str]:
         "selection-mode=": "visible selection-mode blocker reason",
         "blacklist": "blacklist promotion blocker token",
         "all-minus-blacklist": "all-minus-blacklist promotion blocker token",
+        "validate_ltp_output": "mandatory LTP-scoped validation",
+        "strict_case_binding": "source/group/case lifecycle binding",
+        "args.strict or args.promotion_candidates": "mandatory promotion validation branch",
+        "validate_promotion_dimensions": "nonempty known promotion dimensions",
+        "validate_promotion_input_pairs": "strict promotion stdout/stderr identity pairing",
+        "capture_source_key": "exact promotion capture source keys",
+        "hashlib.sha256(raw).hexdigest()": "raw stdout SHA-256 provenance",
+        "hashlib.sha256(stderr_raw).hexdigest()": "raw stderr SHA-256 provenance",
+        "or not _bootstrap_sys.flags.no_site": "isolated result-tool startup without site initialization",
+        'or _bootstrap_sys.pycache_prefix != "/dev/null"': "isolated result-tool bytecode cache boundary",
+        '"--stderr-log",\n        action="append"': "mandatory stderr companion input",
+        "args.strict and not args.promotion_candidates": "mandatory strict-mode stderr companion",
+        "noncanonical-ltp-group=": "exact canonical LTP group eligibility blocker",
+        "required_arches != KNOWN_PROMOTION_ARCHES": "full RV/LA promotion matrix gate",
+        "required_libcs != KNOWN_PROMOTION_LIBCS": "full musl/glibc promotion matrix gate",
     }
     for token, label in required_tokens.items():
         if token not in text:
@@ -286,9 +301,25 @@ def scan_ltp_summary(root: Path) -> list[str]:
         "test_case_list_manifest_is_reported",
         "test_promotion_candidate_blocks_blacklist_selection_mode",
         "test_promotion_mode_boundary_allows_stable_file_inline_batch_core_and_blocks_sweep",
+        "test_promotion_candidate_requires_complete_lifecycle",
     ):
         if test_name not in tests:
             findings.append(f"test/unit/test_ltp_result_summary.py: missing {test_name}")
+    if "strict-malformed-protocol-record" not in tests:
+        findings.append(
+            "test/unit/test_ltp_result_summary.py: missing malformed protocol promotion assertion"
+        )
+    for token, label in (
+        ('"outside-ltp-group" in reason', "outside-group quality-signal assertion"),
+        ("self.assertEqual(invalid.returncode, 2", "invalid-dimension CLI assertion"),
+    ):
+        if token not in tests:
+            findings.append(f"test/unit/test_ltp_result_summary.py: missing {label}")
+    parser_text = read(root / "test/evaluation/parse_official_results.py")
+    if "outside-ltp-group" not in parser_text:
+        findings.append(
+            "test/evaluation/parse_official_results.py: missing outside-group LTP quality blocker"
+        )
     return findings
 
 

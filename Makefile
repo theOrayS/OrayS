@@ -490,19 +490,19 @@ unittest_no_fail_fast:
 	$(call unit_test,--no-fail-fast)
 
 test-list:
-	$(PYTHON) test/run_suite.py --list
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --list
 
 test-checks:
-	$(PYTHON) test/run_suite.py --profile checks
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile checks
 
 test-unit:
-	$(PYTHON) test/run_suite.py --profile unit
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile unit
 
 test-quick:
-	$(PYTHON) test/run_suite.py --profile quick
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile quick
 
 test-baseline:
-	$(PYTHON) test/run_suite.py --profile baseline
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile baseline
 
 disk_img:
 ifneq ($(wildcard $(DISK_IMG)),)

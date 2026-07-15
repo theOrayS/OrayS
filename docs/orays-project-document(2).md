@@ -573,7 +573,7 @@ OrayS 当前是一个基于 ArceOS 演进的 OSKernel 2026 评测内核。它的
 - 核心源码与构建验证路径涉及 **246 个文件**，新增 **70,590 行**、删除 **883 行**，主要集中在 `kernel/`、`api/`、`ulib/`、用户态入口、`scripts/`、`configs/` 和根构建文件。
 - Linux syscall dispatcher 已注册 **231 个唯一 syscall 编号**，形成较完整的 Linux ABI 入口基础。
 - 用户态兼容实现拆分为 **30 个 Rust 模块**，覆盖用户内存、FD、进程、信号、futex、mmap、metadata、时间、调度和 IPC 等方向。
-- 在 canonical `test/` 下显式注册 **16 个静态检查** 和 **20 个 Python 单元测试套件（488 个方法）**，用于约束 fake pass、用户指针、FD/资源限制、runner/parser、official verdict 和 syscall 语义回归；构建与开发辅助脚本继续留在 `scripts/`。
+- 在 canonical `test/` 下显式注册 **16 个静态检查** 和 **20 个 Python 单元测试套件（492 个方法）**，用于约束 fake pass、用户指针、FD/资源限制、runner/parser、official verdict 和 syscall 语义回归；构建与开发辅助脚本继续留在 `scripts/`。
 
 整体来看，项目已从 RV/LA ELF 用户程序运行入口，扩展为覆盖内存、进程、VFS/FD、信号、futex、IPC、socket、时间调度、资源限制、procfs 以及本地/远程评测证据链的实验性内核执行环境。上述数字主要描述工程规模，功能完成度仍以源码语义、跨架构测试和公开失败记录为准。
 

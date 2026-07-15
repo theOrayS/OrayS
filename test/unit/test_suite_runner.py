@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
+import py_compile
 import shutil
 import signal
 import subprocess
@@ -17,6 +19,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "test/run_suite.py"
+UNITTEST_HARNESS = ROOT / "test/run_unittest_suite.py"
+sys.path.insert(0, str(ROOT / "test"))
+import run_suite as runner_implementation
 
 
 def fixture_case(
@@ -43,7 +48,7 @@ def fixture_manifest(cases: list[dict[str, Any]], case_ids: list[str] | None = N
         "schema_version": 1,
         "baseline_ref": "origin/main",
         "profiles": {
-            "quick": {
+            "fixture": {
                 "description": "fixture profile",
                 "arch_policy": "none",
                 "include": [],
@@ -92,7 +97,7 @@ class SuiteRunnerTest(unittest.TestCase):
             "--manifest",
             str(self.manifest_path),
             "--profile",
-            "quick",
+            "fixture",
             "--output-dir",
             str(self.output_path),
         ]
@@ -197,8 +202,8 @@ class SuiteRunnerTest(unittest.TestCase):
     def test_list_rejects_duplicate_profile_include(self) -> None:
         case = fixture_case()
         manifest = fixture_manifest([case])
-        manifest["profiles"]["base"] = manifest["profiles"]["quick"]
-        manifest["profiles"]["quick"] = {
+        manifest["profiles"]["base"] = manifest["profiles"]["fixture"]
+        manifest["profiles"]["fixture"] = {
             "description": "duplicate include graph",
             "arch_policy": "none",
             "include": ["base", "base"],
@@ -277,6 +282,203 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(self.summary()["cases"][0]["status"], "FAIL")
 
+        old_infrastructure_markers = [
+            "unknown target triple 'loongarch64-unknown-none'",
+            "libclang error; possible causes include:",
+            "Host vs. target architecture mismatch",
+        ]
+        capability_id = "clang.target.loongarch64-unknown-none"
+        fake_bin = self.work / "fake-clang-bin"
+        fake_bin.mkdir()
+        fake_clang = fake_bin / "clang"
+        probe_environment = {**os.environ, "PATH": str(fake_bin)}
+        sentinel = self.work / "main-command-ran"
+
+        def write_fake_clang(source: str) -> None:
+            fake_clang.write_text("#!/bin/sh\n" + source, encoding="utf-8")
+            fake_clang.chmod(0o755)
+
+        def capability_case(*, code: str | None = None) -> dict[str, Any]:
+            selected = fixture_case(
+                code=code
+                or (
+                    "import pathlib; "
+                    f"pathlib.Path({str(sentinel)!r}).write_text('ran'); "
+                    "print('primary command completed')"
+                ),
+                contract={"type": "exit_code"},
+            )
+            selected["required_commands"] = ["clang"]
+            selected["required_capabilities"] = [capability_id]
+            return selected
+
+        write_fake_clang(
+            "printf 'probe stdout\\n'\n"
+            "printf 'probe stderr\\n' >&2\n"
+            "exit 0\n"
+        )
+        self.output_path = self.work / "capability-available"
+        available_result = self.invoke(
+            fixture_manifest([capability_case()]),
+            environment=probe_environment,
+        )
+        self.assertEqual(
+            available_result.returncode,
+            0,
+            available_result.stdout + available_result.stderr,
+        )
+        available_record = self.summary()["cases"][0]
+        self.assertTrue(available_record["executed"])
+        self.assertTrue(available_record["details"]["capability_executed"])
+        available_probe = available_record["details"]["capability_probes"][0]
+        self.assertEqual(available_probe["status"], "PASS")
+        self.assertEqual(available_probe["return_code"], 0)
+        self.assertEqual(Path(available_probe["stdout_log"]).read_text(), "probe stdout\n")
+        self.assertEqual(Path(available_probe["stderr_log"]).read_text(), "probe stderr\n")
+        self.assertTrue(sentinel.exists())
+
+        self.output_path = self.work / "main-failure-after-capability"
+        marker_failure_case = capability_case(
+            code=(
+                "import sys; "
+                f"print({old_infrastructure_markers[0]!r}, file=sys.stderr); "
+                f"print({old_infrastructure_markers[1]!r}, file=sys.stderr); "
+                f"print({old_infrastructure_markers[2]!r}, file=sys.stderr); "
+                "print('error: real production regression', file=sys.stderr); "
+                "raise SystemExit(2)"
+            )
+        )
+        marker_failure_result = self.invoke(
+            fixture_manifest([marker_failure_case]),
+            environment=probe_environment,
+        )
+        self.assertEqual(
+            marker_failure_result.returncode,
+            1,
+            marker_failure_result.stdout + marker_failure_result.stderr,
+        )
+        marker_failure_record = self.summary()["cases"][0]
+        self.assertEqual(marker_failure_record["status"], "FAIL")
+        self.assertEqual(
+            marker_failure_record["details"]["capability_probes"][0]["status"],
+            "PASS",
+        )
+
+        sentinel.unlink()
+        write_fake_clang(
+            "printf 'probe unavailable stdout\\n'\n"
+            "printf 'probe unavailable stderr\\n' >&2\n"
+            "exit 7\n"
+        )
+        self.output_path = self.work / "capability-unavailable"
+        unavailable_result = self.invoke(
+            fixture_manifest([capability_case()]),
+            environment=probe_environment,
+        )
+        self.assertEqual(
+            unavailable_result.returncode,
+            2,
+            unavailable_result.stdout + unavailable_result.stderr,
+        )
+        unavailable_record = self.summary()["cases"][0]
+        self.assertEqual(unavailable_record["status"], "INFRA_ERROR")
+        self.assertFalse(unavailable_record["executed"])
+        unavailable_probe = unavailable_record["details"]["capability_probes"][0]
+        self.assertEqual(unavailable_probe["return_code"], 7)
+        self.assertEqual(
+            Path(unavailable_probe["stderr_log"]).read_text(),
+            "probe unavailable stderr\n",
+        )
+        self.assertFalse(sentinel.exists())
+
+        unknown_case = capability_case()
+        unknown_case["required_capabilities"] = ["clang.target.unknown"]
+        self.output_path = self.work / "unknown-capability"
+        unknown_result = self.invoke(fixture_manifest([unknown_case]))
+        self.assertEqual(unknown_result.returncode, 2)
+        self.assertIn("unsupported capability IDs", unknown_result.stderr)
+
+        duplicate_case = capability_case()
+        duplicate_case["required_capabilities"] = [capability_id, capability_id]
+        self.output_path = self.work / "duplicate-capability"
+        duplicate_result = self.invoke(fixture_manifest([duplicate_case]))
+        self.assertEqual(duplicate_result.returncode, 2)
+        self.assertIn("contains duplicates", duplicate_result.stderr)
+
+        missing_required_command_case = capability_case()
+        missing_required_command_case["required_commands"] = []
+        self.output_path = self.work / "capability-command-not-declared"
+        missing_required_command_result = self.invoke(
+            fixture_manifest([missing_required_command_case])
+        )
+        self.assertEqual(missing_required_command_result.returncode, 2)
+        self.assertIn("in required_commands", missing_required_command_result.stderr)
+
+        malformed_capability_case = capability_case()
+        malformed_capability_case["required_capabilities"] = capability_id
+        self.output_path = self.work / "malformed-capability-list"
+        malformed_capability_result = self.invoke(
+            fixture_manifest([malformed_capability_case])
+        )
+        self.assertEqual(malformed_capability_result.returncode, 2)
+        self.assertIn("required_capabilities must be list", malformed_capability_result.stderr)
+
+        fake_clang.unlink()
+        self.output_path = self.work / "capability-command-missing"
+        missing_command_result = self.invoke(
+            fixture_manifest([capability_case()]),
+            environment=probe_environment,
+        )
+        self.assertEqual(missing_command_result.returncode, 2)
+        missing_command_record = self.summary()["cases"][0]
+        self.assertEqual(missing_command_record["status"], "INFRA_ERROR")
+        self.assertFalse(missing_command_record["executed"])
+        self.assertIn("required command not found", missing_command_record["result"])
+        self.assertFalse(sentinel.exists())
+
+        write_fake_clang("kill -TERM $$\n")
+        self.output_path = self.work / "capability-signal"
+        signal_result = self.invoke(
+            fixture_manifest([capability_case()]),
+            environment=probe_environment,
+        )
+        self.assertEqual(signal_result.returncode, 2, signal_result.stdout + signal_result.stderr)
+        signal_record = self.summary()["cases"][0]
+        self.assertFalse(signal_record["executed"])
+        signal_probe = signal_record["details"]["capability_probes"][0]
+        self.assertEqual(signal_probe["status"], "CRASH")
+        self.assertEqual(signal_probe["signal"], signal.SIGTERM)
+        self.assertFalse(sentinel.exists())
+
+        escaped_probe_pid = self.work / "escaped-capability-probe.pid"
+        write_fake_clang(
+            f"/usr/bin/setsid /bin/sleep 60 &\nprintf '%s' \"$!\" > {str(escaped_probe_pid)!r}\nwait\n"
+        )
+        self.output_path = self.work / "capability-timeout"
+        timeout_result = self.invoke(
+            fixture_manifest([capability_case()]),
+            environment=probe_environment,
+        )
+        self.assertEqual(
+            timeout_result.returncode,
+            2,
+            timeout_result.stdout + timeout_result.stderr,
+        )
+        timeout_record = self.summary()["cases"][0]
+        self.assertFalse(timeout_record["executed"])
+        timeout_probe = timeout_record["details"]["capability_probes"][0]
+        self.assertEqual(timeout_probe["status"], "TIMEOUT")
+        self.assertTrue(escaped_probe_pid.is_file())
+        escaped_pid = int(escaped_probe_pid.read_text(encoding="utf-8"))
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline and self.process_is_live(escaped_pid):
+            time.sleep(0.05)
+        self.assertFalse(
+            self.process_is_live(escaped_pid),
+            f"capability probe descendant {escaped_pid} survived timeout cleanup",
+        )
+        self.assertFalse(sentinel.exists())
+
     def test_child_signal_termination_is_crash(self) -> None:
         code = "import os, signal; os.kill(os.getpid(), signal.SIGTERM)"
         result = self.invoke(fixture_manifest([fixture_case(code=code)]))
@@ -350,6 +552,38 @@ class SuiteRunnerTest(unittest.TestCase):
             time.sleep(0.05)
         self.assertFalse(self.process_is_live(descendant), f"descendant {descendant} survived")
 
+        direct_case = fixture_case(
+            code="print('primary command must not run')",
+            contract={"type": "exit_code"},
+        )
+        original_snapshot = runner_implementation._proc_snapshot
+        try:
+            runner_implementation._proc_snapshot = lambda: {}
+            unavailable_record = runner_implementation.run_case(
+                direct_case,
+                repo=ROOT,
+                output_dir=self.work / "unavailable-proc-snapshot",
+                arch=None,
+            )
+            self.assertEqual(unavailable_record["status"], "INFRA_ERROR")
+            self.assertFalse(unavailable_record["executed"])
+            self.assertIn("process snapshot", unavailable_record["result"])
+
+            runner_implementation._proc_snapshot = lambda: {
+                os.getpid(): (os.getppid() + 1, os.getpgrp())
+            }
+            partial_record = runner_implementation.run_case(
+                direct_case,
+                repo=ROOT,
+                output_dir=self.work / "partial-proc-snapshot",
+                arch=None,
+            )
+            self.assertEqual(partial_record["status"], "INFRA_ERROR")
+            self.assertFalse(partial_record["executed"])
+            self.assertIn("does not accurately describe", partial_record["result"])
+        finally:
+            runner_implementation._proc_snapshot = original_snapshot
+
     def test_runner_interrupt_kills_active_child_and_finalizes_report(self) -> None:
         for runner_signal in (signal.SIGINT, signal.SIGTERM):
             with self.subTest(runner_signal=runner_signal):
@@ -368,7 +602,7 @@ class SuiteRunnerTest(unittest.TestCase):
                         "--manifest",
                         str(self.manifest_path),
                         "--profile",
-                        "quick",
+                        "fixture",
                         "--output-dir",
                         str(output_path),
                     ],
@@ -725,11 +959,91 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
 
     def test_exit_code_zero_rejects_non_pass_evidence(self) -> None:
-        code = "print('TFAIL: hidden failure')"
-        result = self.invoke(
-            fixture_manifest([fixture_case(code=code, contract={"type": "exit_code"})])
+        for index, line in enumerate(
+            (
+                "TFAIL: hidden failure",
+                "suite: TFAIL hidden",
+                "build panic: kernel died",
+                "prefix TIMEOUT",
+                "prefix HANG detected",
+                "worker ABORTED unexpectedly",
+                "prefix FATAL error",
+                "phase INCOMPLETE after 1 of 2 steps",
+                "probe STATUS: UNKNOWN after execution",
+                "suite: UNKNOWN",
+                "guest reached a FATAL TRAP during shutdown",
+                "worker terminated by SIGNAL 9",
+                "prefix hang detected",
+                "worker aborted unexpectedly",
+                "prefix fatal error",
+                "phase incomplete after 1 of 2 steps",
+                "probe tfail hidden",
+                "suite: unknown",
+                "operation FAILED",
+                "prefix ERROR occurred",
+                "test failed as expected",
+                "worker aborted as expected",
+                "warning: TFAIL hidden failure",
+                "warning: TIMEOUT occurred",
+                "warning: ENOSYS result",
+                "warning: test SKIPPED",
+                "warning: STATUS: UNKNOWN",
+                "Running TFAIL hidden failure",
+                "Finished with ERROR",
+                "Building failed",
+                "Checking TIMEOUT",
+                "Compiling panic failure",
+                "warning: kernel panic occurred",
+                "warning: worker aborted unexpectedly",
+                "warning: process killed by signal",
+                "warning: test failed unexpectedly",
+                "warning: suite failure detected",
+                "warning: case ERROR occurred",
+                "warning: build failed unexpectedly",
+                "warning: operation FAILED",
+                "command exited with status 1",
+                "process exit code: 2",
+                "return code 127",
+                "non-zero exit status",
+                "exited unsuccessfully",
+                "command was unsuccessful",
+            )
+        ):
+            with self.subTest(line=line):
+                self.output_path = self.work / f"exit-hard-failure-{index}"
+                result = self.invoke(
+                    fixture_manifest(
+                        [
+                            fixture_case(
+                                code=f"print({line!r})",
+                                contract={"type": "exit_code"},
+                            )
+                        ]
+                    )
+                )
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+        self.output_path = self.work / "exit-empty-rejected"
+        empty_result = self.invoke(
+            fixture_manifest(
+                [fixture_case(code="pass", contract={"type": "exit_code"})]
+            )
         )
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(empty_result.returncode, 2, empty_result.stdout + empty_result.stderr)
+        self.assertEqual(self.summary()["cases"][0]["status"], "INFRA_ERROR")
+
+        self.output_path = self.work / "exit-empty-explicitly-allowed"
+        allowed_empty = self.invoke(
+            fixture_manifest(
+                [
+                    fixture_case(
+                        code="pass",
+                        contract={"type": "exit_code", "allow_empty_output": True},
+                    )
+                ]
+            )
+        )
+        self.assertEqual(allowed_empty.returncode, 0, allowed_empty.stdout + allowed_empty.stderr)
 
     def test_exit_code_zero_rejects_unknown_status(self) -> None:
         code = "print('STATUS: MAYBE')"
@@ -741,7 +1055,29 @@ class SuiteRunnerTest(unittest.TestCase):
     def test_exit_code_allows_source_diagnostics_that_quote_failure_words(self) -> None:
         code = (
             "print('243 | source diagnostic says receive failed'); "
-            "print('5 | source diagnostic mentions error handling')"
+            "print('5 | source diagnostic mentions error handling'); "
+            "print('308 | sys_epoll_wait(epfd, maxevents, timeout)'); "
+            "print('309 | let timeout = request.timeout'); "
+            "print('command was aborted? no'); "
+            "print('error count: 0'); "
+            "print('failed attempts: 0'); "
+            "print('0 failures'); "
+            "print('none failed'); "
+            "print('10 passed; 0 failed'); "
+            "print('0 tests failed'); "
+            "print('operation did not fail'); "
+            "print('warning: error handling path was checked'); "
+            "print('warning: panic message contains unused formatting placeholders'); "
+            "print('warning: function abort is deprecated'); "
+            "print('   Compiling proc-macro-error-attr2 v2.0.0'); "
+            "print('     Running tests/error-path.rs (target/debug/error-path)'); "
+            "print('completed without errors'); "
+            "print('completed without any failures'); "
+            "print('error-free completion'); "
+            "print('failure-free completion'); "
+            "print('command exited with status 0'); "
+            "print('process exit code: 0'); "
+            "print('return code 0')"
         )
         result = self.invoke(
             fixture_manifest([fixture_case(code=code, contract={"type": "exit_code"})])
@@ -875,49 +1211,21 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertIn("terminal non-empty", self.summary()["cases"][0]["result"])
 
     def test_official_image_missing_is_infrastructure_error(self) -> None:
-        case = canonical_official_case()
-        case["required_files"] = [
-            {
-                "environment": "RV_TESTSUITE_IMG",
-                "fallback": str(self.work / "missing-rv.img"),
-            }
-        ]
-        manifest = {
-            "schema_version": 1,
-            "profiles": {
-                "official": {
-                    "arch_policy": "one",
-                    "include": [],
-                    "cases": [],
-                    "arch_cases": {"rv": ["official.rv"], "la": []},
-                }
-            },
-            "cases": [case],
-        }
+        canonical_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        canonical_case = next(
+            case
+            for case in canonical_manifest["cases"]
+            if case["id"] == "official.riscv64"
+        )
+        case = canonical_official_case("official.fixture-missing-image")
+        case["required_files"] = canonical_case["required_files"]
         environment = os.environ.copy()
-        environment.pop("RV_TESTSUITE_IMG", None)
-        environment.pop("TESTSUITE_DIR", None)
-        self.write_manifest(manifest)
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(RUNNER),
-                "--manifest",
-                str(self.manifest_path),
-                "--profile",
-                "official",
-                "--arch",
-                "rv",
-                "--output-dir",
-                str(self.output_path),
-            ],
-            cwd=ROOT,
-            env=environment,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
-            check=False,
+        environment["RV_TESTSUITE_IMG"] = str(self.work / "missing-rv.img")
+        result = self.invoke(
+            fixture_manifest([case]),
+            environment=environment,
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("required file", self.summary()["cases"][0]["result"])
@@ -1021,31 +1329,18 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertIn("unknown profile", result.stderr)
 
     def test_invalid_architecture_is_rejected(self) -> None:
-        case = canonical_official_case()
-        manifest = {
-            "schema_version": 1,
-            "profiles": {
-                "official": {
-                    "arch_policy": "one",
-                    "include": [],
-                    "cases": [],
-                    "arch_cases": {"rv": ["official.rv"], "la": []},
-                }
-            },
-            "cases": [case],
-        }
-        self.write_manifest(manifest)
-        result = subprocess.run(
-            [sys.executable, str(RUNNER), "--manifest", str(self.manifest_path), "--profile", "official", "--arch", "mips"],
-            cwd=ROOT,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
-            check=False,
+        rv = fixture_case("architecture.rv")
+        la = fixture_case("architecture.la")
+        manifest = fixture_manifest([rv, la], case_ids=[])
+        manifest["profiles"]["fixture"].update(
+            {
+                "arch_policy": "one",
+                "arch_cases": {"rv": [rv["id"]], "la": [la["id"]]},
+            }
         )
+        result = self.invoke(manifest, extra=["--arch", "mips"])
         self.assertEqual(result.returncode, 2)
-        self.assertIn("requires --arch rv or --arch la", result.stderr)
+        self.assertIn("profile fixture requires --arch rv or --arch la", result.stderr)
 
     def test_official_profile_rejects_coordinated_plan_shrink(self) -> None:
         manifest = json.loads((ROOT / "test/suite_manifest.json").read_text(encoding="utf-8"))
@@ -1161,7 +1456,544 @@ class SuiteRunnerTest(unittest.TestCase):
         case["result_contract"]["expected_tests"] = 1
         result = self.invoke(manifest)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("must preserve 10 canonical unittest methods", result.stderr)
+        self.assertIn("must preserve and identity-bind 10", result.stderr)
+
+        dependency_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        reporter_case = next(
+            case
+            for case in dependency_manifest["cases"]
+            if case["id"] == "unit.evaluation_failure_report"
+        )
+        reporter_case["required_paths"].pop()
+        dependency_result = self.invoke(dependency_manifest)
+        self.assertEqual(dependency_result.returncode, 2)
+        self.assertIn("exact canonical Python implementation", dependency_result.stderr)
+
+        valid_source = (
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_assertion(self):\n"
+            "        self.assertTrue(True)\n"
+            "if __name__ == '__main__':\n"
+            "    unittest.main()\n"
+        )
+        self.assertEqual(
+            runner_implementation.canonical_unittest_method_count(
+                ast.parse(valid_source),
+                Path("valid.py"),
+            ),
+            1,
+        )
+        invalid_sources = (
+            (
+                valid_source.replace("def test_assertion", "async def test_assertion"),
+                "async test method",
+            ),
+            (
+                valid_source.replace(
+                    "        self.assertTrue(True)",
+                    "        yield self.fail('never executed')",
+                ),
+                "generator test method",
+            ),
+            (
+                valid_source.replace(
+                    "    def test_assertion",
+                    "    def testFailure(self):\n"
+                    "        self.fail('default unittest discovery must not be ignored')\n"
+                    "    def test_assertion",
+                ),
+                "discoverable test names without the test_ prefix",
+            ),
+            (
+                valid_source.replace(
+                    "class T(unittest.TestCase):",
+                    "class T(unittest.TestCase):\n"
+                    "    def setUp(self):\n"
+                    "        yield self.fail('generator setup body must execute')",
+                ),
+                "lifecycle hook setUp must execute synchronously",
+            ),
+            (
+                valid_source.replace(
+                    "    def test_assertion",
+                    "    async def tearDown(self):\n"
+                    "        self.fail('async teardown body must execute')\n"
+                    "    def test_assertion",
+                ),
+                "lifecycle hook tearDown must execute synchronously",
+            ),
+            (
+                valid_source.replace(
+                    "    def test_assertion",
+                    "    @staticmethod\n    def test_assertion",
+                ),
+                "decorated test method",
+            ),
+            (
+                valid_source.replace(
+                    "class T(unittest.TestCase):",
+                    "@staticmethod\nclass T(unittest.TestCase):",
+                ),
+                "undecorated direct unittest.TestCase",
+            ),
+            (
+                valid_source.replace(
+                    "class T(unittest.TestCase):",
+                    "class Mixin:\n    pass\nclass T(Mixin, unittest.TestCase):",
+                ),
+                "without mixins",
+            ),
+            (
+                valid_source.replace(
+                    "    def test_assertion",
+                    "    def _callTestMethod(self, method):\n"
+                    "        return None\n"
+                    "    def test_assertion",
+                ),
+                "overrides unittest execution hooks",
+            ),
+            (
+                valid_source.replace(
+                    "if __name__ == '__main__':",
+                    "def load_tests(loader, tests, pattern):\n"
+                    "    return tests\n"
+                    "if __name__ == '__main__':",
+                ),
+                "must not bind load_tests",
+            ),
+            (
+                valid_source.replace(
+                    "if __name__ == '__main__':",
+                    "if True:\n"
+                    "    def load_tests(loader, tests, pattern):\n"
+                    "        return unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])\n"
+                    "if __name__ == '__main__':",
+                ),
+                "must not bind load_tests",
+            ),
+            (
+                "import unittest\n"
+                "def test_not_discovered():\n"
+                "    raise AssertionError\n"
+                "if __name__ == '__main__':\n"
+                "    unittest.main()\n",
+                "outside a direct unittest.TestCase",
+            ),
+            (
+                valid_source.replace("unittest.main()", "unittest.main(defaultTest='T')"),
+                "plain unittest",
+            ),
+        )
+        for source, message in invalid_sources:
+            with self.subTest(canonical_unittest_bypass=message):
+                with self.assertRaisesRegex(runner_implementation.ManifestError, message):
+                    runner_implementation.canonical_unittest_method_count(
+                        ast.parse(source),
+                        Path("mutated.py"),
+                    )
+
+        harness_source = self.work / "harness-valid.py"
+        harness_source.write_text(valid_source, encoding="utf-8")
+        harness_command = [
+            sys.executable,
+            "-I",
+            "-S",
+            "-B",
+            "-X",
+            "pycache_prefix=/dev/null",
+            str(UNITTEST_HARNESS),
+        ]
+        harness_result = subprocess.run(
+            [*harness_command, str(harness_source)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(harness_result.returncode, 0, harness_result.stderr)
+        self.assertIn(
+            "UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1",
+            harness_result.stderr,
+        )
+
+        positive_semantics_sources = (
+            valid_source.replace(
+                "        self.assertTrue(True)",
+                "        def values():\n"
+                "            yield 1\n"
+                "        self.assertEqual(list(values()), [1])",
+            ),
+            valid_source.replace(
+                "    def test_assertion(self):",
+                "    def test_assertion(self):\n"
+                "        \"documented test\"",
+            ).replace(
+                "        self.assertTrue(True)",
+                "        self.assertEqual(self.shortDescription(), 'documented test')",
+            ),
+            valid_source.replace(
+                "        self.assertTrue(True)",
+                "        self.assertEqual(__name__, '__main__')\n"
+                "        self.assertEqual(self.__class__.__module__, '__main__')",
+            ),
+            valid_source.replace(
+                "import unittest\n",
+                "import unittest\nimport os\n",
+            ).replace(
+                "        self.assertTrue(True)",
+                "        self.assertEqual(os.environ.get('PYTHONDONTWRITEBYTECODE'), '1')\n"
+                "        self.assertEqual(os.environ.get('PYTHONPYCACHEPREFIX'), '/dev/null')",
+            ),
+        )
+        for index, positive_source in enumerate(positive_semantics_sources):
+            with self.subTest(native_semantics_positive=index):
+                path = self.work / f"harness-positive-{index}.py"
+                path.write_text(positive_source, encoding="utf-8")
+                positive_result = subprocess.run(
+                    [*harness_command, str(path)],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=15,
+                    check=False,
+                )
+                self.assertEqual(
+                    positive_result.returncode,
+                    0,
+                    positive_result.stdout + positive_result.stderr,
+                )
+
+        nested_module_dir = self.work / "nested-bytecode"
+        nested_module_dir.mkdir()
+        nested_module = nested_module_dir / "bytecode_probe.py"
+        nested_module.write_text("VALUE = 'pyc'\n", encoding="utf-8")
+        source_stat = nested_module.stat()
+        nested_cache_dir = nested_module_dir / "__pycache__"
+        nested_cache_dir.mkdir()
+        nested_pyc = nested_cache_dir / (
+            f"bytecode_probe.{sys.implementation.cache_tag}.pyc"
+        )
+        py_compile.compile(
+            str(nested_module),
+            cfile=str(nested_pyc),
+            doraise=True,
+        )
+        nested_module.write_text("VALUE = 'src'\n", encoding="utf-8")
+        os.utime(
+            nested_module,
+            ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns),
+        )
+        poisoned_pyc = nested_pyc.read_bytes()
+        control_environment = os.environ.copy()
+        control_environment.pop("PYTHONDONTWRITEBYTECODE", None)
+        control_environment.pop("PYTHONPYCACHEPREFIX", None)
+        control_result = subprocess.run(
+            [sys.executable, "-c", "import bytecode_probe; print(bytecode_probe.VALUE)"],
+            cwd=nested_module_dir,
+            env=control_environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(control_result.returncode, 0, control_result.stderr)
+        self.assertEqual(control_result.stdout.strip(), "pyc")
+        bytecode_source = valid_source.replace(
+            "import unittest\n",
+            "import unittest\nimport subprocess\nimport sys\n",
+        ).replace(
+            "        self.assertTrue(True)",
+            "        result = subprocess.run(\n"
+            "            [sys.executable, '-c', "
+            "'import bytecode_probe, sys; print(bytecode_probe.VALUE); print(sys.pycache_prefix)'],\n"
+            f"            cwd={str(nested_module_dir)!r}, text=True, capture_output=True, check=False,\n"
+            "        )\n"
+            "        self.assertEqual(result.returncode, 0, result.stderr)\n"
+            "        self.assertEqual(result.stdout.splitlines(), ['src', '/dev/null'])",
+        )
+        bytecode_fixture = self.work / "harness-bytecode.py"
+        bytecode_fixture.write_text(bytecode_source, encoding="utf-8")
+        bytecode_result = subprocess.run(
+            [*harness_command, str(bytecode_fixture)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(
+            bytecode_result.returncode,
+            0,
+            bytecode_result.stdout + bytecode_result.stderr,
+        )
+        self.assertEqual(nested_pyc.read_bytes(), poisoned_pyc)
+        self.assertEqual(list(nested_pyc.parent.iterdir()), [nested_pyc])
+
+        failing_source = valid_source.replace(
+            "self.assertTrue(True)", "self.fail('original test body must execute')"
+        )
+        failing_path = self.work / "harness-failing.py"
+        failing_path.write_text(failing_source, encoding="utf-8")
+        failing_result = subprocess.run(
+            [*harness_command, str(failing_path)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(failing_result.returncode, 1, failing_result.stderr)
+        self.assertIn(
+            "non-success outcome events are not complete success",
+            failing_result.stderr,
+        )
+        self.assertNotIn(
+            "skip/expected-failure outcomes are not complete success",
+            failing_result.stderr,
+        )
+        runtime_bypasses = (
+            failing_source.replace(
+                "if __name__ == '__main__':",
+                "T.test_assertion = lambda self: None\nif __name__ == '__main__':",
+            ),
+            failing_source.replace(
+                "    def test_assertion",
+                "    def __getattribute__(self, name):\n"
+                "        if name.startswith('test_'):\n"
+                "            return lambda: None\n"
+                "        return super().__getattribute__(name)\n"
+                "    def test_assertion",
+            ),
+            failing_source.replace(
+                "if __name__ == '__main__':",
+                "unittest.main = lambda: print('Ran 1 test in 0.001s\\nOK')\n"
+                "if __name__ == '__main__':",
+            ),
+            failing_source.replace(
+                "if __name__ == '__main__':",
+                "def __getattr__(name):\n"
+                "    if name == 'load_tests':\n"
+                "        return lambda *args: unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])\n"
+                "    raise AttributeError(name)\n"
+                "if __name__ == '__main__':",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "def setUpModule():\n"
+                "    raise RuntimeError('module setup must execute')\n"
+                "class T(unittest.TestCase):",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "def tearDownModule():\n"
+                "    raise RuntimeError('module teardown must execute')\n"
+                "class T(unittest.TestCase):",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "def setUpModule():\n"
+                "    def cleanup():\n"
+                "        raise RuntimeError('module cleanup must execute')\n"
+                "    unittest.addModuleCleanup(cleanup)\n"
+                "class T(unittest.TestCase):",
+            ),
+            valid_source.replace(
+                "if __name__ == '__main__':",
+                "Alias = T\nif __name__ == '__main__':",
+            ).replace(
+                "        self.assertTrue(True)",
+                "        count = getattr(T, 'count', 0) + 1\n"
+                "        T.count = count\n"
+                "        self.assertEqual(count, 1)",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "class RunOnly(unittest.TestCase):\n"
+                "    def runTest(self):\n"
+                "        self.fail('runTest must not be omitted')\n"
+                "class T(unittest.TestCase):",
+            ),
+            valid_source.replace(
+                "if __name__ == '__main__':",
+                "class Hidden(unittest.TestCase):\n"
+                "    pass\n"
+                "def hidden_failure(self):\n"
+                "    self.fail('dynamic test must not be omitted')\n"
+                "Hidden.test_failure = hidden_failure\n"
+                "if __name__ == '__main__':",
+            ),
+            valid_source.replace(
+                "if __name__ == '__main__':",
+                "def dynamic_loader(loader, tests, pattern):\n"
+                "    return unittest.TestSuite([unittest.FunctionTestCase(\n"
+                "        lambda: (_ for _ in ()).throw(AssertionError('dynamic failure'))\n"
+                "    )])\n"
+                "globals()['load_tests'] = dynamic_loader\n"
+                "if __name__ == '__main__':",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "class T(unittest.TestCase):\n"
+                "    def setUp(self):\n"
+                "        self.addCleanup(self.lazy_cleanup)\n"
+                "    def lazy_cleanup(self):\n"
+                "        yield self.fail('generator cleanup body must execute')",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "class T(unittest.TestCase):\n"
+                "    @classmethod\n"
+                "    def setUpClass(cls):\n"
+                "        cls.addClassCleanup(cls.lazy_cleanup)\n"
+                "    @classmethod\n"
+                "    def lazy_cleanup(cls):\n"
+                "        yield cls.fail('generator class cleanup body must execute')",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "def lazy_module_cleanup():\n"
+                "    yield AssertionError('generator module cleanup body must execute')\n"
+                "def setUpModule():\n"
+                "    unittest.addModuleCleanup(lazy_module_cleanup)\n"
+                "class T(unittest.TestCase):",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "register_module_cleanup = unittest.addModuleCleanup\n"
+                "def lazy_aliased_module_cleanup():\n"
+                "    yield AssertionError('aliased module cleanup body must execute')\n"
+                "class T(unittest.TestCase):",
+            ).replace(
+                "        self.assertTrue(True)",
+                "        register_module_cleanup(lazy_aliased_module_cleanup)\n"
+                "        self.assertTrue(True)",
+            ),
+            valid_source.replace(
+                "if __name__ == '__main__':",
+                "register_class_cleanup = T.addClassCleanup\n"
+                "def lazy_aliased_class_cleanup():\n"
+                "    yield AssertionError('aliased class cleanup body must execute')\n"
+                "if __name__ == '__main__':",
+            ).replace(
+                "        self.assertTrue(True)",
+                "        register_class_cleanup(lazy_aliased_class_cleanup)\n"
+                "        self.assertTrue(True)",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "def lazy_case_module_cleanup():\n"
+                "    yield AssertionError('unittest.case module cleanup body must execute')\n"
+                "class T(unittest.TestCase):",
+            ).replace(
+                "        self.assertTrue(True)",
+                "        unittest.case.addModuleCleanup(lazy_case_module_cleanup)\n"
+                "        self.assertTrue(True)",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "class T(unittest.TestCase):\n"
+                "    def setUp(self):\n"
+                "        self.addCleanup(self.lazy_cleanup)\n"
+                "    async def lazy_cleanup(self):\n"
+                "        self.fail('async cleanup body must execute')",
+            ),
+            failing_source.replace(
+                "        self.fail('original test body must execute')",
+                "        self.addCleanup(lambda: self._outcome.errors.clear())\n"
+                "        self.fail('outcome mutation must not hide failure')",
+            ),
+            valid_source.replace(
+                "        self.assertTrue(True)",
+                "        raise unittest.case._ShouldStop()",
+            ),
+            valid_source.replace(
+                "class T(unittest.TestCase):",
+                "class T(unittest.TestCase):\n"
+                "    marker = False\n"
+                "    def test_z_prime(self):\n"
+                "        T.marker = True\n"
+                "    def test_a_observe(self):\n"
+                "        self.assertTrue(T.marker)\n"
+                "class Ignored(unittest.TestCase):",
+            ).replace(
+                "class Ignored(unittest.TestCase):\n"
+                "    def test_assertion(self):",
+                "class Ignored(unittest.TestCase):\n"
+                "    def test_assertion(self):",
+            ),
+        )
+        for index, malicious_source in enumerate(runtime_bypasses):
+            with self.subTest(runtime_identity_bypass=index):
+                path = self.work / f"harness-bypass-{index}.py"
+                path.write_text(malicious_source, encoding="utf-8")
+                bypass_result = subprocess.run(
+                    [*harness_command, str(path)],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=15,
+                    check=False,
+                )
+                self.assertNotEqual(
+                    bypass_result.returncode,
+                    0,
+                    bypass_result.stdout + bypass_result.stderr,
+                )
+                self.assertNotIn(
+                    "UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1",
+                    bypass_result.stderr,
+                )
+
+        import_fd_source = valid_source.replace(
+            "import unittest\n",
+            "import unittest\nimport os\nos.write(2, b'IMPORT-FD-MARKER\\n')\n",
+        )
+        import_fd_path = self.work / "harness-import-fd.py"
+        import_fd_path.write_text(import_fd_source, encoding="utf-8")
+        import_fd_result = subprocess.run(
+            [*harness_command, str(import_fd_path)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+        self.assertNotEqual(import_fd_result.returncode, 0)
+        self.assertIn("IMPORT-FD-MARKER", import_fd_result.stderr)
+        self.assertIn("side-effect free", import_fd_result.stderr)
+
+        signal_source = valid_source.replace(
+            "import unittest\n",
+            "import unittest\nimport os\nimport signal\nimport sys\n",
+        ).replace(
+            "        self.assertTrue(True)",
+            "        print('stdout-before-signal', flush=True)\n"
+            "        print('stderr-before-signal', file=sys.stderr, flush=True)\n"
+            "        os.write(1, b'fd-stdout-before-signal\\n')\n"
+            "        os.write(2, b'fd-stderr-before-signal\\n')\n"
+            "        os.kill(os.getpid(), signal.SIGTERM)",
+        )
+        signal_path = self.work / "harness-signal.py"
+        signal_path.write_text(signal_source, encoding="utf-8")
+        signal_result = subprocess.run(
+            [*harness_command, str(signal_path)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+        self.assertNotEqual(signal_result.returncode, 0)
+        self.assertIn("stdout-before-signal", signal_result.stdout)
+        self.assertIn("stderr-before-signal", signal_result.stderr)
+        self.assertIn("fd-stdout-before-signal", signal_result.stdout)
+        self.assertIn("fd-stderr-before-signal", signal_result.stderr)
+        self.assertNotIn("UNITTEST_BINDING:", signal_result.stderr)
 
     def test_canonical_baseline_command_cannot_be_replaced_by_true(self) -> None:
         manifest = json.loads((ROOT / "test/suite_manifest.json").read_text(encoding="utf-8"))
@@ -1170,6 +2002,103 @@ class SuiteRunnerTest(unittest.TestCase):
         result = self.invoke(manifest)
         self.assertEqual(result.returncode, 2)
         self.assertIn("exact canonical baseline command", result.stderr)
+
+        capability_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        capability_case = next(
+            case
+            for case in capability_manifest["cases"]
+            if case["id"] == "baseline.clippy_loongarch64"
+        )
+        capability_case["required_capabilities"] = []
+        capability_result = self.invoke(capability_manifest)
+        self.assertEqual(capability_result.returncode, 2)
+        self.assertIn("capability requirements", capability_result.stderr)
+
+        required_command_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        required_command_case = next(
+            case
+            for case in required_command_manifest["cases"]
+            if case["id"] == "baseline.clippy_loongarch64"
+        )
+        required_command_case["required_commands"].remove("clang")
+        self.output_path = self.work / "canonical-capability-command-mutation"
+        required_command_result = self.invoke(required_command_manifest)
+        self.assertEqual(required_command_result.returncode, 2)
+        self.assertIn("in required_commands", required_command_result.stderr)
+
+        result_contract_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        result_contract_case = next(
+            case
+            for case in result_contract_manifest["cases"]
+            if case["id"] == "baseline.kernel_riscv64"
+        )
+        result_contract_case["result_contract"]["allow_empty_output"] = True
+        self.output_path = self.work / "canonical-baseline-contract-mutation"
+        result_contract_result = self.invoke(result_contract_manifest)
+        self.assertEqual(result_contract_result.returncode, 2)
+        self.assertIn("result/capability requirements", result_contract_result.stderr)
+
+        infrastructure_code_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        infrastructure_code_case = next(
+            case
+            for case in infrastructure_code_manifest["cases"]
+            if case["id"] == "baseline.kernel_riscv64"
+        )
+        infrastructure_code_case["infrastructure_exit_codes"] = [1]
+        self.output_path = self.work / "canonical-baseline-infra-code-mutation"
+        infrastructure_code_result = self.invoke(infrastructure_code_manifest)
+        self.assertEqual(infrastructure_code_result.returncode, 2)
+        self.assertIn("result/capability requirements", infrastructure_code_result.stderr)
+
+        required_inputs_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        required_inputs_case = next(
+            case
+            for case in required_inputs_manifest["cases"]
+            if case["id"] == "baseline.kernel_riscv64"
+        )
+        required_inputs_case["required_commands"].append("orays-nonexistent-poison")
+        self.output_path = self.work / "canonical-baseline-required-command-mutation"
+        required_inputs_result = self.invoke(required_inputs_manifest)
+        self.assertEqual(required_inputs_result.returncode, 2)
+        self.assertIn("result/capability requirements", required_inputs_result.stderr)
+
+        required_path_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        required_path_case = next(
+            case
+            for case in required_path_manifest["cases"]
+            if case["id"] == "baseline.kernel_riscv64"
+        )
+        required_path_case["required_paths"] = ["{repo}/test/README.md"]
+        self.output_path = self.work / "canonical-baseline-required-path-mutation"
+        required_path_result = self.invoke(required_path_manifest)
+        self.assertEqual(required_path_result.returncode, 2)
+        self.assertIn("result/capability requirements", required_path_result.stderr)
+
+        timeout_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        timeout_case = next(
+            case
+            for case in timeout_manifest["cases"]
+            if case["id"] == "baseline.kernel_riscv64"
+        )
+        timeout_case["timeout_seconds"] = 1
+        self.output_path = self.work / "canonical-baseline-timeout-mutation"
+        timeout_result = self.invoke(timeout_manifest)
+        self.assertEqual(timeout_result.returncode, 2)
+        self.assertIn("result/capability requirements", timeout_result.stderr)
 
     def test_canonical_baseline_reference_cannot_be_retargeted(self) -> None:
         manifest = json.loads((ROOT / "test/suite_manifest.json").read_text(encoding="utf-8"))
@@ -1205,26 +2134,197 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertIn("--profile", summary["invocation"])
         self.assertIsInstance(summary["duration_seconds"], float)
         self.assertGreaterEqual(summary["duration_seconds"], 0.0)
+        self.assertIsInstance(summary["runner_dirty"], bool)
+        self.assertIsInstance(summary["runner_status"], list)
+        self.assertEqual(summary["runner_commit_final"], summary["runner_commit"])
+        self.assertEqual(summary["runner_dirty_final"], summary["runner_dirty"])
+        self.assertEqual(summary["runner_status_final"], summary["runner_status"])
+        self.assertTrue(summary["runner_provenance_stable"])
+        self.assertEqual(
+            summary["python_runtime"],
+            {
+                "isolated": True,
+                "no_site": True,
+                "dont_write_bytecode": True,
+                "pycache_prefix": "/dev/null",
+            },
+        )
+
+        for label, startup_flags in (
+            ("missing-no-site-and-prefix", ["-I", "-B"]),
+            ("missing-prefix", ["-I", "-S", "-B"]),
+            (
+                "wrong-prefix",
+                ["-I", "-S", "-B", "-X", f"pycache_prefix={self.work / 'wrong-cache'}"],
+            ),
+        ):
+            with self.subTest(startup_isolation=label):
+                output_path = self.work / f"startup-{label}"
+                startup_result = subprocess.run(
+                    [
+                        sys.executable,
+                        *startup_flags,
+                        str(RUNNER),
+                        "--manifest",
+                        str(self.manifest_path),
+                        "--profile",
+                        "fixture",
+                        "--output-dir",
+                        str(output_path),
+                    ],
+                    cwd=ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=15,
+                    check=False,
+                )
+                self.assertEqual(
+                    startup_result.returncode,
+                    0,
+                    startup_result.stdout + startup_result.stderr,
+                )
+                startup_summary = json.loads(
+                    (output_path / "summary.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(startup_summary["python_runtime"], summary["python_runtime"])
+                self.assertTrue(startup_summary["runner_provenance_stable"])
+
+        probe_repo = self.work / "git-provenance"
+        probe_repo.mkdir()
+        probe_environment = runner_implementation.git_probe_environment(probe_repo)
+        git_command = shutil.which("git", path=probe_environment["PATH"])
+        self.assertIsNotNone(git_command)
+        resolved_git = str(Path(git_command).resolve())
+        for command in (
+            [resolved_git, "init", "--quiet"],
+            [resolved_git, "config", "user.name", "Suite Runner Test"],
+            [resolved_git, "config", "user.email", "suite-runner@example.invalid"],
+        ):
+            subprocess.run(
+                command,
+                cwd=probe_repo,
+                env=probe_environment,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        tracked = probe_repo / "tracked.txt"
+        tracked.write_text("clean\n", encoding="utf-8")
+        for command in (
+            [resolved_git, "add", "tracked.txt"],
+            [resolved_git, "commit", "--quiet", "-m", "fixture"],
+        ):
+            subprocess.run(
+                command,
+                cwd=probe_repo,
+                env=probe_environment,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        self.assertEqual(runner_implementation.git_worktree_status(probe_repo), "")
+        initial_probe_commit = runner_implementation.baseline_commit(probe_repo, "HEAD")
+        (probe_repo / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+        self.assertIn(
+            "?? untracked.txt",
+            runner_implementation.git_worktree_status(probe_repo) or "",
+        )
+        self.assertEqual(
+            runner_implementation.baseline_commit(probe_repo, "HEAD"),
+            initial_probe_commit,
+        )
+        self.assertNotEqual(runner_implementation.git_worktree_status(probe_repo), "")
+
+        clean_git_environment = {
+            name: value
+            for name, value in os.environ.items()
+            if not name.startswith("GIT_")
+        }
+        expected_baseline = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--verify", "origin/main^{commit}"],
+            env=clean_git_environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        expected_runner = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--verify", "HEAD^{commit}"],
+            env=clean_git_environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        hostile_environment = os.environ.copy()
+        hostile_environment.update(
+            {
+                "GIT_DIR": str(self.work / "attacker.git"),
+                "GIT_WORK_TREE": str(self.work / "attacker-worktree"),
+                "GIT_CONFIG_GLOBAL": str(self.work / "attacker-gitconfig"),
+            }
+        )
+        self.output_path = self.work / "git-environment-isolation"
+        isolated = self.invoke(
+            fixture_manifest([fixture_case()]),
+            environment=hostile_environment,
+        )
+        self.assertEqual(isolated.returncode, 0, isolated.stdout + isolated.stderr)
+        isolated_summary = self.summary()
+        self.assertEqual(isolated_summary["baseline_commit"], expected_baseline)
+        self.assertEqual(isolated_summary["runner_commit"], expected_runner)
+        self.assertEqual(isolated_summary["runner_commit_final"], expected_runner)
+        self.assertTrue(isolated_summary["runner_provenance_stable"])
 
     def test_child_environment_is_offline_by_default(self) -> None:
         code = (
             "import os; print('offline=' + os.environ.get('CARGO_NET_OFFLINE', '')); "
+            "print('home=' + os.environ.get('HOME', '')); "
+            "print('path=' + os.environ.get('PATH', '')); "
+            "print('manifest=' + os.environ.get('EXPLICIT_CASE_CONTROL', '')); "
+            "print('cargo_home=' + os.environ.get('CARGO_HOME', '')); "
+            "print('no_bytecode=' + os.environ.get('PYTHONDONTWRITEBYTECODE', '')); "
+            "print('pycache_prefix=' + os.environ.get('PYTHONPYCACHEPREFIX', '')); "
+            "print('no_user_site=' + os.environ.get('PYTHONNOUSERSITE', '')); "
             "print('bash_env=' + os.environ.get('BASH_ENV', '')); "
+            "print('rustfmt=' + os.environ.get('RUSTFMT', '')); "
+            "print('remote_ltp=' + os.environ.get('REMOTE_LTP_CASES', '')); "
+            "print('ambient=' + os.environ.get('AMBIENT_FUTURE_CONTROL', '')); "
             "print('shell_functions=' + ','.join(sorted(name for name in os.environ if name.startswith('BASH_FUNC_')))); "
             "print('CASE_RESULT: PASS')"
         )
         environment = os.environ.copy()
         environment["CARGO_NET_OFFLINE"] = "false"
         environment["BASH_ENV"] = "/tmp/untrusted-bash-env"
+        environment["RUSTFMT"] = "/bin/true"
+        environment["CARGO_HOME"] = "/tmp/untrusted-cargo-home"
+        environment["REMOTE_LTP_CASES"] = '"; :; #'
+        environment["AMBIENT_FUTURE_CONTROL"] = "must-not-propagate"
         environment["BASH_FUNC_fake%%"] = "() { return 0; }"
+        case = fixture_case(code=code)
+        case["environment"] = {
+            "EXPLICIT_CASE_CONTROL": "manifest-owned",
+            "PYTHONNOUSERSITE": "",
+            "PYTHONDONTWRITEBYTECODE": "",
+            "PYTHONPYCACHEPREFIX": str(self.work / "untrusted-cache"),
+        }
         result = self.invoke(
-            fixture_manifest([fixture_case(code=code)]),
+            fixture_manifest([case]),
             environment=environment,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         stdout = Path(self.summary()["cases"][0]["stdout_log"]).read_text(encoding="utf-8")
         self.assertIn("offline=true", stdout)
+        self.assertIn(f"home={environment.get('HOME', str(Path.home()))}\n", stdout)
+        self.assertIn(f"path={environment.get('PATH', os.defpath)}\n", stdout)
+        self.assertIn("manifest=manifest-owned\n", stdout)
+        self.assertIn(f"cargo_home={ROOT / 'cargo-home'}\n", stdout)
+        self.assertIn("no_bytecode=1\n", stdout)
+        self.assertIn("pycache_prefix=/dev/null\n", stdout)
+        self.assertIn("no_user_site=1\n", stdout)
         self.assertIn("bash_env=\n", stdout)
+        self.assertIn("rustfmt=\n", stdout)
+        self.assertIn("remote_ltp=\n", stdout)
+        self.assertIn("ambient=\n", stdout)
         self.assertIn("shell_functions=\n", stdout)
 
     def test_parent_python_optimize_cannot_disable_child_assertions(self) -> None:
@@ -1244,16 +2344,42 @@ class SuiteRunnerTest(unittest.TestCase):
         stderr = Path(self.summary()["cases"][0]["stderr_log"]).read_text(encoding="utf-8")
         self.assertIn("AssertionError", stderr)
 
-    def test_parent_make_dry_run_flags_are_not_inherited(self) -> None:
+    def test_parent_make_control_environment_is_not_inherited(self) -> None:
         makefile = self.work / "Makefile"
+        middle_makefile = self.work / "Middle.mk"
+        child_makefile = self.work / "Child.mk"
         marker = self.work / "recipe-executed"
+        injection_marker = self.work / "makefiles-injection-loaded"
+        makefiles_injection = self.work / "untrusted-injected.mk"
         makefile.write_text(
-            f"all:\n\t@touch {marker}\n",
+            f"all:\n\t@$(MAKE) -f {middle_makefile} middle\n",
             encoding="utf-8",
         )
-        for index, variable in enumerate(("MAKEFLAGS", "MFLAGS", "GNUMAKEFLAGS")):
+        middle_makefile.write_text(
+            f"middle:\n\t@$(MAKE) -f {child_makefile} child\n",
+            encoding="utf-8",
+        )
+        child_makefile.write_text(
+            f"child:\n\t@touch {marker}\n",
+            encoding="utf-8",
+        )
+        makefiles_injection.write_text(
+            f"injected := $(shell touch {injection_marker})\n",
+            encoding="utf-8",
+        )
+        inherited_values = (
+            (".SHELLFLAGS", "-n -c"),
+            ("MAKE", "/bin/false"),
+            ("MAKEFILES", str(makefiles_injection)),
+            ("MAKEFLAGS", "-n"),
+            ("MAKEOVERRIDES", "MAKE=/bin/false"),
+            ("MFLAGS", "-n"),
+            ("GNUMAKEFLAGS", "-n"),
+        )
+        for index, (variable, value) in enumerate(inherited_values):
             with self.subTest(variable=variable):
                 marker.unlink(missing_ok=True)
+                injection_marker.unlink(missing_ok=True)
                 self.output_path = self.work / f"make-environment-{index}"
                 case = fixture_case(
                     f"fixture.make-{index}",
@@ -1262,24 +2388,76 @@ class SuiteRunnerTest(unittest.TestCase):
                 case["command"] = ["make", "-f", str(makefile), "all"]
                 case["required_commands"] = ["make"]
                 environment = os.environ.copy()
-                environment[variable] = "-n"
+                environment[variable] = value
                 result = self.invoke(
                     fixture_manifest([case]),
                     environment=environment,
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertTrue(marker.is_file(), f"{variable} suppressed the recipe")
+                self.assertFalse(
+                    injection_marker.exists(),
+                    f"{variable} loaded the untrusted makefile",
+                )
                 resolved = self.summary()["cases"][0]["required_command_paths"]
                 self.assertEqual(Path(resolved["make"]), Path(shutil.which("make") or "").resolve())
 
-    def test_full_all_preserves_each_arch_case_architecture(self) -> None:
+        bypass_makefile = self.work / "AmbientBypass.mk"
+        bypass_marker = self.work / "ambient-bypass-recipe-continued"
+        bypass_makefile.write_text(
+            f"all:\n\t@false $(AMBIENT_FUTURE_CONTROL)\n\t@touch {bypass_marker}\n",
+            encoding="utf-8",
+        )
+        self.output_path = self.work / "unknown-make-environment"
+        bypass_case = fixture_case(
+            "fixture.unknown-make-environment",
+            contract={"type": "exit_code"},
+        )
+        bypass_case["command"] = ["make", "-f", str(bypass_makefile), "all"]
+        bypass_case["required_commands"] = ["make"]
+        environment = os.environ.copy()
+        environment["AMBIENT_FUTURE_CONTROL"] = "; :; #"
+        result = self.invoke(
+            fixture_manifest([bypass_case]),
+            environment=environment,
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.summary()["cases"][0]["status"], "FAIL")
+        self.assertFalse(
+            bypass_marker.exists(),
+            "an unknown inherited Make variable converted a failing recipe into PASS",
+        )
+
+        path_expansion_marker = self.work / "ambient-path-expansion-ran"
+        self.output_path = self.work / "make-path-expansion"
+        environment = os.environ.copy()
+        environment["PATH"] = (
+            f"$(shell touch {path_expansion_marker}):"
+            + environment.get("PATH", os.defpath)
+        )
+        result = self.invoke(
+            fixture_manifest([bypass_case]),
+            environment=environment,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(self.summary()["cases"][0]["status"], "INFRA_ERROR")
+        self.assertIn(
+            "PATH contains control or Make-expansion syntax",
+            self.summary()["cases"][0]["result"],
+        )
+        self.assertFalse(
+            path_expansion_marker.exists(),
+            "Make expanded caller-controlled PATH syntax",
+        )
+
+    def test_one_or_all_profile_preserves_each_arch_case_architecture(self) -> None:
         rv = fixture_case("architecture.rv")
         la = fixture_case("architecture.la")
         manifest = {
             "schema_version": 1,
             "baseline_ref": "origin/main",
             "profiles": {
-                "full": {
+                "registered-all": {
                     "description": "two-architecture fixture",
                     "arch_policy": "one_or_all",
                     "include": [],
@@ -1289,7 +2467,7 @@ class SuiteRunnerTest(unittest.TestCase):
             },
             "cases": [rv, la],
         }
-        result = self.invoke(manifest, extra=["--profile", "full", "--arch", "all"])
+        result = self.invoke(manifest, extra=["--profile", "registered-all", "--arch", "all"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         cases = self.summary()["cases"]
         self.assertEqual([case["architecture"] for case in cases], ["rv", "la"])
@@ -1361,6 +2539,38 @@ class SuiteRunnerTest(unittest.TestCase):
         result = self.invoke(fixture_manifest([fixture_case(code=code, contract=contract)]))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+        self.output_path = self.work / "identity-bound-output"
+        bound_code = (
+            "import sys; "
+            "print('UNITTEST_BINDING: planned=1 started=1 executed=1 stopped=1', file=sys.stderr); "
+            "print('Ran 1 test in 0.001s', file=sys.stderr); print('OK', file=sys.stderr)"
+        )
+        bound_contract = {
+            "type": "unittest",
+            "expected_tests": 1,
+            "identity_binding": True,
+        }
+        bound_result = self.invoke(
+            fixture_manifest([fixture_case(code=bound_code, contract=bound_contract)])
+        )
+        self.assertEqual(bound_result.returncode, 0, bound_result.stdout + bound_result.stderr)
+        self.assertEqual(self.summary()["cases"][0]["details"]["executed_tests"], 1)
+
+        self.output_path = self.work / "missing-binding-output"
+        missing_result = self.invoke(
+            fixture_manifest([fixture_case(code=code, contract=bound_contract)])
+        )
+        self.assertEqual(missing_result.returncode, 2)
+        self.assertIn("binding record", self.summary()["cases"][0]["result"])
+
+        self.output_path = self.work / "mismatched-binding-output"
+        mismatched_code = bound_code.replace("executed=1", "executed=0")
+        mismatched_result = self.invoke(
+            fixture_manifest([fixture_case(code=mismatched_code, contract=bound_contract)])
+        )
+        self.assertEqual(mismatched_result.returncode, 2)
+        self.assertIn("binding count mismatch", self.summary()["cases"][0]["result"])
+
     def test_unittest_malformed_duration_cannot_pass(self) -> None:
         code = "import sys; print('Ran 1 test in bananas', file=sys.stderr); print('OK', file=sys.stderr)"
         contract = {"type": "unittest", "expected_tests": 1}
@@ -1399,6 +2609,22 @@ class SuiteRunnerTest(unittest.TestCase):
         contract = {"type": "unittest", "expected_tests": 1}
         result = self.invoke(fixture_manifest([fixture_case(code=code, contract=contract)]))
         self.assertEqual(result.returncode, 2)
+
+        self.output_path = self.work / "async-unittest"
+        async_code = (
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    async def test_never_runs(self):\n"
+            "        self.fail('not awaited')\n"
+            "unittest.main()\n"
+        )
+        async_result = self.invoke(
+            fixture_manifest(
+                [fixture_case(code=async_code, contract={"type": "unittest", "expected_tests": 1})]
+            )
+        )
+        self.assertEqual(async_result.returncode, 2, async_result.stdout + async_result.stderr)
+        self.assertIn("coroutine test", self.summary()["cases"][0]["result"])
 
     def test_unittest_negated_ok_record_cannot_pass(self) -> None:
         code = (
@@ -1604,7 +2830,7 @@ class SuiteRunnerTest(unittest.TestCase):
     def test_checks_profile_contract_cannot_be_downgraded(self) -> None:
         case = fixture_case("fixture.silent", code="pass", contract={"type": "exit_code"})
         manifest = fixture_manifest([case])
-        manifest["profiles"] = {"checks": manifest["profiles"]["quick"]}
+        manifest["profiles"] = {"checks": manifest["profiles"]["fixture"]}
         result = self.invoke(manifest)
         self.assertEqual(result.returncode, 2)
         self.assertIn("profile checks requires the check result contract", result.stderr)
@@ -1612,12 +2838,12 @@ class SuiteRunnerTest(unittest.TestCase):
     def test_unit_profile_contract_cannot_be_downgraded(self) -> None:
         case = fixture_case("fixture.zero", code="pass", contract={"type": "exit_code"})
         manifest = fixture_manifest([case])
-        manifest["profiles"] = {"unit": manifest["profiles"]["quick"]}
+        manifest["profiles"] = {"unit": manifest["profiles"]["fixture"]}
         result = self.invoke(manifest)
         self.assertEqual(result.returncode, 2)
         self.assertIn("profile unit requires the unittest result contract", result.stderr)
 
-    def test_official_profile_contract_cannot_be_downgraded(self) -> None:
+    def test_alternate_official_profile_cannot_bypass_canonical_contract(self) -> None:
         case = fixture_case("fixture.empty", code="pass", contract={"type": "exit_code"})
         manifest = fixture_manifest([case], case_ids=[])
         manifest["profiles"] = {
@@ -1632,6 +2858,73 @@ class SuiteRunnerTest(unittest.TestCase):
         result = self.invoke(manifest)
         self.assertEqual(result.returncode, 2)
         self.assertIn("profile official requires the official result contract", result.stderr)
+
+        strict_case = fixture_case(
+            "fixture.strict-official",
+            code=(
+                "print('#### OS COMP TEST GROUP START demo-musl ####\\n'"
+                "      'PASS OFFICIAL TEST GROUP demo-musl : 0\\n'"
+                "      '#### OS COMP TEST GROUP END demo-musl ####')"
+            ),
+            contract={
+                "type": "official",
+                "expected_group_labels": ["demo-musl"],
+                "expected_group_case_counts": {},
+            },
+        )
+        manifest = {
+            "schema_version": 1,
+            "baseline_ref": "origin/main",
+            "profiles": {
+                "official": {
+                    "description": "maliciously reduced but internally complete official fixture",
+                    "arch_policy": "one",
+                    "include": [],
+                    "cases": [],
+                    "arch_cases": {"rv": [strict_case["id"]], "la": []},
+                }
+            },
+            "cases": [strict_case],
+        }
+        self.output_path = self.work / "alternate-official-output"
+        result = self.invoke(manifest, extra=["--profile", "official", "--arch", "rv"])
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("reserved canonical profile names", result.stderr)
+        self.assertFalse(self.output_path.exists(), "alternate official evidence directory was created")
+
+        for reserved_name, contract in (
+            ("checks", {"type": "check"}),
+            ("unit", {"type": "unittest", "expected_tests": 1}),
+            ("quick", {"type": "case_result"}),
+            ("baseline", {"type": "case_result"}),
+            (
+                "official",
+                {
+                    "type": "official",
+                    "expected_group_labels": ["demo-musl"],
+                    "expected_group_case_counts": {},
+                },
+            ),
+            ("full", {"type": "case_result"}),
+        ):
+            with self.subTest(reserved_profile=reserved_name):
+                reserved_case = fixture_case(
+                    f"fixture.reserved-{reserved_name}",
+                    contract=contract,
+                )
+                reserved_manifest = fixture_manifest([reserved_case])
+                reserved_manifest["profiles"] = {
+                    reserved_name: reserved_manifest["profiles"]["fixture"]
+                }
+                self.output_path = self.work / f"reserved-profile-{reserved_name}"
+                reserved_result = self.invoke(reserved_manifest, extra=["--list"])
+                self.assertEqual(
+                    reserved_result.returncode,
+                    2,
+                    reserved_result.stdout + reserved_result.stderr,
+                )
+                self.assertIn("reserved canonical profile names", reserved_result.stderr)
+                self.assertFalse(self.output_path.exists())
 
     def test_unknown_result_contract_is_rejected(self) -> None:
         case = fixture_case()

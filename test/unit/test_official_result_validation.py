@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 import subprocess
 import tempfile
@@ -11,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "evaluation"))
 
-import validate_official_results as validator
+import parse_official_results as validator
 
 
 def group(label: str, body: str) -> str:
@@ -293,6 +295,26 @@ class OfficialResultValidationTest(unittest.TestCase):
     def test_complete_zero_status_ltp_passes(self) -> None:
         result = self.assert_status(complete_ltp(), "PASS")
         self.assertEqual(result["groups"][0]["executed_cases"], 1)
+        scoped = validator.validate_ltp_output(
+            complete_ltp()
+            + group("demo-musl", "FAIL OFFICIAL TEST GROUP demo-musl : 7")
+        )
+        self.assertEqual(scoped["status"], "PASS", scoped)
+        self.assertEqual(scoped["validation_scope"], "ltp")
+        self.assertEqual(
+            scoped["groups"][0]["cases"],
+            [
+                {
+                    "case": "access01",
+                    "code": 0,
+                    "events": ["START", "RUN", "RESULT", "PASS", "END"],
+                }
+            ],
+        )
+        incomplete = validator.validate_ltp_output(
+            complete_ltp().replace("Pass!\n", "")
+        )
+        self.assertEqual(incomplete["status"], "ERROR", incomplete)
 
     def test_prefixed_ltp_result_record_is_malformed(self) -> None:
         text = complete_ltp().replace(
@@ -739,6 +761,46 @@ ltp cases: 2 passed, 0 failed, 0 timed out
             expected_group_labels=["demo-musl"],
         )
         self.assertEqual(result["status"], "PASS", result)
+        normal_ltp_wording = validator.validate_official_output(
+            group(
+                "demo-musl",
+                "TPASS: clone returned 241\n"
+                "TPASS: removexattr failed as expected\n"
+                "PASS OFFICIAL TEST GROUP demo-musl : 0",
+            ),
+            expected_group_labels=["demo-musl"],
+        )
+        self.assertEqual(normal_ltp_wording["status"], "PASS", normal_ltp_wording)
+        for stream, marker in (
+            ("stdout", "autorun: smoke exited with status 7"),
+            ("stderr", "warning: subprocess exited with status 7"),
+            ("stderr", "warning: subprocess exited with code 7"),
+            ("stderr", "warning: command returned 7"),
+            ("stderr", "warning: qemu exit code 7"),
+            ("stderr", "warning: qemu exit code: 7"),
+            ("stderr", "warning: subprocess failed with exit code 7"),
+            ("stderr", "warning: command returned status 7"),
+            ("stderr", "warning: command returned code 7"),
+        ):
+            with self.subTest(stream=stream):
+                marked_stdout = group(
+                    "demo-musl",
+                    (
+                        f"{marker}\nPASS OFFICIAL TEST GROUP demo-musl : 0"
+                        if stream == "stdout"
+                        else "PASS OFFICIAL TEST GROUP demo-musl : 0"
+                    ),
+                )
+                marked = validator.validate_official_output(
+                    marked_stdout,
+                    marker + "\n" if stream == "stderr" else "",
+                    expected_group_labels=["demo-musl"],
+                )
+                self.assertEqual(marked["status"], "FAIL", marked)
+                self.assertIn(
+                    "explicit-nonzero",
+                    {finding["kind"] for finding in marked["failures"]},
+                )
 
     def test_ltp_summary_on_stderr_is_error(self) -> None:
         stderr = "ltp cases: 99 passed, 0 failed, 0 timed out\n"
@@ -921,13 +983,11 @@ ltp cases: 2 passed, 0 failed, 0 timed out
             "====== kill hackbench: fail, ignore STRESS result ======",
         ):
             with self.subTest(marker=marker):
-                self.assert_status(
-                    group(
-                        "demo-musl",
-                        f"PASS OFFICIAL TEST GROUP demo-musl : 0\n{marker}",
-                    ),
-                    "FAIL",
-                )
+                for body in (
+                    f"{marker}\nPASS OFFICIAL TEST GROUP demo-musl : 0",
+                    f"PASS OFFICIAL TEST GROUP demo-musl : 0\n{marker}",
+                ):
+                    self.assert_status(group("demo-musl", body), "FAIL")
 
     def test_residual_escape_control_cannot_obscure_failure(self) -> None:
         text = group(
@@ -938,15 +998,17 @@ ltp cases: 2 passed, 0 failed, 0 timed out
 
     def test_cli_requires_the_canonical_official_plan(self) -> None:
         with tempfile.TemporaryDirectory(prefix="official-validator-cli-") as directory:
-            stdout_path = Path(directory) / "stdout.log"
+            stdout_path = Path(directory) / "capture.stdout.log"
             stdout_path.write_text(
                 group("demo-musl", "PASS OFFICIAL TEST GROUP demo-musl : 0"),
                 encoding="utf-8",
             )
+            stderr_path = Path(directory) / "capture.stderr.log"
+            stderr_path.write_text("", encoding="utf-8")
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(Path(__file__).parents[1] / "evaluation" / "validate_official_results.py"),
+                    str(Path(__file__).parents[1] / "evaluation" / "parse_official_results.py"),
                     "--stdout",
                     str(stdout_path),
                 ],
@@ -955,7 +1017,61 @@ ltp cases: 2 passed, 0 failed, 0 timed out
                 stderr=subprocess.PIPE,
                 check=False,
             )
+            paired_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).parents[1] / "evaluation" / "parse_official_results.py"),
+                    "--stdout",
+                    str(stdout_path),
+                    "--stderr",
+                    str(stderr_path),
+                    "--process-exit-code",
+                    "0",
+                    "--json",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            nonzero_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).parents[1] / "evaluation" / "parse_official_results.py"),
+                    "--stdout",
+                    str(stdout_path),
+                    "--stderr",
+                    str(stderr_path),
+                    "--process-exit-code",
+                    "7",
+                    "--json",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("--stderr", result.stderr)
+        self.assertEqual(paired_result.returncode, 2, paired_result.stdout + paired_result.stderr)
+        self.assertNotIn("the following arguments are required", paired_result.stderr)
+        paired_data = json.loads(paired_result.stdout)
+        evidence = paired_data["input_evidence"]
+        self.assertEqual(evidence["process_exit_code"], 0)
+        self.assertEqual(
+            evidence["stdout_sha256"],
+            hashlib.sha256(
+                group("demo-musl", "PASS OFFICIAL TEST GROUP demo-musl : 0").encode(
+                    "utf-8"
+                )
+            ).hexdigest(),
+        )
+        self.assertEqual(nonzero_result.returncode, 2, nonzero_result.stderr)
+        nonzero_data = json.loads(nonzero_result.stdout)
+        self.assertIn(
+            "evaluator-process-nonzero",
+            {finding["kind"] for finding in nonzero_data["failures"]},
+        )
 
     def test_tracked_specialized_identity_plan_loads_exact_counts(self) -> None:
         busybox_cases, libctest_cases = validator.trusted_official_case_plan(

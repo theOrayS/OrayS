@@ -14,11 +14,12 @@ HISTORICAL_ID_RE = re.compile(r"(?i)(?:^|[^a-z0-9])g0\d{2}(?:$|[^a-z0-9])")
 CANONICAL_REQUIRED = (
     Path("test/README.md"),
     Path("test/run_suite.py"),
+    Path("test/run_unittest_suite.py"),
     Path("test/run_official_suite.sh"),
     Path("test/suite_manifest.json"),
     Path("test/evaluation/run_official_evaluation.sh"),
     Path("test/evaluation/official_case_plan.json"),
-    Path("test/evaluation/validate_official_results.py"),
+    Path("test/evaluation/parse_official_results.py"),
     Path("test/evaluation/summarize_ltp_results.py"),
     Path("test/evaluation/report_evaluation_failures.py"),
     Path("test/evaluation/config/loongarch64_submission.toml"),
@@ -119,10 +120,37 @@ def registered_python_paths(manifest: dict[str, Any], profile: str, root: Path) 
         if not isinstance(command, list):
             findings.append(f"case {case_id} has no argv command")
             continue
-        candidates = [value for value in command if isinstance(value, str) and value.endswith(".py")]
+        candidates = [
+            value
+            for value in command
+            if isinstance(value, str)
+            and value.endswith(".py")
+            and value != "{repo}/test/run_unittest_suite.py"
+        ]
         if len(candidates) != 1:
             findings.append(f"case {case_id} must name exactly one Python implementation path")
             continue
+        if profile == "unit" and command[:-1] != [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "-X",
+            "pycache_prefix=/dev/null",
+            "{repo}/test/run_unittest_suite.py",
+        ]:
+            findings.append(
+                f"case {case_id} must use the isolated identity-binding unittest harness"
+            )
+        if profile == "checks" and command[:-1] != [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "-X",
+            "pycache_prefix=/dev/null",
+        ]:
+            findings.append(f"case {case_id} must use isolated safe-path Python execution")
         raw = candidates[0].replace("{repo}", str(root))
         path = Path(raw)
         if not path.is_absolute():
@@ -244,6 +272,14 @@ def scan_result_contracts(manifest: dict[str, Any]) -> list[str]:
                 findings.append(
                     f"case {case_id} in {profile_name} profile must use {expected} result contract"
                 )
+            if (
+                profile_name == "unit"
+                and isinstance(contract, dict)
+                and contract.get("identity_binding") is not True
+            ):
+                findings.append(
+                    f"case {case_id} in unit profile must require exact runtime identity binding"
+                )
     return findings
 
 
@@ -277,17 +313,18 @@ def scan_canonical_names_and_text(root: Path) -> list[str]:
     for path in sorted(test_root.rglob("*")):
         if "output" in path.relative_to(test_root).parts or "__pycache__" in path.parts:
             continue
-        if path == test_root / "docs/migration_map.md":
-            continue
         rel = path.relative_to(root)
         if HISTORICAL_ID_RE.search(path.name):
             findings.append(f"historical sequence ID in canonical path: {rel}")
         if path.is_file():
             try:
                 text = path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except UnicodeDecodeError as error:
+                findings.append(
+                    f"canonical test asset is not valid UTF-8: {rel}: {error}"
+                )
                 continue
-            if HISTORICAL_ID_RE.search(text):
+            if path != test_root / "docs/migration_map.md" and HISTORICAL_ID_RE.search(text):
                 findings.append(f"historical sequence ID in canonical content: {rel}")
     return findings
 
@@ -341,11 +378,56 @@ def scan_required_files(root: Path) -> list[str]:
             "#!/bin/bash -p\n"
             "set -euo pipefail\n\n"
             'SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
-            "if (( $# == 0 )); then\n"
-            "    set -- rv\n"
-            "fi\n\n"
-            'exec python3 -B -E -s "$SCRIPT_DIR/run_suite.py" '
-            '--profile official --arch "$@"\n'
+            "\n"
+            "usage() {\n"
+            "    printf 'Usage: %s [rv|la] [--output-dir PATH] [--fail-fast]\\n' \"$0\" >&2\n"
+            "}\n\n"
+            'architecture="${1:-rv}"\n'
+            "if (( $# > 0 )); then\n"
+            "    shift\n"
+            "fi\n"
+            'case "$architecture" in\n'
+            "    rv|la) ;;\n"
+            "    *)\n"
+            "        printf 'infrastructure error: invalid official architecture: %s\\n' \"$architecture\" >&2\n"
+            "        usage\n"
+            "        exit 2\n"
+            "        ;;\n"
+            "esac\n\n"
+            "runner_args=()\n"
+            "output_dir_seen=0\n"
+            "fail_fast_seen=0\n"
+            "while (( $# > 0 )); do\n"
+            '    case "$1" in\n'
+            "        --output-dir)\n"
+            "            if (( output_dir_seen || $# < 2 )); then\n"
+            "                printf 'infrastructure error: --output-dir requires exactly one value\\n' >&2\n"
+            "                usage\n"
+            "                exit 2\n"
+            "            fi\n"
+            "            output_dir_seen=1\n"
+            '            runner_args+=("$1" "$2")\n'
+            "            shift 2\n"
+            "            ;;\n"
+            "        --fail-fast)\n"
+            "            if (( fail_fast_seen )); then\n"
+            "                printf 'infrastructure error: duplicate --fail-fast\\n' >&2\n"
+            "                usage\n"
+            "                exit 2\n"
+            "            fi\n"
+            "            fail_fast_seen=1\n"
+            '            runner_args+=("$1")\n'
+            "            shift\n"
+            "            ;;\n"
+            "        *)\n"
+            "            printf 'infrastructure error: unsupported official entry argument: %s\\n' \"$1\" >&2\n"
+            "            usage\n"
+            "            exit 2\n"
+            "            ;;\n"
+            "    esac\n"
+            "done\n\n"
+            'exec python3 -I -S -B -X pycache_prefix=/dev/null "$SCRIPT_DIR/run_suite.py" \\\n'
+            '    --profile official --arch "$architecture" "${runner_args[@]}"\n'
         )
         if text != expected_launcher:
             findings.append(
@@ -359,6 +441,9 @@ def scan_required_files(root: Path) -> list[str]:
     local_runner = root / "test/run_suite.py"
     if local_runner.is_file() and local_runner.stat().st_mode & 0o111 == 0:
         findings.append("canonical local suite runner is not executable")
+    unittest_runner = root / "test/run_unittest_suite.py"
+    if unittest_runner.is_file() and unittest_runner.stat().st_mode & 0o111 == 0:
+        findings.append("canonical identity-binding unittest runner is not executable")
     return findings
 
 

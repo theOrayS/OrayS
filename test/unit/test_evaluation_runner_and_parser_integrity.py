@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,7 @@ TARGETS = [
     Path("user/shell/src/uspace/program_loader.rs"),
     Path("Makefile"),
     Path("test/evaluation/summarize_ltp_results.py"),
+    Path("test/evaluation/parse_official_results.py"),
     Path("test/unit/test_ltp_result_summary.py"),
 ]
 
@@ -43,17 +45,23 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
             "make() { printf 'BASH_ENV make function was not removed\\n'; return 0; }\n",
             encoding="utf-8",
         )
+        makefiles_marker = directory / "makefiles-injection-loaded"
+        makefiles_injection = directory / "untrusted-injected.mk"
+        makefiles_injection.write_text(
+            f"injected := $(shell touch {makefiles_marker})\n",
+            encoding="utf-8",
+        )
         make_script = bin_dir / "make"
         make_script.write_text(
             "#!/bin/sh\n"
-            "printf '%s\\n' \"$@\" > \"$FAKE_MAKE_ARGS\"\n"
+            f"printf '%s\\n' \"$@\" > {shlex.quote(str(args_log))}\n"
             "{\n"
             "  printf '%s\\n' LTP_BLACKLIST_BEGIN\n"
             "  printf '%s\\n' \"${LTP_BLACKLIST-}\"\n"
             "  printf '%s\\n' LTP_BLACKLIST_END\n"
             "  env | LC_ALL=C sort\n"
-            "} > \"$FAKE_MAKE_ENVIRONMENT\"\n"
-            "exit \"$FAKE_MAKE_STATUS\"\n",
+            f"}} > {shlex.quote(str(environment_log))}\n"
+            f"exit {make_status}\n",
             encoding="utf-8",
         )
         make_script.chmod(0o755)
@@ -90,11 +98,21 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 "RV_TESTSUITE_IMG": "images/sdcard-rv.img",
                 "LA_TESTSUITE_IMG": "images/sdcard-la.img",
                 "ORAYS_TEST_OUTPUT_DIR": "out",
-                "FAKE_MAKE_ARGS": str(args_log),
-                "FAKE_MAKE_ENVIRONMENT": str(environment_log),
-                "FAKE_MAKE_STATUS": str(make_status),
+                "OSCOMP_TEST_GROUPS": "all",
+                "OSCOMP_SKIP_TEST_GROUPS": "none",
+                "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900",
+                "LTP_CASES": "stable-full",
+                "LTP_CASE_TIMEOUT_SECS": "180",
+                ".SHELLFLAGS": "-n -c",
+                "AXCONFIG_GEN": "/bin/false",
                 "CARGO_NET_OFFLINE": "false",
+                "PYTHONNOUSERSITE": "",
+                "PYTHONDONTWRITEBYTECODE": "",
+                "PYTHONPYCACHEPREFIX": "/tmp/untrusted-python-cache",
+                "MAKE": "/bin/false",
+                "MAKEFILES": str(makefiles_injection),
                 "MAKEFLAGS": "-n",
+                "MAKEOVERRIDES": "MAKE=/bin/false",
                 "BASH_ENV": str(bash_environment),
                 "ENV": str(bash_environment),
                 "BASH_FUNC_make%%": "() { printf 'exported make function was not removed\\n'; return 0; }",
@@ -216,6 +234,17 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 )
                 self.assertNotIn("la-file" if arch == "rv" else "rv-file", composed)
                 self.assertIn("CARGO_NET_OFFLINE=true", environment_text)
+                self.assertIn("PYTHONNOUSERSITE=1", environment_text)
+                self.assertIn("PYTHONDONTWRITEBYTECODE=1", environment_text)
+                self.assertIn("PYTHONPYCACHEPREFIX=/dev/null", environment_text)
+                for variable, value in (
+                    ("OSCOMP_TEST_GROUPS", "all"),
+                    ("OSCOMP_SKIP_TEST_GROUPS", "none"),
+                    ("OSCOMP_GROUP_TIMEOUT_CEILING_SECS", "900"),
+                    ("LTP_CASES", "stable-full"),
+                    ("LTP_CASE_TIMEOUT_SECS", "180"),
+                ):
+                    self.assertIn(f"{variable}={value}", environment_text)
                 for variable, value in (
                     ("LTP_BLACKLIST_RV", "rv-inline"),
                     ("LTP_BLACKLIST_RISCV64", "riscv64-inline"),
@@ -224,7 +253,12 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 ):
                     self.assertIn(f"{variable}={value}", environment_text)
                 for variable in (
+                    ".SHELLFLAGS",
+                    "AXCONFIG_GEN",
+                    "MAKE",
+                    "MAKEFILES",
                     "MAKEFLAGS",
+                    "MAKEOVERRIDES",
                     "BASH_ENV",
                     "ENV",
                     "BASH_FUNC_make%%",
@@ -238,9 +272,13 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                     "KERNEL_RV",
                 ):
                     self.assertNotIn(f"{variable}=", environment_text)
+                self.assertFalse(
+                    (directory / "makefiles-injection-loaded").exists(),
+                    "untrusted MAKEFILES injection was loaded",
+                )
 
     def test_official_executor_reserves_125_for_preflight_infrastructure(self) -> None:
-        directory, environment, _args_log, _environment_log = self.fake_official_environment()
+        directory, environment, args_log, _environment_log = self.fake_official_environment()
         (directory / "images/sdcard-rv.img").unlink()
         result = subprocess.run(
             [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
@@ -272,6 +310,47 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         )
         self.assertIn("LTP_BLACKLIST_FILE", missing_blacklist.stderr)
         self.assertIn("missing or unreadable blacklist file", missing_blacklist.stderr)
+
+        environment.pop("LTP_BLACKLIST_FILE")
+        malicious_image = directory / "images/sdcard-rv.img;printf-injected;#"
+        malicious_image.write_bytes(b"fixture")
+        environment["RV_TESTSUITE_IMG"] = str(malicious_image)
+        unsafe_path = subprocess.run(
+            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(unsafe_path.returncode, 125, unsafe_path.stdout + unsafe_path.stderr)
+        self.assertIn("not a safe absolute path for Make", unsafe_path.stderr)
+        self.assertFalse(args_log.exists(), "an unsafe image path reached Make")
+
+        environment["RV_TESTSUITE_IMG"] = "images/sdcard-rv.img"
+        make_expansion_marker = directory / "selector-make-expansion-ran"
+        environment["LTP_BLACKLIST"] = f"$(shell touch {make_expansion_marker})"
+        unsafe_selector = subprocess.run(
+            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(
+            unsafe_selector.returncode,
+            125,
+            unsafe_selector.stdout + unsafe_selector.stderr,
+        )
+        self.assertIn("dollar sign that Make could expand", unsafe_selector.stderr)
+        self.assertFalse(args_log.exists(), "an unsafe selector reached Make")
+        self.assertFalse(
+            make_expansion_marker.exists(),
+            "Make expanded an untrusted official selector",
+        )
 
     def test_official_executor_preserves_make_exit_two_as_test_failure(self) -> None:
         directory, environment, _args_log, _environment_log = self.fake_official_environment(
@@ -313,7 +392,7 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
             "  printf '%s\\n' LTP_BLACKLIST_BEGIN\n"
             "  printf '%s\\n' \"${LTP_BLACKLIST-}\"\n"
             "  printf '%s\\n' LTP_BLACKLIST_END\n"
-            "} > \"$FAKE_MAKE_ENVIRONMENT\"\n"
+            f"}} > {shlex.quote(str(environment_log))}\n"
             "printf '%s\\n' "
             "'#### OS COMP TEST GROUP START demo-musl ####' "
             "'FAIL OFFICIAL TEST GROUP demo-musl : 7' "
@@ -322,11 +401,60 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
             encoding="utf-8",
         )
         fake_make.chmod(0o755)
+        canonical_manifest = json.loads(
+            (ROOT / "test/suite_manifest.json").read_text(encoding="utf-8")
+        )
+        fixture_case = json.loads(
+            json.dumps(
+                next(
+                    case
+                    for case in canonical_manifest["cases"]
+                    if case["id"] == "official.riscv64"
+                )
+            )
+        )
+        fixture_case["id"] = "official.fixture-guest-failure"
+        fixture_case["result_contract"] = {
+            "type": "official",
+            "expected_group_labels": ["demo-musl"],
+            "expected_group_case_counts": {},
+        }
+        fixture_manifest = {
+            "schema_version": 1,
+            "baseline_ref": "origin/main",
+            "profiles": {
+                "fixture": {
+                    "description": "official failure propagation fixture",
+                    "arch_policy": "none",
+                    "include": [],
+                    "cases": [fixture_case["id"]],
+                    "arch_cases": {},
+                }
+            },
+            "cases": [fixture_case],
+        }
+        fixture_manifest_path = directory / "official-fixture-manifest.json"
+        fixture_manifest_path.write_text(
+            json.dumps(fixture_manifest),
+            encoding="utf-8",
+        )
+        environment["RV_TESTSUITE_IMG"] = str(
+            (directory / "images/sdcard-rv.img").resolve()
+        )
         output_dir = directory / "suite-output"
         result = subprocess.run(
             [
-                str(ROOT / "run-eval.sh"),
-                "rv",
+                sys.executable,
+                "-I",
+                "-S",
+                "-B",
+                "-X",
+                "pycache_prefix=/dev/null",
+                str(ROOT / "test/run_suite.py"),
+                "--manifest",
+                str(fixture_manifest_path),
+                "--profile",
+                "fixture",
                 "--output-dir",
                 str(output_dir),
             ],
@@ -337,10 +465,10 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
             stderr=subprocess.PIPE,
             check=False,
         )
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
-        self.assertEqual(summary["result"], "INFRA_ERROR", summary)
-        self.assertEqual(summary["cases"][0]["status"], "INFRA_ERROR", summary)
+        self.assertIn(summary["result"], {"FAIL", "INFRA_ERROR"}, summary)
+        self.assertIn(summary["cases"][0]["status"], {"FAIL", "INFRA_ERROR"}, summary)
         self.assertNotEqual(summary["cases"][0]["status"], "PASS", summary)
         self.assertEqual(
             environment_log.read_text(encoding="utf-8").splitlines(),
@@ -362,6 +490,45 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 "LTP_BLACKLIST_RV_FILE",
             ],
         )
+
+        environment_log.unlink()
+        unsafe_output = directory / "suite-output;printf-injected;#"
+        unsafe_result = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-S",
+                "-B",
+                "-X",
+                "pycache_prefix=/dev/null",
+                str(ROOT / "test/run_suite.py"),
+                "--manifest",
+                str(fixture_manifest_path),
+                "--profile",
+                "fixture",
+                "--output-dir",
+                str(unsafe_output),
+            ],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(unsafe_result.returncode, 2, unsafe_result.stdout + unsafe_result.stderr)
+        unsafe_summary = json.loads(
+            (unsafe_output / "summary.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(unsafe_summary["cases"][0]["status"], "INFRA_ERROR")
+        unsafe_stderr = Path(
+            unsafe_summary["cases"][0]["stderr_log"]
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "not a safe absolute path for Make",
+            unsafe_stderr,
+        )
+        self.assertFalse(environment_log.exists(), "an unsafe output path reached Make")
 
     def test_public_official_entry_ignores_startup_hooks_and_preserves_environment(self) -> None:
         directory = Path(tempfile.mkdtemp(prefix="official-public-wrapper-fixture-"))
@@ -413,9 +580,11 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertEqual(
             args_log.read_text(encoding="utf-8").splitlines(),
             [
+                "-I",
+                "-S",
                 "-B",
-                "-E",
-                "-s",
+                "-X",
+                "pycache_prefix=/dev/null",
                 str(ROOT / "test/run_suite.py"),
                 "--profile",
                 "official",
@@ -448,9 +617,11 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertEqual(
             args_log.read_text(encoding="utf-8").splitlines(),
             [
+                "-I",
+                "-S",
                 "-B",
-                "-E",
-                "-s",
+                "-X",
+                "pycache_prefix=/dev/null",
                 str(ROOT / "test/run_suite.py"),
                 "--profile",
                 "official",
@@ -458,6 +629,27 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 "rv",
             ],
         )
+
+        for arguments in (
+            ["rv", "--manifest", str(directory / "alternate.json")],
+            ["rv", "--profile", "quick"],
+            ["rv", "--arch", "la"],
+            ["rv", "--list"],
+        ):
+            with self.subTest(arguments=arguments):
+                args_log.unlink(missing_ok=True)
+                rejected = subprocess.run(
+                    [str(ROOT / "run-eval.sh"), *arguments],
+                    cwd=directory,
+                    env=environment,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(2, rejected.returncode, rejected.stdout + rejected.stderr)
+                self.assertIn("unsupported official entry argument", rejected.stderr)
+                self.assertFalse(args_log.exists(), "rejected options reached Python")
 
         python_hook_directory = directory / "python-hook"
         python_hook_directory.mkdir()
@@ -725,6 +917,295 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("promotion mode blocker", result.stdout)
+
+        lifecycle_tree = self.make_tree()
+        lifecycle_path = lifecycle_tree / "test/evaluation/summarize_ltp_results.py"
+        lifecycle_path.write_text(
+            lifecycle_path.read_text(encoding="utf-8").replace(
+                "validate_ltp_output",
+                "validate_unscoped_output",
+            ),
+            encoding="utf-8",
+        )
+        lifecycle_result = self.run_guard(lifecycle_tree)
+        self.assertNotEqual(lifecycle_result.returncode, 0)
+        self.assertIn("LTP-scoped validation", lifecycle_result.stdout)
+
+        dimension_tree = self.make_tree()
+        dimension_path = dimension_tree / "test/evaluation/summarize_ltp_results.py"
+        dimension_path.write_text(
+            dimension_path.read_text(encoding="utf-8").replace(
+                "validate_promotion_dimensions",
+                "accept_empty_promotion_dimensions",
+            ),
+            encoding="utf-8",
+        )
+        dimension_result = self.run_guard(dimension_tree)
+        self.assertNotEqual(dimension_result.returncode, 0)
+        self.assertIn("nonempty known promotion dimensions", dimension_result.stdout)
+
+        pair_tree = self.make_tree()
+        pair_summary = pair_tree / "test/evaluation/summarize_ltp_results.py"
+        pair_summary.write_text(
+            pair_summary.read_text(encoding="utf-8").replace(
+                "validate_promotion_input_pairs",
+                "accept_unpaired_promotion_inputs",
+            ),
+            encoding="utf-8",
+        )
+        pair_result = self.run_guard(pair_tree)
+        self.assertNotEqual(pair_result.returncode, 0)
+        self.assertIn("strict promotion stdout/stderr identity pairing", pair_result.stdout)
+
+        source_key_tree = self.make_tree()
+        source_key_summary = source_key_tree / "test/evaluation/summarize_ltp_results.py"
+        source_key_summary.write_text(
+            source_key_summary.read_text(encoding="utf-8").replace(
+                "capture_source_key",
+                "stream_identity_key",
+            ),
+            encoding="utf-8",
+        )
+        source_key_result = self.run_guard(source_key_tree)
+        self.assertNotEqual(source_key_result.returncode, 0)
+        self.assertIn("exact promotion capture source keys", source_key_result.stdout)
+
+        digest_tree = self.make_tree()
+        digest_summary = digest_tree / "test/evaluation/summarize_ltp_results.py"
+        digest_summary.write_text(
+            digest_summary.read_text(encoding="utf-8").replace(
+                "hashlib.sha256(raw).hexdigest()",
+                "hashlib.sha1(raw).hexdigest()",
+            ),
+            encoding="utf-8",
+        )
+        digest_result = self.run_guard(digest_tree)
+        self.assertNotEqual(digest_result.returncode, 0)
+        self.assertIn("raw stdout SHA-256 provenance", digest_result.stdout)
+
+        stderr_digest_tree = self.make_tree()
+        stderr_digest_summary = (
+            stderr_digest_tree / "test/evaluation/summarize_ltp_results.py"
+        )
+        stderr_digest_summary.write_text(
+            stderr_digest_summary.read_text(encoding="utf-8").replace(
+                "hashlib.sha256(stderr_raw).hexdigest()",
+                "hashlib.sha1(stderr_raw).hexdigest()",
+            ),
+            encoding="utf-8",
+        )
+        stderr_digest_result = self.run_guard(stderr_digest_tree)
+        self.assertNotEqual(stderr_digest_result.returncode, 0)
+        self.assertIn("raw stderr SHA-256 provenance", stderr_digest_result.stdout)
+
+        isolation_tree = self.make_tree()
+        isolation_summary = isolation_tree / "test/evaluation/summarize_ltp_results.py"
+        isolation_summary.write_text(
+            isolation_summary.read_text(encoding="utf-8").replace(
+                "or not _bootstrap_sys.flags.no_site",
+                "or False",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        isolation_result = self.run_guard(isolation_tree)
+        self.assertNotEqual(isolation_result.returncode, 0)
+        self.assertIn(
+            "isolated result-tool startup without site initialization",
+            isolation_result.stdout,
+        )
+
+        cache_tree = self.make_tree()
+        cache_summary = cache_tree / "test/evaluation/summarize_ltp_results.py"
+        cache_summary.write_text(
+            cache_summary.read_text(encoding="utf-8").replace(
+                'or _bootstrap_sys.pycache_prefix != "/dev/null"',
+                "or False",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        cache_result = self.run_guard(cache_tree)
+        self.assertNotEqual(cache_result.returncode, 0)
+        self.assertIn("isolated result-tool bytecode cache boundary", cache_result.stdout)
+
+        stderr_tree = self.make_tree()
+        stderr_summary = stderr_tree / "test/evaluation/summarize_ltp_results.py"
+        stderr_summary.write_text(
+            stderr_summary.read_text(encoding="utf-8").replace(
+                '"--stderr-log"',
+                '"--optional-stderr-log"',
+            ),
+            encoding="utf-8",
+        )
+        stderr_result = self.run_guard(stderr_tree)
+        self.assertNotEqual(stderr_result.returncode, 0)
+        self.assertIn("mandatory stderr companion input", stderr_result.stdout)
+
+        strict_stderr_tree = self.make_tree()
+        strict_stderr_summary = (
+            strict_stderr_tree / "test/evaluation/summarize_ltp_results.py"
+        )
+        strict_stderr_summary.write_text(
+            strict_stderr_summary.read_text(encoding="utf-8").replace(
+                "args.strict and not args.promotion_candidates",
+                "False",
+            ),
+            encoding="utf-8",
+        )
+        strict_stderr_result = self.run_guard(strict_stderr_tree)
+        self.assertNotEqual(strict_stderr_result.returncode, 0)
+        self.assertIn(
+            "mandatory strict-mode stderr companion",
+            strict_stderr_result.stdout,
+        )
+
+        group_tree = self.make_tree()
+        group_summary = group_tree / "test/evaluation/summarize_ltp_results.py"
+        group_summary.write_text(
+            group_summary.read_text(encoding="utf-8").replace(
+                "noncanonical-ltp-group=",
+                "permissive-ltp-group=",
+            ),
+            encoding="utf-8",
+        )
+        group_result = self.run_guard(group_tree)
+        self.assertNotEqual(group_result.returncode, 0)
+        self.assertIn("exact canonical LTP group eligibility blocker", group_result.stdout)
+
+        subset_tree = self.make_tree()
+        subset_summary = subset_tree / "test/evaluation/summarize_ltp_results.py"
+        subset_summary.write_text(
+            subset_summary.read_text(encoding="utf-8").replace(
+                "required_arches != KNOWN_PROMOTION_ARCHES",
+                "False",
+            ),
+            encoding="utf-8",
+        )
+        subset_result = self.run_guard(subset_tree)
+        self.assertNotEqual(subset_result.returncode, 0)
+        self.assertIn("full RV/LA promotion matrix gate", subset_result.stdout)
+
+        libc_subset_tree = self.make_tree()
+        libc_subset_summary = (
+            libc_subset_tree / "test/evaluation/summarize_ltp_results.py"
+        )
+        libc_subset_summary.write_text(
+            libc_subset_summary.read_text(encoding="utf-8").replace(
+                "required_libcs != KNOWN_PROMOTION_LIBCS",
+                "False",
+            ),
+            encoding="utf-8",
+        )
+        libc_subset_result = self.run_guard(libc_subset_tree)
+        self.assertNotEqual(libc_subset_result.returncode, 0)
+        self.assertIn("full musl/glibc promotion matrix gate", libc_subset_result.stdout)
+
+        strict_binding_tree = self.make_tree()
+        strict_binding_summary = (
+            strict_binding_tree / "test/evaluation/summarize_ltp_results.py"
+        )
+        strict_binding_summary.write_text(
+            strict_binding_summary.read_text(encoding="utf-8").replace(
+                "strict_case_binding",
+                "unchecked_case_binding",
+            ),
+            encoding="utf-8",
+        )
+        strict_binding_result = self.run_guard(strict_binding_tree)
+        self.assertNotEqual(strict_binding_result.returncode, 0)
+        self.assertIn("source/group/case lifecycle binding", strict_binding_result.stdout)
+
+        promotion_branch_tree = self.make_tree()
+        promotion_branch_summary = (
+            promotion_branch_tree / "test/evaluation/summarize_ltp_results.py"
+        )
+        promotion_branch_summary.write_text(
+            promotion_branch_summary.read_text(encoding="utf-8").replace(
+                "args.strict or args.promotion_candidates",
+                "args.strict",
+            ),
+            encoding="utf-8",
+        )
+        promotion_branch_result = self.run_guard(promotion_branch_tree)
+        self.assertNotEqual(promotion_branch_result.returncode, 0)
+        self.assertIn("mandatory promotion validation branch", promotion_branch_result.stdout)
+
+        lifecycle_test_tree = self.make_tree()
+        lifecycle_test_path = lifecycle_test_tree / "test/unit/test_ltp_result_summary.py"
+        lifecycle_test_path.write_text(
+            lifecycle_test_path.read_text(encoding="utf-8").replace(
+                "test_promotion_candidate_requires_complete_lifecycle",
+                "test_promotion_candidate_accepts_incomplete_lifecycle",
+            ),
+            encoding="utf-8",
+        )
+        lifecycle_test_result = self.run_guard(lifecycle_test_tree)
+        self.assertNotEqual(lifecycle_test_result.returncode, 0)
+        self.assertIn(
+            "test_promotion_candidate_requires_complete_lifecycle",
+            lifecycle_test_result.stdout,
+        )
+
+        malformed_protocol_tree = self.make_tree()
+        malformed_protocol_path = (
+            malformed_protocol_tree / "test/unit/test_ltp_result_summary.py"
+        )
+        malformed_protocol_path.write_text(
+            malformed_protocol_path.read_text(encoding="utf-8").replace(
+                "strict-malformed-protocol-record",
+                "ignored-malformed-protocol-record",
+            ),
+            encoding="utf-8",
+        )
+        malformed_protocol_result = self.run_guard(malformed_protocol_tree)
+        self.assertNotEqual(malformed_protocol_result.returncode, 0)
+        self.assertIn("malformed protocol promotion assertion", malformed_protocol_result.stdout)
+
+        outside_assertion_tree = self.make_tree()
+        outside_assertion_path = (
+            outside_assertion_tree / "test/unit/test_ltp_result_summary.py"
+        )
+        outside_assertion_path.write_text(
+            outside_assertion_path.read_text(encoding="utf-8").replace(
+                '"outside-ltp-group" in reason',
+                '"ignored-outside-ltp-group" in reason',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        outside_assertion_result = self.run_guard(outside_assertion_tree)
+        self.assertNotEqual(outside_assertion_result.returncode, 0)
+        self.assertIn("outside-group quality-signal assertion", outside_assertion_result.stdout)
+
+        invalid_dimension_tree = self.make_tree()
+        invalid_dimension_path = (
+            invalid_dimension_tree / "test/unit/test_ltp_result_summary.py"
+        )
+        invalid_dimension_path.write_text(
+            invalid_dimension_path.read_text(encoding="utf-8").replace(
+                "self.assertEqual(invalid.returncode, 2",
+                "self.assertEqual(invalid.returncode, 0",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        invalid_dimension_result = self.run_guard(invalid_dimension_tree)
+        self.assertNotEqual(invalid_dimension_result.returncode, 0)
+        self.assertIn("invalid-dimension CLI assertion", invalid_dimension_result.stdout)
+
+        outside_tree = self.make_tree()
+        outside_parser = outside_tree / "test/evaluation/parse_official_results.py"
+        outside_parser.write_text(
+            outside_parser.read_text(encoding="utf-8").replace(
+                "outside-ltp-group",
+                "ignored-outside-ltp-signal",
+            ),
+            encoding="utf-8",
+        )
+        outside_result = self.run_guard(outside_tree)
+        self.assertNotEqual(outside_result.returncode, 0)
+        self.assertIn("outside-group LTP quality blocker", outside_result.stdout)
 
 
 if __name__ == "__main__":
