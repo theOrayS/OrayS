@@ -456,6 +456,43 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
   repair loop, exact dual-target QEMU 9.2.4, RV/LA official/full runs, independent
   reviewer, remote freshness, and safe promotion.
 
+## 2026-07-15T12:30:49Z - first post-governance canonical quick completed non-passing
+
+- Clean/stable commit: `764211c5c221d7c64d57a658eac05fe7c5cee38c`; start/final
+  revision and cleanliness match; provenance stability is true.
+- Command: `python3 -I -S -B -X pycache_prefix=/dev/null test/run_suite.py
+  --profile quick --output-dir test/output/integration-764211c5-quick-1`.
+- Result: exit 1 / `FAIL`, duration 515.911347 s; planned/executed/completed
+  45/45/45; PASS 42, FAIL 2, TIMEOUT 1; no crash, infrastructure error,
+  NOT_RUN, or unknown status.
+- `check.file_object_event_core` and the 24-method unit suite's current-tree
+  assertion fail because Test CI no longer runs `make unittest_no_fail_fast`;
+  quick alone does not execute the axfile Rust semantics wired by `pr2-check`.
+- `unit.suite_runner` timed out at 302.122305 s under its 300-second contract
+  while sharing a 2-core host with `ninja -j2` QEMU compilation. This remains
+  TIMEOUT; a non-concurrent rerun is required.
+- Summary: `test/output/integration-764211c5-quick-1/summary.json`.
+
+## 2026-07-15T12:31:57Z - required CI file-object regression coverage restored
+
+- Narrow repair: `.github/workflows/test.yml` keeps the canonical quick step and
+  adds a required `make unittest_no_fail_fast` step. This restores execution of
+  the PR2 `pr2-check` static/mutation/axfile Rust tests plus existing workspace
+  units instead of weakening the guard or treating Python mutation coverage as a
+  substitute for executable Rust semantics.
+- Focused validation on the dirty repair worktree:
+  - file-object/event guard: PASS with 0 findings;
+  - exact-bound file-object/event unit suite: 24/24;
+  - PR3 competition workflow guard: PASS with 0 findings;
+  - exact-bound PR3 workflow unit suite: 33/33;
+  - `git diff --check`: exit 0.
+- No production source, test count, parser, status mapping, skip/blacklist,
+  dependency, toolchain, lockfile, image, or unsafe block changed.
+- The QEMU setup build remains an ignored-output background process; the next
+  canonical quick will wait until that CPU-intensive build ends.
+- Remaining risks: clean quick rerun, baseline repair loop,
+  exact QEMU evidence, official/full gates, independent review, and promotion.
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -490,6 +527,7 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 | Run ID | 命令 | 架构/目标 | 退出码 | 结果 | 耗时 | 原始证据 |
 |---|---|---|---:|---|---:|---|
 | `integration-suite-126e21a4-quick-1` | canonical quick | common / suite merge commit | 1 | FAIL | 259.665 s | `test/output/integration-suite-126e21a4-quick-1/summary.json` |
+| `integration-764211c5-quick-1` | canonical quick | common / governance commit | 1 | FAIL | 515.911347 s | 42 PASS, 2 FAIL, 1 TIMEOUT; `test/output/integration-764211c5-quick-1/summary.json` |
 | pre-commit focused PR3 suites | 33+75+27+9+41+26+36+133+23+8+7 methods/checks | host | 0 | PASS | 分项 | 外部 journal checkpoint 2026-07-15T11:58:16Z |
 | pre-commit raw LA smoke | supervised exact QEMU 9.2.4 | LA64 | 0 | PASS | 分项 | 外部 ignored build evidence |
 | pre-commit raw RV smoke | supervised QEMU 6.2.0 | RV64 | 0 | BLOCKED | 分项 | markers complete，但版本不满足 required contract |
@@ -534,4 +572,4 @@ source `0c2a3cff...`. All first three source tips pass `merge-base --is-ancestor
 
 # 10. 最终摘要
 
-当前状态为 Draft：四个来源 merge 已完成且 ancestry 明确，starter 长期策略已激活，治理提交正在形成。最终 canonical 门禁、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。
+当前状态为 Draft：四个来源 merge 与 governance 提交已完成且 ancestry 明确。首次 post-governance clean quick 如实失败；本提交包含的 required CI coverage 窄修复已通过 focused tests，但尚未 clean rerun。最终 baseline/official/full、独立审查、远端 freshness 和安全推广仍未完成，因此本日志不宣称 ready 或 merged。

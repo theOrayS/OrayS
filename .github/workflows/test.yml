@@ -35,6 +35,8 @@ jobs:
           python3 -I -S -B -X pycache_prefix=/dev/null test/run_suite.py \
             --profile quick \
             --output-dir test/output/ci-quick
+      - name: Run workspace and file-object Rust unit tests
+        run: make unittest_no_fail_fast
 
   pr3-infrastructure:
     name: PR3 infrastructure + host evidence (required)
