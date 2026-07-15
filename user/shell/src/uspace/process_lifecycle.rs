@@ -197,7 +197,7 @@ pub fn user_process_retention_stats() -> (usize, usize, usize, usize, usize, usi
 }
 
 fn zero_child_wipe_on_fork_ranges(
-    process: &UserProcess,
+    aspace: &Arc<Mutex<AddrSpace>>,
     ranges: &[(usize, usize)],
 ) -> Result<(), LinuxError> {
     if ranges.is_empty() {
@@ -214,8 +214,7 @@ fn zero_child_wipe_on_fork_ranges(
         let mut cursor = start;
         while cursor < end {
             let len = (end - cursor).min(zeros.len());
-            process
-                .aspace
+            aspace
                 .lock()
                 .write(VirtAddr::from(cursor), &zeros[..len])
                 .map_err(LinuxError::from)?;
@@ -342,7 +341,6 @@ impl ProcessTeardown {
         aspace: &Mutex<AddrSpace>,
         clear_aspace: bool,
         fds: &ProcessFdTable,
-        close_fd_base: bool,
         children: &Mutex<Vec<ChildTask>>,
     ) {
         if self.done.swap(true, Ordering::AcqRel) {
@@ -354,7 +352,7 @@ impl ProcessTeardown {
         if clear_aspace {
             aspace.lock().clear();
         }
-        fds.close_all_for_pid(pid, close_fd_base);
+        fds.close_all_for_pid(pid);
         children.lock().clear();
     }
 }
@@ -708,16 +706,23 @@ fn load_program_with_env(
     })
 }
 
+enum ExecProgramError {
+    Loader(String),
+    FdTable(LinuxError),
+}
+
 fn exec_program(
     process: &UserProcess,
     cwd: &str,
     path: &str,
     argv: &[String],
     env: &[String],
-) -> Result<(usize, usize, usize), String> {
-    let argv_refs = exec_loader_string_refs(argv, "prepare exec argv references")?;
+) -> Result<(usize, usize, usize), ExecProgramError> {
+    let argv_refs = exec_loader_string_refs(argv, "prepare exec argv references")
+        .map_err(ExecProgramError::Loader)?;
     let mut new_aspace = axmm::new_user_aspace(VirtAddr::from(USER_ASPACE_BASE), USER_ASPACE_SIZE)
-        .map_err(|err| exec_loader_axerr("failed to create exec address space".to_string(), err))?;
+        .map_err(|err| exec_loader_axerr("failed to create exec address space".to_string(), err))
+        .map_err(ExecProgramError::Loader)?;
     let image = load_program_image(
         Some(process),
         &mut new_aspace,
@@ -725,8 +730,16 @@ fn exec_program(
         path,
         &argv_refs,
         Some(env),
-    )?;
+    )
+    .map_err(ExecProgramError::Loader)?;
     let new_root = new_aspace.page_table_root();
+    // This is the last fallible step.  It must complete before the live
+    // address space is replaced: a failed CLONE_FILES split remains an
+    // ordinary execve error returned to the still-intact caller image.
+    process
+        .fds
+        .unshare_for_pid_if_shared(process.pid())
+        .map_err(ExecProgramError::FdTable)?;
     {
         let mut aspace = process.aspace.lock();
         process.cache_exec_shared_file_mappings(&mut aspace);
@@ -894,6 +907,7 @@ impl UserProcess {
 
     pub(super) fn set_pid(&self, pid: i32) {
         self.pid.store(pid, Ordering::Release);
+        self.fds.register_pid(pid);
         let _ = self
             .pgid
             .compare_exchange(0, pid, Ordering::AcqRel, Ordering::Acquire);
@@ -933,15 +947,13 @@ impl UserProcess {
             self.aspace.as_ref(),
             self.owns_aspace,
             self.fds.as_ref(),
-            Arc::strong_count(&self.fds) == 1,
             &self.children,
         );
     }
 
     #[cfg(feature = "auto-run-tests")]
     fn close_eval_file_descriptors(&self) {
-        self.fds
-            .close_all_for_pid(self.pid(), Arc::strong_count(&self.fds) == 1);
+        self.fds.close_all_for_pid(self.pid());
     }
 
     pub(super) fn release_exec_shared_mmap_cache(&self) {
@@ -1666,7 +1678,7 @@ impl UserProcess {
     }
 
     pub(super) fn fork(&self) -> Result<Arc<UserProcess>, LinuxError> {
-        self.fork_with_fd_sharing(false, false, false, None)
+        self.fork_with_fd_sharing(false, false, false, None, None)
     }
 
     pub(super) fn fork_with_fd_sharing(
@@ -1675,6 +1687,7 @@ impl UserProcess {
         share_vm: bool,
         share_writable_mappings: bool,
         child_stack: Option<usize>,
+        child_pid: Option<i32>,
     ) -> Result<Arc<UserProcess>, LinuxError> {
         let child_aspace = if share_vm {
             self.aspace.clone()
@@ -1754,8 +1767,14 @@ impl UserProcess {
             .filter(|region| region.wipe_on_fork)
             .map(|region| (region.start, region.end()))
             .collect();
+        if !share_vm {
+            zero_child_wipe_on_fork_ranges(&child_aspace, &wipe_on_fork_ranges)?;
+        }
         let child_fds = if share_fds {
-            self.fds.clone()
+            self.fds.share_for_child_pid(
+                self.pid(),
+                child_pid.expect("CLONE_FILES process child must have an allocated pid"),
+            )
         } else {
             Arc::new(ProcessFdTable::from_table(
                 self.fds.fork_copy_for_pid(self.pid())?,
@@ -1890,9 +1909,6 @@ impl UserProcess {
         });
         #[cfg(feature = "auto-run-tests")]
         record_user_process_created(&child);
-        if !share_vm {
-            zero_child_wipe_on_fork_ranges(child.as_ref(), &wipe_on_fork_ranges)?;
-        }
         track_running_executable(exec_path.as_str());
         Ok(child)
     }
@@ -2467,11 +2483,15 @@ pub(super) fn sys_execve(
     let (entry, stack_ptr, argc) =
         match exec_program(process, cwd.as_str(), raw_path.as_str(), &argv, &env) {
             Ok(image) => image,
-            Err(err) => return neg_errno(exec_loader_errno_from_message(err.as_str())),
+            Err(ExecProgramError::Loader(err)) => {
+                return neg_errno(exec_loader_errno_from_message(err.as_str()));
+            }
+            Err(ExecProgramError::FdTable(err)) => return neg_errno(err),
         };
     process.reset_caught_signal_handlers_for_exec();
     let context = make_uspace_context(entry, stack_ptr, argc);
-    process.fds.lock().close_cloexec();
+    let closed_cloexec = { process.fds.lock().close_cloexec() };
+    drop(closed_cloexec);
     let kstack_top = axtask::current()
         .kernel_stack_top()
         .expect("user task must have a kernel stack");
@@ -2545,15 +2565,21 @@ pub(super) fn sys_clone(
         // parent's AddrSpace.
         let share_vm = false;
         let share_writable_mappings = vfork_requested;
+        let mut task = TaskInner::new(user_task_entry, "user:fork".into(), USER_TASK_KSTACK_SIZE);
+        let pid = task.id().as_u64() as i32;
         let child_process = match process.fork_with_fd_sharing(
             share_fds,
             share_vm,
             share_writable_mappings,
             (!share_vm).then_some(child_stack),
+            Some(pid),
         ) {
             Ok(process) => process,
             Err(err) => return neg_errno(err),
         };
+        // CLONE_FILES membership was registered with this pid while creating
+        // the child.  Publish it before any rollback path can call teardown.
+        child_process.set_pid(pid);
         if process.child_creation_interrupted().is_some() {
             child_process.request_exit_group(137);
             child_process.teardown();
@@ -2564,21 +2590,17 @@ pub(super) fn sys_clone(
             child_tf.regs.tp = tls;
         }
         let child_context = UspaceContext::from(&child_tf);
-        let mut task = TaskInner::new(user_task_entry, "user:fork".into(), USER_TASK_KSTACK_SIZE);
-        let pid = task.id().as_u64() as i32;
-        child_process.set_pid(pid);
-        if share_fds {
-            process.fds.share_table_for_child_pid(process.pid(), pid);
-        }
         if clone_flags & general::CLONE_PARENT_SETTID as usize != 0 {
             let ret = write_user_value(process.as_ref(), ptid, &pid);
             if ret != 0 {
+                child_process.teardown();
                 return ret;
             }
         }
         if clone_flags & general::CLONE_CHILD_SETTID as usize != 0 {
             let ret = write_user_value(child_process.as_ref(), ctid, &pid);
             if ret != 0 {
+                child_process.teardown();
                 return ret;
             }
         }

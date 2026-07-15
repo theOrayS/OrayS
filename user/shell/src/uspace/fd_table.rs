@@ -2,14 +2,21 @@ use core::cmp;
 use core::mem::{offset_of, size_of};
 use core::ops::{Deref, DerefMut};
 use core::ptr;
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicU64, Ordering};
 use core::time::Duration;
 
 use axdriver::prelude::{BaseDriverOps, BlockDriverOps, DevError, DevResult, DeviceType};
 use axerrno::LinuxError;
+use axfile::{
+    DescriptionIdentity, EventDeliveryState, EventObserver, EventSource, EventSubscription,
+    FileTableDetach, FileTableGroup, FileTableShareTracker, LevelWaitDecision, OpenFile,
+    OpenFileId, ReadyEvents, ReentrancyGate, RegistrationKey, decide_level_wait,
+    readiness_deadline_delay,
+};
 use axfs::fops::{self, Directory, File, FileAttr, OpenOptions};
 use axio::SeekFrom;
 use axsync::{Mutex as AxMutex, MutexGuard as AxMutexGuard};
+use axtask::WaitQueue;
 use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
 use std::boxed::Box;
@@ -19,6 +26,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::vec::Vec;
 
 use super::credentials::access_allowed;
+use super::fd_object::{FileObject, OpenFileRef, new_open_file, object_as};
 use super::fd_pipe::PipeEndpoint;
 use super::fd_socket::{LocalSocketEntry, SocketEntry, recv_socket_data_to_user, socket_entry};
 use super::linux_abi::{
@@ -47,9 +55,7 @@ use super::runtime_paths::{
     normalize_path, push_runtime_candidate, runtime_absolute_path_candidates,
     runtime_library_name_candidates,
 };
-use super::select_fdset::{
-    SelectMode, yield_poll_blocking_timeout_until, yield_poll_wait, yield_poll_wait_until,
-};
+use super::select_fdset::{SelectMode, yield_poll_wait};
 use super::signal_abi::{
     current_pending_signal_matches, current_unblocked_signal_pending,
     install_temporary_signal_mask, take_current_pending_signal_matching,
@@ -87,8 +93,56 @@ use super::user_memory::{
 use super::{PathTimes, UserProcess};
 
 pub(super) struct FdTable {
-    pub(super) entries: Vec<Option<FdEntry>>,
-    pub(super) fd_flags: Vec<u32>,
+    slots: Vec<Option<FdSlot>>,
+}
+
+struct FdSlot {
+    entry: FdEntry,
+    fd_flags: u32,
+    description: Arc<DescriptionIdentity>,
+}
+
+impl FdSlot {
+    fn new(entry: FdEntry, fd_flags: u32) -> Result<Self, LinuxError> {
+        let id = OpenFileId::allocate().map_err(|_| LinuxError::ENFILE)?;
+        Ok(Self::with_identity(
+            entry,
+            fd_flags,
+            Arc::new(DescriptionIdentity::new(id)),
+        ))
+    }
+
+    fn with_identity(entry: FdEntry, fd_flags: u32, description: Arc<DescriptionIdentity>) -> Self {
+        Self {
+            entry,
+            fd_flags: fd_flags & general::FD_CLOEXEC,
+            description,
+        }
+    }
+
+    fn description_id(&self) -> OpenFileId {
+        self.description.id()
+    }
+}
+
+pub(super) struct ClosedFd {
+    _entry: FdEntry,
+    _description: Arc<DescriptionIdentity>,
+}
+
+fn discard_uninstalled_entry(entry: FdEntry) {
+    // SocketEntry wraps a raw POSIX descriptor and intentionally has no Drop
+    // implementation: installed slots are closed by the FdTable close path.
+    // A prepared duplicate that never reaches a slot therefore needs explicit
+    // rollback, while all RAII-backed variants only need to be dropped here.
+    if let FdEntry::Socket(socket) = &entry {
+        let _ = socket.close();
+    }
+    drop(entry);
+}
+
+fn pipe_endpoint(description: &OpenFileRef) -> Result<&PipeEndpoint, LinuxError> {
+    object_as(description)
 }
 
 pub(super) struct ProcessFdTable {
@@ -97,8 +151,8 @@ pub(super) struct ProcessFdTable {
 
 struct ProcessFdTableState {
     base: FdTable,
+    sharing: FileTableShareTracker,
     unshared: BTreeMap<i32, FdTable>,
-    aliases: BTreeMap<i32, i32>,
 }
 
 pub(super) struct ProcessFdTableGuard<'a> {
@@ -114,6 +168,12 @@ const LINUX_PATH_MAX: usize = 4096;
 const LINUX_NAME_MAX: usize = 63;
 const MEMFD_NAME_MAX: usize = 249;
 const LINUX_EPOLL_MAX_NEST_DEPTH: usize = 5;
+
+fn epoll_graph_lock() -> &'static Mutex<()> {
+    static EPOLL_GRAPH_LOCK: LazyInit<Mutex<()>> = LazyInit::new();
+    let _ = EPOLL_GRAPH_LOCK.call_once(|| Mutex::new(()));
+    &EPOLL_GRAPH_LOCK
+}
 // Keep the ramfs/VFS backing for regular files bounded and represent larger
 // tmp/scratch extents with the per-process sparse-file overlay below.  The
 // ramfs node stores a file in one Vec, so long evaluator runs can fragment the
@@ -175,13 +235,13 @@ pub(super) enum FdEntry {
     Memfd(MemfdEntry),
     ProcPagemap(ProcPagemapEntry),
     ProcTimerSlack(ProcTimerSlackEntry),
-    Pipe(PipeEndpoint),
+    Pipe(OpenFileRef),
     Socket(SocketEntry),
     LocalSocket(LocalSocketEntry),
-    EventFd(EventFdEntry),
+    EventFd(OpenFileRef),
     Inotify(InotifyEntry),
     Epoll(EpollEntry),
-    TimerFd(TimerFdEntry),
+    TimerFd(OpenFileRef),
     SignalFd(SignalFdEntry),
     PidFd(PidFdEntry),
     PosixMq(PosixMqDescriptor),
@@ -468,11 +528,11 @@ pub(super) struct ProcTimerSlackEntry {
     pub(super) status_flags: u32,
 }
 
-#[derive(Clone)]
 pub(super) struct EventFdEntry {
-    counter: Arc<Mutex<u64>>,
-    status_flags: u32,
+    counter: Mutex<u64>,
     semaphore: bool,
+    events: EventSource,
+    wait: WaitQueue,
 }
 
 #[derive(Clone)]
@@ -487,11 +547,12 @@ pub(super) struct PidFdEntry {
     status_flags: u32,
 }
 
-#[derive(Clone)]
 pub(super) struct TimerFdEntry {
     clock_id: u32,
-    status_flags: u32,
-    state: Arc<Mutex<TimerFdState>>,
+    state: Mutex<TimerFdState>,
+    events: EventSource,
+    wait: WaitQueue,
+    wait_generation: AtomicU64,
 }
 
 #[derive(Clone, Copy)]
@@ -509,22 +570,148 @@ pub(super) struct SignalFdEntry {
 
 #[derive(Clone)]
 pub(super) struct EpollEntry {
-    registrations: Arc<Mutex<BTreeMap<i32, EpollRegistration>>>,
+    state: Arc<EpollState>,
 }
 
-#[derive(Clone, Copy)]
+struct EpollState {
+    id: OpenFileId,
+    registrations: Mutex<BTreeMap<RegistrationKey, EpollRegistration>>,
+    events: EventSource,
+    wait: WaitQueue,
+    generation: AtomicU64,
+    next_version: AtomicU64,
+    notifying: ReentrancyGate,
+}
+
+#[derive(Clone)]
+enum EpollTarget {
+    Object(Weak<OpenFile<dyn FileObject>>),
+    Legacy(Arc<LegacyEpollTarget>),
+    Epoll(Weak<EpollState>),
+}
+
+/// Epoll's compatibility reference for an unmigrated open description.
+///
+/// The duplicate is deliberately not part of `DescriptionIdentity`'s alias
+/// count: the final userspace descriptor closes that identity and removes this
+/// registration. Until then, this snapshot keeps a queryable legacy target
+/// even if the process performing `epoll_wait` has closed all of its local
+/// aliases while another fork still owns the description.
+struct LegacyEpollTarget {
+    entry: FdEntry,
+}
+
+impl LegacyEpollTarget {
+    fn duplicate(entry: &FdEntry) -> Result<Arc<Self>, LinuxError> {
+        Ok(Arc::new(Self {
+            entry: entry.duplicate_for_fork()?,
+        }))
+    }
+}
+
+impl Drop for LegacyEpollTarget {
+    fn drop(&mut self) {
+        // Raw POSIX sockets do not have a Drop close. Every duplicate created
+        // solely for this compatibility lease is therefore closed here.
+        if let FdEntry::Socket(socket) = &self.entry {
+            let _ = socket.close();
+        }
+    }
+}
+
 struct EpollRegistration {
+    target: EpollTarget,
     event: general::epoll_event,
-    last_ready: u32,
-    disabled: bool,
+    delivery: EventDeliveryState,
+    version: u64,
+    ready_observer: Option<Arc<EpollReadyObserver>>,
+    _subscription: Option<EventSubscription>,
+    _close_observer: Arc<dyn EventObserver>,
+    _close_subscription: EventSubscription,
+}
+
+struct EpollCtlUpdate {
+    epoll: EpollEntry,
+    // A legacy registration may own a raw POSIX socket duplicate. The syscall
+    // drops this only after releasing the descriptor-table lock.
+    retired: Option<EpollRegistration>,
 }
 
 impl EpollRegistration {
-    const fn new(event: general::epoll_event) -> Self {
+    fn new(
+        target: EpollTarget,
+        event: general::epoll_event,
+        version: u64,
+        ready_observer: Option<Arc<EpollReadyObserver>>,
+        subscription: Option<EventSubscription>,
+        close_observer: Arc<dyn EventObserver>,
+        close_subscription: EventSubscription,
+    ) -> Self {
         Self {
+            target,
             event,
-            last_ready: 0,
-            disabled: false,
+            delivery: EventDeliveryState::default(),
+            version,
+            ready_observer,
+            _subscription: subscription,
+            _close_observer: close_observer,
+            _close_subscription: close_subscription,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct EpollRegistrationSnapshot {
+    key: RegistrationKey,
+    target: EpollTarget,
+    event: general::epoll_event,
+    delivery: EventDeliveryState,
+    ready_observer: Option<Arc<EpollReadyObserver>>,
+    version: u64,
+}
+
+struct EpollReadyObserver {
+    owner: Weak<EpollState>,
+    interests: ReadyEvents,
+    notification: AtomicU64,
+}
+
+impl EpollReadyObserver {
+    fn new(owner: &Arc<EpollState>, interests: ReadyEvents) -> Arc<Self> {
+        Arc::new(Self {
+            owner: Arc::downgrade(owner),
+            interests,
+            notification: AtomicU64::new(0),
+        })
+    }
+
+    fn generation(&self) -> u64 {
+        self.notification.load(Ordering::Acquire)
+    }
+}
+
+impl EventObserver for EpollReadyObserver {
+    fn on_event(&self, events: ReadyEvents) {
+        if !events.intersects(self.interests) {
+            return;
+        }
+        self.notification.fetch_add(1, Ordering::AcqRel);
+        if let Some(owner) = self.owner.upgrade() {
+            owner.wake();
+        }
+    }
+}
+
+struct EpollCloseObserver {
+    owner: Weak<EpollState>,
+    key: RegistrationKey,
+    version: u64,
+}
+
+impl EventObserver for EpollCloseObserver {
+    fn on_event(&self, _events: ReadyEvents) {
+        if let Some(owner) = self.owner.upgrade() {
+            owner.remove_registration_if_version(self.key, self.version);
         }
     }
 }
@@ -645,8 +832,11 @@ fn complete_open_fd(process: &UserProcess, fd: i32) -> Result<(), LinuxError> {
         }
     };
     if let Some(pipe) = fifo {
-        if let Err(err) = pipe.wait_for_fifo_open_peer() {
-            let _ = process.fds.lock().close_for_process(process, fd);
+        let endpoint = object_as::<PipeEndpoint>(&pipe)?;
+        endpoint.notify_open();
+        if let Err(err) = endpoint.wait_for_fifo_open_peer(pipe.status_flags()) {
+            let closed = { process.fds.lock().close_for_process(process, fd).ok() };
+            drop(closed);
             return Err(err);
         }
     }
@@ -870,8 +1060,12 @@ pub(super) fn sys_fadvise64(
 }
 
 pub(super) fn sys_close(process: &UserProcess, fd: usize) -> isize {
-    match process.fds.lock().close_for_process(process, fd as i32) {
-        Ok(()) => 0,
+    let result = { process.fds.lock().close_for_process(process, fd as i32) };
+    match result {
+        Ok(closed) => {
+            drop(closed);
+            0
+        }
         Err(err) => neg_errno(err),
     }
 }
@@ -889,18 +1083,22 @@ pub(super) fn sys_close_range(
     }
 
     if flags & CLOSE_RANGE_UNSHARE != 0 {
-        let shared = Arc::strong_count(&process.fds) > 1;
-        if let Err(err) = process.fds.unshare_for_pid_if_shared(process.pid(), shared) {
+        if let Err(err) = process.fds.unshare_for_pid_if_shared(process.pid()) {
             return neg_errno(err);
         }
     }
 
-    match process
-        .fds
-        .lock_for_pid(process.pid())
-        .close_range_for_process(process, first, last, flags)
-    {
-        Ok(()) => 0,
+    let result = {
+        process
+            .fds
+            .lock_for_pid(process.pid())
+            .close_range_for_process(process, first, last, flags)
+    };
+    match result {
+        Ok(closed) => {
+            drop(closed);
+            0
+        }
         Err(err) => neg_errno(err),
     }
 }
@@ -916,10 +1114,14 @@ pub(super) fn sys_epoll_create1(process: &UserProcess, flags: usize) -> isize {
 }
 
 fn insert_epoll_fd(process: &UserProcess, fd_flags: u32) -> isize {
+    let epoll = match EpollEntry::new() {
+        Ok(epoll) => epoll,
+        Err(err) => return neg_errno(err),
+    };
     match process
         .fds
         .lock()
-        .insert_with_flags(FdEntry::Epoll(EpollEntry::new()), fd_flags)
+        .insert_with_flags(FdEntry::Epoll(epoll), fd_flags)
     {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
@@ -938,14 +1140,18 @@ pub(super) fn sys_eventfd2(process: &UserProcess, initval: usize, flags: usize) 
     } else {
         0
     };
-    match process.fds.lock().insert_with_flags(
-        FdEntry::EventFd(EventFdEntry::new(
-            initval as u64,
-            status_flags,
-            flags & general::EFD_SEMAPHORE != 0,
-        )),
-        fd_flags,
+    let eventfd = match new_open_file(
+        EventFdEntry::new(initval as u64, flags & general::EFD_SEMAPHORE != 0),
+        status_flags,
     ) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
+    match process
+        .fds
+        .lock()
+        .insert_with_flags(FdEntry::EventFd(eventfd), fd_flags)
+    {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
     }
@@ -1038,20 +1244,16 @@ pub(super) fn sys_pidfd_getfd(
         return neg_errno(LinuxError::EPERM);
     }
 
-    let entry = match target_process
-        .fds
-        .lock()
-        .entry(targetfd)
-        .and_then(FdEntry::duplicate_for_fork)
-    {
-        Ok(entry) => entry,
+    let (entry, description_id) = match target_process.fds.lock().duplicate_entry(targetfd) {
+        Ok(duplicate) => duplicate,
         Err(err) => return neg_errno(err),
     };
-    match process
-        .fds
-        .lock()
-        .insert_with_flags(entry, general::FD_CLOEXEC)
-    {
+    match process.fds.lock().insert_min_with_description(
+        entry,
+        0,
+        general::FD_CLOEXEC,
+        description_id,
+    ) {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
     }
@@ -1106,10 +1308,15 @@ pub(super) fn sys_timerfd_create(process: &UserProcess, clock_id: usize, flags: 
     } else {
         0
     };
-    match process.fds.lock().insert_with_flags(
-        FdEntry::TimerFd(TimerFdEntry::new(clock_id, status_flags)),
-        fd_flags,
-    ) {
+    let timer = match new_open_file(TimerFdEntry::new(clock_id), status_flags) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
+    match process
+        .fds
+        .lock()
+        .insert_with_flags(FdEntry::TimerFd(timer), fd_flags)
+    {
         Ok(fd) => fd as isize,
         Err(err) => neg_errno(err),
     }
@@ -1134,6 +1341,10 @@ pub(super) fn sys_timerfd_settime(
             Ok(_) => return neg_errno(LinuxError::EINVAL),
             Err(err) => return neg_errno(err),
         }
+    };
+    let timer = match object_as::<TimerFdEntry>(&timer) {
+        Ok(timer) => timer,
+        Err(err) => return neg_errno(err),
     };
     let new_spec = match read_user_value::<general::itimerspec>(process, new_value) {
         Ok(value) => value,
@@ -1160,6 +1371,10 @@ pub(super) fn sys_timerfd_gettime(process: &UserProcess, fd: usize, curr_value: 
             Ok(_) => return neg_errno(LinuxError::EINVAL),
             Err(err) => return neg_errno(err),
         }
+    };
+    let timer = match object_as::<TimerFdEntry>(&timer) {
+        Ok(timer) => timer,
+        Err(err) => return neg_errno(err),
     };
     let spec = match timer.gettime() {
         Ok(spec) => spec,
@@ -1233,9 +1448,19 @@ pub(super) fn sys_epoll_ctl(
         general::EPOLL_CTL_DEL => None,
         _ => return neg_errno(LinuxError::EINVAL),
     };
-    let mut table = process.fds.lock();
-    match table.epoll_ctl(epfd as i32, op as u32, fd as i32, event_value) {
-        Ok(()) => 0,
+    let result = {
+        let mut table = process.fds.lock();
+        table.epoll_ctl(epfd as i32, op as u32, fd as i32, event_value)
+    };
+    match result {
+        Ok(update) => {
+            // Observer callbacks may enter nested event code, so wake only
+            // after the descriptor-table guard has been dropped. A retired
+            // legacy target is likewise closed outside that guard.
+            drop(update.retired);
+            update.epoll.state.wake();
+            0
+        }
         Err(err) => neg_errno(err),
     }
 }
@@ -1324,51 +1549,41 @@ fn sys_epoll_wait_with_timeout(
         return neg_errno(LinuxError::EFAULT);
     }
     perf_counters::record_epoll_wait();
-    if matches!(timeout, EpollWaitTimeout::Immediate) && sigmask == 0 {
-        let table = process.fds.lock_for_pid(process.pid());
-        match table.epoll_fast_no_ready(epfd as i32) {
-            Ok(Some(true)) => return 0,
-            Ok(Some(false) | None) => {}
-            Err(err) => return neg_errno(err),
-        }
-    }
     let _signal_mask_guard = match install_temporary_signal_mask(process, sigmask, sigsetsize) {
         Ok(guard) => guard,
         Err(err) => return neg_errno(err),
     };
+    let epoll = {
+        let table = process.fds.lock_for_pid(process.pid());
+        match table.epoll_entry(epfd as i32) {
+            Ok(epoll) => epoll,
+            Err(err) => return neg_errno(err),
+        }
+    };
     let mut ready = Vec::new();
     if matches!(timeout, EpollWaitTimeout::Immediate) {
-        {
-            let table = process.fds.lock();
-            match table.epoll_collect_ready(epfd as i32, maxevents, &mut ready) {
-                Ok(_) => {}
-                Err(err) => return neg_errno(err),
-            }
+        if let Err(err) = FdTable::epoll_collect_ready_for(&epoll, maxevents, &mut ready) {
+            return neg_errno(err);
         }
         return copy_epoll_events_to_user(process, events, &ready);
     }
-    let mut polled_once = false;
     loop {
-        if polled_once && matches!(timeout, EpollWaitTimeout::Until(ddl) if poll_clock_now() >= ddl)
-        {
-            return 0;
-        }
         if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
         ready.clear();
-        let watched = {
-            let table = process.fds.lock();
-            match table.epoll_collect_ready(epfd as i32, maxevents, &mut ready) {
-                Ok(count) => count,
-                Err(err) => return neg_errno(err),
-            }
-        };
-        polled_once = true;
-        if !ready.is_empty() {
+        let wait_generation = epoll.state.generation();
+        if let Err(err) = FdTable::epoll_collect_ready_for(&epoll, maxevents, &mut ready) {
+            return neg_errno(err);
+        }
+        let wait_decision = decide_level_wait(
+            !ready.is_empty(),
+            matches!(timeout, EpollWaitTimeout::Until(ddl) if poll_clock_now() >= ddl),
+        );
+        if matches!(wait_decision, LevelWaitDecision::Ready) {
             return copy_epoll_events_to_user(process, events, &ready);
         }
-        if matches!(timeout, EpollWaitTimeout::Until(ddl) if poll_clock_now() >= ddl) {
+        if matches!(wait_decision, LevelWaitDecision::TimedOut) {
             return 0;
         }
         let wait_deadline = match timeout {
@@ -1376,14 +1591,27 @@ fn sys_epoll_wait_with_timeout(
             EpollWaitTimeout::Infinite => None,
             EpollWaitTimeout::Immediate => unreachable!("immediate epoll waits return before loop"),
         };
-        let timed_out = if watched == 0 {
-            yield_poll_blocking_timeout_until(wait_deadline)
+        let (has_legacy, object_timeout) =
+            match FdTable::epoll_wait_profile(&epoll.state, &mut Vec::new()) {
+                Ok(profile) => profile,
+                Err(err) => return neg_errno(err),
+            };
+        let mut delay = if has_legacy {
+            Duration::from_millis(1)
         } else {
-            yield_poll_wait_until(wait_deadline)
+            Duration::from_millis(10)
         };
-        if timed_out {
-            return 0;
+        if let Some(timeout) = object_timeout {
+            delay = delay.min(timeout);
         }
+        if let Some(deadline) = wait_deadline {
+            delay = delay.min(deadline.saturating_sub(poll_clock_now()));
+        }
+        // Empty epolls also wait on this queue: epoll_ctl wakes the state.  For
+        // legacy targets, the bounded 1 ms delay preserves the old adapter.
+        epoll.state.wait_for_change(process, wait_generation, delay);
+        // Always return to the level query.  A notification can happen before
+        // the deadline while scheduling resumes this task after it.
     }
 }
 
@@ -1410,35 +1638,34 @@ fn copy_epoll_events_to_user(
 impl EventFdEntry {
     const COUNTER_MAX: u64 = u64::MAX - 1;
 
-    fn new(initval: u64, status_flags: u32, semaphore: bool) -> Self {
+    fn new(initval: u64, semaphore: bool) -> Self {
         Self {
-            counter: Arc::new(Mutex::new(initval)),
-            status_flags: status_flags & general::O_NONBLOCK,
+            counter: Mutex::new(initval),
             semaphore,
+            events: EventSource::new(),
+            wait: WaitQueue::new(),
         }
-    }
-
-    fn status_flags(&self) -> u32 {
-        self.status_flags
-    }
-
-    fn set_status_flags(&mut self, flags: u32) {
-        self.status_flags = flags & general::O_NONBLOCK;
-    }
-
-    fn nonblocking(&self) -> bool {
-        self.status_flags & general::O_NONBLOCK != 0
     }
 
     fn poll_readable(&self) -> bool {
         *self.counter.lock() > 0
     }
 
-    fn poll_writable(&self) -> bool {
-        *self.counter.lock() < Self::COUNTER_MAX
+    fn notify_state_change(&self, events: ReadyEvents) {
+        self.events.notify(events);
+        self.wait.notify_all(false);
     }
 
-    fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
+    fn interrupted(process: &UserProcess) -> bool {
+        process.eval_watchdog_expired() || current_unblocked_signal_pending()
+    }
+
+    fn read(
+        &self,
+        status_flags: u32,
+        process: &UserProcess,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
         if dst.len() < size_of::<u64>() {
             return Err(LinuxError::EINVAL);
         }
@@ -1452,21 +1679,32 @@ impl EventFdEntry {
                     } else {
                         *counter = 0;
                     }
+                    drop(counter);
                     dst[..size_of::<u64>()].copy_from_slice(&value.to_ne_bytes());
+                    self.notify_state_change(ReadyEvents::WRITABLE);
                     return Ok(size_of::<u64>());
                 }
             }
-            if self.nonblocking() {
+            if status_flags & general::O_NONBLOCK != 0 {
                 return Err(LinuxError::EAGAIN);
             }
-            if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+            if Self::interrupted(process) {
                 return Err(LinuxError::EINTR);
             }
-            axtask::yield_now();
+            process.set_syscall_wait_blocked(true);
+            self.wait.wait_timeout_until(Duration::from_millis(10), || {
+                self.poll_readable() || Self::interrupted(process)
+            });
+            process.set_syscall_wait_blocked(false);
         }
     }
 
-    fn write(&self, process: &UserProcess, src: &[u8]) -> Result<usize, LinuxError> {
+    fn write(
+        &self,
+        status_flags: u32,
+        process: &UserProcess,
+        src: &[u8],
+    ) -> Result<usize, LinuxError> {
         if src.len() < size_of::<u64>() {
             return Err(LinuxError::EINVAL);
         }
@@ -1479,17 +1717,66 @@ impl EventFdEntry {
                 let mut counter = self.counter.lock();
                 if value <= Self::COUNTER_MAX.saturating_sub(*counter) {
                     *counter += value;
+                    drop(counter);
+                    if value != 0 {
+                        self.notify_state_change(ReadyEvents::READABLE);
+                    }
                     return Ok(size_of::<u64>());
                 }
             }
-            if self.nonblocking() {
+            if status_flags & general::O_NONBLOCK != 0 {
                 return Err(LinuxError::EAGAIN);
             }
-            if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
+            if Self::interrupted(process) {
                 return Err(LinuxError::EINTR);
             }
-            axtask::yield_now();
+            process.set_syscall_wait_blocked(true);
+            self.wait.wait_timeout_until(Duration::from_millis(10), || {
+                value <= Self::COUNTER_MAX.saturating_sub(*self.counter.lock())
+                    || Self::interrupted(process)
+            });
+            process.set_syscall_wait_blocked(false);
         }
+    }
+}
+
+impl FileObject for EventFdEntry {
+    fn read(
+        &self,
+        description: &OpenFile<dyn FileObject>,
+        process: &UserProcess,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
+        self.read(description.status_flags(), process, dst)
+    }
+
+    fn write(
+        &self,
+        description: &OpenFile<dyn FileObject>,
+        process: &UserProcess,
+        src: &[u8],
+    ) -> Result<usize, LinuxError> {
+        self.write(description.status_flags(), process, src)
+    }
+
+    fn readiness(&self) -> ReadyEvents {
+        let mut events = ReadyEvents::EMPTY;
+        let counter = *self.counter.lock();
+        if counter > 0 {
+            events |= ReadyEvents::READABLE;
+        }
+        if counter < Self::COUNTER_MAX {
+            events |= ReadyEvents::WRITABLE;
+        }
+        events
+    }
+
+    fn event_source(&self) -> &EventSource {
+        &self.events
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
     }
 }
 
@@ -1554,15 +1841,17 @@ impl PidFdEntry {
 }
 
 impl TimerFdEntry {
-    fn new(clock_id: u32, status_flags: u32) -> Self {
+    fn new(clock_id: u32) -> Self {
         Self {
             clock_id,
-            status_flags: status_flags & general::O_NONBLOCK,
-            state: Arc::new(Mutex::new(TimerFdState {
+            state: Mutex::new(TimerFdState {
                 deadline: None,
                 interval: Duration::ZERO,
                 expirations: 0,
-            })),
+            }),
+            events: EventSource::new(),
+            wait: WaitQueue::new(),
+            wait_generation: AtomicU64::new(0),
         }
     }
 
@@ -1577,16 +1866,10 @@ impl TimerFdEntry {
         )
     }
 
-    fn status_flags(&self) -> u32 {
-        self.status_flags
-    }
-
-    fn set_status_flags(&mut self, flags: u32) {
-        self.status_flags = flags & general::O_NONBLOCK;
-    }
-
-    fn nonblocking(&self) -> bool {
-        self.status_flags & general::O_NONBLOCK != 0
+    fn notify_state_change(&self) {
+        self.wait_generation.fetch_add(1, Ordering::AcqRel);
+        self.events.notify(ReadyEvents::READABLE);
+        self.wait.notify_all(false);
     }
 
     fn settime(
@@ -1611,44 +1894,87 @@ impl TimerFdEntry {
                 new_value,
             ))
         };
+        drop(state);
+        self.notify_state_change();
         Ok(old_spec)
     }
 
     fn gettime(&self) -> Result<general::itimerspec, LinuxError> {
-        let mut state = self.state.lock();
-        self.refresh_locked(&mut state)?;
-        self.spec_from_state(&state)
+        self.refresh()?;
+        self.spec_from_state(&self.state.lock())
     }
 
     fn poll_readable(&self) -> bool {
-        let mut state = self.state.lock();
-        self.refresh_locked(&mut state)
-            .is_ok_and(|()| state.expirations > 0)
+        self.refresh_silent().is_ok() && self.state.lock().expirations > 0
     }
 
-    fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
+    fn read(
+        &self,
+        status_flags: u32,
+        process: &UserProcess,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
         if dst.len() < size_of::<u64>() {
             return Err(LinuxError::EINVAL);
         }
         loop {
+            self.refresh()?;
             {
                 let mut state = self.state.lock();
-                self.refresh_locked(&mut state)?;
                 if state.expirations > 0 {
                     let value = state.expirations;
                     state.expirations = 0;
+                    drop(state);
                     dst[..size_of::<u64>()].copy_from_slice(&value.to_ne_bytes());
+                    self.notify_state_change();
                     return Ok(size_of::<u64>());
                 }
             }
-            if self.nonblocking() {
+            if status_flags & general::O_NONBLOCK != 0 {
                 return Err(LinuxError::EAGAIN);
             }
             if process.eval_watchdog_expired() || current_unblocked_signal_pending() {
                 return Err(LinuxError::EINTR);
             }
-            yield_poll_wait();
+            let (deadline, generation) = {
+                let state = self.state.lock();
+                (state.deadline, self.wait_generation.load(Ordering::Acquire))
+            };
+            let wait_for = match deadline {
+                Some(deadline) => deadline
+                    .saturating_sub(clock_now_duration(self.clock_id)?)
+                    .min(Duration::from_millis(10)),
+                None => Duration::from_millis(10),
+            };
+            process.set_syscall_wait_blocked(true);
+            self.wait.wait_timeout_until(wait_for, || {
+                self.wait_generation.load(Ordering::Acquire) != generation
+                    || process.eval_watchdog_expired()
+                    || current_unblocked_signal_pending()
+            });
+            process.set_syscall_wait_blocked(false);
         }
+    }
+
+    fn refresh(&self) -> Result<(), LinuxError> {
+        let changed = {
+            let mut state = self.state.lock();
+            let previous = state.expirations;
+            self.refresh_locked(&mut state)?;
+            state.expirations != previous
+        };
+        if changed {
+            self.notify_state_change();
+        }
+        Ok(())
+    }
+
+    /// Refresh readiness during a level query without invoking observers from
+    /// inside a poll/epoll call (which may hold a compatibility-table lock).
+    /// Waiters use `next_timeout`, so passage of the timer deadline does not
+    /// rely on this query producing a notification.
+    fn refresh_silent(&self) -> Result<(), LinuxError> {
+        self.refresh_locked(&mut self.state.lock())
     }
 
     fn refresh_locked(&self, state: &mut TimerFdState) -> Result<(), LinuxError> {
@@ -1688,6 +2014,48 @@ impl TimerFdEntry {
             it_interval: duration_to_timespec(state.interval),
             it_value: duration_to_timespec(remaining),
         })
+    }
+}
+
+impl FileObject for TimerFdEntry {
+    fn read(
+        &self,
+        description: &OpenFile<dyn FileObject>,
+        process: &UserProcess,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
+        self.read(description.status_flags(), process, dst)
+    }
+
+    fn write(
+        &self,
+        _description: &OpenFile<dyn FileObject>,
+        _process: &UserProcess,
+        _src: &[u8],
+    ) -> Result<usize, LinuxError> {
+        Err(LinuxError::EINVAL)
+    }
+
+    fn readiness(&self) -> ReadyEvents {
+        if self.poll_readable() {
+            ReadyEvents::READABLE
+        } else {
+            ReadyEvents::EMPTY
+        }
+    }
+
+    fn event_source(&self) -> &EventSource {
+        &self.events
+    }
+
+    fn next_timeout(&self) -> Option<Duration> {
+        let state = self.state.lock();
+        let now = clock_now_duration(self.clock_id).ok()?;
+        readiness_deadline_delay(state.expirations > 0, state.deadline, now)
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
     }
 }
 
@@ -1779,16 +2147,252 @@ fn duration_from_nanos_saturating(nanos: u128) -> Duration {
 }
 
 impl EpollEntry {
-    fn new() -> Self {
-        Self {
-            registrations: Arc::new(Mutex::new(BTreeMap::new())),
+    fn new() -> Result<Self, LinuxError> {
+        Ok(Self {
+            state: Arc::new(EpollState {
+                id: OpenFileId::allocate().map_err(|_| LinuxError::ENFILE)?,
+                registrations: Mutex::new(BTreeMap::new()),
+                events: EventSource::new(),
+                wait: WaitQueue::new(),
+                generation: AtomicU64::new(0),
+                next_version: AtomicU64::new(1),
+                notifying: ReentrancyGate::new(),
+            }),
+        })
+    }
+
+    fn id(&self) -> OpenFileId {
+        self.state.id
+    }
+}
+
+impl EpollState {
+    fn wake(&self) {
+        self.generation.fetch_add(1, Ordering::AcqRel);
+        self.wait.notify_all(false);
+        // Cycle validation and insertion share the global graph lock, so the
+        // live nested graph is acyclic. Coalesce concurrent/reentrant attempts
+        // into another flat walk: this bounds stack recursion without losing
+        // the parent wake that arrived during an active callback fan-out.
+        let Some(mut notification_guard) = self.notifying.try_enter() else {
+            return;
+        };
+        loop {
+            self.events.notify(ReadyEvents::READABLE);
+            if !notification_guard.finish_round() {
+                break;
+            }
         }
     }
+
+    fn remove_registration_if_version(&self, key: RegistrationKey, version: u64) {
+        let removed = {
+            let mut registrations = self.registrations.lock();
+            if registrations
+                .get(&key)
+                .is_some_and(|registration| registration.version == version)
+            {
+                registrations.remove(&key)
+            } else {
+                None
+            }
+        };
+        if removed.is_some() {
+            // Drop subscriptions before callbacks are fanned out, and never
+            // while holding the registration map lock.
+            drop(removed);
+            self.wake();
+        }
+    }
+
+    fn next_version(&self) -> Result<u64, LinuxError> {
+        self.next_version
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+                next.checked_add(1)
+            })
+            .map_err(|_| LinuxError::ENFILE)
+    }
+
+    fn registration_snapshots(&self) -> Result<Vec<EpollRegistrationSnapshot>, LinuxError> {
+        let registrations = self.registrations.lock();
+        let mut snapshots = Vec::new();
+        snapshots
+            .try_reserve_exact(registrations.len())
+            .map_err(|_| LinuxError::ENOMEM)?;
+        for (&key, registration) in registrations.iter() {
+            snapshots.push(EpollRegistrationSnapshot {
+                key,
+                target: registration.target.clone(),
+                event: registration.event,
+                delivery: registration.delivery,
+                ready_observer: registration.ready_observer.clone(),
+                version: registration.version,
+            });
+        }
+        Ok(snapshots)
+    }
+
+    fn generation(&self) -> u64 {
+        self.generation.load(Ordering::Acquire)
+    }
+
+    fn wait_for_change(&self, process: &UserProcess, sample: u64, timeout: Duration) {
+        if timeout.is_zero() || self.generation() != sample {
+            return;
+        }
+        process.set_syscall_wait_blocked(true);
+        self.wait.wait_timeout_until(timeout, || {
+            self.generation() != sample
+                || process.eval_watchdog_expired()
+                || current_unblocked_signal_pending()
+        });
+        process.set_syscall_wait_blocked(false);
+    }
+}
+
+fn read_open_file_to_user(
+    process: &UserProcess,
+    file: &OpenFileRef,
+    buf: usize,
+    count: usize,
+) -> isize {
+    if count == 0 {
+        return match file.object().read(file, process, &mut []) {
+            Ok(_) => 0,
+            Err(err) => neg_errno(err),
+        };
+    }
+
+    let mut total = 0usize;
+    let mut scratch = Vec::new();
+    while total < count {
+        let Some(base) = buf.checked_add(total) else {
+            return if total > 0 {
+                total as isize
+            } else {
+                neg_errno(LinuxError::EFAULT)
+            };
+        };
+        let len = (count - total).min(MAX_USER_IO_CHUNK);
+        if let Err(err) = validate_user_write(process, base, len) {
+            return if total > 0 {
+                total as isize
+            } else {
+                neg_errno(err)
+            };
+        }
+        let dst = match io_scratch_slice(&mut scratch, len) {
+            Ok(dst) => dst,
+            Err(err) => {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+        let read = match file.object().read(file, process, dst) {
+            Ok(read) if read <= len => read,
+            Ok(_) => return neg_errno(LinuxError::EINVAL),
+            Err(err) => {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+        if let Err(err) = write_user_bytes(process, base, &dst[..read]) {
+            return if total > 0 {
+                total as isize
+            } else {
+                neg_errno(err)
+            };
+        }
+        total += read;
+        if read < len {
+            break;
+        }
+    }
+    total as isize
+}
+
+fn write_open_file_from_user(
+    process: &UserProcess,
+    file: &OpenFileRef,
+    buf: usize,
+    count: usize,
+) -> isize {
+    if count == 0 {
+        return match file.object().write(file, process, &[]) {
+            Ok(_) => 0,
+            Err(err) => neg_errno(err),
+        };
+    }
+
+    let mut total = 0usize;
+    let mut scratch = Vec::new();
+    while total < count {
+        let Some(base) = buf.checked_add(total) else {
+            return if total > 0 {
+                total as isize
+            } else {
+                neg_errno(LinuxError::EFAULT)
+            };
+        };
+        let len = (count - total).min(MAX_USER_IO_CHUNK);
+        if let Err(err) = validate_user_read(process, base, len) {
+            return if total > 0 {
+                total as isize
+            } else {
+                neg_errno(err)
+            };
+        }
+        let src = match io_scratch_slice(&mut scratch, len) {
+            Ok(src) => src,
+            Err(err) => {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+        if let Err(err) = read_user_bytes_into(process, base, src) {
+            return if total > 0 {
+                total as isize
+            } else {
+                neg_errno(err)
+            };
+        }
+        let written = match file.object().write(file, process, src) {
+            Ok(written) if written <= len => written,
+            Ok(_) => return neg_errno(LinuxError::EINVAL),
+            Err(err) => {
+                return if total > 0 {
+                    total as isize
+                } else {
+                    neg_errno(err)
+                };
+            }
+        };
+        total += written;
+        if written < len {
+            break;
+        }
+    }
+    total as isize
 }
 
 pub(super) fn sys_read(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
     if let Ok(socket) = socket_entry(process, fd) {
         return recv_socket_data_to_user(process, socket.posix_fd, buf, count, 0);
+    }
+    let open_file = { process.fds.lock().open_file_ref(fd as i32) };
+    match open_file {
+        Ok(Some(file)) => return read_open_file_to_user(process, &file, buf, count),
+        Ok(None) => {}
+        Err(err) => return neg_errno(err),
     }
     if count > MAX_USER_IO_CHUNK {
         let mut total = 0usize;
@@ -1878,6 +2482,12 @@ pub(super) fn sys_pread64(
 }
 
 pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
+    let open_file = { process.fds.lock().open_file_ref(fd as i32) };
+    match open_file {
+        Ok(Some(file)) => return write_open_file_from_user(process, &file, buf, count),
+        Ok(None) => {}
+        Err(err) => return neg_errno(err),
+    }
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
     if count > MAX_USER_IO_CHUNK {
         let mut written = 0usize;
@@ -1975,6 +2585,10 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
         Ok(iov_entries) => iov_entries,
         Err(err) => return neg_errno(err),
     };
+    let open_file = match process.fds.lock().open_file_ref(fd as i32) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
     let mut written = 0isize;
     let mut scratch = Vec::new();
     for entry in iov_entries {
@@ -1992,12 +2606,17 @@ pub(super) fn sys_writev(process: &UserProcess, fd: usize, iov: usize, iovcnt: u
             if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
                 return if written > 0 { written } else { neg_errno(err) };
             }
-            let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
-            let n = match process
-                .fds
-                .lock()
-                .write(process, fd as i32, src, Some(file_size_limit))
-            {
+            let result = match &open_file {
+                Some(file) => file.object().write(file, process, src),
+                None => {
+                    let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+                    process
+                        .fds
+                        .lock()
+                        .write(process, fd as i32, src, Some(file_size_limit))
+                }
+            };
+            let n = match result {
                 Ok(v) => v,
                 Err(err) => return if written > 0 { written } else { neg_errno(err) },
             };
@@ -2017,6 +2636,10 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
         Ok(iov_entries) => iov_entries,
         Err(err) => return neg_errno(err),
     };
+    let open_file = match process.fds.lock().open_file_ref(fd as i32) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
     let mut total = 0isize;
     let mut scratch = Vec::new();
     for entry in iov_entries {
@@ -2031,7 +2654,11 @@ pub(super) fn sys_readv(process: &UserProcess, fd: usize, iov: usize, iovcnt: us
                 Ok(bytes) => bytes,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
-            let n = match process.fds.lock().read(process, fd as i32, &mut *bytes) {
+            let result = match &open_file {
+                Some(file) => file.object().read(file, process, bytes),
+                None => process.fds.lock().read(process, fd as i32, bytes),
+            };
+            let n = match result {
                 Ok(v) => v,
                 Err(err) => return if total > 0 { total } else { neg_errno(err) },
             };
@@ -2230,6 +2857,10 @@ pub(super) fn sys_sendfile(
         }
     };
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+    let output_file = match process.fds.lock().open_file_ref(out_fd as i32) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
     {
         let mut table = process.fds.lock();
         let input_check = match offset {
@@ -2241,7 +2872,14 @@ pub(super) fn sys_sendfile(
         if let Err(err) = input_check {
             return neg_errno(err);
         }
-        if let Err(err) = table.write(process, out_fd as i32, &[], Some(file_size_limit)) {
+        if output_file.is_none() {
+            if let Err(err) = table.write(process, out_fd as i32, &[], Some(file_size_limit)) {
+                return neg_errno(err);
+            }
+        }
+    }
+    if let Some(file) = &output_file {
+        if let Err(err) = file.object().write(file, process, &[]) {
             return neg_errno(err);
         }
     }
@@ -2280,12 +2918,16 @@ pub(super) fn sys_sendfile(
                 };
             }
         };
-        let written = match process.fds.lock().write(
-            process,
-            out_fd as i32,
-            &buf[..read],
-            Some(file_size_limit),
-        ) {
+        let write_result = match &output_file {
+            Some(file) => file.object().write(file, process, &buf[..read]),
+            None => process.fds.lock().write(
+                process,
+                out_fd as i32,
+                &buf[..read],
+                Some(file_size_limit),
+            ),
+        };
+        let written = match write_result {
             Ok(n) => n,
             Err(err) => {
                 return if copied > 0 {
@@ -2411,13 +3053,33 @@ pub(super) fn sys_splice(
         }
         (in_kind, out_kind)
     };
+    let (input_pipe, output_pipe) = {
+        let table = process.fds.lock();
+        let input = if in_kind == SpliceEndpointKind::Pipe {
+            match table.splice_pipe_input(fd_in) {
+                Ok(pipe) => Some(pipe),
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            None
+        };
+        let output = if out_kind == SpliceEndpointKind::Pipe {
+            match table.splice_pipe_input(fd_out) {
+                Ok(pipe) => Some(pipe),
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            None
+        };
+        (input, output)
+    };
     let mut copied = 0usize;
     let mut scratch = Vec::new();
     while copied < len {
         let mut chunk_len = (len - copied).min(MAX_USER_IO_CHUNK);
         if in_kind == SpliceEndpointKind::Pipe {
-            let available = match process.fds.lock().pipe_available_read(fd_in) {
-                Ok(available) => available,
+            let available = match pipe_endpoint(input_pipe.as_ref().unwrap()) {
+                Ok(endpoint) => endpoint.available_read(),
                 Err(err) => {
                     return if copied > 0 {
                         copied as isize
@@ -2473,8 +3135,9 @@ pub(super) fn sys_splice(
             }
         }
         if out_kind == SpliceEndpointKind::Pipe {
-            let available = match process.fds.lock().splice_pipe_available_write(fd_out) {
-                Ok(available) => available,
+            let output = output_pipe.as_ref().unwrap();
+            let endpoint = match pipe_endpoint(output) {
+                Ok(endpoint) => endpoint,
                 Err(err) => {
                     return if copied > 0 {
                         copied as isize
@@ -2483,6 +3146,9 @@ pub(super) fn sys_splice(
                     };
                 }
             };
+            let available = endpoint
+                .capacity()
+                .saturating_sub(endpoint.available_read());
             if available == 0 {
                 if copied > 0 {
                     break;
@@ -2528,7 +3194,17 @@ pub(super) fn sys_splice(
                 // deadlock.
                 let written = output_socket.write_from_pipe_splice_reservation(
                     process,
-                    &input_pipe,
+                    match pipe_endpoint(&input_pipe) {
+                        Ok(endpoint) => endpoint,
+                        Err(err) => {
+                            return if copied > 0 {
+                                copied as isize
+                            } else {
+                                neg_errno(err)
+                            };
+                        }
+                    },
+                    input_pipe.status_flags(),
                     chunk_len,
                     nonblocking,
                 );
@@ -2601,9 +3277,12 @@ pub(super) fn sys_splice(
                 };
             }
         };
-        let read = {
+        let read = if let Some(pipe) = &input_pipe {
+            pipe_endpoint(pipe)
+                .and_then(|endpoint| endpoint.read_partial(pipe.status_flags(), buf, nonblocking))
+        } else {
             let mut table = process.fds.lock();
-            splice_read_input(&mut table, process, fd_in, in_kind, off_in, &mut *buf)
+            splice_read_input(&mut table, process, fd_in, in_kind, off_in, buf)
         };
         let read = match read {
             Ok(0) => break,
@@ -2617,7 +3296,11 @@ pub(super) fn sys_splice(
             }
         };
 
-        let written = {
+        let written = if let Some(pipe) = &output_pipe {
+            pipe_endpoint(pipe).and_then(|endpoint| {
+                endpoint.write_partial(pipe.status_flags(), &buf[..read], nonblocking)
+            })
+        } else {
             let mut table = process.fds.lock();
             splice_write_output(
                 &mut table,
@@ -2701,11 +3384,26 @@ pub(super) fn sys_tee(
         return neg_errno(LinuxError::EINVAL);
     }
     let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
-    match process
-        .fds
-        .lock()
-        .tee_pipe(fd_in as i32, fd_out as i32, len, nonblocking)
-    {
+    let pipes = {
+        let table = process.fds.lock();
+        match (
+            table.splice_pipe_input(fd_in as i32),
+            table.splice_pipe_input(fd_out as i32),
+        ) {
+            (Ok(src), Ok(dst)) => Ok((src, dst)),
+            (Err(err), _) | (_, Err(err)) => Err(err),
+        }
+    };
+    let result = pipes.and_then(|(src, dst)| {
+        pipe_endpoint(&src)?.tee_to(
+            src.status_flags(),
+            pipe_endpoint(&dst)?,
+            dst.status_flags(),
+            len,
+            nonblocking,
+        )
+    });
+    match result {
         Ok(copied) => copied as isize,
         Err(err) => neg_errno(err),
     }
@@ -2727,9 +3425,21 @@ pub(super) fn sys_vmsplice(
     }
     let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
     let fd = fd as i32;
-    let direction = match process.fds.lock().vmsplice_pipe_direction(fd) {
-        Ok(direction) => direction,
+    let pipe = match process.fds.lock().open_file_ref(fd) {
+        Ok(Some(pipe)) if object_as::<PipeEndpoint>(&pipe).is_ok() => pipe,
+        Ok(_) => return neg_errno(LinuxError::EBADF),
         Err(err) => return neg_errno(err),
+    };
+    let endpoint = match pipe_endpoint(&pipe) {
+        Ok(endpoint) => endpoint,
+        Err(err) => return neg_errno(err),
+    };
+    let direction = if endpoint.writable() {
+        VmspliceDirection::ToPipe
+    } else if endpoint.readable() {
+        VmspliceDirection::FromPipe
+    } else {
+        return neg_errno(LinuxError::EBADF);
     };
     let iov_entries = match read_iovec_entries(process, iov, iovcnt) {
         Ok(iov_entries) => iov_entries,
@@ -2755,11 +3465,11 @@ pub(super) fn sys_vmsplice(
                     if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
                         return if total > 0 { total } else { neg_errno(err) };
                     }
-                    let written = match process.fds.lock().vmsplice_write_pipe(fd, src, nonblocking)
-                    {
-                        Ok(written) => written,
-                        Err(err) => return if total > 0 { total } else { neg_errno(err) },
-                    };
+                    let written =
+                        match endpoint.write_partial(pipe.status_flags(), src, nonblocking) {
+                            Ok(written) => written,
+                            Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                        };
                     total += written as isize;
                     if written == 0 {
                         return total;
@@ -2781,15 +3491,11 @@ pub(super) fn sys_vmsplice(
                         Ok(bytes) => bytes,
                         Err(err) => return if total > 0 { total } else { neg_errno(err) },
                     };
-                    let read =
-                        match process
-                            .fds
-                            .lock()
-                            .vmsplice_read_pipe(fd, &mut *bytes, nonblocking)
-                        {
-                            Ok(read) => read,
-                            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-                        };
+                    let read = match endpoint.read_partial(pipe.status_flags(), bytes, nonblocking)
+                    {
+                        Ok(read) => read,
+                        Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                    };
                     if read > len {
                         return if total > 0 {
                             total
@@ -3213,12 +3919,17 @@ pub(super) fn sys_dup(process: &UserProcess, fd: usize) -> isize {
 }
 
 pub(super) fn sys_dup3(process: &UserProcess, oldfd: usize, newfd: usize, flags: usize) -> isize {
-    match process
-        .fds
-        .lock()
-        .dup3(process, oldfd as i32, newfd as i32, flags as u32)
-    {
-        Ok(fd) => fd as isize,
+    let result = {
+        process
+            .fds
+            .lock()
+            .dup3(process, oldfd as i32, newfd as i32, flags as u32)
+    };
+    match result {
+        Ok((fd, closed)) => {
+            drop(closed);
+            fd as isize
+        }
         Err(err) => neg_errno(err),
     }
 }
@@ -3227,6 +3938,8 @@ pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize
     let cmd = cmd as u32;
     let fd = fd as i32;
     let result = match cmd {
+        cmd @ (general::F_SETOWN | general::F_GETOWN | general::F_SETSIG | general::F_GETSIG)
+        | cmd @ (15 | 16) => fcntl_pipe_async_owner(process, fd, cmd, arg),
         general::F_GETLK => fcntl_getlk_record(process, fd, arg, false),
         general::F_SETLK => fcntl_setlk_record(process, fd, arg, false, false),
         general::F_SETLKW => fcntl_setlk_record(process, fd, arg, true, false),
@@ -3239,6 +3952,24 @@ pub(super) fn sys_fcntl(process: &UserProcess, fd: usize, cmd: usize, arg: usize
         Ok(v) => v as isize,
         Err(err) => neg_errno(err),
     }
+}
+
+fn fcntl_pipe_async_owner(
+    process: &UserProcess,
+    fd: i32,
+    cmd: u32,
+    arg: usize,
+) -> Result<i32, LinuxError> {
+    let pipe = {
+        let table = process.fds.lock();
+        match table.entry(fd)? {
+            FdEntry::Pipe(pipe) => pipe.clone(),
+            _ => return Err(LinuxError::EINVAL),
+        }
+    };
+    pipe_endpoint(&pipe)?
+        .fcntl_async_owner(process, cmd, arg)?
+        .ok_or(LinuxError::EINVAL)
 }
 
 fn fcntl_record_lock_fd_exists(process: &UserProcess, fd: i32) -> Result<(), LinuxError> {
@@ -4069,8 +4800,8 @@ impl ProcessFdTable {
         Self {
             state: AxMutex::new(ProcessFdTableState {
                 base,
+                sharing: FileTableShareTracker::default(),
                 unshared: BTreeMap::new(),
-                aliases: BTreeMap::new(),
             }),
         }
     }
@@ -4092,63 +4823,72 @@ impl ProcessFdTable {
         }
     }
 
-    pub(super) fn try_lock_for_pid(&self, pid: i32) -> Option<ProcessFdTableGuard<'_>> {
-        self.state
-            .try_lock()
-            .map(|state| ProcessFdTableGuard { state, pid })
-    }
-
     pub(super) fn fork_copy_for_pid(&self, pid: i32) -> Result<FdTable, LinuxError> {
         self.lock_for_pid(pid).fork_copy()
     }
 
-    pub(super) fn share_table_for_child_pid(&self, parent_pid: i32, child_pid: i32) {
-        let mut state = self.state.lock();
-        if let Some(owner) = state.unshared_owner_for_pid(parent_pid) {
-            if child_pid != owner {
-                state.aliases.insert(child_pid, owner);
-            }
-        }
+    pub(super) fn register_pid(&self, pid: i32) {
+        self.state.lock().sharing.register_base(pid);
     }
 
-    pub(super) fn unshare_for_pid_if_shared(
-        &self,
-        pid: i32,
-        shared: bool,
-    ) -> Result<(), LinuxError> {
-        if !shared {
+    pub(super) fn share_for_child_pid(
+        self: &Arc<Self>,
+        parent_pid: i32,
+        child_pid: i32,
+    ) -> Arc<Self> {
+        let mut state = self.state.lock();
+        state.sharing.share(parent_pid, child_pid);
+        // Clone while holding the state lock.  exec/close_range take the same
+        // lock when splitting a CLONE_FILES table, so a new sharer is ordered
+        // either wholly before or wholly after that split.
+        Arc::clone(self)
+    }
+
+    pub(super) fn unshare_for_pid_if_shared(&self, pid: i32) -> Result<(), LinuxError> {
+        let mut state = self.state.lock();
+        if !state.sharing.is_shared(pid) {
             return Ok(());
         }
-        let mut state = self.state.lock();
-        let owner = state.unshared_owner_for_pid(pid);
-        let copy = match owner {
-            Some(owner) => state
+        let copy = match state.sharing.group(pid) {
+            FileTableGroup::Private(owner) => state
                 .unshared
                 .get(&owner)
                 .expect("unshared fd table owner must exist")
                 .fork_copy()?,
-            None => state.base.fork_copy()?,
+            FileTableGroup::Base => state.base.fork_copy()?,
         };
-        if let Some(owner) = owner {
-            state.detach_unshared_alias(pid, owner);
+        if let Some((old_owner, new_owner)) = state.sharing.split(pid) {
+            let table = state
+                .unshared
+                .remove(&old_owner)
+                .expect("split private fd table owner must exist");
+            state.unshared.insert(new_owner, table);
         }
         state.unshared.insert(pid, copy);
         Ok(())
     }
 
-    pub(super) fn close_all_for_pid(&self, pid: i32, close_base: bool) {
+    pub(super) fn close_all_for_pid(&self, pid: i32) {
         let mut tables = Vec::new();
         {
             let mut state = self.state.lock();
-            if let Some(table) = state.detach_process_table(pid) {
-                tables.push(table);
-            }
-            if close_base {
-                tables.push(core::mem::replace(&mut state.base, FdTable::empty()));
-                for (_, table) in core::mem::take(&mut state.unshared) {
-                    tables.push(table);
+            match state.sharing.detach(pid) {
+                FileTableDetach::Keep => {}
+                FileTableDetach::DropBase => {
+                    tables.push(core::mem::replace(&mut state.base, FdTable::empty()));
                 }
-                state.aliases.clear();
+                FileTableDetach::DropPrivate(owner) => {
+                    if let Some(table) = state.unshared.remove(&owner) {
+                        tables.push(table);
+                    }
+                }
+                FileTableDetach::MovePrivate { from, to } => {
+                    let table = state
+                        .unshared
+                        .remove(&from)
+                        .expect("moved private fd table owner must exist");
+                    state.unshared.insert(to, table);
+                }
             }
         }
         for mut table in tables {
@@ -4166,7 +4906,6 @@ impl Drop for ProcessFdTable {
             for (_, table) in core::mem::take(&mut state.unshared) {
                 tables.push(table);
             }
-            state.aliases.clear();
         }
         for mut table in tables {
             table.close_all();
@@ -4178,145 +4917,96 @@ impl Deref for ProcessFdTableGuard<'_> {
     type Target = FdTable;
 
     fn deref(&self) -> &Self::Target {
-        if let Some(owner) = self.state.unshared_owner_for_pid(self.pid) {
-            self.state
+        match self.state.sharing.group(self.pid) {
+            FileTableGroup::Private(owner) => self
+                .state
                 .unshared
                 .get(&owner)
-                .expect("unshared fd table owner must exist")
-        } else {
-            &self.state.base
+                .expect("unshared fd table owner must exist"),
+            FileTableGroup::Base => &self.state.base,
         }
     }
 }
 
 impl DerefMut for ProcessFdTableGuard<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        if let Some(owner) = self.state.unshared_owner_for_pid(self.pid) {
-            self.state
+        match self.state.sharing.group(self.pid) {
+            FileTableGroup::Private(owner) => self
+                .state
                 .unshared
                 .get_mut(&owner)
-                .expect("unshared fd table owner must exist")
-        } else {
-            &mut self.state.base
+                .expect("unshared fd table owner must exist"),
+            FileTableGroup::Base => &mut self.state.base,
         }
-    }
-}
-
-impl ProcessFdTableState {
-    fn unshared_owner_for_pid(&self, pid: i32) -> Option<i32> {
-        self.aliases
-            .get(&pid)
-            .copied()
-            .or_else(|| self.unshared.contains_key(&pid).then_some(pid))
-    }
-
-    fn detach_unshared_alias(&mut self, pid: i32, owner: i32) {
-        self.aliases.remove(&pid);
-        if pid != owner {
-            return;
-        }
-
-        let Some(new_owner) = self
-            .aliases
-            .iter()
-            .find_map(|(&alias, &alias_owner)| (alias_owner == owner).then_some(alias))
-        else {
-            return;
-        };
-        let Some(table) = self.unshared.remove(&owner) else {
-            return;
-        };
-        self.unshared.insert(new_owner, table);
-        let aliases = self
-            .aliases
-            .iter()
-            .filter_map(|(&alias, &alias_owner)| (alias_owner == owner).then_some(alias))
-            .collect::<Vec<_>>();
-        for alias in aliases {
-            if alias == new_owner {
-                self.aliases.remove(&alias);
-            } else {
-                self.aliases.insert(alias, new_owner);
-            }
-        }
-    }
-
-    fn detach_process_table(&mut self, pid: i32) -> Option<FdTable> {
-        let owner = self.unshared_owner_for_pid(pid)?;
-        self.aliases.remove(&pid);
-        if pid != owner {
-            return None;
-        }
-
-        let aliases = self
-            .aliases
-            .iter()
-            .filter_map(|(&alias, &alias_owner)| (alias_owner == owner).then_some(alias))
-            .collect::<Vec<_>>();
-        if aliases.is_empty() {
-            return self.unshared.remove(&owner);
-        }
-
-        let new_owner = aliases[0];
-        let table = self.unshared.remove(&owner)?;
-        self.unshared.insert(new_owner, table);
-        for alias in aliases {
-            if alias == new_owner {
-                self.aliases.remove(&alias);
-            } else {
-                self.aliases.insert(alias, new_owner);
-            }
-        }
-        None
     }
 }
 
 impl FdTable {
     pub(super) fn new() -> Self {
         Self {
-            entries: vec![
-                Some(FdEntry::Stdin(STDIN_STATUS_FLAGS)),
-                Some(FdEntry::Stdout(STDOUT_STATUS_FLAGS)),
-                Some(FdEntry::Stderr(STDERR_STATUS_FLAGS)),
+            slots: vec![
+                Some(
+                    FdSlot::new(FdEntry::Stdin(STDIN_STATUS_FLAGS), 0)
+                        .expect("open-file IDs exhausted while creating stdin"),
+                ),
+                Some(
+                    FdSlot::new(FdEntry::Stdout(STDOUT_STATUS_FLAGS), 0)
+                        .expect("open-file IDs exhausted while creating stdout"),
+                ),
+                Some(
+                    FdSlot::new(FdEntry::Stderr(STDERR_STATUS_FLAGS), 0)
+                        .expect("open-file IDs exhausted while creating stderr"),
+                ),
             ],
-            fd_flags: vec![0, 0, 0],
         }
     }
 
     fn empty() -> Self {
-        Self {
-            entries: Vec::new(),
-            fd_flags: Vec::new(),
-        }
+        Self { slots: Vec::new() }
     }
 
     pub(super) fn fork_copy(&self) -> Result<Self, LinuxError> {
         let active_len = self
-            .entries
+            .slots
             .iter()
             .rposition(Option::is_some)
             .map_or(0, |idx| idx + 1);
-        let mut entries = Vec::with_capacity(active_len);
-        let mut fd_flags = Vec::with_capacity(active_len);
-        for (idx, entry) in self.entries.iter().take(active_len).enumerate() {
-            entries.push(match entry {
-                Some(entry) => Some(entry.duplicate_for_fork()?),
+        let mut slots: Vec<Option<FdSlot>> = Vec::with_capacity(active_len);
+        for slot in self.slots.iter().take(active_len) {
+            slots.push(match slot {
+                Some(slot) => {
+                    let entry = match slot.entry.duplicate_for_fork() {
+                        Ok(entry) => entry,
+                        Err(err) => {
+                            // Socket duplicates own freshly allocated POSIX
+                            // descriptors and do not have an implicit Drop
+                            // close.  Roll them back before abandoning a
+                            // partially constructed table.
+                            for copied in slots.iter().flatten() {
+                                if let FdEntry::Socket(socket) = &copied.entry {
+                                    let _ = socket.close();
+                                }
+                            }
+                            return Err(err);
+                        }
+                    };
+                    Some(FdSlot::with_identity(
+                        entry,
+                        slot.fd_flags,
+                        Arc::clone(&slot.description),
+                    ))
+                }
                 None => None,
             });
-            fd_flags.push(if entry.is_some() {
-                self.fd_flags.get(idx).copied().unwrap_or(0)
-            } else {
-                0
-            });
         }
-        let table = Self { entries, fd_flags };
+        let table = Self { slots };
         table.track_existing_exec_write_opens();
         Ok(table)
     }
 
     fn track_existing_exec_write_opens(&self) {
-        for entry in self.entries.iter().flatten() {
-            track_exec_write_open(entry);
+        for slot in self.slots.iter().flatten() {
+            track_exec_write_open(&slot.entry);
         }
     }
 
@@ -4344,21 +5034,14 @@ impl FdTable {
 
     pub(super) fn pipe_available_read(&self, fd: i32) -> Result<usize, LinuxError> {
         match self.entry(fd)? {
-            FdEntry::Pipe(pipe) => Ok(pipe.available_read()),
+            FdEntry::Pipe(pipe) => Ok(pipe_endpoint(pipe)?.available_read()),
             _ => Err(LinuxError::ENOTTY),
         }
     }
 
-    fn splice_pipe_input(&self, fd: i32) -> Result<PipeEndpoint, LinuxError> {
+    fn splice_pipe_input(&self, fd: i32) -> Result<OpenFileRef, LinuxError> {
         match self.entry(fd)? {
             FdEntry::Pipe(pipe) => Ok(pipe.clone()),
-            _ => Err(LinuxError::EBADF),
-        }
-    }
-
-    fn splice_pipe_available_write(&self, fd: i32) -> Result<usize, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::Pipe(pipe) => Ok(pipe.capacity().saturating_sub(pipe.available_read())),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -4403,62 +5086,9 @@ impl FdTable {
         }
     }
 
-    fn tee_pipe(
-        &self,
-        fd_in: i32,
-        fd_out: i32,
-        len: usize,
-        nonblocking: bool,
-    ) -> Result<usize, LinuxError> {
-        let src = match self.entry(fd_in)? {
-            FdEntry::Pipe(pipe) => pipe,
-            _ => return Err(LinuxError::EINVAL),
-        };
-        let dst = match self.entry(fd_out)? {
-            FdEntry::Pipe(pipe) => pipe,
-            _ => return Err(LinuxError::EINVAL),
-        };
-        src.tee_to(dst, len, nonblocking)
-    }
-
-    fn vmsplice_pipe_direction(&self, fd: i32) -> Result<VmspliceDirection, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::Pipe(pipe) if pipe.writable() => Ok(VmspliceDirection::ToPipe),
-            FdEntry::Pipe(pipe) if pipe.readable() => Ok(VmspliceDirection::FromPipe),
-            FdEntry::Pipe(_) => Err(LinuxError::EBADF),
-            _ => Err(LinuxError::EBADF),
-        }
-    }
-
-    fn vmsplice_write_pipe(
-        &self,
-        fd: i32,
-        src: &[u8],
-        nonblocking: bool,
-    ) -> Result<usize, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::Pipe(pipe) if pipe.writable() => pipe.write_partial(src, nonblocking),
-            FdEntry::Pipe(_) => Err(LinuxError::EBADF),
-            _ => Err(LinuxError::EBADF),
-        }
-    }
-
-    fn vmsplice_read_pipe(
-        &self,
-        fd: i32,
-        dst: &mut [u8],
-        nonblocking: bool,
-    ) -> Result<usize, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::Pipe(pipe) if pipe.readable() => pipe.read_partial(dst, nonblocking),
-            FdEntry::Pipe(_) => Err(LinuxError::EBADF),
-            _ => Err(LinuxError::EBADF),
-        }
-    }
-
     pub(super) fn pipe_capacity(&self, fd: i32) -> Result<usize, LinuxError> {
         match self.entry(fd)? {
-            FdEntry::Pipe(pipe) => Ok(pipe.capacity()),
+            FdEntry::Pipe(pipe) => Ok(pipe_endpoint(pipe)?.capacity()),
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -4491,15 +5121,22 @@ impl FdTable {
                 | FdEntry::ProcTimerSlack(_)
                 | FdEntry::ProcSysFile(_) => true,
                 FdEntry::Path(_) => false,
-                FdEntry::EventFd(eventfd) => eventfd.poll_readable(),
+                FdEntry::EventFd(eventfd) => {
+                    eventfd.object().readiness().contains(ReadyEvents::READABLE)
+                }
                 FdEntry::Inotify(_) => false,
-                FdEntry::TimerFd(timerfd) => timerfd.poll_readable(),
+                FdEntry::TimerFd(timerfd) => {
+                    timerfd.object().readiness().contains(ReadyEvents::READABLE)
+                }
                 FdEntry::SignalFd(signalfd) => signalfd.poll_readable(),
                 FdEntry::PidFd(pidfd) => pidfd.exited(),
                 FdEntry::PosixMq(mq) => mq.poll_readable(),
                 FdEntry::ProcMqQueuesMax(_) => true,
                 FdEntry::Epoll(_) => false,
-                FdEntry::Pipe(pipe) => pipe.poll_readable(),
+                FdEntry::Pipe(pipe) => pipe
+                    .object()
+                    .readiness()
+                    .contains(axfile::ReadyEvents::READABLE),
                 FdEntry::Socket(socket) => socket.poll(mode),
                 FdEntry::LocalSocket(socket) => socket.poll(mode),
             },
@@ -4529,8 +5166,13 @@ impl FdTable {
                 FdEntry::PosixMq(mq) => mq.poll_writable(),
                 FdEntry::ProcMqQueuesMax(_) => true,
                 FdEntry::ProcSysFile(_) => true,
-                FdEntry::EventFd(eventfd) => eventfd.poll_writable(),
-                FdEntry::Pipe(pipe) => pipe.poll_writable(),
+                FdEntry::EventFd(eventfd) => {
+                    eventfd.object().readiness().contains(ReadyEvents::WRITABLE)
+                }
+                FdEntry::Pipe(pipe) => pipe
+                    .object()
+                    .readiness()
+                    .contains(axfile::ReadyEvents::WRITABLE),
                 FdEntry::Socket(socket) => socket.poll(mode),
                 FdEntry::LocalSocket(socket) => socket.poll(mode),
             },
@@ -4538,13 +5180,13 @@ impl FdTable {
         }
     }
 
-    pub(super) fn epoll_ctl(
+    fn epoll_ctl(
         &mut self,
         epfd: i32,
         op: u32,
         fd: i32,
         event: Option<general::epoll_event>,
-    ) -> Result<(), LinuxError> {
+    ) -> Result<EpollCtlUpdate, LinuxError> {
         if epfd == fd {
             return Err(LinuxError::EINVAL);
         }
@@ -4552,42 +5194,123 @@ impl FdTable {
             FdEntry::Epoll(epoll) => epoll.clone(),
             _ => return Err(LinuxError::EINVAL),
         };
-        match op {
+        let target_slot = self.slot(fd)?;
+        let key = RegistrationKey::new(fd, target_slot.description_id());
+        // Serialize validation and graph mutation across independently forked
+        // FdTables that still share EpollState objects.
+        let graph_guard = epoll_graph_lock().lock();
+        let retired = match op {
             general::EPOLL_CTL_ADD | general::EPOLL_CTL_MOD => {
                 let Some(event) = event else {
                     return Err(LinuxError::EFAULT);
                 };
-                self.validate_epoll_target(epfd, fd)?;
-                let mut registrations = epoll.registrations.lock();
-                match op {
-                    general::EPOLL_CTL_ADD => {
-                        if registrations.contains_key(&fd) {
-                            return Err(LinuxError::EEXIST);
-                        }
-                        registrations.insert(fd, EpollRegistration::new(event));
+                {
+                    let registrations = epoll.state.registrations.lock();
+                    if op == general::EPOLL_CTL_ADD && registrations.contains_key(&key) {
+                        return Err(LinuxError::EEXIST);
                     }
-                    general::EPOLL_CTL_MOD => {
-                        if !registrations.contains_key(&fd) {
-                            return Err(LinuxError::ENOENT);
-                        }
-                        registrations.insert(fd, EpollRegistration::new(event));
+                    if op == general::EPOLL_CTL_MOD && !registrations.contains_key(&key) {
+                        return Err(LinuxError::ENOENT);
                     }
-                    _ => unreachable!(),
                 }
+                self.validate_epoll_target(&epoll, &target_slot.entry)?;
+                let version = epoll.state.next_version()?;
+                let close_observer = Arc::new(EpollCloseObserver {
+                    owner: Arc::downgrade(&epoll.state),
+                    key,
+                    version,
+                });
+                let erased_close_observer: Arc<dyn EventObserver> = close_observer.clone();
+                let close_subscription = target_slot
+                    .description
+                    .close_events()
+                    .subscribe(&erased_close_observer)
+                    .map_err(|err| match err {
+                        axfile::RegistrationError::SourceClosed => LinuxError::EBADF,
+                        axfile::RegistrationError::TokenExhausted => LinuxError::ENFILE,
+                    })?
+                    .1;
+                let (target, ready_observer, subscription) = match &target_slot.entry {
+                    entry if entry.open_file().is_some() => {
+                        let file = entry.open_file().expect("guarded by is_some");
+                        let ready_observer = EpollReadyObserver::new(
+                            &epoll.state,
+                            Self::epoll_observer_interests(event.events),
+                        );
+                        let observer: Arc<dyn EventObserver> = ready_observer.clone();
+                        let subscription = file
+                            .object()
+                            .event_source()
+                            .subscribe(&observer)
+                            .map_err(|err| match err {
+                                axfile::RegistrationError::SourceClosed => LinuxError::EBADF,
+                                axfile::RegistrationError::TokenExhausted => LinuxError::ENFILE,
+                            })?
+                            .1;
+                        (
+                            EpollTarget::Object(Arc::downgrade(file)),
+                            Some(ready_observer),
+                            Some(subscription),
+                        )
+                    }
+                    FdEntry::Epoll(target_epoll) => {
+                        let ready_observer = EpollReadyObserver::new(
+                            &epoll.state,
+                            Self::epoll_observer_interests(event.events),
+                        );
+                        let observer: Arc<dyn EventObserver> = ready_observer.clone();
+                        let subscription = target_epoll
+                            .state
+                            .events
+                            .subscribe(&observer)
+                            .map_err(|err| match err {
+                                axfile::RegistrationError::SourceClosed => LinuxError::EBADF,
+                                axfile::RegistrationError::TokenExhausted => LinuxError::ENFILE,
+                            })?
+                            .1;
+                        (
+                            EpollTarget::Epoll(Arc::downgrade(&target_epoll.state)),
+                            Some(ready_observer),
+                            Some(subscription),
+                        )
+                    }
+                    _ => (
+                        EpollTarget::Legacy(LegacyEpollTarget::duplicate(&target_slot.entry)?),
+                        None,
+                        None,
+                    ),
+                };
+                let registration = EpollRegistration::new(
+                    target,
+                    event,
+                    version,
+                    ready_observer,
+                    subscription,
+                    close_observer,
+                    close_subscription,
+                );
+                epoll.state.registrations.lock().insert(key, registration)
             }
             general::EPOLL_CTL_DEL => {
-                let mut registrations = epoll.registrations.lock();
-                if registrations.remove(&fd).is_none() {
+                let mut registrations = epoll.state.registrations.lock();
+                let retired = registrations.remove(&key);
+                if retired.is_none() {
                     return Err(LinuxError::ENOENT);
                 }
+                retired
             }
             _ => return Err(LinuxError::EINVAL),
-        }
-        Ok(())
+        };
+        drop(graph_guard);
+        Ok(EpollCtlUpdate { epoll, retired })
     }
 
-    fn validate_epoll_target(&self, epfd: i32, fd: i32) -> Result<(), LinuxError> {
-        match self.entry(fd)? {
+    fn validate_epoll_target(
+        &self,
+        epoll: &EpollEntry,
+        target: &FdEntry,
+    ) -> Result<(), LinuxError> {
+        match target {
             FdEntry::Pipe(_)
             | FdEntry::Socket(_)
             | FdEntry::LocalSocket(_)
@@ -4596,11 +5319,16 @@ impl FdTable {
             | FdEntry::SignalFd(_)
             | FdEntry::PidFd(_)
             | FdEntry::PosixMq(_) => Ok(()),
-            FdEntry::Epoll(_) => {
-                if self.epoll_reaches(fd, epfd, &mut Vec::new()) {
+            FdEntry::Epoll(target) => {
+                if target.id() == epoll.id() {
+                    return Err(LinuxError::EINVAL);
+                }
+                if Self::epoll_reaches(&target.state, epoll.id(), &mut Vec::new())? {
                     return Err(LinuxError::ELOOP);
                 }
-                if self.epoll_nesting_depth(fd, &mut Vec::new()) >= LINUX_EPOLL_MAX_NEST_DEPTH {
+                if Self::epoll_nesting_depth(&target.state, &mut Vec::new())?
+                    >= LINUX_EPOLL_MAX_NEST_DEPTH
+                {
                     return Err(LinuxError::EINVAL);
                 }
                 Ok(())
@@ -4609,119 +5337,291 @@ impl FdTable {
         }
     }
 
-    fn epoll_reaches(&self, start_epfd: i32, target_epfd: i32, visited: &mut Vec<i32>) -> bool {
-        if start_epfd == target_epfd {
-            return true;
+    fn epoll_reaches(
+        state: &Arc<EpollState>,
+        target_id: OpenFileId,
+        visited: &mut Vec<OpenFileId>,
+    ) -> Result<bool, LinuxError> {
+        if state.id == target_id {
+            return Ok(true);
         }
-        if visited.contains(&start_epfd) {
-            return false;
+        if visited.contains(&state.id) {
+            return Ok(false);
         }
-        visited.push(start_epfd);
-        let registrations = match self.entry(start_epfd) {
-            Ok(FdEntry::Epoll(epoll)) => epoll.registrations.lock().clone(),
-            _ => {
-                visited.pop();
-                return false;
-            }
-        };
-        for fd in registrations.keys() {
-            if self.epoll_reaches(*fd, target_epfd, visited) {
-                return true;
+        visited.push(state.id);
+        for registration in state.registration_snapshots()? {
+            if let EpollTarget::Epoll(child) = registration.target {
+                if let Some(child) = child.upgrade() {
+                    if Self::epoll_reaches(&child, target_id, visited)? {
+                        visited.pop();
+                        return Ok(true);
+                    }
+                }
             }
         }
         visited.pop();
-        false
+        Ok(false)
     }
 
-    fn epoll_nesting_depth(&self, epfd: i32, visited: &mut Vec<i32>) -> usize {
-        if visited.contains(&epfd) {
-            return LINUX_EPOLL_MAX_NEST_DEPTH;
+    fn epoll_nesting_depth(
+        state: &Arc<EpollState>,
+        visited: &mut Vec<OpenFileId>,
+    ) -> Result<usize, LinuxError> {
+        if visited.contains(&state.id) {
+            return Ok(LINUX_EPOLL_MAX_NEST_DEPTH);
         }
-        visited.push(epfd);
-        let registrations = match self.entry(epfd) {
-            Ok(FdEntry::Epoll(epoll)) => epoll.registrations.lock().clone(),
-            _ => {
-                visited.pop();
-                return 0;
-            }
-        };
+        visited.push(state.id);
         let mut max_child_depth = 0usize;
-        for fd in registrations.keys() {
-            max_child_depth = cmp::max(max_child_depth, self.epoll_nesting_depth(*fd, visited));
+        for registration in state.registration_snapshots()? {
+            if let EpollTarget::Epoll(child) = registration.target {
+                if let Some(child) = child.upgrade() {
+                    max_child_depth =
+                        cmp::max(max_child_depth, Self::epoll_nesting_depth(&child, visited)?);
+                }
+            }
         }
         visited.pop();
-        max_child_depth.saturating_add(1)
+        Ok(max_child_depth.saturating_add(1))
     }
 
-    pub(super) fn epoll_collect_ready(
-        &self,
-        epfd: i32,
+    pub(super) fn epoll_entry(&self, epfd: i32) -> Result<EpollEntry, LinuxError> {
+        match self.entry(epfd)? {
+            FdEntry::Epoll(epoll) => Ok(epoll.clone()),
+            _ => Err(LinuxError::EINVAL),
+        }
+    }
+
+    fn epoll_wait_profile(
+        state: &Arc<EpollState>,
+        visited: &mut Vec<OpenFileId>,
+    ) -> Result<(bool, Option<Duration>), LinuxError> {
+        if visited.contains(&state.id) {
+            return Ok((false, None));
+        }
+        visited.push(state.id);
+        let mut has_legacy = false;
+        let mut next_timeout: Option<Duration> = None;
+        for snapshot in state.registration_snapshots()? {
+            match snapshot.target {
+                EpollTarget::Object(file) => {
+                    if let Some(file) = file.upgrade() {
+                        if let Some(timeout) = file.object().next_timeout() {
+                            next_timeout =
+                                Some(next_timeout.map_or(timeout, |current| current.min(timeout)));
+                        }
+                    }
+                }
+                EpollTarget::Legacy(_) => has_legacy = true,
+                EpollTarget::Epoll(child) => {
+                    if let Some(child) = child.upgrade() {
+                        let (child_legacy, child_timeout) =
+                            Self::epoll_wait_profile(&child, visited)?;
+                        has_legacy |= child_legacy;
+                        if let Some(timeout) = child_timeout {
+                            next_timeout =
+                                Some(next_timeout.map_or(timeout, |current| current.min(timeout)));
+                        }
+                    }
+                }
+            }
+        }
+        visited.pop();
+        Ok((has_legacy, next_timeout))
+    }
+
+    fn epoll_collect_ready_for(
+        epoll: &EpollEntry,
         maxevents: usize,
         out: &mut Vec<general::epoll_event>,
     ) -> Result<usize, LinuxError> {
-        let registrations = match self.entry(epfd)? {
-            FdEntry::Epoll(epoll) => epoll.registrations.clone(),
-            _ => return Err(LinuxError::EINVAL),
-        };
-        let mut registrations = registrations.lock();
-        perf_counters::record_epoll_ready_scan(registrations.len());
-        for (&fd, registration) in registrations.iter_mut() {
-            if registration.disabled {
+        let snapshots = epoll.state.registration_snapshots()?;
+        perf_counters::record_epoll_ready_scan(snapshots.len());
+        let mut stale = Vec::new();
+        for snapshot in snapshots {
+            if snapshot.delivery.is_disabled() {
                 continue;
             }
-            let ready_events =
-                Self::epoll_ready_events_for_entry(self.entry(fd).ok(), registration.event.events);
-            let edge_triggered = registration.event.events & general::EPOLLET != 0;
-            let became_ready = ready_events & !registration.last_ready != 0;
-            let should_emit = ready_events != 0 && (!edge_triggered || became_ready);
-            let has_capacity = out.len() < maxevents;
-            if should_emit && has_capacity {
-                out.try_reserve_exact(1).map_err(|_| LinuxError::ENOMEM)?;
-                out.push(general::epoll_event {
-                    events: ready_events,
-                    data: registration.event.data,
-                });
-                if registration.event.events & general::EPOLLONESHOT != 0 {
-                    registration.disabled = true;
+            let mut notification = snapshot
+                .ready_observer
+                .as_ref()
+                .map_or(0, |observer| observer.generation());
+            loop {
+                let Some(ready_events) = Self::epoll_ready_events_for_target(
+                    &snapshot.target,
+                    snapshot.event.events,
+                    &mut Vec::new(),
+                )?
+                else {
+                    stale.push((snapshot.key, snapshot.version));
+                    break;
+                };
+                let observed_after_query = snapshot
+                    .ready_observer
+                    .as_ref()
+                    .map_or(0, |observer| observer.generation());
+                if observed_after_query != notification {
+                    notification = observed_after_query;
+                    continue;
+                }
+                let has_capacity = out.len() < maxevents;
+                if ready_events != 0 && has_capacity {
+                    out.try_reserve_exact(1).map_err(|_| LinuxError::ENOMEM)?;
+                }
+                enum DeliveryClaim {
+                    Retry(u64),
+                    Done(bool),
+                    Gone,
+                }
+                let claim = {
+                    let mut registrations = epoll.state.registrations.lock();
+                    let Some(registration) = registrations.get_mut(&snapshot.key) else {
+                        break;
+                    };
+                    if registration.version != snapshot.version {
+                        DeliveryClaim::Gone
+                    } else {
+                        let current_notification = registration
+                            .ready_observer
+                            .as_ref()
+                            .map_or(0, |observer| observer.generation());
+                        if current_notification != notification {
+                            DeliveryClaim::Retry(current_notification)
+                        } else {
+                            DeliveryClaim::Done(registration.delivery.claim(
+                                ready_events,
+                                notification,
+                                registration.event.events & general::EPOLLET != 0,
+                                registration.event.events & general::EPOLLONESHOT != 0,
+                                has_capacity,
+                            ))
+                        }
+                    }
+                };
+                match claim {
+                    DeliveryClaim::Retry(current) => {
+                        notification = current;
+                    }
+                    DeliveryClaim::Done(true) => {
+                        out.push(general::epoll_event {
+                            events: ready_events,
+                            data: snapshot.event.data,
+                        });
+                        break;
+                    }
+                    DeliveryClaim::Done(false) | DeliveryClaim::Gone => break,
                 }
             }
-            if !should_emit || has_capacity {
-                registration.last_ready = ready_events;
-            }
         }
-        Ok(registrations.len())
+        if !stale.is_empty() {
+            let mut registrations = epoll.state.registrations.lock();
+            let mut removed = Vec::new();
+            for (key, version) in stale {
+                if registrations
+                    .get(&key)
+                    .is_some_and(|registration| registration.version == version)
+                {
+                    if let Some(registration) = registrations.remove(&key) {
+                        removed.push(registration);
+                    }
+                }
+            }
+            drop(registrations);
+            drop(removed);
+        }
+        Ok(epoll.state.registrations.lock().len())
     }
 
-    pub(super) fn epoll_fast_no_ready(&self, epfd: i32) -> Result<Option<bool>, LinuxError> {
-        let registrations = match self.entry(epfd)? {
-            FdEntry::Epoll(epoll) => epoll.registrations.clone(),
-            _ => return Err(LinuxError::EINVAL),
-        };
-        let registrations = registrations.lock();
-        for (&fd, registration) in registrations.iter() {
-            if registration.disabled {
+    fn epoll_ready_events_for_target(
+        target: &EpollTarget,
+        requested: u32,
+        visited: &mut Vec<OpenFileId>,
+    ) -> Result<Option<u32>, LinuxError> {
+        match target {
+            EpollTarget::Object(file) => Ok(file
+                .upgrade()
+                .map(|file| Self::epoll_ready_events_for_object(&file, requested))),
+            EpollTarget::Legacy(target) => Ok(Some(Self::epoll_ready_events_for_entry(
+                &target.entry,
+                requested,
+            ))),
+            EpollTarget::Epoll(state) => {
+                let Some(state) = state.upgrade() else {
+                    return Ok(None);
+                };
+                Ok(Some(if Self::epoll_state_has_ready(&state, visited)? {
+                    general::EPOLLIN
+                } else {
+                    0
+                }))
+            }
+        }
+    }
+
+    fn epoll_state_has_ready(
+        state: &Arc<EpollState>,
+        visited: &mut Vec<OpenFileId>,
+    ) -> Result<bool, LinuxError> {
+        if visited.contains(&state.id) {
+            return Ok(false);
+        }
+        visited.push(state.id);
+        for snapshot in state.registration_snapshots()? {
+            if snapshot.delivery.is_disabled() {
                 continue;
             }
-            if registration.event.events & (general::EPOLLET | general::EPOLLONESHOT) != 0 {
-                return Ok(None);
-            }
-            let Some(ready_events) = Self::epoll_ready_events_for_fast_entry(
-                self.entry(fd).ok(),
-                registration.event.events,
-            ) else {
-                return Ok(None);
-            };
-            if ready_events != 0 {
-                return Ok(Some(false));
+            if let Some(ready) = Self::epoll_ready_events_for_target(
+                &snapshot.target,
+                snapshot.event.events,
+                visited,
+            )? {
+                let edge = snapshot.event.events & general::EPOLLET != 0;
+                let notification = snapshot
+                    .ready_observer
+                    .as_ref()
+                    .map_or(0, |observer| observer.generation());
+                if snapshot.delivery.should_emit(ready, notification, edge) {
+                    visited.pop();
+                    return Ok(true);
+                }
             }
         }
-        Ok(Some(true))
+        visited.pop();
+        Ok(false)
     }
 
-    fn epoll_ready_events_for_entry(entry: Option<&FdEntry>, requested: u32) -> u32 {
-        let Some(entry) = entry else {
-            return general::EPOLLNVAL;
-        };
+    fn epoll_observer_interests(requested: u32) -> ReadyEvents {
+        let mut interests = ReadyEvents::ERROR | ReadyEvents::HANGUP;
+        if requested & general::EPOLLIN != 0 {
+            interests |= ReadyEvents::READABLE;
+        }
+        if requested & general::EPOLLOUT != 0 {
+            interests |= ReadyEvents::WRITABLE;
+        }
+        if requested & general::EPOLLPRI != 0 {
+            interests |= ReadyEvents::PRIORITY;
+        }
+        interests
+    }
+
+    fn epoll_ready_events_for_object(file: &OpenFileRef, requested: u32) -> u32 {
+        let ready = file.object().readiness();
+        let mut ready_events = 0u32;
+        if requested & general::EPOLLIN != 0 && ready.intersects(ReadyEvents::READABLE) {
+            ready_events |= general::EPOLLIN;
+        }
+        if requested & general::EPOLLOUT != 0 && ready.intersects(ReadyEvents::WRITABLE) {
+            ready_events |= general::EPOLLOUT;
+        }
+        if ready.intersects(ReadyEvents::ERROR) {
+            ready_events |= general::EPOLLERR;
+        }
+        if ready.intersects(ReadyEvents::HANGUP) {
+            ready_events |= general::EPOLLHUP;
+        }
+        ready_events
+    }
+
+    fn epoll_ready_events_for_entry(entry: &FdEntry, requested: u32) -> u32 {
         let mut ready_events = 0u32;
         if requested & general::EPOLLIN != 0 && Self::poll_entry(entry, SelectMode::Read) {
             ready_events |= general::EPOLLIN;
@@ -4735,95 +5635,6 @@ impl FdTable {
             ready_events |= general::EPOLLRDHUP;
         }
         ready_events
-    }
-
-    fn epoll_ready_events_for_fast_entry(entry: Option<&FdEntry>, requested: u32) -> Option<u32> {
-        let Some(entry) = entry else {
-            return Some(general::EPOLLNVAL);
-        };
-        let mut ready_events = 0u32;
-        if requested & general::EPOLLIN != 0 {
-            if Self::poll_entry_fast(entry, SelectMode::Read)? {
-                ready_events |= general::EPOLLIN;
-            }
-        }
-        if requested & general::EPOLLOUT != 0 {
-            if Self::poll_entry_fast(entry, SelectMode::Write)? {
-                ready_events |= general::EPOLLOUT;
-            }
-        }
-        if requested & general::EPOLLRDHUP != 0 {
-            if matches!(entry, FdEntry::Socket(_)) {
-                return None;
-            }
-        }
-        Some(ready_events)
-    }
-
-    fn poll_entry_fast(entry: &FdEntry, mode: SelectMode) -> Option<bool> {
-        match mode {
-            SelectMode::Read => match entry {
-                FdEntry::Stdin(_) | FdEntry::Stdout(_) | FdEntry::Stderr(_) => Some(false),
-                FdEntry::DevNull
-                | FdEntry::DevZero(_)
-                | FdEntry::DevRandom(_)
-                | FdEntry::DevCpuDmaLatency(_)
-                | FdEntry::BlockDevice(_)
-                | FdEntry::Rtc
-                | FdEntry::File(_)
-                | FdEntry::Directory(_)
-                | FdEntry::ProcFdDir(_)
-                | FdEntry::SyntheticDir(_)
-                | FdEntry::MemoryFile(_)
-                | FdEntry::Memfd(_)
-                | FdEntry::ProcPagemap(_)
-                | FdEntry::ProcTimerSlack(_)
-                | FdEntry::ProcSysFile(_)
-                | FdEntry::ProcMqQueuesMax(_) => Some(true),
-                FdEntry::Path(_) | FdEntry::Inotify(_) | FdEntry::Epoll(_) => Some(false),
-                FdEntry::Pipe(pipe) => Some(pipe.poll_readable()),
-                FdEntry::EventFd(_)
-                | FdEntry::TimerFd(_)
-                | FdEntry::SignalFd(_)
-                | FdEntry::PidFd(_)
-                | FdEntry::PosixMq(_)
-                | FdEntry::Socket(_)
-                | FdEntry::LocalSocket(_) => None,
-            },
-            SelectMode::Write => match entry {
-                FdEntry::Stdin(_) => Some(false),
-                FdEntry::Stdout(_)
-                | FdEntry::Stderr(_)
-                | FdEntry::DevNull
-                | FdEntry::DevZero(_)
-                | FdEntry::DevRandom(_)
-                | FdEntry::DevCpuDmaLatency(_)
-                | FdEntry::BlockDevice(_)
-                | FdEntry::Rtc
-                | FdEntry::File(_)
-                | FdEntry::Memfd(_)
-                | FdEntry::ProcMqQueuesMax(_)
-                | FdEntry::ProcSysFile(_) => Some(true),
-                FdEntry::Directory(_)
-                | FdEntry::ProcFdDir(_)
-                | FdEntry::SyntheticDir(_)
-                | FdEntry::Path(_)
-                | FdEntry::MemoryFile(_)
-                | FdEntry::ProcPagemap(_)
-                | FdEntry::ProcTimerSlack(_)
-                | FdEntry::Inotify(_)
-                | FdEntry::TimerFd(_)
-                | FdEntry::SignalFd(_)
-                | FdEntry::PidFd(_)
-                | FdEntry::Epoll(_) => Some(false),
-                FdEntry::EventFd(_)
-                | FdEntry::Pipe(_)
-                | FdEntry::PosixMq(_)
-                | FdEntry::Socket(_)
-                | FdEntry::LocalSocket(_) => None,
-            },
-            SelectMode::Except => Some(false),
-        }
     }
 
     pub(super) fn read(
@@ -4876,12 +5687,13 @@ impl FdTable {
             FdEntry::Directory(_) | FdEntry::ProcFdDir(_) | FdEntry::SyntheticDir(_) => {
                 Err(LinuxError::EISDIR)
             }
-            FdEntry::Pipe(pipe) => pipe.read(dst),
+            // Migrated objects are snapshotted and dispatched before entering
+            // this legacy adapter, so a reused slot can never block while the
+            // FD-table lock is held.
+            FdEntry::Pipe(_) | FdEntry::EventFd(_) | FdEntry::TimerFd(_) => Err(LinuxError::EBADF),
             FdEntry::Socket(socket) => socket.read(dst),
             FdEntry::LocalSocket(socket) => socket.read(process, dst),
-            FdEntry::EventFd(eventfd) => eventfd.read(process, dst),
             FdEntry::Inotify(inotify) => inotify.read(),
-            FdEntry::TimerFd(timerfd) => timerfd.read(process, dst),
             FdEntry::SignalFd(signalfd) => signalfd.read(process, dst),
             FdEntry::ProcMqQueuesMax(entry) => entry.read(dst),
             FdEntry::PosixMq(_) => Err(LinuxError::EBADF),
@@ -4935,10 +5747,9 @@ impl FdTable {
                 file_entry_write(process, file, src, file_size_limit)
             }
             FdEntry::Memfd(file) => file.write(src, file_size_limit),
-            FdEntry::Pipe(pipe) => pipe.write(src),
+            FdEntry::Pipe(_) | FdEntry::EventFd(_) => Err(LinuxError::EBADF),
             FdEntry::Socket(socket) => socket.write(src),
             FdEntry::LocalSocket(socket) => socket.write(process, src),
-            FdEntry::EventFd(eventfd) => eventfd.write(process, src),
             FdEntry::ProcTimerSlack(file) => {
                 if !file_is_writable(file.status_flags) {
                     return Err(LinuxError::EBADF);
@@ -4984,27 +5795,43 @@ impl FdTable {
         }
     }
 
-    fn close_slot(&mut self, idx: usize) -> Result<(), LinuxError> {
-        if let Some(entry) = self.entries[idx].as_ref() {
-            if let FdEntry::File(file) = entry {
-                release_flock_on_last_close(file);
-                release_file_lease_on_last_close(file);
-                release_ofd_record_locks_on_last_close(file);
-            }
-            if let FdEntry::Socket(socket) = entry {
-                socket.close()?;
-            }
-            untrack_exec_write_open(entry);
-        }
-        self.entries[idx] = None;
-        if let Some(flags) = self.fd_flags.get_mut(idx) {
-            *flags = 0;
+    fn prepare_close_slot(&self, idx: usize) -> Result<(), LinuxError> {
+        let Some(slot) = self.slots.get(idx).and_then(Option::as_ref) else {
+            return Err(LinuxError::EBADF);
+        };
+        if let FdEntry::Socket(socket) = &slot.entry {
+            socket.close()?;
         }
         Ok(())
     }
 
-    pub(super) fn close(&mut self, fd: i32) -> Result<(), LinuxError> {
-        if !(0..self.entries.len() as i32).contains(&fd) || self.entries[fd as usize].is_none() {
+    fn take_prepared_slot(&mut self, idx: usize) -> ClosedFd {
+        let entry = &self.slots[idx]
+            .as_ref()
+            .expect("prepared descriptor slot must remain present")
+            .entry;
+        if let FdEntry::File(file) = entry {
+            release_flock_on_last_close(file);
+            release_file_lease_on_last_close(file);
+            release_ofd_record_locks_on_last_close(file);
+        }
+        untrack_exec_write_open(entry);
+        let slot = self.slots[idx]
+            .take()
+            .expect("prepared descriptor slot must remain present");
+        ClosedFd {
+            _entry: slot.entry,
+            _description: slot.description,
+        }
+    }
+
+    fn close_slot(&mut self, idx: usize) -> Result<ClosedFd, LinuxError> {
+        self.prepare_close_slot(idx)?;
+        Ok(self.take_prepared_slot(idx))
+    }
+
+    pub(super) fn close(&mut self, fd: i32) -> Result<ClosedFd, LinuxError> {
+        if !(0..self.slots.len() as i32).contains(&fd) || self.slots[fd as usize].is_none() {
             return Err(LinuxError::EBADF);
         }
         self.close_slot(fd as usize)
@@ -5014,11 +5841,15 @@ impl FdTable {
         &mut self,
         process: &UserProcess,
         fd: i32,
-    ) -> Result<(), LinuxError> {
-        if !(0..self.entries.len() as i32).contains(&fd) || self.entries[fd as usize].is_none() {
+    ) -> Result<ClosedFd, LinuxError> {
+        if !(0..self.slots.len() as i32).contains(&fd) || self.slots[fd as usize].is_none() {
             return Err(LinuxError::EBADF);
         }
-        if let Some(FdEntry::File(file)) = self.entries[fd as usize].as_ref() {
+        if let Some(FdSlot {
+            entry: FdEntry::File(file),
+            ..
+        }) = self.slots[fd as usize].as_ref()
+        {
             release_posix_record_locks_for_file_owner(record_lock_key(file), process.pid());
         }
         self.close_slot(fd as usize)
@@ -5030,54 +5861,82 @@ impl FdTable {
         first: usize,
         last: usize,
         flags: u32,
-    ) -> Result<(), LinuxError> {
-        let Some(last) = last
-            .min(self.entries.len().saturating_sub(1))
-            .checked_add(1)
-        else {
-            return Ok(());
+    ) -> Result<Vec<ClosedFd>, LinuxError> {
+        let Some(last) = last.min(self.slots.len().saturating_sub(1)).checked_add(1) else {
+            return Ok(Vec::new());
         };
         if first >= last {
-            return Ok(());
+            return Ok(Vec::new());
         }
 
         if flags & CLOSE_RANGE_CLOEXEC != 0 {
-            if self.fd_flags.len() < self.entries.len() {
-                self.fd_flags.resize(self.entries.len(), 0);
-            }
             for idx in first..last {
-                if self.entries[idx].is_some() {
-                    self.fd_flags[idx] |= general::FD_CLOEXEC;
+                if let Some(slot) = self.slots[idx].as_mut() {
+                    slot.fd_flags |= general::FD_CLOEXEC;
                 }
             }
-            return Ok(());
+            return Ok(Vec::new());
         }
 
         // CLOSE_RANGE_UNSHARE is applied by ProcessFdTable before selecting the
         // active table for this process.  At this layer only the requested
         // close/CLOEXEC operation remains.
         let _unshare_requested = flags & CLOSE_RANGE_UNSHARE != 0;
+        let mut closed = Vec::new();
+        closed
+            .try_reserve_exact(last - first)
+            .map_err(|_| LinuxError::ENOMEM)?;
+        // Perform all fallible socket closes before detaching any entries, so
+        // an error cannot drop already-detached event sources under the table
+        // lock while unwinding this call.
         for idx in first..last {
-            if self.entries[idx].is_some() {
-                self.close_for_process(process, idx as i32)?;
+            if self.slots[idx].is_some() {
+                self.prepare_close_slot(idx)?;
             }
         }
-        Ok(())
+        for idx in first..last {
+            if self.slots[idx].is_some() {
+                if let Some(FdSlot {
+                    entry: FdEntry::File(file),
+                    ..
+                }) = self.slots[idx].as_ref()
+                {
+                    release_posix_record_locks_for_file_owner(record_lock_key(file), process.pid());
+                }
+                closed.push(self.take_prepared_slot(idx));
+            }
+        }
+        Ok(closed)
     }
 
     pub(super) fn close_all(&mut self) {
-        for idx in 0..self.entries.len() {
-            let _ = self.close_slot(idx);
+        for idx in 0..self.slots.len() {
+            if let Ok(entry) = self.close_slot(idx) {
+                drop(entry);
+            }
         }
     }
 
-    pub(super) fn close_cloexec(&mut self) {
-        for idx in 0..self.entries.len() {
-            if self.fd_flags.get(idx).copied().unwrap_or(0) & general::FD_CLOEXEC == 0 {
+    pub(super) fn close_cloexec(&mut self) -> Vec<ClosedFd> {
+        let close_count = self
+            .slots
+            .iter()
+            .flatten()
+            .filter(|slot| slot.fd_flags & general::FD_CLOEXEC != 0)
+            .count();
+        let mut closed = Vec::with_capacity(close_count);
+        for idx in 0..self.slots.len() {
+            if self.slots[idx]
+                .as_ref()
+                .is_none_or(|slot| slot.fd_flags & general::FD_CLOEXEC == 0)
+            {
                 continue;
             }
-            let _ = self.close_slot(idx);
+            if let Ok(entry) = self.close_slot(idx) {
+                closed.push(entry);
+            }
         }
+        closed
     }
 
     pub(super) fn truncate(
@@ -5430,8 +6289,13 @@ impl FdTable {
         if min_fd as usize >= current_fd_table_limit() {
             return Err(LinuxError::EINVAL);
         }
-        let entry = self.entry(fd)?.duplicate_for_fork()?;
-        self.insert_min_with_flags(entry, min_fd as usize, fd_flags & general::FD_CLOEXEC)
+        let (entry, description) = self.duplicate_entry(fd)?;
+        self.insert_min_with_description(
+            entry,
+            min_fd as usize,
+            fd_flags & general::FD_CLOEXEC,
+            description,
+        )
     }
 
     pub(super) fn dup3(
@@ -5440,14 +6304,13 @@ impl FdTable {
         oldfd: i32,
         newfd: i32,
         flags: u32,
-    ) -> Result<i32, LinuxError> {
+    ) -> Result<(i32, Option<ClosedFd>), LinuxError> {
         if oldfd == newfd {
             return Err(LinuxError::EINVAL);
         }
         if flags & !general::O_CLOEXEC != 0 {
             return Err(LinuxError::EINVAL);
         }
-        let entry = self.entry(oldfd)?.duplicate_for_fork()?;
         if newfd < 0 {
             return Err(LinuxError::EBADF);
         }
@@ -5463,18 +6326,27 @@ impl FdTable {
         {
             return Err(LinuxError::EBADF);
         }
-        if self.entries.len() <= newfd {
-            self.entries.resize_with(newfd + 1, || None);
-            self.fd_flags.resize(newfd + 1, 0);
-        } else if self.entries[newfd].is_some() {
-            let _ = self.close_for_process(process, newfd as i32);
-        }
-        if self.fd_flags.len() <= newfd {
-            self.fd_flags.resize(newfd + 1, 0);
-        }
-        self.entries[newfd] = Some(entry);
-        self.fd_flags[newfd] = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
-        Ok(newfd as i32)
+        let (entry, description) = self.duplicate_entry(oldfd)?;
+        let closed = if self.slots.len() <= newfd {
+            self.slots.resize_with(newfd + 1, || None);
+            None
+        } else if self.slots[newfd].is_some() {
+            match self.close_for_process(process, newfd as i32) {
+                Ok(closed) => Some(closed),
+                Err(err) => {
+                    discard_uninstalled_entry(entry);
+                    return Err(err);
+                }
+            }
+        } else {
+            None
+        };
+        self.slots[newfd] = Some(FdSlot::with_identity(
+            entry,
+            fd_cloexec_flag(flags & general::O_CLOEXEC != 0),
+            description,
+        ));
+        Ok((newfd as i32, closed))
     }
 
     pub(super) fn getdents64(
@@ -5485,10 +6357,10 @@ impl FdTable {
     ) -> Result<Vec<u8>, LinuxError> {
         if matches!(self.entry(fd)?, FdEntry::ProcFdDir(_)) {
             let fd_names = self
-                .entries
+                .slots
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, entry)| entry.as_ref().map(|_| idx.to_string()))
+                .filter_map(|(idx, slot)| slot.as_ref().map(|_| idx.to_string()))
                 .collect::<Vec<_>>();
             let FdEntry::ProcFdDir(dir) = self.entry_mut(fd)? else {
                 unreachable!();
@@ -5790,19 +6662,45 @@ impl FdTable {
         min_fd: usize,
         fd_flags: u32,
     ) -> Result<i32, LinuxError> {
-        let fd_limit = current_fd_table_limit();
-        if min_fd >= fd_limit {
+        if min_fd >= current_fd_table_limit() {
+            discard_uninstalled_entry(entry);
             return Err(LinuxError::EMFILE);
         }
-        if self.entries.len() < min_fd {
-            self.entries.resize_with(min_fd, || None);
-            self.fd_flags.resize(min_fd, 0);
+        let description_id = match entry.description_id().map_or_else(
+            || OpenFileId::allocate().map_err(|_| LinuxError::ENFILE),
+            Ok,
+        ) {
+            Ok(description_id) => description_id,
+            Err(err) => {
+                discard_uninstalled_entry(entry);
+                return Err(err);
+            }
+        };
+        self.insert_min_with_description(
+            entry,
+            min_fd,
+            fd_flags,
+            Arc::new(DescriptionIdentity::new(description_id)),
+        )
+    }
+
+    fn insert_min_with_description(
+        &mut self,
+        entry: FdEntry,
+        min_fd: usize,
+        fd_flags: u32,
+        description: Arc<DescriptionIdentity>,
+    ) -> Result<i32, LinuxError> {
+        let fd_limit = current_fd_table_limit();
+        if min_fd >= fd_limit {
+            discard_uninstalled_entry(entry);
+            return Err(LinuxError::EMFILE);
         }
-        if self.fd_flags.len() < self.entries.len() {
-            self.fd_flags.resize(self.entries.len(), 0);
+        if self.slots.len() < min_fd {
+            self.slots.resize_with(min_fd, || None);
         }
         if let Some((idx, slot)) = self
-            .entries
+            .slots
             .iter_mut()
             .enumerate()
             .take(fd_limit)
@@ -5810,57 +6708,64 @@ impl FdTable {
             .find(|(_, slot)| slot.is_none())
         {
             track_exec_write_open(&entry);
-            *slot = Some(entry);
-            self.fd_flags[idx] = fd_flags & general::FD_CLOEXEC;
+            *slot = Some(FdSlot::with_identity(entry, fd_flags, description));
             return Ok(idx as i32);
         }
-        if self.entries.len() >= fd_limit {
+        if self.slots.len() >= fd_limit {
+            discard_uninstalled_entry(entry);
             return Err(LinuxError::EMFILE);
         }
         track_exec_write_open(&entry);
-        self.entries.push(Some(entry));
-        self.fd_flags.push(fd_flags & general::FD_CLOEXEC);
-        Ok((self.entries.len() - 1) as i32)
+        self.slots
+            .push(Some(FdSlot::with_identity(entry, fd_flags, description)));
+        Ok((self.slots.len() - 1) as i32)
     }
 
     pub(super) fn get_fd_flags(&self, fd: i32) -> Result<i32, LinuxError> {
-        self.entry(fd)?;
-        Ok(self.fd_flags.get(fd as usize).copied().unwrap_or(0) as i32)
+        Ok(self.slot(fd)?.fd_flags as i32)
     }
 
     pub(super) fn set_fd_flags(&mut self, fd: i32, flags: u32) -> Result<i32, LinuxError> {
-        self.entry(fd)?;
-        let idx = fd as usize;
-        if self.fd_flags.len() <= idx {
-            self.fd_flags.resize(idx + 1, 0);
-        }
-        self.fd_flags[idx] = flags & general::FD_CLOEXEC;
+        self.slot_mut(fd)?.fd_flags = flags & general::FD_CLOEXEC;
         Ok(0)
     }
 
     pub(super) fn entry(&self, fd: i32) -> Result<&FdEntry, LinuxError> {
-        self.entries
-            .get(fd as usize)
-            .and_then(|entry| entry.as_ref())
-            .ok_or(LinuxError::EBADF)
+        Ok(&self.slot(fd)?.entry)
     }
 
     pub(super) fn entry_mut(&mut self, fd: i32) -> Result<&mut FdEntry, LinuxError> {
-        self.entries
-            .get_mut(fd as usize)
-            .and_then(|entry| entry.as_mut())
+        Ok(&mut self.slot_mut(fd)?.entry)
+    }
+
+    pub(super) fn open_file_ref(&self, fd: i32) -> Result<Option<OpenFileRef>, LinuxError> {
+        Ok(self.entry(fd)?.open_file().cloned())
+    }
+
+    fn slot(&self, fd: i32) -> Result<&FdSlot, LinuxError> {
+        self.slots
+            .get(fd as usize)
+            .and_then(|slot| slot.as_ref())
             .ok_or(LinuxError::EBADF)
     }
 
-    pub(super) fn file_description_key(&self, fd: i32) -> Result<Option<(u8, usize)>, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::File(file) => Ok(Some((1, Arc::as_ptr(&file.offset) as usize))),
-            FdEntry::Memfd(file) => Ok(Some((2, Arc::as_ptr(&file.offset) as usize))),
-            FdEntry::EventFd(eventfd) => Ok(Some((3, Arc::as_ptr(&eventfd.counter) as usize))),
-            FdEntry::TimerFd(timerfd) => Ok(Some((4, Arc::as_ptr(&timerfd.state) as usize))),
-            FdEntry::Epoll(epoll) => Ok(Some((5, Arc::as_ptr(&epoll.registrations) as usize))),
-            _ => Ok(None),
-        }
+    fn slot_mut(&mut self, fd: i32) -> Result<&mut FdSlot, LinuxError> {
+        self.slots
+            .get_mut(fd as usize)
+            .and_then(|slot| slot.as_mut())
+            .ok_or(LinuxError::EBADF)
+    }
+
+    fn duplicate_entry(&self, fd: i32) -> Result<(FdEntry, Arc<DescriptionIdentity>), LinuxError> {
+        let slot = self.slot(fd)?;
+        Ok((
+            slot.entry.duplicate_for_fork()?,
+            Arc::clone(&slot.description),
+        ))
+    }
+
+    pub(super) fn file_description_key(&self, fd: i32) -> Result<Option<OpenFileId>, LinuxError> {
+        Ok(Some(self.slot(fd)?.description_id()))
     }
 
     pub(super) fn pidfd_wait_target(&self, fd: i32) -> Result<(i32, bool), LinuxError> {
@@ -5938,7 +6843,7 @@ fn kcmp_file_description_key(
     process: &UserProcess,
     pid: i32,
     fd: i32,
-) -> Result<Option<(u8, usize)>, LinuxError> {
+) -> Result<Option<OpenFileId>, LinuxError> {
     if pid == process.pid() {
         return process.fds.lock().file_description_key(fd);
     }
@@ -6341,7 +7246,7 @@ impl FdTable {
             FdEntry::Memfd(file) => Ok(file.stat()),
             FdEntry::ProcPagemap(file) => Ok(file.stat()),
             FdEntry::ProcTimerSlack(file) => Ok(file.stat()),
-            FdEntry::Pipe(pipe) => Ok(pipe.stat()),
+            FdEntry::Pipe(pipe) => Ok(pipe_endpoint(pipe)?.stat()),
             FdEntry::Socket(socket) => Ok(socket.stat()),
             FdEntry::LocalSocket(socket) => Ok(socket.stat()),
             FdEntry::EventFd(_) => Ok(PathEntry::synthetic_file("anon_inode:[eventfd]", 0).stat()),
@@ -6564,11 +7469,9 @@ impl FdTable {
         if matches!(self.entry(fd)?, FdEntry::LocalSocket(_)) {
             return match cmd {
                 general::F_DUPFD => self.dup_min_with_flags(fd, arg as i32, 0),
-                general::F_DUPFD_CLOEXEC => self.insert_min_with_flags(
-                    self.entry(fd)?.duplicate_for_fork()?,
-                    arg,
-                    general::FD_CLOEXEC,
-                ),
+                general::F_DUPFD_CLOEXEC => {
+                    self.dup_min_with_flags(fd, arg as i32, general::FD_CLOEXEC)
+                }
                 general::F_GETFD => self.get_fd_flags(fd),
                 general::F_SETFD => self.set_fd_flags(fd, arg as u32),
                 general::F_GETFL => match self.entry(fd)? {
@@ -6591,14 +7494,10 @@ impl FdTable {
         };
         if let Some(socket) = socket {
             return match cmd {
-                general::F_DUPFD => {
-                    self.insert_min_with_flags(FdEntry::Socket(socket.duplicate()?), arg, 0)
+                general::F_DUPFD => self.dup_min_with_flags(fd, arg as i32, 0),
+                general::F_DUPFD_CLOEXEC => {
+                    self.dup_min_with_flags(fd, arg as i32, general::FD_CLOEXEC)
                 }
-                general::F_DUPFD_CLOEXEC => self.insert_min_with_flags(
-                    FdEntry::Socket(socket.duplicate()?),
-                    arg,
-                    general::FD_CLOEXEC,
-                ),
                 general::F_GETFD => self.get_fd_flags(fd),
                 general::F_SETFD => self.set_fd_flags(fd, arg as u32),
                 general::F_GETFL | general::F_SETFL => posix_ret_i32(arceos_posix_api::sys_fcntl(
@@ -6637,7 +7536,7 @@ impl FdTable {
             },
             F_GETPIPE_SZ => Ok(self.pipe_capacity(fd)? as i32),
             F_SETPIPE_SZ => match self.entry(fd)? {
-                FdEntry::Pipe(pipe) => Ok(pipe.set_capacity(arg as usize)? as i32),
+                FdEntry::Pipe(pipe) => Ok(pipe_endpoint(pipe)?.set_capacity(arg as usize)? as i32),
                 _ => Err(LinuxError::EBADF),
             },
             general::F_GET_SEALS => match self.entry(fd)? {
@@ -6652,16 +7551,12 @@ impl FdTable {
                 }
                 _ => Err(LinuxError::EINVAL),
             },
-            cmd @ (general::F_SETOWN
+            general::F_SETOWN
             | general::F_GETOWN
             | general::F_SETSIG
-            | general::F_GETSIG)
-            | cmd @ (15 | 16) => match self.entry(fd)? {
-                FdEntry::Pipe(pipe) => pipe
-                    .fcntl_async_owner(process, cmd, arg)?
-                    .ok_or(LinuxError::EINVAL),
-                _ => Err(LinuxError::EINVAL),
-            },
+            | general::F_GETSIG
+            | 15
+            | 16 => Err(LinuxError::EINVAL),
             general::F_SETFL => match self.entry_mut(fd)? {
                 FdEntry::Stdin(status_flags)
                 | FdEntry::Stdout(status_flags)
@@ -6682,11 +7577,13 @@ impl FdTable {
                     Ok(0)
                 }
                 FdEntry::Pipe(pipe) => {
-                    pipe.set_status_flags(arg as u32);
+                    let flags = pipe_endpoint(pipe)?
+                        .status_flags_after_setfl(pipe.status_flags(), arg as u32);
+                    pipe.set_status_flags(flags);
                     Ok(0)
                 }
                 FdEntry::EventFd(eventfd) => {
-                    eventfd.set_status_flags(arg as u32);
+                    eventfd.set_status_flags(arg as u32 & general::O_NONBLOCK);
                     Ok(0)
                 }
                 FdEntry::Inotify(inotify) => {
@@ -6694,7 +7591,7 @@ impl FdTable {
                     Ok(0)
                 }
                 FdEntry::TimerFd(timerfd) => {
-                    timerfd.set_status_flags(arg as u32);
+                    timerfd.set_status_flags(arg as u32 & general::O_NONBLOCK);
                     Ok(0)
                 }
                 FdEntry::SignalFd(signalfd) => {
@@ -8033,6 +8930,21 @@ fn apply_flock_operation(key: u64, owner: usize, operation: u32) -> Result<(), L
 }
 
 impl FdEntry {
+    fn description_id(&self) -> Option<OpenFileId> {
+        match self {
+            Self::Pipe(file) | Self::EventFd(file) | Self::TimerFd(file) => Some(file.id()),
+            Self::Epoll(epoll) => Some(epoll.id()),
+            _ => None,
+        }
+    }
+
+    fn open_file(&self) -> Option<&OpenFileRef> {
+        match self {
+            Self::Pipe(file) | Self::EventFd(file) | Self::TimerFd(file) => Some(file),
+            _ => None,
+        }
+    }
+
     pub(super) fn duplicate_for_fork(&self) -> Result<Self, LinuxError> {
         match self {
             Self::Stdin(status_flags) => Ok(Self::Stdin(*status_flags)),
@@ -9730,11 +10642,11 @@ fn open_candidates(
                 return Ok(FdEntry::Path(PathEntry::fifo(path.as_str(), mode)));
             }
             let status_flags = flags & (general::O_NONBLOCK | general::O_DIRECT);
-            return Ok(FdEntry::Pipe(PipeEndpoint::new_named_fifo(
-                path.as_str(),
-                flags & general::O_ACCMODE,
-                status_flags,
-            )));
+            let endpoint = PipeEndpoint::new_named_fifo(path.as_str(), flags & general::O_ACCMODE);
+            return Ok(FdEntry::Pipe(new_open_file(
+                endpoint,
+                (flags & general::O_ACCMODE) | status_flags,
+            )?));
         }
         if let Some(backing_path) = process.path_hardlink_backing(path.as_str()) {
             if prefer_dir {

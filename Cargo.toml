@@ -8,6 +8,7 @@ members = [
     "kernel/drivers/axdisplay",
     "kernel/drivers/axdma",
     "kernel/drivers/axdriver",
+    "kernel/fs/axfile",
     "kernel/fs/axfs",
     "kernel/memory/axalloc",
     "kernel/memory/axmm",
@@ -56,6 +57,7 @@ axalloc = { path = "kernel/memory/axalloc" }
 axconfig = { path = "kernel/config/axconfig" }
 axdisplay = { path = "kernel/drivers/axdisplay" }
 axdriver = { path = "kernel/drivers/axdriver" }
+axfile = { path = "kernel/fs/axfile" }
 axfs = { path = "kernel/fs/axfs" }
 axhal = { path = "kernel/arch/axhal" }
 axlog = { path = "kernel/diagnostics/axlog" }

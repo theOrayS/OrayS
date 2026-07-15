@@ -1,0 +1,12 @@
+[package]
+name = "axfile"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Shared open-file identity and readiness event primitives for ArceOS"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+axsync = { workspace = true }

@@ -92,6 +92,18 @@ class Pr1LinuxBoundaryGuardTest(unittest.TestCase):
         path.write_text(path.read_text(encoding="utf-8") + "\n// read_user_value(process, ptr)\n", encoding="utf-8")
         self.assert_guard_fails(tree, "caller inventory changed for read_user_value")
 
+    def test_detects_legacy_user_copy_caller_loss(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/fd_table.rs"
+        text = path.read_text(encoding="utf-8")
+        call = "validate_user_write(process, base, len)"
+        self.assertIn(call, text)
+        path.write_text(
+            text.replace(call, "validate_user_write_removed(process, base, len)", 1),
+            encoding="utf-8",
+        )
+        self.assert_guard_fails(tree, "caller inventory changed for validate_user_write")
+
     def test_detects_raw_boundary_visibility_growth(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/user_memory.rs"

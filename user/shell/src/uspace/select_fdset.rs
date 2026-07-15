@@ -3,9 +3,13 @@ use core::sync::atomic::Ordering;
 use core::time::Duration;
 
 use axerrno::LinuxError;
+use axfile::{LevelWaitDecision, OpenFileId, ReadyEvents, decide_level_wait};
 use kspin::SpinNoPreempt;
 use linux_raw_sys::general;
+use std::collections::BTreeMap;
+use std::vec::Vec;
 
+use super::fd_object::{ObjectWaitSet, OpenFileRef};
 use super::linux_abi::{BITS_PER_USIZE, FD_SET_WORDS, FD_SETSIZE, neg_errno};
 use super::perf_counters;
 use super::signal_abi::{current_unblocked_signal_pending, install_temporary_signal_mask};
@@ -46,6 +50,7 @@ const POLLIN: i16 = 0x0001;
 const POLLPRI: i16 = 0x0002;
 const POLLOUT: i16 = 0x0004;
 const POLLERR: i16 = 0x0008;
+const POLLHUP: i16 = 0x0010;
 const POLLNVAL: i16 = 0x0020;
 const POLL_WAIT_BLOCK_QUANTUM: Duration = Duration::from_millis(1);
 const POLL_DEADLINE_YIELD_WINDOW: Duration = Duration::from_millis(2);
@@ -59,6 +64,7 @@ const POLL_TIMEOUT_ONLY_LONG_EXIT_GUARD: Duration = Duration::from_micros(1152);
 const EMPTY_TIMEOUT_BLOCK_THRESHOLD: Duration = Duration::from_millis(5);
 const EMPTY_TIMEOUT_SPIN_WINDOW: Duration = Duration::from_millis(2);
 static POLL_DEADLINE_SPIN_GUARD: SpinNoPreempt<()> = SpinNoPreempt::new(());
+const OBJECT_WAIT_MAX: Duration = Duration::from_millis(10);
 
 fn poll_clock_now() -> Duration {
     axhal::time::monotonic_time()
@@ -108,8 +114,17 @@ pub(super) fn write_fd_set(
     write_user_value(process, ptr, &UserFdSet { fds_bits: *bits })
 }
 
-pub(super) fn poll_fd_set(
-    table: &FdTable,
+fn object_ready_for_mode(file: &OpenFileRef, mode: SelectMode) -> bool {
+    let ready = file.object().readiness();
+    match mode {
+        SelectMode::Read => ready.intersects(ReadyEvents::READABLE | ReadyEvents::HANGUP),
+        SelectMode::Write => ready.intersects(ReadyEvents::WRITABLE | ReadyEvents::ERROR),
+        SelectMode::Except => ready.intersects(ReadyEvents::PRIORITY),
+    }
+}
+
+fn poll_object_fd_set(
+    objects: &BTreeMap<i32, OpenFileRef>,
     nfds: usize,
     requested: &[usize; FD_SET_WORDS],
     ready: &mut [usize; FD_SET_WORDS],
@@ -125,7 +140,10 @@ pub(super) fn poll_fd_set(
             if fd >= nfds {
                 break;
             }
-            if table.poll(fd as i32, mode) {
+            if objects
+                .get(&(fd as i32))
+                .is_some_and(|file| object_ready_for_mode(file, mode))
+            {
                 ready[word_idx] |= 1usize << bit_idx;
                 count += 1;
             }
@@ -135,11 +153,15 @@ pub(super) fn poll_fd_set(
     count
 }
 
-fn validate_fd_set_entries(
+fn poll_legacy_fd_set_mode(
     table: &FdTable,
+    legacy: &BTreeMap<i32, OpenFileId>,
     nfds: usize,
     requested: &[usize; FD_SET_WORDS],
-) -> Result<(), LinuxError> {
+    mode: SelectMode,
+    ready: &mut [usize; FD_SET_WORDS],
+) -> usize {
+    let mut count = 0usize;
     let words = nfds.div_ceil(BITS_PER_USIZE).min(FD_SET_WORDS);
     for word_idx in 0..words {
         let mut bits = requested[word_idx];
@@ -153,11 +175,81 @@ fn validate_fd_set_entries(
             if fd >= nfds {
                 break;
             }
-            table.entry(fd as i32)?;
+            let fd = fd as i32;
+            if legacy.get(&fd).is_some_and(|expected| {
+                table.file_description_key(fd).ok().flatten() == Some(*expected)
+                    && table.poll(fd, mode)
+            }) {
+                ready[word_idx] |= 1usize << bit_idx;
+                count += 1;
+            }
             bits &= bits - 1;
         }
     }
-    Ok(())
+    count
+}
+
+struct SelectTargets {
+    objects: BTreeMap<i32, OpenFileRef>,
+    legacy: BTreeMap<i32, OpenFileId>,
+}
+
+fn snapshot_select_targets(
+    table: &FdTable,
+    nfds: usize,
+    requested_sets: [&[usize; FD_SET_WORDS]; 3],
+) -> Result<SelectTargets, LinuxError> {
+    let mut objects = BTreeMap::new();
+    let mut legacy = BTreeMap::new();
+    for requested in requested_sets {
+        let words = nfds.div_ceil(BITS_PER_USIZE).min(FD_SET_WORDS);
+        for word_idx in 0..words {
+            let mut bits = requested[word_idx];
+            let used_bits = nfds.saturating_sub(word_idx * BITS_PER_USIZE);
+            if used_bits < BITS_PER_USIZE {
+                bits &= (1usize << used_bits) - 1;
+            }
+            while bits != 0 {
+                let bit_idx = bits.trailing_zeros() as usize;
+                let fd = (word_idx * BITS_PER_USIZE + bit_idx) as i32;
+                table.entry(fd)?;
+                match table.open_file_ref(fd)? {
+                    Some(file) => {
+                        objects.insert(fd, file);
+                    }
+                    None => {
+                        legacy.insert(
+                            fd,
+                            table.file_description_key(fd)?.ok_or(LinuxError::EBADF)?,
+                        );
+                    }
+                }
+                bits &= bits - 1;
+            }
+        }
+    }
+    Ok(SelectTargets { objects, legacy })
+}
+
+fn object_wait_delay(
+    files: &[OpenFileRef],
+    deadline: Option<Duration>,
+    has_legacy: bool,
+) -> Duration {
+    let mut delay = if has_legacy {
+        POLL_WAIT_BLOCK_QUANTUM
+    } else {
+        OBJECT_WAIT_MAX
+    };
+    for file in files {
+        if let Some(timeout) = file.object().next_timeout() {
+            delay = delay.min(timeout);
+        }
+    }
+    if let Some(deadline) = deadline {
+        delay = delay.min(deadline.saturating_sub(poll_clock_now()));
+    }
+    delay
 }
 
 fn fd_set_has_requested(nfds: usize, requested: &[usize; FD_SET_WORDS]) -> bool {
@@ -217,39 +309,27 @@ pub(super) fn sys_pselect6(
         Ok(deadline) => deadline,
         Err(err) => return neg_errno(err),
     };
-    {
+    let targets = {
         let table = process.fds.lock();
-        for fd_set in [&read_bits, &write_bits, &except_bits] {
-            if let Err(err) = validate_fd_set_entries(&table, nfds, fd_set) {
-                return neg_errno(err);
-            }
+        match snapshot_select_targets(&table, nfds, [&read_bits, &write_bits, &except_bits]) {
+            Ok(targets) => targets,
+            Err(err) => return neg_errno(err),
         }
-    }
+    };
+    let object_files: Vec<OpenFileRef> = targets.objects.values().cloned().collect();
+    let object_wait = if object_files.is_empty() {
+        None
+    } else {
+        match ObjectWaitSet::subscribe(&object_files) {
+            Ok(wait) => Some(wait),
+            Err(err) => return neg_errno(err),
+        }
+    };
     let empty_requested_fd_sets = !fd_set_has_requested(nfds, &read_bits)
         && !fd_set_has_requested(nfds, &write_bits)
         && !fd_set_has_requested(nfds, &except_bits);
     let wait_deadline = deadline;
-    let mut polled_once = false;
     loop {
-        if polled_once && wait_deadline.is_some_and(|ddl| poll_clock_now() >= ddl) {
-            if empty_requested_fd_sets {
-                return 0;
-            }
-            let empty = [0; FD_SET_WORDS];
-            let ret = write_fd_set(process, readfds, &empty);
-            if ret != 0 {
-                return ret;
-            }
-            let ret = write_fd_set(process, writefds, &empty);
-            if ret != 0 {
-                return ret;
-            }
-            let ret = write_fd_set(process, exceptfds, &empty);
-            if ret != 0 {
-                return ret;
-            }
-            return 0;
-        }
         if process.eval_watchdog_expired() {
             return neg_errno(LinuxError::EINTR);
         }
@@ -259,28 +339,65 @@ pub(super) fn sys_pselect6(
         let mut ready_read = [0usize; FD_SET_WORDS];
         let mut ready_write = [0usize; FD_SET_WORDS];
         let mut ready_except = [0usize; FD_SET_WORDS];
-        let ready = {
+        // Sample before querying.  A producer racing with the query changes
+        // this generation, so the subsequent wait returns without sleeping.
+        let wait_generation = object_wait.as_ref().map(ObjectWaitSet::generation);
+        let mut ready = 0usize;
+        ready += poll_object_fd_set(
+            &targets.objects,
+            nfds,
+            &read_bits,
+            &mut ready_read,
+            SelectMode::Read,
+        );
+        ready += poll_object_fd_set(
+            &targets.objects,
+            nfds,
+            &write_bits,
+            &mut ready_write,
+            SelectMode::Write,
+        );
+        ready += poll_object_fd_set(
+            &targets.objects,
+            nfds,
+            &except_bits,
+            &mut ready_except,
+            SelectMode::Except,
+        );
+        ready += {
             let table = process.fds.lock();
             let mut count = 0usize;
-            count += poll_fd_set(&table, nfds, &read_bits, &mut ready_read, SelectMode::Read);
-            count += poll_fd_set(
+            count += poll_legacy_fd_set_mode(
                 &table,
+                &targets.legacy,
+                nfds,
+                &read_bits,
+                SelectMode::Read,
+                &mut ready_read,
+            );
+            count += poll_legacy_fd_set_mode(
+                &table,
+                &targets.legacy,
                 nfds,
                 &write_bits,
-                &mut ready_write,
                 SelectMode::Write,
+                &mut ready_write,
             );
-            count += poll_fd_set(
+            count += poll_legacy_fd_set_mode(
                 &table,
+                &targets.legacy,
                 nfds,
                 &except_bits,
-                &mut ready_except,
                 SelectMode::Except,
+                &mut ready_except,
             );
             count
         };
-        polled_once = true;
-        if ready > 0 {
+        let wait_decision = decide_level_wait(
+            ready > 0,
+            wait_deadline.is_some_and(|ddl| poll_clock_now() >= ddl),
+        );
+        if matches!(wait_decision, LevelWaitDecision::Ready) {
             let ret = write_fd_set(process, readfds, &ready_read);
             if ret != 0 {
                 return ret;
@@ -301,7 +418,7 @@ pub(super) fn sys_pselect6(
             yield_if_peer_user_task();
             return ready as isize;
         }
-        if wait_deadline.is_some_and(|ddl| poll_clock_now() >= ddl) {
+        if matches!(wait_decision, LevelWaitDecision::TimedOut) {
             if empty_requested_fd_sets {
                 return 0;
             }
@@ -320,30 +437,18 @@ pub(super) fn sys_pselect6(
             }
             return 0;
         }
-        let timed_out = if empty_requested_fd_sets {
-            yield_poll_blocking_timeout_until(wait_deadline)
+        if empty_requested_fd_sets {
+            let _ = yield_poll_blocking_timeout_until(wait_deadline);
+        } else if let (Some(wait), Some(sample)) = (&object_wait, wait_generation) {
+            let delay = object_wait_delay(&object_files, wait_deadline, !targets.legacy.is_empty());
+            wait.wait_for_change(process, sample, delay);
         } else {
-            yield_poll_wait_until(wait_deadline)
-        };
-        if timed_out {
-            if empty_requested_fd_sets {
-                return 0;
-            }
-            let empty = [0; FD_SET_WORDS];
-            let ret = write_fd_set(process, readfds, &empty);
-            if ret != 0 {
-                return ret;
-            }
-            let ret = write_fd_set(process, writefds, &empty);
-            if ret != 0 {
-                return ret;
-            }
-            let ret = write_fd_set(process, exceptfds, &empty);
-            if ret != 0 {
-                return ret;
-            }
-            return 0;
+            let _ = yield_poll_wait_until(wait_deadline);
         }
+        // A wake at the deadline is only a hint.  The next iteration always
+        // performs one final level query before deciding that the call timed
+        // out, so a ready-before-deadline event cannot be discarded merely
+        // because this task resumed late.
     }
 }
 
@@ -357,19 +462,47 @@ fn poll_deadline_from_timeout_ms(timeout_ms: i32) -> Option<core::time::Duration
         .then(|| poll_clock_now() + core::time::Duration::from_millis(timeout_ms as u64))
 }
 
-fn poll_one_fd(table: &FdTable, pollfd: &mut UserPollFd) -> (bool, bool) {
+enum PollTarget {
+    Ignored,
+    Invalid,
+    Object(OpenFileRef),
+    Legacy(OpenFileId),
+}
+
+fn object_poll_revents(file: &OpenFileRef, events: i16) -> i16 {
+    let ready = file.object().readiness();
+    let mut revents = 0;
+    if events & POLLIN != 0 && ready.intersects(ReadyEvents::READABLE) {
+        revents |= POLLIN;
+    }
+    if events & POLLPRI != 0 && ready.intersects(ReadyEvents::PRIORITY) {
+        revents |= POLLPRI;
+    }
+    if events & POLLOUT != 0 && ready.intersects(ReadyEvents::WRITABLE) {
+        revents |= POLLOUT;
+    }
+    if ready.intersects(ReadyEvents::ERROR) {
+        revents |= POLLERR;
+    }
+    if ready.intersects(ReadyEvents::HANGUP) {
+        revents |= POLLHUP;
+    }
+    revents
+}
+
+fn poll_legacy_one(table: &FdTable, pollfd: &mut UserPollFd, expected: OpenFileId) -> bool {
     pollfd.revents = 0;
-    if pollfd.fd < 0 {
-        return (false, false);
+    if table.file_description_key(pollfd.fd).ok().flatten() != Some(expected) {
+        pollfd.revents = POLLNVAL;
+        return true;
     }
     let entry = match table.entry(pollfd.fd) {
         Ok(entry) => entry,
         Err(_) => {
             pollfd.revents = POLLNVAL;
-            return (true, false);
+            return true;
         }
     };
-    let watched = true;
     if pollfd.events & POLLIN != 0 && FdTable::poll_entry(entry, SelectMode::Read) {
         pollfd.revents |= POLLIN;
     }
@@ -382,34 +515,111 @@ fn poll_one_fd(table: &FdTable, pollfd: &mut UserPollFd) -> (bool, bool) {
     if FdTable::poll_entry(entry, SelectMode::Except) {
         pollfd.revents |= POLLERR;
     }
-    (pollfd.revents != 0, watched)
+    pollfd.revents != 0
 }
 
-fn poll_fds_once(
+fn read_poll_fds(
     process: &UserProcess,
     fds: usize,
     nfds: usize,
-) -> Result<(usize, usize), LinuxError> {
-    let mut ready = 0usize;
-    let mut watched = 0usize;
-    perf_counters::record_poll_fd_scan(nfds);
-    let table = process.fds.lock();
+) -> Result<Vec<UserPollFd>, LinuxError> {
+    let mut pollfds = Vec::new();
+    pollfds
+        .try_reserve_exact(nfds)
+        .map_err(|_| LinuxError::ENOMEM)?;
     for idx in 0..nfds {
-        let ptr = fds + idx * size_of::<UserPollFd>();
+        let ptr = fds
+            .checked_add(idx * size_of::<UserPollFd>())
+            .ok_or(LinuxError::EFAULT)?;
         let mut pollfd = read_user_value::<UserPollFd>(process, ptr)?;
-        let (is_ready, is_watched) = poll_one_fd(&table, &mut pollfd);
-        if is_ready {
-            ready += 1;
-        }
-        if is_watched {
-            watched += 1;
-        }
+        pollfd.revents = 0;
+        pollfds.push(pollfd);
+    }
+    Ok(pollfds)
+}
+
+fn write_poll_fds(
+    process: &UserProcess,
+    fds: usize,
+    pollfds: &[UserPollFd],
+) -> Result<(), LinuxError> {
+    for (idx, pollfd) in pollfds.iter().enumerate() {
+        let ptr = fds
+            .checked_add(idx * size_of::<UserPollFd>())
+            .ok_or(LinuxError::EFAULT)?;
         let ret = write_user_value(process, ptr, &pollfd);
         if ret != 0 {
             return Err(LinuxError::EFAULT);
         }
     }
-    Ok((ready, watched))
+    Ok(())
+}
+
+fn snapshot_poll_targets(
+    table: &FdTable,
+    pollfds: &[UserPollFd],
+) -> Result<(Vec<PollTarget>, Vec<OpenFileRef>, bool), LinuxError> {
+    let mut targets = Vec::new();
+    let mut objects = Vec::new();
+    targets
+        .try_reserve_exact(pollfds.len())
+        .map_err(|_| LinuxError::ENOMEM)?;
+    objects
+        .try_reserve_exact(pollfds.len())
+        .map_err(|_| LinuxError::ENOMEM)?;
+    let mut has_legacy = false;
+    for pollfd in pollfds {
+        if pollfd.fd < 0 {
+            targets.push(PollTarget::Ignored);
+        } else if table.entry(pollfd.fd).is_err() {
+            targets.push(PollTarget::Invalid);
+        } else if let Some(file) = table.open_file_ref(pollfd.fd)? {
+            objects.push(file.clone());
+            targets.push(PollTarget::Object(file));
+        } else {
+            has_legacy = true;
+            targets.push(PollTarget::Legacy(
+                table
+                    .file_description_key(pollfd.fd)?
+                    .ok_or(LinuxError::EBADF)?,
+            ));
+        }
+    }
+    Ok((targets, objects, has_legacy))
+}
+
+fn poll_fds_once(
+    process: &UserProcess,
+    pollfds: &mut [UserPollFd],
+    targets: &[PollTarget],
+) -> usize {
+    let mut ready = 0usize;
+    perf_counters::record_poll_fd_scan(pollfds.len());
+    for (pollfd, target) in pollfds.iter_mut().zip(targets) {
+        pollfd.revents = match target {
+            PollTarget::Ignored => 0,
+            PollTarget::Invalid => POLLNVAL,
+            PollTarget::Object(file) => object_poll_revents(file, pollfd.events),
+            PollTarget::Legacy(_) => 0,
+        };
+        if pollfd.revents != 0 {
+            ready += 1;
+        }
+    }
+    if targets
+        .iter()
+        .any(|target| matches!(target, PollTarget::Legacy(_)))
+    {
+        let table = process.fds.lock();
+        for (pollfd, target) in pollfds.iter_mut().zip(targets) {
+            if let PollTarget::Legacy(expected) = target {
+                if poll_legacy_one(&table, pollfd, *expected) {
+                    ready += 1;
+                }
+            }
+        }
+    }
+    ready
 }
 
 pub(super) fn sys_ppoll(
@@ -458,37 +668,68 @@ fn sys_poll_until(
     nfds: usize,
     deadline: Option<core::time::Duration>,
 ) -> isize {
-    let mut polled_once = false;
-    loop {
-        if polled_once && deadline.is_some_and(|ddl| poll_clock_now() >= ddl) {
-            return 0;
+    let mut pollfds = match read_poll_fds(process, fds, nfds) {
+        Ok(pollfds) => pollfds,
+        Err(err) => return neg_errno(err),
+    };
+    let (targets, object_files, has_legacy) = {
+        let table = process.fds.lock();
+        match snapshot_poll_targets(&table, &pollfds) {
+            Ok(targets) => targets,
+            Err(err) => return neg_errno(err),
         }
+    };
+    let object_wait = if object_files.is_empty() {
+        None
+    } else {
+        match ObjectWaitSet::subscribe(&object_files) {
+            Ok(wait) => Some(wait),
+            Err(err) => return neg_errno(err),
+        }
+    };
+    let watched = targets
+        .iter()
+        .filter(|target| matches!(target, PollTarget::Object(_) | PollTarget::Legacy(_)))
+        .count();
+    loop {
         if process.eval_watchdog_expired() {
             return neg_errno(LinuxError::EINTR);
         }
         if current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
-        let watched = match poll_fds_once(process, fds, nfds) {
-            Ok((ready, _watched)) if ready > 0 => {
-                yield_if_peer_user_task();
-                return ready as isize;
-            }
-            Ok((_, watched)) => watched,
-            Err(err) => return neg_errno(err),
-        };
-        polled_once = true;
-        if deadline.is_some_and(|ddl| poll_clock_now() >= ddl) {
-            return 0;
+        let wait_generation = object_wait.as_ref().map(ObjectWaitSet::generation);
+        let ready = poll_fds_once(process, &mut pollfds, &targets) > 0;
+        let wait_decision =
+            decide_level_wait(ready, deadline.is_some_and(|ddl| poll_clock_now() >= ddl));
+        if matches!(wait_decision, LevelWaitDecision::Ready) {
+            return match write_poll_fds(process, fds, &pollfds) {
+                Ok(()) => {
+                    yield_if_peer_user_task();
+                    pollfds.iter().filter(|pollfd| pollfd.revents != 0).count() as isize
+                }
+                Err(err) => neg_errno(err),
+            };
         }
-        let timed_out = if watched == 0 {
-            yield_poll_timeout_only_until(deadline)
+        if matches!(wait_decision, LevelWaitDecision::TimedOut) {
+            return match write_poll_fds(process, fds, &pollfds) {
+                Ok(()) => 0,
+                Err(err) => neg_errno(err),
+            };
+        }
+        if watched == 0 {
+            let _ = yield_poll_timeout_only_until(deadline);
+        } else if let (Some(wait), Some(sample)) = (&object_wait, wait_generation) {
+            wait.wait_for_change(
+                process,
+                sample,
+                object_wait_delay(&object_files, deadline, has_legacy),
+            );
         } else {
-            yield_poll_wait_until(deadline)
-        };
-        if timed_out {
-            return 0;
+            let _ = yield_poll_wait_until(deadline);
         }
+        // Re-query first on the next iteration; do not infer timeout directly
+        // from the wall clock after a notification wake.
     }
 }
 
