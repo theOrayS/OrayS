@@ -8,6 +8,7 @@
       "include": [],
       "cases": [
         "check.compliance_regressions",
+        "check.competition_semantic_evidence",
         "check.evaluation_runner_and_parser_integrity",
         "check.file_object_event_core",
         "check.kernel_state_backed_semantics",
@@ -34,8 +35,10 @@
       "include": [],
       "cases": [
         "unit.compliance_regressions",
+        "unit.competition_semantic_evidence",
         "unit.evaluation_failure_report",
         "unit.evaluation_runner_and_parser_integrity",
+        "unit.evaluator_protocol",
         "unit.file_object_event_core",
         "unit.kernel_state_backed_semantics",
         "unit.libc_stateful_semantics",
@@ -46,9 +49,11 @@
         "unit.official_result_validation",
         "unit.posix_state_integrity",
         "unit.rlimit_and_fd_semantics",
+        "unit.qemu_setup",
         "unit.runtime_binary_patch_prohibition",
         "unit.socket_message_and_buffer_semantics",
         "unit.stat_metadata_semantics",
+        "unit.semantic_evidence",
         "unit.suite_runner",
         "unit.synthetic_capability_integrity",
         "unit.syscall_boundary_regressions",
@@ -65,10 +70,45 @@
       "cases": [],
       "arch_cases": {}
     },
-    "baseline": {
-      "description": "Quick plus deterministic repository formatting, unit, lint, and RV/LA build checks.",
+    "evidence-host": {
+      "description": "PR3 host-side semantic-evidence, parser, workflow, and report infrastructure shard.",
       "arch_policy": "none",
-      "include": ["quick"],
+      "include": [],
+      "cases": ["evidence.host"],
+      "arch_cases": {}
+    },
+    "evidence-runtime": {
+      "description": "One fixed PR3 build and repository-contained ABI runtime-smoke shard.",
+      "arch_policy": "one",
+      "include": [],
+      "cases": [],
+      "arch_cases": {
+        "rv": ["evidence.riscv64"],
+        "la": ["evidence.loongarch64"]
+      }
+    },
+    "evidence-aggregate": {
+      "description": "Merge complete host/RV/LA semantic shards and render deterministic reports.",
+      "arch_policy": "none",
+      "include": [],
+      "cases": ["evidence.aggregate"],
+      "arch_cases": {}
+    },
+    "evidence-required": {
+      "description": "Complete local PR3 host, RV64, LA64, merge, and report sequence.",
+      "arch_policy": "none",
+      "include": ["evidence-host"],
+      "cases": [
+        "evidence.riscv64",
+        "evidence.loongarch64",
+        "evidence.aggregate"
+      ],
+      "arch_cases": {}
+    },
+    "baseline": {
+      "description": "Quick plus required PR3 semantic evidence and deterministic repository formatting, unit, lint, and RV/LA build checks.",
+      "arch_policy": "none",
+      "include": ["quick", "evidence-required"],
       "cases": [
         "baseline.cargo_format",
         "baseline.workspace_unit_tests",
@@ -111,6 +151,16 @@
       "timeout_seconds": 120,
       "result_contract": {"type": "check"},
       "required_paths": ["{repo}/test/checks/check_compliance_regressions.py"],
+      "required_commands": []
+    },
+    {
+      "id": "check.competition_semantic_evidence",
+      "description": "PR3 fixed/observational CI, pinned QEMU, canonical profile, and evidence policy guard.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_competition_semantic_evidence.py"],
+      "cwd": "{repo}",
+      "timeout_seconds": 120,
+      "result_contract": {"type": "check"},
+      "required_paths": ["{repo}/test/checks/check_competition_semantic_evidence.py"],
       "required_commands": []
     },
     {
@@ -293,6 +343,14 @@
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"], "required_commands": []
     },
     {
+      "id": "unit.competition_semantic_evidence",
+      "description": "PR3 workflow and evidence-policy mutation fixtures.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_competition_semantic_evidence.py"],
+      "cwd": "{repo}", "timeout_seconds": 300,
+      "result_contract": {"type": "unittest", "expected_tests": 33, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_competition_semantic_evidence.py", "{repo}/test/checks/check_competition_semantic_evidence.py"], "required_commands": []
+    },
+    {
       "id": "unit.evaluation_failure_report",
       "description": "Paired-stream evaluation failure reporter and strict LTP lifecycle fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_failure_report.py"],
@@ -309,6 +367,14 @@
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
     },
     {
+      "id": "unit.evaluator_protocol",
+      "description": "Byte-preserving evaluator protocol and terminal-control adversarial fixtures.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluator_protocol.py"],
+      "cwd": "{repo}", "timeout_seconds": 180,
+      "result_contract": {"type": "unittest", "expected_tests": 27, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluator_protocol.py", "{repo}/test/evidence/evaluator_protocol.py"], "required_commands": []
+    },
+    {
       "id": "unit.file_object_event_core",
       "description": "File-object identity, readiness, lifecycle, and integration mutation fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_file_object_event_core.py"],
@@ -321,7 +387,7 @@
       "description": "Kernel state-backed semantics guard fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_kernel_state_backed_semantics.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 36, "identity_binding": true},
+      "result_contract": {"type": "unittest", "expected_tests": 41, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_kernel_state_backed_semantics.py"], "required_commands": []
     },
     {
@@ -389,6 +455,14 @@
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_rlimit_and_fd_semantics.py"], "required_commands": []
     },
     {
+      "id": "unit.qemu_setup",
+      "description": "Pinned QEMU 9.2.4 source and transferred-artifact setup fixtures.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_qemu_setup.py"],
+      "cwd": "{repo}", "timeout_seconds": 180,
+      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_qemu_setup.py", "{repo}/test/evidence/setup_qemu.sh"], "required_commands": []
+    },
+    {
       "id": "unit.runtime_binary_patch_prohibition",
       "description": "Runtime binary rewriting prohibition fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"],
@@ -411,6 +485,14 @@
       "cwd": "{repo}", "timeout_seconds": 180,
       "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_stat_metadata_semantics.py"], "required_commands": []
+    },
+    {
+      "id": "unit.semantic_evidence",
+      "description": "Versioned semantic evidence validator, supervisor, merger, and deterministic renderer fixtures.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_semantic_evidence.py"],
+      "cwd": "{repo}", "timeout_seconds": 600,
+      "result_contract": {"type": "unittest", "expected_tests": 75, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_semantic_evidence.py", "{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/render_semantic_evidence.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json", "{repo}/test/evidence/semantic_evidence_schema.v1.json", "{repo}/test/fixtures/semantic_evidence/guard-ambiguous.txt", "{repo}/test/fixtures/semantic_evidence/guard-pass.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-duplicate.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-panic-after-pass.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-pass.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-truncated.txt"], "required_commands": []
     },
     {
       "id": "unit.suite_runner",
@@ -459,6 +541,47 @@
       "cwd": "{repo}", "timeout_seconds": 180,
       "result_contract": {"type": "unittest", "expected_tests": 13, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_user_memory_copy_boundaries.py"], "required_commands": []
+    },
+
+    {
+      "id": "evidence.host",
+      "description": "Canonical PR3 host semantic-evidence shard.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evidence/semantic_evidence.py", "run", "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json", "--output", "build/pr3-evidence/host", "--arch", "host"],
+      "cwd": "{repo}", "timeout_seconds": 1800,
+      "result_contract": {"type": "exit_code", "allow_empty_output": false},
+      "required_paths": ["{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json"],
+      "required_commands": ["python3"],
+      "infrastructure_exit_codes": [2]
+    },
+    {
+      "id": "evidence.riscv64",
+      "description": "Canonical PR3 RISC-V64 fixed build and repository-contained ABI smoke shard.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evidence/semantic_evidence.py", "run", "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json", "--output", "build/pr3-evidence/rv64", "--arch", "riscv64"],
+      "cwd": "{repo}", "timeout_seconds": 7200,
+      "result_contract": {"type": "exit_code", "allow_empty_output": false},
+      "required_paths": ["{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json", "{repo}/scripts/rust-lld.sh", "{repo}/scripts/rust-objcopy.sh"],
+      "required_commands": ["python3", "make", "cargo", "rustc", "qemu-system-riscv64"],
+      "infrastructure_exit_codes": [2]
+    },
+    {
+      "id": "evidence.loongarch64",
+      "description": "Canonical PR3 LoongArch64 fixed build and repository-contained ABI smoke shard.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evidence/semantic_evidence.py", "run", "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json", "--output", "build/pr3-evidence/la64", "--arch", "loongarch64"],
+      "cwd": "{repo}", "timeout_seconds": 7200,
+      "result_contract": {"type": "exit_code", "allow_empty_output": false},
+      "required_paths": ["{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json", "{repo}/scripts/rust-lld.sh", "{repo}/scripts/rust-objcopy.sh"],
+      "required_commands": ["python3", "make", "cargo", "rustc", "qemu-system-loongarch64"],
+      "infrastructure_exit_codes": [2]
+    },
+    {
+      "id": "evidence.aggregate",
+      "description": "Merge complete PR3 semantic shards and render canonical JSON-derived reports.",
+      "command": ["{repo}/test/evidence/aggregate_semantic_evidence.sh"],
+      "cwd": "{repo}", "timeout_seconds": 600,
+      "result_contract": {"type": "exit_code", "allow_empty_output": false},
+      "required_paths": ["{repo}/test/evidence/aggregate_semantic_evidence.sh", "{repo}/test/evidence/render_semantic_evidence.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json"],
+      "required_commands": ["bash", "python3"],
+      "infrastructure_exit_codes": [2]
     },
 
     {

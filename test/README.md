@@ -105,10 +105,14 @@ python3 -I -S -B -X pycache_prefix=/dev/null /absolute/path/to/worktree/test/run
 
 | Profile | Contents | Architecture argument |
 | --- | --- | --- |
-| `checks` | All 18 registered static/structural guards | none |
-| `unit` | All 22 Python unit scripts with 532 exact-counted methods | none |
-| `quick` | `checks` followed by `unit` (40 planned cases) | none |
-| `baseline` | `quick`, format, workspace units, three clippy cases, RV/LA kernel builds, and `make all` | none |
+| `checks` | All 19 registered static/structural guards | none |
+| `unit` | All 26 Python unit scripts with 681 exact-counted methods | none |
+| `quick` | `checks` followed by `unit` (45 planned cases) | none |
+| `evidence-host` | One fail-closed PR3 host evidence shard | none |
+| `evidence-runtime` | One fixed build plus repository-contained ABI smoke shard | required: `rv` or `la` |
+| `evidence-aggregate` | Strictly merge host/RV/LA shards and render reports | none |
+| `evidence-required` | Host, RV, LA, then aggregate (4 planned cases) | none |
+| `baseline` | `quick`, `evidence-required`, format, workspace units, three clippy cases, RV/LA kernel builds, and `make all` (57 planned cases) | none |
 | `official` | Exactly one canonical local official evaluation | required: `rv` or `la` |
 | `full` | `baseline` followed by the requested official path(s) | `rv`, `la`, or `all`; default is `all` |
 
@@ -117,6 +121,11 @@ python3 test/run_suite.py --list
 python3 test/run_suite.py --profile checks
 python3 test/run_suite.py --profile unit
 python3 test/run_suite.py --profile quick
+python3 test/run_suite.py --profile evidence-host
+python3 test/run_suite.py --profile evidence-runtime --arch rv
+python3 test/run_suite.py --profile evidence-runtime --arch la
+python3 test/run_suite.py --profile evidence-aggregate
+python3 test/run_suite.py --profile evidence-required
 python3 test/run_suite.py --profile baseline
 python3 test/run_suite.py --profile official --arch rv
 python3 test/run_suite.py --profile official --arch la

@@ -40,14 +40,15 @@ Y8.   .8P 88       88.  .88 88.  .88 d8'   .8P
 | 项目文档 PDF（生产快照） | [orays-project-document(2).pdf](docs/orays-project-document(2).pdf) |
 |项目初赛介绍ppt|[项目初赛介绍ppt](docs/orays.pptx) |
 |演示视频|[演示视频](docs/演示视频.webm) |
+| PR3 语义证据与双架构 CI | [可信 semantic-evidence 流程](docs/pr3-semantic-evidence.md) |
 ## 当前状态
 
 **生产功能状态截至 2026-06-29；测试基础设施验证截至 2026-07-15**：
 
 - 完成 **531 次项目提交**
 - syscall dispatcher 已注册 **231 个唯一 Linux syscall 编号**
-- 统一在 `test/` 注册 **18 个静态守卫及 22 个 Python 单元测试套件（532 个方法）**，用于检查
-  fake success、用户指针、runner/parser、FD/资源限制和 syscall 语义回归。
+- 统一在 `test/` 注册 **19 个静态守卫及 26 个 Python 单元测试套件（681 个方法）**，用于检查
+  fake success、用户指针、runner/parser、FD/资源限制、PR3 evidence/CI 和 syscall 语义回归。
 
 #### 核心功能实现
 
@@ -162,6 +163,13 @@ python3 -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile baselin
 真实 PASS/FAIL 和 RV/LA 阻断见
 [test/docs/baseline_validation.md](test/docs/baseline_validation.md)，非零结果不会被
 文档改写成 PASS。
+
+PR3 的固定双架构构建、仓库内 QEMU runtime smoke 和确定性 JSON/JUnit/HTML/Markdown
+报告已作为 `baseline` 的显式 case 纳入同一 manifest 和 runner，不再提供另一套顶层测试
+入口。runtime case 启动前会核对 `PATH` 中对应 QEMU；只有精确的
+`QEMU emulator version 9.2.4` 能产生 required runtime evidence，其他版本会保留为
+`blocked`，不会改写成 PASS。固定源码、校验和、证据等级与 CI 边界见
+[PR3 semantic-evidence 文档](docs/pr3-semantic-evidence.md)。
 
 ## 运行方式
 

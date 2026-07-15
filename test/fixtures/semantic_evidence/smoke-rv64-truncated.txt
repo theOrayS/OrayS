@@ -1,0 +1,4 @@
+PR3_SMOKE_V1 HARNESS_START arch=riscv64
+PR3_SMOKE_V1 USER_START arch=riscv64
+PR3_SMOKE_V1 ASSERT write PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64

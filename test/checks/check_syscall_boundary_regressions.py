@@ -133,7 +133,10 @@ def scan_user_trace(root: Path) -> list[str]:
         findings.append("uspace mod: missing central user_trace macro")
     else:
         body = macro_match.group("body")
-        if "=> {};" in body or "format_args" not in body:
+        if (
+            'option_env!("USER_TRACE")' not in body
+            or "Some(_) => println!($($arg)*)" not in body
+        ):
             findings.append("uspace mod: user_trace macro must not be an empty shell")
     for rel in (
         "user/shell/src/uspace/futex.rs",

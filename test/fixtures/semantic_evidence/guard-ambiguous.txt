@@ -1,0 +1,2 @@
+G999 fixture static check: PASS (0 findings)
+G999 fixture static check: FAIL (1 finding)

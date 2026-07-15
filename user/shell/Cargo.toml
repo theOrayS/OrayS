@@ -34,6 +34,7 @@ uspace = [
     "dep:xmas-elf",
 ]
 auto-run-tests = ["axtask/sched-rr"]
+semantic-smoke = ["auto-run-tests", "uspace", "use-ramfs"]
 default = []
 
 [dependencies]

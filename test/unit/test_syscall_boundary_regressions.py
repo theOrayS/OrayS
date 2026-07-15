@@ -64,10 +64,14 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
     def test_detects_empty_central_user_trace(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/mod.rs"
-        text = path.read_text(encoding="utf-8")
-        marker = 'let _ = core::format_args!("");'
-        self.assertIn(marker, text)
-        path.write_text(text.replace(marker, "", 1), encoding="utf-8")
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "Some(_) => println!($($arg)*),",
+                "Some(_) => {},",
+                1,
+            ),
+            encoding="utf-8",
+        )
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("user_trace", result.stdout)

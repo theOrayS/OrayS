@@ -1,32 +1,64 @@
 name: Build & Deploy docs
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  rust-toolchain: nightly-2025-05-20
+  RUST_TOOLCHAIN: nightly-2025-05-20
 
 jobs:
   doc:
+    name: Docs (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, macos-14]
       fail-fast: false
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Build docs
+        run: make doc_check_missing ARCH=${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
+      - name: Upload deployable docs
+        if: ${{ matrix.os == 'ubuntu-24.04' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: generated-rust-docs
+          path: target/doc
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy docs
+    if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: doc
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
-    env:
-      default-branch: ${{ format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ env.rust-toolchain }}
-    - name: Build docs
-      run: make doc_check_missing ARCH=${{ matrix.os == 'macos-latest' && 'aarch64' || 'x86_64' }}
-    - name: Deploy to Github Pages
-      if: ${{ github.ref == env.default-branch && matrix.os == 'ubuntu-latest' }}
-      uses: JamesIves/github-pages-deploy-action@v4
-      with:
-        single-commit: true
-        branch: gh-pages
-        folder: target/doc
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: generated-rust-docs
+          path: target/doc
+      - uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f
+        with:
+          single-commit: true
+          branch: gh-pages
+          folder: target/doc

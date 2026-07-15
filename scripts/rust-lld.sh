@@ -1,32 +1,29 @@
 #!/usr/bin/env sh
 set -eu
 
+# rustup does not expose rust-lld as a proxy, but the pinned llvm-tools
+# component installs it in the host toolchain's rustlib directory. Resolve that
+# repository-independently so clean CI runners do not depend on cargo-binutils
+# or an unpinned system linker.
 resolve_tool() {
-  if command -v rustup >/dev/null 2>&1; then
-    tool=$(rustup which llvm-objcopy 2>/dev/null || true)
-    if [ -n "$tool" ] && [ -x "$tool" ]; then
-      printf '%s\n' "$tool"
-      return 0
-    fi
-  fi
   if command -v rustc >/dev/null 2>&1; then
     sysroot=$(rustc --print sysroot 2>/dev/null || true)
     host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')
-    tool="$sysroot/lib/rustlib/$host/bin/llvm-objcopy"
+    tool="$sysroot/lib/rustlib/$host/bin/rust-lld"
     if [ -n "$sysroot" ] && [ -n "$host" ] && [ -x "$tool" ]; then
       printf '%s\n' "$tool"
       return 0
     fi
   fi
-  if command -v llvm-objcopy >/dev/null 2>&1; then
-    command -v llvm-objcopy
+  if command -v rust-lld >/dev/null 2>&1; then
+    command -v rust-lld
     return 0
   fi
   return 1
 }
 
 tool=$(resolve_tool) || {
-  echo "rust-objcopy offline shim: llvm-objcopy not found; install rust llvm-tools component" >&2
+  echo "rust-lld offline shim: bundled rust-lld not found; install the pinned rust llvm-tools component" >&2
   exit 127
 }
 if [ "$#" -eq 1 ] && [ "$1" = "--pr3-print-effective-tool" ]; then

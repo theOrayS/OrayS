@@ -1,0 +1,578 @@
+{
+  "schema_version": 1,
+  "suite_id": "orays-pr3-semantic-evidence",
+  "capabilities": [
+    {
+      "id": "cargo",
+      "kind": "tool",
+      "value": "cargo",
+      "external": false
+    },
+    {
+      "id": "make",
+      "kind": "tool",
+      "value": "make",
+      "external": false
+    },
+    {
+      "id": "python3",
+      "kind": "tool",
+      "value": "python3",
+      "external": false
+    },
+    {
+      "id": "qemu-la64",
+      "kind": "tool",
+      "value": "qemu-system-loongarch64",
+      "external": false,
+      "required_version": "QEMU emulator version 9.2.4"
+    },
+    {
+      "id": "qemu-rv64",
+      "kind": "tool",
+      "value": "qemu-system-riscv64",
+      "external": false,
+      "required_version": "QEMU emulator version 9.2.4"
+    },
+    {
+      "id": "rust-lld",
+      "kind": "executable",
+      "value": "scripts/rust-lld.sh",
+      "external": false
+    },
+    {
+      "id": "rust-objcopy",
+      "kind": "executable",
+      "value": "scripts/rust-objcopy.sh",
+      "external": false
+    },
+    {
+      "id": "rustc",
+      "kind": "tool",
+      "value": "rustc",
+      "external": false
+    }
+  ],
+  "runners": [
+    {
+      "id": "build-command",
+      "kind": "process",
+      "classifier_kind": "exit_code",
+      "max_evidence": "built",
+      "combine_output": false,
+      "grace_seconds": 2.0
+    },
+    {
+      "id": "qemu-smoke-v1",
+      "kind": "process",
+      "classifier_kind": "marker_protocol",
+      "max_evidence": "runtime_semantic",
+      "combine_output": true,
+      "grace_seconds": 2.0
+    },
+    {
+      "id": "static-guard",
+      "kind": "process",
+      "classifier_kind": "guard_protocol",
+      "max_evidence": "static_checked",
+      "combine_output": true,
+      "grace_seconds": 2.0
+    },
+    {
+      "id": "unit-test",
+      "kind": "process",
+      "classifier_kind": "guard_protocol",
+      "max_evidence": "static_checked",
+      "combine_output": true,
+      "grace_seconds": 2.0
+    }
+  ],
+  "inventories": [],
+  "cases": [
+    {
+      "id": "build.la64.fixed",
+      "title": "LoongArch64 fixed-baseline kernel build",
+      "category": "build",
+      "architectures": [
+        "loongarch64"
+      ],
+      "runner_id": "build-command",
+      "evidence_level": "built",
+      "policy": "required",
+      "timeout_seconds": 2700,
+      "requires": [
+        "cargo",
+        "make",
+        "rust-lld",
+        "rust-objcopy",
+        "rustc"
+      ],
+      "depends_on": [],
+      "command": [
+        "make",
+        "kernel-la"
+      ],
+      "artifacts": [
+        "kernel-la"
+      ],
+      "classifier": {
+        "kind": "exit_code"
+      },
+      "provenance": [
+        "Makefile",
+        "api/arceos_posix_api/build.rs",
+        "api/arceos_posix_api/src/ctypes_gen.rs",
+        "api/arceos_posix_api/src/lib.rs",
+        "rust-toolchain.toml",
+        "scripts/rust-lld.sh",
+        "scripts/rust-objcopy.sh"
+      ]
+    },
+    {
+      "id": "build.la64.smoke-harness",
+      "title": "LoongArch64 repository-contained smoke harness build",
+      "category": "smoke-build",
+      "architectures": [
+        "loongarch64"
+      ],
+      "runner_id": "build-command",
+      "evidence_level": "built",
+      "policy": "required",
+      "timeout_seconds": 2700,
+      "requires": [
+        "cargo",
+        "make",
+        "rust-lld",
+        "rust-objcopy",
+        "rustc"
+      ],
+      "depends_on": [],
+      "command": [
+        "make",
+        "pr3-smoke-kernel-la"
+      ],
+      "artifacts": [
+        "build/pr3-smoke/kernel-la"
+      ],
+      "classifier": {
+        "kind": "exit_code"
+      },
+      "provenance": [
+        "Makefile",
+        "api/arceos_posix_api/build.rs",
+        "api/arceos_posix_api/src/ctypes_gen.rs",
+        "api/arceos_posix_api/src/lib.rs",
+        "rust-toolchain.toml",
+        "scripts/rust-lld.sh",
+        "scripts/rust-objcopy.sh",
+        "user/shell/Cargo.toml",
+        "user/shell/build.rs",
+        "user/shell/runtime_smoke/semantic_smoke.ld",
+        "user/shell/runtime_smoke/semantic_smoke.rs",
+        "user/shell/src/main.rs",
+        "user/shell/src/semantic_smoke.rs"
+      ]
+    },
+    {
+      "id": "build.rv64.fixed",
+      "title": "RISC-V64 fixed-baseline kernel build",
+      "category": "build",
+      "architectures": [
+        "riscv64"
+      ],
+      "runner_id": "build-command",
+      "evidence_level": "built",
+      "policy": "required",
+      "timeout_seconds": 2700,
+      "requires": [
+        "cargo",
+        "make",
+        "rust-lld",
+        "rust-objcopy",
+        "rustc"
+      ],
+      "depends_on": [],
+      "command": [
+        "make",
+        "kernel-rv"
+      ],
+      "artifacts": [
+        "kernel-rv"
+      ],
+      "classifier": {
+        "kind": "exit_code"
+      },
+      "provenance": [
+        "Makefile",
+        "api/arceos_posix_api/build.rs",
+        "api/arceos_posix_api/src/ctypes_gen.rs",
+        "api/arceos_posix_api/src/lib.rs",
+        "rust-toolchain.toml",
+        "scripts/rust-lld.sh",
+        "scripts/rust-objcopy.sh"
+      ]
+    },
+    {
+      "id": "build.rv64.smoke-harness",
+      "title": "RISC-V64 repository-contained smoke harness build",
+      "category": "smoke-build",
+      "architectures": [
+        "riscv64"
+      ],
+      "runner_id": "build-command",
+      "evidence_level": "built",
+      "policy": "required",
+      "timeout_seconds": 2700,
+      "requires": [
+        "cargo",
+        "make",
+        "rust-lld",
+        "rust-objcopy",
+        "rustc"
+      ],
+      "depends_on": [],
+      "command": [
+        "make",
+        "pr3-smoke-kernel-rv"
+      ],
+      "artifacts": [
+        "build/pr3-smoke/kernel-rv"
+      ],
+      "classifier": {
+        "kind": "exit_code"
+      },
+      "provenance": [
+        "Makefile",
+        "api/arceos_posix_api/build.rs",
+        "api/arceos_posix_api/src/ctypes_gen.rs",
+        "api/arceos_posix_api/src/lib.rs",
+        "rust-toolchain.toml",
+        "scripts/rust-lld.sh",
+        "scripts/rust-objcopy.sh",
+        "user/shell/Cargo.toml",
+        "user/shell/build.rs",
+        "user/shell/runtime_smoke/semantic_smoke.ld",
+        "user/shell/runtime_smoke/semantic_smoke.rs",
+        "user/shell/src/main.rs",
+        "user/shell/src/semantic_smoke.rs"
+      ]
+    },
+    {
+      "id": "infra.competition-workflow",
+      "title": "Competition semantic-evidence workflow guard",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "static-guard",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 120,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/checks/check_competition_semantic_evidence.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^competition semantic-evidence workflow check: PASS \\(0 findings\\)$",
+        "fail_pattern": "^competition semantic-evidence workflow check: FAIL$",
+        "min_tests": 1
+      },
+      "provenance": [
+        ".github/workflows/build.yml",
+        ".github/workflows/docs.yml",
+        ".github/workflows/test.yml",
+        "Makefile",
+        "docs/pr3-semantic-evidence.md",
+        "test/checks/check_competition_semantic_evidence.py",
+        "test/evidence/semantic_evidence_manifest.json"
+      ]
+    },
+    {
+      "id": "infra.competition-workflow-tests",
+      "title": "Competition semantic-evidence workflow mutation tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 180,
+      "requires": ["python3"],
+      "depends_on": ["infra.competition-workflow"],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_competition_semantic_evidence.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "test/checks/check_competition_semantic_evidence.py",
+        "test/run_unittest_suite.py",
+        "test/unit/test_competition_semantic_evidence.py"
+      ]
+    },
+    {
+      "id": "infra.evaluator-protocol",
+      "title": "Evaluator byte protocol parser tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 60,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_evaluator_protocol.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "test/evidence/evaluator_protocol.py",
+        "test/run_unittest_suite.py",
+        "test/unit/test_evaluator_protocol.py"
+      ]
+    },
+    {
+      "id": "infra.failure-report",
+      "title": "Evaluator failure report tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 60,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_evaluation_failure_report.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "test/evaluation/parse_official_results.py",
+        "test/evaluation/report_evaluation_failures.py",
+        "test/run_unittest_suite.py",
+        "test/unit/test_evaluation_failure_report.py"
+      ]
+    },
+    {
+      "id": "infra.ltp-summary",
+      "title": "LTP summary and promotion fail-closed tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 60,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_ltp_result_summary.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "test/evaluation/summarize_ltp_results.py",
+        "test/run_unittest_suite.py",
+        "test/unit/test_ltp_result_summary.py"
+      ]
+    },
+    {
+      "id": "infra.run-eval",
+      "title": "Evaluator launcher supervision and cleanup tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 60,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_evaluation_runner_and_parser_integrity.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "run-eval.sh",
+        "test/evaluation/run_official_evaluation.sh",
+        "test/run_official_suite.sh",
+        "test/run_unittest_suite.py",
+        "test/unit/test_evaluation_runner_and_parser_integrity.py"
+      ]
+    },
+    {
+      "id": "infra.semantic-evidence",
+      "title": "Semantic evidence validator, runner, merger, and renderer tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 180,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_semantic_evidence.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "test/evidence/evaluator_protocol.py",
+        "test/evidence/render_semantic_evidence.py",
+        "test/evidence/semantic_evidence.py",
+        "test/evidence/semantic_evidence_manifest.json",
+        "test/evidence/semantic_evidence_schema.v1.json",
+        "test/run_unittest_suite.py",
+        "test/unit/test_semantic_evidence.py"
+      ]
+    },
+    {
+      "id": "infra.setup-qemu",
+      "title": "Pinned QEMU setup contract tests",
+      "category": "infrastructure",
+      "architectures": ["host"],
+      "runner_id": "unit-test",
+      "evidence_level": "static_checked",
+      "policy": "required",
+      "timeout_seconds": 60,
+      "requires": ["python3"],
+      "depends_on": [],
+      "command": ["python3", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "test/run_unittest_suite.py", "test/unit/test_qemu_setup.py"],
+      "classifier": {
+        "kind": "guard_protocol",
+        "pass_pattern": "^OK$",
+        "fail_pattern": "^FAILED(?: \\(.*\\))?$|^ERROR:",
+        "min_tests": 1
+      },
+      "provenance": [
+        "test/evidence/setup_qemu.sh",
+        "test/run_unittest_suite.py",
+        "test/unit/test_qemu_setup.py"
+      ]
+    },
+    {
+      "id": "smoke.la64.abi",
+      "title": "LoongArch64 repository-contained Linux ABI smoke",
+      "category": "runtime-smoke",
+      "architectures": [
+        "loongarch64"
+      ],
+      "runner_id": "qemu-smoke-v1",
+      "evidence_level": "runtime_semantic",
+      "policy": "required",
+      "timeout_seconds": 120,
+      "requires": [
+        "make",
+        "qemu-la64"
+      ],
+      "depends_on": [
+        "build.la64.smoke-harness"
+      ],
+      "command": [
+        "make",
+        "pr3-smoke-run-la-raw"
+      ],
+      "classifier": {
+        "kind": "marker_protocol",
+        "ordered_markers": [
+          "PR3_SMOKE_V1 HARNESS_START arch={arch}",
+          "PR3_SMOKE_V1 USER_START arch={arch}",
+          "PR3_SMOKE_V1 ASSERT write PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT getpid PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT uname_sysname PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT uname_machine PASS arch={arch}",
+          "PR3_SMOKE_V1 USER_PASS arch={arch}",
+          "PR3_SMOKE_V1 HARNESS_PASS arch={arch} status=0",
+          "PR3_SMOKE_V1 SHUTDOWN arch={arch}"
+        ],
+        "fatal_patterns": [
+          "^PR3_SMOKE_V1 (?:USER|HARNESS)_FAIL\\b",
+          "\\b(?:panic|panicked)\\b",
+          "\\b(?:Unhandled trap|fatal trap|kernel trap|InstructionNotExist)\\b",
+          "\\bENOSYS\\b",
+          "\\b(?:TIMEOUT|timed out)\\b"
+        ],
+        "boot_marker": "PR3_SMOKE_V1 HARNESS_START arch={arch}"
+      },
+      "provenance": [
+        "Makefile",
+        "user/shell/Cargo.toml",
+        "user/shell/build.rs",
+        "user/shell/runtime_smoke/semantic_smoke.ld",
+        "user/shell/runtime_smoke/semantic_smoke.rs",
+        "user/shell/src/main.rs",
+        "user/shell/src/semantic_smoke.rs"
+      ],
+      "environment": {
+        "PR3_EVIDENCE_SUPERVISED": "1"
+      }
+    },
+    {
+      "id": "smoke.rv64.abi",
+      "title": "RISC-V64 repository-contained Linux ABI smoke",
+      "category": "runtime-smoke",
+      "architectures": [
+        "riscv64"
+      ],
+      "runner_id": "qemu-smoke-v1",
+      "evidence_level": "runtime_semantic",
+      "policy": "required",
+      "timeout_seconds": 120,
+      "requires": [
+        "make",
+        "qemu-rv64"
+      ],
+      "depends_on": [
+        "build.rv64.smoke-harness"
+      ],
+      "command": [
+        "make",
+        "pr3-smoke-run-rv-raw"
+      ],
+      "classifier": {
+        "kind": "marker_protocol",
+        "ordered_markers": [
+          "PR3_SMOKE_V1 HARNESS_START arch={arch}",
+          "PR3_SMOKE_V1 USER_START arch={arch}",
+          "PR3_SMOKE_V1 ASSERT write PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT getpid PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT uname_sysname PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT uname_machine PASS arch={arch}",
+          "PR3_SMOKE_V1 USER_PASS arch={arch}",
+          "PR3_SMOKE_V1 HARNESS_PASS arch={arch} status=0",
+          "PR3_SMOKE_V1 SHUTDOWN arch={arch}"
+        ],
+        "fatal_patterns": [
+          "^PR3_SMOKE_V1 (?:USER|HARNESS)_FAIL\\b",
+          "\\b(?:panic|panicked)\\b",
+          "\\b(?:Unhandled trap|fatal trap|kernel trap|InstructionNotExist)\\b",
+          "\\bENOSYS\\b",
+          "\\b(?:TIMEOUT|timed out)\\b"
+        ],
+        "boot_marker": "PR3_SMOKE_V1 HARNESS_START arch={arch}"
+      },
+      "provenance": [
+        "Makefile",
+        "user/shell/Cargo.toml",
+        "user/shell/build.rs",
+        "user/shell/runtime_smoke/semantic_smoke.ld",
+        "user/shell/runtime_smoke/semantic_smoke.rs",
+        "user/shell/src/main.rs",
+        "user/shell/src/semantic_smoke.rs"
+      ],
+      "environment": {
+        "PR3_EVIDENCE_SUPERVISED": "1"
+      }
+    }
+  ]
+}

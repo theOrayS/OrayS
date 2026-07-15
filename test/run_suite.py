@@ -175,7 +175,18 @@ ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 RESULT_TYPES = {"exit_code", "check", "unittest", "cargo_test", "case_result", "official"}
 ARCH_POLICIES = {"none", "one", "one_or_all"}
 CANONICAL_PROFILE_NAMES = frozenset(
-    {"checks", "unit", "quick", "baseline", "official", "full"}
+    {
+        "checks",
+        "unit",
+        "quick",
+        "evidence-host",
+        "evidence-runtime",
+        "evidence-aggregate",
+        "evidence-required",
+        "baseline",
+        "official",
+        "full",
+    }
 )
 NON_PASS_OUTPUT_RE = re.compile(
     r"\b(?:SKIP(?:PED|PING)?|XFAIL|TCONF|TBROK|TFAIL|ENOSYS|TIMEOUT|TIMED[_ -]?OUT|"
@@ -438,6 +449,7 @@ CANONICAL_OFFICIAL_EXECUTION = {
 }
 CANONICAL_CHECK_CASE_IDS = (
     "check.compliance_regressions",
+    "check.competition_semantic_evidence",
     "check.evaluation_runner_and_parser_integrity",
     "check.file_object_event_core",
     "check.kernel_state_backed_semantics",
@@ -458,8 +470,10 @@ CANONICAL_CHECK_CASE_IDS = (
 )
 CANONICAL_UNIT_CASE_IDS = (
     "unit.compliance_regressions",
+    "unit.competition_semantic_evidence",
     "unit.evaluation_failure_report",
     "unit.evaluation_runner_and_parser_integrity",
+    "unit.evaluator_protocol",
     "unit.file_object_event_core",
     "unit.kernel_state_backed_semantics",
     "unit.libc_stateful_semantics",
@@ -470,9 +484,11 @@ CANONICAL_UNIT_CASE_IDS = (
     "unit.official_result_validation",
     "unit.posix_state_integrity",
     "unit.rlimit_and_fd_semantics",
+    "unit.qemu_setup",
     "unit.runtime_binary_patch_prohibition",
     "unit.socket_message_and_buffer_semantics",
     "unit.stat_metadata_semantics",
+    "unit.semantic_evidence",
     "unit.suite_runner",
     "unit.synthetic_capability_integrity",
     "unit.syscall_boundary_regressions",
@@ -482,10 +498,12 @@ CANONICAL_UNIT_CASE_IDS = (
 )
 CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.compliance_regressions": 7,
+    "unit.competition_semantic_evidence": 33,
     "unit.evaluation_failure_report": 8,
     "unit.evaluation_runner_and_parser_integrity": 23,
+    "unit.evaluator_protocol": 27,
     "unit.file_object_event_core": 24,
-    "unit.kernel_state_backed_semantics": 36,
+    "unit.kernel_state_backed_semantics": 41,
     "unit.libc_stateful_semantics": 9,
     "unit.linux_boundary": 16,
     "unit.ltp_result_summary": 20,
@@ -494,9 +512,11 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.official_result_validation": 106,
     "unit.posix_state_integrity": 15,
     "unit.rlimit_and_fd_semantics": 13,
+    "unit.qemu_setup": 9,
     "unit.runtime_binary_patch_prohibition": 9,
     "unit.socket_message_and_buffer_semantics": 10,
     "unit.stat_metadata_semantics": 7,
+    "unit.semantic_evidence": 75,
     "unit.suite_runner": 133,
     "unit.synthetic_capability_integrity": 5,
     "unit.syscall_boundary_regressions": 26,
@@ -505,6 +525,9 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.user_memory_copy_boundaries": 13,
 }
 CANONICAL_PYTHON_EXTRA_REQUIRED_PATHS = {
+    "unit.competition_semantic_evidence": [
+        "{repo}/test/checks/check_competition_semantic_evidence.py",
+    ],
     "unit.evaluation_failure_report": [
         "{repo}/test/evaluation/report_evaluation_failures.py",
         "{repo}/test/evaluation/parse_official_results.py",
@@ -512,9 +535,98 @@ CANONICAL_PYTHON_EXTRA_REQUIRED_PATHS = {
     "unit.file_object_event_core": [
         "{repo}/test/checks/check_file_object_event_core.py",
     ],
+    "unit.evaluator_protocol": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+    ],
     "unit.linux_boundary": [
         "{repo}/test/checks/check_linux_boundary.py",
     ],
+    "unit.qemu_setup": [
+        "{repo}/test/evidence/setup_qemu.sh",
+    ],
+    "unit.semantic_evidence": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/render_semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "{repo}/test/evidence/semantic_evidence_schema.v1.json",
+        "{repo}/test/fixtures/semantic_evidence/guard-ambiguous.txt",
+        "{repo}/test/fixtures/semantic_evidence/guard-pass.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-duplicate.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-panic-after-pass.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-pass.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-truncated.txt",
+    ],
+}
+CANONICAL_EVIDENCE_CASE_IDS = (
+    "evidence.host",
+    "evidence.riscv64",
+    "evidence.loongarch64",
+    "evidence.aggregate",
+)
+CANONICAL_EVIDENCE_COMMANDS = {
+    "evidence.host": [
+        "{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null",
+        "{repo}/test/evidence/semantic_evidence.py", "run",
+        "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "--output", "build/pr3-evidence/host", "--arch", "host",
+    ],
+    "evidence.riscv64": [
+        "{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null",
+        "{repo}/test/evidence/semantic_evidence.py", "run",
+        "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "--output", "build/pr3-evidence/rv64", "--arch", "riscv64",
+    ],
+    "evidence.loongarch64": [
+        "{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null",
+        "{repo}/test/evidence/semantic_evidence.py", "run",
+        "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "--output", "build/pr3-evidence/la64", "--arch", "loongarch64",
+    ],
+    "evidence.aggregate": ["{repo}/test/evidence/aggregate_semantic_evidence.sh"],
+}
+CANONICAL_EVIDENCE_REQUIRED_PATHS = {
+    "evidence.host": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+    ],
+    "evidence.riscv64": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "{repo}/scripts/rust-lld.sh",
+        "{repo}/scripts/rust-objcopy.sh",
+    ],
+    "evidence.loongarch64": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "{repo}/scripts/rust-lld.sh",
+        "{repo}/scripts/rust-objcopy.sh",
+    ],
+    "evidence.aggregate": [
+        "{repo}/test/evidence/aggregate_semantic_evidence.sh",
+        "{repo}/test/evidence/render_semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+    ],
+}
+CANONICAL_EVIDENCE_REQUIRED_COMMANDS = {
+    "evidence.host": ["python3"],
+    "evidence.riscv64": [
+        "python3", "make", "cargo", "rustc", "qemu-system-riscv64",
+    ],
+    "evidence.loongarch64": [
+        "python3", "make", "cargo", "rustc", "qemu-system-loongarch64",
+    ],
+    "evidence.aggregate": ["bash", "python3"],
+}
+CANONICAL_EVIDENCE_TIMEOUTS = {
+    "evidence.host": 1800,
+    "evidence.riscv64": 7200,
+    "evidence.loongarch64": 7200,
+    "evidence.aggregate": 600,
 }
 CANONICAL_BASELINE_CASE_IDS = (
     "baseline.cargo_format",
@@ -1304,6 +1416,7 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
     canonical_case_ids = {
         *CANONICAL_CHECK_CASE_IDS,
         *CANONICAL_UNIT_CASE_IDS,
+        *CANONICAL_EVIDENCE_CASE_IDS,
         *CANONICAL_BASELINE_CASE_IDS,
         *(case_id for values in canonical_arch_cases.values() for case_id in values),
     }
@@ -1332,7 +1445,29 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
             "checks": ("none", [], list(CANONICAL_CHECK_CASE_IDS), {}),
             "unit": ("none", [], list(CANONICAL_UNIT_CASE_IDS), {}),
             "quick": ("none", ["checks", "unit"], [], {}),
-            "baseline": ("none", ["quick"], list(CANONICAL_BASELINE_CASE_IDS), {}),
+            "evidence-host": ("none", [], ["evidence.host"], {}),
+            "evidence-runtime": (
+                "one",
+                [],
+                [],
+                {
+                    "rv": ["evidence.riscv64"],
+                    "la": ["evidence.loongarch64"],
+                },
+            ),
+            "evidence-aggregate": ("none", [], ["evidence.aggregate"], {}),
+            "evidence-required": (
+                "none",
+                ["evidence-host"],
+                ["evidence.riscv64", "evidence.loongarch64", "evidence.aggregate"],
+                {},
+            ),
+            "baseline": (
+                "none",
+                ["quick", "evidence-required"],
+                list(CANONICAL_BASELINE_CASE_IDS),
+                {},
+            ),
             "official": ("one", [], [], canonical_arch_cases),
             "full": ("one_or_all", ["baseline"], [], canonical_arch_cases),
         }
@@ -1434,6 +1569,27 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                 raise ManifestError(
                     f"case {case_id} must preserve its exact canonical baseline command "
                     "and result/capability requirements"
+                )
+        for case_id, expected_command in CANONICAL_EVIDENCE_COMMANDS.items():
+            case = cases_by_id[case_id]
+            if (
+                case.get("command") != expected_command
+                or case.get("cwd", "{repo}") != "{repo}"
+                or case.get("environment", {}) != {}
+                or case.get("required_capabilities", []) != []
+                or case.get("result_contract")
+                != {"type": "exit_code", "allow_empty_output": False}
+                or case.get("infrastructure_exit_codes", []) != [2]
+                or case.get("required_commands", [])
+                != CANONICAL_EVIDENCE_REQUIRED_COMMANDS[case_id]
+                or case.get("required_paths", [])
+                != CANONICAL_EVIDENCE_REQUIRED_PATHS[case_id]
+                or case.get("required_files", []) != []
+                or case.get("timeout_seconds") != CANONICAL_EVIDENCE_TIMEOUTS[case_id]
+            ):
+                raise ManifestError(
+                    f"case {case_id} must preserve its exact canonical semantic-evidence "
+                    "adapter and result/capability requirements"
                 )
         live_ltp_count = len(_live_ltp_stable_cases(repo))
         try:
