@@ -237,10 +237,21 @@ class TestAssetIntegrityTest(unittest.TestCase):
         )
 
     def test_missing_canonical_asset_is_detected(self) -> None:
-        tree = self.make_tree()
-        (tree / "test/evaluation/report_evaluation_failures.py").unlink()
-        findings = guard.scan_repo(tree)
-        self.assertTrue(any("required canonical test asset is missing" in finding for finding in findings), findings)
+        for relative_path in (
+            "test/evaluation/report_evaluation_failures.py",
+            "test/run_official_suite.sh",
+        ):
+            with self.subTest(path=relative_path):
+                tree = self.make_tree()
+                (tree / relative_path).unlink()
+                findings = guard.scan_repo(tree)
+                self.assertTrue(
+                    any(
+                        f"required canonical test asset is missing: {relative_path}" in finding
+                        for finding in findings
+                    ),
+                    findings,
+                )
 
     def test_missing_baseline_validation_report_is_detected(self) -> None:
         tree = self.make_tree()
@@ -264,23 +275,58 @@ class TestAssetIntegrityTest(unittest.TestCase):
         self.assertIn("root official compatibility wrapper is missing", findings)
 
     def test_non_delegating_root_wrapper_is_detected(self) -> None:
-        tree = self.make_tree()
-        wrapper = tree / "run-eval.sh"
-        wrapper.write_text("#!/bin/sh\nexec true\n", encoding="utf-8")
-        wrapper.chmod(0o755)
-        findings = guard.scan_repo(tree)
-        self.assertTrue(any("does not exec the strict canonical profile" in finding for finding in findings), findings)
+        for target, content, expected in (
+            (
+                "run-eval.sh",
+                "#!/bin/sh\nexec true\n",
+                "does not only exec the canonical /test launcher",
+            ),
+            (
+                "run-eval.sh",
+                "#!/bin/sh\nexec python3 test/run_suite.py --profile official --arch \"$@\"\n",
+                "does not only exec the canonical /test launcher",
+            ),
+            (
+                "test/run_official_suite.sh",
+                "#!/bin/bash -p\nset -euo pipefail\nexec true\n",
+                "does not invoke the strict official profile",
+            ),
+            (
+                "run-eval.sh",
+                (REPO_ROOT / "run-eval.sh").read_text(encoding="utf-8")
+                + "printf 'unexpected root policy\\n'\n",
+                "does not only exec the canonical /test launcher",
+            ),
+            (
+                "test/run_official_suite.sh",
+                (REPO_ROOT / "test/run_official_suite.sh").read_text(encoding="utf-8")
+                + "printf 'unexpected launcher policy\\n'\n",
+                "does not invoke the strict official profile",
+            ),
+        ):
+            with self.subTest(target=target, content=content):
+                tree = self.make_tree()
+                wrapper = tree / target
+                wrapper.write_text(content, encoding="utf-8")
+                wrapper.chmod(0o755)
+                findings = guard.scan_repo(tree)
+                self.assertTrue(any(expected in finding for finding in findings), findings)
 
     def test_root_wrapper_with_duplicated_logic_is_detected(self) -> None:
-        tree = self.make_tree()
-        wrapper = tree / "run-eval.sh"
-        wrapper.write_text(
-            "#!/bin/sh\nexec python3 test/run_suite.py --profile official --arch \"$@\"\nmake all\n",
-            encoding="utf-8",
-        )
-        wrapper.chmod(0o755)
-        findings = guard.scan_repo(tree)
-        self.assertTrue(any("contains duplicated evaluation logic" in finding for finding in findings), findings)
+        for target in ("run-eval.sh", "test/run_official_suite.sh"):
+            with self.subTest(target=target):
+                tree = self.make_tree()
+                wrapper = tree / target
+                wrapper.write_text(
+                    "#!/bin/sh\nexec true\nmake all\n",
+                    encoding="utf-8",
+                )
+                wrapper.chmod(0o755)
+                findings = guard.scan_repo(tree)
+                self.assertTrue(
+                    any("contains duplicated evaluation logic" in finding for finding in findings),
+                    findings,
+                )
 
     def test_non_executable_root_wrapper_is_detected(self) -> None:
         tree = self.make_tree()
@@ -289,10 +335,18 @@ class TestAssetIntegrityTest(unittest.TestCase):
         self.assertIn("root official compatibility wrapper is not executable", findings)
 
     def test_non_executable_canonical_runner_is_detected(self) -> None:
-        tree = self.make_tree()
-        (tree / "test/evaluation/run_official_evaluation.sh").chmod(0o644)
-        findings = guard.scan_repo(tree)
-        self.assertIn("canonical official evaluation runner is not executable", findings)
+        for relative_path, expected in (
+            ("test/run_official_suite.sh", "canonical official suite launcher is not executable"),
+            (
+                "test/evaluation/run_official_evaluation.sh",
+                "canonical official evaluation runner is not executable",
+            ),
+        ):
+            with self.subTest(path=relative_path):
+                tree = self.make_tree()
+                (tree / relative_path).chmod(0o644)
+                findings = guard.scan_repo(tree)
+                self.assertIn(expected, findings)
 
     def test_non_executable_local_suite_runner_is_detected(self) -> None:
         tree = self.make_tree()

@@ -47,23 +47,48 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         make_script.write_text(
             "#!/bin/sh\n"
             "printf '%s\\n' \"$@\" > \"$FAKE_MAKE_ARGS\"\n"
-            "env | LC_ALL=C sort > \"$FAKE_MAKE_ENVIRONMENT\"\n"
+            "{\n"
+            "  printf '%s\\n' LTP_BLACKLIST_BEGIN\n"
+            "  printf '%s\\n' \"${LTP_BLACKLIST-}\"\n"
+            "  printf '%s\\n' LTP_BLACKLIST_END\n"
+            "  env | LC_ALL=C sort\n"
+            "} > \"$FAKE_MAKE_ENVIRONMENT\"\n"
             "exit \"$FAKE_MAKE_STATUS\"\n",
             encoding="utf-8",
         )
         make_script.chmod(0o755)
-        for command in ("cargo", "qemu-img", "qemu-system-riscv64"):
+        for command in (
+            "cargo",
+            "qemu-img",
+            "qemu-system-riscv64",
+            "qemu-system-loongarch64",
+        ):
             path = bin_dir / command
             path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             path.chmod(0o755)
-        image = directory / "images/sdcard-rv.img"
-        image.parent.mkdir()
-        image.write_bytes(b"fixture")
+        image_directory = directory / "images"
+        image_directory.mkdir()
+        for image_name in ("sdcard-rv.img", "sdcard-la.img"):
+            (image_directory / image_name).write_bytes(b"fixture")
         environment = os.environ.copy()
+        for name in (
+            "LTP_BLACKLIST",
+            "LTP_BLACKLIST_FILE",
+            "LTP_BLACKLIST_COMMON_FILE",
+            "LTP_BLACKLIST_RV_FILE",
+            "LTP_BLACKLIST_LA_FILE",
+            "LTP_BLACKLIST_RV",
+            "LTP_BLACKLIST_RISCV64",
+            "LTP_BLACKLIST_LA",
+            "LTP_BLACKLIST_LOONGARCH64",
+            "OSCOMP_SKIP_TEST_GROUPS",
+        ):
+            environment.pop(name, None)
         environment.update(
             {
                 "PATH": f"{bin_dir}:{environment['PATH']}",
                 "RV_TESTSUITE_IMG": "images/sdcard-rv.img",
+                "LA_TESTSUITE_IMG": "images/sdcard-la.img",
                 "ORAYS_TEST_OUTPUT_DIR": "out",
                 "FAKE_MAKE_ARGS": str(args_log),
                 "FAKE_MAKE_ENVIRONMENT": str(environment_log),
@@ -76,6 +101,8 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 "KERNEL_APP": "untrusted/app",
                 "KERNEL_RV_FEATURES": "untrusted-features",
                 "KERNEL_RV_APP_FEATURES": "untrusted-app-features",
+                "KERNEL_LA_FEATURES": "untrusted-la-features",
+                "KERNEL_LA_APP_FEATURES": "untrusted-la-app-features",
                 "KERNEL_MODE": "debug",
                 "PLAT_CONFIG": "/untrusted/platform.toml",
                 "KERNEL_RV": "/untrusted/kernel-rv",
@@ -122,40 +149,95 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
 
     def test_official_executor_absolutizes_paths_and_fixes_consumed_resources(self) -> None:
         directory, environment, args_log, environment_log = self.fake_official_environment()
-        result = subprocess.run(
-            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
-            cwd=directory,
-            env=environment,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
+        blacklist_directory = directory / "blacklists"
+        blacklist_directory.mkdir()
+        contents = {
+            "generic-one.txt": "generic-one",
+            "generic-two.txt": "generic-two",
+            "common.txt": "common",
+            "rv.txt": "rv-file",
+            "la.txt": "la-file",
+        }
+        for name, content in contents.items():
+            (blacklist_directory / name).write_text(f"{content}\n", encoding="utf-8")
+        environment.update(
+            {
+                "LTP_BLACKLIST": "inline-base",
+                "LTP_BLACKLIST_FILE": "blacklists/generic-one.txt blacklists/generic-two.txt",
+                "LTP_BLACKLIST_COMMON_FILE": "blacklists/common.txt",
+                "LTP_BLACKLIST_RV_FILE": "blacklists/rv.txt",
+                "LTP_BLACKLIST_LA_FILE": "blacklists/la.txt",
+                "LTP_BLACKLIST_RV": "rv-inline",
+                "LTP_BLACKLIST_RISCV64": "riscv64-inline",
+                "LTP_BLACKLIST_LA": "la-inline",
+                "LTP_BLACKLIST_LOONGARCH64": "loongarch64-inline",
+            }
         )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        arguments = args_log.read_text(encoding="utf-8").splitlines()
-        self.assertIn(f"RV_TESTSUITE_IMG={directory}/images/sdcard-rv.img", arguments)
-        self.assertTrue(
-            any(value.startswith(f"RV_TESTSUITE_RUN_IMG={directory}/out/") for value in arguments),
-            arguments,
-        )
-        self.assertIn("KERNEL_SMP=1", arguments)
-        self.assertIn("RV_MEM=1G", arguments)
-        self.assertFalse(any(value.startswith(("SMP=", "MEM=")) for value in arguments), arguments)
-        environment_text = environment_log.read_text(encoding="utf-8")
-        self.assertIn("CARGO_NET_OFFLINE=true", environment_text)
-        for variable in (
-            "MAKEFLAGS",
-            "BASH_ENV",
-            "ENV",
-            "BASH_FUNC_make%%",
-            "KERNEL_APP",
-            "KERNEL_RV_FEATURES",
-            "KERNEL_RV_APP_FEATURES",
-            "KERNEL_MODE",
-            "PLAT_CONFIG",
-            "KERNEL_RV",
+        for arch, image_variable, run_image_variable, memory_variable, arch_content in (
+            ("rv", "RV_TESTSUITE_IMG", "RV_TESTSUITE_RUN_IMG", "RV_MEM", "rv-file"),
+            ("la", "LA_TESTSUITE_IMG", "LA_TESTSUITE_RUN_IMG", "LA_MEM", "la-file"),
         ):
-            self.assertNotIn(f"{variable}=", environment_text)
+            with self.subTest(arch=arch):
+                result = subprocess.run(
+                    [str(ROOT / "test/evaluation/run_official_evaluation.sh"), arch],
+                    cwd=directory,
+                    env=environment,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                arguments = args_log.read_text(encoding="utf-8").splitlines()
+                self.assertIn(
+                    f"{image_variable}={directory}/images/sdcard-{arch}.img",
+                    arguments,
+                )
+                self.assertTrue(
+                    any(
+                        value.startswith(f"{run_image_variable}={directory}/out/")
+                        for value in arguments
+                    ),
+                    arguments,
+                )
+                self.assertIn("KERNEL_SMP=1", arguments)
+                self.assertIn(f"{memory_variable}=1G", arguments)
+                self.assertFalse(
+                    any(value.startswith(("SMP=", "MEM=")) for value in arguments),
+                    arguments,
+                )
+                environment_text = environment_log.read_text(encoding="utf-8")
+                composed = environment_text.split("LTP_BLACKLIST_BEGIN\n", 1)[1].split(
+                    "\nLTP_BLACKLIST_END\n", 1
+                )[0]
+                self.assertEqual(
+                    composed.splitlines(),
+                    ["inline-base", "generic-one", "generic-two", "common", arch_content],
+                )
+                self.assertNotIn("la-file" if arch == "rv" else "rv-file", composed)
+                self.assertIn("CARGO_NET_OFFLINE=true", environment_text)
+                for variable, value in (
+                    ("LTP_BLACKLIST_RV", "rv-inline"),
+                    ("LTP_BLACKLIST_RISCV64", "riscv64-inline"),
+                    ("LTP_BLACKLIST_LA", "la-inline"),
+                    ("LTP_BLACKLIST_LOONGARCH64", "loongarch64-inline"),
+                ):
+                    self.assertIn(f"{variable}={value}", environment_text)
+                for variable in (
+                    "MAKEFLAGS",
+                    "BASH_ENV",
+                    "ENV",
+                    "BASH_FUNC_make%%",
+                    "KERNEL_APP",
+                    "KERNEL_RV_FEATURES",
+                    "KERNEL_RV_APP_FEATURES",
+                    "KERNEL_LA_FEATURES",
+                    "KERNEL_LA_APP_FEATURES",
+                    "KERNEL_MODE",
+                    "PLAT_CONFIG",
+                    "KERNEL_RV",
+                ):
+                    self.assertNotIn(f"{variable}=", environment_text)
 
     def test_official_executor_reserves_125_for_preflight_infrastructure(self) -> None:
         directory, environment, _args_log, _environment_log = self.fake_official_environment()
@@ -171,6 +253,25 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 125, result.stdout + result.stderr)
         self.assertIn("infrastructure error", result.stderr)
+
+        (directory / "images/sdcard-rv.img").write_bytes(b"fixture")
+        environment["LTP_BLACKLIST_FILE"] = "missing-blacklist.txt"
+        missing_blacklist = subprocess.run(
+            [str(ROOT / "test/evaluation/run_official_evaluation.sh"), "rv"],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(
+            missing_blacklist.returncode,
+            125,
+            missing_blacklist.stdout + missing_blacklist.stderr,
+        )
+        self.assertIn("LTP_BLACKLIST_FILE", missing_blacklist.stderr)
+        self.assertIn("missing or unreadable blacklist file", missing_blacklist.stderr)
 
     def test_official_executor_preserves_make_exit_two_as_test_failure(self) -> None:
         directory, environment, _args_log, _environment_log = self.fake_official_environment(
@@ -188,10 +289,31 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
 
     def test_public_official_entry_cannot_pass_explicit_guest_failure(self) -> None:
-        directory, environment, _args_log, _environment_log = self.fake_official_environment()
+        directory, environment, _args_log, environment_log = self.fake_official_environment()
+        blacklist_directory = directory / "blacklists"
+        blacklist_directory.mkdir()
+        for name, content in (
+            ("generic.txt", "generic-entry"),
+            ("common.txt", "common-entry"),
+            ("rv.txt", "rv-entry"),
+        ):
+            (blacklist_directory / name).write_text(f"{content}\n", encoding="utf-8")
+        environment.update(
+            {
+                "LTP_BLACKLIST": "inline-entry",
+                "LTP_BLACKLIST_FILE": "blacklists/generic.txt",
+                "LTP_BLACKLIST_COMMON_FILE": "blacklists/common.txt",
+                "LTP_BLACKLIST_RV_FILE": "blacklists/rv.txt",
+            }
+        )
         fake_make = directory / "bin/make"
         fake_make.write_text(
             "#!/bin/sh\n"
+            "{\n"
+            "  printf '%s\\n' LTP_BLACKLIST_BEGIN\n"
+            "  printf '%s\\n' \"${LTP_BLACKLIST-}\"\n"
+            "  printf '%s\\n' LTP_BLACKLIST_END\n"
+            "} > \"$FAKE_MAKE_ENVIRONMENT\"\n"
             "printf '%s\\n' "
             "'#### OS COMP TEST GROUP START demo-musl ####' "
             "'FAIL OFFICIAL TEST GROUP demo-musl : 7' "
@@ -220,6 +342,26 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertEqual(summary["result"], "INFRA_ERROR", summary)
         self.assertEqual(summary["cases"][0]["status"], "INFRA_ERROR", summary)
         self.assertNotEqual(summary["cases"][0]["status"], "PASS", summary)
+        self.assertEqual(
+            environment_log.read_text(encoding="utf-8").splitlines(),
+            [
+                "LTP_BLACKLIST_BEGIN",
+                "inline-entry",
+                "generic-entry",
+                "common-entry",
+                "rv-entry",
+                "LTP_BLACKLIST_END",
+            ],
+        )
+        self.assertEqual(
+            summary["cases"][0]["details"]["noncanonical_official_environment"],
+            [
+                "LTP_BLACKLIST",
+                "LTP_BLACKLIST_FILE",
+                "LTP_BLACKLIST_COMMON_FILE",
+                "LTP_BLACKLIST_RV_FILE",
+            ],
+        )
 
     def test_public_official_entry_ignores_startup_hooks_and_preserves_environment(self) -> None:
         directory = Path(tempfile.mkdtemp(prefix="official-public-wrapper-fixture-"))
@@ -289,6 +431,31 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
                 f"BASH_ENV={bash_environment}",
                 "ENV=preserved-env-value",
                 "PYTHONPATH=preserved-python-path",
+            ],
+        )
+
+        default_result = subprocess.run(
+            [str(ROOT / "run-eval.sh")],
+            cwd=directory,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(default_result.returncode, 37, default_result.stdout + default_result.stderr)
+        self.assertFalse(hook_marker.exists(), "root wrapper executed inherited BASH_ENV")
+        self.assertEqual(
+            args_log.read_text(encoding="utf-8").splitlines(),
+            [
+                "-B",
+                "-E",
+                "-s",
+                str(ROOT / "test/run_suite.py"),
+                "--profile",
+                "official",
+                "--arch",
+                "rv",
             ],
         )
 

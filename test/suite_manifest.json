@@ -377,7 +377,7 @@
       "description": "Manifest and runner lifecycle integration fixtures.",
       "command": ["{python}", "-B", "{repo}/test/unit/test_suite_runner.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 132},
+      "result_contract": {"type": "unittest", "expected_tests": 133},
       "required_paths": ["{repo}/test/unit/test_suite_runner.py"], "required_commands": []
     },
     {
@@ -519,17 +519,7 @@
       "environment": {
         "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
         "OSCOMP_TEST_GROUPS": "all",
-        "OSCOMP_SKIP_TEST_GROUPS": "none",
         "LTP_CASES": "stable-full",
-        "LTP_BLACKLIST": "",
-        "LTP_BLACKLIST_FILE": "",
-        "LTP_BLACKLIST_COMMON_FILE": "",
-        "LTP_BLACKLIST_RV_FILE": "",
-        "LTP_BLACKLIST_LA_FILE": "",
-        "LTP_BLACKLIST_RV": "",
-        "LTP_BLACKLIST_RISCV64": "",
-        "LTP_BLACKLIST_LA": "",
-        "LTP_BLACKLIST_LOONGARCH64": "",
         "LTP_CASE_TIMEOUT_SECS": "180",
         "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },
@@ -576,17 +566,7 @@
       "environment": {
         "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
         "OSCOMP_TEST_GROUPS": "all",
-        "OSCOMP_SKIP_TEST_GROUPS": "none",
         "LTP_CASES": "stable-full",
-        "LTP_BLACKLIST": "",
-        "LTP_BLACKLIST_FILE": "",
-        "LTP_BLACKLIST_COMMON_FILE": "",
-        "LTP_BLACKLIST_RV_FILE": "",
-        "LTP_BLACKLIST_LA_FILE": "",
-        "LTP_BLACKLIST_RV": "",
-        "LTP_BLACKLIST_RISCV64": "",
-        "LTP_BLACKLIST_LA": "",
-        "LTP_BLACKLIST_LOONGARCH64": "",
         "LTP_CASE_TIMEOUT_SECS": "180",
         "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },

@@ -922,6 +922,72 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("required file", self.summary()["cases"][0]["result"])
 
+    def test_noncanonical_official_scouting_configuration_cannot_pass(self) -> None:
+        pass_transcript = (
+            "#### OS COMP TEST GROUP START demo-musl ####\n"
+            "PASS OFFICIAL TEST GROUP demo-musl : 0\n"
+            "#### OS COMP TEST GROUP END demo-musl ####"
+        )
+        fail_transcript = (
+            "#### OS COMP TEST GROUP START demo-musl ####\n"
+            "FAIL OFFICIAL TEST GROUP demo-musl : 7\n"
+            "#### OS COMP TEST GROUP END demo-musl ####"
+        )
+        contract = {
+            "type": "official",
+            "expected_group_labels": ["demo-musl"],
+            "expected_group_case_counts": {},
+        }
+        base_environment = os.environ.copy()
+        for name in (
+            "LTP_BLACKLIST",
+            "LTP_BLACKLIST_FILE",
+            "LTP_BLACKLIST_COMMON_FILE",
+            "LTP_BLACKLIST_RV_FILE",
+            "LTP_BLACKLIST_LA_FILE",
+            "LTP_BLACKLIST_RV",
+            "LTP_BLACKLIST_RISCV64",
+            "LTP_BLACKLIST_LA",
+            "LTP_BLACKLIST_LOONGARCH64",
+            "OSCOMP_SKIP_TEST_GROUPS",
+        ):
+            base_environment.pop(name, None)
+
+        scenarios = (
+            ("blacklist-pass", "LTP_BLACKLIST", "no-such-case", pass_transcript, 2, "INFRA_ERROR"),
+            (
+                "skip-pass",
+                "OSCOMP_SKIP_TEST_GROUPS",
+                "demo-musl",
+                pass_transcript,
+                2,
+                "INFRA_ERROR",
+            ),
+            ("blacklist-fail", "LTP_BLACKLIST", "no-such-case", fail_transcript, 1, "FAIL"),
+        )
+        for label, variable, value, transcript, expected_exit, expected_status in scenarios:
+            with self.subTest(label=label):
+                self.output_path = self.work / f"official-scouting-{label}"
+                environment = base_environment.copy()
+                environment[variable] = value
+                case = fixture_case(
+                    "fixture.official-result",
+                    code=f"print({transcript!r})",
+                    contract=contract,
+                )
+                result = self.invoke(
+                    fixture_manifest([case]),
+                    environment=environment,
+                )
+                self.assertEqual(expected_exit, result.returncode, result.stdout + result.stderr)
+                record = self.summary()["cases"][0]
+                self.assertEqual(expected_status, record["status"], record)
+                self.assertEqual(
+                    [variable],
+                    record["details"]["noncanonical_official_environment"],
+                )
+                self.assertNotEqual("PASS", record["status"], record)
+
     def test_official_contract_requires_expected_group_plan(self) -> None:
         case = fixture_case(contract={"type": "official"})
         result = self.invoke(fixture_manifest([case]))

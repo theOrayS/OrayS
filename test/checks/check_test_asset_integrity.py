@@ -14,6 +14,7 @@ HISTORICAL_ID_RE = re.compile(r"(?i)(?:^|[^a-z0-9])g0\d{2}(?:$|[^a-z0-9])")
 CANONICAL_REQUIRED = (
     Path("test/README.md"),
     Path("test/run_suite.py"),
+    Path("test/run_official_suite.sh"),
     Path("test/suite_manifest.json"),
     Path("test/evaluation/run_official_evaluation.sh"),
     Path("test/evaluation/official_case_plan.json"),
@@ -307,17 +308,53 @@ def scan_required_files(root: Path) -> list[str]:
         if wrapper.stat().st_mode & 0o111 == 0:
             findings.append("root official compatibility wrapper is not executable")
         text = wrapper.read_text(encoding="utf-8")
-        if (
-            "test/run_suite.py" not in text
-            or "--profile official" not in text
-            or "--arch" not in text
-            or "exec " not in text
+        expected_wrapper = (
+            "#!/bin/bash -p\n"
+            "set -euo pipefail\n\n"
+            'SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
+            'exec "$SCRIPT_DIR/test/run_official_suite.sh" "$@"\n'
+        )
+        if text != expected_wrapper:
+            findings.append(
+                "root official compatibility wrapper does not only exec the canonical /test launcher"
+            )
+        if any(
+            token in text
+            for token in (
+                "python",
+                "run_suite.py",
+                "--profile",
+                "--arch",
+                "run_official_evaluation.sh",
+                "make",
+                "qemu-system",
+                "qemu-img",
+            )
         ):
-            findings.append("root official compatibility wrapper does not exec the strict canonical profile")
-        if re.search(r"\b(?:make|qemu-system|qemu-img)\b", text):
             findings.append("root official compatibility wrapper contains duplicated evaluation logic")
-    canonical_wrapper = root / "test/evaluation/run_official_evaluation.sh"
-    if canonical_wrapper.is_file() and canonical_wrapper.stat().st_mode & 0o111 == 0:
+    canonical_launcher = root / "test/run_official_suite.sh"
+    if canonical_launcher.is_file():
+        if canonical_launcher.stat().st_mode & 0o111 == 0:
+            findings.append("canonical official suite launcher is not executable")
+        text = canonical_launcher.read_text(encoding="utf-8")
+        expected_launcher = (
+            "#!/bin/bash -p\n"
+            "set -euo pipefail\n\n"
+            'SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
+            "if (( $# == 0 )); then\n"
+            "    set -- rv\n"
+            "fi\n\n"
+            'exec python3 -B -E -s "$SCRIPT_DIR/run_suite.py" '
+            '--profile official --arch "$@"\n'
+        )
+        if text != expected_launcher:
+            findings.append(
+                "canonical official suite launcher does not invoke the strict official profile"
+            )
+        if re.search(r"\b(?:make|qemu-system|qemu-img)\b", text):
+            findings.append("canonical official suite launcher contains duplicated evaluation logic")
+    evaluation_runner = root / "test/evaluation/run_official_evaluation.sh"
+    if evaluation_runner.is_file() and evaluation_runner.stat().st_mode & 0o111 == 0:
         findings.append("canonical official evaluation runner is not executable")
     local_runner = root / "test/run_suite.py"
     if local_runner.is_file() and local_runner.stat().st_mode & 0o111 == 0:

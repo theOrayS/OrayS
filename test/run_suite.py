@@ -139,20 +139,24 @@ _SUBREAPER_ENABLED = False
 CANONICAL_OFFICIAL_ENVIRONMENT = {
     "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
     "OSCOMP_TEST_GROUPS": "all",
-    "OSCOMP_SKIP_TEST_GROUPS": "none",
     "LTP_CASES": CANONICAL_LTP_CASE_LIST,
-    "LTP_BLACKLIST": "",
-    "LTP_BLACKLIST_FILE": "",
-    "LTP_BLACKLIST_COMMON_FILE": "",
-    "LTP_BLACKLIST_RV_FILE": "",
-    "LTP_BLACKLIST_LA_FILE": "",
-    "LTP_BLACKLIST_RV": "",
-    "LTP_BLACKLIST_RISCV64": "",
-    "LTP_BLACKLIST_LA": "",
-    "LTP_BLACKLIST_LOONGARCH64": "",
     "LTP_CASE_TIMEOUT_SECS": "180",
     "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900",
 }
+OFFICIAL_BLACKLIST_FILE_ENVIRONMENT = (
+    "LTP_BLACKLIST_FILE",
+    "LTP_BLACKLIST_COMMON_FILE",
+    "LTP_BLACKLIST_RV_FILE",
+    "LTP_BLACKLIST_LA_FILE",
+)
+OFFICIAL_BLACKLIST_ENVIRONMENT = (
+    "LTP_BLACKLIST",
+    *OFFICIAL_BLACKLIST_FILE_ENVIRONMENT,
+    "LTP_BLACKLIST_RV",
+    "LTP_BLACKLIST_RISCV64",
+    "LTP_BLACKLIST_LA",
+    "LTP_BLACKLIST_LOONGARCH64",
+)
 CANONICAL_OFFICIAL_EXECUTION = {
     "rv": {
         "timeout_seconds": 21600,
@@ -300,7 +304,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.runtime_binary_patch_prohibition": 9,
     "unit.socket_message_and_buffer_semantics": 10,
     "unit.stat_metadata_semantics": 7,
-    "unit.suite_runner": 132,
+    "unit.suite_runner": 133,
     "unit.synthetic_capability_integrity": 5,
     "unit.syscall_boundary_regressions": 26,
     "unit.test_asset_integrity": 36,
@@ -1605,6 +1609,39 @@ def parse_contract(
     return "INFRA_ERROR", f"unknown result contract: {result_type!r}", {}
 
 
+def prepare_official_scouting_environment(
+    case: dict[str, Any],
+    environment: dict[str, str],
+    *,
+    invocation_cwd: Path,
+) -> list[str]:
+    """Preserve legacy scouting inputs while making their non-PASS status explicit."""
+    if case["result_contract"]["type"] != "official":
+        return []
+
+    for name in OFFICIAL_BLACKLIST_FILE_ENVIRONMENT:
+        tokens = environment.get(name, "").split()
+        if not tokens:
+            continue
+        absolute_tokens: list[str] = []
+        for token in tokens:
+            path = Path(token)
+            if not path.is_absolute():
+                path = invocation_cwd / path
+            absolute_tokens.append(str(path.resolve()))
+        environment[name] = " ".join(absolute_tokens)
+
+    configured = [
+        name
+        for name in OFFICIAL_BLACKLIST_ENVIRONMENT
+        if environment.get(name, "").strip()
+    ]
+    skipped_groups = environment.get("OSCOMP_SKIP_TEST_GROUPS", "").strip()
+    if skipped_groups and skipped_groups.lower() != "none":
+        configured.append("OSCOMP_SKIP_TEST_GROUPS")
+    return configured
+
+
 def run_case(
     case: dict[str, Any],
     *,
@@ -1634,6 +1671,11 @@ def run_case(
         environment[name] = expand_value(
             value, repo=repo, output_dir=output_dir, case_output_dir=case_output_dir, arch=arch
         )
+    noncanonical_official_environment = prepare_official_scouting_environment(
+        case,
+        environment,
+        invocation_cwd=Path.cwd(),
+    )
     for name in tuple(environment):
         if name in UNTRUSTED_EXECUTION_ENVIRONMENT or name.startswith("BASH_FUNC_"):
             environment.pop(name, None)
@@ -1658,7 +1700,13 @@ def run_case(
         "signal": None,
         "stdout_log": str(stdout_path),
         "stderr_log": str(stderr_path),
-        "details": {},
+        "details": (
+            {
+                "noncanonical_official_environment": noncanonical_official_environment,
+            }
+            if noncanonical_official_environment
+            else {}
+        ),
         "required_command_paths": {},
     }
 
@@ -1769,6 +1817,18 @@ def run_case(
                 record["status"] = status
                 record["result"] = result
                 record["details"] = details
+
+    if noncanonical_official_environment:
+        record["details"] = {
+            **record["details"],
+            "noncanonical_official_environment": noncanonical_official_environment,
+        }
+        if record["status"] == "PASS":
+            record["status"] = "INFRA_ERROR"
+            record["result"] = (
+                "official run used noncanonical scouting configuration and "
+                "cannot count as official PASS"
+            )
 
     record["ended_at"] = utc_now()
     record["duration_seconds"] = round(time.monotonic() - started, 6)
