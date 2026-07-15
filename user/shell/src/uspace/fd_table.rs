@@ -31,9 +31,9 @@ use super::linux_abi::{
 };
 use super::memory_map::align_up;
 use super::metadata::{
-    DEV_CPU_DMA_LATENCY_RDEV, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
+    DEV_CPU_DMA_LATENCY_RDEV, DEV_FULL_RDEV, DEV_NULL_RDEV, DEV_ZERO_RDEV, ST_NOSYMFOLLOW_FLAG,
     apply_recorded_path_metadata, canonical_permission_path, dev_cpu_dma_latency_stat,
-    dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path,
+    dev_full_stat, dev_null_stat, dev_zero_stat, dirent_type, fd_entry_path, fd_entry_statfs_path,
     file_attr_to_stat, file_type_mode, generic_statfs, path_inode, stdio_stat,
     synthetic_block_stat_for_path, synthetic_char_stat_for_path,
 };
@@ -132,7 +132,7 @@ const FALLOC_FL_ZERO_RANGE: usize = 0x10;
 const FALLOC_FL_INSERT_RANGE: usize = 0x20;
 const POSIX_FADV_MIN: i32 = 0;
 const POSIX_FADV_MAX: i32 = 5;
-const SYNTHETIC_CHAR_DEVICE_NAMES: &[&str] = &["cpu_dma_latency"];
+const SYNTHETIC_CHAR_DEVICE_NAMES: &[&str] = &["cpu_dma_latency", "full"];
 const SYNTHETIC_BLOCK_DEVICE_NAMES: &[&str] = &["vda"];
 
 fn current_fd_table_limit() -> usize {
@@ -162,6 +162,7 @@ pub(super) enum FdEntry {
     Stderr(u32),
     DevNull,
     DevZero(u32),
+    DevFull(u32),
     DevRandom(u32),
     DevCpuDmaLatency(u32),
     BlockDevice(BlockDeviceEntry),
@@ -1879,6 +1880,15 @@ pub(super) fn sys_pread64(
 
 pub(super) fn sys_write(process: &UserProcess, fd: usize, buf: usize, count: usize) -> isize {
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
+    {
+        let mut table = process.fds.lock();
+        if matches!(table.entry(fd as i32), Ok(FdEntry::DevFull(_))) {
+            return match table.write(process, fd as i32, &[], Some(file_size_limit)) {
+                Ok(written) => written as isize,
+                Err(err) => neg_errno(err),
+            };
+        }
+    }
     if count > MAX_USER_IO_CHUNK {
         let mut written = 0usize;
         let mut scratch = Vec::new();
@@ -3364,6 +3374,7 @@ pub(super) fn sys_fsync(process: &UserProcess, fd: usize) -> isize {
             | FdEntry::Stderr(_)
             | FdEntry::DevNull
             | FdEntry::DevZero(_)
+            | FdEntry::DevFull(_)
             | FdEntry::DevRandom(_)
             | FdEntry::DevCpuDmaLatency(_)
             | FdEntry::BlockDevice(_)
@@ -4477,6 +4488,7 @@ impl FdTable {
                 FdEntry::Stdout(_) | FdEntry::Stderr(_) => false,
                 FdEntry::DevNull
                 | FdEntry::DevZero(_)
+                | FdEntry::DevFull(_)
                 | FdEntry::DevRandom(_)
                 | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
@@ -4509,6 +4521,7 @@ impl FdTable {
                 | FdEntry::Stderr(_)
                 | FdEntry::DevNull
                 | FdEntry::DevZero(_)
+                | FdEntry::DevFull(_)
                 | FdEntry::DevRandom(_)
                 | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
@@ -4766,6 +4779,7 @@ impl FdTable {
                 FdEntry::Stdin(_) | FdEntry::Stdout(_) | FdEntry::Stderr(_) => Some(false),
                 FdEntry::DevNull
                 | FdEntry::DevZero(_)
+                | FdEntry::DevFull(_)
                 | FdEntry::DevRandom(_)
                 | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
@@ -4796,6 +4810,7 @@ impl FdTable {
                 | FdEntry::Stderr(_)
                 | FdEntry::DevNull
                 | FdEntry::DevZero(_)
+                | FdEntry::DevFull(_)
                 | FdEntry::DevRandom(_)
                 | FdEntry::DevCpuDmaLatency(_)
                 | FdEntry::BlockDevice(_)
@@ -4837,6 +4852,16 @@ impl FdTable {
             FdEntry::DevNull => Ok(0),
             FdEntry::DevZero(status_flags) => {
                 if !file_is_readable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                dst.fill(0);
+                Ok(dst.len())
+            }
+            FdEntry::DevFull(status_flags) => {
+                if !matches!(
+                    *status_flags & general::O_ACCMODE,
+                    general::O_RDONLY | general::O_RDWR
+                ) {
                     return Err(LinuxError::EBADF);
                 }
                 dst.fill(0);
@@ -4907,6 +4932,12 @@ impl FdTable {
                     return Err(LinuxError::EBADF);
                 }
                 Ok(src.len())
+            }
+            FdEntry::DevFull(status_flags) => {
+                if !file_is_writable(*status_flags) {
+                    return Err(LinuxError::EBADF);
+                }
+                Err(LinuxError::ENOSPC)
             }
             FdEntry::DevRandom(status_flags) => {
                 if !file_is_writable(*status_flags) {
@@ -5356,6 +5387,16 @@ impl FdTable {
         offset: i64,
         whence: u32,
     ) -> Result<u64, LinuxError> {
+        if matches!(self.entry(fd), Ok(FdEntry::DevFull(_))) {
+            return match whence {
+                general::SEEK_SET
+                | general::SEEK_CUR
+                | general::SEEK_END
+                | SEEK_DATA_WHENCE
+                | SEEK_HOLE_WHENCE => Ok(0),
+                _ => Err(LinuxError::EINVAL),
+            };
+        }
         if matches!(whence, SEEK_DATA_WHENCE | SEEK_HOLE_WHENCE) {
             if offset < 0 {
                 return Err(LinuxError::EINVAL);
@@ -5752,7 +5793,9 @@ impl FdTable {
                 Err(LinuxError::ESPIPE)
             }
             FdEntry::DevZero(_) => Ok(()),
-            FdEntry::DevRandom(_) | FdEntry::DevCpuDmaLatency(_) => Err(LinuxError::ENODEV),
+            FdEntry::DevFull(_) | FdEntry::DevRandom(_) | FdEntry::DevCpuDmaLatency(_) => {
+                Err(LinuxError::ENODEV)
+            }
             _ => Err(LinuxError::EBADF),
         }
     }
@@ -6325,6 +6368,7 @@ impl FdTable {
             FdEntry::Stdout(_) | FdEntry::Stderr(_) => Ok(stdio_stat(false)),
             FdEntry::DevNull => Ok(dev_null_stat()),
             FdEntry::DevZero(_) => Ok(dev_zero_stat()),
+            FdEntry::DevFull(_) => Ok(dev_full_stat()),
             FdEntry::DevRandom(_) => Ok(PathEntry::synthetic_char("/dev/urandom").stat()),
             FdEntry::DevCpuDmaLatency(_) => Ok(dev_cpu_dma_latency_stat()),
             FdEntry::BlockDevice(dev) => Ok(PathEntry::synthetic_block(dev.path.as_str()).stat()),
@@ -6407,6 +6451,7 @@ impl FdTable {
         match open_fd_entry(process, self, dirfd, path, O_PATH_FLAG, 0) {
             Ok(FdEntry::DevNull)
             | Ok(FdEntry::DevZero(_))
+            | Ok(FdEntry::DevFull(_))
             | Ok(FdEntry::DevRandom(_))
             | Ok(FdEntry::DevCpuDmaLatency(_))
             | Ok(FdEntry::Rtc) => Ok(stdio_stat(false)),
@@ -6620,6 +6665,7 @@ impl FdTable {
                 FdEntry::Stdin(status_flags)
                 | FdEntry::Stdout(status_flags)
                 | FdEntry::Stderr(status_flags)
+                | FdEntry::DevFull(status_flags)
                 | FdEntry::DevCpuDmaLatency(status_flags) => Ok(*status_flags as i32),
                 FdEntry::File(file) => Ok(file.status_flags as i32),
                 FdEntry::Memfd(file) => Ok(file.status_flags as i32),
@@ -6666,6 +6712,7 @@ impl FdTable {
                 FdEntry::Stdin(status_flags)
                 | FdEntry::Stdout(status_flags)
                 | FdEntry::Stderr(status_flags)
+                | FdEntry::DevFull(status_flags)
                 | FdEntry::DevCpuDmaLatency(status_flags) => {
                     *status_flags =
                         (*status_flags & general::O_ACCMODE) | fcntl_setfl_flags(arg as u32);
@@ -8040,6 +8087,7 @@ impl FdEntry {
             Self::Stderr(status_flags) => Ok(Self::Stderr(*status_flags)),
             Self::DevNull => Ok(Self::DevNull),
             Self::DevZero(status_flags) => Ok(Self::DevZero(*status_flags)),
+            Self::DevFull(status_flags) => Ok(Self::DevFull(*status_flags)),
             Self::DevRandom(status_flags) => Ok(Self::DevRandom(*status_flags)),
             Self::DevCpuDmaLatency(status_flags) => Ok(Self::DevCpuDmaLatency(*status_flags)),
             Self::BlockDevice(dev) => Ok(Self::BlockDevice(dev.clone())),
@@ -9624,6 +9672,20 @@ fn open_candidates(
                 FdEntry::DevZero(fcntl_status_flags(flags))
             });
         }
+        if path == "/dev/full" {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if flags & general::O_CREAT != 0 && flags & general::O_EXCL != 0 {
+                return Err(LinuxError::EEXIST);
+            }
+            check_synthetic_open_permission(process, "/dev/full", &dev_full_stat(), flags)?;
+            return Ok(if path_only {
+                FdEntry::Path(PathEntry::synthetic_char_with_mode("/dev/full", 0o666))
+            } else {
+                FdEntry::DevFull(fcntl_status_flags(flags))
+            });
+        }
         if path == "/dev/urandom" || path == "/dev/random" {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
@@ -9698,6 +9760,9 @@ fn open_candidates(
                 (ST_MODE_CHR, Some(DEV_NULL_RDEV)) => return Ok(FdEntry::DevNull),
                 (ST_MODE_CHR, Some(DEV_ZERO_RDEV)) => {
                     return Ok(FdEntry::DevZero(fcntl_status_flags(flags)));
+                }
+                (ST_MODE_CHR, Some(DEV_FULL_RDEV)) => {
+                    return Ok(FdEntry::DevFull(fcntl_status_flags(flags)));
                 }
                 (ST_MODE_CHR, Some(DEV_CPU_DMA_LATENCY_RDEV)) => {
                     return Ok(FdEntry::DevCpuDmaLatency(fcntl_status_flags(flags)));
