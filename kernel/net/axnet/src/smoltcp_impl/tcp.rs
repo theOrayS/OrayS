@@ -755,8 +755,9 @@ impl TcpSocket {
         self.get_state() == STATE_CONNECTED
     }
 
+    /// Returns whether this socket is currently accepting connections.
     #[inline]
-    fn is_listening(&self) -> bool {
+    pub fn is_listening(&self) -> bool {
         self.get_state() == STATE_LISTENING
     }
 

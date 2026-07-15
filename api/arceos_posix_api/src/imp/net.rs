@@ -406,6 +406,21 @@ impl Socket {
             Socket::Udp(_) => Err(LinuxError::ENOPROTOOPT),
         }
     }
+
+    fn identity(&self) -> (c_int, c_int, bool) {
+        match self {
+            Socket::Udp(_) => (
+                ctypes::AF_INET as c_int,
+                ctypes::IPPROTO_UDP as c_int,
+                false,
+            ),
+            Socket::Tcp(tcpsocket) => (
+                ctypes::AF_INET as c_int,
+                ctypes::IPPROTO_TCP as c_int,
+                tcpsocket.lock().is_listening(),
+            ),
+        }
+    }
 }
 
 pub fn set_socket_recv_timeout(sockfd: c_int, timeout: Option<Duration>) -> LinuxResult {
@@ -499,6 +514,11 @@ pub fn socket_tcp_max_segment_size(sockfd: c_int) -> LinuxResult<c_int> {
     Ok(Socket::from_fd(sockfd)?
         .tcp_max_segment_size()?
         .min(c_int::MAX as usize) as c_int)
+}
+
+/// Returns the socket domain, protocol, and whether it accepts connections.
+pub fn socket_identity(sockfd: c_int) -> LinuxResult<(c_int, c_int, bool)> {
+    Ok(Socket::from_fd(sockfd)?.identity())
 }
 
 impl FileLike for Socket {

@@ -458,6 +458,13 @@ fn local_socket_listener_pending(owner_id: usize) -> bool {
         .any(|listener| listener.owner_id == owner_id && !listener.pending.is_empty())
 }
 
+fn local_socket_is_listening(owner_id: usize) -> bool {
+    local_socket_listeners()
+        .lock()
+        .iter()
+        .any(|listener| listener.owner_id == owner_id)
+}
+
 impl Clone for LocalSocketEntry {
     fn clone(&self) -> Self {
         self.duplicate()
@@ -841,14 +848,6 @@ fn setsockopt_unsupported_errno_code(_level: i32) -> u32 {
     LINUX_ENOPROTOOPT
 }
 
-fn socket_protocol(socket: &SocketEntry) -> i32 {
-    if socket.socktype as u32 == posix_ctypes::SOCK_DGRAM {
-        posix_ctypes::IPPROTO_UDP as i32
-    } else {
-        posix_ctypes::IPPROTO_TCP as i32
-    }
-}
-
 fn socket_level_supported(socket: &SocketEntry, level: i32) -> bool {
     level == SOL_SOCKET_LEVEL
         || level == IPPROTO_IP_LEVEL
@@ -862,22 +861,56 @@ fn socket_recv_error_queue_empty(flags: i32) -> bool {
     flags & MSG_ERRQUEUE_FLAG != 0
 }
 
+fn socket_identity_option(optname: i32) -> bool {
+    matches!(optname, SO_DOMAIN_OPT | SO_PROTOCOL_OPT | SO_ACCEPTCONN_OPT)
+}
+
 // Deliberately expose only options backed by kernel/socket state. Mutable
 // socket-option emulation used to cache arbitrary scalars and made unsupported
 // options look successful; new options must wire into a real backend before
 // they are accepted by setsockopt/getsockopt.
-fn socket_readonly_scalar(socket: &SocketEntry, level: i32, optname: i32) -> Option<i32> {
+fn socket_readonly_scalar(
+    socket: &SocketEntry,
+    level: i32,
+    optname: i32,
+) -> Result<Option<i32>, LinuxError> {
     if !socket_level_supported(socket, level) || level != SOL_SOCKET_LEVEL {
-        return None;
+        return Ok(None);
     }
-    match optname {
+    let value = match optname {
         SO_ERROR_OPT => Some(0),
         SO_TYPE_OPT => Some(socket.socktype),
-        SO_DOMAIN_OPT => Some(posix_ctypes::AF_INET as i32),
-        SO_PROTOCOL_OPT => Some(socket_protocol(socket)),
-        SO_ACCEPTCONN_OPT => Some(0),
+        SO_DOMAIN_OPT | SO_PROTOCOL_OPT | SO_ACCEPTCONN_OPT => {
+            let (domain, protocol, is_listening) =
+                arceos_posix_api::socket_identity(socket.posix_fd)?;
+            Some(match optname {
+                SO_DOMAIN_OPT => domain,
+                SO_PROTOCOL_OPT => protocol,
+                SO_ACCEPTCONN_OPT => i32::from(is_listening),
+                _ => unreachable!(),
+            })
+        }
         _ => None,
+    };
+    Ok(value)
+}
+
+fn write_socket_scalar_option(
+    process: &UserProcess,
+    optval: usize,
+    optlen: usize,
+    requested_len: usize,
+    value: i32,
+) -> isize {
+    let copy_len = cmp::min(requested_len, size_of::<i32>());
+    if let Err(err) = validate_user_write(process, optval, copy_len) {
+        return neg_errno(err);
     }
+    if let Err(err) = write_user_bytes(process, optval, &value.to_ne_bytes()[..copy_len]) {
+        return neg_errno(err);
+    }
+    let out_len = copy_len as posix_ctypes::socklen_t;
+    write_user_value(process, optlen, &out_len)
 }
 
 fn read_socket_bool_option(process: &UserProcess, optval: usize) -> Result<bool, LinuxError> {
@@ -2533,23 +2566,15 @@ pub(super) fn sys_getsockopt_bridge(
         let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
         return write_user_value(process, optlen, &out_len);
     }
-    if len < size_of::<i32>() {
+    if len < size_of::<i32>() && !socket_identity_option(optname) {
         return neg_errno(LinuxError::EINVAL);
     }
-    if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
-        return neg_errno(err);
-    }
-    let value = if let Some(value) = socket_readonly_scalar(&socket, level, optname) {
-        value
-    } else {
-        return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level));
+    let value = match socket_readonly_scalar(&socket, level, optname) {
+        Ok(Some(value)) => value,
+        Ok(None) => return neg_errno_code(getsockopt_unsupported_errno_code(&socket, level)),
+        Err(err) => return neg_errno(err),
     };
-    let ret = write_user_value(process, optval, &value);
-    if ret != 0 {
-        return ret;
-    }
-    let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
-    write_user_value(process, optlen, &out_len)
+    write_socket_scalar_option(process, optval, optlen, len, value)
 }
 
 fn sys_getsockopt_local_socket(
@@ -2599,25 +2624,20 @@ fn sys_getsockopt_local_socket(
         let out_len = size_of::<LinuxUcred>() as posix_ctypes::socklen_t;
         return write_user_value(process, optlen, &out_len);
     }
-    if len < size_of::<i32>() {
+    if len < size_of::<i32>() && !socket_identity_option(optname) {
         return neg_errno(LinuxError::EINVAL);
-    }
-    if let Err(err) = validate_user_write(process, optval, size_of::<i32>()) {
-        return neg_errno(err);
     }
     let value = if level == SOL_SOCKET_LEVEL {
         match optname {
             SO_ERROR_OPT => 0,
             SO_TYPE_OPT => socket.socktype,
+            SO_DOMAIN_OPT => AF_UNIX_DOMAIN,
+            SO_PROTOCOL_OPT => 0,
+            SO_ACCEPTCONN_OPT => i32::from(local_socket_is_listening(socket.id)),
             _ => return neg_errno_code(LINUX_ENOPROTOOPT),
         }
     } else {
         return neg_errno_code(LINUX_ENOPROTOOPT);
     };
-    let ret = write_user_value(process, optval, &value);
-    if ret != 0 {
-        return ret;
-    }
-    let out_len = size_of::<i32>() as posix_ctypes::socklen_t;
-    write_user_value(process, optlen, &out_len)
+    write_socket_scalar_option(process, optval, optlen, len, value)
 }
