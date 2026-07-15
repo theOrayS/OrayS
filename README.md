@@ -6,6 +6,7 @@
       - [核心竞争优势](#核心竞争优势)
   - [项目结构](#项目结构)
   - [构建方式](#构建方式)
+  - [本地测试](#本地测试)
   - [运行方式](#运行方式)
   - [项目说明与模块完成情况](#项目说明与模块完成情况)
   - [开发日志](#开发日志)
@@ -35,17 +36,18 @@ Y8.   .8P 88       88.  .88 88.  .88 d8'   .8P
 
 | 内容 | 文档 |
 | --- | --- |
-| 项目文档 PDF | [文档.pdf](docs/orays-project-document(2).pdf) |
+| 项目文档（当前 Markdown） | [orays-project-document(2).md](docs/orays-project-document(2).md) |
+| 项目文档 PDF（生产快照） | [orays-project-document(2).pdf](docs/orays-project-document(2).pdf) |
 |项目初赛介绍ppt|[项目初赛介绍ppt](docs/orays.pptx) |
 |演示视频|[演示视频](docs/演示视频.webm) |
 ## 当前状态
 
-**截至 2026-06-29**：
+**生产功能状态截至 2026-06-29；测试基础设施验证截至 2026-07-15**：
 
 - 完成 **531 次项目提交**
 - syscall dispatcher 已注册 **231 个唯一 Linux syscall 编号**
-- 建立 **12 个合规静态守卫及 12 个对应单元测试脚本**，用于检查 fake pass、
-  用户指针、runner parser、FD/资源限制和 syscall 语义回归。
+- 统一在 `test/` 注册 **16 个静态守卫及 20 个 Python 单元测试套件（488 个方法）**，用于检查
+  fake success、用户指针、runner/parser、FD/资源限制和 syscall 语义回归。
 
 #### 核心功能实现
 
@@ -91,9 +93,9 @@ Y8.   .8P 88       88.  .88 88.  .88 d8'   .8P
 │   ├── axlibc                 # C 用户库
 │   └── axstd                  # Rust 用户库
 ├── configs
-│   ├── platforms              # 本地平台配置
-│   └── remote-eval            # 远程评测配置
-├── scripts                    # 构建、评测、日志汇总和合规检查
+│   └── platforms              # 通用本地平台配置
+├── test                       # 统一测试、fixture、评测、解析器、报告与本地 runner
+├── scripts                    # 构建和开发辅助工具（不存放权威测试实现）
 ├── docs                       # 项目文档、开发日志与验证报告
 ├── tools                      # 仓库内置构建辅助工具
 ├── cargo-home                 # 离线 Cargo source replacement
@@ -130,13 +132,53 @@ make A=user/shell ARCH=riscv64 build
 make A=user/shell ARCH=loongarch64 build
 ```
 
+## 本地测试
+
+测试清单和 profile 由 `test/suite_manifest.json` 显式注册，入口为
+`test/run_suite.py`。先列出完整计划，再按需要运行：
+
+```bash
+python3 test/run_suite.py --list
+python3 test/run_suite.py --profile quick
+python3 test/run_suite.py --profile baseline
+```
+
+受控证据运行可在 `python3` 后增加 `-B -E -s`，避免调用者的 Python 启动配置在
+runner 代码之前执行。无论采用哪种写法，都必须以本次生成的 `summary.json` 及其中
+`planned == executed == completed` 为结果依据；只有 shell 返回 0 而没有本次汇总并不构成 PASS。
+
+等价的常用 Make 目标为 `make test-list`、`make test-checks`、
+`make test-unit`、`make test-quick` 和 `make test-baseline`。每次执行都会在已忽略的
+`test/output/` 下生成独立 stdout/stderr 日志和 JSON 汇总；只有所有计划 case 都被
+执行并得到明确成功记录时进程才返回 0。完整的 profile、退出码、RV/LA 镜像变量和
+添加测试方法见 [test/README.md](test/README.md)；当前 unchanged-baseline 的
+真实 PASS/FAIL 和 RV/LA 阻断见
+[test/docs/baseline_validation.md](test/docs/baseline_validation.md)，非零结果不会被
+文档改写成 PASS。
+
 ## 运行方式
 
 准备对应的官方测试镜像或 SD 卡镜像后，运行本地评测：
 
 ```bash
+./run-eval.sh       # 兼容旧行为：默认 RV
 ./run-eval.sh rv
 ./run-eval.sh la
+```
+
+根目录 `run-eval.sh` 只把参数和环境原样 `exec` 给 canonical
+`test/run_official_suite.sh`；后者分别等价于
+`python3 -B -E -s test/run_suite.py --profile official --arch rv|la`，零参数保持
+旧入口的 RV 默认值。严格 runner 会执行 manifest 预检、外层超时、进程组控制、
+日志捕获和完整结果解析。低层执行适配器位于
+`test/evaluation/run_official_evaluation.sh`，其单独退出 0 只代表 Make/QEMU 进程
+返回 0，不能解释为 official PASS。legacy blacklist/skip 输入仍可用于侦察，但只要
+配置过，即使未匹配任何 case 也绝不会得到 official PASS；详细组合规则见
+[test/README.md](test/README.md)。也可直接调用严格 profile：
+
+```bash
+RV_TESTSUITE_IMG=/path/to/sdcard-rv.img python3 -B -E -s test/run_suite.py --profile official --arch rv
+LA_TESTSUITE_IMG=/path/to/sdcard-la.img python3 -B -E -s test/run_suite.py --profile official --arch la
 ```
 
 也可以使用 Make 目标直接启动 QEMU：

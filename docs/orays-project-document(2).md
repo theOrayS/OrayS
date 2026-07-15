@@ -83,9 +83,9 @@ OrayS
 │   ├── axlibc                  // libc 支持
 │   └── axstd                   // Rust 用户态标准库封装
 ├── configs                     // 平台配置
-│   ├── platforms               // 本地平台配置
-│   └── remote-eval             // 远程评测平台配置
-├── scripts                     // 构建与评测辅助脚本
+│   └── platforms               // 通用本地平台配置
+├── test                        // 统一测试、评测、解析器与报告工具
+├── scripts                     // 构建与开发辅助脚本
 ├── tools
 │   └── bin                     // 离线 helper 与构建 shim
 ├── cargo-home                  // 离线 Cargo 配置
@@ -564,16 +564,16 @@ OrayS 当前是一个基于 ArceOS 演进的 OSKernel 2026 评测内核。它的
 - 通过 `axruntime`、`axtask`、`axhal`、`axdriver`、`axfs` 和 `axnet` 串联启动、调度、内存、驱动、文件系统与网络，形成可被评测程序实际运行的内核执行环境。
 - 围绕 LTP 建立 runner、summary parser、阶段报告和合规约束，使通过结果、失败原因、timeout、`ENOSYS` 和 panic/trap 都能被追踪和复核。
 
-### 7.1 截至目前的开发规模
+### 7.1 开发规模与测试基础设施快照
 
-从 2026 年 4 月 17 日前的基线提交到当前版本，OrayS 的主要开发规模如下：
+从 2026 年 4 月 17 日前的基线提交到 2026 年 6 月 29 日生产版本，OrayS 的主要开发规模如下；测试基础设施数量另按 2026 年 7 月 15 日的统一迁移结果列出：
 
 - 项目开发提交 **531 次**，覆盖竞赛阶段主要功能、修复、验证和文档提交。
 - 仓库总体变更涉及 **566 个文件**，新增 **145,523 行**、删除 **2,849 行**；其中包含 vendor 依赖、测试、脚本和文档。
 - 核心源码与构建验证路径涉及 **246 个文件**，新增 **70,590 行**、删除 **883 行**，主要集中在 `kernel/`、`api/`、`ulib/`、用户态入口、`scripts/`、`configs/` 和根构建文件。
 - Linux syscall dispatcher 已注册 **231 个唯一 syscall 编号**，形成较完整的 Linux ABI 入口基础。
 - 用户态兼容实现拆分为 **30 个 Rust 模块**，覆盖用户内存、FD、进程、信号、futex、mmap、metadata、时间、调度和 IPC 等方向。
-- 建立 **12 个合规检查脚本** 和 **12 个对应测试脚本**，用于约束 fake pass、用户指针、FD/资源限制、runner parser 和 syscall 语义回归。
+- 在 canonical `test/` 下显式注册 **16 个静态检查** 和 **20 个 Python 单元测试套件（488 个方法）**，用于约束 fake pass、用户指针、FD/资源限制、runner/parser、official verdict 和 syscall 语义回归；构建与开发辅助脚本继续留在 `scripts/`。
 
 整体来看，项目已从 RV/LA ELF 用户程序运行入口，扩展为覆盖内存、进程、VFS/FD、信号、futex、IPC、socket、时间调度、资源限制、procfs 以及本地/远程评测证据链的实验性内核执行环境。上述数字主要描述工程规模，功能完成度仍以源码语义、跨架构测试和公开失败记录为准。
 
