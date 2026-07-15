@@ -25,7 +25,7 @@ if [ "${1:-}" = "info" ]; then
     esac
   done
   if [ -n "$pkg" ]; then
-    for dir in "$PWD/configs/platforms" "$PWD/configs/remote-eval"; do
+    for dir in "$PWD/configs/platforms" "$PWD/test/evaluation/config"; do
       if [ -f "$dir/$pkg.toml" ]; then
         printf '%s\n' "$dir/$pkg.toml"
         exit 0

@@ -375,7 +375,7 @@
         <mxCell id="b_build" value="test_build&#xa;RV: wrapper bin -> kernel-rv&#xa;LA: ELF -> kernel-la" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f2df;strokeColor=#82b366;fontSize=13" vertex="1" parent="1">
           <mxGeometry x="420" y="200" width="360" height="85" as="geometry"/>
         </mxCell>
-        <mxCell id="b_run" value="run-eval.sh / make run-*&#xa;检查 QEMU / qemu-img / sdcard 镜像&#xa;创建 qcow2 运行副本" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+        <mxCell id="b_run" value="run-eval.sh → test/run_official_suite.sh&#xa;canonical args/manifest → runner → adapter&#xa;→ make run-*；严格解析后才产生 verdict" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="420" y="325" width="360" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="b_qemu" value="QEMU 平台路径&#xa;RV: virt + MMIO VirtIO&#xa;LA: qemu-virt + PCI VirtIO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13" vertex="1" parent="1">
@@ -384,13 +384,13 @@
         <mxCell id="b_ltp" value="examples/shell LTP runner&#xa;LTP_STABLE_CASES / blacklist / all-minus-blacklist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="420" y="580" width="360" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="b_summary" value="scripts/ltp_summary.py&#xa;PASS/FAIL / TFAIL / TBROK / TCONF&#xa;timeout / ENOSYS / panic-trap" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13" vertex="1" parent="1">
+        <mxCell id="b_summary" value="test/evaluation/parse_official_results.py&#xa;24 groups + exact identity/lifecycle&#xa;FAIL / timeout / crash / incomplete" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13" vertex="1" parent="1">
           <mxGeometry x="420" y="700" width="360" height="85" as="geometry"/>
         </mxCell>
-        <mxCell id="b_remote" value="远程评测配置&#xa;configs/remote-eval&#xa;LA 远程平台以该配置为准" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+        <mxCell id="b_remote" value="评测平台配置&#xa;test/evaluation/config&#xa;LA 提交构建以该配置为准" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
           <mxGeometry x="90" y="455" width="240" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="b_docs" value="证据文档&#xa;docs/ 阶段报告 / summaries&#xa;不把 blacklist case 计为通过" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
+        <mxCell id="b_docs" value="证据文档&#xa;docs/ 阶段报告 / summaries&#xa;blacklist/skip scouting 永不计 official PASS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12" vertex="1" parent="1">
           <mxGeometry x="870" y="700" width="240" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="b_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#6c8ebf" edge="1" parent="1" source="b_make" target="b_build">

@@ -38,6 +38,7 @@
 
 # General options
 ARCH ?= x86_64
+PYTHON ?= python3
 MYPLAT ?=
 PLAT_CONFIG ?=
 PLATFORM_CONFIG_DIR ?= $(CURDIR)/configs/platforms
@@ -45,7 +46,7 @@ PLATFORM_CONFIG_DIR ?= $(CURDIR)/configs/platforms
 # Keep local QEMU targets (`kernel-la`, `run-la`, `./run-eval.sh la`) on the
 # package default platform config, but build the submission `kernel-la` with the
 # remote LoongArch address map that matches the official evaluator.
-REMOTE_LA_PLAT_CONFIG ?= $(CURDIR)/configs/remote-eval/axplat-loongarch64-qemu-virt.toml
+REMOTE_LA_PLAT_CONFIG ?= $(CURDIR)/test/evaluation/config/loongarch64_submission.toml
 SMP ?=
 MODE ?= release
 LOG ?= warn
@@ -483,8 +484,8 @@ fmt_c:
 	@clang-format --style=file -i $(shell find ulib/axlibc -iname '*.c' -o -iname '*.h')
 
 pr2-check:
-	python3 scripts/check_pr2_file_event_core.py
-	python3 scripts/test_pr2_file_event_core.py
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/checks/check_file_object_event_core.py
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_unittest_suite.py test/unit/test_file_object_event_core.py
 	cargo test -p axfile --lib
 
 unittest: pr2-check
@@ -492,6 +493,21 @@ unittest: pr2-check
 
 unittest_no_fail_fast: pr2-check
 	$(call unit_test,--no-fail-fast)
+
+test-list:
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --list
+
+test-checks:
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile checks
+
+test-unit:
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile unit
+
+test-quick:
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile quick
+
+test-baseline:
+	$(PYTHON) -I -S -B -X pycache_prefix=/dev/null test/run_suite.py --profile baseline
 
 disk_img:
 ifneq ($(wildcard $(DISK_IMG)),)
@@ -512,6 +528,7 @@ clean_c::
 .PHONY: all defconfig oldconfig \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c pr2-check unittest unittest_no_fail_fast \
+	test-list test-checks test-unit test-quick test-baseline \
 	disk_img clean clean_c \
 	test_build kernel-rv kernel-la docker-image docker testsuite-sdcard \
 	prepare-rv-testsuite-img prepare-la-testsuite-img run-rv run-la
