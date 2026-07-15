@@ -1,4 +1,5 @@
 use axerrno::LinuxError;
+use axfile::{EventSource, OpenFile, ReadyEvents, with_ordered_arc_mutex_pair};
 use axsync::Mutex;
 use axtask::WaitQueue;
 use core::time::Duration;
@@ -6,10 +7,11 @@ use lazyinit::LazyInit;
 use linux_raw_sys::general;
 use std::collections::BTreeMap;
 use std::string::String;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
 use std::vec::Vec;
 
+use super::fd_object::{FileObject, new_open_file};
 use super::fd_table::FdEntry;
 use super::linux_abi::{SIGPIPE_NUM, fd_cloexec_flag};
 use super::signal_abi::{current_unblocked_signal_pending, deliver_user_signal};
@@ -48,6 +50,12 @@ struct PipeRingBuffer {
     status: RingBufferStatus,
 }
 
+enum TeeAttempt {
+    SourceEmpty,
+    DestinationFull,
+    Copied(usize),
+}
+
 struct PipePeerCounts {
     readers: AtomicUsize,
     writers: AtomicUsize,
@@ -56,6 +64,7 @@ struct PipePeerCounts {
 
 #[derive(Clone, Copy)]
 struct PipeAsyncState {
+    readable: bool,
     enabled: bool,
     owner_type: i32,
     owner_pid: i32,
@@ -63,8 +72,9 @@ struct PipeAsyncState {
 }
 
 impl PipeAsyncState {
-    const fn new() -> Self {
+    const fn new(readable: bool) -> Self {
         Self {
+            readable,
             enabled: false,
             owner_type: F_OWNER_PID,
             owner_pid: 0,
@@ -86,36 +96,20 @@ pub(super) struct PipeEndpoint {
     buffer: Arc<Mutex<PipeRingBuffer>>,
     read_wait: Arc<WaitQueue>,
     write_wait: Arc<WaitQueue>,
-    status_flags: Arc<Mutex<u32>>,
+    events: Arc<EventSource>,
     async_state: Arc<Mutex<PipeAsyncState>>,
+    async_listeners: Arc<Mutex<Vec<Weak<Mutex<PipeAsyncState>>>>>,
     peers: Arc<PipePeerCounts>,
     fifo_path: Option<Arc<String>>,
 }
 
-impl Clone for PipeEndpoint {
-    fn clone(&self) -> Self {
-        if self.readable {
-            self.peers.readers.fetch_add(1, Ordering::AcqRel);
-        }
-        if self.writable {
-            self.peers.writers.fetch_add(1, Ordering::AcqRel);
-        }
-        Self {
-            readable: self.readable,
-            writable: self.writable,
-            buffer: self.buffer.clone(),
-            read_wait: self.read_wait.clone(),
-            write_wait: self.write_wait.clone(),
-            status_flags: self.status_flags.clone(),
-            async_state: self.async_state.clone(),
-            peers: self.peers.clone(),
-            fifo_path: self.fifo_path.clone(),
-        }
-    }
-}
-
 impl Drop for PipeEndpoint {
     fn drop(&mut self) {
+        self.async_listeners.lock().retain(|listener| {
+            listener
+                .upgrade()
+                .is_some_and(|state| !Arc::ptr_eq(&state, &self.async_state))
+        });
         if self.readable {
             self.peers.readers.fetch_sub(1, Ordering::AcqRel);
         }
@@ -135,6 +129,7 @@ impl Drop for PipeEndpoint {
         if self.writable {
             self.read_wait.notify_all(false);
         }
+        self.events.notify(ReadyEvents::ALL);
     }
 }
 
@@ -143,7 +138,8 @@ struct NamedFifoState {
     buffer: Arc<Mutex<PipeRingBuffer>>,
     read_wait: Arc<WaitQueue>,
     write_wait: Arc<WaitQueue>,
-    async_state: Arc<Mutex<PipeAsyncState>>,
+    events: Arc<EventSource>,
+    async_listeners: Arc<Mutex<Vec<Weak<Mutex<PipeAsyncState>>>>>,
     peers: Arc<PipePeerCounts>,
     path: Arc<String>,
 }
@@ -164,7 +160,8 @@ fn named_fifo_state(path: &str) -> NamedFifoState {
                 buffer: Arc::new(Mutex::new(PipeRingBuffer::new(PIPE_DEFAULT_CAPACITY_SIZE))),
                 read_wait: Arc::new(WaitQueue::new()),
                 write_wait: Arc::new(WaitQueue::new()),
-                async_state: Arc::new(Mutex::new(PipeAsyncState::new())),
+                events: Arc::new(EventSource::new()),
+                async_listeners: Arc::new(Mutex::new(Vec::new())),
                 peers: Arc::new(PipePeerCounts {
                     readers: AtomicUsize::new(0),
                     writers: AtomicUsize::new(0),
@@ -273,13 +270,13 @@ impl PipeRingBuffer {
 }
 
 impl PipeEndpoint {
-    pub(super) fn new_pair_for_process(process: &UserProcess, status_flags: u32) -> (Self, Self) {
+    pub(super) fn new_pair_for_process(process: &UserProcess) -> (Self, Self) {
         let capacity = if process.fs_uid() == 0 {
             PIPE_DEFAULT_CAPACITY_SIZE
         } else {
             PIPE_UNPRIVILEGED_CAPACITY_SIZE
         };
-        Self::new_pair_with_capacity(status_flags, capacity)
+        Self::new_pair_with_capacity(capacity)
     }
 
     pub(super) fn named_fifo_has_reader(path: &str) -> bool {
@@ -289,8 +286,11 @@ impl PipeEndpoint {
             .is_some_and(|state| state.peers.readers.load(Ordering::Acquire) > 0)
     }
 
-    pub(super) fn wait_for_fifo_open_peer(&self) -> Result<(), LinuxError> {
-        if self.fifo_path.is_none() || self.nonblocking() || self.readable == self.writable {
+    pub(super) fn wait_for_fifo_open_peer(&self, status_flags: u32) -> Result<(), LinuxError> {
+        if self.fifo_path.is_none()
+            || Self::nonblocking(status_flags)
+            || self.readable == self.writable
+        {
             return Ok(());
         }
         loop {
@@ -317,10 +317,15 @@ impl PipeEndpoint {
         }
     }
 
-    pub(super) fn new_named_fifo(path: &str, access: u32, status_flags: u32) -> Self {
+    pub(super) fn new_named_fifo(path: &str, access: u32) -> Self {
         let state = named_fifo_state(path);
         let readable = access != general::O_WRONLY;
         let writable = access != general::O_RDONLY;
+        let async_state = Arc::new(Mutex::new(PipeAsyncState::new(readable)));
+        state
+            .async_listeners
+            .lock()
+            .push(Arc::downgrade(&async_state));
         if readable {
             state.peers.readers.fetch_add(1, Ordering::AcqRel);
         }
@@ -339,18 +344,25 @@ impl PipeEndpoint {
             buffer: state.buffer,
             read_wait: state.read_wait,
             write_wait: state.write_wait,
-            status_flags: Arc::new(Mutex::new(access | (status_flags & !general::O_ACCMODE))),
-            async_state: state.async_state,
+            events: state.events,
+            async_state,
+            async_listeners: state.async_listeners,
             peers: state.peers,
             fifo_path: Some(state.path),
         }
     }
 
-    fn new_pair_with_capacity(status_flags: u32, capacity: usize) -> (Self, Self) {
+    fn new_pair_with_capacity(capacity: usize) -> (Self, Self) {
         let buffer = Arc::new(Mutex::new(PipeRingBuffer::new(capacity)));
         let read_wait = Arc::new(WaitQueue::new());
         let write_wait = Arc::new(WaitQueue::new());
-        let async_state = Arc::new(Mutex::new(PipeAsyncState::new()));
+        let events = Arc::new(EventSource::new());
+        let read_async_state = Arc::new(Mutex::new(PipeAsyncState::new(true)));
+        let write_async_state = Arc::new(Mutex::new(PipeAsyncState::new(false)));
+        let async_listeners = Arc::new(Mutex::new(vec![
+            Arc::downgrade(&read_async_state),
+            Arc::downgrade(&write_async_state),
+        ]));
         let peers = Arc::new(PipePeerCounts {
             readers: AtomicUsize::new(1),
             writers: AtomicUsize::new(1),
@@ -363,8 +375,9 @@ impl PipeEndpoint {
                 buffer: buffer.clone(),
                 read_wait: read_wait.clone(),
                 write_wait: write_wait.clone(),
-                status_flags: Arc::new(Mutex::new(status_flags & !general::O_ACCMODE)),
-                async_state: async_state.clone(),
+                events: events.clone(),
+                async_state: read_async_state,
+                async_listeners: async_listeners.clone(),
                 peers: peers.clone(),
                 fifo_path: None,
             },
@@ -374,10 +387,9 @@ impl PipeEndpoint {
                 buffer,
                 read_wait,
                 write_wait,
-                status_flags: Arc::new(Mutex::new(
-                    general::O_WRONLY | (status_flags & !general::O_ACCMODE),
-                )),
-                async_state,
+                events,
+                async_state: write_async_state,
+                async_listeners,
                 peers,
                 fifo_path: None,
             },
@@ -392,12 +404,8 @@ impl PipeEndpoint {
         self.peers.readers.load(Ordering::Acquire) == 0
     }
 
-    fn nonblocking(&self) -> bool {
-        *self.status_flags.lock() & general::O_NONBLOCK != 0
-    }
-
-    pub(super) fn status_flags(&self) -> u32 {
-        *self.status_flags.lock()
+    const fn nonblocking(status_flags: u32) -> bool {
+        status_flags & general::O_NONBLOCK != 0
     }
 
     pub(super) const fn readable(&self) -> bool {
@@ -408,11 +416,11 @@ impl PipeEndpoint {
         self.writable
     }
 
-    pub(super) fn set_status_flags(&self, flags: u32) {
-        let access = self.status_flags() & general::O_ACCMODE;
-        *self.status_flags.lock() =
-            access | (flags & (general::O_NONBLOCK | general::O_DIRECT | O_ASYNC_FLAG));
-        self.async_state.lock().enabled = flags & O_ASYNC_FLAG != 0;
+    pub(super) fn status_flags_after_setfl(&self, current: u32, flags: u32) -> u32 {
+        let status_flags = (current & general::O_ACCMODE)
+            | (flags & (general::O_NONBLOCK | general::O_DIRECT | O_ASYNC_FLAG));
+        self.async_state.lock().enabled = status_flags & O_ASYNC_FLAG != 0;
+        status_flags
     }
 
     pub(super) fn fcntl_async_owner(
@@ -456,10 +464,12 @@ impl PipeEndpoint {
                 Ok(Some(0))
             }
             F_GETOWN_EX => {
-                let state = self.async_state.lock();
-                let owner = FOwnerEx {
-                    owner_type: state.owner_type,
-                    pid: state.owner_pid,
+                let owner = {
+                    let state = self.async_state.lock();
+                    FOwnerEx {
+                        owner_type: state.owner_type,
+                        pid: state.owner_pid,
+                    }
                 };
                 if write_user_value(process, arg, &owner) == 0 {
                     Ok(Some(0))
@@ -502,7 +512,9 @@ impl PipeEndpoint {
         ring.head = 0;
         ring.tail = 0;
         ring.capacity = requested;
-        Ok(ring.capacity)
+        let capacity = ring.capacity;
+        drop(ring);
+        Ok(capacity)
     }
 
     pub(super) fn available_read(&self) -> usize {
@@ -511,7 +523,9 @@ impl PipeEndpoint {
 
     pub(super) fn tee_to(
         &self,
+        status_flags: u32,
         dst: &Self,
+        dst_status_flags: u32,
         len: usize,
         nonblocking: bool,
     ) -> Result<usize, LinuxError> {
@@ -529,49 +543,62 @@ impl PipeEndpoint {
                 Self::raise_sigpipe();
                 return Err(LinuxError::EPIPE);
             }
-            let src_ring = self.buffer.lock();
-            let available_read = src_ring.available_read();
-            if available_read == 0 {
-                if self.read_peer_closed() {
-                    return Ok(0);
+            // Reciprocal tee calls acquire the pair through the same canonical
+            // order, while the closure still receives source then destination.
+            let attempt =
+                with_ordered_arc_mutex_pair(&self.buffer, &dst.buffer, |src_ring, dst_ring| {
+                    Self::tee_locked(src_ring, dst_ring, len)
+                })
+                .expect("identical pipe buffers were rejected above");
+            match attempt {
+                TeeAttempt::SourceEmpty => {
+                    if self.read_peer_closed() {
+                        return Ok(0);
+                    }
+                    if nonblocking || Self::nonblocking(status_flags) {
+                        return Err(LinuxError::EAGAIN);
+                    }
+                    if Self::interrupted() {
+                        return Err(LinuxError::EINTR);
+                    }
+                    self.wait_for_readable()?;
                 }
-                drop(src_ring);
-                if nonblocking || self.nonblocking() {
-                    return Err(LinuxError::EAGAIN);
+                TeeAttempt::DestinationFull => {
+                    if nonblocking || Self::nonblocking(dst_status_flags) {
+                        return Err(LinuxError::EAGAIN);
+                    }
+                    if Self::interrupted() {
+                        return Err(LinuxError::EINTR);
+                    }
+                    dst.wait_for_writable()?;
                 }
-                if Self::interrupted() {
-                    return Err(LinuxError::EINTR);
+                TeeAttempt::Copied(copied) => {
+                    if copied > 0 {
+                        dst.peers.buffered.fetch_add(copied, Ordering::AcqRel);
+                        dst.notify_readable();
+                    }
+                    return Ok(copied);
                 }
-                self.wait_for_readable()?;
-                continue;
             }
-            let mut dst_ring = dst.buffer.lock();
-            let available_write = dst_ring.available_write();
-            if available_write == 0 {
-                drop(dst_ring);
-                drop(src_ring);
-                if nonblocking || dst.nonblocking() {
-                    return Err(LinuxError::EAGAIN);
-                }
-                if Self::interrupted() {
-                    return Err(LinuxError::EINTR);
-                }
-                dst.wait_for_writable()?;
-                continue;
-            }
-
-            let to_copy = len.min(available_read).min(available_write);
-            let copied = src_ring.copy_into(&mut dst_ring, to_copy);
-            if copied > 0 {
-                dst.peers.buffered.fetch_add(copied, Ordering::AcqRel);
-            }
-            drop(dst_ring);
-            drop(src_ring);
-            if copied > 0 {
-                dst.notify_readable();
-            }
-            return Ok(copied);
         }
+    }
+
+    fn tee_locked(
+        src_ring: &PipeRingBuffer,
+        dst_ring: &mut PipeRingBuffer,
+        len: usize,
+    ) -> TeeAttempt {
+        let available_read = src_ring.available_read();
+        if available_read == 0 {
+            return TeeAttempt::SourceEmpty;
+        }
+        let available_write = dst_ring.available_write();
+        if available_write == 0 {
+            return TeeAttempt::DestinationFull;
+        }
+        TeeAttempt::Copied(
+            src_ring.copy_into(dst_ring, len.min(available_read).min(available_write)),
+        )
     }
 
     fn wait_on_queue_until<F>(&self, queue: &WaitQueue, condition: F) -> Result<(), LinuxError>
@@ -615,56 +642,75 @@ impl PipeEndpoint {
         };
         if let Some(entry) = user_thread_entry_by_tid(current_tid()) {
             // `write(2)` on a pipe with no readers raises SIGPIPE and reports
-            // EPIPE when the signal is ignored/handled/blocked.  The fd-table
-            // syscall path still holds `process.fds` while it calls into a pipe
-            // endpoint, so do not synchronously tear the process down here: the
+            // EPIPE when the signal is ignored/handled/blocked.  Do not
+            // synchronously tear the process down in this object callback: the
             // normal user-return hook observes the pending default-fatal signal
-            // after the fd-table lock has been released and then performs the
-            // exit-group teardown.
+            // and performs the exit-group teardown after syscall dispatch.
             let _ = deliver_user_signal(&entry, SIGPIPE_NUM, ext.process.pid());
         }
     }
 
     fn notify_async_readable(&self) {
-        let state = *self.async_state.lock();
-        if !state.enabled || state.owner_pid == 0 {
-            return;
-        }
+        let listeners = {
+            let mut registry = self.async_listeners.lock();
+            let mut live = Vec::with_capacity(registry.len());
+            registry.retain(|listener| {
+                if let Some(listener) = listener.upgrade() {
+                    live.push(listener);
+                    true
+                } else {
+                    false
+                }
+            });
+            live
+        };
         let Some(ext) = current_task_ext() else {
             return;
         };
-        let sig = if state.signal == 0 {
-            SIGIO_NUM
-        } else {
-            state.signal
-        };
-        match state.owner_type {
-            F_OWNER_TID => {
-                if let Some(entry) = user_thread_entry_by_tid(state.owner_pid) {
-                    let _ = deliver_user_signal(&entry, sig, ext.process.pid());
-                }
+        for listener in listeners {
+            let state = *listener.lock();
+            if !state.readable || !state.enabled || state.owner_pid == 0 {
+                continue;
             }
-            F_OWNER_PID => {
-                if let Some(entry) = user_thread_entry_by_process_pid(state.owner_pid) {
-                    let _ = deliver_user_signal(&entry, sig, ext.process.pid());
+            let sig = if state.signal == 0 {
+                SIGIO_NUM
+            } else {
+                state.signal
+            };
+            match state.owner_type {
+                F_OWNER_TID => {
+                    if let Some(entry) = user_thread_entry_by_tid(state.owner_pid) {
+                        let _ = deliver_user_signal(&entry, sig, ext.process.pid());
+                    }
                 }
-            }
-            F_OWNER_PGRP => {
-                for entry in user_thread_entries_by_process_group(state.owner_pid) {
-                    let _ = deliver_user_signal(&entry, sig, ext.process.pid());
+                F_OWNER_PID => {
+                    if let Some(entry) = user_thread_entry_by_process_pid(state.owner_pid) {
+                        let _ = deliver_user_signal(&entry, sig, ext.process.pid());
+                    }
                 }
+                F_OWNER_PGRP => {
+                    for entry in user_thread_entries_by_process_group(state.owner_pid) {
+                        let _ = deliver_user_signal(&entry, sig, ext.process.pid());
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 
     fn notify_readable(&self) {
         self.read_wait.notify_all(false);
+        self.events.notify(ReadyEvents::READABLE);
         self.notify_async_readable();
     }
 
     fn notify_writable(&self) {
         self.write_wait.notify_all(false);
+        self.events.notify(ReadyEvents::WRITABLE);
+    }
+
+    pub(super) fn notify_open(&self) {
+        self.events.notify(ReadyEvents::ALL);
     }
 
     fn interrupted() -> bool {
@@ -676,6 +722,7 @@ impl PipeEndpoint {
 
     fn read_with_nonblocking(
         &self,
+        status_flags: u32,
         dst: &mut [u8],
         nonblocking: bool,
     ) -> Result<usize, LinuxError> {
@@ -695,7 +742,7 @@ impl PipeEndpoint {
                     return Ok(read_len);
                 }
                 drop(ring);
-                if nonblocking || self.nonblocking() {
+                if nonblocking || Self::nonblocking(status_flags) {
                     return Err(LinuxError::EAGAIN);
                 }
                 if Self::interrupted() {
@@ -719,19 +766,20 @@ impl PipeEndpoint {
         Ok(read_len)
     }
 
-    pub(super) fn read(&self, dst: &mut [u8]) -> Result<usize, LinuxError> {
-        self.read_with_nonblocking(dst, false)
+    pub(super) fn read(&self, status_flags: u32, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        self.read_with_nonblocking(status_flags, dst, false)
     }
 
     pub(super) fn read_partial(
         &self,
+        status_flags: u32,
         dst: &mut [u8],
         nonblocking: bool,
     ) -> Result<usize, LinuxError> {
-        self.read_with_nonblocking(dst, nonblocking)
+        self.read_with_nonblocking(status_flags, dst, nonblocking)
     }
 
-    pub(super) fn write(&self, src: &[u8]) -> Result<usize, LinuxError> {
+    pub(super) fn write(&self, status_flags: u32, src: &[u8]) -> Result<usize, LinuxError> {
         if !self.writable {
             return Err(LinuxError::EBADF);
         }
@@ -752,7 +800,7 @@ impl PipeEndpoint {
             let available = ring.available_write();
             if available == 0 {
                 drop(ring);
-                if self.nonblocking() {
+                if Self::nonblocking(status_flags) {
                     if written > 0 {
                         self.notify_readable();
                     }
@@ -786,7 +834,12 @@ impl PipeEndpoint {
         Ok(written)
     }
 
-    pub(super) fn write_partial(&self, src: &[u8], nonblocking: bool) -> Result<usize, LinuxError> {
+    pub(super) fn write_partial(
+        &self,
+        status_flags: u32,
+        src: &[u8],
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
         if !self.writable {
             return Err(LinuxError::EBADF);
         }
@@ -802,7 +855,7 @@ impl PipeEndpoint {
             let available = ring.available_write();
             if available == 0 {
                 drop(ring);
-                if nonblocking || self.nonblocking() {
+                if nonblocking || Self::nonblocking(status_flags) {
                     return Err(LinuxError::EAGAIN);
                 }
                 if Self::interrupted() {
@@ -843,6 +896,51 @@ impl PipeEndpoint {
     }
 }
 
+impl FileObject for PipeEndpoint {
+    fn read(
+        &self,
+        description: &OpenFile<dyn FileObject>,
+        _process: &UserProcess,
+        dst: &mut [u8],
+    ) -> Result<usize, LinuxError> {
+        self.read(description.status_flags(), dst)
+    }
+
+    fn write(
+        &self,
+        description: &OpenFile<dyn FileObject>,
+        _process: &UserProcess,
+        src: &[u8],
+    ) -> Result<usize, LinuxError> {
+        self.write(description.status_flags(), src)
+    }
+
+    fn readiness(&self) -> ReadyEvents {
+        let mut events = ReadyEvents::EMPTY;
+        if self.poll_readable() {
+            events |= ReadyEvents::READABLE;
+        }
+        if self.poll_writable() {
+            events |= ReadyEvents::WRITABLE;
+        }
+        if self.readable && self.read_peer_closed() {
+            events |= ReadyEvents::HANGUP;
+        }
+        if self.writable && self.write_peer_closed() {
+            events |= ReadyEvents::ERROR;
+        }
+        events
+    }
+
+    fn event_source(&self) -> &EventSource {
+        &self.events
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
+    }
+}
+
 pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> isize {
     let flags = flags as u32;
     let supported_flags = general::O_CLOEXEC | general::O_NONBLOCK | general::O_DIRECT;
@@ -854,7 +952,18 @@ pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> i
     }
     let fd_flags = fd_cloexec_flag(flags & general::O_CLOEXEC != 0);
     let status_flags = flags & (general::O_NONBLOCK | general::O_DIRECT);
-    let (read_end, write_end) = PipeEndpoint::new_pair_for_process(process, status_flags);
+    let (read_end, write_end) = PipeEndpoint::new_pair_for_process(process);
+    let read_end = match new_open_file(read_end, status_flags & !general::O_ACCMODE) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
+    let write_end = match new_open_file(
+        write_end,
+        general::O_WRONLY | (status_flags & !general::O_ACCMODE),
+    ) {
+        Ok(file) => file,
+        Err(err) => return neg_errno(err),
+    };
     let fds = {
         let mut table = process.fds.lock();
         let read_fd = match table.insert_with_flags(FdEntry::Pipe(read_end), fd_flags) {
@@ -864,7 +973,9 @@ pub(super) fn sys_pipe2(process: &UserProcess, pipefd: usize, flags: usize) -> i
         let write_fd = match table.insert_with_flags(FdEntry::Pipe(write_end), fd_flags) {
             Ok(fd) => fd,
             Err(err) => {
-                let _ = table.close(read_fd);
+                let closed = table.close(read_fd).ok();
+                drop(table);
+                drop(closed);
                 return neg_errno(err);
             }
         };

@@ -118,6 +118,7 @@ dependencies = [
  "axalloc",
  "axdriver",
  "axerrno 0.1.2",
+ "axfile",
  "axfs",
  "axfs_ramfs",
  "axfs_vfs",
@@ -466,6 +467,13 @@ dependencies = [
  "axsync",
  "axtask",
  "kspin",
+]
+
+[[package]]
+name = "axfile"
+version = "0.2.0"
+dependencies = [
+ "axsync",
 ]
 
 [[package]]

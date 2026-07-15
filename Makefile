@@ -482,10 +482,15 @@ fmt:
 fmt_c:
 	@clang-format --style=file -i $(shell find ulib/axlibc -iname '*.c' -o -iname '*.h')
 
-unittest:
+pr2-check:
+	python3 scripts/check_pr2_file_event_core.py
+	python3 scripts/test_pr2_file_event_core.py
+	cargo test -p axfile --lib
+
+unittest: pr2-check
 	$(call unit_test)
 
-unittest_no_fail_fast:
+unittest_no_fail_fast: pr2-check
 	$(call unit_test,--no-fail-fast)
 
 disk_img:
@@ -506,7 +511,7 @@ clean_c::
 
 .PHONY: all defconfig oldconfig \
 	build disasm run justrun debug \
-	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
+	clippy doc doc_check_missing fmt fmt_c pr2-check unittest unittest_no_fail_fast \
 	disk_img clean clean_c \
 	test_build kernel-rv kernel-la docker-image docker testsuite-sdcard \
 	prepare-rv-testsuite-img prepare-la-testsuite-img run-rv run-la

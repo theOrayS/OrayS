@@ -24,6 +24,7 @@ macro_rules! user_trace {
 }
 
 mod credentials;
+mod fd_object;
 mod fd_pipe;
 mod fd_socket;
 mod fd_table;

@@ -690,6 +690,7 @@ impl LocalSocketEntry {
         &self,
         process: &UserProcess,
         pipe: &PipeEndpoint,
+        pipe_status_flags: u32,
         requested: usize,
         nonblocking: bool,
     ) -> Result<usize, LinuxError> {
@@ -705,7 +706,7 @@ impl LocalSocketEntry {
         let peer_side = 1 - pair.side;
         loop {
             if !pipe.poll_readable() {
-                if nonblocking || pipe.status_flags() & general::O_NONBLOCK != 0 {
+                if nonblocking || pipe_status_flags & general::O_NONBLOCK != 0 {
                     return Err(LinuxError::EAGAIN);
                 }
                 if socket_block_interrupt_pending(process) {
@@ -740,10 +741,10 @@ impl LocalSocketEntry {
 
             let take = cmp::min(available, requested);
             let mut staging = vec![0; take];
-            let read = match pipe.read_partial(&mut staging, true) {
+            let read = match pipe.read_partial(pipe_status_flags, &mut staging, true) {
                 Ok(read) => read,
                 Err(LinuxError::EAGAIN)
-                    if !nonblocking && pipe.status_flags() & general::O_NONBLOCK == 0 =>
+                    if !nonblocking && pipe_status_flags & general::O_NONBLOCK == 0 =>
                 {
                     drop(buffer);
                     if socket_block_interrupt_pending(process) {
@@ -915,10 +916,9 @@ pub(super) fn insert_socket_entry(
         fd_cloexec_flag(flags & posix_ctypes::SOCK_CLOEXEC as i32 != 0),
     ) {
         Ok(fd) => fd as isize,
-        Err(err) => {
-            let _ = arceos_posix_api::sys_close(posix_fd);
-            neg_errno(err)
-        }
+        // FdTable owns the entry after this call starts and rolls back the raw
+        // POSIX descriptor itself when no slot can be installed.
+        Err(err) => neg_errno(err),
     }
 }
 
