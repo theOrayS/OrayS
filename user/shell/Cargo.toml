@@ -29,6 +29,7 @@ uspace = [
     "dep:linkme",
     "dep:linux-raw-sys",
     "dep:memory_addr",
+    "dep:orays-linux",
     "dep:xmas-elf",
 ]
 auto-run-tests = ["axtask/sched-rr"]
@@ -55,6 +56,7 @@ lazyinit = { version = "0.2", optional = true }
 linkme = { version = "0.3.35", optional = true }
 linux-raw-sys = { version = "0.12.1", default-features = false, features = ["auxvec", "general", "ioctl", "no_std", "system"], optional = true }
 memory_addr = { version = "0.4", optional = true }
+orays-linux = { workspace = true, optional = true }
 xmas-elf = { version = "0.10", optional = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]

@@ -44,6 +44,7 @@ mod select_fdset;
 mod signal_abi;
 mod synthetic_fs;
 mod syscall_dispatch;
+mod syscall_metadata;
 mod system_info;
 mod sysv_msg;
 mod sysv_sem;

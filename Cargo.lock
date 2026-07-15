@@ -135,6 +135,7 @@ dependencies = [
  "linux-raw-sys",
  "loongArch64",
  "memory_addr",
+ "orays-linux",
  "riscv",
  "xmas-elf",
 ]
@@ -1661,6 +1662,20 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "orays-linux"
+version = "0.2.0"
+dependencies = [
+ "orays-linux-abi",
+]
+
+[[package]]
+name = "orays-linux-abi"
+version = "0.2.0"
+dependencies = [
+ "linux-raw-sys",
+]
 
 [[package]]
 name = "page_table_entry"

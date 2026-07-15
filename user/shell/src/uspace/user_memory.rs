@@ -1,3 +1,10 @@
+//! Shell-owned low-level userspace memory backend.
+//!
+//! Raw integer addresses enter the typed boundary in this module. Existing
+//! byte reinterpretation also remains confined here until each ABI value type
+//! can be audited independently; PR1 does not broaden the generic value-copy
+//! contract.
+
 use core::mem::{MaybeUninit, forget, size_of};
 use core::slice;
 use core::sync::atomic::{AtomicU64, Ordering};
@@ -7,6 +14,8 @@ use axhal::paging::MappingFlags;
 use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
 use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, VirtAddr};
+use orays_linux::backend::UserMemoryBackend;
+use orays_linux::user::{Access, Read, UserAddr, UserRange, Write};
 use std::string::String;
 use std::vec::Vec;
 
@@ -54,7 +63,8 @@ pub(super) fn validate_user_read(
     ptr: usize,
     len: usize,
 ) -> Result<(), LinuxError> {
-    validate_user_access(process, ptr, len, false)
+    let range = typed_user_range::<Read>(ptr, len)?;
+    ProcessUserMemory { process }.validate_read(range)
 }
 
 pub(super) fn validate_user_write(
@@ -62,7 +72,8 @@ pub(super) fn validate_user_write(
     ptr: usize,
     len: usize,
 ) -> Result<(), LinuxError> {
-    validate_user_access(process, ptr, len, true)
+    let range = typed_user_range::<Write>(ptr, len)?;
+    ProcessUserMemory { process }.validate_write(range)
 }
 
 pub(super) fn fault_in_user_read(
@@ -70,7 +81,7 @@ pub(super) fn fault_in_user_read(
     ptr: usize,
     len: usize,
 ) -> Result<(), LinuxError> {
-    fault_in_user_range(process, ptr, len, false)
+    validate_user_read(process, ptr, len)
 }
 
 pub(super) fn fault_in_user_write(
@@ -78,7 +89,7 @@ pub(super) fn fault_in_user_write(
     ptr: usize,
     len: usize,
 ) -> Result<(), LinuxError> {
-    fault_in_user_range(process, ptr, len, true)
+    validate_user_write(process, ptr, len)
 }
 
 pub(super) fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags: usize) -> isize {
@@ -109,7 +120,11 @@ pub(super) fn sys_getrandom(process: &UserProcess, buf: usize, len: usize, flags
     filled as isize
 }
 
-fn validate_user_access(
+fn typed_user_range<A: Access>(ptr: usize, len: usize) -> Result<UserRange<A>, LinuxError> {
+    UserRange::new(UserAddr::new(ptr), len).ok_or(LinuxError::EFAULT)
+}
+
+fn validate_user_access_raw(
     process: &UserProcess,
     ptr: usize,
     len: usize,
@@ -199,20 +214,30 @@ pub(super) fn read_user_bytes(
     if len == 0 {
         return Ok(Vec::new());
     }
-    fault_in_user_read(process, ptr, len)?;
+    let range = typed_user_range::<Read>(ptr, len)?;
+    ProcessUserMemory { process }.validate_read(range)?;
 
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(len)
         .map_err(|_| LinuxError::ENOMEM)?;
     bytes.resize(len, 0);
+    read_user_bytes_validated_raw(process, ptr, &mut bytes)?;
+    Ok(bytes)
+}
+
+fn read_user_bytes_validated_raw(
+    process: &UserProcess,
+    ptr: usize,
+    dst: &mut [u8],
+) -> Result<(), LinuxError> {
     process
         .aspace
         .lock()
-        .read(VirtAddr::from(ptr), &mut bytes)
+        .read(VirtAddr::from(ptr), dst)
         .map_err(|_| LinuxError::EFAULT)?;
-    perf_counters::record_user_copy_read(len);
-    Ok(bytes)
+    perf_counters::record_user_copy_read(dst.len());
+    Ok(())
 }
 
 pub(super) fn read_user_bytes_into(
@@ -223,14 +248,20 @@ pub(super) fn read_user_bytes_into(
     if dst.is_empty() {
         return Ok(());
     }
-    fault_in_user_read(process, ptr, dst.len())?;
-    process
-        .aspace
-        .lock()
-        .read(VirtAddr::from(ptr), dst)
-        .map_err(|_| LinuxError::EFAULT)?;
-    perf_counters::record_user_copy_read(dst.len());
-    Ok(())
+    let range = typed_user_range::<Read>(ptr, dst.len())?;
+    ProcessUserMemory { process }.read_bytes(range, dst)
+}
+
+fn read_user_bytes_into_raw(
+    process: &UserProcess,
+    ptr: usize,
+    dst: &mut [u8],
+) -> Result<(), LinuxError> {
+    if dst.is_empty() {
+        return Ok(());
+    }
+    validate_user_access_raw(process, ptr, dst.len(), false)?;
+    read_user_bytes_validated_raw(process, ptr, dst)
 }
 
 pub(super) fn read_iovec_entries(
@@ -283,8 +314,15 @@ pub(super) fn write_user_bytes(
     if bytes.is_empty() {
         return Ok(());
     }
-    fault_in_user_write(process, ptr, bytes.len())?;
+    let range = typed_user_range::<Write>(ptr, bytes.len())?;
+    ProcessUserMemory { process }.write_bytes(range, bytes)
+}
 
+fn write_user_bytes_raw(process: &UserProcess, ptr: usize, bytes: &[u8]) -> Result<(), LinuxError> {
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    validate_user_access_raw(process, ptr, bytes.len(), true)?;
     process
         .aspace
         .lock()
@@ -292,6 +330,36 @@ pub(super) fn write_user_bytes(
         .map_err(|_| LinuxError::EFAULT)?;
     perf_counters::record_user_copy_write(bytes.len());
     Ok(())
+}
+
+struct ProcessUserMemory<'a> {
+    process: &'a UserProcess,
+}
+
+impl UserMemoryBackend for ProcessUserMemory<'_> {
+    type Error = LinuxError;
+
+    fn validate_read(&self, range: UserRange<Read>) -> Result<(), Self::Error> {
+        validate_user_access_raw(self.process, range.start().get(), range.len(), false)
+    }
+
+    fn validate_write(&self, range: UserRange<Write>) -> Result<(), Self::Error> {
+        validate_user_access_raw(self.process, range.start().get(), range.len(), true)
+    }
+
+    fn read_bytes(&self, src: UserRange<Read>, dst: &mut [u8]) -> Result<(), Self::Error> {
+        if src.len() != dst.len() {
+            return Err(LinuxError::EINVAL);
+        }
+        read_user_bytes_into_raw(self.process, src.start().get(), dst)
+    }
+
+    fn write_bytes(&self, dst: UserRange<Write>, src: &[u8]) -> Result<(), Self::Error> {
+        if dst.len() != src.len() {
+            return Err(LinuxError::EINVAL);
+        }
+        write_user_bytes_raw(self.process, dst.start().get(), src)
+    }
 }
 
 pub(super) fn user_io_buffer(len: usize) -> Result<Vec<u8>, LinuxError> {
