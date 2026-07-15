@@ -93,12 +93,20 @@ class OfficialResultValidationTest(unittest.TestCase):
     def test_only_trusted_ansi_styling_and_crlf_are_normalized(self) -> None:
         text = group(
             "demo-musl",
-            "\x1b[32mPASS OFFICIAL TEST GROUP demo-musl : 0\x1b[0m",
+            "\x1b[H\x1b[J\x1b[32mPASS OFFICIAL TEST GROUP demo-musl : 0\x1b[0m",
         ).replace("\n", "\r\n")
         self.assert_status(text, "PASS")
+        self.assert_status(
+            group(
+                "demo-musl",
+                "F\x1b[H\x1b[J\x1b[31mAIL\x1b[0m\n"
+                "PASS OFFICIAL TEST GROUP demo-musl : 0",
+            ),
+            "FAIL",
+        )
 
     def test_non_styling_csi_and_bare_carriage_return_are_errors(self) -> None:
-        for index, control in enumerate(("\x1b[2J", "\x1b[2A", "\r")):
+        for index, control in enumerate(("\x1b[H", "\x1b[J", "\x1b[2J", "\x1b[2A", "\r")):
             with self.subTest(control=index):
                 text = group(
                     "demo-musl",
@@ -139,6 +147,17 @@ class OfficialResultValidationTest(unittest.TestCase):
 
     def test_generic_group_with_explicit_zero_success_passes(self) -> None:
         self.assert_status(group("demo-musl", "PASS OFFICIAL TEST GROUP demo-musl : 0"), "PASS")
+        controlled_cleanup = (
+            "autorun: cyclictest-musl timeout bounded to 900s (nominal 1200s)\n"
+            + group(
+                "demo-musl",
+                "Signal 2 caught, longjmp'ing out!\n"
+                "sending SIGTERM to all child processes\n"
+                "signaling 240 worker threads to terminate\n"
+                "PASS OFFICIAL TEST GROUP demo-musl : 0",
+            )
+        )
+        self.assert_status(controlled_cleanup, "PASS")
 
     def test_generic_zero_or_incomplete_execution_markers_are_errors(self) -> None:
         for marker in (
@@ -315,6 +334,14 @@ class OfficialResultValidationTest(unittest.TestCase):
             complete_ltp().replace("Pass!\n", "")
         )
         self.assertEqual(incomplete["status"], "ERROR", incomplete)
+        benign_diagnostics = (
+            "tst_test.c:1617: TINFO: Timeout per run is 0h 00m 30s\n"
+            "signal01 1 TPASS: signal 11 was rejected as expected\n"
+            "futex01 1 TPASS: futex failed as expected: ETIMEDOUT (110)\n"
+            "     --vm-hang         hang in a sleep loop after memory allocated\n"
+            "passed   1\nfailed   0\nbroken   0\nskipped   0\nwarnings 0"
+        )
+        self.assert_status(complete_ltp(internal=benign_diagnostics), "PASS")
 
     def test_prefixed_ltp_result_record_is_malformed(self) -> None:
         text = complete_ltp().replace(
@@ -343,6 +370,20 @@ class OfficialResultValidationTest(unittest.TestCase):
 
     def test_ltp_tfail_fails_even_with_zero_wrapper_status(self) -> None:
         self.assert_status(complete_ltp(internal="access01 1 TFAIL: mismatch"), "FAIL")
+        for marker in (
+            "access01 1 TBROK: setup failed",
+            "access01 1 TPASS: syscall returned ENOSYS",
+            "access01 1 TPASS: kernel panic was hidden",
+            "access01 1 TINFO: Test timeouted, sending SIGKILL!",
+            "failed 1",
+            "broken 1",
+            "skipped 1",
+            "warnings 1",
+            "Test timeouted, sending SIGKILL!",
+            "kernel panic: fatal",
+        ):
+            with self.subTest(marker=marker):
+                self.assert_status(complete_ltp(internal=marker), "FAIL")
 
     def test_ltp_zero_case_manifest_is_error(self) -> None:
         text = group("ltp-musl", "ltp case list: stable (0 cases, timeout 180s)\nltp cases: 0 passed, 0 failed, 0 timed out")
@@ -469,6 +510,13 @@ ltp cases: 2 passed, 0 failed, 0 timed out
 
     def test_busybox_complete_success_passes(self) -> None:
         self.assert_status(group("busybox-musl", "testcase busybox echo ok success"), "PASS")
+        self.assert_status(
+            group(
+                "busybox-musl",
+                "cut mktemp timeout\ntestcase busybox echo ok success",
+            ),
+            "PASS",
+        )
 
     def test_busybox_requires_trusted_expected_count(self) -> None:
         text = group("busybox-musl", "testcase busybox echo ok success")
@@ -534,6 +582,15 @@ ltp cases: 2 passed, 0 failed, 0 timed out
 
     def test_busybox_failure_is_failure(self) -> None:
         self.assert_status(group("busybox-musl", "testcase busybox false fail"), "FAIL")
+        for marker in ("TFAIL: hidden mismatch", "kernel panic: fatal"):
+            with self.subTest(marker=marker):
+                self.assert_status(
+                    group(
+                        "busybox-musl",
+                        f"{marker}\ntestcase busybox echo ok success",
+                    ),
+                    "FAIL",
+                )
 
     def test_libctest_complete_success_passes(self) -> None:
         text = group(

@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Any
 
 ANSI_SGR_RE = re.compile(r"\x1b\[(?:[0-9]{1,3}(?:;[0-9]{1,3})*)?[mK]")
+ANSI_CLEAR_HOME_RE = re.compile(r"\x1b\[H\x1b\[J")
 CANONICAL_OFFICIAL_GROUPS = (
     "ltp-musl", "ltp-glibc", "libctest-musl", "basic-musl", "basic-glibc",
     "busybox-musl", "busybox-glibc", "libctest-glibc", "lua-musl", "lua-glibc",
@@ -216,9 +217,10 @@ def validate_capture_input_pairs(
 
 
 def normalize_output_text(raw_text: str) -> str:
-    """Remove only trusted terminal styling and normalize CRLF for parsing."""
+    """Remove trusted styling/clear pairs and normalize CRLF for parsing."""
 
-    return ANSI_SGR_RE.sub("", raw_text).replace("\r\n", "\n")
+    without_clear = ANSI_CLEAR_HOME_RE.sub("", raw_text)
+    return ANSI_SGR_RE.sub("", without_clear).replace("\r\n", "\n")
 
 
 def first_unsupported_output_character(text: str) -> str | None:
@@ -379,6 +381,25 @@ LTP_SUMMARY_RE = re.compile(
     r"^ltp cases:\s+(\d+)\s+passed,\s+(\d+)\s+failed(?:,\s+(\d+)\s+timed out)?\s*$",
     re.I,
 )
+LTP_DIAGNOSTIC_STATUS_RE = re.compile(r"\b(TPASS|TINFO|TWARN|TFAIL|TBROK|TCONF)\b", re.I)
+LTP_INTERNAL_SUMMARY_RE = re.compile(
+    r"^\s*(passed|failed|broken|skipped|warnings)\s+(\d+)\s*$",
+    re.I,
+)
+LTP_FATAL_DIAGNOSTIC_RE = re.compile(
+    r"\b(?:kernel panic|unknown trap|unhandled(?: user)? trap|fatal trap|"
+    r"InstructionNotExist|IllegalInstruction|illegal instruction|SegmentationFault|"
+    r"segmentation fault|segfault|bus error|core dump(?:ed)?|process crash(?:ed)?|"
+    r"crashed)\b",
+    re.I,
+)
+LTP_TIMEOUT_EVENT_RE = re.compile(
+    r"\b(?:timed out after|timeout reached|timeout expired|killed after timeout|"
+    r"command timed out|deadline exceeded|watchdog expired|"
+    r"time[_ -]?limit[_ -]?exceeded|timeouted|deadline_exceeded|"
+    r"watchdog_expired|command_timed_out|timeout_error)\b",
+    re.I,
+)
 BUSYBOX_RESULT_RE = re.compile(r"^testcase busybox\s+(.+?)\s+(success|fail)\s*$")
 LIBCTEST_START_RE = re.compile(r"^=+ START\s+(\S+)\s+(\S+)\s+=+$")
 LIBCTEST_END_RE = re.compile(r"^=+ END\s+(\S+)\s+(\S+)\s+=+$")
@@ -396,7 +417,7 @@ TIMEOUT_RE = re.compile(
     r"\b(?:TIMEOUT (?:LTP CASE|OFFICIAL TEST GROUP)|timed out after|timeout reached|"
     r"timeout expired|killed after timeout|command timed out|deadline exceeded|"
     r"watchdog expired|time[_ -]?limit[_ -]?exceeded|timed[_ -]?out|"
-    r"deadline_exceeded|watchdog_expired|command_timed_out|timeout_error|ETIMEDOUT)\b",
+    r"timeouted|deadline_exceeded|watchdog_expired|command_timed_out|timeout_error|ETIMEDOUT)\b",
     re.I,
 )
 PANIC_RE = re.compile(
@@ -440,6 +461,16 @@ EXPLICIT_NONZERO_RE = re.compile(
     r"(?:(?:exited|failed)\s+with\s+(?:exit\s+)?(?:status|code)|"
     r"returned(?:\s+(?:status|code))?)\s*[:=]?\s*[1-9]\d*|"
     r"qemu(?:\s+.*?)?\s+exit (?:status|code)\s*[:=]?\s*[1-9]\d*))\s*$",
+    re.I,
+)
+OFFICIAL_TIMEOUT_BUDGET_RE = re.compile(
+    r"^autorun:\s+\S+\s+timeout bounded to \d+s \(nominal \d+s\)$",
+    re.I,
+)
+CONTROLLED_PROCESS_CLEANUP_RE = re.compile(
+    r"^(?:Signal (?:2|15) caught, longjmp'ing out!|"
+    r"sending SIGTERM to all child processes|"
+    r"signaling \d+ worker threads to terminate)$",
     re.I,
 )
 UNKNOWN_STATE_RE = re.compile(
@@ -556,6 +587,144 @@ def _protocol_record_kinds(line: str) -> set[str]:
     if line == "Pass!":
         kinds.add("case-pass")
     return kinds
+
+
+def _group_family(label: str) -> str:
+    if label.startswith("ltp-"):
+        return "ltp"
+    if label.startswith("busybox-"):
+        return "busybox"
+    if label.startswith("libctest-"):
+        return "libctest"
+    return "generic"
+
+
+def _scan_unstructured_line(
+    source: str,
+    line: str,
+    family: str = "generic",
+    group: str | None = None,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Classify human output without reinterpreting trusted case grammar.
+
+    Specialized validators bind their machine records to exact lifecycles.
+    Their diagnostics still need fail-closed checks, but wording such as
+    ``failed 0``, ``Timeout per run``, or a BusyBox applet named ``timeout`` is
+    not itself a failure. Keep those family grammars narrow while retaining
+    explicit TFAIL/TBROK/TCONF/ENOSYS, non-zero summaries, timeouts, and crashes.
+    """
+
+    errors: list[dict[str, str]] = []
+    failures: list[dict[str, str]] = []
+    context = f"{source}: {line.strip()}"
+
+    if _protocol_record_kinds(line):
+        return errors, failures
+    if OFFICIAL_TIMEOUT_BUDGET_RE.fullmatch(line):
+        return errors, failures
+    if family == "generic" and CONTROLLED_PROCESS_CLEANUP_RE.fullmatch(line):
+        return errors, failures
+
+    if UNKNOWN_STATE_RE.search(line) and not UNCONSUMED_FAILURE_RE.search(line):
+        errors.append(issue("unknown-status", context, group))
+    if ZERO_EXECUTION_RE.search(line):
+        errors.append(issue("zero-execution", context, group))
+
+    if family == "ltp":
+        if summary := LTP_INTERNAL_SUMMARY_RE.fullmatch(line):
+            summary_kind = summary.group(1).lower()
+            summary_count = int(summary.group(2))
+            if summary_kind != "passed" and summary_count != 0:
+                failures.append(
+                    issue(
+                        "ltp-internal-summary-failure",
+                        f"{source}: {summary_kind}={summary_count}",
+                        group,
+                    )
+                )
+            return errors, failures
+
+        diagnostic_statuses = {
+            marker.upper() for marker in LTP_DIAGNOSTIC_STATUS_RE.findall(line)
+        }
+        failing_statuses = sorted(
+            diagnostic_statuses & {"TFAIL", "TBROK", "TCONF"}
+        )
+        if re.search(r"\bENOSYS\b", line, re.I):
+            failing_statuses.append("ENOSYS")
+        for marker in failing_statuses:
+            failures.append(
+                issue("forbidden-status", f"{source}: {marker}", group)
+            )
+        if diagnostic_statuses:
+            # LTP result tags own expected errno/signal wording, but they do
+            # not make an actual panic/trap or timeout event benign.  Keep the
+            # latter checks narrower than the generic scanners so legitimate
+            # diagnostics such as "Timeout per run", "failed as expected",
+            # and ETIMEDOUT under TPASS remain valid.
+            if LTP_FATAL_DIAGNOSTIC_RE.search(line):
+                failures.append(issue("panic-or-trap", context, group))
+            if LTP_TIMEOUT_EVENT_RE.search(line):
+                failures.append(issue("timeout", context, group))
+            return errors, failures
+
+        # Untagged LTP help text legitimately uses bare words such as "error"
+        # and "hang". Exact numeric results and tagged LTP statuses own those
+        # semantics; retain only high-confidence untagged status markers here.
+        retained_markers = {
+            "TCONF",
+            "TBROK",
+            "TFAIL",
+            "ENOSYS",
+            "XFAIL",
+            "SKIP",
+            "SKIPPED",
+            "CRASH",
+            "PANIC",
+        }
+        for marker in FORBIDDEN_STATUS_RE.findall(line):
+            if marker.upper() in retained_markers:
+                failures.append(
+                    issue("forbidden-status", f"{source}: {marker}", group)
+                )
+    elif family in {"busybox", "libctest"}:
+        # Exact per-case records own timeout/success semantics for these
+        # families. Do not confuse command output with a terminal status.
+        retained_markers = {
+            "TCONF",
+            "TBROK",
+            "TFAIL",
+            "ENOSYS",
+            "XFAIL",
+            "SKIP",
+            "SKIPPED",
+            "CRASH",
+            "PANIC",
+        }
+        for marker in FORBIDDEN_STATUS_RE.findall(line):
+            if marker.upper() in retained_markers:
+                failures.append(
+                    issue("forbidden-status", f"{source}: {marker}", group)
+                )
+    else:
+        for marker in FORBIDDEN_STATUS_RE.findall(line):
+            failures.append(
+                issue("forbidden-status", f"{source}: {marker}", group)
+            )
+
+    if TIMEOUT_RE.search(line):
+        failures.append(issue("timeout", context, group))
+    if SKIP_RE.search(line):
+        failures.append(issue("skipped-group", context, group))
+    if PANIC_RE.search(line):
+        failures.append(issue("panic-or-trap", context, group))
+    if UNCONSUMED_FAILURE_RE.search(line):
+        failures.append(issue("explicit-failure", context, group))
+    if GENERIC_SUBTEST_FAILURE_RE.fullmatch(line):
+        failures.append(issue("generic-subtest-failure", context, group))
+    if EXPLICIT_NONZERO_RE.search(line):
+        failures.append(issue("explicit-nonzero", context, group))
+    return errors, failures
 
 
 def _validate_ltp(
@@ -1239,12 +1408,7 @@ def validate_official_output(
                 if not kinds <= {"group-start", "group-end"}:
                     structural_errors.append(issue("protocol-record-outside-group", line.strip()))
                 continue
-            family = (
-                "ltp" if source_group.label.startswith("ltp-")
-                else "busybox" if source_group.label.startswith("busybox-")
-                else "libctest" if source_group.label.startswith("libctest-")
-                else "generic"
-            )
+            family = _group_family(source_group.label)
             if not kinds & allowed_protocols[family]:
                 structural_errors.append(
                     issue("unexpected-protocol-record", line.strip(), source_group.label)
@@ -1255,34 +1419,24 @@ def validate_official_output(
         if PROTOCOL_SIGNATURE_RE.search(line):
             structural_errors.append(issue("protocol-record-on-stderr", line.strip()))
 
-    for source, line in [
-        *(("stdout", line) for line in lines),
-        *(("stderr", line) for line in stderr_lines),
-    ]:
-        if _protocol_record_kinds(line):
-            # Strict machine records are interpreted by their group-specific
-            # validator.  Their vocabulary legitimately includes strings such
-            # as "FAIL ... : 0", "0 failed", and "timeout 180s".
-            continue
-        if UNKNOWN_STATE_RE.search(line) and not UNCONSUMED_FAILURE_RE.search(line):
-            structural_errors.append(issue("unknown-status", f"{source}: {line.strip()}"))
-        if ZERO_EXECUTION_RE.search(line):
-            structural_errors.append(issue("zero-execution", f"{source}: {line.strip()}"))
-        markers = FORBIDDEN_STATUS_RE.findall(line)
-        for marker in markers:
-            failures.append(issue("forbidden-status", f"{source}: {marker}"))
-        if TIMEOUT_RE.search(line) and "TIMEOUT" not in markers:
-            failures.append(issue("timeout", f"{source}: {line.strip()}"))
-        if SKIP_RE.search(line) and not any(marker.startswith("SKIP") for marker in markers):
-            failures.append(issue("skipped-group", f"{source}: {line.strip()}"))
-        if PANIC_RE.search(line) and "PANIC" not in markers:
-            failures.append(issue("panic-or-trap", f"{source}: {line.strip()}"))
-        if UNCONSUMED_FAILURE_RE.search(line) and not _protocol_record_kinds(line):
-            failures.append(issue("explicit-failure", f"{source}: {line.strip()}"))
-        if GENERIC_SUBTEST_FAILURE_RE.fullmatch(line):
-            failures.append(issue("generic-subtest-failure", f"{source}: {line.strip()}"))
-        if EXPLICIT_NONZERO_RE.search(line):
-            failures.append(issue("explicit-nonzero", f"{source}: {line.strip()}"))
+    scan_inputs = [
+        *(("stdout", line, "generic", None) for line in outside_lines),
+        *(
+            ("stdout", line, _group_family(group.label), group.label)
+            for group in groups
+            for line in group.lines
+        ),
+        *(("stderr", line, "generic", None) for line in stderr_lines),
+    ]
+    for source, line, family, group_label in scan_inputs:
+        line_errors, line_failures = _scan_unstructured_line(
+            source,
+            line,
+            family,
+            group_label,
+        )
+        structural_errors.extend(line_errors)
+        failures.extend(line_failures)
 
     for line in [*outside_lines, *stderr_lines]:
         if OFFICIAL_FAIL_RE.search(line):

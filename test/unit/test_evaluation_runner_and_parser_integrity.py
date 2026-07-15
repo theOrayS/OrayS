@@ -881,6 +881,18 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("PASS LTP CASE", result.stdout)
 
+        framing_tree = self.make_tree()
+        framing_path = framing_tree / "user/shell/src/cmd.rs"
+        framing_text = self.replace_once(
+            framing_path.read_text(encoding="utf-8"),
+            'println!("PASS OFFICIAL TEST GROUP {label} : 0");',
+            'println!("official group completed");',
+        )
+        framing_path.write_text(framing_text, encoding="utf-8")
+        framing_result = self.run_guard(framing_tree)
+        self.assertNotEqual(framing_result.returncode, 0)
+        self.assertIn("status-bound PASS/FAIL", framing_result.stdout)
+
     def test_detects_busybox_execve_magic_fallback(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/process_lifecycle.rs"

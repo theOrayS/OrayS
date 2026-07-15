@@ -1853,6 +1853,59 @@ fn copy_script_file(
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn shell_echoes_exact_text(line: &str, text: &str) -> bool {
+    let trimmed = line.trim();
+    for quoted in [format!("\"{text}\""), format!("'{text}'")] {
+        let Some(prefix) = trimmed.strip_suffix(&quoted) else {
+            continue;
+        };
+        let command = prefix.trim_end().split_whitespace().collect::<Vec<_>>();
+        if command == ["echo"]
+            || (command.len() == 2
+                && command[0].rsplit('/').next() == Some("busybox")
+                && command[1] == "echo")
+        {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn remove_official_group_frame_markers(script_path: &str, label: &str) -> Result<(), String> {
+    let raw_script = fs::read_to_string(script_path)
+        .map_err(|err| format!("read staged official script {script_path} failed: {err}"))?;
+    let start_marker = format!("#### OS COMP TEST GROUP START {label} ####");
+    let end_marker = format!("#### OS COMP TEST GROUP END {label} ####");
+    let mut start_count = 0usize;
+    let mut end_count = 0usize;
+    let mut retained = Vec::new();
+    for line in raw_script.lines() {
+        if shell_echoes_exact_text(line, &start_marker) {
+            start_count += 1;
+        } else if shell_echoes_exact_text(line, &end_marker) {
+            end_count += 1;
+        } else {
+            retained.push(line);
+        }
+    }
+    if start_count != 1 || end_count != 1 {
+        return Err(format!(
+            "official script {script_path} must contain exactly one shell-emitted start/end frame for {label}; observed {start_count}/{end_count}"
+        ));
+    }
+
+    let mut script = retained.join("\n");
+    if raw_script.ends_with('\n') {
+        script.push('\n');
+    }
+    let mut file = File::create(script_path)
+        .map_err(|err| format!("rewrite staged official script {script_path} failed: {err}"))?;
+    file.write_all(script.as_bytes())
+        .map_err(|err| format!("write staged official script {script_path} failed: {err}"))
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn write_text_file(path: &str, content: &str) -> io::Result<()> {
     if let Some(parent) = parent_dir(path) {
         ensure_dir_all(parent)?;
@@ -3171,6 +3224,19 @@ pub fn maybe_run_official_tests() {
             }
             continue;
         }
+        println!("#### OS COMP TEST GROUP START {label} ####");
+        if let Err(err) = remove_official_group_frame_markers(&script_arg, &label) {
+            println!("FAIL OFFICIAL TEST GROUP {label} : -1");
+            println!("autorun: prepare official framing for {cwd}/{script} failed: {err}");
+            println!("#### OS COMP TEST GROUP END {label} ####");
+            if use_staged_dir {
+                let _ = remove_dir_all(&cwd);
+            }
+            if let Some(dir) = unstaged_script_dir {
+                let _ = remove_dir_all(&dir);
+            }
+            continue;
+        }
         let chmod_args = busybox_path_wrapper_chmod_args(path_dir);
         let command = format!(
             "{shell_path} chmod 755 {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
@@ -3181,7 +3247,6 @@ pub fn maybe_run_official_tests() {
                 "autorun: {label} timeout bounded to {timeout_secs}s (nominal {nominal_timeout_secs}s)"
             );
         }
-        let mut close_timed_out_group = false;
         match run_user_program_argv_in_timeout(
             &cwd,
             &[&shell_path, "sh", "-c", &command],
@@ -3191,25 +3256,23 @@ pub fn maybe_run_official_tests() {
                 println!("FAIL OFFICIAL TEST GROUP {label} : {status}");
                 println!("TIMEOUT OFFICIAL TEST GROUP {label} after {timeout_secs}s");
                 println!("autorun: {cwd}/{script} timed out after {timeout_secs}s");
-                close_timed_out_group = true;
             }
             Ok(status) if status != 0 => {
                 println!("FAIL OFFICIAL TEST GROUP {label} : {status}");
                 println!("autorun: {cwd}/{script} exited with status {status}");
             }
-            Ok(_) => {}
+            Ok(_) => {
+                println!("PASS OFFICIAL TEST GROUP {label} : 0");
+            }
             Err(err) => {
                 println!("FAIL OFFICIAL TEST GROUP {label} : -1");
                 println!("autorun: {cwd}/{script} failed: {err}");
                 if err.to_ascii_lowercase().contains("timeout") {
                     println!("TIMEOUT OFFICIAL TEST GROUP {label} after {timeout_secs}s");
-                    close_timed_out_group = true;
                 }
             }
         }
-        if close_timed_out_group {
-            println!("#### OS COMP TEST GROUP END {label} ####");
-        }
+        println!("#### OS COMP TEST GROUP END {label} ####");
         uspace::cleanup_user_processes();
         if use_staged_dir {
             let _ = remove_dir_all(&cwd);

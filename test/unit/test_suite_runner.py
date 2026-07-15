@@ -702,12 +702,18 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_valid_ansi_sgr_is_normalized_without_changing_status(self) -> None:
-        code = "import os; os.write(1, b'\\x1b[32mCASE_RESULT: PASS\\x1b[0m\\n')"
+        code = (
+            "import os; "
+            "os.write(1, b'\\x1b[H\\x1b[J\\x1b[32mCASE_RESULT: PASS\\x1b[0m\\n')"
+        )
         result = self.invoke(fixture_manifest([fixture_case(code=code)]))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_valid_ansi_sgr_cannot_split_and_hide_failure(self) -> None:
-        code = "import os; os.write(1, b'F\\x1b[31mAIL\\x1b[0m\\nCASE_RESULT: PASS\\n')"
+        code = (
+            "import os; "
+            "os.write(1, b'F\\x1b[H\\x1b[J\\x1b[31mAIL\\x1b[0m\\nCASE_RESULT: PASS\\n')"
+        )
         result = self.invoke(fixture_manifest([fixture_case(code=code)]))
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 

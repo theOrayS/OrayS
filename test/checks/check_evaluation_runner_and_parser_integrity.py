@@ -156,6 +156,7 @@ def scan_cmd_rs(root: Path) -> list[str]:
     run_dir_block = function_block(text, "prepare_ltp_case_run_dir")
     helper_cases_block = function_block(text, "ltp_resource_helper_cases")
     copy_block = function_block(text, "copy_script_file")
+    framing_block = function_block(text, "remove_official_group_frame_markers")
     unstaged_block = function_block(text, "prepare_unstaged_script_dir")
     forbidden_runner_rewrite_tokens = [
         "rewrite_iperf_daemon_server",
@@ -226,6 +227,32 @@ def scan_cmd_rs(root: Path) -> list[str]:
         findings.append("user/shell/src/cmd.rs: copy_script_file must stay generic and must not branch on script names or LTP $file patterns")
     if unstaged_block and 'group == "ltp"' in unstaged_block:
         findings.append("user/shell/src/cmd.rs: unstaged script preparation must not inject LTP-only rewrites")
+    if not framing_block:
+        findings.append(
+            "user/shell/src/cmd.rs: missing generic official group framing helper"
+        )
+    else:
+        required_framing_tokens = (
+            "shell_echoes_exact_text",
+            "start_count != 1 || end_count != 1",
+            "File::create(script_path)",
+        )
+        if any(token not in framing_block for token in required_framing_tokens):
+            findings.append(
+                "user/shell/src/cmd.rs: official group framing must remove exactly one derived start/end pair from the staged script"
+            )
+        if any(name in framing_block for name in ("basic", "iperf", "cyclictest", "iozone")):
+            findings.append(
+                "user/shell/src/cmd.rs: official group framing must not specialize named test groups"
+            )
+    if autorun_body and (
+        "remove_official_group_frame_markers(&script_arg, &label)" not in autorun_body
+        or 'println!("PASS OFFICIAL TEST GROUP {label} : 0")' not in autorun_body
+        or 'println!("#### OS COMP TEST GROUP END {label} ####")' not in autorun_body
+    ):
+        findings.append(
+            "user/shell/src/cmd.rs: generic official execution must emit one status-bound PASS/FAIL record inside a runner-owned group frame"
+        )
     if not env_block:
         findings.append("user/shell/src/cmd.rs: missing ltp_case_env")
     else:
