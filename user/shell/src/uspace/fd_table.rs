@@ -3535,12 +3535,14 @@ fn splice_input_kind(
             }
             Ok(SpliceEndpointKind::RegularFile)
         }
-        FdEntry::Pipe(_) => {
+        FdEntry::Pipe(pipe) => {
             if has_offset {
-                Err(LinuxError::ESPIPE)
-            } else {
-                Ok(SpliceEndpointKind::Pipe)
+                return Err(LinuxError::ESPIPE);
             }
+            if !pipe_endpoint(pipe)?.readable() {
+                return Err(LinuxError::EBADF);
+            }
+            Ok(SpliceEndpointKind::Pipe)
         }
         FdEntry::LocalSocket(_) => {
             if has_offset {
@@ -3581,12 +3583,14 @@ fn splice_output_kind(
             }
             Ok(SpliceEndpointKind::RegularFile)
         }
-        FdEntry::Pipe(_) => {
+        FdEntry::Pipe(pipe) => {
             if has_offset {
-                Err(LinuxError::ESPIPE)
-            } else {
-                Ok(SpliceEndpointKind::Pipe)
+                return Err(LinuxError::ESPIPE);
             }
+            if !pipe_endpoint(pipe)?.writable() {
+                return Err(LinuxError::EBADF);
+            }
+            Ok(SpliceEndpointKind::Pipe)
         }
         FdEntry::LocalSocket(_) => {
             if has_offset {
@@ -3628,9 +3632,8 @@ fn validate_splice_input(
                 .read_file_at_current_offset_into_fd(process, fd, &mut [])
                 .map(|_| ()),
         },
-        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => {
-            table.read(process, fd, &mut []).map(|_| ())
-        }
+        SpliceEndpointKind::Pipe => Ok(()),
+        SpliceEndpointKind::Stream => table.read(process, fd, &mut []).map(|_| ()),
     }
 }
 
@@ -3648,7 +3651,8 @@ fn validate_splice_output(
             None => table.write(process, fd, &[], Some(file_size_limit)),
         }
         .map(|_| ()),
-        SpliceEndpointKind::Pipe | SpliceEndpointKind::Stream => table
+        SpliceEndpointKind::Pipe => Ok(()),
+        SpliceEndpointKind::Stream => table
             .write(process, fd, &[], Some(file_size_limit))
             .map(|_| ()),
     }
