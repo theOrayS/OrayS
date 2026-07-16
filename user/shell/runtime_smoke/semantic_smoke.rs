@@ -10,7 +10,11 @@ use core::panic::PanicInfo;
 // The semantic-evidence manifest builds and executes this same source on RV64 and
 // LA64, and requires the ordered syscall assertions plus clean guest shutdown.
 
+const SYS_CLOSE: usize = 57;
+const SYS_PIPE2: usize = 59;
+const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
+const SYS_SPLICE: usize = 76;
 const SYS_EXIT: usize = 93;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
@@ -27,6 +31,10 @@ const ASSERT_WRITE: &[u8] = b"PR3_SMOKE_V1 ASSERT write PASS arch=loongarch64\n"
 const ASSERT_GETPID: &[u8] = b"PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_GETPID: &[u8] = b"PR3_SMOKE_V1 ASSERT getpid PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_UNAME_SYSNAME: &[u8] = b"PR3_SMOKE_V1 ASSERT uname_sysname PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -47,6 +55,10 @@ const USER_FAIL_WRITE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL write arch=loongarch64\n
 const USER_FAIL_GETPID: &[u8] = b"PR3_SMOKE_V1 USER_FAIL getpid arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_GETPID: &[u8] = b"PR3_SMOKE_V1 USER_FAIL getpid arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_UNAME: &[u8] = b"PR3_SMOKE_V1 USER_FAIL uname arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -94,18 +106,26 @@ impl UtsName {
 
 #[cfg(target_arch = "riscv64")]
 #[inline(always)]
-/// Issues a three-argument syscall using the Linux RV64 userspace ABI.
+/// Issues a six-argument syscall using the Linux RV64 userspace ABI.
 ///
 /// # Safety
 ///
-/// `number` must identify a syscall whose first three raw arguments have the layouts
-/// supplied in `arg0..=arg2`. Any pointer/length pair must remain valid with the
+/// `number` must identify a syscall whose six raw arguments have the layouts
+/// supplied in `arg0..=arg5`. Any pointer/length pair must remain valid with the
 /// syscall's required read or write access until `ecall` returns, and writable memory
 /// must not be aliased for the duration of the call. The caller must interpret the
 /// returned Linux value, including negative errno. This instruction binding uses
-/// `a0..a2` for arguments/return and `a7` for the number; it intentionally does not
+/// `a0..a5` for arguments/return and `a7` for the number; it intentionally does not
 /// claim `nomem` because the kernel may access caller-provided memory.
-unsafe fn syscall3(number: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
+unsafe fn syscall6(
+    number: usize,
+    arg0: usize,
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    arg4: usize,
+    arg5: usize,
+) -> isize {
     let ret: isize;
     // SAFETY: the caller upholds the raw syscall argument contract documented above,
     // and this target-specific block names the Linux RV64 syscall ABI registers.
@@ -115,6 +135,9 @@ unsafe fn syscall3(number: usize, arg0: usize, arg1: usize, arg2: usize) -> isiz
             inlateout("a0") arg0 => ret,
             in("a1") arg1,
             in("a2") arg2,
+            in("a3") arg3,
+            in("a4") arg4,
+            in("a5") arg5,
             in("a7") number,
             options(nostack)
         );
@@ -124,18 +147,26 @@ unsafe fn syscall3(number: usize, arg0: usize, arg1: usize, arg2: usize) -> isiz
 
 #[cfg(target_arch = "loongarch64")]
 #[inline(always)]
-/// Issues a three-argument syscall using the Linux LA64 userspace ABI.
+/// Issues a six-argument syscall using the Linux LA64 userspace ABI.
 ///
 /// # Safety
 ///
-/// `number` must identify a syscall whose first three raw arguments have the layouts
-/// supplied in `arg0..=arg2`. Any pointer/length pair must remain valid with the
+/// `number` must identify a syscall whose six raw arguments have the layouts
+/// supplied in `arg0..=arg5`. Any pointer/length pair must remain valid with the
 /// syscall's required read or write access until `syscall 0` returns, and writable
 /// memory must not be aliased for the duration of the call. The caller must interpret
 /// the returned Linux value, including negative errno. This instruction binding uses
-/// `$a0..$a2` for arguments/return and `$a7` for the number; it intentionally does not
+/// `$a0..$a5` for arguments/return and `$a7` for the number; it intentionally does not
 /// claim `nomem` because the kernel may access caller-provided memory.
-unsafe fn syscall3(number: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
+unsafe fn syscall6(
+    number: usize,
+    arg0: usize,
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    arg4: usize,
+    arg5: usize,
+) -> isize {
     let ret: isize;
     // SAFETY: the caller upholds the raw syscall argument contract documented above,
     // and this target-specific block names the Linux LA64 syscall ABI registers.
@@ -145,6 +176,9 @@ unsafe fn syscall3(number: usize, arg0: usize, arg1: usize, arg2: usize) -> isiz
             inlateout("$a0") arg0 => ret,
             in("$a1") arg1,
             in("$a2") arg2,
+            in("$a3") arg3,
+            in("$a4") arg4,
+            in("$a5") arg5,
             in("$a7") number,
             options(nostack)
         );
@@ -156,7 +190,7 @@ unsafe fn syscall3(number: usize, arg0: usize, arg1: usize, arg2: usize) -> isiz
 fn write(bytes: &[u8]) -> isize {
     // SAFETY: `bytes` is readable for exactly `len` bytes and remains live until the
     // synchronous write returns. fd 1 and the length are scalar SYS_WRITE arguments.
-    unsafe { syscall3(SYS_WRITE, 1, bytes.as_ptr() as usize, bytes.len()) }
+    unsafe { syscall6(SYS_WRITE, 1, bytes.as_ptr() as usize, bytes.len(), 0, 0, 0) }
 }
 
 #[inline(always)]
@@ -164,7 +198,7 @@ fn exit(code: usize) -> ! {
     // SAFETY: SYS_EXIT consumes only the scalar exit code; its other raw arguments are
     // ignored. If a defective kernel returns, the fallback loop preserves `!`.
     unsafe {
-        let _ = syscall3(SYS_EXIT, code, 0, 0);
+        let _ = syscall6(SYS_EXIT, code, 0, 0, 0, 0, 0);
     }
     loop {
         core::hint::spin_loop();
@@ -241,7 +275,7 @@ pub extern "C" fn _start() -> ! {
 
     // SAFETY: SYS_GETPID has no pointer arguments; all three raw argument slots are
     // ignored, and the returned scalar is checked before use.
-    let pid = unsafe { syscall3(SYS_GETPID, 0, 0, 0) };
+    let pid = unsafe { syscall6(SYS_GETPID, 0, 0, 0, 0, 0, 0) };
     if pid <= 0 {
         fail(USER_FAIL_GETPID, 103);
     }
@@ -249,28 +283,125 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_WRITE, 104);
     }
 
+    let mut source_pipe = [-1_i32; 2];
+    let mut destination_pipe = [-1_i32; 2];
+    // SAFETY: each pipe array is uniquely borrowed and writable for two i32 values
+    // until its synchronous SYS_PIPE2 call returns; flags and unused slots are scalar.
+    if unsafe {
+        syscall6(
+            SYS_PIPE2,
+            source_pipe.as_mut_ptr() as usize,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    } != 0
+        || unsafe {
+            syscall6(
+                SYS_PIPE2,
+                destination_pipe.as_mut_ptr() as usize,
+                0,
+                0,
+                0,
+                0,
+                0,
+            )
+        } != 0
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 105);
+    }
+    const SPLICE_PAYLOAD: &[u8; 12] = b"splice-smoke";
+    // SAFETY: the pipe descriptor is a scalar and the static payload remains readable
+    // for its complete length until the synchronous write returns.
+    if unsafe {
+        syscall6(
+            SYS_WRITE,
+            source_pipe[1] as usize,
+            SPLICE_PAYLOAD.as_ptr() as usize,
+            SPLICE_PAYLOAD.len(),
+            0,
+            0,
+            0,
+        )
+    } != SPLICE_PAYLOAD.len() as isize
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 106);
+    }
+    // SAFETY: both offsets are null by contract, descriptors and flags are scalars,
+    // and the requested length is bounded by the bytes already present in source_pipe.
+    if unsafe {
+        syscall6(
+            SYS_SPLICE,
+            source_pipe[0] as usize,
+            0,
+            destination_pipe[1] as usize,
+            0,
+            SPLICE_PAYLOAD.len(),
+            0,
+        )
+    } != SPLICE_PAYLOAD.len() as isize
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 107);
+    }
+    let mut spliced = [0_u8; SPLICE_PAYLOAD.len()];
+    // SAFETY: `spliced` is uniquely borrowed and writable for its complete length
+    // until the synchronous pipe read returns; the descriptor is a scalar.
+    if unsafe {
+        syscall6(
+            SYS_READ,
+            destination_pipe[0] as usize,
+            spliced.as_mut_ptr() as usize,
+            spliced.len(),
+            0,
+            0,
+            0,
+        )
+    } != spliced.len() as isize
+        || spliced != *SPLICE_PAYLOAD
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 108);
+    }
+    for fd in [
+        source_pipe[0],
+        source_pipe[1],
+        destination_pipe[0],
+        destination_pipe[1],
+    ] {
+        // SAFETY: each fd was returned by SYS_PIPE2, is closed exactly once here, and
+        // SYS_CLOSE ignores the remaining scalar argument slots.
+        if unsafe { syscall6(SYS_CLOSE, fd as usize, 0, 0, 0, 0, 0) } != 0 {
+            fail(USER_FAIL_SPLICE_PIPE, 109);
+        }
+    }
+    if write(ASSERT_SPLICE_PIPE) != ASSERT_SPLICE_PIPE.len() as isize {
+        fail(USER_FAIL_WRITE, 110);
+    }
+
     let mut uts = UtsName::zeroed();
     // SAFETY: `uts` is a live, uniquely borrowed, writable `repr(C)` Linux utsname
     // buffer for the duration of SYS_UNAME; no Rust reference observes it until the
     // synchronous syscall returns. The remaining argument slots are ignored.
-    let uname_result = unsafe { syscall3(SYS_UNAME, &mut uts as *mut UtsName as usize, 0, 0) };
+    let uname_result =
+        unsafe { syscall6(SYS_UNAME, &mut uts as *mut UtsName as usize, 0, 0, 0, 0, 0) };
     if uname_result != 0 {
-        fail(USER_FAIL_UNAME, 105);
+        fail(USER_FAIL_UNAME, 111);
     }
     if !c_field_equals(&uts.sysname, b"Linux") {
-        fail(USER_FAIL_SYSNAME, 106);
+        fail(USER_FAIL_SYSNAME, 112);
     }
     if write(ASSERT_UNAME_SYSNAME) != ASSERT_UNAME_SYSNAME.len() as isize {
-        fail(USER_FAIL_WRITE, 107);
+        fail(USER_FAIL_WRITE, 113);
     }
     if !c_field_equals(&uts.machine, EXPECTED_MACHINE) {
-        fail(USER_FAIL_MACHINE, 108);
+        fail(USER_FAIL_MACHINE, 114);
     }
     if write(ASSERT_UNAME_MACHINE) != ASSERT_UNAME_MACHINE.len() as isize {
-        fail(USER_FAIL_WRITE, 109);
+        fail(USER_FAIL_WRITE, 115);
     }
     if write(USER_PASS) != USER_PASS.len() as isize {
-        fail(USER_FAIL_WRITE, 110);
+        fail(USER_FAIL_WRITE, 116);
     }
     exit(0)
 }

@@ -3,6 +3,7 @@ PR3_SMOKE_V1 USER_START arch=riscv64
 PR3_SMOKE_V1 ASSERT write PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT uname_sysname PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT uname_machine PASS arch=riscv64
 PR3_SMOKE_V1 USER_PASS arch=riscv64
