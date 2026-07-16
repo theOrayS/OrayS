@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: independent review passed; final-head gates and authorized push pending
+- State: follow-up review passed; documentation-head gates and authorized push pending
 - Branch: `stabilize/post-integration-gates-20260716`
 - Authoritative base: `origin/integration/four-prs-20260715`
 - Base commit and initial HEAD: `09f4076ac151e0e7800103de724d9042230738b5`

@@ -10,7 +10,7 @@ authors:
 reviewers:
   - "Codex independent read-only reviewer (automated; not human PR owner)"
 base_commit: "09f4076ac151e0e7800103de724d9042230738b5"
-head_commit: "8301898911f34e847e7070f04988c704beaa751d"
+head_commit: "cbb3baf64ad0af5b4d6bb35b8e4d24f483abc314"
 evidence_commit: "9ec972f4eb06e7f50dcdec023d494b7e67c9a990"
 capability_domains:
   - "official-evidence"
@@ -236,6 +236,44 @@ capability_domains:
   远端状态没有变化。未尝试 force-push、旁路执行或修改 `main`；等待明确授权时继续
   完成所有本地 final-head 验证。
 
+## 2026-07-16 — Checkpoint 6：final-head 门禁、首次失败与根因重跑
+
+- review/closure 文档提交后的受测 HEAD 为
+  `cbb3baf64ad0af5b4d6bb35b8e4d24f483abc314`。所有下述 runner 都在开始与结束时
+  精确报告该 commit、`runner_dirty == false` 和 stable provenance。
+- final quick：45/45/45 planned/executed/completed，45 PASS、其余状态为 0，退出码 0，
+  用时 289.222 s；summary SHA-256 为
+  `b225634a64562c1f36033984074b5a753fef3e06844106241af1606d29948f4b`。
+- final baseline 首次运行没有使用先前验证过的工具 prefix，因而诚实结束为
+  `INFRA_ERROR`：57 planned、56 executed、57 completed，54 PASS、2 FAIL、
+  1 INFRA_ERROR，退出码 2，用时 714.663 s；summary SHA-256 为
+  `696d1646d0a4f24c71b5f967eb63d1a559ebc562f2b84d1203de6588dfa732d9`。
+- 首次失败明细：`evidence.riscv64` 解析到系统 QEMU 6.2，而 manifest 要求 QEMU
+  9.2.4，因此 required smoke 为 BLOCKED、该 case 为 FAIL；`evidence.aggregate` 仅派生
+  FAIL。`baseline.clippy_loongarch64` 解析到 clang 14，其 LoongArch target capability
+  probe 返回 1，故主体命令未执行并严格记为 INFRA_ERROR。LA evidence、两个 kernel
+  build、submission build、workspace 73 tests 及其余已执行项均保留真实结果。
+- 诊断先独立复核既有 QEMU 9.2.4 与 clang 21：两架构 QEMU、`qemu-img`、clang 的
+  SHA-256 均与 Checkpoint 4 一致；两架构 QEMU 的版本首行均为 9.2.4，clang 21 的空
+  LoongArch translation-unit probe 返回 0。该根因属于 invocation prerequisite 选择，
+  没有修改产品、runner、manifest、工具二进制或失败分类代码。
+- 随后以显式
+  `PATH=<qemu-9.2.4-prefix>/bin:<llvm-21-prefix>/bin:$PATH` 写入独立输出目录重跑完整
+  baseline。该次为 57/57/57 planned/executed/completed，57 PASS、其余状态为 0，
+  退出码 0，用时 708.662 s；summary SHA-256 为
+  `886c87df1bc39e8f50c057936a06939b75eea9e1f87c70cbe56725a97bd7ae4b`。
+  summary 的 required-command provenance 精确指向 QEMU 9.2.4 和 clang 21。
+- 第二次 PASS 不覆盖首次 `INFRA_ERROR`；两份 summary 与逐项日志位于不同忽略目录，
+  本日志同时保留首次失败、根因和重跑结果。此事件是可解释的错误工具选择，不记为
+  产品 PASS，也不记作未解释 flake。
+- 门禁后再次确认两官方镜像哈希仍精确等于合同值，未发现 `sdcard-*.run.qcow2`；
+  worktree clean，完整 `base..HEAD` diff check 通过，远端权威基线仍为 `09f4076a…`，
+  同名稳定化分支仍不存在。
+- 独立 follow-up reviewer 在本 checkpoint 写入前正确报告 1 Major：上述 final-head
+  三份 summary 尚未进入 tracked 开发日志。当前 checkpoint 专门补齐命令、退出码、
+  计数、哈希、首次失败和根因；修复后的只读复核结论为 0 Blocker / 0 Major /
+  0 Minor / 0 Nit，不能沿用修复前的结论代替本次复核。
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -269,6 +307,15 @@ capability_domains:
 | 05:29:33–06:49:17 | `python3 test/run_suite.py --profile official --arch rv --output-dir test/output/goala-9ec972f4-official-rv-1` | 1 | FAIL（仅语义） | 24/24/24 groups；2544/2544/2544 cases；0 error、115 failure；4784.534 s | `test/output/goala-9ec972f4-official-rv-1/` / `ace51a9e6ec217d55276c1f98caec2722eb94fa63b2d24a07dc020e55b35933b` |
 | 06:51:14–08:07:46 | `python3 test/run_suite.py --profile official --arch la --output-dir test/output/goala-9ec972f4-official-la-1` | 1 | FAIL（仅语义） | 24/24/24 groups；2544/2544/2544 cases；0 error、159 failure；4591.489 s | `test/output/goala-9ec972f4-official-la-1/` / `090d3fc3a6127da0937d2b08ee7ba6f4a39d1887e054de88c8d6c607a7ef6658` |
 
+final-head closure 验证如下。首次 baseline 的非 PASS 被完整保留；第二次运行使用经哈希
+和 capability probe 验证的必需工具 prefix，不修改任何产品或测试文件。
+
+| UTC 时间 | 命令 | 退出码 | 结果 | 计数与耗时 | 忽略的证据目录 / summary SHA-256 |
+|---|---|---:|---|---|---|
+| 08:28:41–08:33:31 | `python3 test/run_suite.py --profile quick --output-dir test/output/goala-cbb3baf6-final-quick-1` | 0 | PASS | 45/45/45；45 PASS；289.222 s | `test/output/goala-cbb3baf6-final-quick-1/` / `b225634a64562c1f36033984074b5a753fef3e06844106241af1606d29948f4b` |
+| 08:33:48–08:45:42 | `python3 test/run_suite.py --profile baseline --output-dir test/output/goala-cbb3baf6-final-baseline-1` | 2 | INFRA_ERROR | 57/56/57；54 PASS、2 FAIL、1 INFRA_ERROR；714.663 s | `test/output/goala-cbb3baf6-final-baseline-1/` / `696d1646d0a4f24c71b5f967eb63d1a559ebc562f2b84d1203de6588dfa732d9` |
+| 08:47:15–08:59:04 | `PATH=<qemu-9.2.4-prefix>/bin:<llvm-21-prefix>/bin:$PATH python3 test/run_suite.py --profile baseline --output-dir test/output/goala-cbb3baf6-final-baseline-2` | 0 | PASS | 57/57/57；57 PASS；708.662 s | `test/output/goala-cbb3baf6-final-baseline-2/` / `886c87df1bc39e8f50c057936a06939b75eea9e1f87c70cbe56725a97bd7ae4b` |
+
 official 运行显式设置 `$RV_TESTSUITE_IMG` / `$LA_TESTSUITE_IMG` 为 workspace 父目录的
 对应只读镜像，并将 `QEMU_PREFIX` 指向临时 QEMU 9.2.4 prefix。RV 原始 stdout/stderr
 SHA-256 分别为
@@ -294,10 +341,12 @@ guest 语义失败，不是结构、identity、parser、runner、镜像或 QEMU 
 - [x] 独立 reviewer 的 blocker/major finding 已清零。
 - [ ] 人工 PR 负责人能够不依赖 AI 解释和调试本 PR。
 
-审查人及结论：独立 Codex 只读 reviewer（自动化、非人工 PR 负责人）审查已审候选
-`8301898911f34e847e7070f04988c704beaa751d`，结论 0 Blocker / 0 Major / 1 Minor /
-0 Nit，Goal A 独立 review 门禁满足。Minor 已通过区分 `head_commit` 与
-`evidence_commit` 处理；最终文档 delta 与 final-head gate 仍需同一 reviewer 复核。
+审查人及结论：独立 Codex 只读 reviewer（自动化、非人工 PR 负责人）初审候选
+`8301898911f34e847e7070f04988c704beaa751d` 为 0 Blocker / 0 Major / 1 Minor / 0 Nit；
+Minor 已通过区分 `head_commit` 与 `evidence_commit` 处理。follow-up reviewer 对
+`cbb3baf6…` 的代码和三份 final-head summary 未发现实现问题，但因这些结果尚未写入
+tracked 日志而给出 1 Major；Checkpoint 6 补齐记录后，reviewer 复核为 0 Blocker /
+0 Major / 0 Minor / 0 Nit，Goal A 独立 review 门禁满足。
 
 # 9. 已知限制、后续工作与回滚
 
@@ -321,6 +370,8 @@ push。到达终态后停止，不自动进入语义修复。
 # 10. 最终摘要
 
 实现提交上的 Goal A canonical evidence 已收集完成：quick/baseline 明确 PASS，两个
-official 均完整、零基础设施错误并真实为语义 FAIL，镜像未变且 overlay 已清理；独立
-只读 review 已为 0 Blocker / 0 Major。当前只剩最终文档 delta 复核、final-head clean
-quick/baseline 和经明确授权的普通 push；尚未声明 Goal A 终态，也未开始 Goal B。
+official 均完整、零基础设施错误并真实为语义 FAIL，镜像未变且 overlay 已清理。文档
+closure HEAD 的 quick 明确 PASS；首次 baseline 因错误系统工具选择为 INFRA_ERROR 并已
+完整记录，显式使用已验证 QEMU 9.2.4/clang 21 的独立重跑为 57/57 PASS；日志修复的
+follow-up review 为 0 Blocker / 0 Major。当前只剩最终 documentation-only HEAD 门禁和
+经明确授权的普通 push；尚未声明 Goal A 终态，也未开始 Goal B。
