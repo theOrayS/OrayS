@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: `IN_PROGRESS`
+- State: `READY_FOR_SEMANTIC_FIX`
 - Branch: `stabilize/post-integration-gates-20260716`
 - Authoritative base: `origin/integration/four-prs-20260715`
 - Base commit and initial HEAD: `09f4076ac151e0e7800103de724d9042230738b5`
@@ -127,11 +127,11 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 
 ### Phase 5 — independent review and terminal state
 
-- [ ] Obtain an independent read-only review of the remediated final diff and evidence.
+- [x] Obtain an independent read-only review of the remediated final diff and evidence.
 - [x] Resolve the late blocker/major findings and rerun affected validation.
-- [ ] Complete the development log, AI disclosure, risks, and rollback record.
-- [ ] Push only `stabilize/post-integration-gates-20260716` normally.
-- [ ] Declare exactly one Goal A terminal state and stop before Goal B.
+- [x] Complete the development log, AI disclosure, risks, and rollback record.
+- [x] Push only `stabilize/post-integration-gates-20260716` normally.
+- [x] Declare exactly one Goal A terminal state and stop before Goal B.
 
 ### Phase 6 — late review remediation
 
@@ -143,7 +143,7 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
   that truncated/malformed output remains `INFRA_ERROR`.
 - [x] Rerun focused, quick, baseline, fresh RV official, and fresh LA official
   on the corrected clean candidate.
-- [ ] Obtain independent read-only review on the exact evidence candidate and
+- [x] Obtain independent read-only review on the exact evidence candidate and
   resolve any new blocker/major findings.
 
 ## Risks and mitigations
