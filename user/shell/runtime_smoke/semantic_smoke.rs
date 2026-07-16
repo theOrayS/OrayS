@@ -19,6 +19,13 @@ const SYS_EXIT: usize = 93;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
 
+const NEG_EBADF: isize = -9;
+const NEG_EAGAIN: isize = -11;
+const NEG_EINVAL: isize = -22;
+const NEG_ESPIPE: isize = -29;
+const O_NONBLOCK: usize = 0o4000;
+const SPLICE_F_NONBLOCK: usize = 0x02;
+
 #[cfg(target_arch = "riscv64")]
 const USER_START: &[u8] = b"PR3_SMOKE_V1 USER_START arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -111,12 +118,13 @@ impl UtsName {
 /// # Safety
 ///
 /// `number` must identify a syscall whose six raw arguments have the layouts
-/// supplied in `arg0..=arg5`. Any pointer/length pair must remain valid with the
-/// syscall's required read or write access until `ecall` returns, and writable memory
-/// must not be aliased for the duration of the call. The caller must interpret the
-/// returned Linux value, including negative errno. This instruction binding uses
-/// `a0..a5` for arguments/return and `a7` for the number; it intentionally does not
-/// claim `nomem` because the kernel may access caller-provided memory.
+/// supplied in `arg0..=arg5`. A pointer may intentionally be invalid when exercising
+/// kernel rejection and errno precedence, but Rust must never dereference such a value;
+/// whenever the syscall is expected to access memory, the complete range must remain
+/// valid with the required access and writable memory must not be aliased until `ecall`
+/// returns. The caller must interpret the Linux return value, including negative errno.
+/// This instruction binding uses `a0..a5` for arguments/return and `a7` for the number;
+/// it intentionally does not claim `nomem` because the kernel may access caller memory.
 unsafe fn syscall6(
     number: usize,
     arg0: usize,
@@ -152,12 +160,14 @@ unsafe fn syscall6(
 /// # Safety
 ///
 /// `number` must identify a syscall whose six raw arguments have the layouts
-/// supplied in `arg0..=arg5`. Any pointer/length pair must remain valid with the
-/// syscall's required read or write access until `syscall 0` returns, and writable
-/// memory must not be aliased for the duration of the call. The caller must interpret
-/// the returned Linux value, including negative errno. This instruction binding uses
-/// `$a0..$a5` for arguments/return and `$a7` for the number; it intentionally does not
-/// claim `nomem` because the kernel may access caller-provided memory.
+/// supplied in `arg0..=arg5`. A pointer may intentionally be invalid when exercising
+/// kernel rejection and errno precedence, but Rust must never dereference such a value;
+/// whenever the syscall is expected to access memory, the complete range must remain
+/// valid with the required access and writable memory must not be aliased until
+/// `syscall 0` returns. The caller must interpret the Linux return value, including
+/// negative errno. This binding uses `$a0..$a5` for arguments/return and `$a7` for the
+/// number; it intentionally does not claim `nomem` because the kernel may access caller
+/// memory.
 unsafe fn syscall6(
     number: usize,
     arg0: usize,
@@ -191,6 +201,82 @@ fn write(bytes: &[u8]) -> isize {
     // SAFETY: `bytes` is readable for exactly `len` bytes and remains live until the
     // synchronous write returns. fd 1 and the length are scalar SYS_WRITE arguments.
     unsafe { syscall6(SYS_WRITE, 1, bytes.as_ptr() as usize, bytes.len(), 0, 0, 0) }
+}
+
+#[inline(always)]
+fn pipe2(pipe: &mut [i32; 2], flags: usize) -> isize {
+    // SAFETY: `pipe` is uniquely borrowed and writable for two i32 values until the
+    // synchronous syscall returns; flags and unused argument slots are scalar values.
+    unsafe {
+        syscall6(
+            SYS_PIPE2,
+            pipe.as_mut_ptr() as usize,
+            flags,
+            0,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn pipe_write(fd: i32, bytes: &[u8]) -> isize {
+    // SAFETY: `bytes` remains readable for its complete length until the synchronous
+    // syscall returns; the descriptor and unused argument slots are scalar values.
+    unsafe {
+        syscall6(
+            SYS_WRITE,
+            fd as usize,
+            bytes.as_ptr() as usize,
+            bytes.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn pipe_read(fd: i32, bytes: &mut [u8]) -> isize {
+    // SAFETY: `bytes` is uniquely borrowed and writable for its complete length until
+    // the synchronous syscall returns; no Rust reference observes it during the call.
+    unsafe {
+        syscall6(
+            SYS_READ,
+            fd as usize,
+            bytes.as_mut_ptr() as usize,
+            bytes.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn splice(fd_in: i32, fd_out: i32, len: usize, flags: usize) -> isize {
+    // SAFETY: both offset pointers are null by contract, descriptors/length/flags are
+    // scalars, and the kernel validates descriptor direction and available data.
+    unsafe {
+        syscall6(
+            SYS_SPLICE,
+            fd_in as usize,
+            0,
+            fd_out as usize,
+            0,
+            len,
+            flags,
+        )
+    }
+}
+
+#[inline(always)]
+fn close(fd: i32) -> isize {
+    // SAFETY: SYS_CLOSE consumes only the scalar descriptor and ignores the remaining
+    // argument slots. Callers ensure each successfully installed descriptor is closed
+    // at most once in the success path.
+    unsafe { syscall6(SYS_CLOSE, fd as usize, 0, 0, 0, 0, 0) }
 }
 
 #[inline(always)]
@@ -283,100 +369,181 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_WRITE, 104);
     }
 
-    let mut source_pipe = [-1_i32; 2];
-    let mut destination_pipe = [-1_i32; 2];
-    // SAFETY: each pipe array is uniquely borrowed and writable for two i32 values
-    // until its synchronous SYS_PIPE2 call returns; flags and unused slots are scalar.
+    // Linux resolves a zero-length splice before flags, descriptors, or user offsets.
+    // The deliberately invalid scalar pointer values must therefore never be touched.
+    // SAFETY: no Rust pointer is constructed or dereferenced; this call intentionally
+    // supplies invalid raw values to verify that the zero-length ABI returns first.
     if unsafe {
         syscall6(
-            SYS_PIPE2,
-            source_pipe.as_mut_ptr() as usize,
+            SYS_SPLICE,
+            usize::MAX,
+            1,
+            usize::MAX,
+            1,
             0,
-            0,
-            0,
-            0,
-            0,
+            usize::MAX,
         )
     } != 0
-        || unsafe {
-            syscall6(
-                SYS_PIPE2,
-                destination_pipe.as_mut_ptr() as usize,
-                0,
-                0,
-                0,
-                0,
-                0,
-            )
-        } != 0
     {
         fail(USER_FAIL_SPLICE_PIPE, 105);
     }
-    const SPLICE_PAYLOAD: &[u8; 12] = b"splice-smoke";
-    // SAFETY: the pipe descriptor is a scalar and the static payload remains readable
-    // for its complete length until the synchronous write returns.
-    if unsafe {
-        syscall6(
-            SYS_WRITE,
-            source_pipe[1] as usize,
-            SPLICE_PAYLOAD.as_ptr() as usize,
-            SPLICE_PAYLOAD.len(),
-            0,
-            0,
-            0,
-        )
-    } != SPLICE_PAYLOAD.len() as isize
-    {
+
+    let mut source_pipe = [-1_i32; 2];
+    let mut destination_pipe = [-1_i32; 2];
+    if pipe2(&mut source_pipe, 0) != 0 || pipe2(&mut destination_pipe, 0) != 0 {
         fail(USER_FAIL_SPLICE_PIPE, 106);
     }
-    // SAFETY: both offsets are null by contract, descriptors and flags are scalars,
-    // and the requested length is bounded by the bytes already present in source_pipe.
+    const SPLICE_PAYLOAD: &[u8; 12] = b"splice-smoke";
+    if pipe_write(source_pipe[1], SPLICE_PAYLOAD) != SPLICE_PAYLOAD.len() as isize {
+        fail(USER_FAIL_SPLICE_PIPE, 107);
+    }
+
+    // fd acquisition precedes offset copying. An invalid input fd plus an invalid raw
+    // offset must report EBADF without dereferencing the offset.
+    // SAFETY: the raw value 1 is intentionally not a Rust pointer and must be rejected
+    // before access because fd_in is invalid; all other arguments are bounded scalars.
+    if unsafe {
+        syscall6(
+            SYS_SPLICE,
+            usize::MAX,
+            1,
+            destination_pipe[1] as usize,
+            0,
+            1,
+            0,
+        )
+    } != NEG_EBADF
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 108);
+    }
+
+    // Pipe offsets are rejected as ESPIPE before the kernel reads the pointed-to value.
+    // SAFETY: the deliberately invalid raw offset is never made into a Rust reference;
+    // the live pipe endpoint requires the kernel to reject it before user-memory access.
     if unsafe {
         syscall6(
             SYS_SPLICE,
             source_pipe[0] as usize,
-            0,
+            1,
             destination_pipe[1] as usize,
             0,
-            SPLICE_PAYLOAD.len(),
+            1,
             0,
         )
-    } != SPLICE_PAYLOAD.len() as isize
+    } != NEG_ESPIPE
     {
-        fail(USER_FAIL_SPLICE_PIPE, 107);
+        fail(USER_FAIL_SPLICE_PIPE, 109);
     }
-    let mut spliced = [0_u8; SPLICE_PAYLOAD.len()];
-    // SAFETY: `spliced` is uniquely borrowed and writable for its complete length
-    // until the synchronous pipe read returns; the descriptor is a scalar.
-    if unsafe {
-        syscall6(
-            SYS_READ,
-            destination_pipe[0] as usize,
-            spliced.as_mut_ptr() as usize,
-            spliced.len(),
-            0,
-            0,
-            0,
-        )
-    } != spliced.len() as isize
-        || spliced != *SPLICE_PAYLOAD
-    {
-        fail(USER_FAIL_SPLICE_PIPE, 108);
+
+    if splice(source_pipe[1], destination_pipe[1], 1, 0) != NEG_EBADF {
+        fail(USER_FAIL_SPLICE_PIPE, 110);
     }
-    for fd in [
+
+    // Different descriptors can still identify the same pipe backing object. The
+    // rejected transfer must leave the source bytes available for the valid splice.
+    if splice(
         source_pipe[0],
         source_pipe[1],
-        destination_pipe[0],
+        SPLICE_PAYLOAD.len(),
+        0,
+    ) != NEG_EINVAL
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 111);
+    }
+    if splice(
+        source_pipe[0],
         destination_pipe[1],
-    ] {
-        // SAFETY: each fd was returned by SYS_PIPE2, is closed exactly once here, and
-        // SYS_CLOSE ignores the remaining scalar argument slots.
-        if unsafe { syscall6(SYS_CLOSE, fd as usize, 0, 0, 0, 0, 0) } != 0 {
-            fail(USER_FAIL_SPLICE_PIPE, 109);
+        SPLICE_PAYLOAD.len(),
+        0,
+    ) != SPLICE_PAYLOAD.len() as isize
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 112);
+    }
+    let mut spliced = [0_u8; SPLICE_PAYLOAD.len()];
+    if pipe_read(destination_pipe[0], &mut spliced) != spliced.len() as isize
+        || spliced != *SPLICE_PAYLOAD
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 113);
+    }
+
+    // Close both destination descriptors, install a replacement pipe (which may reuse
+    // either fd number), and prove the next transfer uses the newly installed objects.
+    if close(destination_pipe[0]) != 0 || close(destination_pipe[1]) != 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 114);
+    }
+    destination_pipe = [-1; 2];
+    if pipe2(&mut destination_pipe, 0) != 0
+        || pipe_write(source_pipe[1], SPLICE_PAYLOAD) != SPLICE_PAYLOAD.len() as isize
+        || splice(
+            source_pipe[0],
+            destination_pipe[1],
+            SPLICE_PAYLOAD.len(),
+            0,
+        ) != SPLICE_PAYLOAD.len() as isize
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 115);
+    }
+    spliced = [0; SPLICE_PAYLOAD.len()];
+    if pipe_read(destination_pipe[0], &mut spliced) != spliced.len() as isize
+        || spliced != *SPLICE_PAYLOAD
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 116);
+    }
+    for fd in source_pipe.into_iter().chain(destination_pipe) {
+        if close(fd) != 0 {
+            fail(USER_FAIL_SPLICE_PIPE, 117);
+        }
+    }
+
+    // A nonblocking splice into a full pipe must not consume its source. Filling the
+    // destination through its normal writer exercises capacity contention without a
+    // timing-dependent race; the subsequent source read proves byte preservation.
+    let mut preserved_source = [-1_i32; 2];
+    let mut full_destination = [-1_i32; 2];
+    if pipe2(&mut preserved_source, 0) != 0
+        || pipe2(&mut full_destination, O_NONBLOCK) != 0
+        || pipe_write(preserved_source[1], SPLICE_PAYLOAD) != SPLICE_PAYLOAD.len() as isize
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 118);
+    }
+    let fill = [0x5a_u8; 512];
+    let mut filled = 0usize;
+    loop {
+        let result = pipe_write(full_destination[1], &fill);
+        if result > 0 {
+            filled = filled.saturating_add(result as usize);
+            if filled > 1024 * 1024 {
+                fail(USER_FAIL_SPLICE_PIPE, 119);
+            }
+        } else if result == NEG_EAGAIN {
+            break;
+        } else {
+            fail(USER_FAIL_SPLICE_PIPE, 120);
+        }
+    }
+    if filled == 0
+        || splice(
+            preserved_source[0],
+            full_destination[1],
+            SPLICE_PAYLOAD.len(),
+            SPLICE_F_NONBLOCK,
+        ) != NEG_EAGAIN
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 121);
+    }
+    let mut preserved = [0_u8; SPLICE_PAYLOAD.len()];
+    if pipe_read(preserved_source[0], &mut preserved) != preserved.len() as isize
+        || preserved != *SPLICE_PAYLOAD
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 122);
+    }
+    for fd in preserved_source.into_iter().chain(full_destination) {
+        if close(fd) != 0 {
+            fail(USER_FAIL_SPLICE_PIPE, 123);
         }
     }
     if write(ASSERT_SPLICE_PIPE) != ASSERT_SPLICE_PIPE.len() as isize {
-        fail(USER_FAIL_WRITE, 110);
+        fail(USER_FAIL_WRITE, 124);
     }
 
     let mut uts = UtsName::zeroed();
@@ -386,22 +553,22 @@ pub extern "C" fn _start() -> ! {
     let uname_result =
         unsafe { syscall6(SYS_UNAME, &mut uts as *mut UtsName as usize, 0, 0, 0, 0, 0) };
     if uname_result != 0 {
-        fail(USER_FAIL_UNAME, 111);
+        fail(USER_FAIL_UNAME, 125);
     }
     if !c_field_equals(&uts.sysname, b"Linux") {
-        fail(USER_FAIL_SYSNAME, 112);
+        fail(USER_FAIL_SYSNAME, 126);
     }
     if write(ASSERT_UNAME_SYSNAME) != ASSERT_UNAME_SYSNAME.len() as isize {
-        fail(USER_FAIL_WRITE, 113);
+        fail(USER_FAIL_WRITE, 127);
     }
     if !c_field_equals(&uts.machine, EXPECTED_MACHINE) {
-        fail(USER_FAIL_MACHINE, 114);
+        fail(USER_FAIL_MACHINE, 128);
     }
     if write(ASSERT_UNAME_MACHINE) != ASSERT_UNAME_MACHINE.len() as isize {
-        fail(USER_FAIL_WRITE, 115);
+        fail(USER_FAIL_WRITE, 129);
     }
     if write(USER_PASS) != USER_PASS.len() as isize {
-        fail(USER_FAIL_WRITE, 116);
+        fail(USER_FAIL_WRITE, 130);
     }
     exit(0)
 }
