@@ -106,7 +106,7 @@ python3 -I -S -B -X pycache_prefix=/dev/null /absolute/path/to/worktree/test/run
 | Profile | Contents | Architecture argument |
 | --- | --- | --- |
 | `checks` | All 19 registered static/structural guards | none |
-| `unit` | All 26 Python unit scripts with 681 exact-counted methods | none |
+| `unit` | All 26 Python unit scripts with 689 exact-counted methods | none |
 | `quick` | `checks` followed by `unit` (45 planned cases) | none |
 | `evidence-host` | One fail-closed PR3 host evidence shard | none |
 | `evidence-runtime` | One fixed build plus repository-contained ABI smoke shard | required: `rv` or `la` |
@@ -231,9 +231,11 @@ The canonical validator binds output to exact tracked plans:
 - LTP musl and glibc must each execute exactly 1000 unique cases in the exact
   order read from tracked `user/shell/src/cmd.rs::LTP_STABLE_CASES`, with one
   complete START/RUN/RESULT/END lifecycle per identity;
-- BusyBox musl and glibc must each emit exactly 55 ordered terminal records that
-  match `test/evaluation/official_case_plan.json`; duplicate identities,
-  invented identities, missing rows, reordering, or any failure is non-passing;
+- BusyBox musl and glibc must each emit exactly 55 ordered START/RESULT/END
+  frames whose one-based execution ordinals and command payloads match
+  `test/evaluation/official_case_plan.json`; replayed ordinals, duplicate
+  explicit IDs, invented identities, missing rows, reordering, malformed or
+  incomplete frames, and any semantic failure are all non-passing;
 - libctest musl and glibc must each execute exactly 217 unique ordered
   `(binary, case)` identities from that same tracked plan, with paired
   start/result/end records and one exact summary;
@@ -249,13 +251,15 @@ the RV/LA musl/glibc source files, reviewing identity/count changes, and rerunni
 the parser mutation tests. The plan must never be edited merely to make one log
 pass.
 
-Known BusyBox identity blocker: the tracked 2026-07-14 RV/LA image snapshot has
-55 executable rows but only 54 unique identities because
-`echo "bbbbbbb" >> test.txt` appears twice. The validator intentionally rejects
-the duplicate. Therefore these images cannot produce canonical official PASS
-even if every command reports success. The external testcase plan/image must be
-corrected and then consciously re-snapshotted; weakening duplicate-ID detection
-or inventing a replacement identity would be a false result.
+BusyBox command text is evidence payload, not a unique identity. The tracked
+2026-07-14 RV/LA snapshot has 55 executable ordered rows and 54 distinct command
+strings because `echo "bbbbbbb" >> test.txt` is an intentional state-mutating
+step at ordinals 37 and 41. Those are two valid cases. The producer derives the
+ordinal from actual non-empty execution order, and the parser independently
+checks ordinal, payload, plan order, and frame completion. A replay of the same
+ordinal or a duplicate explicit plan ID still fails closed. Legacy text-only
+records remain useful for forensic replay but are structurally noncanonical and
+cannot produce official PASS.
 
 ### LTP-only promotion review
 

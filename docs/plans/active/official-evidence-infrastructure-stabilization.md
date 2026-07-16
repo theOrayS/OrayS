@@ -82,28 +82,28 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 
 ### Phase 1 — protocol and plan contract
 
-- [ ] Add structured ordered BusyBox identities to the trusted plan.
-- [ ] Emit stable row identity from the shell producer without changing command
+- [x] Add structured ordered BusyBox identities to the trusted plan.
+- [x] Emit stable row identity from the shell producer without changing command
   execution semantics.
-- [ ] Update parser and failure reporting for the structured protocol.
-- [ ] Keep legacy ambiguous records fail-closed.
+- [x] Update parser and failure reporting for the structured protocol.
+- [x] Keep legacy ambiguous records fail-closed.
 
 ### Phase 2 — regression coverage
 
-- [ ] Accept repeated command text at distinct ordinals.
-- [ ] Reject duplicate explicit IDs.
-- [ ] Reject duplicate frame replay, missing/extra/order drift, malformed
+- [x] Accept repeated command text at distinct ordinals.
+- [x] Reject duplicate explicit IDs.
+- [x] Reject duplicate frame replay, missing/extra/order drift, malformed
   identities, unknown groups, and incomplete accounting.
-- [ ] Prove identity rules are architecture- and libc-independent.
-- [ ] Prove semantic `FAIL` is not reclassified as infrastructure `ERROR` once
+- [x] Prove identity rules are architecture- and libc-independent.
+- [x] Prove semantic `FAIL` is not reclassified as infrastructure `ERROR` once
   identity evidence is valid.
-- [ ] Update manifest counts and integrity inventories exactly.
+- [x] Update manifest counts and integrity inventories exactly.
 
 ### Phase 3 — focused and clean validation
 
-- [ ] Run focused parser/runner/reporter/static-guard tests.
-- [ ] Run mutation-style negative cases.
-- [ ] Run `git diff --check` and inspect the complete diff.
+- [x] Run focused parser/runner/reporter/static-guard tests.
+- [x] Run mutation-style negative cases.
+- [x] Run `git diff --check` and inspect the complete diff.
 - [ ] Commit reviewable protocol/test/documentation stages normally.
 - [ ] From a clean candidate commit, run canonical `quick` and `baseline`.
 

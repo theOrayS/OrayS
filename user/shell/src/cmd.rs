@@ -2721,11 +2721,14 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
     let chmod_args = busybox_path_wrapper_chmod_args(cwd);
     let commands = fs::read_to_string(&join_path(cwd, "busybox_cmd.txt"))
         .map_err(|err| format!("read busybox_cmd.txt failed: {err}"))?;
+    let mut case_ordinal = 0usize;
     for line in commands.lines() {
         let label_line = line.trim();
         if label_line.is_empty() {
             continue;
         }
+        case_ordinal += 1;
+        println!("#### OS COMP BUSYBOX CASE START ordinal={case_ordinal} ####");
         let exec_line = label_line.replace("./busybox", &busybox_path);
         let command = if exec_line.starts_with(&busybox_path) {
             format!("{busybox_path} chmod 755 {chmod_args}; PATH={cwd}:. {exec_line}")
@@ -2741,24 +2744,33 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
             BUSYBOX_CASE_TIMEOUT_SECS,
         ) {
             Ok(status) if expected_status.is_met_by(status) => {
-                println!("testcase busybox {label_line} success");
+                println!(
+                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=success command={label_line}"
+                );
             }
             Ok(status @ (137 | 143)) => {
-                println!("testcase busybox {label_line} fail");
+                println!(
+                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=fail command={label_line}"
+                );
                 println!("return: {status}, timeout: {BUSYBOX_CASE_TIMEOUT_SECS}s");
             }
             Ok(status) => {
-                println!("testcase busybox {label_line} fail");
+                println!(
+                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=fail command={label_line}"
+                );
                 println!("return: {status}, cmd: {label_line}");
             }
             Err(err) => {
-                println!("testcase busybox {label_line} fail");
+                println!(
+                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=fail command={label_line}"
+                );
                 if err.to_ascii_lowercase().contains("timeout") {
                     println!("timeout: {BUSYBOX_CASE_TIMEOUT_SECS}s");
                 }
                 println!("{err}");
             }
         }
+        println!("#### OS COMP BUSYBOX CASE END ordinal={case_ordinal} ####");
     }
     uspace::cleanup_user_processes();
     println!("#### OS COMP TEST GROUP END {label} ####");

@@ -155,6 +155,20 @@ class EvaluationFailureReportTest(unittest.TestCase):
         self.assertIn("LTP_SCOPE_COMPLETE_NOT_OFFICIAL_VERDICT", scoped_markdown)
         self.assertIn("NO_VISIBLE_FAILURE_UNVALIDATED", scoped_markdown)
 
+    def test_busybox_failure_report_preserves_ordinal_and_command(self) -> None:
+        report = self.parse(
+            "#### OS COMP TEST GROUP START busybox-musl ####\n"
+            "#### OS COMP BUSYBOX CASE START ordinal=7 ####\n"
+            "BUSYBOX CASE RESULT ordinal=7 status=fail command=false\n"
+            "#### OS COMP BUSYBOX CASE END ordinal=7 ####\n"
+            "#### OS COMP TEST GROUP END busybox-musl ####\n"
+        )
+        self.assertEqual(
+            report.busybox_failures,
+            ["busybox-musl: ordinal 7: false"],
+        )
+        self.assertIn("ordinal 7: false", reporter.render_markdown([report]))
+
     def test_cli_writes_report_for_clean_utf8_input(self) -> None:
         script = Path(__file__).parents[1] / "evaluation" / "report_evaluation_failures.py"
         with tempfile.TemporaryDirectory() as temporary:

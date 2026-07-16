@@ -1330,6 +1330,62 @@ class SuiteRunnerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("must be a positive integer", result.stderr)
 
+    def test_official_busybox_semantic_failure_and_replay_keep_distinct_statuses(self) -> None:
+        busybox_cases, _libctest_cases = runner_implementation.trusted_official_case_plan(
+            ROOT
+        )
+
+        def frame(case: Any, status: str = "success") -> str:
+            return "\n".join(
+                (
+                    f"#### OS COMP BUSYBOX CASE START ordinal={case.ordinal} ####",
+                    f"BUSYBOX CASE RESULT ordinal={case.ordinal} "
+                    f"status={status} command={case.command}",
+                    f"#### OS COMP BUSYBOX CASE END ordinal={case.ordinal} ####",
+                )
+            )
+
+        contract = {
+            "type": "official",
+            "expected_group_labels": ["busybox-musl"],
+            "expected_group_case_counts": {"busybox-musl": len(busybox_cases)},
+        }
+        case = fixture_case("fixture.official-busybox", contract=contract)
+        semantic_body = "\n".join(
+            frame(item, "fail" if item.ordinal == 1 else "success")
+            for item in busybox_cases
+        )
+        semantic_stdout = (
+            "#### OS COMP TEST GROUP START busybox-musl ####\n"
+            f"{semantic_body}\n"
+            "#### OS COMP TEST GROUP END busybox-musl ####\n"
+        )
+        status, _result, details = runner_implementation.parse_contract(
+            case, semantic_stdout, ""
+        )
+        self.assertEqual(status, "FAIL", details)
+        self.assertEqual(details["error_count"], 0, details)
+        self.assertEqual(details["planned_case_count"], len(busybox_cases))
+        self.assertEqual(details["executed_case_count"], len(busybox_cases))
+        self.assertEqual(details["completed_case_count"], len(busybox_cases))
+
+        replay_body = "\n".join(
+            [frame(busybox_cases[0]), *(frame(item) for item in busybox_cases)]
+        )
+        replay_stdout = (
+            "#### OS COMP TEST GROUP START busybox-musl ####\n"
+            f"{replay_body}\n"
+            "#### OS COMP TEST GROUP END busybox-musl ####\n"
+        )
+        replay_status, _replay_result, replay_details = (
+            runner_implementation.parse_contract(case, replay_stdout, "")
+        )
+        self.assertEqual(replay_status, "INFRA_ERROR", replay_details)
+        self.assertIn(
+            "busybox-duplicate-identity",
+            {finding["kind"] for finding in replay_details["errors"]},
+        )
+
     def test_unknown_profile_is_rejected(self) -> None:
         result = self.invoke(fixture_manifest([fixture_case()]), extra=["--profile", "unknown"])
         self.assertEqual(result.returncode, 2)

@@ -75,6 +75,7 @@ ARCH_ALIASES = {
     "loongarch": "la",
     "loongarch64": "la",
 }
+BUSYBOX_EXPLICIT_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]*")
 
 
 def infer_capture_arch_tokens(path: Path) -> set[str]:
@@ -267,9 +268,18 @@ def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+@dataclass(frozen=True)
+class BusyBoxCase:
+    """Stable identity and evidence payload for one ordered BusyBox command."""
+
+    ordinal: int
+    command: str
+    explicit_id: str | None = None
+
+
 def trusted_official_case_plan(
     repo: Path,
-) -> tuple[list[str], list[tuple[str, str]]]:
+) -> tuple[list[BusyBoxCase], list[tuple[str, str]]]:
     """Read exact BusyBox and libctest identities from the tracked snapshot."""
 
     path = repo / OFFICIAL_CASE_PLAN_RELATIVE_PATH
@@ -284,12 +294,12 @@ def trusted_official_case_plan(
     if not isinstance(payload, dict) or set(payload) != {
         "schema_version",
         "source_snapshot",
-        "busybox_rows",
+        "busybox_cases",
         "libctest_cases",
     }:
-        raise ValueError("official case plan must use the exact schema-v1 top-level fields")
-    if payload["schema_version"] != 1:
-        raise ValueError("official case plan schema_version must be 1")
+        raise ValueError("official case plan must use the exact schema-v2 top-level fields")
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 2:
+        raise ValueError("official case plan schema_version must be 2")
 
     snapshot = payload["source_snapshot"]
     snapshot_fields = {
@@ -334,17 +344,54 @@ def trusted_official_case_plan(
         ):
             raise ValueError(f"official case plan {field_name} must be a SHA-256 digest")
 
-    busybox_rows = payload["busybox_rows"]
-    if (
-        not isinstance(busybox_rows, list)
-        or any(not isinstance(row, str) or not row or row != row.strip() for row in busybox_rows)
-    ):
-        raise ValueError("official case plan busybox_rows must be non-empty trimmed strings")
-    if len(busybox_rows) != CANONICAL_OFFICIAL_CASE_COUNTS["busybox-musl"]:
+    raw_busybox_cases = payload["busybox_cases"]
+    if not isinstance(raw_busybox_cases, list):
+        raise ValueError("official case plan busybox_cases must be a list")
+    busybox_cases: list[BusyBoxCase] = []
+    explicit_ids: set[str] = set()
+    for index, entry in enumerate(raw_busybox_cases):
+        location = f"official case plan busybox_cases[{index}]"
+        if (
+            not isinstance(entry, dict)
+            or not {"ordinal", "command"} <= set(entry)
+            or not set(entry) <= {"ordinal", "command", "id"}
+        ):
+            raise ValueError(f"{location} has missing or unknown fields")
+        ordinal = entry["ordinal"]
+        if type(ordinal) is not int or ordinal != index + 1:
+            raise ValueError(
+                f"{location} ordinal must be the contiguous one-based value {index + 1}"
+            )
+        command = entry["command"]
+        if (
+            not isinstance(command, str)
+            or not command
+            or command != command.strip()
+            or "\n" in command
+            or "\r" in command
+            or first_unsupported_output_character(command) is not None
+        ):
+            raise ValueError(f"{location} command must be one non-empty trimmed safe line")
+        explicit_id = entry.get("id")
+        if explicit_id is not None:
+            if (
+                not isinstance(explicit_id, str)
+                or BUSYBOX_EXPLICIT_ID_RE.fullmatch(explicit_id) is None
+            ):
+                raise ValueError(f"{location} id is not a stable explicit ID")
+            if explicit_id in explicit_ids:
+                raise ValueError(
+                    f"official case plan has duplicate BusyBox explicit ID: {explicit_id}"
+                )
+            explicit_ids.add(explicit_id)
+        busybox_cases.append(BusyBoxCase(ordinal, command, explicit_id))
+
+    if len(busybox_cases) != CANONICAL_OFFICIAL_CASE_COUNTS["busybox-musl"]:
         raise ValueError("official case plan has the wrong BusyBox row count")
-    if snapshot["busybox_row_count"] != len(busybox_rows):
+    if snapshot["busybox_row_count"] != len(busybox_cases):
         raise ValueError("official case plan BusyBox row metadata does not match its rows")
-    if snapshot["busybox_unique_count"] != len(set(busybox_rows)):
+    busybox_commands = [case.command for case in busybox_cases]
+    if snapshot["busybox_unique_count"] != len(set(busybox_commands)):
         raise ValueError("official case plan BusyBox unique-count metadata is inconsistent")
 
     raw_libctest_cases = payload["libctest_cases"]
@@ -365,7 +412,7 @@ def trusted_official_case_plan(
         raise ValueError("official case plan libctest identities must be unique")
     if snapshot["libctest_case_count"] != len(libctest_cases):
         raise ValueError("official case plan libctest count metadata is inconsistent")
-    return busybox_rows, libctest_cases
+    return busybox_cases, libctest_cases
 GROUP_START_RE = re.compile(r"^#### OS COMP TEST GROUP START (.+?) ####$")
 GROUP_END_RE = re.compile(r"^#### OS COMP TEST GROUP END (.+?) ####$")
 OFFICIAL_PASS_RE = re.compile(r"^PASS OFFICIAL TEST GROUP\s+(.+?)\s*:\s*(-?\d+)\s*$")
@@ -400,7 +447,19 @@ LTP_TIMEOUT_EVENT_RE = re.compile(
     r"watchdog_expired|command_timed_out|timeout_error)\b",
     re.I,
 )
-BUSYBOX_RESULT_RE = re.compile(r"^testcase busybox\s+(.+?)\s+(success|fail)\s*$")
+BUSYBOX_CASE_START_RE = re.compile(
+    r"^#### OS COMP BUSYBOX CASE START ordinal=([1-9]\d*) ####$"
+)
+BUSYBOX_CASE_RESULT_RE = re.compile(
+    r"^BUSYBOX CASE RESULT ordinal=([1-9]\d*) "
+    r"status=(success|fail) command=(.+)$"
+)
+BUSYBOX_CASE_END_RE = re.compile(
+    r"^#### OS COMP BUSYBOX CASE END ordinal=([1-9]\d*) ####$"
+)
+BUSYBOX_LEGACY_RESULT_RE = re.compile(
+    r"^testcase busybox\s+(.+?)\s+(success|fail)\s*$"
+)
 LIBCTEST_START_RE = re.compile(r"^=+ START\s+(\S+)\s+(\S+)\s+=+$")
 LIBCTEST_END_RE = re.compile(r"^=+ END\s+(\S+)\s+(\S+)\s+=+$")
 LIBCTEST_FAIL_RE = re.compile(r"^FAIL libctest\s+(\S+)\s+(\S+)\s*:\s*(.+)\s*$")
@@ -514,7 +573,8 @@ TRUSTED_BUILD_STDERR_RE = re.compile(
 )
 RESULT_RECORD_RE = re.compile(
     r"\b(?:PASS|FAIL) OFFICIAL TEST GROUP|\b(?:PASS|FAIL) LTP CASE|"
-    r"\btestcase busybox\b.*\b(?:success|fail)\b|\bFAIL libctest\b|\bPass!\s*$",
+    r"\bBUSYBOX CASE RESULT\b|\btestcase busybox\b.*\b(?:success|fail)\b|"
+    r"\bFAIL libctest\b|\bPass!\s*$",
     re.I,
 )
 PROTOCOL_SIGNATURE_RE = re.compile(
@@ -522,6 +582,7 @@ PROTOCOL_SIGNATURE_RE = re.compile(
     r"(?:PASS|FAIL) OFFICIAL TEST GROUP|"
     r"\bltp case list:|\bltp cases:|"
     r"\bRUN LTP CASE\b|\b(?:PASS|FAIL) LTP CASE\b|"
+    r"OS COMP BUSYBOX CASE\s+(?:START|END)|\bBUSYBOX CASE RESULT\b|"
     r"\btestcase busybox\b|"
     r"=+\s+(?:START|END)\s+\S+\s+\S+\s+=+|"
     r"\bFAIL libctest\b|\blibctest cases:|\bPass!",
@@ -547,7 +608,10 @@ STRICT_PROTOCOL_PATTERNS = (
     ("ltp-result", LTP_RESULT_RE),
     ("ltp-end", LTP_END_RE),
     ("ltp-summary", LTP_SUMMARY_RE),
-    ("busybox-result", BUSYBOX_RESULT_RE),
+    ("busybox-start", BUSYBOX_CASE_START_RE),
+    ("busybox-result", BUSYBOX_CASE_RESULT_RE),
+    ("busybox-end", BUSYBOX_CASE_END_RE),
+    ("busybox-legacy-result", BUSYBOX_LEGACY_RESULT_RE),
     ("libctest-start", LIBCTEST_START_RE),
     ("libctest-end", LIBCTEST_END_RE),
     ("libctest-fail", LIBCTEST_FAIL_RE),
@@ -559,6 +623,7 @@ STRICT_PROTOCOL_PATTERNS = (
 class Group:
     label: str
     lines: list[str] = field(default_factory=list)
+    completed: bool = False
 
 
 def issue(kind: str, message: str, group: str | None = None) -> dict[str, str]:
@@ -947,8 +1012,10 @@ def _validate_ltp(
     return errors + failures, {
         "case_list_name": lists[0][0] if len(lists) == 1 else None,
         "planned_cases": planned,
+        "started_cases": len(starts),
         "executed_cases": len(all_cases),
         "result_cases": len(results),
+        "completed_cases": len(ends),
         "passed_cases": sum(code == 0 for _name, code in results),
         "failed_cases": sum(code != 0 for _name, code in results),
         "summary": (
@@ -971,53 +1038,247 @@ def _validate_ltp(
     }
 
 
+def _busybox_plan_error(expected_cases: Any) -> str | None:
+    if not isinstance(expected_cases, list) or not expected_cases:
+        return "expected BusyBox identities must be a non-empty list"
+    explicit_ids: set[str] = set()
+    for index, case in enumerate(expected_cases):
+        if not isinstance(case, BusyBoxCase):
+            return f"expected BusyBox identity at index {index} is not a BusyBoxCase"
+        if case.ordinal != index + 1:
+            return "expected BusyBox ordinals must be contiguous and one-based"
+        if (
+            not case.command
+            or case.command != case.command.strip()
+            or "\n" in case.command
+            or "\r" in case.command
+            or first_unsupported_output_character(case.command) is not None
+        ):
+            return f"expected BusyBox command at ordinal {case.ordinal} is malformed"
+        if case.explicit_id is not None:
+            if BUSYBOX_EXPLICIT_ID_RE.fullmatch(case.explicit_id) is None:
+                return f"expected BusyBox explicit ID at ordinal {case.ordinal} is malformed"
+            if case.explicit_id in explicit_ids:
+                return f"expected BusyBox explicit ID is duplicated: {case.explicit_id}"
+            explicit_ids.add(case.explicit_id)
+    return None
+
+
 def _validate_busybox(
     group: Group,
-    expected_cases: list[str] | None = None,
-) -> tuple[list[dict[str, str]], dict[str, int]]:
-    results = [
+    expected_cases: list[BusyBoxCase] | None = None,
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    issues: list[dict[str, str]] = []
+    legacy_results = [
         (match.group(1), match.group(2).lower())
         for line in group.lines
-        if (match := BUSYBOX_RESULT_RE.fullmatch(line))
+        if (match := BUSYBOX_LEGACY_RESULT_RE.fullmatch(line))
     ]
-    passed = sum(status == "success" for _case, status in results)
-    failed = sum(status == "fail" for _case, status in results)
-    issues: list[dict[str, str]] = []
-    duplicate_cases = _duplicates([case for case, _status in results])
-    if duplicate_cases:
+    has_structured_records = any(
+        BUSYBOX_CASE_START_RE.fullmatch(line)
+        or BUSYBOX_CASE_RESULT_RE.fullmatch(line)
+        or BUSYBOX_CASE_END_RE.fullmatch(line)
+        for line in group.lines
+    )
+
+    accepted_results: list[tuple[int, str, str]] = []
+    completed_results: list[tuple[int, str, str]] = []
+    starts = 0
+    result_records = 0
+    if legacy_results:
         issues.append(
             issue(
-                "busybox-duplicate-case",
-                f"duplicate busybox case results: {', '.join(duplicate_cases)}",
+                "busybox-legacy-identity",
+                "legacy text-only BusyBox results do not provide replay-safe case identity",
                 group.label,
             )
         )
-    observed_cases = [case for case, _status in results]
-    if expected_cases is not None and observed_cases != expected_cases:
-        mismatch_index = next(
-            (
-                index
-                for index, (observed, expected) in enumerate(zip(observed_cases, expected_cases))
-                if observed != expected
-            ),
-            min(len(observed_cases), len(expected_cases)),
-        )
-        observed = observed_cases[mismatch_index] if mismatch_index < len(observed_cases) else "<missing>"
-        expected = expected_cases[mismatch_index] if mismatch_index < len(expected_cases) else "<none>"
-        issues.append(
-            issue(
-                "busybox-case-plan-mismatch",
-                f"case sequence diverges at index {mismatch_index}: expected {expected!r}, "
-                f"observed {observed!r}; expected {len(expected_cases)} identities, "
-                f"observed {len(observed_cases)}",
-                group.label,
+        if has_structured_records:
+            issues.append(
+                issue(
+                    "busybox-mixed-protocol",
+                    "legacy and structured BusyBox case records must not be mixed",
+                    group.label,
+                )
             )
-        )
-    if passed + failed == 0:
+        accepted_results = [
+            (ordinal, command, status)
+            for ordinal, (command, status) in enumerate(legacy_results, start=1)
+        ]
+        completed_results = list(accepted_results)
+        starts = len(legacy_results)
+        result_records = len(legacy_results)
+    elif has_structured_records:
+        current_ordinal: int | None = None
+        current_result: tuple[int, str, str] | None = None
+        seen_ordinals: set[int] = set()
+        for line in group.lines:
+            if match := BUSYBOX_CASE_START_RE.fullmatch(line):
+                ordinal = int(match.group(1))
+                starts += 1
+                if current_ordinal is not None:
+                    issues.append(
+                        issue(
+                            "busybox-nested-frame",
+                            f"ordinal {ordinal} started before ordinal {current_ordinal} ended",
+                            group.label,
+                        )
+                    )
+                    continue
+                if ordinal in seen_ordinals:
+                    issues.append(
+                        issue(
+                            "busybox-duplicate-identity",
+                            f"BusyBox ordinal {ordinal} was replayed",
+                            group.label,
+                        )
+                    )
+                seen_ordinals.add(ordinal)
+                current_ordinal = ordinal
+                current_result = None
+                continue
+            if match := BUSYBOX_CASE_RESULT_RE.fullmatch(line):
+                ordinal = int(match.group(1))
+                status = match.group(2).lower()
+                command = match.group(3)
+                result_records += 1
+                if current_ordinal is None:
+                    issues.append(
+                        issue(
+                            "busybox-orphan-result",
+                            f"result for ordinal {ordinal} appeared outside a case frame",
+                            group.label,
+                        )
+                    )
+                elif ordinal != current_ordinal:
+                    issues.append(
+                        issue(
+                            "busybox-identity-mismatch",
+                            f"active ordinal {current_ordinal} received result for ordinal {ordinal}",
+                            group.label,
+                        )
+                    )
+                elif current_result is not None:
+                    issues.append(
+                        issue(
+                            "busybox-duplicate-result",
+                            f"ordinal {ordinal} emitted more than one terminal result",
+                            group.label,
+                        )
+                    )
+                else:
+                    current_result = (ordinal, command, status)
+                    accepted_results.append(current_result)
+                continue
+            if match := BUSYBOX_CASE_END_RE.fullmatch(line):
+                ordinal = int(match.group(1))
+                if current_ordinal is None:
+                    issues.append(
+                        issue(
+                            "busybox-orphan-end",
+                            f"end for ordinal {ordinal} appeared without an active frame",
+                            group.label,
+                        )
+                    )
+                elif ordinal != current_ordinal:
+                    issues.append(
+                        issue(
+                            "busybox-identity-mismatch",
+                            f"active ordinal {current_ordinal} ended as ordinal {ordinal}",
+                            group.label,
+                        )
+                    )
+                    current_ordinal = None
+                    current_result = None
+                else:
+                    if current_result is None:
+                        issues.append(
+                            issue(
+                                "busybox-missing-result",
+                                f"ordinal {ordinal} ended without a terminal result",
+                                group.label,
+                            )
+                        )
+                    else:
+                        completed_results.append(current_result)
+                    current_ordinal = None
+                    current_result = None
+        if current_ordinal is not None:
+            issues.append(
+                issue(
+                    "busybox-missing-end",
+                    f"ordinal {current_ordinal} did not emit its end marker",
+                    group.label,
+                )
+            )
+
+    observed_cases = [(ordinal, command) for ordinal, command, _status in accepted_results]
+    if expected_cases is not None:
+        expected_identities = [(case.ordinal, case.command) for case in expected_cases]
+        if observed_cases != expected_identities:
+            mismatch_index = next(
+                (
+                    index
+                    for index, (observed, expected) in enumerate(
+                        zip(observed_cases, expected_identities)
+                    )
+                    if observed != expected
+                ),
+                min(len(observed_cases), len(expected_identities)),
+            )
+            observed = (
+                observed_cases[mismatch_index]
+                if mismatch_index < len(observed_cases)
+                else "<missing>"
+            )
+            expected = (
+                expected_identities[mismatch_index]
+                if mismatch_index < len(expected_identities)
+                else "<none>"
+            )
+            issues.append(
+                issue(
+                    "busybox-case-plan-mismatch",
+                    f"case sequence diverges at index {mismatch_index}: expected {expected!r}, "
+                    f"observed {observed!r}; expected {len(expected_identities)} identities, "
+                    f"observed {len(observed_cases)}",
+                    group.label,
+                )
+            )
+
+    passed = sum(status == "success" for _ordinal, _command, status in accepted_results)
+    failed = sum(status == "fail" for _command, status in legacy_results) + sum(
+        match.group(2).lower() == "fail"
+        for line in group.lines
+        if (match := BUSYBOX_CASE_RESULT_RE.fullmatch(line))
+    )
+    if not accepted_results:
         issues.append(issue("busybox-empty", "busybox group contains no case results", group.label))
     if failed:
         issues.append(issue("busybox-failure", f"{failed} busybox cases failed", group.label))
-    return issues, {"executed_cases": passed + failed, "passed_cases": passed, "failed_cases": failed}
+    return issues, {
+        "started_cases": starts,
+        "executed_cases": starts,
+        "result_cases": result_records,
+        "completed_cases": len(completed_results),
+        "passed_cases": passed,
+        "failed_cases": failed,
+        "cases": [
+            {
+                "ordinal": ordinal,
+                "command": command,
+                "status": status,
+                "explicit_id": (
+                    expected_cases[ordinal - 1].explicit_id
+                    if expected_cases is not None
+                    and ordinal <= len(expected_cases)
+                    and expected_cases[ordinal - 1].ordinal == ordinal
+                    else None
+                ),
+            }
+            for ordinal, command, status in completed_results
+        ],
+    }
 
 
 def _validate_libctest(
@@ -1036,6 +1297,7 @@ def _validate_libctest(
     observed_passed = 0
     observed_failed = 0
     starts = 0
+    completed_frames = 0
     seen_cases: set[tuple[str, str]] = set()
     started_cases: list[tuple[str, str]] = []
     for line in group.lines:
@@ -1085,6 +1347,8 @@ def _validate_libctest(
                 issues.append(issue("libctest-mismatched-end", f"case end does not match active case: {ended}", group.label))
             elif current_terminal is None:
                 issues.append(issue("libctest-missing-result", f"case {current} ended without Pass!/FAIL", group.label))
+            else:
+                completed_frames += 1
             current = None
             current_terminal = None
     if expected_cases is not None and started_cases != expected_cases:
@@ -1111,7 +1375,13 @@ def _validate_libctest(
         issues.append(issue("libctest-missing-end", f"case {current} did not emit its end marker", group.label))
     if len(summaries) != 1:
         issues.append(issue("libctest-summary-count", f"expected one libctest summary, found {len(summaries)}", group.label))
-        return issues, {"executed_cases": starts, "passed_cases": 0, "failed_cases": 0}
+        return issues, {
+            "started_cases": starts,
+            "executed_cases": starts,
+            "completed_cases": completed_frames,
+            "passed_cases": 0,
+            "failed_cases": 0,
+        }
     last_end_index = max(
         (
             index
@@ -1164,7 +1434,13 @@ def _validate_libctest(
                 group.label,
             )
         )
-    return issues, {"executed_cases": completed, "passed_cases": passed, "failed_cases": failed}
+    return issues, {
+        "started_cases": starts,
+        "executed_cases": starts,
+        "completed_cases": completed_frames,
+        "passed_cases": passed,
+        "failed_cases": failed,
+    }
 
 
 def _validate_generic(group: Group) -> tuple[list[dict[str, str]], dict[str, int]]:
@@ -1234,7 +1510,7 @@ def validate_official_output(
     expected_group_case_counts: dict[str, int] | None = None,
     expected_ltp_case_list: str | None = None,
     expected_ltp_cases: list[str] | None = None,
-    expected_busybox_cases: list[str] | None = None,
+    expected_busybox_cases: list[BusyBoxCase] | None = None,
     expected_libctest_cases: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Return a strict PASS/FAIL/ERROR result for captured official output."""
@@ -1248,7 +1524,11 @@ def validate_official_output(
     labels: set[str] = set()
     current: Group | None = None
     outside_lines: list[str] = []
-    case_count_plan = expected_group_case_counts or {}
+    case_count_plan = (
+        expected_group_case_counts
+        if expected_group_case_counts is not None
+        else {}
+    )
 
     for source, cleaned_text in (("stdout", text), ("stderr", stderr_text)):
         if invalid_character := first_unsupported_output_character(cleaned_text):
@@ -1260,6 +1540,19 @@ def validate_official_output(
                 )
             )
 
+    if expected_group_labels is not None and (
+        not isinstance(expected_group_labels, list)
+        or not expected_group_labels
+        or any(not isinstance(label, str) or not label for label in expected_group_labels)
+        or len(expected_group_labels) != len(set(expected_group_labels))
+    ):
+        structural_errors.append(
+            issue(
+                "official-group-plan",
+                "expected official group labels must be non-empty and unique strings",
+            )
+        )
+        expected_group_labels = None
     if expected_ltp_case_list is not None and (
         not isinstance(expected_ltp_case_list, str) or not expected_ltp_case_list
     ):
@@ -1276,13 +1569,14 @@ def validate_official_output(
             issue("official-ltp-case-plan", "expected LTP case identities must be non-empty and unique")
         )
         expected_ltp_cases = None
-    if expected_busybox_cases is not None and (
-        not isinstance(expected_busybox_cases, list)
-        or not expected_busybox_cases
-        or any(not isinstance(case, str) or not case for case in expected_busybox_cases)
-    ):
+    busybox_plan_error = (
+        _busybox_plan_error(expected_busybox_cases)
+        if expected_busybox_cases is not None
+        else None
+    )
+    if busybox_plan_error is not None:
         structural_errors.append(
-            issue("official-busybox-case-plan", "expected BusyBox identities must be non-empty strings")
+            issue("official-busybox-case-plan", busybox_plan_error)
         )
         expected_busybox_cases = None
     if expected_libctest_cases is not None and (
@@ -1351,6 +1645,7 @@ def validate_official_output(
                 )
                 current = None
             else:
+                current.completed = True
                 current = None
             continue
         if current is not None:
@@ -1380,7 +1675,10 @@ def validate_official_output(
             "official-pass", "official-fail", "ltp-list", "ltp-start",
             "ltp-run", "ltp-result", "ltp-end", "ltp-summary", "case-pass",
         },
-        "busybox": {"official-pass", "official-fail", "busybox-result"},
+        "busybox": {
+            "official-pass", "official-fail", "busybox-start", "busybox-result",
+            "busybox-end", "busybox-legacy-result",
+        },
         "libctest": {
             "official-pass", "official-fail", "libctest-start", "libctest-end",
             "libctest-fail", "libctest-summary", "case-pass",
@@ -1500,6 +1798,15 @@ def validate_official_output(
                             group.label,
                         )
                     )
+                completed_cases = counts.get("completed_cases", counts["executed_cases"])
+                if completed_cases != expected_cases:
+                    structural_errors.append(
+                        issue(
+                            "official-planned-completed-mismatch",
+                            f"expected {expected_cases} completed cases but observed {completed_cases}",
+                            group.label,
+                        )
+                    )
 
         if group.label.startswith(("ltp-", "busybox-", "libctest-")):
             explicit_passes = [
@@ -1565,10 +1872,36 @@ def validate_official_output(
             )
         )
 
+    planned_group_count = (
+        len(expected_group_labels) if expected_group_labels is not None else None
+    )
+    planned_case_count = (
+        sum(
+            count
+            for count in case_count_plan.values()
+            if type(count) is int and count > 0
+        )
+        if isinstance(case_count_plan, dict)
+        else None
+    )
+    counted_group_rows = [
+        row for row in group_rows if row["label"] in case_count_plan
+    ]
     status = "ERROR" if structural_errors else "FAIL" if failures else "PASS"
     return {
         "status": status,
         "group_count": len(groups),
+        "planned_group_count": planned_group_count,
+        "executed_group_count": len(groups),
+        "completed_group_count": sum(group.completed for group in groups),
+        "planned_case_count": planned_case_count,
+        "executed_case_count": sum(
+            row.get("executed_cases", 0) for row in counted_group_rows
+        ),
+        "completed_case_count": sum(
+            row.get("completed_cases", row.get("executed_cases", 0))
+            for row in counted_group_rows
+        ),
         "groups": group_rows,
         "error_count": len(structural_errors),
         "failure_count": len(failures),
@@ -1640,6 +1973,7 @@ def validate_ltp_output(stdout: str, stderr: str = "") -> dict[str, Any]:
                 )
                 current = None
             else:
+                current.completed = True
                 current = None
             continue
         if current is None:
@@ -1706,7 +2040,10 @@ def validate_ltp_output(stdout: str, stderr: str = "") -> dict[str, Any]:
             else "generic"
         )
         allowed_protocols = {
-            "busybox": {"official-pass", "official-fail", "busybox-result"},
+            "busybox": {
+                "official-pass", "official-fail", "busybox-start", "busybox-result",
+                "busybox-end", "busybox-legacy-result",
+            },
             "libctest": {
                 "official-pass",
                 "official-fail",

@@ -130,6 +130,43 @@ capability_domains:
 - 对应文件/提交：本日志、活动计划；尚无代码提交。
 - 下一步：完整阅读相关 producer/parser/runner 测试，实施最小协议与可信计划迁移。
 
+## 2026-07-16 — Checkpoint 2：有序身份协议与 fail-closed 回归
+
+- 修改：把可信 BusyBox 计划从字符串数组迁移为 55 个结构化
+  `{ordinal, command}` case；原命令、顺序、source metadata 与 libctest 计划均未改变。
+- 修改：生产者对每个实际执行的非空行发出同一 ordinal 的 START、唯一终态 RESULT
+  和 END；成功、普通非零、timeout-like 退出与执行错误都保留真实状态。
+- 修改：解析器验证 ordinal、command payload、计划顺序、frame 完成性、可选显式 ID
+  唯一性以及 planned/executed/completed 计数；reporter 保留失败 ordinal 与命令。
+- 完整性边界：旧文本记录仍可用于不可变日志回放，但产生
+  `busybox-legacy-identity`，不能成为 canonical PASS；混合协议、重放、缺失、额外、
+  乱序、孤立记录和不完整 frame 均为结构错误。
+- 语义边界：即使同一流同时存在结构错误，合法或畸形流中可辨认的 BusyBox `fail`
+  仍保留为 `busybox-failure`，不由 `ERROR` 隐藏。身份完整且有语义失败的流严格为
+  `FAIL`，`error_count == 0`。
+- 计划一致性复核：55 个命令和旧 schema 的顺序逐项相同，54 个不同文本；重复命令
+  仍只位于 ordinal 37 与 41。source snapshot 和 217 个 libctest case 未改变。
+- 旧日志重新回放：RV 与 LA 仍各有 24/24/24 个 planned/executed/completed group、
+  2544/2544/2544 个 planned/executed/completed case；旧协议各产生 2 个
+  `busybox-legacy-identity`，同时分别保留 119 与 161 条语义发现。
+- 诊断投影：第一次内存投影未先规范化 ANSI 清屏序列，留下旧协议残片，解析器正确
+  返回 `ERROR`；修正诊断脚本为先调用产品同一 `normalize_output_text` 后，完整投影的
+  RV/LA 分别返回 `FAIL`（119/161 semantic findings）、`error_count == 0`，且两者均为
+  24/24/24 group 与 2544/2544/2544 case。投影未修改或复制原始 evidence 文件，且
+  不是最终运行证据。
+- 测试：官方解析 111/111、失败报告 9/9、静态 guard mutation 24/24、LTP 汇总
+  20/20、测试资产完整性 36/36 均 PASS；直接 integrity guard 为 0 findings；
+  `test/run_suite.py --list` 发现 59 个注册 case；runner 集成重跑 134/134 PASS
+  （196.053 s）。
+- 调试记录：首次 runner 集成测试因 manifest 的精确方法数尚未同步而出现 10 个
+  assertion failure；这是预期的 fail-closed inventory 检测。将 4 个受影响 suite 的
+  exact count 从 8/23/106/133 更新为 9/24/111/134 后，先前重跑为 134/134 PASS；
+  本 checkpoint 再次重跑最终候选。
+- 代码范围：`user/shell/src/cmd.rs`、`test/evaluation/`、对应 checks/unit tests、
+  canonical manifest/count inventory 与 `test/README.md`；未修改 ABI、syscall、errno、
+  架构配置、依赖、工具链、镜像或外部测试源。
+- 对应提交：计划/日志基线 `8aa57fd8`；实现提交待创建。
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |

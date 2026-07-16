@@ -24,6 +24,23 @@ def group(label: str, body: str) -> str:
     )
 
 
+def busybox_frame(ordinal: int, command: str, status: str = "success") -> str:
+    return "\n".join(
+        (
+            f"#### OS COMP BUSYBOX CASE START ordinal={ordinal} ####",
+            f"BUSYBOX CASE RESULT ordinal={ordinal} status={status} command={command}",
+            f"#### OS COMP BUSYBOX CASE END ordinal={ordinal} ####",
+        )
+    )
+
+
+def busybox_plan(*commands: str) -> list[validator.BusyBoxCase]:
+    return [
+        validator.BusyBoxCase(ordinal, command)
+        for ordinal, command in enumerate(commands, start=1)
+    ]
+
+
 def complete_ltp(
     *,
     case: str = "access01",
@@ -509,23 +526,23 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         self.assert_status(text, "ERROR")
 
     def test_busybox_complete_success_passes(self) -> None:
-        self.assert_status(group("busybox-musl", "testcase busybox echo ok success"), "PASS")
+        self.assert_status(group("busybox-musl", busybox_frame(1, "echo ok")), "PASS")
         self.assert_status(
             group(
                 "busybox-musl",
-                "cut mktemp timeout\ntestcase busybox echo ok success",
+                f"cut mktemp timeout\n{busybox_frame(1, 'echo ok')}",
             ),
             "PASS",
         )
 
     def test_busybox_requires_trusted_expected_count(self) -> None:
-        text = group("busybox-musl", "testcase busybox echo ok success")
+        text = group("busybox-musl", busybox_frame(1, "echo ok"))
         result = validator.validate_official_output(text)
         self.assertEqual(result["status"], "ERROR", result)
         self.assertTrue(any(item["kind"] == "official-case-count-missing" for item in result["errors"]))
 
     def test_busybox_partial_execution_cannot_satisfy_expected_count(self) -> None:
-        text = group("busybox-musl", "testcase busybox echo ok success")
+        text = group("busybox-musl", busybox_frame(1, "echo ok"))
         result = validator.validate_official_output(
             text,
             expected_group_case_counts={"busybox-musl": 55},
@@ -534,11 +551,11 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         self.assertTrue(any(item["kind"] == "official-planned-executed-mismatch" for item in result["errors"]))
 
     def test_busybox_identity_must_match_trusted_plan(self) -> None:
-        text = group("busybox-musl", "testcase busybox invented command success")
+        text = group("busybox-musl", busybox_frame(1, "invented command"))
         result = validator.validate_official_output(
             text,
             expected_group_case_counts={"busybox-musl": 1},
-            expected_busybox_cases=["echo expected"],
+            expected_busybox_cases=busybox_plan("echo expected"),
         )
         self.assertEqual(result["status"], "ERROR", result)
         self.assertTrue(
@@ -547,32 +564,144 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         )
 
     def test_busybox_identity_plan_passes_when_exact(self) -> None:
-        text = group("busybox-musl", "testcase busybox echo expected success")
-        result = validator.validate_official_output(
-            text,
-            expected_group_case_counts={"busybox-musl": 1},
-            expected_busybox_cases=["echo expected"],
-        )
-        self.assertEqual(result["status"], "PASS", result)
+        for label in ("busybox-musl", "busybox-glibc"):
+            with self.subTest(label=label):
+                text = group(label, busybox_frame(1, "echo expected"))
+                result = validator.validate_official_output(
+                    text,
+                    expected_group_case_counts={label: 1},
+                    expected_busybox_cases=busybox_plan("echo expected"),
+                )
+                self.assertEqual(result["status"], "PASS", result)
 
-    def test_prefixed_busybox_result_record_is_malformed(self) -> None:
-        self.assert_status(group("busybox-musl", "NOT testcase busybox echo success"), "ERROR")
-
-    def test_duplicate_busybox_case_is_error_even_when_count_matches(self) -> None:
-        body = "testcase busybox echo ok success\ntestcase busybox echo ok success"
+    def test_busybox_repeated_text_at_distinct_ordinals_is_valid(self) -> None:
+        command = 'echo "bbbbbbb" >> test.txt'
+        body = f"{busybox_frame(1, command)}\n{busybox_frame(2, command)}"
         result = validator.validate_official_output(
             group("busybox-musl", body),
             expected_group_case_counts={"busybox-musl": 2},
+            expected_busybox_cases=busybox_plan(command, command),
+        )
+        self.assertEqual(result["status"], "PASS", result)
+        self.assertEqual(result["planned_case_count"], 2)
+        self.assertEqual(result["executed_case_count"], 2)
+        self.assertEqual(result["completed_case_count"], 2)
+        self.assertEqual(
+            [case["ordinal"] for case in result["groups"][0]["cases"]],
+            [1, 2],
+        )
+
+    def test_busybox_missing_extra_and_order_drift_are_errors(self) -> None:
+        expected = busybox_plan("first", "second")
+        scenarios = {
+            "missing": busybox_frame(1, "first"),
+            "extra": "\n".join(
+                (
+                    busybox_frame(1, "first"),
+                    busybox_frame(2, "second"),
+                    busybox_frame(3, "third"),
+                )
+            ),
+            "order": f"{busybox_frame(2, 'second')}\n{busybox_frame(1, 'first')}",
+        }
+        for label, body in scenarios.items():
+            with self.subTest(label=label):
+                result = validator.validate_official_output(
+                    group("busybox-musl", body),
+                    expected_group_case_counts={"busybox-musl": 2},
+                    expected_busybox_cases=expected,
+                )
+                self.assertEqual(result["status"], "ERROR", result)
+                self.assertTrue(result["errors"], result)
+
+    def test_busybox_malformed_or_incomplete_frames_are_errors(self) -> None:
+        scenarios = {
+            "zero-identity": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=0 ####",
+                    "BUSYBOX CASE RESULT ordinal=0 status=success command=first",
+                    "#### OS COMP BUSYBOX CASE END ordinal=0 ####",
+                )
+            ),
+            "result-mismatch": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "BUSYBOX CASE RESULT ordinal=2 status=success command=first",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "missing-result": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "missing-end": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                )
+            ),
+            "orphan-result": "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+            "mixed-with-fail": (
+                f"{busybox_frame(1, 'first', 'fail')}\n"
+                "testcase busybox first success"
+            ),
+        }
+        for label, body in scenarios.items():
+            with self.subTest(label=label):
+                result = validator.validate_official_output(
+                    group("busybox-musl", body),
+                    expected_group_case_counts={"busybox-musl": 1},
+                    expected_busybox_cases=busybox_plan("first"),
+                )
+                self.assertEqual(result["status"], "ERROR", result)
+                self.assertTrue(result["errors"], result)
+                if label == "mixed-with-fail":
+                    self.assertIn(
+                        "busybox-failure",
+                        {item["kind"] for item in result["failures"]},
+                    )
+
+    def test_busybox_legacy_text_protocol_remains_fail_closed(self) -> None:
+        result = validator.validate_official_output(
+            group("busybox-musl", "testcase busybox echo expected success"),
+            expected_group_case_counts={"busybox-musl": 1},
+            expected_busybox_cases=busybox_plan("echo expected"),
+        )
+        self.assertEqual(result["status"], "ERROR", result)
+        self.assertEqual(result["executed_case_count"], 1)
+        self.assertEqual(result["completed_case_count"], 1)
+        self.assertIn(
+            "busybox-legacy-identity",
+            {item["kind"] for item in result["errors"]},
+        )
+
+    def test_prefixed_busybox_result_record_is_malformed(self) -> None:
+        self.assert_status(
+            group(
+                "busybox-musl",
+                "NOT BUSYBOX CASE RESULT ordinal=1 status=success command=echo",
+            ),
+            "ERROR",
+        )
+
+    def test_duplicate_busybox_case_is_error_even_when_count_matches(self) -> None:
+        body = f"{busybox_frame(1, 'echo ok')}\n{busybox_frame(1, 'echo ok')}"
+        result = validator.validate_official_output(
+            group("busybox-musl", body),
+            expected_group_case_counts={"busybox-musl": 2},
+            expected_busybox_cases=busybox_plan("echo ok", "echo ok"),
         )
         self.assertEqual(result["status"], "ERROR", result)
         self.assertTrue(
-            any(item["kind"] == "busybox-duplicate-case" for item in result["errors"]),
+            any(item["kind"] == "busybox-duplicate-identity" for item in result["errors"]),
             result,
         )
 
     def test_busybox_explicit_official_failure_cannot_pass(self) -> None:
         body = (
-            "testcase busybox echo ok success\n"
+            f"{busybox_frame(1, 'echo ok')}\n"
             "FAIL OFFICIAL TEST GROUP busybox-musl : 7"
         )
         self.assert_status(group("busybox-musl", body), "FAIL")
@@ -581,13 +710,20 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         self.assert_status(group("busybox-musl", "busybox started"), "ERROR")
 
     def test_busybox_failure_is_failure(self) -> None:
-        self.assert_status(group("busybox-musl", "testcase busybox false fail"), "FAIL")
+        result = validator.validate_official_output(
+            group("busybox-musl", busybox_frame(1, "false", "fail")),
+            expected_group_case_counts={"busybox-musl": 1},
+            expected_busybox_cases=busybox_plan("false"),
+        )
+        self.assertEqual(result["status"], "FAIL", result)
+        self.assertEqual(result["error_count"], 0, result)
+        self.assertGreater(result["failure_count"], 0, result)
         for marker in ("TFAIL: hidden mismatch", "kernel panic: fatal"):
             with self.subTest(marker=marker):
                 self.assert_status(
                     group(
                         "busybox-musl",
-                        f"{marker}\ntestcase busybox echo ok success",
+                        f"{marker}\n{busybox_frame(1, 'echo ok')}",
                     ),
                     "FAIL",
                 )
@@ -773,8 +909,11 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         self.assertEqual(result["status"], "ERROR", result)
 
     def test_busybox_machine_result_on_stderr_is_error(self) -> None:
-        stdout = group("busybox-musl", "testcase busybox echo ok success")
-        result = validator.validate_official_output(stdout, "testcase busybox false fail\n")
+        stdout = group("busybox-musl", busybox_frame(1, "echo ok"))
+        result = validator.validate_official_output(
+            stdout,
+            "BUSYBOX CASE RESULT ordinal=1 status=fail command=false\n",
+        )
         self.assertEqual(result["status"], "ERROR", result)
 
     def test_libctest_machine_result_on_stderr_is_error(self) -> None:
@@ -910,7 +1049,8 @@ ltp cases: 2 passed, 0 failed, 0 timed out
     def test_extra_prefixed_busybox_result_is_malformed(self) -> None:
         text = group(
             "busybox-musl",
-            "testcase busybox echo ok success\nNOT testcase busybox false success",
+            f"{busybox_frame(1, 'echo ok')}\n"
+            "NOT BUSYBOX CASE RESULT ordinal=2 status=success command=false",
         )
         result = self.assert_status(text, "ERROR")
         self.assertTrue(any(item["kind"] == "malformed-protocol-record" for item in result["errors"]))
@@ -1135,7 +1275,10 @@ ltp cases: 2 passed, 0 failed, 0 timed out
             Path(__file__).resolve().parents[2]
         )
         self.assertEqual(len(busybox_cases), 55)
-        self.assertEqual(len(set(busybox_cases)), 54)
+        self.assertEqual([case.ordinal for case in busybox_cases], list(range(1, 56)))
+        self.assertEqual(len(set(busybox_cases)), 55)
+        self.assertEqual(len({case.command for case in busybox_cases}), 54)
+        self.assertEqual(busybox_cases[36].command, busybox_cases[40].command)
         self.assertEqual(len(libctest_cases), 217)
         self.assertEqual(len(set(libctest_cases)), 217)
 
@@ -1151,13 +1294,31 @@ ltp cases: 2 passed, 0 failed, 0 timed out
             ).read_text(encoding="utf-8")
             target.write_text(
                 source.replace(
-                    '"schema_version": 1,',
-                    '"schema_version": 1,\n  "schema_version": 1,',
+                    '"schema_version": 2,',
+                    '"schema_version": 2,\n  "schema_version": 2,',
                     1,
                 ),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "duplicate JSON key"):
+                validator.trusted_official_case_plan(root)
+
+    def test_specialized_identity_plan_rejects_duplicate_explicit_ids(self) -> None:
+        source = json.loads(
+            (
+                Path(__file__).resolve().parents[1]
+                / "evaluation"
+                / "official_case_plan.json"
+            ).read_text(encoding="utf-8")
+        )
+        source["busybox_cases"][0]["id"] = "shared-step"
+        source["busybox_cases"][1]["id"] = "shared-step"
+        with tempfile.TemporaryDirectory(prefix="official-case-plan-") as directory:
+            root = Path(directory)
+            target = root / validator.OFFICIAL_CASE_PLAN_RELATIVE_PATH
+            target.parent.mkdir(parents=True)
+            target.write_text(json.dumps(source), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate BusyBox explicit ID"):
                 validator.trusted_official_case_plan(root)
 
     def test_unconsumed_explicit_fail_line_cannot_pass(self) -> None:

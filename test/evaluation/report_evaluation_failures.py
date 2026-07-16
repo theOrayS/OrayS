@@ -72,7 +72,10 @@ LTP_LIST_RE = re.compile(r"\bltp case list:\s+(.+?)\s+\((\d+)\s+cases,\s+timeout
 LTP_SUITE_SUMMARY_RE = re.compile(r"\bltp cases:\s+(\d+)\s+passed,\s+(\d+)\s+failed(?:,\s+(\d+)\s+timed out)?", re.I)
 LIBCTEST_FAIL_RE = re.compile(r"\bFAIL libctest\s+(\S+)\s+([^:]+):\s*(.*)")
 LIBCTEST_SUMMARY_RE = re.compile(r"\blibctest cases:\s+(\d+)\s+passed,\s+(\d+)\s+failed,\s+(\d+)\s+timed out", re.I)
-BUSYBOX_FAIL_RE = re.compile(r"\btestcase busybox\s+(.+?)\s+fail\b")
+BUSYBOX_FAIL_RE = re.compile(
+    r"^BUSYBOX CASE RESULT ordinal=([1-9]\d*) status=fail command=(.+)$"
+)
+BUSYBOX_LEGACY_FAIL_RE = re.compile(r"^testcase busybox\s+(.+?)\s+fail\s*$")
 OFFICIAL_GROUP_FAIL_RE = re.compile(r"\bFAIL OFFICIAL TEST GROUP\s+(.+?)\s*:\s*(-?\d+)")
 OFFICIAL_GROUP_TIMEOUT_RE = re.compile(r"\bTIMEOUT OFFICIAL TEST GROUP\s+(.+?)\s+after\s+(\d+)s", re.I)
 AUTORUN_TIMEOUT_RE = re.compile(r"\bautorun:\s+(.+?)\s+timed out after\s+(\d+)s", re.I)
@@ -363,7 +366,14 @@ def parse_log(
             report.libctest_summaries.append(f"{current_group}: {line.strip()}")
             continue
         if match := BUSYBOX_FAIL_RE.search(line):
-            report.busybox_failures.append(f"{current_group}: {match.group(1)}")
+            report.busybox_failures.append(
+                f"{current_group}: ordinal {match.group(1)}: {match.group(2)}"
+            )
+            continue
+        if match := BUSYBOX_LEGACY_FAIL_RE.search(line):
+            report.busybox_failures.append(
+                f"{current_group}: legacy-unidentified: {match.group(1)}"
+            )
             continue
         if match := OFFICIAL_GROUP_FAIL_RE.search(line):
             report.group_failures.append(f"{match.group(1)} => status {match.group(2)}")

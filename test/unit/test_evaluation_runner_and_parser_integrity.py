@@ -951,6 +951,19 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("run_ltp_suite", result.stdout)
 
+    def test_detects_missing_busybox_ordinal_identity_framing(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/cmd.rs"
+        text = self.replace_once(
+            path.read_text(encoding="utf-8"),
+            "case_ordinal += 1;",
+            "case_ordinal += 0;",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stable ordinal START/RESULT/END", result.stdout)
+
     def test_detects_blacklist_default(self) -> None:
         tree = self.make_tree()
         path = tree / "Makefile"

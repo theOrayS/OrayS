@@ -120,6 +120,22 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
             findings.append(
                 f"user/shell/src/cmd.rs: {runner_name} must enforce real busybox wrapper preparation instead of relying on outer autorun order"
             )
+    if busybox_runner:
+        identity_tokens = (
+            "let mut case_ordinal = 0usize",
+            "case_ordinal += 1",
+            "OS COMP BUSYBOX CASE START ordinal={case_ordinal}",
+            "BUSYBOX CASE RESULT ordinal={case_ordinal} status=",
+            "OS COMP BUSYBOX CASE END ordinal={case_ordinal}",
+        )
+        if any(token not in busybox_runner for token in identity_tokens):
+            findings.append(
+                "user/shell/src/cmd.rs: BusyBox execution must emit one stable ordinal START/RESULT/END frame per non-empty source row"
+            )
+        if "testcase busybox" in busybox_runner:
+            findings.append(
+                "user/shell/src/cmd.rs: legacy text-only BusyBox result records are forbidden"
+            )
 
     forbidden_uspace_tokens = {
         "busybox_applet_target_path": "runtime path/VFS layer must not rewrite applet paths to busybox",
