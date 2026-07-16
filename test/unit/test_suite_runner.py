@@ -1303,6 +1303,96 @@ class SuiteRunnerTest(unittest.TestCase):
                 )
                 self.assertNotEqual("PASS", record["status"], record)
 
+    def test_official_nonzero_exit_still_requires_structural_validation(self) -> None:
+        contract = {
+            "type": "official",
+            "expected_group_labels": ["demo-musl"],
+            "expected_group_case_counts": {},
+        }
+        pass_transcript = (
+            "#### OS COMP TEST GROUP START demo-musl ####\n"
+            "PASS OFFICIAL TEST GROUP demo-musl : 0\n"
+            "#### OS COMP TEST GROUP END demo-musl ####"
+        )
+        fail_transcript = (
+            "#### OS COMP TEST GROUP START demo-musl ####\n"
+            "FAIL OFFICIAL TEST GROUP demo-musl : 7\n"
+            "#### OS COMP TEST GROUP END demo-musl ####"
+        )
+        scenarios = (
+            (
+                "truncated",
+                "#### OS COMP TEST GROUP START demo-musl ####",
+                2,
+                "INFRA_ERROR",
+                "ERROR",
+            ),
+            (
+                "malformed",
+                "NOT #### OS COMP TEST GROUP START demo-musl ####",
+                2,
+                "INFRA_ERROR",
+                "ERROR",
+            ),
+            ("semantic-failure", fail_transcript, 1, "FAIL", "FAIL"),
+            ("pass-exit-conflict", pass_transcript, 2, "INFRA_ERROR", "PASS"),
+        )
+        for label, transcript, runner_exit, status, parser_status in scenarios:
+            with self.subTest(label=label):
+                self.output_path = self.work / f"official-nonzero-{label}"
+                case = fixture_case(
+                    f"fixture.official-nonzero-{label}",
+                    code=(
+                        "import sys; "
+                        f"print({transcript!r}); "
+                        "raise SystemExit(1)"
+                    ),
+                    contract=contract,
+                )
+                result = self.invoke(fixture_manifest([case]))
+                self.assertEqual(
+                    runner_exit,
+                    result.returncode,
+                    result.stdout + result.stderr,
+                )
+                record = self.summary()["cases"][0]
+                self.assertEqual(status, record["status"], record)
+                self.assertEqual(1, record["return_code"], record)
+                self.assertEqual(1, record["details"]["process_exit_code"], record)
+                self.assertEqual(parser_status, record["details"]["status"], record)
+                if parser_status == "ERROR":
+                    self.assertGreater(record["details"]["error_count"], 0, record)
+
+        self.output_path = self.work / "official-nonzero-invalid-utf8"
+        invalid_utf8 = fixture_case(
+            "fixture.official-nonzero-invalid-utf8",
+            code=(
+                "import sys; "
+                "sys.stdout.buffer.write(bytes([255])); "
+                "sys.stdout.flush(); "
+                "raise SystemExit(1)"
+            ),
+            contract=contract,
+        )
+        invalid_utf8_result = self.invoke(fixture_manifest([invalid_utf8]))
+        self.assertEqual(
+            2,
+            invalid_utf8_result.returncode,
+            invalid_utf8_result.stdout + invalid_utf8_result.stderr,
+        )
+        invalid_utf8_record = self.summary()["cases"][0]
+        self.assertEqual("INFRA_ERROR", invalid_utf8_record["status"], invalid_utf8_record)
+        self.assertEqual(1, invalid_utf8_record["return_code"], invalid_utf8_record)
+        self.assertEqual(
+            1,
+            invalid_utf8_record["details"]["process_exit_code"],
+            invalid_utf8_record,
+        )
+        self.assertIn(
+            "not valid UTF-8",
+            invalid_utf8_record["details"]["output_integrity_error"],
+        )
+
     def test_official_contract_requires_expected_group_plan(self) -> None:
         case = fixture_case(contract={"type": "official"})
         result = self.invoke(fixture_manifest([case]))
@@ -1341,6 +1431,7 @@ class SuiteRunnerTest(unittest.TestCase):
                     f"#### OS COMP BUSYBOX CASE START ordinal={case.ordinal} ####",
                     f"BUSYBOX CASE RESULT ordinal={case.ordinal} "
                     f"status={status} command={case.command}",
+                    f"testcase busybox {case.command} {status}",
                     f"#### OS COMP BUSYBOX CASE END ordinal={case.ordinal} ####",
                 )
             )

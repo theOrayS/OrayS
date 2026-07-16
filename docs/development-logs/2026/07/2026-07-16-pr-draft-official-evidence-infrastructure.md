@@ -1,8 +1,8 @@
 ---
 title: "PR draft: stabilize official evidence infrastructure"
 date_started: 2026-07-16
-date_completed: 2026-07-16
-status: ready-for-semantic-fix
+date_completed: null
+status: draft
 pr: null
 branch: "stabilize/post-integration-gates-20260716"
 authors:
@@ -10,7 +10,7 @@ authors:
 reviewers:
   - "Codex independent read-only reviewer (automated; not human PR owner)"
 base_commit: "09f4076ac151e0e7800103de724d9042230738b5"
-head_commit: "1a320a9f0b016dc6a861da364a3b7af6ba8e0d1d"
+head_commit: "0b4f3f21d43c3dd6cfc4d7727fbaf336e2587224"
 evidence_commit: "9ec972f4eb06e7f50dcdec023d494b7e67c9a990"
 capability_domains:
   - "official-evidence"
@@ -49,11 +49,11 @@ capability_domains:
 
 - [x] 重复文本在不同稳定序号下可合法完成；相同显式 ID 必须拒绝。
 - [x] 重放、缺失、额外、乱序、畸形身份、未知组和不完整执行全部拒绝。
-- [x] 有真实测试失败但身份完整的官方结果为 `FAIL`，不是 `ERROR` 或 `PASS`。
-- [x] quick、baseline、RV official、LA official 满足 Goal A 的干净验证合同。
+- [ ] 有真实测试失败但身份完整的官方结果为 `FAIL`，不是 `ERROR` 或 `PASS`。
+- [ ] quick、baseline、RV official、LA official 满足 Goal A 的干净验证合同。
 - [x] 两个官方镜像哈希不变，临时 overlay 全部清理。
-- [x] 独立 reviewer 的 blocker/major finding 为零。
-- [x] 分支保持可追溯祖先关系并仅以普通 push 发布。
+- [ ] 独立 reviewer 的 blocker/major finding 为零。
+- [ ] 分支保持可追溯祖先关系并仅以普通 push 发布。
 
 # 2. 基线
 
@@ -302,6 +302,73 @@ capability_domains:
   `READY_FOR_SEMANTIC_FIX`。本任务停止，不自动开始 Goal B，也不把该交接终态表述为
   official/full PASS 或 PR Ready。
 
+## 2026-07-16 — Checkpoint 8：终态复核重开与兼容性/退出分类 Major
+
+- 在 documentation-only closure 提交 `0b4f3f21d43c3dd6cfc4d7727fbaf336e2587224`
+  上，clean quick 为 45/45/45 PASS，summary SHA-256 为
+  `e3dd5af42d67215774a9d3721764b8605838e291a1c0ecabf6b4fc1a607ca5f8`；clean
+  baseline 为 57/57/57 PASS，summary SHA-256 为
+  `814a1f00146db7a35a301fc29126cd897e5b1987f33c01c6df6d38063676f830`。
+  两者均绑定精确 HEAD、运行前后 clean 且 stable provenance 为 true。
+- 最终独立只读 reviewer 随后给出 0 Blocker / 2 Major / 0 Minor / 0 Nit，并明确禁止
+  在不修改候选的情况下继续推送。此前的 `READY_FOR_SEMANTIC_FIX` 声明因此撤回，
+  本日志与活动计划恢复为 `IN_PROGRESS`；这不是忽略或覆盖旧审查结论。
+- Major 1：producer 只发结构化 `BUSYBOX CASE RESULT`，但仓库 evidence protocol 与
+  当前外部 BusyBox musl/glibc scorer 仍消费 `testcase busybox ... success|fail`；当前
+  fresh 日志没有兼容记录，远端 scorer 会把缺项全判失败。修复必须在结构化 ordinal
+  frame 内发出一条严格绑定 command/status 的兼容投影；legacy-only 输入仍 fail-closed。
+- Major 2：runner 对 official 的非基础设施非零子进程退出先直接标 `FAIL`，没有读取并
+  解析 capture；因此退出 1 的截断/畸形流可能绕过结构校验。修复必须先解析 official
+  capture，让结构 `ERROR` 优先映射为 `INFRA_ERROR`，完整语义失败才保持 `FAIL`，并在
+  machine-readable details 中保留 process exit status。
+- 重开时 Git 基线：本地 HEAD `0b4f3f21…`、远端稳定化分支 `1a320a9f…`、远端权威
+  集成基线及 merge-base `09f4076a…`，worktree clean；未 force-push、未修改 `main`，
+  未开始 Goal B。后续将补通用回归并重新生成 clean quick/baseline 与 fresh RV/LA
+  official，不能沿用本 checkpoint 前的证据宣称完成。
+
+## 2026-07-16 — Checkpoint 9：两项 Major 的通用修复与聚焦回归
+
+- BusyBox producer 仍以实际非空执行顺序生成一基 ordinal，且每个 case 只计算一次真实
+  `case_status`；随后在同一 START/END frame 内依次发出结构化 RESULT 与一条
+  `testcase busybox ... success|fail` 兼容投影。兼容投影不参与 identity 判定，既没有
+  command/libc/架构特化，也没有伪造额外执行。
+- parser 以结构化 ordinal/result 为权威，并要求 frame 内恰好一条兼容投影；缺失、
+  重复、孤立、先于结构化结果、command 不同或 status 不同均为独立结构错误。
+  legacy-only 日志仍产生 `busybox-legacy-identity`，不能成为 PASS；失败计数只取权威
+  结构化结果，避免同一语义 failure 被兼容投影重复累计。reporter 同样只报告一次带
+  ordinal 的 canonical failure。
+- runner 对 manifest 声明的 infrastructure exit code、signal、timeout 与进程 containment
+  错误保持原优先级；仅对其余 nonzero official 子进程改为先读取 stdout/stderr 并执行
+  canonical parser。截断/畸形流仍为 `INFRA_ERROR`，完整显式失败为 `FAIL`，完整 PASS
+  与 nonzero exit 冲突为 `INFRA_ERROR`；实际退出码写入
+  `details.process_exit_code`，不再被跳过或吞掉。
+- 新增/扩展回归覆盖 compatibility missing/duplicate/orphan/before-result/command mismatch/
+  status mismatch、reporter 去重、static guard mutation，以及 nonzero official 的 truncated、
+  malformed、semantic FAIL、PASS/exit conflict 四种映射。runner exact inventory 从 134
+  更新为 135；其他 unit method 数不变。
+- 首轮聚焦结果：official validator 111/111 PASS，failure reporter 9/9 PASS，静态 guard
+  本体 0 finding。guard mutation 首次因仍搜索重构前 Rust match 文本而 23 PASS / 1
+  FAIL；这是测试 fixture 失配，不是产品 PASS。fixture 改为篡改新的 `case_status` 分支后，
+  24/24 PASS；evaluator protocol 27/27 PASS，完整 suite runner 135/135 PASS（198.841 s）。
+  后续补入 invalid UTF-8/nonzero 子用例后，首次完整重跑为 134/135 PASS
+  （204.809 s）：唯一失败是新测试断言期待的文本片段与产品已返回的
+  `stdout is not valid UTF-8` 描述不一致，产品仍正确 fail closed。修正断言后再次完整
+  重跑为 135/135 PASS（202.188 s）；该中间失败未被隐藏。
+  补入 `failed_cases == 1` 与 `compatibility_result_cases == 1` 精确断言后，
+  official validator 已对当前最终测试内容再次重跑为 111/111 PASS（1.044 s）。
+  test asset unit 36/36 PASS、asset static check 0 finding、`cargo fmt --check` PASS、
+  canonical `--list` 发现 59 个注册 case，`git diff --check` PASS。
+- 外部 scorer 探针第一次使用非法 Python f-string 转义，生成器 SyntaxError 且没有输入；
+  因管道末端仍退出 0 而得到的 0 分输出明确作废，不能当作产品结论。修正生成器后，
+  当前 musl/glibc BusyBox scorer 均得到 54/55。唯一未通过键为 scorer 的 `kill 10`；
+  当前官方计划相对 scorer 另有 `printf "abc\\n"` 与动态 sleep/kill 行，而 scorer 仍有
+  `kill 10`。基线 `09f4076a…` producer 已按当前计划原样输出 legacy command，因此该
+  1 项是既有外部 scorer/计划漂移；本修复恢复基线兼容协议，不增加命令映射或特殊分支。
+  此探针只验证协议兼容，不替代 fresh guest official。
+- 本 checkpoint 尚未宣称 clean candidate 或 terminal state。下一步是提交此逻辑批次，
+  在精确 clean HEAD 上运行 quick/baseline，再分别 fresh 运行 RV/LA official；两次旧
+  `9ec972f4…` official 证据保留为历史但不再承担最终验收。
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
@@ -371,10 +438,10 @@ guest 语义失败，不是结构、identity、parser、runner、镜像或 QEMU 
 - [x] 无测例特化、假成功或吞退出码。
 - [x] 无凭据、无机器相关绝对路径、无大体积生成物。
 - [x] Linux/ABI/errno/并发/资源回收已检查；本改动只改变测试证据协议与解析，不改变这些可见语义。
-- [x] Goal A 要求的 clean quick、baseline 与双架构 official 已完成。
+- [ ] Goal A 要求的 clean quick、baseline 与双架构 official 已在修复后重新完成。
 - [x] AI 使用披露已更新到实现、验证与文档范围。
 - [x] 当前无外部代码来源；若变化则追加披露。
-- [x] 独立 reviewer 的 blocker/major finding 已清零。
+- [ ] 独立 reviewer 的 blocker/major finding 已清零。
 - [ ] 人工 PR 负责人能够不依赖 AI 解释和调试本 PR。
 
 审查人及结论：独立 Codex 只读 reviewer（自动化、非人工 PR 负责人）初审候选
@@ -383,8 +450,9 @@ Minor 已通过区分 `head_commit` 与 `evidence_commit` 处理。follow-up rev
 `cbb3baf6…` 的代码和三份 final-head summary 未发现实现问题，但因这些结果尚未写入
 tracked 日志而给出 1 Major；Checkpoint 6 补齐记录后，reviewer 复核为 0 Blocker /
 0 Major / 0 Minor / 0 Nit。terminal reviewer 随后对精确 `1a320a9f…`、最终两份 clean
-summary、镜像与推送前远端 freshness 再次给出 0 Blocker / 0 Major / 0 Minor / 0 Nit，Goal A 独立
-review 门禁满足。
+summary、镜像与推送前远端 freshness 再次给出 0 Blocker / 0 Major / 0 Minor / 0 Nit；
+但对后续精确 `0b4f3f21…` 的更完整复核发现上述 2 Major，因此当前独立 review 门禁
+尚未满足，旧的零 finding 结论不能替代修复后的重新审查。
 
 # 9. 已知限制、后续工作与回滚
 
@@ -398,8 +466,8 @@ review 门禁满足。
 
 ## 后续工作
 
-Goal A 已停止在 `READY_FOR_SEMANTIC_FIX`。语义 failure 的修复必须作为独立 Goal B 或
-后续任务显式启动；本任务不自动进入语义修复。
+Goal A 当前仍在证据基础设施修复中。语义 failure 的修复仍必须作为独立 Goal B 或
+后续任务显式启动；本任务不进入语义修复。
 
 ## 回滚方式
 
@@ -407,11 +475,9 @@ Goal A 已停止在 `READY_FOR_SEMANTIC_FIX`。语义 failure 的修复必须作
 
 # 10. 最终摘要
 
-Goal A 唯一终态：`READY_FOR_SEMANTIC_FIX`。
+Goal A 当前状态：`IN_PROGRESS`。
 
-实现、final 与 terminal quick/baseline 均有 clean/stable provenance；RV/LA official
-均完整执行 24/24 groups、2544/2544 cases、0 infrastructure error，并保留为真实语义
-`FAIL`（115/159 findings），没有宣称 official/full PASS。两镜像哈希未变、overlay 无
-残留，独立 terminal review 为 0 Blocker / 0 Major / 0 Minor / 0 Nit，稳定化分支已普通
-push 且远端 head/权威基线精确验证。未修改或推进 `main`，未开始 Goal B；PR Ready 前
-仍须真实人工负责人完成理解与复核声明。
+此前 fresh RV/LA official 确实完整执行 24/24 groups、2544/2544 cases 并把语义失败
+保留为 `FAIL`（115/159 findings），但最终 reviewer 发现 scorer 兼容记录缺失和 nonzero
+official 退出绕过结构解析两个 Major。修复、fresh 双架构重跑、零 Major 复核与最终普通
+push 完成前，不再声明 `READY_FOR_SEMANTIC_FIX`。未修改或推进 `main`，未开始 Goal B。

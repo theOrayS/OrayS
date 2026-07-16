@@ -1085,7 +1085,8 @@ def _validate_busybox(
     completed_results: list[tuple[int, str, str]] = []
     starts = 0
     result_records = 0
-    if legacy_results:
+    compatibility_records = 0
+    if legacy_results and not has_structured_records:
         issues.append(
             issue(
                 "busybox-legacy-identity",
@@ -1093,14 +1094,6 @@ def _validate_busybox(
                 group.label,
             )
         )
-        if has_structured_records:
-            issues.append(
-                issue(
-                    "busybox-mixed-protocol",
-                    "legacy and structured BusyBox case records must not be mixed",
-                    group.label,
-                )
-            )
         accepted_results = [
             (ordinal, command, status)
             for ordinal, (command, status) in enumerate(legacy_results, start=1)
@@ -1111,6 +1104,7 @@ def _validate_busybox(
     elif has_structured_records:
         current_ordinal: int | None = None
         current_result: tuple[int, str, str] | None = None
+        current_compatibility: tuple[str, str] | None = None
         seen_ordinals: set[int] = set()
         for line in group.lines:
             if match := BUSYBOX_CASE_START_RE.fullmatch(line):
@@ -1136,6 +1130,7 @@ def _validate_busybox(
                 seen_ordinals.add(ordinal)
                 current_ordinal = ordinal
                 current_result = None
+                current_compatibility = None
                 continue
             if match := BUSYBOX_CASE_RESULT_RE.fullmatch(line):
                 ordinal = int(match.group(1))
@@ -1169,6 +1164,60 @@ def _validate_busybox(
                 else:
                     current_result = (ordinal, command, status)
                     accepted_results.append(current_result)
+                    if current_compatibility is not None and current_compatibility != (
+                        command,
+                        status,
+                    ):
+                        issues.append(
+                            issue(
+                                "busybox-compatibility-mismatch",
+                                f"ordinal {ordinal} structured result {(command, status)!r} "
+                                f"does not match compatibility result {current_compatibility!r}",
+                                group.label,
+                            )
+                        )
+                continue
+            if match := BUSYBOX_LEGACY_RESULT_RE.fullmatch(line):
+                command = match.group(1)
+                status = match.group(2).lower()
+                compatibility_records += 1
+                if current_ordinal is None:
+                    issues.append(
+                        issue(
+                            "busybox-orphan-compatibility-result",
+                            f"compatibility result {(command, status)!r} appeared outside a case frame",
+                            group.label,
+                        )
+                    )
+                elif current_compatibility is not None:
+                    issues.append(
+                        issue(
+                            "busybox-duplicate-compatibility-result",
+                            f"ordinal {current_ordinal} emitted more than one compatibility result",
+                            group.label,
+                        )
+                    )
+                else:
+                    current_compatibility = (command, status)
+                    if current_result is None:
+                        issues.append(
+                            issue(
+                                "busybox-compatibility-before-result",
+                                f"ordinal {current_ordinal} emitted its compatibility result "
+                                "before the structured terminal result",
+                                group.label,
+                            )
+                        )
+                    elif current_result[1:] != current_compatibility:
+                        issues.append(
+                            issue(
+                                "busybox-compatibility-mismatch",
+                                f"ordinal {current_ordinal} structured result "
+                                f"{current_result[1:]!r} does not match compatibility result "
+                                f"{current_compatibility!r}",
+                                group.label,
+                            )
+                        )
                 continue
             if match := BUSYBOX_CASE_END_RE.fullmatch(line):
                 ordinal = int(match.group(1))
@@ -1190,6 +1239,7 @@ def _validate_busybox(
                     )
                     current_ordinal = None
                     current_result = None
+                    current_compatibility = None
                 else:
                     if current_result is None:
                         issues.append(
@@ -1199,10 +1249,19 @@ def _validate_busybox(
                                 group.label,
                             )
                         )
-                    else:
+                    if current_compatibility is None:
+                        issues.append(
+                            issue(
+                                "busybox-missing-compatibility-result",
+                                f"ordinal {ordinal} ended without a scorer-compatible result",
+                                group.label,
+                            )
+                        )
+                    if current_result is not None and current_compatibility is not None:
                         completed_results.append(current_result)
                     current_ordinal = None
                     current_result = None
+                    current_compatibility = None
         if current_ordinal is not None:
             issues.append(
                 issue(
@@ -1247,11 +1306,7 @@ def _validate_busybox(
             )
 
     passed = sum(status == "success" for _ordinal, _command, status in accepted_results)
-    failed = sum(status == "fail" for _command, status in legacy_results) + sum(
-        match.group(2).lower() == "fail"
-        for line in group.lines
-        if (match := BUSYBOX_CASE_RESULT_RE.fullmatch(line))
-    )
+    failed = sum(status == "fail" for _ordinal, _command, status in accepted_results)
     if not accepted_results:
         issues.append(issue("busybox-empty", "busybox group contains no case results", group.label))
     if failed:
@@ -1260,6 +1315,7 @@ def _validate_busybox(
         "started_cases": starts,
         "executed_cases": starts,
         "result_cases": result_records,
+        "compatibility_result_cases": compatibility_records,
         "completed_cases": len(completed_results),
         "passed_cases": passed,
         "failed_cases": failed,

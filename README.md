@@ -43,11 +43,11 @@ Y8.   .8P 88       88.  .88 88.  .88 d8'   .8P
 | PR3 语义证据与双架构 CI | [可信 semantic-evidence 流程](docs/pr3-semantic-evidence.md) |
 ## 当前状态
 
-**生产功能状态截至 2026-06-29；测试基础设施验证截至 2026-07-15**：
+**生产功能状态截至 2026-06-29；测试基础设施验证截至 2026-07-16**：
 
 - 完成 **531 次项目提交**
 - syscall dispatcher 已注册 **231 个唯一 Linux syscall 编号**
-- 统一在 `test/` 注册 **19 个静态守卫及 26 个 Python 单元测试套件（681 个方法）**，用于检查
+- 统一在 `test/` 注册 **19 个静态守卫及 26 个 Python 单元测试套件（690 个方法）**，用于检查
   fake success、用户指针、runner/parser、FD/资源限制、PR3 evidence/CI 和 syscall 语义回归。
 
 #### 核心功能实现

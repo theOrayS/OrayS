@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: `READY_FOR_SEMANTIC_FIX`
+- State: `IN_PROGRESS`
 - Branch: `stabilize/post-integration-gates-20260716`
 - Authoritative base: `origin/integration/four-prs-20260715`
 - Base commit and initial HEAD: `09f4076ac151e0e7800103de724d9042230738b5`
@@ -68,6 +68,13 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 5. Treat legacy text-only captures as immutable diagnostic input. They may
    demonstrate the ambiguity but must not silently satisfy the new canonical
    identity contract.
+6. Preserve the existing official scorer line as a compatibility projection
+   inside each structured frame. The parser must bind that projection to the
+   frame's command and status exactly; an unframed legacy-only stream remains
+   non-canonical and fail-closed.
+7. Parse official captures before classifying non-infrastructure nonzero child
+   exits. Structural errors take precedence over a semantic `FAIL`, while a
+   complete structured failure remains `FAIL` with the process status retained.
 
 ## Phases and checkpoints
 
@@ -121,10 +128,21 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 ### Phase 5 — independent review and terminal state
 
 - [x] Obtain an independent read-only review of the final diff and evidence.
-- [x] Resolve all blocker/major findings and rerun affected validation.
-- [x] Complete the development log, AI disclosure, risks, and rollback record.
-- [x] Push only `stabilize/post-integration-gates-20260716` normally.
-- [x] Declare exactly one Goal A terminal state and stop before Goal B.
+- [ ] Resolve all blocker/major findings and rerun affected validation.
+- [ ] Complete the development log, AI disclosure, risks, and rollback record.
+- [ ] Push only `stabilize/post-integration-gates-20260716` normally.
+- [ ] Declare exactly one Goal A terminal state and stop before Goal B.
+
+### Phase 6 — late review remediation
+
+- [x] Emit one scorer-compatible BusyBox result inside every ordinal frame and
+  reject missing, duplicate, orphaned, reordered, or mismatched projections.
+- [x] Preserve legacy-only fail-closed behavior and prevent reporter double
+  counting of the paired compatibility projection.
+- [x] Parse official output on non-infrastructure nonzero child exits and prove
+  that truncated/malformed output remains `INFRA_ERROR`.
+- [ ] Rerun focused, quick, baseline, fresh RV official, fresh LA official, and
+  independent read-only review on the corrected clean candidate.
 
 ## Risks and mitigations
 
@@ -132,6 +150,8 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 |---|---|
 | A delimiter in command text makes the record ambiguous | Use a numeric identity in a fixed anchored prefix and treat the remaining text as payload. Add malformed-record tests. |
 | Compatibility parsing hides replay or omission | Legacy text-only results remain non-canonical and fail-closed; fresh producer output is required for terminal evidence. |
+| A structured producer breaks the existing external scorer protocol | Emit exactly one legacy-compatible projection inside each ordinal frame and bind its command/status to the structured terminal record. |
+| A nonzero official child exit bypasses structural validation | Parse every non-infrastructure official capture before applying process-exit semantics; malformed or incomplete evidence remains infrastructure error. |
 | A semantic failure is mislabeled as infrastructure | Keep structural findings and test findings in separate collections and assert runner mapping. |
 | Plan drift is mistaken for a parser fix | Keep the external row order and text unchanged; migrate only the tracked representation and verify source metadata/hash. |
 | Architecture/libc-specific logic enters generic code | Use one identity implementation and exercise all canonical labels in table-driven tests. |

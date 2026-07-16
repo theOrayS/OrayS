@@ -29,6 +29,7 @@ def busybox_frame(ordinal: int, command: str, status: str = "success") -> str:
         (
             f"#### OS COMP BUSYBOX CASE START ordinal={ordinal} ####",
             f"BUSYBOX CASE RESULT ordinal={ordinal} status={status} command={command}",
+            f"testcase busybox {command} {status}",
             f"#### OS COMP BUSYBOX CASE END ordinal={ordinal} ####",
         )
     )
@@ -640,9 +641,53 @@ ltp cases: 2 passed, 0 failed, 0 timed out
                 (
                     "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
                     "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                    "testcase busybox first success",
                 )
             ),
             "orphan-result": "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+            "missing-compatibility": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "compatibility-command-mismatch": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                    "testcase busybox second success",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "compatibility-status-mismatch": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                    "testcase busybox first fail",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "compatibility-before-result": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "testcase busybox first success",
+                    "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "duplicate-compatibility": "\n".join(
+                (
+                    "#### OS COMP BUSYBOX CASE START ordinal=1 ####",
+                    "BUSYBOX CASE RESULT ordinal=1 status=success command=first",
+                    "testcase busybox first success",
+                    "testcase busybox first success",
+                    "#### OS COMP BUSYBOX CASE END ordinal=1 ####",
+                )
+            ),
+            "orphan-compatibility": (
+                "testcase busybox first success\n" + busybox_frame(1, "first")
+            ),
             "mixed-with-fail": (
                 f"{busybox_frame(1, 'first', 'fail')}\n"
                 "testcase busybox first success"
@@ -661,6 +706,20 @@ ltp cases: 2 passed, 0 failed, 0 timed out
                     self.assertIn(
                         "busybox-failure",
                         {item["kind"] for item in result["failures"]},
+                    )
+                expected_kinds = {
+                    "missing-compatibility": "busybox-missing-compatibility-result",
+                    "compatibility-command-mismatch": "busybox-compatibility-mismatch",
+                    "compatibility-status-mismatch": "busybox-compatibility-mismatch",
+                    "compatibility-before-result": "busybox-compatibility-before-result",
+                    "duplicate-compatibility": "busybox-duplicate-compatibility-result",
+                    "orphan-compatibility": "busybox-orphan-compatibility-result",
+                }
+                if expected_kind := expected_kinds.get(label):
+                    self.assertIn(
+                        expected_kind,
+                        {item["kind"] for item in result["errors"]},
+                        result,
                     )
 
     def test_busybox_legacy_text_protocol_remains_fail_closed(self) -> None:
@@ -718,6 +777,8 @@ ltp cases: 2 passed, 0 failed, 0 timed out
         self.assertEqual(result["status"], "FAIL", result)
         self.assertEqual(result["error_count"], 0, result)
         self.assertGreater(result["failure_count"], 0, result)
+        self.assertEqual(result["groups"][0]["failed_cases"], 1, result)
+        self.assertEqual(result["groups"][0]["compatibility_result_cases"], 1, result)
         for marker in ("TFAIL: hidden mismatch", "kernel panic: fatal"):
             with self.subTest(marker=marker):
                 self.assert_status(

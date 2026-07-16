@@ -76,6 +76,12 @@ BUSYBOX_FAIL_RE = re.compile(
     r"^BUSYBOX CASE RESULT ordinal=([1-9]\d*) status=fail command=(.+)$"
 )
 BUSYBOX_LEGACY_FAIL_RE = re.compile(r"^testcase busybox\s+(.+?)\s+fail\s*$")
+BUSYBOX_CASE_START_RE = re.compile(
+    r"^#### OS COMP BUSYBOX CASE START ordinal=([1-9]\d*) ####$"
+)
+BUSYBOX_CASE_END_RE = re.compile(
+    r"^#### OS COMP BUSYBOX CASE END ordinal=([1-9]\d*) ####$"
+)
 OFFICIAL_GROUP_FAIL_RE = re.compile(r"\bFAIL OFFICIAL TEST GROUP\s+(.+?)\s*:\s*(-?\d+)")
 OFFICIAL_GROUP_TIMEOUT_RE = re.compile(r"\bTIMEOUT OFFICIAL TEST GROUP\s+(.+?)\s+after\s+(\d+)s", re.I)
 AUTORUN_TIMEOUT_RE = re.compile(r"\bautorun:\s+(.+?)\s+timed out after\s+(\d+)s", re.I)
@@ -318,16 +324,30 @@ def parse_log(
     )
     current_group = "ungrouped"
     current_ltp: LtpCase | None = None
+    current_busybox_ordinal: str | None = None
+    current_busybox_failure: tuple[str, str] | None = None
 
     for raw in stdout_text.splitlines():
         line = clean(raw)
         if match := GROUP_START_RE.search(line):
             current_group = match.group(1)
             current_ltp = None
+            current_busybox_ordinal = None
+            current_busybox_failure = None
             continue
         if GROUP_END_RE.search(line):
             current_group = "ungrouped"
             current_ltp = None
+            current_busybox_ordinal = None
+            current_busybox_failure = None
+            continue
+        if match := BUSYBOX_CASE_START_RE.fullmatch(line):
+            current_busybox_ordinal = match.group(1)
+            current_busybox_failure = None
+            continue
+        if BUSYBOX_CASE_END_RE.fullmatch(line):
+            current_busybox_ordinal = None
+            current_busybox_failure = None
             continue
         if match := LTP_LIST_RE.search(line):
             report.ltp_manifests.append(line.strip())
@@ -366,11 +386,18 @@ def parse_log(
             report.libctest_summaries.append(f"{current_group}: {line.strip()}")
             continue
         if match := BUSYBOX_FAIL_RE.search(line):
+            current_busybox_failure = (match.group(1), match.group(2))
             report.busybox_failures.append(
                 f"{current_group}: ordinal {match.group(1)}: {match.group(2)}"
             )
             continue
         if match := BUSYBOX_LEGACY_FAIL_RE.search(line):
+            if (
+                current_busybox_ordinal is not None
+                and current_busybox_failure
+                == (current_busybox_ordinal, match.group(1))
+            ):
+                continue
             report.busybox_failures.append(
                 f"{current_group}: legacy-unidentified: {match.group(1)}"
             )

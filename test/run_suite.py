@@ -650,7 +650,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.socket_message_and_buffer_semantics": 10,
     "unit.stat_metadata_semantics": 7,
     "unit.semantic_evidence": 75,
-    "unit.suite_runner": 134,
+    "unit.suite_runner": 135,
     "unit.synthetic_capability_integrity": 5,
     "unit.syscall_boundary_regressions": 26,
     "unit.test_asset_integrity": 36,
@@ -3119,7 +3119,7 @@ def run_case(
         elif return_code in case.get("infrastructure_exit_codes", []):
             record["status"] = "INFRA_ERROR"
             record["result"] = f"child reported infrastructure exit code {return_code}"
-        elif return_code != 0:
+        elif return_code != 0 and case["result_contract"]["type"] != "official":
             record["status"] = "FAIL"
             record["result"] = f"child exited with status {return_code}"
         else:
@@ -3128,8 +3128,23 @@ def run_case(
             except (OSError, OutputIntegrityError) as error:
                 record["status"] = "INFRA_ERROR"
                 record["result"] = f"captured output is malformed: {error}"
+                if case["result_contract"]["type"] == "official" and return_code != 0:
+                    record["details"] = {
+                        "output_integrity_error": str(error),
+                        "process_exit_code": return_code,
+                    }
             else:
                 status, result, details = parse_contract(case, stdout, stderr)
+                if case["result_contract"]["type"] == "official" and return_code != 0:
+                    details = {**details, "process_exit_code": return_code}
+                    if status == "PASS":
+                        status = "INFRA_ERROR"
+                        result = (
+                            "official output reports complete success but the child exited "
+                            f"with status {return_code}"
+                        )
+                    elif status == "FAIL":
+                        result = f"{result}; child exited with status {return_code}"
                 record["status"] = status
                 record["result"] = result
                 record["details"] = details

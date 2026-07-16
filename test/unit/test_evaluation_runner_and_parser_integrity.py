@@ -759,8 +759,8 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         text = self.replace_once(
             text,
-            "Ok(status) if expected_status.is_met_by(status) => {",
-            'Ok(status) if expected_status.is_met_by(status) || line == "false" => {',
+            'Ok(status) if expected_status.is_met_by(status) => "success",',
+            'Ok(status) if expected_status.is_met_by(status) || line == "false" => "success",',
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
@@ -963,6 +963,18 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("stable ordinal START/RESULT/END", result.stdout)
+
+        compatibility_tree = self.make_tree()
+        compatibility_path = compatibility_tree / "user/shell/src/cmd.rs"
+        compatibility_text = self.replace_once(
+            compatibility_path.read_text(encoding="utf-8"),
+            "testcase busybox {label_line} {case_status}",
+            "compatibility record removed",
+        )
+        compatibility_path.write_text(compatibility_text, encoding="utf-8")
+        compatibility_result = self.run_guard(compatibility_tree)
+        self.assertNotEqual(compatibility_result.returncode, 0)
+        self.assertIn("scorer-compatible result projection", compatibility_result.stdout)
 
     def test_detects_blacklist_default(self) -> None:
         tree = self.make_tree()

@@ -2738,38 +2738,32 @@ fn run_busybox_suite(cwd: &str, suite_dir: &str) -> Result<(), String> {
             )
         };
         let expected_status = shell_command_exit_expectation(label_line);
-        match run_user_program_argv_in_timeout(
+        let case_status = match run_user_program_argv_in_timeout(
             cwd,
             &[&busybox_path, "sh", "-c", &command],
             BUSYBOX_CASE_TIMEOUT_SECS,
         ) {
-            Ok(status) if expected_status.is_met_by(status) => {
-                println!(
-                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=success command={label_line}"
-                );
-            }
+            Ok(status) if expected_status.is_met_by(status) => "success",
             Ok(status @ (137 | 143)) => {
-                println!(
-                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=fail command={label_line}"
-                );
                 println!("return: {status}, timeout: {BUSYBOX_CASE_TIMEOUT_SECS}s");
+                "fail"
             }
             Ok(status) => {
-                println!(
-                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=fail command={label_line}"
-                );
                 println!("return: {status}, cmd: {label_line}");
+                "fail"
             }
             Err(err) => {
-                println!(
-                    "BUSYBOX CASE RESULT ordinal={case_ordinal} status=fail command={label_line}"
-                );
                 if err.to_ascii_lowercase().contains("timeout") {
                     println!("timeout: {BUSYBOX_CASE_TIMEOUT_SECS}s");
                 }
                 println!("{err}");
+                "fail"
             }
-        }
+        };
+        println!(
+            "BUSYBOX CASE RESULT ordinal={case_ordinal} status={case_status} command={label_line}"
+        );
+        println!("testcase busybox {label_line} {case_status}");
         println!("#### OS COMP BUSYBOX CASE END ordinal={case_ordinal} ####");
     }
     uspace::cleanup_user_processes();

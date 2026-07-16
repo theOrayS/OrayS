@@ -124,6 +124,7 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
         identity_tokens = (
             "let mut case_ordinal = 0usize",
             "case_ordinal += 1",
+            "let case_status = match",
             "OS COMP BUSYBOX CASE START ordinal={case_ordinal}",
             "BUSYBOX CASE RESULT ordinal={case_ordinal} status=",
             "OS COMP BUSYBOX CASE END ordinal={case_ordinal}",
@@ -132,9 +133,10 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
             findings.append(
                 "user/shell/src/cmd.rs: BusyBox execution must emit one stable ordinal START/RESULT/END frame per non-empty source row"
             )
-        if "testcase busybox" in busybox_runner:
+        compatibility_token = "testcase busybox {label_line} {case_status}"
+        if busybox_runner.count(compatibility_token) != 1:
             findings.append(
-                "user/shell/src/cmd.rs: legacy text-only BusyBox result records are forbidden"
+                "user/shell/src/cmd.rs: BusyBox execution must emit exactly one scorer-compatible result projection from the structured case status"
             )
 
     forbidden_uspace_tokens = {

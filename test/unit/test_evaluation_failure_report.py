@@ -160,6 +160,7 @@ class EvaluationFailureReportTest(unittest.TestCase):
             "#### OS COMP TEST GROUP START busybox-musl ####\n"
             "#### OS COMP BUSYBOX CASE START ordinal=7 ####\n"
             "BUSYBOX CASE RESULT ordinal=7 status=fail command=false\n"
+            "testcase busybox false fail\n"
             "#### OS COMP BUSYBOX CASE END ordinal=7 ####\n"
             "#### OS COMP TEST GROUP END busybox-musl ####\n"
         )

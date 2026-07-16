@@ -499,7 +499,7 @@
       "description": "Manifest and runner lifecycle integration fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_suite_runner.py"],
       "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 134, "identity_binding": true},
+      "result_contract": {"type": "unittest", "expected_tests": 135, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_suite_runner.py"], "required_commands": []
     },
     {

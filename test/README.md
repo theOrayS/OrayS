@@ -106,7 +106,7 @@ python3 -I -S -B -X pycache_prefix=/dev/null /absolute/path/to/worktree/test/run
 | Profile | Contents | Architecture argument |
 | --- | --- | --- |
 | `checks` | All 19 registered static/structural guards | none |
-| `unit` | All 26 Python unit scripts with 689 exact-counted methods | none |
+| `unit` | All 26 Python unit scripts with 690 exact-counted methods | none |
 | `quick` | `checks` followed by `unit` (45 planned cases) | none |
 | `evidence-host` | One fail-closed PR3 host evidence shard | none |
 | `evidence-runtime` | One fixed build plus repository-contained ABI smoke shard | required: `rv` or `la` |
@@ -233,9 +233,13 @@ The canonical validator binds output to exact tracked plans:
   complete START/RUN/RESULT/END lifecycle per identity;
 - BusyBox musl and glibc must each emit exactly 55 ordered START/RESULT/END
   frames whose one-based execution ordinals and command payloads match
-  `test/evaluation/official_case_plan.json`; replayed ordinals, duplicate
-  explicit IDs, invented identities, missing rows, reordering, malformed or
-  incomplete frames, and any semantic failure are all non-passing;
+  `test/evaluation/official_case_plan.json`. Each frame also contains exactly
+  one `testcase busybox ... success|fail` compatibility projection for the
+  existing official scorer; its command and status must exactly match the
+  structured terminal record. Replayed ordinals, duplicate explicit IDs,
+  invented identities, missing rows or projections, reordering, mismatched or
+  malformed records, incomplete frames, and any semantic failure are all
+  non-passing;
 - libctest musl and glibc must each execute exactly 217 unique ordered
   `(binary, case)` identities from that same tracked plan, with paired
   start/result/end records and one exact summary;
@@ -256,10 +260,21 @@ BusyBox command text is evidence payload, not a unique identity. The tracked
 strings because `echo "bbbbbbb" >> test.txt` is an intentional state-mutating
 step at ordinals 37 and 41. Those are two valid cases. The producer derives the
 ordinal from actual non-empty execution order, and the parser independently
-checks ordinal, payload, plan order, and frame completion. A replay of the same
-ordinal or a duplicate explicit plan ID still fails closed. Legacy text-only
-records remain useful for forensic replay but are structurally noncanonical and
-cannot produce official PASS.
+checks ordinal, payload, plan order, frame completion, and the paired scorer
+projection. The projection is compatibility output, never case identity. A
+replay of the same ordinal, a duplicate/mismatched projection, or a duplicate
+explicit plan ID still fails closed. Legacy text-only records outside a
+structured frame remain useful for forensic replay but are structurally
+noncanonical and cannot produce official PASS.
+
+For an `official` case, a non-infrastructure nonzero child exit never bypasses
+the validator. The runner first parses both captured streams: incomplete or
+malformed structure remains `INFRA_ERROR`, a complete transcript with explicit
+test failures remains `FAIL`, and a complete PASS transcript conflicting with a
+nonzero child exit is `INFRA_ERROR`. The actual nonzero status is retained in
+`details.process_exit_code`. Signal exits, timeouts, process-containment errors,
+and manifest-declared infrastructure exit codes retain their stronger runner
+classifications.
 
 ### LTP-only promotion review
 
