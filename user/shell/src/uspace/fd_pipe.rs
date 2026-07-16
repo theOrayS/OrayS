@@ -56,6 +56,15 @@ enum TeeAttempt {
     Copied(usize),
 }
 
+#[derive(Clone, Copy)]
+enum SpliceAttempt {
+    SourceEmpty,
+    SourceEof,
+    DestinationClosed,
+    DestinationFull,
+    Moved(usize),
+}
+
 struct PipePeerCounts {
     readers: AtomicUsize,
     writers: AtomicUsize,
@@ -110,11 +119,17 @@ impl Drop for PipeEndpoint {
                 .upgrade()
                 .is_some_and(|state| !Arc::ptr_eq(&state, &self.async_state))
         });
-        if self.readable {
-            self.peers.readers.fetch_sub(1, Ordering::AcqRel);
-        }
-        if self.writable {
-            self.peers.writers.fetch_sub(1, Ordering::AcqRel);
+        {
+            // Peer disappearance is serialized with ring mutations.  A splice
+            // therefore either observes the final close and preserves its
+            // source, or completes before that close becomes visible.
+            let _ring = self.buffer.lock();
+            if self.readable {
+                self.peers.readers.fetch_sub(1, Ordering::AcqRel);
+            }
+            if self.writable {
+                self.peers.writers.fetch_sub(1, Ordering::AcqRel);
+            }
         }
         if let Some(path) = &self.fifo_path {
             if self.peers.readers.load(Ordering::Acquire) == 0
@@ -248,6 +263,24 @@ impl PipeRingBuffer {
             }
         }
         copied
+    }
+
+    fn consume(&mut self, len: usize) {
+        let count = len.min(self.available_read());
+        if count == 0 {
+            return;
+        }
+        self.status = RingBufferStatus::Normal;
+        self.head = (self.head + count) % self.capacity;
+        if self.head == self.tail {
+            self.status = RingBufferStatus::Empty;
+        }
+    }
+
+    fn move_into(&mut self, dst: &mut Self, len: usize) -> usize {
+        let moved = self.copy_into(dst, len);
+        self.consume(moved);
+        moved
     }
 
     const fn available_read(&self) -> usize {
@@ -581,6 +614,114 @@ impl PipeEndpoint {
                 }
             }
         }
+    }
+
+    pub(super) fn splice_to(
+        &self,
+        status_flags: u32,
+        dst: &Self,
+        dst_status_flags: u32,
+        len: usize,
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        if len == 0 {
+            return Ok(0);
+        }
+        if !self.readable || !dst.writable {
+            return Err(LinuxError::EBADF);
+        }
+        if Arc::ptr_eq(&self.buffer, &dst.buffer) {
+            return Err(LinuxError::EINVAL);
+        }
+        let nonblocking =
+            nonblocking || Self::nonblocking(status_flags) || Self::nonblocking(dst_status_flags);
+        loop {
+            // Both rings stay locked from the final readiness decision through
+            // source consumption and destination publication.  The endpoint
+            // counters are updated inside the same critical section, while
+            // notifications happen after the locks are released.
+            let attempt = match with_ordered_arc_mutex_pair(
+                &self.buffer,
+                &dst.buffer,
+                |src_ring, dst_ring| {
+                    let source_empty = src_ring.available_read() == 0;
+                    let source_closed = self.read_peer_closed();
+                    let destination_full = dst_ring.available_write() == 0;
+                    let destination_closed = dst.write_peer_closed();
+                    let attempt = if source_empty && !source_closed {
+                        SpliceAttempt::SourceEmpty
+                    } else if destination_full && destination_closed {
+                        SpliceAttempt::DestinationClosed
+                    } else if destination_full {
+                        SpliceAttempt::DestinationFull
+                    } else if destination_closed {
+                        SpliceAttempt::DestinationClosed
+                    } else if source_empty {
+                        SpliceAttempt::SourceEof
+                    } else {
+                        Self::splice_locked(src_ring, dst_ring, len)
+                    };
+                    if let SpliceAttempt::Moved(moved) = attempt {
+                        self.peers.buffered.fetch_sub(moved, Ordering::AcqRel);
+                        dst.peers.buffered.fetch_add(moved, Ordering::AcqRel);
+                    }
+                    attempt
+                },
+            ) {
+                Some(attempt) => attempt,
+                None => return Err(LinuxError::EINVAL),
+            };
+            match attempt {
+                SpliceAttempt::SourceEmpty => {
+                    if Self::interrupted() {
+                        return Err(LinuxError::EINTR);
+                    }
+                    if nonblocking {
+                        return Err(LinuxError::EAGAIN);
+                    }
+                    self.wait_for_readable()?;
+                }
+                SpliceAttempt::SourceEof => return Ok(0),
+                SpliceAttempt::DestinationClosed => {
+                    Self::raise_sigpipe();
+                    return Err(LinuxError::EPIPE);
+                }
+                SpliceAttempt::DestinationFull => {
+                    if nonblocking {
+                        return Err(LinuxError::EAGAIN);
+                    }
+                    if Self::interrupted() {
+                        return Err(LinuxError::EINTR);
+                    }
+                    dst.wait_for_writable()?;
+                }
+                SpliceAttempt::Moved(moved) => {
+                    if moved > 0 {
+                        self.notify_writable();
+                        dst.notify_readable();
+                    }
+                    return Ok(moved);
+                }
+            }
+        }
+    }
+
+    fn splice_locked(
+        src_ring: &mut PipeRingBuffer,
+        dst_ring: &mut PipeRingBuffer,
+        len: usize,
+    ) -> SpliceAttempt {
+        let available_read = src_ring.available_read();
+        if available_read == 0 {
+            return SpliceAttempt::SourceEmpty;
+        }
+        let available_write = dst_ring.available_write();
+        if available_write == 0 {
+            return SpliceAttempt::DestinationFull;
+        }
+        SpliceAttempt::Moved(
+            src_ring.move_into(dst_ring, len.min(available_read).min(available_write)),
+        )
     }
 
     fn tee_locked(

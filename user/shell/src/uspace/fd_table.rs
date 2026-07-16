@@ -2998,6 +2998,9 @@ pub(super) fn sys_splice(
     len: usize,
     flags: usize,
 ) -> isize {
+    if len == 0 {
+        return 0;
+    }
     let supported_flags = (general::SPLICE_F_MOVE
         | general::SPLICE_F_NONBLOCK
         | general::SPLICE_F_MORE
@@ -3006,36 +3009,97 @@ pub(super) fn sys_splice(
         return neg_errno(LinuxError::EINVAL);
     }
     let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
+    let fd_in = fd_in as i32;
+    let fd_out = fd_out as i32;
 
-    let mut off_in = match read_copy_file_range_offset(process, off_in_ptr) {
-        Ok(offset) => offset,
-        Err(err) => return neg_errno(err),
+    // Linux pins both descriptors before inspecting user offsets.  Clone migrated
+    // pipe descriptions in that same fd-table critical section so a concurrent
+    // close/reuse cannot replace an endpoint after it has been classified.
+    let ((input_description, input_pipe), (output_description, output_pipe)) = {
+        let table = process.fds.lock();
+        let input = match table.splice_pipe_snapshot(fd_in) {
+            Ok(snapshot) => snapshot,
+            Err(err) => return neg_errno(err),
+        };
+        let output = match table.splice_pipe_snapshot(fd_out) {
+            Ok(snapshot) => snapshot,
+            Err(err) => return neg_errno(err),
+        };
+        (input, output)
     };
+    // Pipe offsets are rejected by object type, without dereferencing the user
+    // pointer.  Both fd lookups above intentionally precede these checks.
+    if input_pipe.is_some() && off_in_ptr != 0 {
+        return neg_errno(LinuxError::ESPIPE);
+    }
+    if output_pipe.is_some() && off_out_ptr != 0 {
+        return neg_errno(LinuxError::ESPIPE);
+    }
+    // __do_splice copies the output offset before the input offset.
     let mut off_out = match read_copy_file_range_offset(process, off_out_ptr) {
         Ok(offset) => offset,
         Err(err) => return neg_errno(err),
     };
-    let fd_in = fd_in as i32;
-    let fd_out = fd_out as i32;
+    let mut off_in = match read_copy_file_range_offset(process, off_in_ptr) {
+        Ok(offset) => offset,
+        Err(err) => return neg_errno(err),
+    };
+    // The migrated pipe-to-pipe path uses only the descriptions pinned by the
+    // first fd-table critical section.  No later close or descriptor-number
+    // reuse can replace either endpoint during validation or transfer.
+    if let (Some(input), Some(output)) = (input_pipe.as_ref(), output_pipe.as_ref()) {
+        let result = pipe_endpoint(input).and_then(|source| {
+            source.splice_to(
+                input.status_flags(),
+                pipe_endpoint(output)?,
+                output.status_flags(),
+                len,
+                nonblocking,
+            )
+        });
+        return match result {
+            Ok(moved) => moved as isize,
+            Err(err) => neg_errno(err),
+        };
+    }
     let file_size_limit = process.get_rlimit(RLIMIT_FSIZE_RESOURCE).current();
 
     let (in_kind, out_kind) = {
         let mut table = process.fds.lock();
-        let in_kind = match splice_input_kind(&table, fd_in, off_in.is_some()) {
-            Ok(kind) => kind,
-            Err(err) => return neg_errno(err),
+        // Legacy non-pipe adapters are still table-owned.  Refuse a changed
+        // slot rather than classifying or operating on an object installed
+        // under the same descriptor number after the entry snapshot.
+        if input_pipe.is_none() && !table.splice_snapshot_is_current(fd_in, input_description) {
+            return neg_errno(LinuxError::EBADF);
+        }
+        if output_pipe.is_none() && !table.splice_snapshot_is_current(fd_out, output_description) {
+            return neg_errno(LinuxError::EBADF);
+        }
+        let in_kind = if let Some(pipe) = input_pipe.as_ref() {
+            match pipe_endpoint(pipe) {
+                Ok(endpoint) if endpoint.readable() => SpliceEndpointKind::Pipe,
+                Ok(_) => return neg_errno(LinuxError::EBADF),
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            match splice_input_kind(&table, fd_in, off_in.is_some()) {
+                Ok(kind) => kind,
+                Err(err) => return neg_errno(err),
+            }
         };
-        let out_kind = match splice_output_kind(&table, fd_out, off_out.is_some()) {
-            Ok(kind) => kind,
-            Err(err) => return neg_errno(err),
+        let out_kind = if let Some(pipe) = output_pipe.as_ref() {
+            match pipe_endpoint(pipe) {
+                Ok(endpoint) if endpoint.writable() => SpliceEndpointKind::Pipe,
+                Ok(_) => return neg_errno(LinuxError::EBADF),
+                Err(err) => return neg_errno(err),
+            }
+        } else {
+            match splice_output_kind(&table, fd_out, off_out.is_some()) {
+                Ok(kind) => kind,
+                Err(err) => return neg_errno(err),
+            }
         };
         if in_kind != SpliceEndpointKind::Pipe && out_kind != SpliceEndpointKind::Pipe {
-            return neg_errno(LinuxError::EINVAL);
-        }
-        if in_kind == SpliceEndpointKind::Pipe
-            && out_kind == SpliceEndpointKind::Pipe
-            && fd_in == fd_out
-        {
             return neg_errno(LinuxError::EINVAL);
         }
         if let Err(err) = validate_splice_output(
@@ -3052,26 +3116,6 @@ pub(super) fn sys_splice(
             return neg_errno(err);
         }
         (in_kind, out_kind)
-    };
-    let (input_pipe, output_pipe) = {
-        let table = process.fds.lock();
-        let input = if in_kind == SpliceEndpointKind::Pipe {
-            match table.splice_pipe_input(fd_in) {
-                Ok(pipe) => Some(pipe),
-                Err(err) => return neg_errno(err),
-            }
-        } else {
-            None
-        };
-        let output = if out_kind == SpliceEndpointKind::Pipe {
-            match table.splice_pipe_input(fd_out) {
-                Ok(pipe) => Some(pipe),
-                Err(err) => return neg_errno(err),
-            }
-        } else {
-            None
-        };
-        (input, output)
     };
     let mut copied = 0usize;
     let mut scratch = Vec::new();
@@ -3162,18 +3206,12 @@ pub(super) fn sys_splice(
             }
         }
         if out_kind == SpliceEndpointKind::Stream {
-            let splice_endpoints = {
+            let output_socket = {
                 let table = process.fds.lock();
-                match (
-                    table.splice_local_socket_output(fd_out),
-                    table.splice_pipe_input(fd_in),
-                ) {
-                    (Ok(output_socket), Ok(input_pipe)) => Ok((output_socket, input_pipe)),
-                    (Err(err), _) | (_, Err(err)) => Err(err),
-                }
+                table.splice_local_socket_output(fd_out)
             };
-            let (output_socket, input_pipe) = match splice_endpoints {
-                Ok(endpoints) => endpoints,
+            let output_socket = match output_socket {
+                Ok(output_socket) => output_socket,
                 Err(err) => {
                     return if copied > 0 {
                         copied as isize
@@ -3187,14 +3225,18 @@ pub(super) fn sys_splice(
                 // the splice input.  Otherwise another writer can fill the
                 // stream buffer between an availability check and the later
                 // write, losing bytes already read from a pipe/socket input.
-                // The pipe input and socket output are cloned while the fd table
-                // is locked, then the reservation path only locks endpoint
-                // buffers.  This preserves the repository's normal fd-table ->
-                // endpoint lock order and avoids a socket-buffer -> fd-table
-                // deadlock.
+                // The pipe input was pinned at syscall entry and the socket
+                // output is cloned while the fd table is locked; the reservation
+                // path then only locks endpoint buffers.  This preserves the
+                // repository's normal fd-table -> endpoint lock order and avoids
+                // a socket-buffer -> fd-table deadlock.
                 let written = output_socket.write_from_pipe_splice_reservation(
                     process,
-                    match pipe_endpoint(&input_pipe) {
+                    match input_pipe
+                        .as_ref()
+                        .ok_or(LinuxError::EBADF)
+                        .and_then(pipe_endpoint)
+                    {
                         Ok(endpoint) => endpoint,
                         Err(err) => {
                             return if copied > 0 {
@@ -3204,7 +3246,10 @@ pub(super) fn sys_splice(
                             };
                         }
                     },
-                    input_pipe.status_flags(),
+                    match input_pipe.as_ref() {
+                        Some(pipe) => pipe.status_flags(),
+                        None => return neg_errno(LinuxError::EBADF),
+                    },
                     chunk_len,
                     nonblocking,
                 );
@@ -5048,6 +5093,22 @@ impl FdTable {
             FdEntry::Pipe(pipe) => Ok(pipe.clone()),
             _ => Err(LinuxError::EBADF),
         }
+    }
+
+    fn splice_pipe_snapshot(
+        &self,
+        fd: i32,
+    ) -> Result<(OpenFileId, Option<OpenFileRef>), LinuxError> {
+        let slot = self.slot(fd)?;
+        let pipe = match &slot.entry {
+            FdEntry::Pipe(pipe) => Some(pipe.clone()),
+            _ => None,
+        };
+        Ok((slot.description_id(), pipe))
+    }
+
+    fn splice_snapshot_is_current(&self, fd: i32, description: OpenFileId) -> bool {
+        matches!(self.slot(fd), Ok(slot) if slot.description_id() == description)
     }
 
     fn splice_stream_available_write(&self, fd: i32) -> Result<usize, LinuxError> {

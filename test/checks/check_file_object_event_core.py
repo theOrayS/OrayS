@@ -80,6 +80,7 @@ def check(root: Path) -> list[str]:
     objects = read(root, "user/shell/src/uspace/fd_object.rs")
     table = read(root, "user/shell/src/uspace/fd_table.rs")
     pipe = read(root, "user/shell/src/uspace/fd_pipe.rs")
+    runtime_smoke = read(root, "user/shell/runtime_smoke/semantic_smoke.rs")
     socket = read(root, "user/shell/src/uspace/fd_socket.rs")
     select = read(root, "user/shell/src/uspace/select_fdset.rs")
     lifecycle = read(root, "user/shell/src/uspace/process_lifecycle.rs")
@@ -109,6 +110,15 @@ def check(root: Path) -> list[str]:
             "with_ordered_arc_pair(first, second" in ordered_pair,
             findings,
             "public ordered-pair helper must preserve the caller mutex type")
+    reciprocal_pair_test = block_after(
+        core, "fn reciprocal_pair_operations_share_one_lock_order()"
+    )
+    require("std::sync::Barrier::new(3)" in reciprocal_pair_test and
+            "std::thread::spawn" in reciprocal_pair_test and
+            "forward.join()" in reciprocal_pair_test and
+            "reverse.join()" in reciprocal_pair_test,
+            findings,
+            "reciprocal pair lock ordering must have concurrent executable coverage")
     for token in ("struct FdSlot", "fd_flags: u32",
                   "description: Arc<DescriptionIdentity>"):
         require(token in table, findings, f"descriptor/open-description split missing: {token}")
@@ -233,6 +243,56 @@ def check(root: Path) -> list[str]:
     tee_to = block_after(pipe, "pub(super) fn tee_to(")
     require("with_ordered_arc_mutex_pair(" in tee_to, findings,
             "pipe tee must use the canonical reciprocal lock-order helper")
+    splice_to = block_after(pipe, "pub(super) fn splice_to(")
+    require("Arc::ptr_eq(&self.buffer, &dst.buffer)" in splice_to and
+            "Self::nonblocking(status_flags)" in splice_to and
+            "Self::nonblocking(dst_status_flags)" in splice_to and
+            "with_ordered_arc_mutex_pair(" in splice_to and
+            "Self::splice_locked(src_ring, dst_ring, len)" in splice_to and
+            "self.peers.buffered.fetch_sub(moved" in splice_to and
+            "dst.peers.buffered.fetch_add(moved" in splice_to,
+            findings,
+            "pipe splice must aggregate endpoint nonblocking, reject identical backing, and atomically move bytes under canonical dual locks")
+    pipe_drop = block_after(pipe, "impl Drop for PipeEndpoint")
+    require_order(
+        pipe_drop,
+        ("self.buffer.lock()", "self.peers.readers.fetch_sub(1",
+         "self.peers.writers.fetch_sub(1"),
+        findings,
+        "pipe peer close must serialize with ring mutations before publishing peer counts",
+    )
+    sys_splice = block_after(table, "pub(super) fn sys_splice(")
+    splice_snapshots = block_after(
+        sys_splice, "let ((input_description, input_pipe), (output_description, output_pipe)) ="
+    )
+    require_order(
+        sys_splice,
+        ("if len == 0", "let supported_flags", "table.splice_pipe_snapshot(fd_in)",
+         "table.splice_pipe_snapshot(fd_out)",
+         "if input_pipe.is_some() && off_in_ptr != 0",
+         "if output_pipe.is_some() && off_out_ptr != 0",
+         "read_copy_file_range_offset(process, off_out_ptr)",
+         "read_copy_file_range_offset(process, off_in_ptr)", "source.splice_to("),
+        findings,
+        "splice must preserve Linux len/fd/pipe-offset precedence before its atomic pipe transfer",
+    )
+    require(splice_snapshots.count("process.fds.lock()") == 1 and
+            "table.splice_pipe_snapshot(fd_in)" in splice_snapshots and
+            "table.splice_pipe_snapshot(fd_out)" in splice_snapshots,
+            findings,
+            "splice pipe endpoints must be pinned together in one fd-table critical section")
+    snapshot_identity = block_after(table, "fn splice_pipe_snapshot(")
+    require("slot.description_id()" in snapshot_identity and
+            sys_splice.count("splice_snapshot_is_current(") == 2,
+            findings,
+            "splice legacy endpoints must reject descriptor reuse after the initial snapshot")
+    require("fd_in == fd_out" not in sys_splice, findings,
+            "splice self-pipe detection must use backing identity rather than descriptor numbers")
+    for token in ("NEG_EBADF", "NEG_EAGAIN", "NEG_EINVAL", "NEG_ESPIPE",
+                  "usize::MAX", "source_pipe[0],\n        source_pipe[1]",
+                  "preserved_source", "pipe2(&mut full_destination, O_NONBLOCK)"):
+        require(token in runtime_smoke, findings,
+                f"runtime splice errno/preservation regression missing: {token}")
     require("async_state: Arc<Mutex<PipeAsyncState>>" in pipe and
             "async_listeners: Arc<Mutex<Vec<Weak<Mutex<PipeAsyncState>>>>>" in pipe and
             "let read_async_state = Arc::new(Mutex::new(PipeAsyncState::new(true)))" in pipe and

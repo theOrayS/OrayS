@@ -19,6 +19,7 @@ FILES = (
     "kernel/fs/axfile/src/lib.rs",
     "user/shell/src/uspace/fd_object.rs",
     "user/shell/src/uspace/fd_pipe.rs",
+    "user/shell/runtime_smoke/semantic_smoke.rs",
     "user/shell/src/uspace/fd_socket.rs",
     "user/shell/src/uspace/fd_table.rs",
     "user/shell/src/uspace/select_fdset.rs",
@@ -272,6 +273,96 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
             "with_source_first_mutex_pair(",
         )
         self.assert_rejected(root, "canonical reciprocal lock-order helper")
+
+    def test_detects_sequentialized_reciprocal_lock_test(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "kernel/fs/axfile/src/lib.rs",
+            "            std::thread::spawn(move || {\n                start.wait();\n                for _ in 0..128 {",
+            "            std::hint::black_box(move || {\n                start.wait();\n                for _ in 0..128 {",
+        )
+        self.assert_rejected(root, "concurrent executable coverage")
+
+    def test_detects_splice_dual_lock_bypass(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_pipe.rs",
+            "Self::splice_locked(src_ring, dst_ring, len)",
+            "Self::splice_after_unlock(src_ring, dst_ring, len)",
+        )
+        self.assert_rejected(root, "atomically move bytes under canonical dual locks")
+
+    def test_detects_splice_one_sided_nonblocking(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_pipe.rs",
+            "            nonblocking || Self::nonblocking(status_flags) || Self::nonblocking(dst_status_flags);",
+            "            nonblocking || Self::nonblocking(status_flags);",
+        )
+        self.assert_rejected(root, "aggregate endpoint nonblocking")
+
+    def test_detects_splice_close_without_ring_serialization(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_pipe.rs",
+            "            let _ring = self.buffer.lock();\n",
+            "",
+        )
+        self.assert_rejected(root, "peer close must serialize with ring mutations")
+
+    def test_detects_splice_descriptor_number_self_check(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "if let (Some(input), Some(output)) = (input_pipe.as_ref(), output_pipe.as_ref()) {",
+            "if fd_in == fd_out {",
+        )
+        self.assert_rejected(root, "backing identity rather than descriptor numbers")
+
+    def test_detects_splice_len_precedence_regression(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "    if len == 0 {\n        return 0;\n    }\n    let supported_flags",
+            "    let supported_flags",
+        )
+        self.assert_rejected(root, "preserve Linux len/fd/pipe-offset precedence")
+
+    def test_detects_splice_split_endpoint_snapshot(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "        let output = match table.splice_pipe_snapshot(fd_out) {",
+            "        drop(table);\n        let table = process.fds.lock();\n        let output = match table.splice_pipe_snapshot(fd_out) {",
+        )
+        self.assert_rejected(root, "pinned together in one fd-table critical section")
+
+    def test_detects_splice_descriptor_reuse_gap(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "&& !table.splice_snapshot_is_current(fd_in, input_description)",
+            "&& fd_in < 0",
+        )
+        self.assert_rejected(root, "reject descriptor reuse after the initial snapshot")
+
+    def test_detects_splice_blocking_destination_regression(self) -> None:
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/runtime_smoke/semantic_smoke.rs",
+            "pipe2(&mut full_destination, O_NONBLOCK)",
+            "pipe2(&mut full_destination, 0)",
+        )
+        self.assert_rejected(root, "runtime splice errno/preservation regression missing")
 
     def test_detects_mutating_timer_wait_profile(self) -> None:
         root = self.fixture()

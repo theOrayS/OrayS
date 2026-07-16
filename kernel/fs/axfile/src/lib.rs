@@ -1150,31 +1150,41 @@ mod tests {
 
     #[test]
     fn reciprocal_pair_operations_share_one_lock_order() {
-        let first = Arc::new(TestMutex::new(1_u32));
-        let second = Arc::new(TestMutex::new(10_u32));
-        let apply = |source: &Arc<TestMutex<u32>>, destination: &Arc<TestMutex<u32>>| {
-            with_ordered_arc_pair(
-                source,
-                destination,
-                |lower, higher, caller_order_reversed| {
-                    let mut lower_guard = lower.lock();
-                    let mut higher_guard = higher.lock();
-                    let (source_guard, destination_guard) = if caller_order_reversed {
-                        (&mut higher_guard, &mut lower_guard)
-                    } else {
-                        (&mut lower_guard, &mut higher_guard)
-                    };
-                    **destination_guard += **source_guard;
-                },
-            )
-            .unwrap();
+        let first = Arc::new(TestMutex::new(0_u32));
+        let second = Arc::new(TestMutex::new(0_u32));
+        let start = Arc::new(std::sync::Barrier::new(3));
+        let spawn_reciprocal = |source: Arc<TestMutex<u32>>, destination: Arc<TestMutex<u32>>| {
+            let start = Arc::clone(&start);
+            std::thread::spawn(move || {
+                start.wait();
+                for _ in 0..128 {
+                    with_ordered_arc_pair(
+                        &source,
+                        &destination,
+                        |lower, higher, caller_order_reversed| {
+                            let mut lower_guard = lower.lock();
+                            let mut higher_guard = higher.lock();
+                            let destination_guard = if caller_order_reversed {
+                                &mut lower_guard
+                            } else {
+                                &mut higher_guard
+                            };
+                            **destination_guard += 1;
+                        },
+                    )
+                    .unwrap();
+                }
+            })
         };
 
-        apply(&first, &second);
-        apply(&second, &first);
+        let forward = spawn_reciprocal(Arc::clone(&first), Arc::clone(&second));
+        let reverse = spawn_reciprocal(Arc::clone(&second), Arc::clone(&first));
+        start.wait();
+        forward.join().unwrap();
+        reverse.join().unwrap();
 
-        assert_eq!(*first.lock(), 12);
-        assert_eq!(*second.lock(), 11);
+        assert_eq!(*first.lock(), 128);
+        assert_eq!(*second.lock(), 128);
         assert!(with_ordered_arc_pair(&first, &first, |_, _, _| ()).is_none());
     }
 

@@ -24,7 +24,6 @@ const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
 const O_NONBLOCK: usize = 0o4000;
-const SPLICE_F_NONBLOCK: usize = 0x02;
 
 #[cfg(target_arch = "riscv64")]
 const USER_START: &[u8] = b"PR3_SMOKE_V1 USER_START arch=riscv64\n";
@@ -495,9 +494,10 @@ pub extern "C" fn _start() -> ! {
         }
     }
 
-    // A nonblocking splice into a full pipe must not consume its source. Filling the
-    // destination through its normal writer exercises capacity contention without a
-    // timing-dependent race; the subsequent source read proves byte preservation.
+    // A splice into a full O_NONBLOCK destination must not consume its source even
+    // without SPLICE_F_NONBLOCK. Filling the destination through its normal writer
+    // exercises capacity contention without a timing-dependent race; the subsequent
+    // source read proves byte preservation.
     let mut preserved_source = [-1_i32; 2];
     let mut full_destination = [-1_i32; 2];
     if pipe2(&mut preserved_source, 0) != 0
@@ -526,7 +526,7 @@ pub extern "C" fn _start() -> ! {
             preserved_source[0],
             full_destination[1],
             SPLICE_PAYLOAD.len(),
-            SPLICE_F_NONBLOCK,
+            0,
         ) != NEG_EAGAIN
     {
         fail(USER_FAIL_SPLICE_PIPE, 121);
