@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: active
+- State: evidence validated on implementation commit; independent review pending
 - Branch: `stabilize/post-integration-gates-20260716`
 - Authoritative base: `origin/integration/four-prs-20260715`
 - Base commit and initial HEAD: `09f4076ac151e0e7800103de724d9042230738b5`
@@ -104,18 +104,18 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 - [x] Run focused parser/runner/reporter/static-guard tests.
 - [x] Run mutation-style negative cases.
 - [x] Run `git diff --check` and inspect the complete diff.
-- [ ] Commit reviewable protocol/test/documentation stages normally.
-- [ ] From a clean candidate commit, run canonical `quick` and `baseline`.
+- [x] Commit reviewable protocol/test/documentation stages normally.
+- [x] From a clean candidate commit, run canonical `quick` and `baseline`.
 
 ### Phase 4 — fresh two-architecture evidence
 
-- [ ] Recheck image hashes before execution.
-- [ ] Run fresh canonical RISC-V64 official evaluation.
-- [ ] Run fresh canonical LoongArch64 official evaluation.
-- [ ] Require `planned == executed == completed` and zero infrastructure errors
+- [x] Recheck image hashes before execution.
+- [x] Run fresh canonical RISC-V64 official evaluation.
+- [x] Run fresh canonical LoongArch64 official evaluation.
+- [x] Require `planned == executed == completed` and zero infrastructure errors
   for both architectures.
-- [ ] Preserve real semantic failures as `FAIL`; do not require semantic pass.
-- [ ] Recheck image hashes and prove overlays/temporary writable image state are
+- [x] Preserve real semantic failures as `FAIL`; do not require semantic pass.
+- [x] Recheck image hashes and prove overlays/temporary writable image state are
   absent after each run.
 
 ### Phase 5 — independent review and terminal state

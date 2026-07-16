@@ -9,7 +9,7 @@ authors:
   - "Codex (OpenAI)"
 reviewers: []
 base_commit: "09f4076ac151e0e7800103de724d9042230738b5"
-head_commit: "09f4076ac151e0e7800103de724d9042230738b5"
+head_commit: "9ec972f4eb06e7f50dcdec023d494b7e67c9a990"
 capability_domains:
   - "official-evidence"
   - "test-runner"
@@ -45,11 +45,11 @@ capability_domains:
 
 ## 验收标准
 
-- [ ] 重复文本在不同稳定序号下可合法完成；相同显式 ID 必须拒绝。
-- [ ] 重放、缺失、额外、乱序、畸形身份、未知组和不完整执行全部拒绝。
-- [ ] 有真实测试失败但身份完整的官方结果为 `FAIL`，不是 `ERROR` 或 `PASS`。
-- [ ] quick、baseline、RV official、LA official 满足 Goal A 的干净验证合同。
-- [ ] 两个官方镜像哈希不变，临时 overlay 全部清理。
+- [x] 重复文本在不同稳定序号下可合法完成；相同显式 ID 必须拒绝。
+- [x] 重放、缺失、额外、乱序、畸形身份、未知组和不完整执行全部拒绝。
+- [x] 有真实测试失败但身份完整的官方结果为 `FAIL`，不是 `ERROR` 或 `PASS`。
+- [x] quick、baseline、RV official、LA official 满足 Goal A 的干净验证合同。
+- [x] 两个官方镜像哈希不变，临时 overlay 全部清理。
 - [ ] 独立 reviewer 的 blocker/major finding 为零。
 - [ ] 分支保持可追溯祖先关系并仅以普通 push 发布。
 
@@ -165,13 +165,58 @@ capability_domains:
 - 代码范围：`user/shell/src/cmd.rs`、`test/evaluation/`、对应 checks/unit tests、
   canonical manifest/count inventory 与 `test/README.md`；未修改 ABI、syscall、errno、
   架构配置、依赖、工具链、镜像或外部测试源。
-- 对应提交：计划/日志基线 `8aa57fd8`；实现提交待创建。
+- 对应提交：计划/日志基线 `8aa57fd8`；实现、回归与合同文档
+  `9ec972f4eb06e7f50dcdec023d494b7e67c9a990`。
+
+## 2026-07-16 — Checkpoint 3：干净实现提交上的 quick 与 baseline
+
+- provenance：候选实现提交为
+  `9ec972f4eb06e7f50dcdec023d494b7e67c9a990`；quick 与 baseline 的
+  `runner_commit`/`runner_commit_final` 均精确等于该提交，运行前后
+  `runner_dirty == false`，且 `runner_provenance_stable == true`。
+- quick：45/45/45 planned/executed/completed，45 PASS，其他状态均为 0；退出码
+  0，用时 290.899 s。
+- baseline：57/57/57 planned/executed/completed，57 PASS，其他状态均为 0；退出码
+  0，用时 1287.946 s。其内包含格式检查、静态合规、host/RV/LA evidence、Rust
+  workspace 单元测试、clippy、RV/LA kernel build 与 submission build，均为 PASS。
+- 两次运行的 summary、逐项 stdout/stderr 和 runner provenance 留在忽略的
+  `test/output/` 下；未把原始日志或构建产物提交到 Git。
+
+## 2026-07-16 — Checkpoint 4：新鲜双架构官方证据
+
+- 工具：两个架构均使用同一临时 prefix 中由 QEMU 9.2.4 源码构建的必需
+  `qemu-system-*` 与 `qemu-img`。源码归档 SHA-256 为
+  `f3cc1c4eabfdb288218ac3e33763dbe9e276d8bc890b867a2335d58de2ddd39a`；
+  RV QEMU、LA QEMU、`qemu-img` SHA-256 分别为
+  `194d645ab5063833b35512c2d15364070401f63a4f97baf4b7da2244d44efeee`、
+  `668da3b54ae3ec6eaf3ce58f37a1ca3a89b881ac3b22bff0b2872f087c1b9f32`、
+  `ad01688fda982d710780c06ad3277119a6d110723f0ccb6f9f48535e85d8c8f5`。
+  构建所用 clang 21 SHA-256 为
+  `82481792aef943c1750ae5fd71e5a5737212741337debd0fe5d28bd82dd018e9`。
+- RV official：24/24/24 groups、2544/2544/2544 cases，guest runner 退出码 0，
+  `error_count == 0`；严格汇总为 `FAIL`，包含 115 条未隐藏语义发现。failure kind
+  为 forbidden-status 66、ltp-internal-summary-failure 35、timeout 4、
+  panic-or-trap 4、ltp-summary-failure 2、ltp-nonzero-result 2、
+  libctest-failure 1、official-group-failure 1。
+- LA official：24/24/24 groups、2544/2544/2544 cases，guest runner 退出码 0，
+  `error_count == 0`；严格汇总为 `FAIL`，包含 159 条未隐藏语义发现。failure kind
+  为 forbidden-status 95、ltp-internal-summary-failure 54、timeout 3、
+  panic-or-trap 2、ltp-summary-failure 2、ltp-nonzero-result 2、
+  libctest-failure 1。
+- 两个 libc 的 BusyBox 组在两个架构均为 55 START / 55 RESULT / 55 END，全部 55
+  个命令真实成功；相同文本的 ordinal 37 与 41 分别完整成功，没有合并或丢失。
+- RV 的 cyclictest-musl 真实达到 900 s timeout 并保留为语义 failure；LA 的两个
+  cyclictest 组均真实完成。此架构差异未被统一、过滤或改写。
+- 两次 official 的 suite 顶层退出码均为 1，因为唯一计划项状态是语义 `FAIL`；
+  顶层 `INFRA_ERROR == 0`。这不是 official PASS，也不据此宣称 full PASS。
+- 每次运行前后官方 backing image SHA-256 均与基线一致；两次运行结束后均确认
+  `sdcard-*.run.qcow2` 不存在。运行证据来自同一干净稳定实现提交 `9ec972f4…`。
 
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
 |---|---|---|---|---|---|
-| OpenAI Codex（GPT-5 系列，精确子版本未知） | 合同阅读、证据回放、设计、实现、测试与文档 | 本 Goal A 分支的计划、开发日志及后续证据基础设施改动 | 严格限制在 Goal A；拒绝修改外部计划、弱化解析或提前处理语义失败 | 聚焦测试、mutation tests、quick、baseline、双架构 official、独立只读审查 | 待人工 PR 负责人确认 |
+| OpenAI Codex（GPT-5 系列，精确子版本未知） | 合同阅读、证据回放、根因分析、设计、实现、测试、官方运行与文档 | 本 Goal A 分支的计划、开发日志、BusyBox 有序证据协议、解析/报告、回归与 manifest inventory | 严格限制在 Goal A；拒绝修改外部计划、弱化解析、掩盖 official failure 或提前处理语义失败 | 聚焦与 mutation tests、干净 quick/baseline、新鲜双架构 official、镜像/overlay 复核、独立只读审查 | 待人工 PR 负责人确认 |
 
 交互摘要或记录位置：本开发日志记录决定、实际命令、结果和取舍；不提交完整对话或
 主机隐私信息。
@@ -187,19 +232,40 @@ capability_domains:
 
 | 架构 | 文件名 | SHA-256 | 来源/版本 |
 |---|---|---|---|
-| RISC-V64 | `sdcard-rv.img` | `4336475432728e485bc52f54f0b8ef06910e84d7c425fbba49361a4065cccb99` | Goal A 指定官方只读输入；待最终复核 |
-| LoongArch64 | `sdcard-la.img` | `1aa79d03cf41e2a80ae4ed43771101c1e67ec8db41c3c20b77792fe6b1b85b50` | Goal A 指定官方只读输入；待最终复核 |
+| RISC-V64 | `sdcard-rv.img` | `4336475432728e485bc52f54f0b8ef06910e84d7c425fbba49361a4065cccb99` | Goal A 指定官方只读输入；运行前后相同 |
+| LoongArch64 | `sdcard-la.img` | `1aa79d03cf41e2a80ae4ed43771101c1e67ec8db41c3c20b77792fe6b1b85b50` | Goal A 指定官方只读输入；运行前后相同 |
 
-测试结果：尚未开始最终候选验证；后续逐条追加，未运行不计为通过。
+实现证据提交：`9ec972f4eb06e7f50dcdec023d494b7e67c9a990`。以下四次 canonical
+运行的 runner 在开始与结束时均报告该精确提交、clean worktree 和稳定 provenance。
+
+| UTC 时间 | 命令 | 退出码 | 结果 | 计数与耗时 | 忽略的证据目录 / summary SHA-256 |
+|---|---|---:|---|---|---|
+| 04:59:21–05:04:12 | `python3 test/run_suite.py --profile quick` | 0 | PASS | 45/45/45；45 PASS；290.899 s | `test/output/20260716T045921Z-quick-none-2/` / `16d3ba472cee764941d4e4ea949a2c0cb76ba903a3ee0d8852a5a83f7c00b87c` |
+| 05:05:28–05:26:56 | `python3 test/run_suite.py --profile baseline --output-dir test/output/goala-9ec972f4-baseline-1` | 0 | PASS | 57/57/57；57 PASS；1287.946 s | `test/output/goala-9ec972f4-baseline-1/` / `9898e723b30b5b1ebf652393e3df8e604f247bc2ccc3164f0656b30805d7bbed` |
+| 05:29:33–06:49:17 | `python3 test/run_suite.py --profile official --arch rv --output-dir test/output/goala-9ec972f4-official-rv-1` | 1 | FAIL（仅语义） | 24/24/24 groups；2544/2544/2544 cases；0 error、115 failure；4784.534 s | `test/output/goala-9ec972f4-official-rv-1/` / `ace51a9e6ec217d55276c1f98caec2722eb94fa63b2d24a07dc020e55b35933b` |
+| 06:51:14–08:07:46 | `python3 test/run_suite.py --profile official --arch la --output-dir test/output/goala-9ec972f4-official-la-1` | 1 | FAIL（仅语义） | 24/24/24 groups；2544/2544/2544 cases；0 error、159 failure；4591.489 s | `test/output/goala-9ec972f4-official-la-1/` / `090d3fc3a6127da0937d2b08ee7ba6f4a39d1887e054de88c8d6c607a7ef6658` |
+
+official 运行显式设置 `$RV_TESTSUITE_IMG` / `$LA_TESTSUITE_IMG` 为 workspace 父目录的
+对应只读镜像，并将 `QEMU_PREFIX` 指向临时 QEMU 9.2.4 prefix。RV 原始 stdout/stderr
+SHA-256 分别为
+`d83bb29434a93f65d00815b7dbc0addd7d35628f90674eebfefe7a2ef57fbb5f` /
+`f94ef4bf5914dd35034e6ba024041f40930a26fcb84f286e221dbaed5db913c2`；LA 分别为
+`208a99196e6abeed1216c50948e4ef406a6aacc4745c24eeb9e4eaf026213962` /
+`18e80d507fc59f857abb565175c36023e05ac9836b3bdf8d6a5e4aad210fd305`。
+
+镜像在两次 official 前后分别以 `sha256sum` 复核，值与上表一致；在每次运行后以
+overlay 路径检查确认无 `sdcard-*.run.qcow2`。因此两个 `FAIL` 明确来自完整保留的
+guest 语义失败，不是结构、identity、parser、runner、镜像或 QEMU 基础设施错误，
+也不宣称 official/full PASS。
 
 # 8. 最终审查
 
 - [ ] `git diff --check` 通过。
 - [ ] 无测例特化、假成功或吞退出码。
 - [ ] 无凭据、无机器相关绝对路径、无大体积生成物。
-- [ ] Linux/ABI/errno/并发/资源回收已检查。
-- [ ] Goal A 要求的 clean quick、baseline 与双架构 official 已完成。
-- [x] AI 初始使用披露已建立；任务结束前继续更新。
+- [x] Linux/ABI/errno/并发/资源回收已检查；本改动只改变测试证据协议与解析，不改变这些可见语义。
+- [x] Goal A 要求的 clean quick、baseline 与双架构 official 已完成。
+- [x] AI 使用披露已更新到实现、验证与文档范围。
 - [x] 当前无外部代码来源；若变化则追加披露。
 - [ ] 独立 reviewer 的 blocker/major finding 已清零。
 - [ ] 人工 PR 负责人能够不依赖 AI 解释和调试本 PR。
@@ -211,7 +277,10 @@ capability_domains:
 ## 已知限制
 
 - 旧 capture 的文本协议不具备无歧义身份，只能证明根因，不能替代新鲜最终证据。
-- 旧 capture 中的真实语义失败属于 Goal B 或后续语义修复，不在本任务处理。
+- 新鲜 official 中 RV 的 115 条与 LA 的 159 条语义 findings 均仍存在；它们属于
+  Goal B 或后续语义修复，不在本任务处理，且未被本任务隐藏或改写。
+- 本日志记录的是 Goal A 代码交接门禁；根 `AGENTS.md` 要求的真实队员理解/复核声明
+  仍须在 PR 标记 Ready 或合并前由人工负责人完成，本自动化任务不冒充该声明。
 
 ## 后续工作
 
@@ -224,4 +293,7 @@ push。到达终态后停止，不自动进入语义修复。
 
 # 10. 最终摘要
 
-进行中。尚未达到任何 Goal A 终态，也未开始 Goal B。
+实现提交上的 Goal A canonical evidence 已收集完成：quick/baseline 明确 PASS，两个
+official 均完整、零基础设施错误并真实为语义 FAIL，镜像未变且 overlay 已清理。当前
+等待独立只读 review、最终文档提交、final-head clean gates 与普通 push；尚未声明 Goal A
+终态，也未开始 Goal B。
