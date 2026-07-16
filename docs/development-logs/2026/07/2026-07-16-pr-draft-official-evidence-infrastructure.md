@@ -7,9 +7,11 @@ pr: null
 branch: "stabilize/post-integration-gates-20260716"
 authors:
   - "Codex (OpenAI)"
-reviewers: []
+reviewers:
+  - "Codex independent read-only reviewer (automated; not human PR owner)"
 base_commit: "09f4076ac151e0e7800103de724d9042230738b5"
-head_commit: "9ec972f4eb06e7f50dcdec023d494b7e67c9a990"
+head_commit: "8301898911f34e847e7070f04988c704beaa751d"
+evidence_commit: "9ec972f4eb06e7f50dcdec023d494b7e67c9a990"
 capability_domains:
   - "official-evidence"
   - "test-runner"
@@ -50,7 +52,7 @@ capability_domains:
 - [x] 有真实测试失败但身份完整的官方结果为 `FAIL`，不是 `ERROR` 或 `PASS`。
 - [x] quick、baseline、RV official、LA official 满足 Goal A 的干净验证合同。
 - [x] 两个官方镜像哈希不变，临时 overlay 全部清理。
-- [ ] 独立 reviewer 的 blocker/major finding 为零。
+- [x] 独立 reviewer 的 blocker/major finding 为零。
 - [ ] 分支保持可追溯祖先关系并仅以普通 push 发布。
 
 # 2. 基线
@@ -212,11 +214,33 @@ capability_domains:
 - 每次运行前后官方 backing image SHA-256 均与基线一致；两次运行结束后均确认
   `sdcard-*.run.qcow2` 不存在。运行证据来自同一干净稳定实现提交 `9ec972f4…`。
 
+## 2026-07-16 — Checkpoint 5：独立只读审查与发布边界
+
+- 独立自动化只读 reviewer 审查
+  `09f4076ac151e0e7800103de724d9042230738b5..8301898911f34e847e7070f04988c704beaa751d`、
+  四份 canonical summary、必要 raw log、QEMU/image/overlay provenance；审查过程未修改
+  工作树、镜像、证据或 Git 状态。
+- 结论：0 Blocker、0 Major、1 Minor、0 Nit，Goal A 的独立 review 门禁满足。reviewer
+  确认没有命令/测例/路径/架构/libc 特化，没有弱化 duplicate/missing/unknown/
+  malformed/incomplete 检测，没有把 TCONF/TBROK/TFAIL、timeout、panic/trap 或普通
+  失败映射为 PASS；双架构 summary 与原始日志支持开发日志中的全部关键计数和分类。
+- 唯一 Minor：front matter 的 `head_commit` 仍指向实现 evidence commit，而受审候选
+  已为 `83018989…`。本 checkpoint 将 `head_commit` 更新为已审候选，并新增
+  `evidence_commit` 保留 official 证据与实现提交的精确关联。包含本行的文档提交无法
+  自引用其未来 SHA；最终精确 Git HEAD、final-head gate 与远端 head 由忽略的 canonical
+  summary 和本 session 的终态报告共同记录。
+- reviewer 明确声明其为自动化只读审查，不冒充根 `AGENTS.md` 要求的真实人工 PR
+  负责人理解/复核声明。
+- 在远端再次确认权威基线仍为 `09f4076a…` 且同名稳定化分支不存在后，主 agent 请求
+  执行首次普通 push；执行环境的外部写入审批拒绝该动作，因此 push 命令没有执行、
+  远端状态没有变化。未尝试 force-push、旁路执行或修改 `main`；等待明确授权时继续
+  完成所有本地 final-head 验证。
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
 |---|---|---|---|---|---|
-| OpenAI Codex（GPT-5 系列，精确子版本未知） | 合同阅读、证据回放、根因分析、设计、实现、测试、官方运行与文档 | 本 Goal A 分支的计划、开发日志、BusyBox 有序证据协议、解析/报告、回归与 manifest inventory | 严格限制在 Goal A；拒绝修改外部计划、弱化解析、掩盖 official failure 或提前处理语义失败 | 聚焦与 mutation tests、干净 quick/baseline、新鲜双架构 official、镜像/overlay 复核、独立只读审查 | 待人工 PR 负责人确认 |
+| OpenAI Codex（GPT-5 系列，精确子版本未知） | 合同阅读、证据回放、根因分析、设计、实现、测试、官方运行、文档与独立只读复核编排 | 本 Goal A 分支的计划、开发日志、BusyBox 有序证据协议、解析/报告、回归与 manifest inventory | 严格限制在 Goal A；拒绝修改外部计划、弱化解析、掩盖 official failure 或提前处理语义失败；外部写入审批拒绝后未绕过 | 聚焦与 mutation tests、干净 quick/baseline、新鲜双架构 official、镜像/overlay 复核、独立只读审查 | 待人工 PR 负责人确认 |
 
 交互摘要或记录位置：本开发日志记录决定、实际命令、结果和取舍；不提交完整对话或
 主机隐私信息。
@@ -260,17 +284,20 @@ guest 语义失败，不是结构、identity、parser、runner、镜像或 QEMU 
 
 # 8. 最终审查
 
-- [ ] `git diff --check` 通过。
-- [ ] 无测例特化、假成功或吞退出码。
-- [ ] 无凭据、无机器相关绝对路径、无大体积生成物。
+- [x] `git diff --check` 通过。
+- [x] 无测例特化、假成功或吞退出码。
+- [x] 无凭据、无机器相关绝对路径、无大体积生成物。
 - [x] Linux/ABI/errno/并发/资源回收已检查；本改动只改变测试证据协议与解析，不改变这些可见语义。
 - [x] Goal A 要求的 clean quick、baseline 与双架构 official 已完成。
 - [x] AI 使用披露已更新到实现、验证与文档范围。
 - [x] 当前无外部代码来源；若变化则追加披露。
-- [ ] 独立 reviewer 的 blocker/major finding 已清零。
+- [x] 独立 reviewer 的 blocker/major finding 已清零。
 - [ ] 人工 PR 负责人能够不依赖 AI 解释和调试本 PR。
 
-审查人及结论：待最终独立只读审查。
+审查人及结论：独立 Codex 只读 reviewer（自动化、非人工 PR 负责人）审查已审候选
+`8301898911f34e847e7070f04988c704beaa751d`，结论 0 Blocker / 0 Major / 1 Minor /
+0 Nit，Goal A 独立 review 门禁满足。Minor 已通过区分 `head_commit` 与
+`evidence_commit` 处理；最终文档 delta 与 final-head gate 仍需同一 reviewer 复核。
 
 # 9. 已知限制、后续工作与回滚
 
@@ -294,6 +321,6 @@ push。到达终态后停止，不自动进入语义修复。
 # 10. 最终摘要
 
 实现提交上的 Goal A canonical evidence 已收集完成：quick/baseline 明确 PASS，两个
-official 均完整、零基础设施错误并真实为语义 FAIL，镜像未变且 overlay 已清理。当前
-等待独立只读 review、最终文档提交、final-head clean gates 与普通 push；尚未声明 Goal A
-终态，也未开始 Goal B。
+official 均完整、零基础设施错误并真实为语义 FAIL，镜像未变且 overlay 已清理；独立
+只读 review 已为 0 Blocker / 0 Major。当前只剩最终文档 delta 复核、final-head clean
+quick/baseline 和经明确授权的普通 push；尚未声明 Goal A 终态，也未开始 Goal B。
