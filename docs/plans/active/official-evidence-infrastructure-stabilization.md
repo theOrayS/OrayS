@@ -127,8 +127,8 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 
 ### Phase 5 — independent review and terminal state
 
-- [x] Obtain an independent read-only review of the final diff and evidence.
-- [ ] Resolve all blocker/major findings and rerun affected validation.
+- [ ] Obtain an independent read-only review of the remediated final diff and evidence.
+- [x] Resolve the late blocker/major findings and rerun affected validation.
 - [ ] Complete the development log, AI disclosure, risks, and rollback record.
 - [ ] Push only `stabilize/post-integration-gates-20260716` normally.
 - [ ] Declare exactly one Goal A terminal state and stop before Goal B.
@@ -141,8 +141,10 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
   counting of the paired compatibility projection.
 - [x] Parse official output on non-infrastructure nonzero child exits and prove
   that truncated/malformed output remains `INFRA_ERROR`.
-- [ ] Rerun focused, quick, baseline, fresh RV official, fresh LA official, and
-  independent read-only review on the corrected clean candidate.
+- [x] Rerun focused, quick, baseline, fresh RV official, and fresh LA official
+  on the corrected clean candidate.
+- [ ] Obtain independent read-only review on the exact evidence candidate and
+  resolve any new blocker/major findings.
 
 ## Risks and mitigations
 
