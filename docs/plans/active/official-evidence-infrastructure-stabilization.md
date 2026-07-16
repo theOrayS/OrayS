@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: follow-up review passed; documentation-head gates and authorized push pending
+- State: `READY_FOR_SEMANTIC_FIX`
 - Branch: `stabilize/post-integration-gates-20260716`
 - Authoritative base: `origin/integration/four-prs-20260715`
 - Base commit and initial HEAD: `09f4076ac151e0e7800103de724d9042230738b5`
@@ -123,8 +123,8 @@ as `BLOCKED_EXTERNAL`. An unacceptable regression terminates as `FAILED`.
 - [x] Obtain an independent read-only review of the final diff and evidence.
 - [x] Resolve all blocker/major findings and rerun affected validation.
 - [x] Complete the development log, AI disclosure, risks, and rollback record.
-- [ ] Push only `stabilize/post-integration-gates-20260716` normally.
-- [ ] Declare exactly one Goal A terminal state and stop before Goal B.
+- [x] Push only `stabilize/post-integration-gates-20260716` normally.
+- [x] Declare exactly one Goal A terminal state and stop before Goal B.
 
 ## Risks and mitigations
 

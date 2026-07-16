@@ -1,8 +1,8 @@
 ---
 title: "PR draft: stabilize official evidence infrastructure"
 date_started: 2026-07-16
-date_completed: null
-status: draft
+date_completed: 2026-07-16
+status: ready-for-semantic-fix
 pr: null
 branch: "stabilize/post-integration-gates-20260716"
 authors:
@@ -10,7 +10,7 @@ authors:
 reviewers:
   - "Codex independent read-only reviewer (automated; not human PR owner)"
 base_commit: "09f4076ac151e0e7800103de724d9042230738b5"
-head_commit: "cbb3baf64ad0af5b4d6bb35b8e4d24f483abc314"
+head_commit: "1a320a9f0b016dc6a861da364a3b7af6ba8e0d1d"
 evidence_commit: "9ec972f4eb06e7f50dcdec023d494b7e67c9a990"
 capability_domains:
   - "official-evidence"
@@ -53,7 +53,7 @@ capability_domains:
 - [x] quick、baseline、RV official、LA official 满足 Goal A 的干净验证合同。
 - [x] 两个官方镜像哈希不变，临时 overlay 全部清理。
 - [x] 独立 reviewer 的 blocker/major finding 为零。
-- [ ] 分支保持可追溯祖先关系并仅以普通 push 发布。
+- [x] 分支保持可追溯祖先关系并仅以普通 push 发布。
 
 # 2. 基线
 
@@ -274,11 +274,39 @@ capability_domains:
   计数、哈希、首次失败和根因；修复后的只读复核结论为 0 Blocker / 0 Major /
   0 Minor / 0 Nit，不能沿用修复前的结论代替本次复核。
 
+## 2026-07-16 — Checkpoint 7：terminal HEAD、普通 push 与 Goal A 终态
+
+- 记录首次失败与根因的 documentation-only 提交后，精确 terminal HEAD 为
+  `1a320a9f0b016dc6a861da364a3b7af6ba8e0d1d`；worktree clean，完整
+  `base..HEAD` diff check 通过，权威基线仍为 `09f4076a…`。
+- terminal quick：45/45/45 planned/executed/completed，45 PASS、其余状态为 0，
+  退出码 0，用时 283.746 s；summary SHA-256 为
+  `d65720c1fb0394078152c295879651ff026670ec4ac8429b7f3303fb5d6666db`。
+- terminal baseline：显式使用与 official/final rerun 相同的已验证 QEMU 9.2.4 与
+  clang 21 PATH，57/57/57 planned/executed/completed，57 PASS、其余状态为 0，
+  退出码 0，用时 702.813 s；summary SHA-256 为
+  `935a86a2a994c1b491ca238b47fc62356a197da0ff7baa3cbd09fa7d68f63355`。
+- 两份 terminal summary 的 `runner_commit` 与 `runner_commit_final` 均精确为
+  `1a320a9f…`，运行前后 `runner_dirty == false`，stable provenance 为 true。
+  baseline required-command provenance 精确指向同一 QEMU 9.2.4 双架构二进制和
+  clang 21；没有复用系统 QEMU 6.2 或 clang 14。
+- terminal 独立只读 reviewer 复核最终 diff、两份 exact-HEAD summary、实现 official
+  evidence、首次 baseline `INFRA_ERROR` 记录、镜像/overlay 与推送前远端 freshness，结论为
+  0 Blocker / 0 Major / 0 Minor / 0 Nit。该自动化审查不替代人工 PR owner 声明。
+- terminal gate 后再次计算两官方镜像 SHA-256，均仍精确等于合同值；未发现
+  `sdcard-*.run.qcow2`。未修改镜像、外部计划、`main` 或 Goal B 范围。
+- 用户明确授权后，以普通 `git push -u origin stabilize/post-integration-gates-20260716`
+  创建远端分支；命令退出码 0，未 force-push。随后本地 HEAD、upstream 与远端 head
+  均精确为 `1a320a9f…`，远端权威基线仍为 `09f4076a…`。
+- 至此 Goal A 的成功终止条件全部成立，唯一声明的终态为
+  `READY_FOR_SEMANTIC_FIX`。本任务停止，不自动开始 Goal B，也不把该交接终态表述为
+  official/full PASS 或 PR Ready。
+
 # 5. AI 使用披露
 
 | 工具/模型 | 使用场景 | 影响范围 | 人工修改与取舍 | 验证方法 | 负责人 |
 |---|---|---|---|---|---|
-| OpenAI Codex（GPT-5 系列，精确子版本未知） | 合同阅读、证据回放、根因分析、设计、实现、测试、官方运行、文档与独立只读复核编排 | 本 Goal A 分支的计划、开发日志、BusyBox 有序证据协议、解析/报告、回归与 manifest inventory | 严格限制在 Goal A；拒绝修改外部计划、弱化解析、掩盖 official failure 或提前处理语义失败；外部写入审批拒绝后未绕过 | 聚焦与 mutation tests、干净 quick/baseline、新鲜双架构 official、镜像/overlay 复核、独立只读审查 | 待人工 PR 负责人确认 |
+| OpenAI Codex（GPT-5 系列，精确子版本未知） | 合同阅读、证据回放、根因分析、设计、实现、测试、官方运行、文档、独立只读复核与分支发布编排 | 本 Goal A 分支的计划、开发日志、BusyBox 有序证据协议、解析/报告、回归与 manifest inventory | 严格限制在 Goal A；拒绝修改外部计划、弱化解析、掩盖 official failure 或提前处理语义失败；外部写入审批拒绝后未绕过，取得用户明确授权后才普通 push | 聚焦与 mutation tests、干净 quick/baseline、新鲜双架构 official、镜像/overlay 复核、独立只读审查、远端 head/ancestry 验证 | 待人工 PR 负责人确认 |
 
 交互摘要或记录位置：本开发日志记录决定、实际命令、结果和取舍；不提交完整对话或
 主机隐私信息。
@@ -316,6 +344,14 @@ final-head closure 验证如下。首次 baseline 的非 PASS 被完整保留；
 | 08:33:48–08:45:42 | `python3 test/run_suite.py --profile baseline --output-dir test/output/goala-cbb3baf6-final-baseline-1` | 2 | INFRA_ERROR | 57/56/57；54 PASS、2 FAIL、1 INFRA_ERROR；714.663 s | `test/output/goala-cbb3baf6-final-baseline-1/` / `696d1646d0a4f24c71b5f967eb63d1a559ebc562f2b84d1203de6588dfa732d9` |
 | 08:47:15–08:59:04 | `PATH=<qemu-9.2.4-prefix>/bin:<llvm-21-prefix>/bin:$PATH python3 test/run_suite.py --profile baseline --output-dir test/output/goala-cbb3baf6-final-baseline-2` | 0 | PASS | 57/57/57；57 PASS；708.662 s | `test/output/goala-cbb3baf6-final-baseline-2/` / `886c87df1bc39e8f50c057936a06939b75eea9e1f87c70cbe56725a97bd7ae4b` |
 
+terminal documentation-only HEAD 的不可自引用运行证据如下；该证据由 terminal reviewer
+独立核对，并由本 session 终态报告与远端精确 head 共同绑定。
+
+| UTC 时间 | 命令 | 退出码 | 结果 | 计数与耗时 | 忽略的证据目录 / summary SHA-256 |
+|---|---|---:|---|---|---|
+| 09:15:14–09:19:58 | `PATH=<qemu-9.2.4-prefix>/bin:<llvm-21-prefix>/bin:$PATH python3 test/run_suite.py --profile quick --output-dir test/output/goala-1a320a9f-terminal-quick-1` | 0 | PASS | 45/45/45；45 PASS；283.746 s | `test/output/goala-1a320a9f-terminal-quick-1/` / `d65720c1fb0394078152c295879651ff026670ec4ac8429b7f3303fb5d6666db` |
+| 09:20:06–09:31:48 | `PATH=<qemu-9.2.4-prefix>/bin:<llvm-21-prefix>/bin:$PATH python3 test/run_suite.py --profile baseline --output-dir test/output/goala-1a320a9f-terminal-baseline-1` | 0 | PASS | 57/57/57；57 PASS；702.813 s | `test/output/goala-1a320a9f-terminal-baseline-1/` / `935a86a2a994c1b491ca238b47fc62356a197da0ff7baa3cbd09fa7d68f63355` |
+
 official 运行显式设置 `$RV_TESTSUITE_IMG` / `$LA_TESTSUITE_IMG` 为 workspace 父目录的
 对应只读镜像，并将 `QEMU_PREFIX` 指向临时 QEMU 9.2.4 prefix。RV 原始 stdout/stderr
 SHA-256 分别为
@@ -346,7 +382,9 @@ guest 语义失败，不是结构、identity、parser、runner、镜像或 QEMU 
 Minor 已通过区分 `head_commit` 与 `evidence_commit` 处理。follow-up reviewer 对
 `cbb3baf6…` 的代码和三份 final-head summary 未发现实现问题，但因这些结果尚未写入
 tracked 日志而给出 1 Major；Checkpoint 6 补齐记录后，reviewer 复核为 0 Blocker /
-0 Major / 0 Minor / 0 Nit，Goal A 独立 review 门禁满足。
+0 Major / 0 Minor / 0 Nit。terminal reviewer 随后对精确 `1a320a9f…`、最终两份 clean
+summary、镜像与推送前远端 freshness 再次给出 0 Blocker / 0 Major / 0 Minor / 0 Nit，Goal A 独立
+review 门禁满足。
 
 # 9. 已知限制、后续工作与回滚
 
@@ -360,8 +398,8 @@ tracked 日志而给出 1 Major；Checkpoint 6 补齐记录后，reviewer 复核
 
 ## 后续工作
 
-仅完成 Goal A 合同中的协议、回归、clean gates、新鲜双架构证据、只读审查和普通分支
-push。到达终态后停止，不自动进入语义修复。
+Goal A 已停止在 `READY_FOR_SEMANTIC_FIX`。语义 failure 的修复必须作为独立 Goal B 或
+后续任务显式启动；本任务不自动进入语义修复。
 
 ## 回滚方式
 
@@ -369,9 +407,11 @@ push。到达终态后停止，不自动进入语义修复。
 
 # 10. 最终摘要
 
-实现提交上的 Goal A canonical evidence 已收集完成：quick/baseline 明确 PASS，两个
-official 均完整、零基础设施错误并真实为语义 FAIL，镜像未变且 overlay 已清理。文档
-closure HEAD 的 quick 明确 PASS；首次 baseline 因错误系统工具选择为 INFRA_ERROR 并已
-完整记录，显式使用已验证 QEMU 9.2.4/clang 21 的独立重跑为 57/57 PASS；日志修复的
-follow-up review 为 0 Blocker / 0 Major。当前只剩最终 documentation-only HEAD 门禁和
-经明确授权的普通 push；尚未声明 Goal A 终态，也未开始 Goal B。
+Goal A 唯一终态：`READY_FOR_SEMANTIC_FIX`。
+
+实现、final 与 terminal quick/baseline 均有 clean/stable provenance；RV/LA official
+均完整执行 24/24 groups、2544/2544 cases、0 infrastructure error，并保留为真实语义
+`FAIL`（115/159 findings），没有宣称 official/full PASS。两镜像哈希未变、overlay 无
+残留，独立 terminal review 为 0 Blocker / 0 Major / 0 Minor / 0 Nit，稳定化分支已普通
+push 且远端 head/权威基线精确验证。未修改或推进 `main`，未开始 Goal B；PR Ready 前
+仍须真实人工负责人完成理解与复核声明。
