@@ -289,12 +289,29 @@ def check(root: Path) -> list[str]:
     require("fd_in == fd_out" not in sys_splice, findings,
             "splice self-pipe detection must use backing identity rather than descriptor numbers")
     sys_tee = block_after(table, "pub(super) fn sys_tee(")
-    tee_pipe_input = block_after(table, "fn tee_pipe_input(")
-    require(sys_tee.count("table.tee_pipe_input(") == 2 and
-            "FdEntry::Pipe(pipe) => Ok(pipe.clone())" in tee_pipe_input and
-            "_ => Err(LinuxError::EINVAL)" in tee_pipe_input,
+    tee_fd_snapshot = block_after(table, "fn tee_fd_snapshot(")
+    require_order(
+        sys_tee,
+        ("if flags & !supported_flags != 0", "if len == 0",
+         "let table = process.fds.lock()",
+         "table.tee_fd_snapshot(fd_in as i32)",
+         "table.tee_fd_snapshot(fd_out as i32)",
+         "if !source.readable || !destination.writable",
+         "match (source.pipe, destination.pipe)"),
+        findings,
+        "tee must preserve Linux flags/zero-length/fd/access/type precedence",
+    )
+    require(sys_tee.count("process.fds.lock()") == 1 and
+            sys_tee.count("table.tee_fd_snapshot(") == 2 and
+            "let entry = self.entry(fd)?" in tee_fd_snapshot and
+            "pipe: Some(pipe.clone())" in tee_fd_snapshot and
+            "readable: endpoint.readable()" in tee_fd_snapshot and
+            "writable: endpoint.writable()" in tee_fd_snapshot and
+            "file_is_readable(*status_flags)" in tee_fd_snapshot and
+            "file_is_writable(*status_flags)" in tee_fd_snapshot and
+            "pipe: None" in tee_fd_snapshot,
             findings,
-            "tee must distinguish live non-pipe EINVAL from invalid or wrong-direction EBADF")
+            "tee must pin both fds together and preserve access modes before pipe classification")
     sys_vmsplice = block_after(table, "pub(super) fn sys_vmsplice(")
     require("nonblocking || total > 0" in sys_vmsplice and
             "return if total > 0 { total } else { neg_errno(err) }" in sys_vmsplice,
@@ -303,7 +320,16 @@ def check(root: Path) -> list[str]:
     for token in ("NEG_EBADF", "NEG_EAGAIN", "NEG_EINVAL", "NEG_ESPIPE",
                   "usize::MAX", "source_pipe[0],\n        source_pipe[1]",
                   "preserved_source", "pipe2(&mut full_destination, O_NONBLOCK)",
-                  "SYS_TEE", "tee(1, tee_pipe[1]", "tee(tee_pipe[0], 1",
+                  "SYS_TEE", "tee(-1, -1, 0, 0) != 0",
+                  "tee(-1, -1, 0, usize::MAX) != NEG_EINVAL",
+                  "tee(1, tee_pipe[1], 1, 0) != NEG_EBADF",
+                  "tee(tee_pipe[0], 0, 1, 0) != NEG_EBADF",
+                  "tee(0, -1, 1, 0) != NEG_EBADF",
+                  "tee(0, tee_pipe[0], 1, 0) != NEG_EBADF",
+                  "tee(tee_pipe[1], 1, 1, 0) != NEG_EBADF",
+                  "tee(0, tee_pipe[1], 1, 0) != NEG_EINVAL",
+                  "tee(tee_pipe[0], 1, 1, 0) != NEG_EINVAL",
+                  "tee(tee_pipe[0], tee_pipe[1], 1, 0) != NEG_EINVAL",
                   "SYS_VMSPLICE", "VMSPLICE_FIRST_LEN: usize = 64 * 1024",
                   "&iovecs[..count]", "expected_vmsplice_byte"):
         require(token in runtime_smoke, findings,

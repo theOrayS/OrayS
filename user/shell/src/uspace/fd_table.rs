@@ -2989,6 +2989,12 @@ enum VmspliceDirection {
     FromPipe,
 }
 
+struct TeeFdSnapshot {
+    pipe: Option<OpenFileRef>,
+    readable: bool,
+    writable: bool,
+}
+
 pub(super) fn sys_splice(
     process: &UserProcess,
     fd_in: usize,
@@ -3428,19 +3434,31 @@ pub(super) fn sys_tee(
     if flags & !supported_flags != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
+    if len == 0 {
+        return 0;
+    }
     let nonblocking = flags & general::SPLICE_F_NONBLOCK as usize != 0;
-    let pipes = {
+    let (source, destination) = {
         let table = process.fds.lock();
-        match (
-            table.tee_pipe_input(fd_in as i32),
-            table.tee_pipe_input(fd_out as i32),
-        ) {
-            (Ok(src), Ok(dst)) => Ok((src, dst)),
-            (Err(err), _) | (_, Err(err)) => Err(err),
-        }
+        let source = match table.tee_fd_snapshot(fd_in as i32) {
+            Ok(snapshot) => snapshot,
+            Err(err) => return neg_errno(err),
+        };
+        let destination = match table.tee_fd_snapshot(fd_out as i32) {
+            Ok(snapshot) => snapshot,
+            Err(err) => return neg_errno(err),
+        };
+        (source, destination)
     };
-    let result = pipes.and_then(|(src, dst)| {
-        pipe_endpoint(&src)?.tee_to(
+    if !source.readable || !destination.writable {
+        return neg_errno(LinuxError::EBADF);
+    }
+    let (src, dst) = match (source.pipe, destination.pipe) {
+        (Some(src), Some(dst)) => (src, dst),
+        _ => return neg_errno(LinuxError::EINVAL),
+    };
+    let result = pipe_endpoint(&src).and_then(|source| {
+        source.tee_to(
             src.status_flags(),
             pipe_endpoint(&dst)?,
             dst.status_flags(),
@@ -5095,13 +5113,84 @@ impl FdTable {
         }
     }
 
-    fn tee_pipe_input(&self, fd: i32) -> Result<OpenFileRef, LinuxError> {
-        match self.entry(fd)? {
-            FdEntry::Pipe(pipe) => Ok(pipe.clone()),
-            // tee(2) reserves EBADF for an invalid descriptor or a pipe endpoint
-            // opened in the wrong direction. A live non-pipe object is EINVAL.
-            _ => Err(LinuxError::EINVAL),
+    fn tee_fd_snapshot(&self, fd: i32) -> Result<TeeFdSnapshot, LinuxError> {
+        let entry = self.entry(fd)?;
+        if let FdEntry::Pipe(pipe) = entry {
+            let endpoint = pipe_endpoint(pipe)?;
+            return Ok(TeeFdSnapshot {
+                pipe: Some(pipe.clone()),
+                readable: endpoint.readable(),
+                writable: endpoint.writable(),
+            });
         }
+
+        let (readable, writable) = match entry {
+            FdEntry::Stdin(status_flags)
+            | FdEntry::Stdout(status_flags)
+            | FdEntry::Stderr(status_flags)
+            | FdEntry::DevZero(status_flags)
+            | FdEntry::DevRandom(status_flags)
+            | FdEntry::DevCpuDmaLatency(status_flags) => (
+                file_is_readable(*status_flags),
+                file_is_writable(*status_flags),
+            ),
+            FdEntry::BlockDevice(device) => (
+                file_is_readable(device.status_flags),
+                file_is_writable(device.status_flags),
+            ),
+            FdEntry::File(file) => (
+                file_is_readable(file.status_flags),
+                file_is_writable(file.status_flags),
+            ),
+            FdEntry::Memfd(file) => (file.readable(), file.writable()),
+            FdEntry::ProcTimerSlack(file) => (
+                file_is_readable(file.status_flags),
+                file_is_writable(file.status_flags),
+            ),
+            FdEntry::PosixMq(mq) => {
+                let status_flags = mq.status_flags();
+                (
+                    file_is_readable(status_flags),
+                    file_is_writable(status_flags),
+                )
+            }
+            FdEntry::ProcMqQueuesMax(file) => {
+                let status_flags = file.status_flags();
+                (
+                    file_is_readable(status_flags),
+                    file_is_writable(status_flags),
+                )
+            }
+            FdEntry::ProcSysFile(file) => {
+                let status_flags = file.status_flags();
+                (
+                    file_is_readable(status_flags),
+                    file_is_writable(status_flags),
+                )
+            }
+            FdEntry::Directory(_)
+            | FdEntry::ProcFdDir(_)
+            | FdEntry::SyntheticDir(_)
+            | FdEntry::MemoryFile(_)
+            | FdEntry::ProcPagemap(_)
+            | FdEntry::Inotify(_) => (true, false),
+            FdEntry::Path(_) => (false, false),
+            FdEntry::DevNull
+            | FdEntry::Rtc
+            | FdEntry::Socket(_)
+            | FdEntry::LocalSocket(_)
+            | FdEntry::EventFd(_)
+            | FdEntry::Epoll(_)
+            | FdEntry::TimerFd(_)
+            | FdEntry::SignalFd(_)
+            | FdEntry::PidFd(_) => (true, true),
+            FdEntry::Pipe(_) => unreachable!("pipe returned above"),
+        };
+        Ok(TeeFdSnapshot {
+            pipe: None,
+            readable,
+            writable,
+        })
     }
 
     fn splice_pipe_snapshot(

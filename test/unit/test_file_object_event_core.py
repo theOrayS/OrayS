@@ -368,10 +368,37 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
         self.mutate(
             root,
             "user/shell/src/uspace/fd_table.rs",
-            "            _ => Err(LinuxError::EINVAL),\n        }\n    }\n\n    fn splice_pipe_snapshot(",
-            "            _ => Err(LinuxError::EBADF),\n        }\n    }\n\n    fn splice_pipe_snapshot(",
+            "    if len == 0 {\n        return 0;\n    }\n    let nonblocking",
+            "    let nonblocking",
         )
-        self.assert_rejected(root, "live non-pipe EINVAL")
+        self.assert_rejected(root, "flags/zero-length/fd/access/type precedence")
+
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "table.tee_fd_snapshot(fd_in as i32)",
+            "table.tee_fd_snapshot(fd_out as i32)",
+        )
+        self.assert_rejected(root, "flags/zero-length/fd/access/type precedence")
+
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "if !source.readable || !destination.writable",
+            "if false",
+        )
+        self.assert_rejected(root, "flags/zero-length/fd/access/type precedence")
+
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/runtime_smoke/semantic_smoke.rs",
+            "tee(1, tee_pipe[1], 1, 0) != NEG_EBADF",
+            "tee(1, tee_pipe[1], 1, 0) != NEG_EINVAL",
+        )
+        self.assert_rejected(root, "runtime splice errno/preservation regression missing")
 
         root = self.fixture()
         self.mutate(
