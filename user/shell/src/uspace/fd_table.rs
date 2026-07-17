@@ -3510,11 +3510,18 @@ pub(super) fn sys_vmsplice(
                     if let Err(err) = read_user_bytes_into(process, base, &mut *src) {
                         return if total > 0 { total } else { neg_errno(err) };
                     }
-                    let written =
-                        match endpoint.write_partial(pipe.status_flags(), src, nonblocking) {
-                            Ok(written) => written,
-                            Err(err) => return if total > 0 { total } else { neg_errno(err) },
-                        };
+                    // A blocking vmsplice may wait before its first byte, but Linux
+                    // returns partial progress instead of sleeping again after the
+                    // pipe fills at an iovec boundary. Probe subsequent capacity as
+                    // nonblocking; the existing error path returns `total` on EAGAIN.
+                    let written = match endpoint.write_partial(
+                        pipe.status_flags(),
+                        src,
+                        nonblocking || total > 0,
+                    ) {
+                        Ok(written) => written,
+                        Err(err) => return if total > 0 { total } else { neg_errno(err) },
+                    };
                     total += written as isize;
                     if written == 0 {
                         return total;

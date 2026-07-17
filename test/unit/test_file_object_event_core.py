@@ -354,7 +354,7 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
         )
         self.assert_rejected(root, "reject descriptor reuse after the initial snapshot")
 
-    def test_detects_splice_runtime_and_tee_errno_regressions(self) -> None:
+    def test_detects_splice_runtime_tee_and_vmsplice_regressions(self) -> None:
         root = self.fixture()
         self.mutate(
             root,
@@ -372,6 +372,24 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
             "            _ => Err(LinuxError::EBADF),\n        }\n    }\n\n    fn splice_pipe_snapshot(",
         )
         self.assert_rejected(root, "live non-pipe EINVAL")
+
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "                        nonblocking || total > 0,",
+            "                        nonblocking,",
+        )
+        self.assert_rejected(root, "return accumulated progress")
+
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/runtime_smoke/semantic_smoke.rs",
+            "const VMSPLICE_FIRST_LEN: usize = 64 * 1024;",
+            "const VMSPLICE_FIRST_LEN: usize = 4096;",
+        )
+        self.assert_rejected(root, "runtime splice errno/preservation regression missing")
 
     def test_detects_mutating_timer_wait_profile(self) -> None:
         root = self.fixture()

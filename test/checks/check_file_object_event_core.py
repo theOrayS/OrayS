@@ -295,10 +295,17 @@ def check(root: Path) -> list[str]:
             "_ => Err(LinuxError::EINVAL)" in tee_pipe_input,
             findings,
             "tee must distinguish live non-pipe EINVAL from invalid or wrong-direction EBADF")
+    sys_vmsplice = block_after(table, "pub(super) fn sys_vmsplice(")
+    require("nonblocking || total > 0" in sys_vmsplice and
+            "return if total > 0 { total } else { neg_errno(err) }" in sys_vmsplice,
+            findings,
+            "vmsplice must return accumulated progress instead of blocking at an iovec boundary")
     for token in ("NEG_EBADF", "NEG_EAGAIN", "NEG_EINVAL", "NEG_ESPIPE",
                   "usize::MAX", "source_pipe[0],\n        source_pipe[1]",
                   "preserved_source", "pipe2(&mut full_destination, O_NONBLOCK)",
-                  "SYS_TEE", "tee(1, tee_pipe[1]", "tee(tee_pipe[0], 1"):
+                  "SYS_TEE", "tee(1, tee_pipe[1]", "tee(tee_pipe[0], 1",
+                  "SYS_VMSPLICE", "VMSPLICE_FIRST_LEN: usize = 64 * 1024",
+                  "&iovecs[..count]", "expected_vmsplice_byte"):
         require(token in runtime_smoke, findings,
                 f"runtime splice errno/preservation regression missing: {token}")
     require("async_state: Arc<Mutex<PipeAsyncState>>" in pipe and
