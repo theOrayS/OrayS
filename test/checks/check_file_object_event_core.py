@@ -331,6 +331,8 @@ def check(root: Path) -> list[str]:
                   "tee(tee_pipe[0], 1, 1, 0) != NEG_EINVAL",
                   "tee(tee_pipe[0], tee_pipe[1], 1, 0) != NEG_EINVAL",
                   "SYS_OPENAT", "b\"/dev/null\\0\"", "O_RDONLY", "O_WRONLY",
+                  "USER_FAIL_TEE_DEVICE_OPEN", "USER_FAIL_TEE_DEVICE_MODE",
+                  "USER_FAIL_TEE_DEVICE_CLOSE",
                   "tee(tee_pipe[0], dev_null_read, 1, 0) != NEG_EBADF",
                   "tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EBADF",
                   "tee(dev_null_read, tee_pipe[1], 1, 0) != NEG_EINVAL",

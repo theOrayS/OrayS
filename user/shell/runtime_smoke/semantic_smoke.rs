@@ -81,6 +81,24 @@ const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=r
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const USER_FAIL_TEE_DEVICE_OPEN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tee_device_open arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_TEE_DEVICE_OPEN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tee_device_open arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_TEE_DEVICE_MODE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tee_device_mode arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_TEE_DEVICE_MODE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tee_device_mode arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_TEE_DEVICE_CLOSE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tee_device_close arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_TEE_DEVICE_CLOSE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tee_device_close arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const USER_FAIL_UNAME: &[u8] = b"PR3_SMOKE_V1 USER_FAIL uname arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_UNAME: &[u8] = b"PR3_SMOKE_V1 USER_FAIL uname arch=loongarch64\n";
@@ -658,22 +676,22 @@ pub extern "C" fn _start() -> ! {
     let dev_null_read = openat(b"/dev/null\0", O_RDONLY);
     let dev_null_write = openat(b"/dev/null\0", O_WRONLY);
     if dev_null_read < 0 || dev_null_write < 0 {
-        fail(USER_FAIL_SPLICE_PIPE, 226);
+        fail(USER_FAIL_TEE_DEVICE_OPEN, 226);
     }
     let dev_null_read = dev_null_read as i32;
     let dev_null_write = dev_null_write as i32;
     if tee(tee_pipe[0], dev_null_read, 1, 0) != NEG_EBADF
         || tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EBADF
     {
-        fail(USER_FAIL_SPLICE_PIPE, 227);
+        fail(USER_FAIL_TEE_DEVICE_MODE, 227);
     }
     if tee(dev_null_read, tee_pipe[1], 1, 0) != NEG_EINVAL
         || tee(tee_pipe[0], dev_null_write, 1, 0) != NEG_EINVAL
     {
-        fail(USER_FAIL_SPLICE_PIPE, 228);
+        fail(USER_FAIL_TEE_DEVICE_MODE, 228);
     }
     if close(dev_null_read) != 0 || close(dev_null_write) != 0 {
-        fail(USER_FAIL_SPLICE_PIPE, 229);
+        fail(USER_FAIL_TEE_DEVICE_CLOSE, 229);
     }
     if close(tee_pipe[0]) != 0 || close(tee_pipe[1]) != 0 {
         fail(USER_FAIL_SPLICE_PIPE, 126);
