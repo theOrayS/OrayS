@@ -354,7 +354,7 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
         )
         self.assert_rejected(root, "reject descriptor reuse after the initial snapshot")
 
-    def test_detects_splice_blocking_destination_regression(self) -> None:
+    def test_detects_splice_runtime_and_tee_errno_regressions(self) -> None:
         root = self.fixture()
         self.mutate(
             root,
@@ -363,6 +363,15 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
             "pipe2(&mut full_destination, 0)",
         )
         self.assert_rejected(root, "runtime splice errno/preservation regression missing")
+
+        root = self.fixture()
+        self.mutate(
+            root,
+            "user/shell/src/uspace/fd_table.rs",
+            "            _ => Err(LinuxError::EINVAL),\n        }\n    }\n\n    fn splice_pipe_snapshot(",
+            "            _ => Err(LinuxError::EBADF),\n        }\n    }\n\n    fn splice_pipe_snapshot(",
+        )
+        self.assert_rejected(root, "live non-pipe EINVAL")
 
     def test_detects_mutating_timer_wait_profile(self) -> None:
         root = self.fixture()

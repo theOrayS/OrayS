@@ -288,9 +288,17 @@ def check(root: Path) -> list[str]:
             "splice legacy endpoints must reject descriptor reuse after the initial snapshot")
     require("fd_in == fd_out" not in sys_splice, findings,
             "splice self-pipe detection must use backing identity rather than descriptor numbers")
+    sys_tee = block_after(table, "pub(super) fn sys_tee(")
+    tee_pipe_input = block_after(table, "fn tee_pipe_input(")
+    require(sys_tee.count("table.tee_pipe_input(") == 2 and
+            "FdEntry::Pipe(pipe) => Ok(pipe.clone())" in tee_pipe_input and
+            "_ => Err(LinuxError::EINVAL)" in tee_pipe_input,
+            findings,
+            "tee must distinguish live non-pipe EINVAL from invalid or wrong-direction EBADF")
     for token in ("NEG_EBADF", "NEG_EAGAIN", "NEG_EINVAL", "NEG_ESPIPE",
                   "usize::MAX", "source_pipe[0],\n        source_pipe[1]",
-                  "preserved_source", "pipe2(&mut full_destination, O_NONBLOCK)"):
+                  "preserved_source", "pipe2(&mut full_destination, O_NONBLOCK)",
+                  "SYS_TEE", "tee(1, tee_pipe[1]", "tee(tee_pipe[0], 1"):
         require(token in runtime_smoke, findings,
                 f"runtime splice errno/preservation regression missing: {token}")
     require("async_state: Arc<Mutex<PipeAsyncState>>" in pipe and

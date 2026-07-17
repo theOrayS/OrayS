@@ -3432,8 +3432,8 @@ pub(super) fn sys_tee(
     let pipes = {
         let table = process.fds.lock();
         match (
-            table.splice_pipe_input(fd_in as i32),
-            table.splice_pipe_input(fd_out as i32),
+            table.tee_pipe_input(fd_in as i32),
+            table.tee_pipe_input(fd_out as i32),
         ) {
             (Ok(src), Ok(dst)) => Ok((src, dst)),
             (Err(err), _) | (_, Err(err)) => Err(err),
@@ -5088,10 +5088,12 @@ impl FdTable {
         }
     }
 
-    fn splice_pipe_input(&self, fd: i32) -> Result<OpenFileRef, LinuxError> {
+    fn tee_pipe_input(&self, fd: i32) -> Result<OpenFileRef, LinuxError> {
         match self.entry(fd)? {
             FdEntry::Pipe(pipe) => Ok(pipe.clone()),
-            _ => Err(LinuxError::EBADF),
+            // tee(2) reserves EBADF for an invalid descriptor or a pipe endpoint
+            // opened in the wrong direction. A live non-pipe object is EINVAL.
+            _ => Err(LinuxError::EINVAL),
         }
     }
 
