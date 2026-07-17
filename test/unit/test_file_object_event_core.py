@@ -367,6 +367,15 @@ class FileObjectEventCoreGuardTests(unittest.TestCase):
         root = self.fixture()
         self.mutate(
             root,
+            "user/shell/runtime_smoke/semantic_smoke.rs",
+            "tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EBADF",
+            "tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EINVAL",
+        )
+        self.assert_rejected(root, "runtime splice errno/preservation regression missing")
+
+        root = self.fixture()
+        self.mutate(
+            root,
             "user/shell/src/uspace/fd_table.rs",
             "    if len == 0 {\n        return 0;\n    }\n    let nonblocking",
             "    let nonblocking",

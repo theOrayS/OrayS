@@ -330,6 +330,11 @@ def check(root: Path) -> list[str]:
                   "tee(0, tee_pipe[1], 1, 0) != NEG_EINVAL",
                   "tee(tee_pipe[0], 1, 1, 0) != NEG_EINVAL",
                   "tee(tee_pipe[0], tee_pipe[1], 1, 0) != NEG_EINVAL",
+                  "SYS_OPENAT", "b\"/dev/null\\0\"", "O_RDONLY", "O_WRONLY",
+                  "tee(tee_pipe[0], dev_null_read, 1, 0) != NEG_EBADF",
+                  "tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EBADF",
+                  "tee(dev_null_read, tee_pipe[1], 1, 0) != NEG_EINVAL",
+                  "tee(tee_pipe[0], dev_null_write, 1, 0) != NEG_EINVAL",
                   "SYS_VMSPLICE", "VMSPLICE_FIRST_LEN: usize = 64 * 1024",
                   "&iovecs[..count]", "expected_vmsplice_byte"):
         require(token in runtime_smoke, findings,

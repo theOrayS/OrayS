@@ -10,6 +10,7 @@ use core::panic::PanicInfo;
 // The semantic-evidence manifest builds and executes this same source on RV64 and
 // LA64, and requires the ordered syscall assertions plus clean guest shutdown.
 
+const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
 const SYS_READ: usize = 63;
@@ -25,6 +26,9 @@ const NEG_EBADF: isize = -9;
 const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
+const AT_FDCWD: isize = -100;
+const O_RDONLY: usize = 0;
+const O_WRONLY: usize = 1;
 const O_NONBLOCK: usize = 0o4000;
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
@@ -331,6 +335,24 @@ fn close(fd: i32) -> isize {
 }
 
 #[inline(always)]
+fn openat(path: &[u8], flags: usize) -> isize {
+    // SAFETY: callers provide a readable NUL-terminated pathname that remains live
+    // until this synchronous syscall returns. AT_FDCWD, flags, and mode are scalars;
+    // mode is ignored because these probes do not request O_CREAT.
+    unsafe {
+        syscall6(
+            SYS_OPENAT,
+            AT_FDCWD as usize,
+            path.as_ptr() as usize,
+            flags,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
 fn exit(code: usize) -> ! {
     // SAFETY: SYS_EXIT consumes only the scalar exit code; its other raw arguments are
     // ignored. If a defective kernel returns, the fallback loop preserves `!`.
@@ -628,6 +650,30 @@ pub extern "C" fn _start() -> ! {
         || tee(tee_pipe[0], tee_pipe[1], 1, 0) != NEG_EINVAL
     {
         fail(USER_FAIL_SPLICE_PIPE, 125);
+    }
+
+    // Device-backed descriptions must retain the access mode supplied to openat.
+    // Wrong-direction endpoints fail with EBADF before the correctly directed live
+    // non-pipe combinations reach the EINVAL type check.
+    let dev_null_read = openat(b"/dev/null\0", O_RDONLY);
+    let dev_null_write = openat(b"/dev/null\0", O_WRONLY);
+    if dev_null_read < 0 || dev_null_write < 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 226);
+    }
+    let dev_null_read = dev_null_read as i32;
+    let dev_null_write = dev_null_write as i32;
+    if tee(tee_pipe[0], dev_null_read, 1, 0) != NEG_EBADF
+        || tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EBADF
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 227);
+    }
+    if tee(dev_null_read, tee_pipe[1], 1, 0) != NEG_EINVAL
+        || tee(tee_pipe[0], dev_null_write, 1, 0) != NEG_EINVAL
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 228);
+    }
+    if close(dev_null_read) != 0 || close(dev_null_write) != 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 229);
     }
     if close(tee_pipe[0]) != 0 || close(tee_pipe[1]) != 0 {
         fail(USER_FAIL_SPLICE_PIPE, 126);
