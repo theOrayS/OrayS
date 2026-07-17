@@ -603,15 +603,27 @@ pub extern "C" fn _start() -> ! {
         }
     }
 
-    // Linux reports EINVAL when either live tee descriptor is not a pipe. Here fd 1
-    // is the smoke process's live console description. This differs from EBADF,
-    // which is reserved for an invalid descriptor or a pipe endpoint opened in the
-    // wrong direction. Rejection must also precede any wait on the empty source.
+    // Linux validates tee flags first, returns zero for a zero-length request before
+    // resolving either descriptor, then resolves both descriptors before checking
+    // access modes and finally pipe type/backing identity. Stdio supplies stable
+    // live non-pipe descriptions with known access modes: fd 0 is read-only and fd 1
+    // is write-only. Every rejection below must precede any wait on the empty pipe.
     let mut tee_pipe = [-1_i32; 2];
     if pipe2(&mut tee_pipe, 0) != 0 {
         fail(USER_FAIL_SPLICE_PIPE, 124);
     }
-    if tee(1, tee_pipe[1], 1, 0) != NEG_EINVAL
+    if tee(-1, -1, 0, 0) != 0 || tee(-1, -1, 0, usize::MAX) != NEG_EINVAL {
+        fail(USER_FAIL_SPLICE_PIPE, 224);
+    }
+    if tee(1, tee_pipe[1], 1, 0) != NEG_EBADF
+        || tee(tee_pipe[0], 0, 1, 0) != NEG_EBADF
+        || tee(0, -1, 1, 0) != NEG_EBADF
+        || tee(0, tee_pipe[0], 1, 0) != NEG_EBADF
+        || tee(tee_pipe[1], 1, 1, 0) != NEG_EBADF
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 225);
+    }
+    if tee(0, tee_pipe[1], 1, 0) != NEG_EINVAL
         || tee(tee_pipe[0], 1, 1, 0) != NEG_EINVAL
         || tee(tee_pipe[0], tee_pipe[1], 1, 0) != NEG_EINVAL
     {
