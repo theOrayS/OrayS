@@ -14,7 +14,9 @@ const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
+const SYS_VMSPLICE: usize = 75;
 const SYS_SPLICE: usize = 76;
+const SYS_TEE: usize = 77;
 const SYS_EXIT: usize = 93;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
@@ -24,6 +26,15 @@ const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
 const O_NONBLOCK: usize = 0o4000;
+
+// The first vector is exactly the largest pipe capacity supported by OrayS. A
+// blocking vmsplice that fills it must return its progress rather than wait on
+// the following vector in the same syscall. The one-byte second vector then
+// proves that the caller can drain the pipe and resume without data loss.
+const VMSPLICE_FIRST_LEN: usize = 64 * 1024;
+const VMSPLICE_TOTAL_LEN: usize = VMSPLICE_FIRST_LEN + 1;
+static VMSPLICE_FIRST: [u8; VMSPLICE_FIRST_LEN] = [0x3c; VMSPLICE_FIRST_LEN];
+static VMSPLICE_SECOND: [u8; 1] = [0xa5];
 
 #[cfg(target_arch = "riscv64")]
 const USER_START: &[u8] = b"PR3_SMOKE_V1 USER_START arch=riscv64\n";
@@ -95,6 +106,12 @@ struct UtsName {
     version: [u8; 65],
     machine: [u8; 65],
     domainname: [u8; 65],
+}
+
+#[repr(C)]
+struct IoVec {
+    base: usize,
+    len: usize,
 }
 
 impl UtsName {
@@ -254,6 +271,41 @@ fn pipe_read(fd: i32, bytes: &mut [u8]) -> isize {
 }
 
 #[inline(always)]
+fn tee(fd_in: i32, fd_out: i32, len: usize, flags: usize) -> isize {
+    // SAFETY: tee consumes only scalar descriptors, length, and flags; it has no
+    // userspace pointer arguments.
+    unsafe {
+        syscall6(
+            SYS_TEE,
+            fd_in as usize,
+            fd_out as usize,
+            len,
+            flags,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn vmsplice(fd: i32, iovecs: &[IoVec], flags: usize) -> isize {
+    // SAFETY: the iovec array and every described byte range remain readable until
+    // this synchronous vmsplice returns. The descriptors, count, and flags are
+    // scalar arguments, and the immutable backing arrays outlive the call.
+    unsafe {
+        syscall6(
+            SYS_VMSPLICE,
+            fd as usize,
+            iovecs.as_ptr() as usize,
+            iovecs.len(),
+            flags,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
 fn splice(fd_in: i32, fd_out: i32, len: usize, flags: usize) -> isize {
     // SAFETY: both offset pointers are null by contract, descriptors/length/flags are
     // scalars, and the kernel validates descriptor direction and available data.
@@ -300,6 +352,14 @@ fn c_field_equals(field: &[u8; 65], expected: &[u8]) -> bool {
     expected.len() < field.len()
         && &field[..expected.len()] == expected
         && field[expected.len()] == 0
+}
+
+fn expected_vmsplice_byte(offset: usize) -> u8 {
+    if offset < VMSPLICE_FIRST_LEN {
+        0x3c
+    } else {
+        0xa5
+    }
 }
 
 // SAFETY: this freestanding ELF provides the sole `memset` definition selected by its
@@ -542,8 +602,97 @@ pub extern "C" fn _start() -> ! {
             fail(USER_FAIL_SPLICE_PIPE, 123);
         }
     }
+
+    // Linux reports EINVAL when either live tee descriptor is not a pipe. Here fd 1
+    // is the smoke process's live console description. This differs from EBADF,
+    // which is reserved for an invalid descriptor or a pipe endpoint opened in the
+    // wrong direction. Rejection must also precede any wait on the empty source.
+    let mut tee_pipe = [-1_i32; 2];
+    if pipe2(&mut tee_pipe, 0) != 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 124);
+    }
+    if tee(1, tee_pipe[1], 1, 0) != NEG_EINVAL
+        || tee(tee_pipe[0], 1, 1, 0) != NEG_EINVAL
+        || tee(tee_pipe[0], tee_pipe[1], 1, 0) != NEG_EINVAL
+    {
+        fail(USER_FAIL_SPLICE_PIPE, 125);
+    }
+    if close(tee_pipe[0]) != 0 || close(tee_pipe[1]) != 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 126);
+    }
+
+    // Exercise blocking vmsplice across an iovec boundary larger than a pipe.
+    // Each successful partial result is drained before retrying, and every byte is
+    // checked in order. A syscall that has already copied bytes must not wait for
+    // capacity while advancing to the next vector.
+    let mut vmsplice_pipe = [-1_i32; 2];
+    if pipe2(&mut vmsplice_pipe, 0) != 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 127);
+    }
+    let mut total = 0usize;
+    let mut calls = 0usize;
+    while total < VMSPLICE_TOTAL_LEN {
+        let (iovecs, count) = if total < VMSPLICE_FIRST_LEN {
+            let first = &VMSPLICE_FIRST[total..];
+            (
+                [
+                    IoVec {
+                        base: first.as_ptr() as usize,
+                        len: first.len(),
+                    },
+                    IoVec {
+                        base: VMSPLICE_SECOND.as_ptr() as usize,
+                        len: VMSPLICE_SECOND.len(),
+                    },
+                ],
+                2,
+            )
+        } else {
+            (
+                [
+                    IoVec {
+                        base: VMSPLICE_SECOND.as_ptr() as usize,
+                        len: VMSPLICE_SECOND.len(),
+                    },
+                    IoVec { base: 0, len: 0 },
+                ],
+                1,
+            )
+        };
+        let result = vmsplice(vmsplice_pipe[1], &iovecs[..count], 0);
+        let remaining = VMSPLICE_TOTAL_LEN - total;
+        if result <= 0 || result as usize > remaining {
+            fail(USER_FAIL_SPLICE_PIPE, 128);
+        }
+        let moved = result as usize;
+        let mut drained = 0usize;
+        let mut read_buffer = [0_u8; 512];
+        while drained < moved {
+            let requested = (moved - drained).min(read_buffer.len());
+            let read = pipe_read(vmsplice_pipe[0], &mut read_buffer[..requested]);
+            if read <= 0 || read as usize > requested {
+                fail(USER_FAIL_SPLICE_PIPE, 129);
+            }
+            let read = read as usize;
+            for (index, byte) in read_buffer[..read].iter().enumerate() {
+                if *byte != expected_vmsplice_byte(total + drained + index) {
+                    fail(USER_FAIL_SPLICE_PIPE, 130);
+                }
+            }
+            drained += read;
+        }
+
+        total += moved;
+        calls += 1;
+        if calls > 1024 {
+            fail(USER_FAIL_SPLICE_PIPE, 131);
+        }
+    }
+    if close(vmsplice_pipe[0]) != 0 || close(vmsplice_pipe[1]) != 0 {
+        fail(USER_FAIL_SPLICE_PIPE, 132);
+    }
     if write(ASSERT_SPLICE_PIPE) != ASSERT_SPLICE_PIPE.len() as isize {
-        fail(USER_FAIL_WRITE, 124);
+        fail(USER_FAIL_WRITE, 133);
     }
 
     let mut uts = UtsName::zeroed();
@@ -553,22 +702,22 @@ pub extern "C" fn _start() -> ! {
     let uname_result =
         unsafe { syscall6(SYS_UNAME, &mut uts as *mut UtsName as usize, 0, 0, 0, 0, 0) };
     if uname_result != 0 {
-        fail(USER_FAIL_UNAME, 125);
+        fail(USER_FAIL_UNAME, 134);
     }
     if !c_field_equals(&uts.sysname, b"Linux") {
-        fail(USER_FAIL_SYSNAME, 126);
+        fail(USER_FAIL_SYSNAME, 135);
     }
     if write(ASSERT_UNAME_SYSNAME) != ASSERT_UNAME_SYSNAME.len() as isize {
-        fail(USER_FAIL_WRITE, 127);
+        fail(USER_FAIL_WRITE, 136);
     }
     if !c_field_equals(&uts.machine, EXPECTED_MACHINE) {
-        fail(USER_FAIL_MACHINE, 128);
+        fail(USER_FAIL_MACHINE, 137);
     }
     if write(ASSERT_UNAME_MACHINE) != ASSERT_UNAME_MACHINE.len() as isize {
-        fail(USER_FAIL_WRITE, 129);
+        fail(USER_FAIL_WRITE, 138);
     }
     if write(USER_PASS) != USER_PASS.len() as isize {
-        fail(USER_FAIL_WRITE, 130);
+        fail(USER_FAIL_WRITE, 139);
     }
     exit(0)
 }
