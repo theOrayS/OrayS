@@ -1,0 +1,57 @@
+[package]
+name = "orays-desktop"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later OR Apache-2.0 OR MulanPSL-2.0"
+publish = false
+
+[workspace]
+resolver = "2"
+
+[features]
+default = []
+host-tools = []
+orays = [
+    "dep:axalloc",
+    "dep:axconfig",
+    "dep:axdriver",
+    "dep:axdriver_pci",
+    "dep:axhal",
+    "dep:axstd",
+    "dep:kspin",
+    "dep:virtio-drivers",
+    "axstd/defplat",
+]
+bus-mmio = ["axstd?/bus-mmio"]
+bus-pci = ["axstd?/bus-pci"]
+
+[dependencies]
+axdriver = { path = "../../kernel/drivers/axdriver", features = ["desktop-device-hook"], optional = true }
+axalloc = { path = "../../kernel/memory/axalloc", optional = true }
+axconfig = { path = "../../kernel/config/axconfig", optional = true }
+axdriver_pci = { version = "0.2", optional = true }
+axhal = { path = "../../kernel/arch/axhal", optional = true }
+axstd = { path = "../../ulib/axstd", optional = true, features = ["alloc", "fs", "irq", "multitask"] }
+kspin = { version = "0.2", optional = true }
+virtio-drivers = { version = "0.13", default-features = false, features = ["alloc"], optional = true }
+
+[patch.crates-io]
+axcpu = { path = "../../vendor/axcpu" }
+axfs_ramfs = { path = "../../vendor/axfs_ramfs" }
+axfs_vfs = { path = "../../vendor/axfs_vfs" }
+axsched = { path = "../../vendor/axsched" }
+
+[[bin]]
+name = "orays-desktop"
+path = "src/main.rs"
+required-features = ["orays"]
+
+[[bin]]
+name = "render-golden"
+path = "src/bin/render_golden.rs"
+required-features = ["host-tools"]
+
+[[bin]]
+name = "render-scene"
+path = "src/bin/render_scene.rs"
+required-features = ["host-tools"]

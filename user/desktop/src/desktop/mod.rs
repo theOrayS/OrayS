@@ -1,0 +1,10 @@
+pub mod compositor;
+pub mod dock;
+pub mod launcher;
+pub mod notifications;
+pub mod shell;
+pub mod shortcuts;
+pub mod theme;
+pub mod top_bar;
+pub mod window;
+pub mod window_manager;

@@ -1,0 +1,32 @@
+DESKTOP_BUILD := $(CURDIR)/scripts/desktop/build.sh
+
+.PHONY: desktop desktop-assets desktop-host-test desktop-golden desktop-golden-check desktop-performance desktop-rv desktop-la desktop-rv-smoke desktop-la-smoke
+
+desktop: desktop-assets desktop-host-test desktop-golden-check desktop-rv desktop-la
+
+desktop-assets:
+	python3 scripts/desktop/check-assets.py
+
+desktop-host-test:
+	$(DESKTOP_BUILD) host-test
+
+desktop-golden:
+	$(DESKTOP_BUILD) golden
+
+desktop-golden-check:
+	$(DESKTOP_BUILD) golden-check
+
+desktop-performance:
+	python3 scripts/desktop/measure-performance.py
+
+desktop-rv:
+	$(DESKTOP_BUILD) rv
+
+desktop-la:
+	$(DESKTOP_BUILD) la
+
+desktop-rv-smoke:
+	scripts/desktop/run-headless-qemu.sh --arch rv --scenario boot
+
+desktop-la-smoke:
+	scripts/desktop/run-headless-qemu.sh --arch la --scenario boot

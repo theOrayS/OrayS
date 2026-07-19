@@ -16,6 +16,7 @@ bus-pci = ["dep:axdriver_pci", "dep:axhal", "dep:axconfig"]
 net = ["axdriver_net"]
 block = ["axdriver_block"]
 display = ["axdriver_display"]
+desktop-device-hook = []
 
 # Enabled by features `virtio-*`
 virtio = ["axdriver_virtio", "dep:axalloc", "dep:axhal", "dep:axconfig"]

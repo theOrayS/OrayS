@@ -5,6 +5,17 @@ use axdriver_pci::{
 };
 use axhal::mem::phys_to_virt;
 
+#[cfg(feature = "desktop-device-hook")]
+unsafe extern "C" {
+    fn orays_desktop_probe_device_pci(
+        root: *mut core::ffi::c_void,
+        bus: u8,
+        device: u8,
+        function: u8,
+        info: *const core::ffi::c_void,
+    ) -> bool;
+}
+
 const PCI_BAR_NUM: u8 = 6;
 
 fn config_pci_device(
@@ -87,7 +98,7 @@ fn config_pci_device(
 impl AllDevices {
     pub(crate) fn probe_bus_devices(&mut self) {
         let base_vaddr = phys_to_virt(axconfig::devices::PCI_ECAM_BASE.into());
-        let cam = unsafe { MmioCam::new(base_vaddr.as_mut_ptr(), Cam::Ecam) };
+        let cam: MmioCam<'static> = unsafe { MmioCam::new(base_vaddr.as_mut_ptr(), Cam::Ecam) };
         let mut root = PciRoot::new(cam);
 
         // PCI 32-bit MMIO space
@@ -102,18 +113,41 @@ impl AllDevices {
                     continue;
                 }
                 match config_pci_device(&mut root, bdf, &mut allocator) {
-                    Ok(_) => for_each_drivers!(type Driver, {
-                        if let Some(dev) = Driver::probe_pci(&mut root, bdf, &dev_info) {
-                            info!(
-                                "registered a new {:?} device at {}: {:?}",
-                                dev.device_type(),
-                                bdf,
-                                dev.device_name(),
-                            );
-                            self.add_device(dev);
-                            continue; // skip to the next device
+                    Ok(_) => {
+                        for_each_drivers!(type Driver, {
+                            if let Some(dev) = Driver::probe_pci(&mut root, bdf, &dev_info) {
+                                info!(
+                                    "registered a new {:?} device at {}: {:?}",
+                                    dev.device_type(),
+                                    bdf,
+                                    dev.device_name(),
+                                );
+                                self.add_device(dev);
+                                continue; // skip to the next device
+                            }
+                        });
+                        #[cfg(feature = "desktop-device-hook")]
+                        {
+                            // SAFETY: The private desktop feature requires the final
+                            // binary to provide this exact C ABI symbol. `root` is the
+                            // unique active PciRoot<MmioCam<'static>> and `dev_info`
+                            // belongs to the current loop iteration. The callee may
+                            // borrow both only for this synchronous call and must not
+                            // retain either pointer. This function does not access
+                            // `root` while that exclusive borrow is active.
+                            if unsafe {
+                                orays_desktop_probe_device_pci(
+                                    core::ptr::from_mut(&mut root).cast(),
+                                    bdf.bus,
+                                    bdf.device,
+                                    bdf.function,
+                                    core::ptr::from_ref(&dev_info).cast(),
+                                )
+                            } {
+                                continue;
+                            }
                         }
-                    }),
+                    }
                     Err(e) => warn!(
                         "failed to enable PCI device at {}({}): {:?}",
                         bdf, dev_info, e

@@ -1,6 +1,11 @@
 #[allow(unused_imports)]
 use crate::{AllDevices, prelude::*};
 
+#[cfg(feature = "desktop-device-hook")]
+unsafe extern "C" {
+    fn orays_desktop_probe_device_mmio(base: usize, size: usize) -> bool;
+}
+
 impl AllDevices {
     pub(crate) fn probe_bus_devices(&mut self) {
         // TODO: parse device tree
@@ -18,6 +23,16 @@ impl AllDevices {
                     continue; // skip to the next device
                 }
             });
+            #[cfg(feature = "desktop-device-hook")]
+            {
+                // SAFETY: Enabling the private desktop hook requires the final
+                // desktop binary to provide this exact C ABI symbol. The
+                // physical range is copied directly from platform config and
+                // remains valid for the lifetime of the kernel.
+                if unsafe { orays_desktop_probe_device_mmio(reg.0, reg.1) } {
+                    continue;
+                }
+            }
         }
     }
 }
