@@ -1,0 +1,25 @@
+[
+  {
+    "label": "press-a",
+    "events": [
+      {"type": "key", "data": {"down": true, "key": {"type": "qcode", "data": "a"}}},
+      {"type": "key", "data": {"down": false, "key": {"type": "qcode", "data": "a"}}}
+    ],
+    "wait_ms": 20
+  },
+  {
+    "label": "absolute-tablet",
+    "events": [
+      {"type": "abs", "data": {"axis": "x", "value": 16384}},
+      {"type": "abs", "data": {"axis": "y", "value": 8192}}
+    ],
+    "wait_ms": 20
+  },
+  {
+    "label": "left-click",
+    "events": [
+      {"type": "btn", "data": {"down": true, "button": "left"}},
+      {"type": "btn", "data": {"down": false, "button": "left"}}
+    ]
+  }
+]

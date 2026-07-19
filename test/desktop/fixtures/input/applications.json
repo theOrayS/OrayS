@@ -1,0 +1,34 @@
+[
+  {
+    "label": "move-to-settings-dock-icon",
+    "events": [
+      {"type": "abs-pixel", "data": {"axis": "x", "coordinate": {"anchor": "center", "offset": 196}}},
+      {"type": "abs-pixel", "data": {"axis": "y", "coordinate": {"anchor": "end", "offset": -39}}}
+    ],
+    "wait_ms": 30
+  },
+  {
+    "label": "launch-settings",
+    "events": [
+      {"type": "btn", "data": {"down": true, "button": "left"}},
+      {"type": "btn", "data": {"down": false, "button": "left"}}
+    ],
+    "wait_ms": 300
+  },
+  {
+    "label": "move-to-theme-button",
+    "events": [
+      {"type": "abs-pixel", "data": {"axis": "x", "coordinate": {"anchor": "start", "offset": 398}}},
+      {"type": "abs-pixel", "data": {"axis": "y", "coordinate": {"anchor": "start", "offset": 235}}}
+    ],
+    "wait_ms": 30
+  },
+  {
+    "label": "toggle-live-theme",
+    "events": [
+      {"type": "btn", "data": {"down": true, "button": "left"}},
+      {"type": "btn", "data": {"down": false, "button": "left"}}
+    ],
+    "wait_ms": 350
+  }
+]

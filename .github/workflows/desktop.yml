@@ -1,0 +1,52 @@
+name: Desktop CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FIXED_RUST_TOOLCHAIN: nightly-2025-05-20
+
+jobs:
+  desktop:
+    name: Isolated host and dual-architecture desktop
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
+          components: rust-src, clippy, rustfmt, llvm-tools
+          targets: riscv64gc-unknown-none-elf, loongarch64-unknown-none-softfloat
+      - name: Verify asset and license inventory
+        run: python3 -B scripts/desktop/check-assets.py
+      - name: Run desktop host and Python tests
+        run: |
+          scripts/desktop/build.sh host-test
+          python3 -B -m unittest discover -s test/desktop -p 'test_*.py'
+      - name: Check formatting and lints
+        run: |
+          cargo fmt --manifest-path user/desktop/Cargo.toml -- --check
+          CARGO_HOME="$PWD/build/desktop/cargo-home" CARGO_NET_OFFLINE=true \
+            cargo clippy --offline --locked --manifest-path user/desktop/Cargo.toml \
+            --lib --tests --features host-tools --target-dir build/desktop/target/host-clippy \
+            -- -D warnings
+      - name: Compare deterministic golden frames
+        run: scripts/desktop/build.sh golden-check
+      - name: Build RV64 and LoongArch64 desktop images
+        run: |
+          scripts/desktop/build.sh rv
+          scripts/desktop/build.sh la
+      - name: Enforce desktop isolation budget
+        run: python3 scripts/desktop/check-scope.py

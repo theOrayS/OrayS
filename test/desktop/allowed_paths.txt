@@ -1,0 +1,19 @@
+# Ordinary desktop-owned paths. Patterns only support exact paths or trailing /**.
+.codex/config.toml
+.codex/.gitignore
+.codex/tasks/**
+.codex/prompts/**
+user/desktop/**
+scripts/desktop/**
+test/desktop/**
+test/output/desktop/**
+build/desktop/**
+Makefile.desktop
+.github/workflows/desktop.yml
+docs/plans/active/2026-07-18-orays-desktop-environment.md
+docs/development-logs/2026/07/2026-07-18-pr-draft-orays-desktop-environment.md
+docs/decisions/0001-desktop-isolation.md
+docs/decisions/0002-desktop-ui-toolkit.md
+docs/decisions/0003-desktop-headless-validation.md
+docs/references/desktop-headless-development.md
+docs/references/desktop-dependencies.md

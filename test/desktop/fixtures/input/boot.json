@@ -1,0 +1,6 @@
+[
+  {
+    "label": "settle-before-boot-capture",
+    "wait_ms": 1
+  }
+]

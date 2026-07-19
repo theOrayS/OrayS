@@ -1,0 +1,12 @@
+[
+  {
+    "label": "alt-tab-focus-cycle",
+    "events": [
+      {"type": "key", "data": {"down": true, "key": {"type": "qcode", "data": "alt"}}},
+      {"type": "key", "data": {"down": true, "key": {"type": "qcode", "data": "tab"}}},
+      {"type": "key", "data": {"down": false, "key": {"type": "qcode", "data": "tab"}}},
+      {"type": "key", "data": {"down": false, "key": {"type": "qcode", "data": "alt"}}}
+    ],
+    "wait_ms": 250
+  }
+]

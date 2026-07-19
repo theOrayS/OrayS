@@ -1,0 +1,10 @@
+[
+  {
+    "label": "absolute-pointer-after-runtime-resize",
+    "events": [
+      {"type": "abs-pixel", "data": {"axis": "x", "coordinate": {"anchor": "center", "offset": 0}}},
+      {"type": "abs-pixel", "data": {"axis": "y", "coordinate": {"anchor": "center", "offset": 0}}}
+    ],
+    "wait_ms": 30
+  }
+]

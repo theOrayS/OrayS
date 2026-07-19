@@ -1,0 +1,22 @@
+# Pre-authorized bridge paths. Existing modified files are limited to 8 files
+# and 250 additions+deletions in total.
+api/axfeat/Cargo.toml
+api/arceos_api/Cargo.toml
+api/arceos_api/src/lib.rs
+api/arceos_api/src/imp/mod.rs
+api/arceos_api/src/imp/display.rs
+api/arceos_api/src/imp/input.rs
+kernel/drivers/axdisplay/Cargo.toml
+kernel/drivers/axdisplay/src/lib.rs
+kernel/drivers/axdriver/Cargo.toml
+kernel/drivers/axdriver/src/bus/mmio.rs
+kernel/drivers/axdriver/src/bus/pci.rs
+kernel/drivers/axdriver/src/lib.rs
+kernel/drivers/axdriver/src/input.rs
+kernel/drivers/axdriver/src/macros.rs
+kernel/drivers/axdriver/src/prelude.rs
+kernel/drivers/axdriver/src/structs/**
+kernel/drivers/axdriver/src/virtio.rs
+kernel/runtime/axruntime/Cargo.toml
+kernel/runtime/axruntime/src/lib.rs
+ulib/axstd/Cargo.toml

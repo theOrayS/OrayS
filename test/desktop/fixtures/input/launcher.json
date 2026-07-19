@@ -1,0 +1,12 @@
+[
+  {
+    "label": "super-space-open-launcher",
+    "events": [
+      {"type": "key", "data": {"down": true, "key": {"type": "qcode", "data": "meta_l"}}},
+      {"type": "key", "data": {"down": true, "key": {"type": "qcode", "data": "spc"}}},
+      {"type": "key", "data": {"down": false, "key": {"type": "qcode", "data": "spc"}}},
+      {"type": "key", "data": {"down": false, "key": {"type": "qcode", "data": "meta_l"}}}
+    ],
+    "wait_ms": 350
+  }
+]
