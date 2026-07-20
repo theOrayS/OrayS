@@ -165,6 +165,23 @@ trusted_official_case_plan = _OFFICIAL_PARSER.trusted_official_case_plan
 trusted_ltp_stable_cases = _OFFICIAL_PARSER.trusted_ltp_stable_cases
 validate_official_output = _OFFICIAL_PARSER.validate_official_output
 
+_FINAL_2026_PARSER_PATH = _TEST_ROOT / "evaluation/parse_final_2026_results.py"
+_FINAL_2026_PARSER_SPEC = importlib.util.spec_from_file_location(
+    "_orays_final_2026_result_parser",
+    _FINAL_2026_PARSER_PATH,
+)
+if _FINAL_2026_PARSER_SPEC is None or _FINAL_2026_PARSER_SPEC.loader is None:
+    raise RuntimeError(
+        f"cannot load canonical final-2026 parser: {_FINAL_2026_PARSER_PATH}"
+    )
+_FINAL_2026_PARSER = importlib.util.module_from_spec(_FINAL_2026_PARSER_SPEC)
+sys.modules[_FINAL_2026_PARSER_SPEC.name] = _FINAL_2026_PARSER
+_FINAL_2026_PARSER_SPEC.loader.exec_module(_FINAL_2026_PARSER)
+
+FINAL_2026_GROUPS = _FINAL_2026_PARSER.SUPPORTED_GROUPS
+FINAL_2026_ARCHITECTURES = _FINAL_2026_PARSER.SUPPORTED_ARCHITECTURES
+validate_final_2026_output = _FINAL_2026_PARSER.validate_final_2026_output
+
 SCHEMA_VERSION = 1
 KNOWN_STATUSES = {"PASS", "FAIL", "TIMEOUT", "CRASH", "INFRA_ERROR", "NOT_RUN"}
 SUCCESS_STATUS = "PASS"
@@ -172,7 +189,16 @@ PROFILE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 CASE_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 HISTORICAL_ID_RE = re.compile(r"(?i)(?:^|[._-])g0\d{2}(?:$|[._-])")
 ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-RESULT_TYPES = {"exit_code", "check", "unittest", "cargo_test", "case_result", "official"}
+RESULT_TYPES = {
+    "exit_code",
+    "check",
+    "unittest",
+    "cargo_test",
+    "case_result",
+    "official",
+    "final_2026",
+}
+STRUCTURED_RESULT_TYPES = frozenset({"official", "final_2026"})
 ARCH_POLICIES = {"none", "one", "one_or_all"}
 CANONICAL_PROFILE_NAMES = frozenset(
     {
@@ -543,6 +569,13 @@ OFFICIAL_CALLER_ENVIRONMENT = (
     "LA_TESTSUITE_IMG",
     *OFFICIAL_BLACKLIST_ENVIRONMENT,
     "OSCOMP_SKIP_TEST_GROUPS",
+)
+FINAL_2026_CALLER_ENVIRONMENT = (
+    "RV_FINAL_2026_IMG",
+    "LA_FINAL_2026_IMG",
+    "RV_FINAL_2026_IMG_SHA256",
+    "LA_FINAL_2026_IMG_SHA256",
+    "FINAL_2026_PROTOCOL_ROOT",
 )
 CANONICAL_OFFICIAL_EXECUTION = {
     "rv": {
@@ -1296,6 +1329,14 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
             allowed_contract_keys.update(
                 {"expected_group_labels", "expected_group_case_counts"}
             )
+        if result_type == "final_2026":
+            allowed_contract_keys.update(
+                {
+                    "expected_group",
+                    "expected_arch",
+                    "buildstorm_baseline_seconds",
+                }
+            )
         _reject_unknown_keys(contract, allowed_contract_keys, f"{location}.result_contract")
         if result_type == "exit_code" and not isinstance(
             contract.get("allow_empty_output", False), bool
@@ -1357,6 +1398,33 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                 raise ManifestError(
                     f"{location}.result_contract.expected_group_case_counts must exactly cover "
                     f"LTP/busybox/libctest groups: {sorted(count_required_labels)}"
+                )
+        if result_type == "final_2026":
+            expected_group = contract.get("expected_group")
+            if expected_group not in FINAL_2026_GROUPS:
+                raise ManifestError(
+                    f"{location}.result_contract.expected_group must be one of "
+                    f"{sorted(FINAL_2026_GROUPS)}"
+                )
+            expected_arch = contract.get("expected_arch")
+            if expected_arch not in FINAL_2026_ARCHITECTURES:
+                raise ManifestError(
+                    f"{location}.result_contract.expected_arch must be one of "
+                    f"{sorted(FINAL_2026_ARCHITECTURES)}"
+                )
+            baseline_seconds = contract.get("buildstorm_baseline_seconds")
+            baseline_is_finite = False
+            if not isinstance(baseline_seconds, bool) and isinstance(
+                baseline_seconds, (int, float)
+            ):
+                try:
+                    baseline_is_finite = math.isfinite(baseline_seconds)
+                except OverflowError:
+                    baseline_is_finite = False
+            if not baseline_is_finite or baseline_seconds <= 0:
+                raise ManifestError(
+                    f"{location}.result_contract.buildstorm baseline seconds "
+                    "must be a finite positive number"
                 )
 
         required_paths = _validate_string_list(case.get("required_paths", []), f"{location}.required_paths")
@@ -2372,9 +2440,13 @@ def parse_contract(
     contract = case["result_contract"]
     result_type = contract["type"]
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    if result_type != "official" and UNKNOWN_STATE_OUTPUT_RE.search(combined):
+    if result_type not in STRUCTURED_RESULT_TYPES and UNKNOWN_STATE_OUTPUT_RE.search(
+        combined
+    ):
         return "INFRA_ERROR", "output contains an unknown or unexecuted status", {}
-    if result_type != "official" and ZERO_EXECUTION_OUTPUT_RE.search(combined):
+    if result_type not in STRUCTURED_RESULT_TYPES and ZERO_EXECUTION_OUTPUT_RE.search(
+        combined
+    ):
         return "INFRA_ERROR", "output explicitly reports zero executed tests", {}
     if result_type == "exit_code":
         if not combined.strip() and not contract.get("allow_empty_output", False):
@@ -2819,6 +2891,33 @@ def parse_contract(
         if validation["status"] == "ERROR":
             return "INFRA_ERROR", "official output is incomplete, malformed, or lacks explicit success", validation
         return "INFRA_ERROR", f"unknown official parser status: {validation['status']!r}", validation
+    if result_type == "final_2026":
+        validation = validate_final_2026_output(
+            stdout,
+            stderr,
+            expected_group=contract["expected_group"],
+            expected_arch=contract["expected_arch"],
+            buildstorm_baseline_seconds=contract["buildstorm_baseline_seconds"],
+        )
+        if validation["status"] == "PASS":
+            return (
+                "PASS",
+                "final-2026 group completed with explicit eligible success",
+                validation,
+            )
+        if validation["status"] == "FAIL":
+            return "FAIL", "final-2026 output contains real failed score items", validation
+        if validation["status"] == "ERROR":
+            return (
+                "INFRA_ERROR",
+                "final-2026 output is incomplete, malformed, or score-ineligible",
+                validation,
+            )
+        return (
+            "INFRA_ERROR",
+            f"unknown final-2026 parser status: {validation['status']!r}",
+            validation,
+        )
     return "INFRA_ERROR", f"unknown result contract: {result_type!r}", {}
 
 
@@ -2877,6 +2976,10 @@ def child_environment(
                 environment[name] = os.environ[name]
         if "TESTSUITE_DIR" not in environment and environment.get("ORAYS_WORKSPACE_ROOT"):
             environment["TESTSUITE_DIR"] = environment["ORAYS_WORKSPACE_ROOT"]
+    if case["result_contract"]["type"] == "final_2026":
+        for name in FINAL_2026_CALLER_ENVIRONMENT:
+            if name in os.environ:
+                environment[name] = os.environ[name]
     return environment, None
 
 
@@ -3124,7 +3227,10 @@ def run_case(
         elif return_code in case.get("infrastructure_exit_codes", []):
             record["status"] = "INFRA_ERROR"
             record["result"] = f"child reported infrastructure exit code {return_code}"
-        elif return_code != 0 and case["result_contract"]["type"] != "official":
+        elif (
+            return_code != 0
+            and case["result_contract"]["type"] not in STRUCTURED_RESULT_TYPES
+        ):
             record["status"] = "FAIL"
             record["result"] = f"child exited with status {return_code}"
         else:
@@ -3133,19 +3239,25 @@ def run_case(
             except (OSError, OutputIntegrityError) as error:
                 record["status"] = "INFRA_ERROR"
                 record["result"] = f"captured output is malformed: {error}"
-                if case["result_contract"]["type"] == "official" and return_code != 0:
+                if (
+                    case["result_contract"]["type"] in STRUCTURED_RESULT_TYPES
+                    and return_code != 0
+                ):
                     record["details"] = {
                         "output_integrity_error": str(error),
                         "process_exit_code": return_code,
                     }
             else:
                 status, result, details = parse_contract(case, stdout, stderr)
-                if case["result_contract"]["type"] == "official" and return_code != 0:
+                if (
+                    case["result_contract"]["type"] in STRUCTURED_RESULT_TYPES
+                    and return_code != 0
+                ):
                     details = {**details, "process_exit_code": return_code}
                     if status == "PASS":
                         status = "INFRA_ERROR"
                         result = (
-                            "official output reports complete success but the child exited "
+                            "structured output reports complete success but the child exited "
                             f"with status {return_code}"
                         )
                     elif status == "FAIL":
