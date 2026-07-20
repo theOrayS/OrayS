@@ -24,6 +24,16 @@ const SYS_SCHED_SETAFFINITY: usize = 122;
 const SYS_SCHED_GETAFFINITY: usize = 123;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
+const SYS_SOCKET: usize = 198;
+const SYS_BIND: usize = 200;
+const SYS_LISTEN: usize = 201;
+const SYS_ACCEPT: usize = 202;
+const SYS_CONNECT: usize = 203;
+const SYS_SENDTO: usize = 206;
+const SYS_RECVFROM: usize = 207;
+const SYS_SETSOCKOPT: usize = 208;
+const SYS_CLONE: usize = 220;
+const SYS_WAIT4: usize = 260;
 
 const NEG_EBADF: isize = -9;
 const NEG_EAGAIN: isize = -11;
@@ -33,8 +43,15 @@ const AT_FDCWD: isize = -100;
 const O_RDONLY: usize = 0;
 const O_WRONLY: usize = 1;
 const O_NONBLOCK: usize = 0o4000;
+const AF_INET: usize = 2;
+const SOCK_STREAM: usize = 1;
+const SOL_SOCKET: usize = 1;
+const SO_REUSEADDR: usize = 2;
+const SIGCHLD: usize = 17;
 const CPUSET_BYTES: usize = core::mem::size_of::<usize>();
 const AFFINITY_BUFFER_BYTES: usize = 128;
+const TCP_FORK_CLIENTS: usize = 8;
+const TCP_FORK_PORT: u16 = 39_026;
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -73,6 +90,12 @@ const ASSERT_PROC_UPTIME: &[u8] =
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_UNAME_SYSNAME: &[u8] = b"PR3_SMOKE_V1 ASSERT uname_sysname PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -145,6 +168,12 @@ const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_TEE_DEVICE_OPEN: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tee_device_open arch=riscv64\n";
@@ -612,6 +641,199 @@ fn openat(path: &[u8], flags: usize) -> isize {
             0,
         )
     }
+}
+
+fn loopback_sockaddr() -> [u8; 16] {
+    let mut address = [0_u8; 16];
+    let family = (AF_INET as u16).to_ne_bytes();
+    let port = TCP_FORK_PORT.to_be_bytes();
+    address[..2].copy_from_slice(&family);
+    address[2..4].copy_from_slice(&port);
+    address[4..8].copy_from_slice(&[127, 0, 0, 1]);
+    address
+}
+
+#[inline(always)]
+fn socket_stream() -> isize {
+    // SAFETY: socket consumes only scalar domain, type, and protocol values. AF_INET
+    // plus SOCK_STREAM and protocol zero requests an ordinary IPv4 TCP socket.
+    unsafe { syscall6(SYS_SOCKET, AF_INET, SOCK_STREAM, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn socket_set_reuseaddr(fd: i32) -> isize {
+    let enabled = 1_i32;
+    // SAFETY: `enabled` is an aligned readable i32 for the complete synchronous
+    // setsockopt call; all remaining arguments are bounded scalar values.
+    unsafe {
+        syscall6(
+            SYS_SETSOCKOPT,
+            fd as usize,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            &enabled as *const i32 as usize,
+            core::mem::size_of::<i32>(),
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn socket_bind(fd: i32, address: &[u8; 16]) -> isize {
+    // SAFETY: `address` contains a complete Linux sockaddr_in byte layout and remains
+    // readable until the synchronous bind call returns.
+    unsafe {
+        syscall6(
+            SYS_BIND,
+            fd as usize,
+            address.as_ptr() as usize,
+            address.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn socket_listen(fd: i32, backlog: usize) -> isize {
+    // SAFETY: listen consumes only the scalar descriptor and backlog.
+    unsafe { syscall6(SYS_LISTEN, fd as usize, backlog, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn socket_accept(fd: i32) -> isize {
+    // SAFETY: null address and length pointers explicitly decline peer-address output;
+    // accept consumes only the live listener descriptor.
+    unsafe { syscall6(SYS_ACCEPT, fd as usize, 0, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn socket_connect(fd: i32, address: &[u8; 16]) -> isize {
+    // SAFETY: `address` contains a complete Linux sockaddr_in byte layout and remains
+    // readable until the synchronous connect call returns.
+    unsafe {
+        syscall6(
+            SYS_CONNECT,
+            fd as usize,
+            address.as_ptr() as usize,
+            address.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn socket_send(fd: i32, bytes: &[u8]) -> isize {
+    // SAFETY: `bytes` remains readable for its complete length until sendto returns;
+    // null destination arguments select the already-connected stream peer.
+    unsafe {
+        syscall6(
+            SYS_SENDTO,
+            fd as usize,
+            bytes.as_ptr() as usize,
+            bytes.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn socket_recv(fd: i32, bytes: &mut [u8]) -> isize {
+    // SAFETY: `bytes` is uniquely borrowed and writable for its complete length until
+    // recvfrom returns; null source arguments decline peer-address output.
+    unsafe {
+        syscall6(
+            SYS_RECVFROM,
+            fd as usize,
+            bytes.as_mut_ptr() as usize,
+            bytes.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+fn socket_send_all(fd: i32, bytes: &[u8]) -> bool {
+    let mut sent = 0usize;
+    while sent < bytes.len() {
+        let result = socket_send(fd, &bytes[sent..]);
+        if result <= 0 || result as usize > bytes.len() - sent {
+            return false;
+        }
+        sent += result as usize;
+    }
+    true
+}
+
+fn socket_recv_exact(fd: i32, bytes: &mut [u8]) -> bool {
+    let mut received = 0usize;
+    while received < bytes.len() {
+        let result = socket_recv(fd, &mut bytes[received..]);
+        if result <= 0 || result as usize > bytes.len() - received {
+            return false;
+        }
+        received += result as usize;
+    }
+    true
+}
+
+#[inline(always)]
+fn fork_process() -> isize {
+    // SAFETY: SIGCHLD with a null child stack and no clone flags requests ordinary
+    // fork-like process creation. All optional user pointers are null.
+    unsafe { syscall6(SYS_CLONE, SIGCHLD, 0, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn wait_child(pid: isize, status: &mut i32) -> isize {
+    // SAFETY: `status` is uniquely borrowed and writable for one i32 until wait4
+    // returns. The exact positive pid selects one child; options and rusage are zero.
+    unsafe {
+        syscall6(
+            SYS_WAIT4,
+            pid as usize,
+            status as *mut i32 as usize,
+            0,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+fn tcp_fork_child(listener: i32, client_index: usize, address: &[u8; 16]) -> usize {
+    if close(listener) != 0 {
+        return 1;
+    }
+    let client = socket_stream();
+    if client < 0 {
+        return 2;
+    }
+    let client = client as i32;
+    if socket_connect(client, address) != 0 {
+        let _ = close(client);
+        return 3;
+    }
+    let request = [b'C', client_index as u8, 0x5a, 0xa5];
+    if !socket_send_all(client, &request) {
+        let _ = close(client);
+        return 4;
+    }
+    let mut response = [0_u8; 4];
+    if !socket_recv_exact(client, &mut response) || response != request {
+        let _ = close(client);
+        return 5;
+    }
+    if close(client) != 0 {
+        return 6;
+    }
+    0
 }
 
 #[inline(always)]
@@ -1088,6 +1310,82 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_SPLICE_PIPE) != ASSERT_SPLICE_PIPE.len() as isize {
         fail(USER_FAIL_WRITE, 133);
+    }
+
+    // CAgent's server and concurrent clients depend on ordinary process creation and
+    // blocking IPv4 stream semantics. Bind a reusable loopback listener, fork eight
+    // independent clients before accepting any of them, and echo a distinct payload
+    // over every connection. The parent then reaps every exact pid and requires a
+    // normal zero exit status. This is a generic TCP/fork/wait contract: no evaluator
+    // path, process name, or protocol response is visible to the kernel.
+    let address = loopback_sockaddr();
+    let listener = socket_stream();
+    if listener < 0 {
+        fail(USER_FAIL_TCP_FORK_LOOPBACK, 242);
+    }
+    let listener = listener as i32;
+    if socket_set_reuseaddr(listener) != 0
+        || socket_bind(listener, &address) != 0
+        || socket_listen(listener, TCP_FORK_CLIENTS) != 0
+    {
+        let _ = close(listener);
+        fail(USER_FAIL_TCP_FORK_LOOPBACK, 243);
+    }
+
+    let mut child_pids = [0_isize; TCP_FORK_CLIENTS];
+    for client_index in 0..TCP_FORK_CLIENTS {
+        let child_pid = fork_process();
+        if child_pid == 0 {
+            exit(tcp_fork_child(listener, client_index, &address));
+        }
+        if child_pid < 0 {
+            let _ = close(listener);
+            fail(USER_FAIL_TCP_FORK_LOOPBACK, 244);
+        }
+        child_pids[client_index] = child_pid;
+    }
+
+    let mut seen_clients = 0_u16;
+    for _ in 0..TCP_FORK_CLIENTS {
+        let accepted = socket_accept(listener);
+        if accepted < 0 {
+            let _ = close(listener);
+            fail(USER_FAIL_TCP_FORK_LOOPBACK, 245);
+        }
+        let accepted = accepted as i32;
+        let mut request = [0_u8; 4];
+        if !socket_recv_exact(accepted, &mut request) {
+            let _ = close(accepted);
+            let _ = close(listener);
+            fail(USER_FAIL_TCP_FORK_LOOPBACK, 246);
+        }
+        let client_index = request[1] as usize;
+        if request[0] != b'C'
+            || client_index >= TCP_FORK_CLIENTS
+            || request[2..] != [0x5a, 0xa5]
+            || seen_clients & (1_u16 << client_index) != 0
+        {
+            let _ = close(accepted);
+            let _ = close(listener);
+            fail(USER_FAIL_TCP_FORK_LOOPBACK, 247);
+        }
+        seen_clients |= 1_u16 << client_index;
+        if !socket_send_all(accepted, &request) || close(accepted) != 0 {
+            let _ = close(listener);
+            fail(USER_FAIL_TCP_FORK_LOOPBACK, 248);
+        }
+    }
+    if seen_clients != (1_u16 << TCP_FORK_CLIENTS) - 1 || close(listener) != 0 {
+        fail(USER_FAIL_TCP_FORK_LOOPBACK, 249);
+    }
+    for child_pid in child_pids {
+        let mut status = -1_i32;
+        if wait_child(child_pid, &mut status) != child_pid || status != 0 {
+            fail(USER_FAIL_TCP_FORK_LOOPBACK, 250);
+        }
+    }
+    if write(ASSERT_TCP_FORK_LOOPBACK) != ASSERT_TCP_FORK_LOOPBACK.len() as isize {
+        fail(USER_FAIL_WRITE, 251);
     }
 
     let mut uts = UtsName::zeroed();
