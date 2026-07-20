@@ -180,6 +180,7 @@ _FINAL_2026_PARSER_SPEC.loader.exec_module(_FINAL_2026_PARSER)
 
 FINAL_2026_GROUPS = _FINAL_2026_PARSER.SUPPORTED_GROUPS
 FINAL_2026_ARCHITECTURES = _FINAL_2026_PARSER.SUPPORTED_ARCHITECTURES
+FINAL_2026_GROUP_LABELS = _FINAL_2026_PARSER.EXPECTED_GROUP_LABELS
 validate_final_2026_output = _FINAL_2026_PARSER.validate_final_2026_output
 
 SCHEMA_VERSION = 1
@@ -1333,6 +1334,7 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
             allowed_contract_keys.update(
                 {
                     "expected_group",
+                    "expected_group_label",
                     "expected_arch",
                     "buildstorm_baseline_seconds",
                 }
@@ -1405,6 +1407,16 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                 raise ManifestError(
                     f"{location}.result_contract.expected_group must be one of "
                     f"{sorted(FINAL_2026_GROUPS)}"
+                )
+            expected_group_label = contract.get("expected_group_label")
+            if (
+                expected_group in FINAL_2026_GROUPS
+                and expected_group_label != FINAL_2026_GROUP_LABELS[expected_group]
+            ):
+                raise ManifestError(
+                    f"{location}.result_contract.expected_group_label must be "
+                    f"{FINAL_2026_GROUP_LABELS[expected_group]!r} for "
+                    f"{expected_group!r}"
                 )
             expected_arch = contract.get("expected_arch")
             if expected_arch not in FINAL_2026_ARCHITECTURES:
@@ -2896,6 +2908,7 @@ def parse_contract(
             stdout,
             stderr,
             expected_group=contract["expected_group"],
+            expected_group_label=contract["expected_group_label"],
             expected_arch=contract["expected_arch"],
             buildstorm_baseline_seconds=contract["buildstorm_baseline_seconds"],
         )

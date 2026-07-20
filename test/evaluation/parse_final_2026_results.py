@@ -17,6 +17,10 @@ from typing import Any
 PROTOCOL_REFERENCE_COMMIT = "15e0355bbee0373de4048002448cee37dbb7ca1b"
 SUPPORTED_GROUPS = frozenset({"cagent", "buildstorm"})
 SUPPORTED_ARCHITECTURES = frozenset({"riscv64", "loongarch64"})
+EXPECTED_GROUP_LABELS = {
+    "cagent": "cagent-glibc",
+    "buildstorm": "buildstorm",
+}
 EXPECTED_BUILDSTORM_CORES = 8
 MINIMUM_BUILDSTORM_ARTIFACT_BYTES = 500_000
 BUILDSTORM_MAX_SCRIPTED_SCORE = 180.0
@@ -81,12 +85,19 @@ def _base_result(group: str) -> dict[str, Any]:
 
 def _validate_inputs(
     expected_group: str,
+    expected_group_label: str,
     expected_arch: str,
     baseline_seconds: float,
 ) -> list[str]:
     errors: list[str] = []
     if expected_group not in SUPPORTED_GROUPS:
         errors.append(f"unsupported expected group: {expected_group!r}")
+    elif expected_group_label != EXPECTED_GROUP_LABELS[expected_group]:
+        errors.append(
+            "expected_group_label does not match the fixed final-2026 protocol: "
+            f"group={expected_group!r}, label={expected_group_label!r}, "
+            f"required={EXPECTED_GROUP_LABELS[expected_group]!r}"
+        )
     if expected_arch not in SUPPORTED_ARCHITECTURES:
         errors.append(f"unsupported expected architecture: {expected_arch!r}")
     if (
@@ -100,7 +111,7 @@ def _validate_inputs(
 
 
 def _validate_lifecycle(
-    stdout_lines: list[str], expected_group: str
+    stdout_lines: list[str], expected_group_label: str
 ) -> tuple[int | None, int | None, list[str]]:
     errors: list[str] = []
     markers: list[tuple[int, str, str]] = []
@@ -126,10 +137,10 @@ def _validate_lifecycle(
         errors.append(
             f"group lifecycle labels disagree: START={start_group}, END={end_group}"
         )
-    if start_group != expected_group or end_group != expected_group:
+    if start_group != expected_group_label or end_group != expected_group_label:
         errors.append(
-            f"observed group {start_group}/{end_group} does not match expected group "
-            f"{expected_group}"
+            f"observed group {start_group}/{end_group} does not match expected group label "
+            f"{expected_group_label}"
         )
     return start_index, end_index, errors
 
@@ -462,6 +473,7 @@ def validate_final_2026_output(
     stderr: str,
     *,
     expected_group: str,
+    expected_group_label: str,
     expected_arch: str,
     buildstorm_baseline_seconds: float = 400.0,
 ) -> dict[str, Any]:
@@ -469,12 +481,15 @@ def validate_final_2026_output(
 
     result = _base_result(expected_group)
     input_errors = _validate_inputs(
-        expected_group, expected_arch, buildstorm_baseline_seconds
+        expected_group,
+        expected_group_label,
+        expected_arch,
+        buildstorm_baseline_seconds,
     )
     stdout_lines = stdout.splitlines()
     stderr_lines = stderr.splitlines()
     start_index, end_index, lifecycle_errors = _validate_lifecycle(
-        stdout_lines, expected_group
+        stdout_lines, expected_group_label
     )
     shared_errors = [
         *input_errors,
@@ -519,6 +534,7 @@ __all__ = [
     "BUILDSTORM_MAX_SCRIPTED_SCORE",
     "CAGENT_MAX_SCRIPTED_SCORE",
     "CAGENT_TESTS",
+    "EXPECTED_GROUP_LABELS",
     "PROTOCOL_REFERENCE_COMMIT",
     "validate_final_2026_output",
 ]
