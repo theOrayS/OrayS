@@ -4,7 +4,7 @@
 
 分支：`feature/orays-desktop-environment`
 
-状态：`READY_FOR_HUMAN_REVIEW_DRAFT`
+状态：`BLOCKED_WITH_EVIDENCE`（B-02 与第三轮外部条件未关闭；不可标记 PR Ready、不可合并）
 
 ## 基线
 
@@ -779,3 +779,311 @@ trailing whitespace 与污染检查均通过。因此本任务停止为
 ## 回滚
 
 桌面默认关闭；删除桌面独立构建入口和 feature-gated bridge 即可回滚，不应影响默认内核路径。
+
+## 2026-07-19 人工初审整改
+
+- 人工初审报告：`docs/human_reviews/OrayS-Desktop-人工审查初审报告-2026-07-19.md`；结论为
+  `REQUEST CHANGES`。该文件是审查输入，保持原样，不以修改报告文字代替实际修复。
+- 整改接管基线：分支 `feature/orays-desktop-environment`，HEAD
+  `809155269c8f77e46ba02a31e6ae8715a680cf92`，上游
+  `origin/feature/orays-desktop-environment`。接管时唯一未跟踪内容为用户提供的
+  `docs/human_reviews/`；没有覆盖、移动或加入该内容。
+- 修改前定向基线 `scripts/desktop/build.sh host-test` 退出 0：53/53 PASS；这只证明既有测试
+  通过，报告指出的缺口尚未被既有测试覆盖。
+- 修改前 Python discovery 启动并输出 35 个成功点；完整退出状态在本轮复验表中以独立命令
+  重新记录，不用该并发采集的截断输出宣称 PASS。
+- 本轮范围：B-01 DMA 合同、M-01 焦点 damage、M-02 runtime CI、M-03 原始证据包、N-01
+  WindowId 耗尽、N-02 P6 CRLF、N-03 Terminal 能力边界、N-04 输入溢出 release 保护；B-02
+  canonical/official 状态只按实际门禁结果关闭或继续标记阻塞。
+- AI 使用：OpenAI Codex 用于报告映射、实现、测试、CI/证据脚本与文档；所有生成修改仍需
+  定向测试、双架构构建/runtime、scope/diff 和第二轮人工复核。
+
+### Checkpoint 9：初审问题整改完成，等待第二轮人工审查
+
+整改没有修改人工初审报告，也没有通过弱化测试、parser、QEMU marker、结果分类或扩大
+blacklist 关闭问题。各项处置如下：
+
+| 初审项 | 处置与行为证据 |
+| --- | --- |
+| B-01 | DMA 零页、字节数溢出和 allocator failure 均执行明确 panic 策略；只返回真实、页对齐并完整清零的分配；三条 host 合约测试 PASS。 |
+| M-01 | 新增统一 `set_focused`，旧/新焦点 decoration 都加入 damage；create、close、minimize、focus、Desktop click、Alt-Tab/modal 路径统一使用；三类 incremental-vs-full 像素测试 PASS。 |
+| M-02 | `.github/workflows/desktop.yml` 新增固定 QEMU 9.2.4 的 self-hosted 双架构 required boot job，并仅上传两架构 review package；branch protection 是否把该 job 设为 required 仍需 GitHub 管理员确认。 |
+| M-03 | runner 记录源码 commit/dirty、QEMU/工具链版本和精确生成命令；每个场景打包 serial、QMP input/capture、输入序列、原始 PPM、summary、内外层哈希、geometry、capture precondition，resize 另含 VNC resize 证据；缺失或篡改测试 fail-closed。 |
+| N-01 | `WindowId` 在 `u32::MAX` 只签发一次，随后永久返回 `IdExhausted`，不回绕复用。 |
+| N-02 | P6 只把 CRLF 作为一个 header separator 消费，不继续吞掉可能是空白值的首像素；首像素 `0x20,0x0a,0xff` 测试 PASS。 |
+| N-03 | Terminal 模块、启动界面、README 和测试均明确其为进程内受限内置命令解释器，不提供 POSIX process/shell、pipe、redirect、environment 或 job control。 |
+| N-04 | 队列优先保留 key/button release：普通事件不驱逐 release，新 release 优先驱逐最旧普通事件；保留饱和 dropped 计数并在串口输出 total/delta 诊断。 |
+
+精确干净快照位于忽略的
+`build/desktop/review-round2-source.3FW9N9`，验证提交为
+`cb42268a9d7f47fbd10f8b0a5af80026712829ca`，tree 为
+`91806ae2044a934829cdf8384cc0c9986a7aef3d`；验证开始时提交中的 25 个预期路径与 live
+工作树逐文件一致，未包含用户提供且保持原样的人工报告。门禁结束后只更新本日志、执行计划、
+README 证据说明和忽略的 Goal 状态，产品实现、测试、CI 与证据脚本未再改变。10 组场景证据位于该快照的
+`test/output/desktop/r2/{rb,rl,ro,ra,rr,lb,ll,lo,lapps,lr}/review-package/`。所有包都重新
+校验外层哈希成功；normal 场景的原始 summary 哈希覆盖 8 个文件，resize 覆盖 9 个文件。
+运行元数据均记录 `source_dirty=false`、相同 commit；RV 使用 QEMU 6.2.0，LA 使用 QEMU
+9.2.4，所以这些 RV Desktop 场景是实际运行证据，但不能代替固定 9.2.4 的 canonical
+required smoke。所有 10 个原始 PPM 均转换到 `/tmp` 后人工目视检查，没有黑屏、空白、
+明显裁切、窗口异常重叠或 resize 后主要控件消失。
+
+最终验证记录：
+
+| 命令/证据 | 结果 | 说明 |
+| --- | --- | --- |
+| `python3 -I -S -B -X pycache_prefix=/dev/null -m unittest discover -s test/desktop -p 'test_*.py' -v` | 42/42 PASS，exit 0 | 包含 evidence package、runtime CI、capture binding、Unicode scope 测试。 |
+| `scripts/desktop/build.sh host-test` | 63/63 PASS，exit 0 | lib 16、apps 11、graphics 9、input 8、shell 5、window manager 14。 |
+| Desktop host/RV64/LA64 clippy | PASS | 首轮 host clippy 曾因 test module 位置失败；移动 test module 后三目标复验通过，首次失败保留。 |
+| Desktop RV64/LA64 release build | PASS | live ELF/BIN：RV `98ec2534…` / `7b3d1550…`；LA `c41161ad…` / `2753b280…`。 |
+| 10 个精确快照 headless 场景 | 10/10 PASS | 两架构各 boot、launcher、overlap、applications、resize；完整 review package 有效。 |
+| `scripts/desktop/build.sh golden-check` | 5/5 PASS，exit 0 | applications、boot、launcher、light、power 与 golden 一致。 |
+| asset、fmt、scope、`git diff --check` | 全部 PASS | asset registered=0/generated=5；scope 110/3/3/74。 |
+| canonical quick | 45/45 PASS，exit 0 | clean snapshot；summary SHA-256 `12a17e1cd620e2a85e51d1375d29ea3489d37484d6ff5aabb617fc6680b863e1`。 |
+| canonical `full --arch all` | `INFRA_ERROR`，exit 2 | planned 59、executed 56、completed 59；52 PASS / 4 FAIL / 3 INFRA_ERROR / 0 TIMEOUT / 0 CRASH；summary SHA-256 `c9d0db5278c439a784221f5dc4d693be91849cc92291dd428b52cb12f2b9c6b3`。 |
+
+`full` 的非 PASS 逐项保留：`evidence.riscv64` 因要求 QEMU 9.2.4、实际 6.2.0 而 blocked；
+`evidence.loongarch64` 因 `PR3_SMOKE_V1 USER_FAIL tee_device_mode` / guest nonzero 而 error；
+`evidence.aggregate` 派生 FAIL；`baseline.cargo_format` 因验证 clone 位于 live repo 的
+`build/desktop/` 下，vendor crate 被误绑定到父工作区而 FAIL，live 根目录相同 fmt 命令另行
+PASS，但不覆盖 canonical FAIL；`baseline.clippy_loongarch64` 因 clang 14 不认识
+`loongarch64-unknown-none` 而 INFRA_ERROR；`official.riscv64` 和 `official.loongarch64` 因
+`/root/sdcard-rv.img`、`/root/sdcard-la.img` 不可用而 INFRA_ERROR。完整 summary 记录 runner
+起止 commit 相同、dirty=false、status 为空、provenance stable，运行前后快照仍 clean。
+
+过程中的首次失败同样保留：初次 scope 因 Git 对 Unicode 路径做 octal quoting 而失败，修复为
+`core.quotepath=false` 后 PASS；一次包哈希命令从错误工作目录执行导致 file-not-found，切换到
+包目录后 2/2 校验通过；首个长输出目录触发 Unix QMP socket 108-byte 限制，短路径重跑通过。
+这些是明确的工具/调用路径问题，不被写成产品 PASS，也没有删除原始失败目录。
+
+本 checkpoint 恢复的是 `READY_FOR_HUMAN_REVIEW_DRAFT`：代码与证据已可交付第二轮人工
+审查，但 B-02 仍未关闭，PR 不可标记 Ready、不可合并。第二轮应重点复核 unsafe DMA 合同、
+focus damage 像素等价测试、CI job/branch protection、10 个 raw review package 的哈希与来源；
+并由维护者决定 fixed-QEMU、LoongArch clang、`tee_device_mode` 和官方镜像的关闭方式。
+
+## 2026-07-19 第二轮人工审查整改接管
+
+- 审查输入：`docs/human_reviews/OrayS-Desktop-第二轮人工审查复核报告-2026-07-19.md`；保持
+  原文不变。结论为“部分通过；按备注继续修改”，所以撤销 Checkpoint 9 的 Draft 候选状态。
+- 接管 HEAD：`809155269c8f77e46ba02a31e6ae8715a680cf92`；分支
+  `feature/orays-desktop-environment`，上游 `origin/feature/orays-desktop-environment`。
+- 接管时工作树已有 21 个 tracked modified 路径，以及 5 个 untracked 状态条目；其中
+  `docs/human_reviews/` 是用户审查输入。全部原样保留，没有 reset、覆盖或顺手整理。
+- 修改前 `scripts/desktop/check-headless-host.sh` 退出 0 / `PASS_WITH_WARNINGS`：缺少可选
+  `socat`、ImageMagick `convert` 和 Python `tomllib`；两套 QEMU 均报告可用 headless backend。
+- 修改前首次 `check-scope.py` 退出 1：唯一 finding 是第二轮人工报告未登记 allowlist。该失败
+  原样记录；本 checkpoint 只登记这一精确审查路径，不扩大通配范围。
+- 本轮本地整改范围：S-01 self-hosted 信任边界、M-04 可迁移 package 验证、M-05 失败证据与
+  双架构独立执行、P-01 前后 provenance、T-01 DMA 清零直接测试，以及可安全实现的 N-04 加固。
+- B-02、workflow push/实跑、required check、固定 RV QEMU 9.2.4 和官方镜像仍需真实外部证据；
+  本轮不会伪造、替代或提前勾选这些条件。
+- AI 使用：OpenAI Codex 用于报告映射、实现、测试、CI/证据脚本和文档；修改需由定向测试、
+  双架构验证、scope/diff 和第三轮独立人工审查共同复核。
+
+### Checkpoint 10：第二轮审查本地整改
+
+本 checkpoint 未修改两份人工审查报告。S-01、M-04、M-05、P-01、T-01 与 N-04 可在桌面
+隔离范围内完成的加固均已落地；B-02 和第三轮条件中的 push、GitHub Actions、required checks、
+固定 RV QEMU、官方镜像及 PR base 仍只按真实外部状态记录。
+
+实现与测试映射：
+
+| 审查项 | 当前实现与直接证据 |
+| --- | --- |
+| S-01 / M-05 | `desktop-runtime` 不接受 `pull_request`，仅受控 dispatch/受信任 push；RV/LA 为 `fail-fast: false` matrix。每个架构在 `always()` 上传自身 filtered package。静态 workflow 回归 4/4 PASS。 |
+| M-04 | package schema 2 保存原始 run/frame 绑定与包内相对 `frame.ppm`；专用 validator 验证精确文件集、双层哈希、QMP 命令、截图、summary 和 provenance。迁移、路径逃逸、迁移后篡改均有负向回归。 |
+| M-05 | runner 的 exit trap 总会调用 finalizer；FAIL 包至少包含 summary、serial、QMP input/capture、input sequence 和 metadata，排除 disk/socket。cleanup 对已退出 QEMU 仍执行 wait；真实 stub 演练保留 exit 42。版本采集缺 rustc/cargo 时写 `collection_errors`，仍可得到 `VALID_FAIL`。 |
+| P-01 | metadata schema 2 同时记录 commit/status/dirty before/after 与 `provenance_stable`；变化或采集不全使 semantic summary FAIL。 |
+| T-01 | `zero_dma_bytes` 由生产 DMA 路径调用；直接测试把两页全部填成 `0xa5` 后逐字节验证清零。没有增加第二处裸指针写入。 |
+| N-04 | 全 release 队列对相同 key/button release 身份做 coalesce，不淘汰另一个身份；满队列回归验证 dropped 不增加。跨设备全状态重同步仍明确留作后续，不伪称完成。 |
+
+失败证据协议的实际演练：
+
+- 固定版本前置失败：系统 RV QEMU 6.2.0 在要求 9.2.4 时 runner exit 3；干净快照包记录
+  `failure_stage=runtime-prerequisites`、7 条失败、前后 commit
+  `ec697a8449e00939883e44fb550913159154e051`、dirty=false、stable=true，搬迁后为
+  `VALID_FAIL`。证据保存在忽略的
+  `test/output/desktop/round3-fixed-rv-blocked/version-mismatch/`。
+- QEMU 异常退出：`/tmp` 诊断 stub 通过 9.2.4 版本门禁后立即 exit 42；真实 runner 输出
+  `QEMU exited before desktop boot marker; exit=42`，summary 保存 `qemu_exit=42`、
+  `runner_exit=1`、`failure_stage=qemu-boot` 和 8 条失败，package 为 `VALID_FAIL`。证据为
+  `test/output/desktop/round3-qemu-abnormal-exit-2/`。stub 不进入 Git，也不作为 guest PASS。
+- 缺工具链版本的第一次演练因诊断 PATH 漏掉 rustc/cargo，使旧 collector 抛
+  `FileNotFoundError` 并得到 exit 70；该目录原样保留为修复前失败。修复后回归用受控 PATH
+  重现缺 rustc/cargo，metadata 明确记录两个 collection error，finalizer 不再丢包且 validator
+  返回 `VALID_FAIL`。
+
+固定 LA QEMU 9.2.4 的 current-source 中间干净快照运行了 boot、launcher、overlap、
+applications、resize 五个场景，全部 runner exit 0、summary PASS、原目录及复制后的 package
+均 `VALID_PASS`；metadata 前后 commit 均为 `ec697a8449e00939883e44fb550913159154e051`、
+dirty=false、stable=true。复制后的证据位于忽略的
+`test/output/desktop/round3-fixed-la-clean/{boot,launcher,overlap,applications,resize}/`。五个
+frame SHA-256 分别为：
+
+- boot：`406af959897dcba1f2a770c20e5139416ed8937e6a22d98a21af0b8e58e5e7f2`；
+- launcher：`9316db0152d73b31acfa632edfa4d8f361bdeccbf55cb3454235eb1f7936746d`；
+- overlap：`6f69810e35bf49e042c875a7606ccb0c0b2d68fe7a4b5765e979ae76f5f79587`；
+- applications：`3056b5749344f40c4a247a853371fa61a4488676d4c570e5ba8f1916a83ee169`；
+- resize：`4d78ab00b7533c91039645acb8673d98bc6aaca402d24c984ed1845f0e56fb5f`。
+
+五个复制包的 dedicated validator 为 5/5 `VALID_PASS`，在各自目录执行
+`sha256sum -c package-files.sha256` 也全部 OK。一次错误循环没有切换工作目录，实际重复检查
+boot 五次；该调用不计 5/5，随后按五个独立 package 目录正确重跑。第一次把场景输出指定到
+repo 外也被安全边界全部 exit 2 拒绝，改用快照内忽略目录后才真正启动 guest。
+
+实现收尾前精确快照 `ec697a8449e00939883e44fb550913159154e051` 的 canonical quick 为
+45/45 PASS、exit 0、294.595 秒，summary SHA-256
+`b47611d63093a44480cf96e049f376ada78b1f1f01eeb93a864b11470f355e25`；`full --arch all`
+为 53 PASS / 3 FAIL / 3 INFRA_ERROR、0 timeout/crash、exit 2、1,268.136 秒，summary
+SHA-256 `f99096e5ba39c99b8a4ed98e20d53ae3efbd3253090e7e90422bc76dab520170`。两者均记录
+runner 起止 commit 相同、dirty=false、provenance stable，证据保存在忽略的
+`test/output/desktop/round3-canonical/`。
+
+该轮 full 的三个 FAIL 仍是 `evidence.riscv64`（QEMU 6.2.0≠9.2.4）、
+`evidence.loongarch64`（真实 `PR3_SMOKE_V1 USER_FAIL tee_device_mode`）和派生 aggregate；三个
+INFRA_ERROR 是 clang 14 不支持 `loongarch64-unknown-none`，以及两张官方镜像缺失。与第二轮
+报告的 52 PASS / 4 FAIL / 3 INFRA_ERROR 相比，`baseline.cargo_format` 已在不受父 workspace
+干扰的 `/tmp` 快照中真实转为 PASS。上述快照随后促成 QEMU wait 与 metadata 缺工具两项加固，
+所以只作为中间证据；最终 current-source 快照仍需在这些改动后重建并复验。
+
+固定 QEMU 获取也进行了真实尝试：仓库 `setup_qemu.sh` 固定 9.2.4、134,782,772-byte archive
+及 SHA-256 `f3cc1c4eabfdb288218ac3e33763dbe9e276d8bc890b867a2335d58de2ddd39a`。普通沙箱与获批的
+外层重试均因 `Could not resolve host: download.qemu.org` exit 6，未留下 partial archive，未改用
+未经固定 hash 的替代来源。因此 RV 9.2.4 条件仍是 BLOCKED，而不是“未运行即 PASS”。
+
+本 checkpoint 的首次调用错误也保留：一次 `unittest` 模块路径写法导致 3 个 ImportError，
+改为三个文件入口后 28/28 PASS；一次 summary 只读提取命令因 f-string 转义 SyntaxError 后改用
+普通 format；QEMU abnormal-exit 测试首次期待了错误文案，实际 qemu_exit/failure_stage 断言已
+通过，修正断言后 9/9 PASS。上述过程失败不覆盖最终正确命令，也不归类为产品通过。
+
+AI 使用披露：OpenAI Codex（GPT-5 系列，具体运行时小版本未暴露）用于第二轮报告映射、CI
+信任边界设计、证据 schema/validator/finalizer、DMA/input 加固、测试、运行诊断与本文档。
+人工负责人仍需解释 self-hosted 信任模型、exit trap/QEMU wait、provenance 不变量、DMA slice
+安全边界和 package 双层哈希；第三轮独立人工审查不能由本段 AI 自述替代。
+
+### Checkpoint 10 最终 current-source 验证与第三轮交接
+
+最终干净快照位于 `/tmp/orays-round3-final-source.C5AT5s/repo`，验证提交为
+`7b46e94b70437490aca0e8ab1d000c35bc4bef46`。建快照时本轮 29 个变更/新增路径与 live 工作树
+逐文件一致；验证前后 `git status --porcelain` 均为空。canonical summary 记录 runner
+before/after commit 相同、dirty=false、status 为空、`runner_provenance_stable=true`。gate 后只
+更新计划、开发日志和 Goal 状态，没有再修改实现、测试、workflow 或证据脚本。
+
+最终验证记录：
+
+| 命令/证据 | 退出码/结果 | 当前证据 |
+| --- | --- | --- |
+| Desktop Python discovery | 0；51/51 PASS | 包含 workflow 信任边界、PASS/FAIL package、迁移/篡改/路径逃逸、QEMU exit 42、缺工具 metadata 回归。 |
+| `scripts/desktop/build.sh host-test` | 0；65/65 PASS | 包含两页 `0xa5` 后逐字节清零与全 release 队列 coalesce。 |
+| Desktop host/RV64/LA64 clippy `-D warnings` | 0；3/3 PASS | 独立 desktop workspace 三目标 lint。 |
+| Desktop rustfmt、根 rustfmt、asset、golden、scope、`git diff --check` | 0；全部 PASS | asset 0 registered/5 generated；golden 5/5；scope 113 paths/3 bridge/3 existing/74 churn。 |
+| Desktop RV64/LA64 release build | 0；2/2 PASS | live RV ELF/BIN `edbd7672…` / `2513fe7a…`；LA `a8548872…` / `2a862c37…`。 |
+| canonical quick | 0；45/45 PASS | 294.533 秒；summary `23c7eb5aed851aebed0b97806ae063a97c31ea0622f31d2735f24f9f50611982`。 |
+| canonical `full --arch all` | 2；53 PASS / 3 FAIL / 3 INFRA_ERROR | 59 planned/completed、56 executed、0 timeout/crash、1,281.746 秒；summary `656448c74379cc330260aa849d8ce9c11f0d88a9e91645948439fba4b9184b25`。 |
+| 最终快照 RV boot，要求 QEMU 9.2.4 | 3；FAIL package 有效 | 实际 QEMU 6.2.0；`runtime-prerequisites`、7 条失败；移动后 `VALID_FAIL`。 |
+| 最终快照 LA boot，要求 QEMU 9.2.4 | 0；PASS package 有效 | QEMU 9.2.4；clean stable provenance；移动后 `VALID_PASS failures=0`。 |
+
+canonical full 的非 PASS 没有被隐藏：
+
+- `evidence.riscv64`：fixed tool contract 要求 `QEMU emulator version 9.2.4`，实际为
+  `6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.30)`；
+- `evidence.loongarch64`：guest 真实输出
+  `PR3_SMOKE_V1 USER_FAIL tee_device_mode arch=loongarch64`，随后 harness nonzero；
+- `evidence.aggregate`：继承两个 required shard 的非 PASS；
+- `baseline.clippy_loongarch64`：clang 14 capability probe 报
+  `unknown target triple 'loongarch64-unknown-none'`，严格分类为 INFRA_ERROR；
+- `official.riscv64` / `official.loongarch64`：快照 workspace 根均找不到对应官方镜像，未执行并
+  分类为 INFRA_ERROR。
+
+最终 runtime 证据已从快照迁移到 live 忽略目录并用同一最终 validator 重验。LA boot package
+为 `VALID_PASS failures=0`，PPM 1280x800、SHA-256
+`406af959897dcba1f2a770c20e5139416ed8937e6a22d98a21af0b8e58e5e7f2`；PPM 转为仅供观察的 PNG
+后实际检查，桌面、两个窗口、任务栏和通知均可见，未见黑屏、异常裁切或文字重叠。RV package
+为 `VALID_FAIL failures=7`。两包的 `review-package.json` SHA-256 分别为 RV
+`119a76271c4db2acf44d6bf65a921719810b704714e1891f7b05c98b1f040c3c`、LA
+`96277675e2c059e92a9807d0e82b37999e18569195db7525ce7cf14aae07d43e`。
+
+证据路径：
+
+- `test/output/desktop/round3-final-canonical/quick/summary.json`；
+- `test/output/desktop/round3-final-canonical/full/summary.json`；
+- `test/output/desktop/round3-final-canonical/pr3-evidence/`；
+- `test/output/desktop/round3-final-runtime/rv-version-mismatch/`；
+- `test/output/desktop/round3-final-runtime/la-boot/`。
+
+过程错误继续保留而不冒充产品失败或 PASS：当前系统没有 `jq`，只读 JSON 提取改用 Python；
+第一次 `rsync` 因 live 归档父目录不存在 exit 11，显式创建父目录后两份证据复制成功；图像查看器
+不能直接处理 PPM，且 `convert` 不存在，使用本机 `ffmpeg` 生成忽略的 PNG 观察副本后才完成目视
+检查。上述步骤没有修改 review package 内容，迁移后的专用 validator 结果保持有效。
+
+第三轮最低条件中 1–4 的本地实现/证据已完成，但 5–9 未满足：workflow 尚未提交/push/实跑，
+required checks 未配置，RV64 固定 QEMU 9.2.4 不可用，canonical/official 尚无维护者豁免，官方
+镜像未执行。条件 10 只能证明当前分支 merge-base 是目标基线
+`c776ceff40587de0fa0547724d0abfecbb56cc64`；因为尚未创建 PR，不能声称远端 PR base 已设置。
+未经用户明确授权，本轮未 push、未建 PR、未改 branch protection。Goal 因而停止为
+`BLOCKED_WITH_EVIDENCE`；这不是 PR Ready、merge-ready 或完整门禁通过声明。
+
+## 2026-07-20 最新独立复审 evidence/input 整改
+
+收到 `/tmp/codex-evidence-fix-prompt.txt` 后立即停止旧验证路径。本轮没有修改两份人工审查报告、
+`tee_device_mode`、GitHub CI 远端状态或 Goal，没有在 live 分支 commit/push；修复顺序为先新增
+负向/边界测试并确认当前实现真实失败，再修改实现。
+
+### 实现与契约
+
+- 新增共享 `runtime_evidence_contract.py`，将 canonical QEMU 固定为精确 banner
+  `QEMU emulator version 9.2.4`，并统一 metadata schema 3、summary schema 2、package
+  schema 3。runner 拒绝改变 policy 的环境 override；collector/summarizer 只接受精确 banner，
+  不再用 prefix 判断。
+- `qemu_started=false` 的合法状态必须是 null `qemu_exit`、非零 `runner_exit`、已知 pre-start
+  stage 与该 stage 允许的非空 reason；合法记录永远产生 semantic FAIL。空白、非法字符、未知
+  stage、stage/reason 不一致以及未启动却 runner exit 0 均在 producer/packager/validator
+  fail-closed，不能输出 PASS/VALID_PASS。
+- 新增 `create-qmp-runtime-dir.py`，固定在 `/tmp` 创建短 runtime dir，检查 socket 路径不超过
+  AF_UNIX 107 bytes 且不含 QEMU 参数分隔符。runner 不再读取 `TMPDIR`；EXIT/INT/TERM 均经
+  finalizer，signal 使用受约束 `runner-signal` reason，cleanup 回收 QEMU、socket 和 runtime dir。
+- dirty provenance 负测改为 before/after status 与 dirty flag 自洽且
+  `provenance_stable=false`；relocation 回归与最终 runtime 验证都在移走原 run 目录后再运行
+  dedicated validator。
+- 输入队列保留既有 `StateReset` 设计并补齐容量 0/1：容量 1 为 reset 腾位时同时统计无法保留的
+  旧输入与新 release，pending reset 不被驱逐，重复 resync 不把内部 reset 计为 dropped input。
+  `WindowedDesktop` 在 shell dispatch 前处理 reset，确保不依赖 `response.consumed` 取消 drag。
+
+### 测试先行证据
+
+修改实现前，新测试真实暴露以下问题：完整 evidence 配合 `qemu_started=false`、null QEMU exit、
+runner exit 0 会得到 PASS；空白/未知/不一致 token 被接受；`9.2.40`、`9.2.4-rc0` 与自洽的
+required/observed `6.2.0` 被接受；packager 可组装上述无效 PASS；QMP helper/固定路径不存在；
+StateReset 位于 shell dispatch 后；容量 1 dropped 预期 2/3、实际均为 1。修复后相同用例全部
+通过。第一次 Python 定向命令因 `test/desktop` 不是 import package 得到 ImportError，切换到该
+目录使用模块名后才取得有效失败证据；一次 apps 命令漏掉既有 `host-tools` feature，属于无效调用，
+权威 host-test 随后 12/12 apps PASS。
+
+### 最终本地验证
+
+| 命令/证据 | 退出码/结果 | 说明 |
+| --- | --- | --- |
+| Desktop Python discovery | 0；65/65 PASS | 含 strict version、status enum、legacy schema、forged PASS、dirty、离线 relocation、QMP 长 `TMPDIR` 负测。 |
+| `scripts/desktop/build.sh host-test` | 0；73/73 PASS | lib 17、apps 12、graphics 9、input 16、shell 5、window manager 14。 |
+| host clippy `--all-targets --features host-tools -- -D warnings` | 0；PASS | 当前 input/app 实现零 warning。 |
+| 根/desktop rustfmt、asset、golden、scope、shell syntax、`git diff --check` | 0；全部 PASS | asset 0 registered/5 generated；golden 5/5；scope 115/3/3/74。 |
+| Desktop RV64/LA64 release build | 0/0；PASS | live RV ELF/BIN `6b4b8264…` / `aa5ed3f2…`；LA `5d8d2d2…` / `07dac5ac…`。 |
+| clean snapshot RV/LA 五场景 | 0；10/10 PASS | 两架构均为精确 QEMU 9.2.4；每项原地 summary/package/validator PASS。 |
+| 删除原 run 后 relocated package | 0；10/10 `VALID_PASS` | 原绝对路径不存在时 dedicated validator 仍完整复现语义。 |
+| canonical quick | 0；45/45 PASS | 300.404 秒；summary SHA-256 `d994e0256d4915864bd303515fc7e2d0db86bf8460ada107aab4d0a492e54426`。 |
+
+最终隔离快照为 `/tmp/orays-evidence-fix.icXYne/repo`，仅用于验证的临时提交
+`3a0fade10f542908dc689faf0a4eaf1d85a56b02`；全部 tracked diff 与 8 个新增源码/测试文件均与
+live 逐文件 `cmp` 一致，快照前后 clean。canonical summary 记录 runner before/final commit 相同、
+dirty=false、status=[]、`runner_provenance_stable=true`。十个搬迁包与 quick summary 已保存至
+忽略目录 `test/output/desktop/evidence-fix-final/` 并再次得到 10/10 `VALID_PASS`。
+
+首次并行启动 RV/LA 时，两个进程竞争创建共同 `evidence-fix` 父目录，LA boot 在 guest 启动前
+因 `FileExistsError` 失败；该调用不计 PASS。父目录存在后单独重跑 LA boot 才得到真实
+`PASS + VALID_PASS`。没有用重跑覆盖或删除首次失败事实。
+
+当前本机两套 QEMU 都精确为 9.2.4，但 `/root/sdcard-rv.img` 与 `/root/sdcard-la.img` 仍不可读。
+因此本轮没有宣称 official/full PASS；历史 LA `tee_device_mode` 非 PASS 未修改、未隐藏。GitHub
+workflow/required checks 未实跑，第三轮独立人工审查尚未进行，当前状态仍不是 PR Ready 或
+merge-ready。AI 使用：OpenAI Codex 用于复审映射、测试先行、evidence/input 实现、隔离 runtime
+验证与本日志更新；人工负责人仍需独立解释 status enum、schema bump、QMP path/cleanup、
+StateReset 和 relocated package 不变量。
