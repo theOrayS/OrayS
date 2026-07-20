@@ -35,6 +35,11 @@ pub(crate) fn procfs() -> VfsResult<Arc<fs::ramfs::RamFileSystem>> {
     let meminfo = proc_meminfo();
     file_meminfo.write_at(0, meminfo.as_bytes())?;
 
+    // The Linux ABI layer supplies a live snapshot when this file is opened.
+    // Keep an empty VFS node so directory enumeration can discover it without
+    // publishing stale or fabricated timing data here.
+    proc_root.create("uptime", VfsNodeType::File)?;
+
     proc_root.create("cpuinfo", VfsNodeType::File)?;
     let file_cpuinfo = proc_root.clone().lookup("./cpuinfo")?;
     file_cpuinfo.write_at(0, proc_cpuinfo().as_bytes())?;

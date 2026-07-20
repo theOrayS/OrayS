@@ -79,6 +79,15 @@ pub fn current() -> CurrentTask {
     CurrentTask::get()
 }
 
+/// Returns the scheduler-observed runtime of all per-CPU idle tasks in
+/// hardware ticks.
+///
+/// The value includes the currently running interval of every idle task and
+/// is intended for system-wide accounting such as Linux `/proc/uptime`.
+pub fn idle_runtime_ticks() -> u64 {
+    crate::run_queue::idle_runtime_ticks()
+}
+
 /// Initializes the task scheduler (for the primary CPU).
 pub fn init_scheduler() {
     info!("Initialize scheduling...");

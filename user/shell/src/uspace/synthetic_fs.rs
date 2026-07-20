@@ -37,6 +37,7 @@ const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
 const PROC_CMDLINE_PATH: &str = "/proc/cmdline";
 const PROC_VERSION_PATH: &str = "/proc/version";
 const PROC_MEMINFO_PATH: &str = "/proc/meminfo";
+const PROC_UPTIME_PATH: &str = "/proc/uptime";
 const SYNTHETIC_INIT_PID: i32 = 1;
 
 fn proc_maps_perms(prot: u32, shared: bool) -> String {
@@ -917,6 +918,44 @@ pub(super) fn proc_meminfo_path_entry(path: &str) -> Option<FdEntry> {
         FdEntry::Path(PathEntry::synthetic_file(
             PROC_MEMINFO_PATH,
             proc_meminfo_content().len(),
+        ))
+    })
+}
+
+fn proc_uptime_content() -> Vec<u8> {
+    const NANOS_PER_CENTISECOND: u64 = 10_000_000;
+
+    let uptime_centiseconds = axhal::time::monotonic_time()
+        .as_nanos()
+        .saturating_div(u128::from(NANOS_PER_CENTISECOND));
+    let idle_centiseconds = axhal::time::ticks_to_nanos(axtask::idle_runtime_ticks())
+        .saturating_div(NANOS_PER_CENTISECOND);
+
+    format!(
+        "{}.{:02} {}.{:02}\n",
+        uptime_centiseconds / 100,
+        uptime_centiseconds % 100,
+        idle_centiseconds / 100,
+        idle_centiseconds % 100,
+    )
+    .into_bytes()
+}
+
+pub(super) fn proc_uptime_fd_entry(path: &str) -> Option<FdEntry> {
+    (normalize_path("/", path).as_deref() == Some(PROC_UPTIME_PATH)).then(|| {
+        FdEntry::MemoryFile(MemoryFileEntry {
+            path: PROC_UPTIME_PATH.into(),
+            data: Arc::new(proc_uptime_content()),
+            offset: 0,
+        })
+    })
+}
+
+pub(super) fn proc_uptime_path_entry(path: &str) -> Option<FdEntry> {
+    (normalize_path("/", path).as_deref() == Some(PROC_UPTIME_PATH)).then(|| {
+        FdEntry::Path(PathEntry::synthetic_file(
+            PROC_UPTIME_PATH,
+            proc_uptime_content().len(),
         ))
     })
 }

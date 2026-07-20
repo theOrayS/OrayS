@@ -7,7 +7,7 @@ use alloc::sync::Weak;
 
 use axsched::BaseScheduler;
 use kernel_guard::BaseGuard;
-use kspin::SpinRaw;
+use kspin::{SpinNoIrq, SpinRaw};
 use lazyinit::LazyInit;
 
 use axhal::percpu::this_cpu_id;
@@ -52,6 +52,18 @@ static mut RUN_QUEUES: [MaybeUninit<&'static mut AxRunQueue>; axconfig::plat::MA
     [ARRAY_REPEAT_VALUE; axconfig::plat::MAX_CPU_NUM];
 #[allow(clippy::declare_interior_mutable_const)] // It's ok because it's used only for initialization `RUN_QUEUES`.
 const ARRAY_REPEAT_VALUE: MaybeUninit<&'static mut AxRunQueue> = MaybeUninit::uninit();
+
+/// Strong references to the per-CPU idle tasks used for aggregate idle-time
+/// accounting. Each CPU registers exactly one task while its run queue is
+/// initialized.
+static IDLE_TASKS: SpinNoIrq<alloc::vec::Vec<AxTaskRef>> = SpinNoIrq::new(alloc::vec::Vec::new());
+
+/// Returns scheduler-observed runtime ticks accumulated by all idle tasks.
+pub(crate) fn idle_runtime_ticks() -> u64 {
+    IDLE_TASKS.lock().iter().fold(0_u64, |total, task| {
+        total.saturating_add(task.cpu_runtime_ticks())
+    })
+}
 
 /// Returns a reference to the current run queue in [`CurrentRunQueueRef`].
 ///
@@ -715,7 +727,9 @@ pub(crate) fn init() {
     // idle task should be pinned to the current CPU.
     idle_task.set_cpumask(AxCpuMask::one_shot(cpu_id));
     IDLE_TASK.with_current(|i| {
-        i.init_once(idle_task.into_arc());
+        let idle_task = idle_task.into_arc();
+        IDLE_TASKS.lock().push(idle_task.clone());
+        i.init_once(idle_task);
     });
 
     // Put the subsequent execution into the `main` task.
@@ -737,6 +751,8 @@ pub(crate) fn init_secondary() {
     // Put the subsequent execution into the `idle` task.
     let idle_task = TaskInner::new_init("idle".into()).into_arc();
     idle_task.set_state(TaskState::Running);
+    idle_task.begin_runtime_accounting(axhal::time::current_ticks());
+    IDLE_TASKS.lock().push(idle_task.clone());
     IDLE_TASK.with_current(|i| {
         i.init_once(idle_task.clone());
     });

@@ -124,6 +124,8 @@
         "api/arceos_posix_api/src/ctypes_gen.rs",
         "api/arceos_posix_api/src/lib.rs",
         "kernel/fs/axfs/src/mounts.rs",
+        "kernel/task/axtask/src/api.rs",
+        "kernel/task/axtask/src/run_queue.rs",
         "rust-toolchain.toml",
         "scripts/rust-lld.sh",
         "scripts/rust-objcopy.sh"
@@ -163,6 +165,9 @@
         "api/arceos_posix_api/build.rs",
         "api/arceos_posix_api/src/ctypes_gen.rs",
         "api/arceos_posix_api/src/lib.rs",
+        "kernel/fs/axfs/src/mounts.rs",
+        "kernel/task/axtask/src/api.rs",
+        "kernel/task/axtask/src/run_queue.rs",
         "rust-toolchain.toml",
         "scripts/rust-lld.sh",
         "scripts/rust-objcopy.sh",
@@ -172,6 +177,7 @@
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
         "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/fd_table.rs",
         "user/shell/src/uspace/synthetic_fs.rs"
       ]
     },
@@ -210,6 +216,8 @@
         "api/arceos_posix_api/src/ctypes_gen.rs",
         "api/arceos_posix_api/src/lib.rs",
         "kernel/fs/axfs/src/mounts.rs",
+        "kernel/task/axtask/src/api.rs",
+        "kernel/task/axtask/src/run_queue.rs",
         "rust-toolchain.toml",
         "scripts/rust-lld.sh",
         "scripts/rust-objcopy.sh"
@@ -249,6 +257,9 @@
         "api/arceos_posix_api/build.rs",
         "api/arceos_posix_api/src/ctypes_gen.rs",
         "api/arceos_posix_api/src/lib.rs",
+        "kernel/fs/axfs/src/mounts.rs",
+        "kernel/task/axtask/src/api.rs",
+        "kernel/task/axtask/src/run_queue.rs",
         "rust-toolchain.toml",
         "scripts/rust-lld.sh",
         "scripts/rust-objcopy.sh",
@@ -258,6 +269,7 @@
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
         "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/fd_table.rs",
         "user/shell/src/uspace/synthetic_fs.rs"
       ]
     },
@@ -512,12 +524,15 @@
       "provenance": [
         "Makefile",
         "kernel/fs/axfs/src/mounts.rs",
+        "kernel/task/axtask/src/api.rs",
+        "kernel/task/axtask/src/run_queue.rs",
         "user/shell/Cargo.toml",
         "user/shell/build.rs",
         "user/shell/runtime_smoke/semantic_smoke.ld",
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
         "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/fd_table.rs",
         "user/shell/src/uspace/synthetic_fs.rs"
       ],
       "environment": {
@@ -573,12 +588,15 @@
       "provenance": [
         "Makefile",
         "kernel/fs/axfs/src/mounts.rs",
+        "kernel/task/axtask/src/api.rs",
+        "kernel/task/axtask/src/run_queue.rs",
         "user/shell/Cargo.toml",
         "user/shell/build.rs",
         "user/shell/runtime_smoke/semantic_smoke.ld",
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
         "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/fd_table.rs",
         "user/shell/src/uspace/synthetic_fs.rs"
       ],
       "environment": {

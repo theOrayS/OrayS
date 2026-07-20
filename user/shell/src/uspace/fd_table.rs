@@ -70,10 +70,11 @@ use super::synthetic_fs::{
     proc_sys_file_path_entry, proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
     proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
     proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
-    proc_timerslack_fd_entry, proc_timerslack_path_entry, synthetic_file_is_writable_open,
-    synthetic_kernel_config_content, synthetic_kernel_config_fd_entry,
-    synthetic_kernel_config_path_entry, synthetic_proc_sys_content, synthetic_proc_sys_fd_entry,
-    synthetic_proc_sys_path_entry, synthetic_proc_version_content, synthetic_proc_version_fd_entry,
+    proc_timerslack_fd_entry, proc_timerslack_path_entry, proc_uptime_fd_entry,
+    proc_uptime_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
+    synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
+    synthetic_proc_version_content, synthetic_proc_version_fd_entry,
     synthetic_proc_version_path_entry, synthetic_userdb_content, synthetic_userdb_fd_entry,
     synthetic_userdb_path_entry,
 };
@@ -10476,6 +10477,19 @@ fn open_candidates(
             proc_meminfo_path_entry(path.as_str())
         } else {
             proc_meminfo_fd_entry(path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
+            proc_uptime_path_entry(path.as_str())
+        } else {
+            proc_uptime_fd_entry(path.as_str())
         } {
             if prefer_dir {
                 return Err(LinuxError::ENOTDIR);
