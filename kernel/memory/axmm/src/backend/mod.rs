@@ -2,6 +2,7 @@
 
 use ::alloc::collections::BTreeMap;
 use ::alloc::sync::Arc;
+use ::alloc::vec::Vec;
 use axhal::paging::{MappingFlags, PageTable};
 use kspin::SpinNoIrq;
 use memory_addr::{PhysAddr, VirtAddr};
@@ -120,6 +121,47 @@ impl Backend {
             Self::Alloc { .. } => true,
             Self::Shared { alloc_missing, .. } => alloc_missing,
             Self::Linear { .. } => false,
+        }
+    }
+
+    /// Whether resident pages can be discarded while keeping the memory area
+    /// available for zero-filled faults.
+    pub(crate) fn supports_discard_to_zero(&self) -> bool {
+        matches!(
+            *self,
+            Self::Alloc { .. }
+                | Self::Shared {
+                    alloc_missing: true,
+                    ..
+                }
+        )
+    }
+
+    /// Drops resident frames without removing the owning memory area.
+    ///
+    /// The caller must validate the complete range before invoking this method;
+    /// keeping that validation separate prevents a mixed-backend range from
+    /// being only partially discarded.
+    pub(crate) fn discard_to_zero(
+        &self,
+        start: VirtAddr,
+        size: usize,
+        page_table: &mut PageTable,
+        resident_frames: &mut Vec<PhysAddr>,
+    ) -> bool {
+        match *self {
+            Self::Alloc { .. } => {
+                self.discard_alloc_pages(start, size, page_table, resident_frames)
+            }
+            Self::Shared {
+                ref pages,
+                alloc_missing: true,
+            } => self.discard_shared_pages(start, size, page_table, pages, resident_frames),
+            Self::Linear { .. }
+            | Self::Shared {
+                alloc_missing: false,
+                ..
+            } => false,
         }
     }
 

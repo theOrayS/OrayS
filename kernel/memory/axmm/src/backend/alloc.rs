@@ -225,6 +225,88 @@ impl Backend {
         true
     }
 
+    pub(crate) fn discard_alloc_pages(
+        &self,
+        start: VirtAddr,
+        size: usize,
+        pt: &mut PageTable,
+        resident_frames: &mut Vec<PhysAddr>,
+    ) -> bool {
+        debug_assert!(resident_frames.is_empty());
+
+        {
+            let mut cursor = pt.cursor();
+            for addr in PageIter4K::new(start, start + size).unwrap() {
+                if let Ok((frame, _, page_size)) = cursor.unmap(addr) {
+                    // AddrSpace pre-validates the complete range before any PTE
+                    // is removed, so a huge page cannot make this operation
+                    // partially visible.
+                    if page_size.is_huge() {
+                        return false;
+                    }
+                    resident_frames.push(frame);
+                }
+            }
+        }
+        // The cursor flushes all affected TLB entries before a frame can return
+        // to the allocator and be reused for an unrelated mapping.
+        for frame in resident_frames.drain(..) {
+            release_owned_frame(frame);
+        }
+        true
+    }
+
+    pub(crate) fn discard_shared_pages(
+        &self,
+        start: VirtAddr,
+        size: usize,
+        pt: &mut PageTable,
+        pages: &SharedPages,
+        private_frames: &mut Vec<PhysAddr>,
+    ) -> bool {
+        debug_assert!(private_frames.is_empty());
+
+        let mut pages = pages.lock();
+        {
+            let mut cursor = pt.cursor();
+            for addr in PageIter4K::new(start, start + size).unwrap() {
+                if let Ok((frame, _, page_size)) = cursor.unmap(addr) {
+                    // Shared metadata owns its own frame reference. A PTE that
+                    // still names that frame must not release it twice; a
+                    // private COW frame has no matching metadata and is owned by
+                    // the PTE.
+                    if page_size.is_huge() {
+                        return false;
+                    }
+                    let metadata_owns_frame = pages
+                        .get(&addr.as_usize())
+                        .is_some_and(|(source_frame, _)| *source_frame == frame);
+                    if !metadata_owns_frame {
+                        private_frames.push(frame);
+                    }
+                }
+            }
+        }
+        // As above, the cursor has flushed the affected TLB entries before any
+        // physical frame is released.
+        for frame in private_frames.drain(..) {
+            release_owned_frame(frame);
+        }
+        loop {
+            let Some(key) = pages
+                .range(start.as_usize()..(start + size).as_usize())
+                .next()
+                .map(|(addr, _)| *addr)
+            else {
+                break;
+            };
+            if let Some((frame, _)) = pages.remove(&key) {
+                release_owned_frame(frame);
+            }
+        }
+        true
+    }
+
     pub(crate) fn map_shared(
         &self,
         start: VirtAddr,
@@ -344,14 +426,14 @@ impl Backend {
         vaddr: VirtAddr,
         orig_flags: MappingFlags,
         pt: &mut PageTable,
-        populate: bool,
+        _populate: bool,
     ) -> bool {
         let vaddr = vaddr.align_down_4k();
         if pt.query(vaddr).is_ok() {
             self.handle_cow_fault(vaddr, orig_flags, pt)
-        } else if populate {
-            false // Populated mappings should not trigger page faults.
         } else {
+            // Even an initially populated mapping can become sparse after
+            // MADV_DONTNEED. A later access must recreate a zero-filled frame.
             self.map_fresh_frame(vaddr, orig_flags, pt)
         }
     }

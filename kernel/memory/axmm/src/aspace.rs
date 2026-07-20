@@ -342,6 +342,63 @@ impl AddrSpace {
         Ok(())
     }
 
+    /// Discards resident allocation-backed pages while preserving their memory
+    /// areas so subsequent accesses fault in zero-filled frames.
+    pub fn discard_pages_to_zero(&mut self, start: VirtAddr, size: usize) -> AxResult {
+        if !self.contains_range(start, size) {
+            return ax_err!(InvalidInput, "address out of range");
+        }
+        if !start.is_aligned_4k() || !is_aligned_4k(size) || size == 0 {
+            return ax_err!(InvalidInput, "address not aligned");
+        }
+
+        let end = start + size;
+        for page in PageIter4K::new(start, end).expect("validated 4K-aligned discard range") {
+            let Some(area) = self.areas.find(page) else {
+                return ax_err!(BadState, "discard range is not fully mapped");
+            };
+            if !area.backend().supports_discard_to_zero() {
+                return ax_err!(BadState, "mapping backend cannot fault zero pages");
+            }
+            if self
+                .pt
+                .query(page)
+                .is_ok_and(|(_, _, page_size)| page_size.is_huge())
+            {
+                return ax_err!(BadState, "discarding huge pages is not supported");
+            }
+        }
+
+        // Reserve all temporary frame bookkeeping before changing a PTE. This
+        // keeps memory pressure from turning a multi-area request into a
+        // partially applied operation.
+        let mut resident_frames = Vec::new();
+        resident_frames
+            .try_reserve_exact(size / PAGE_SIZE_4K)
+            .map_err(|_| AxError::NoMemory)?;
+
+        let mut cursor = start;
+        while cursor < end {
+            let (chunk_end, backend) = {
+                let area = self
+                    .areas
+                    .find(cursor)
+                    .expect("discard range was fully pre-validated");
+                (area.end().min(end), area.backend().clone())
+            };
+            if !backend.discard_to_zero(
+                cursor,
+                chunk_end - cursor,
+                &mut self.pt,
+                &mut resident_frames,
+            ) {
+                return ax_err!(BadState, "failed to discard resident pages");
+            }
+            cursor = chunk_end;
+        }
+        Ok(())
+    }
+
     /// To process data in this area with the given function.
     ///
     /// Now it supports reading and writing data in the given interval.

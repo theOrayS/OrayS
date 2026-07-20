@@ -904,7 +904,11 @@ pub(super) fn sys_madvise(process: &UserProcess, addr: usize, len: usize, advice
                 return neg_errno(LinuxError::EINVAL);
             }
             if madvise_range_is_private_anonymous(process, addr, end) {
-                return zero_user_range(process, addr, end).map_or_else(neg_errno, |_| 0);
+                return process
+                    .aspace
+                    .lock()
+                    .discard_pages_to_zero(VirtAddr::from(addr), end - addr)
+                    .map_or_else(|err| neg_errno(LinuxError::from(err)), |_| 0);
             }
             0
         }

@@ -1759,6 +1759,42 @@ pub extern "C" fn _start() -> ! {
             }
         }
     }
+    // After fork, the child owns a COW view of this private mapping. Discarding
+    // the child's resident page must produce a private zero-filled page without
+    // changing the parent's retained byte; writing the replacement page must
+    // remain isolated as well. This covers the allocation-backed and cloned
+    // shared-metadata discard paths used by ordinary processes.
+    // SAFETY: the first byte is inside the still-live writable mapping, and the
+    // volatile access does not create a reference that crosses fork or madvise.
+    unsafe { (madvise_mapping as *mut u8).write_volatile(0x5a) };
+    let madvise_child = fork_process();
+    if madvise_child == 0 {
+        if madvise_dontneed(madvise_mapping, PAGE_BYTES) != 0
+            // SAFETY: the child retains its private readable mapping after fork
+            // and successful madvise; this single volatile read stays in-page.
+            || unsafe { (madvise_mapping as *const u8).read_volatile() } != 0
+        {
+            exit(41);
+        }
+        // SAFETY: the discarded private page has been faulted back into the
+        // child's writable mapping and remains live until the immediate exit.
+        unsafe { (madvise_mapping as *mut u8).write_volatile(0xa5) };
+        exit(0);
+    }
+    if madvise_child < 0 {
+        let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+        fail(USER_FAIL_MADVISE_DONTNEED, 281);
+    }
+    let mut madvise_child_status = -1_i32;
+    if wait_child(madvise_child, &mut madvise_child_status) != madvise_child
+        || madvise_child_status != 0
+        // SAFETY: the parent's original private page remains mapped and readable;
+        // neither the child's discard nor its later write may change this byte.
+        || unsafe { (madvise_mapping as *const u8).read_volatile() } != 0x5a
+    {
+        let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+        fail(USER_FAIL_MADVISE_DONTNEED, 282);
+    }
     if munmap(madvise_mapping, MADVISE_PROBE_BYTES) != 0 {
         fail(USER_FAIL_MADVISE_DONTNEED, 279);
     }
