@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
+use core::{
+    panic::PanicInfo,
+    sync::atomic::{AtomicI32, Ordering},
+};
 
 // This freestanding program is the userspace side of the repository-contained ABI
 // smoke, so using a higher-level syscall or libc wrapper would test that wrapper
@@ -23,6 +26,7 @@ const SYS_EXIT: usize = 93;
 const SYS_NANOSLEEP: usize = 101;
 const SYS_SCHED_SETAFFINITY: usize = 122;
 const SYS_SCHED_GETAFFINITY: usize = 123;
+const SYS_SCHED_YIELD: usize = 124;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
 const SYS_SOCKET: usize = 198;
@@ -53,12 +57,39 @@ const SOCK_STREAM: usize = 1;
 const SOL_SOCKET: usize = 1;
 const SO_REUSEADDR: usize = 2;
 const SIGCHLD: usize = 17;
+const CLONE_VM: u64 = 0x0000_0100;
+const CLONE_FS: u64 = 0x0000_0200;
+const CLONE_FILES: u64 = 0x0000_0400;
+const CLONE_SIGHAND: u64 = 0x0000_0800;
+const CLONE_THREAD: u64 = 0x0001_0000;
+const CLONE_SYSVSEM: u64 = 0x0004_0000;
+const CLONE_SETTLS: u64 = 0x0008_0000;
+const CLONE_PARENT_SETTID: u64 = 0x0010_0000;
+const CLONE_CHILD_CLEARTID: u64 = 0x0020_0000;
+const CARGO_THREAD_CLONE_FLAGS: u64 = CLONE_VM
+    | CLONE_FS
+    | CLONE_FILES
+    | CLONE_SIGHAND
+    | CLONE_THREAD
+    | CLONE_SYSVSEM
+    | CLONE_SETTLS
+    | CLONE_PARENT_SETTID
+    | CLONE_CHILD_CLEARTID;
 const CPUSET_BYTES: usize = core::mem::size_of::<usize>();
 const AFFINITY_BUFFER_BYTES: usize = 128;
 const TCP_FORK_CLIENTS: usize = 8;
 const TCP_FORK_PORT: u16 = 39_026;
 const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
 const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
+const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
+
+// A u128 array gives the clone3 child stack the 16-byte alignment required by
+// both target ABIs. Access is exclusively through raw pointers: the parent never
+// creates a Rust reference while the kernel-created thread owns this stack.
+static mut CLONE3_THREAD_STACK: [u128; CLONE3_THREAD_STACK_BYTES / 16] =
+    [0; CLONE3_THREAD_STACK_BYTES / 16];
+static CLONE3_THREAD_TID: AtomicI32 = AtomicI32::new(0);
+static CLONE3_THREAD_TLS_ANCHOR: AtomicI32 = AtomicI32::new(0);
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -106,6 +137,18 @@ const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS a
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const CLONE3_THREAD_CHILD: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_thread_child PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const CLONE3_THREAD_CHILD: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_thread_child PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_CLONE3_THREAD: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_thread PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_CLONE3_THREAD: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_thread PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64\n";
@@ -194,6 +237,12 @@ const USER_FAIL_CLONE3_PROCESS: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_THREAD: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_THREAD: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
@@ -848,6 +897,22 @@ impl CloneArgs {
             cgroup: 0,
         }
     }
+
+    const fn cargo_thread(stack: usize, parent_and_child_tid: usize, tls: usize) -> Self {
+        Self {
+            flags: CARGO_THREAD_CLONE_FLAGS,
+            pidfd: 0,
+            child_tid: parent_and_child_tid as u64,
+            parent_tid: parent_and_child_tid as u64,
+            exit_signal: 0,
+            stack: stack as u64,
+            stack_size: CLONE3_THREAD_STACK_BYTES as u64,
+            tls: tls as u64,
+            set_tid: 0,
+            set_tid_size: 0,
+            cgroup: 0,
+        }
+    }
 }
 
 #[repr(C)]
@@ -861,6 +926,153 @@ fn clone3_process(args: *const CloneArgs, size: usize) -> isize {
     // SAFETY: callers keep the complete `size` byte range readable until the
     // synchronous clone3 entry has copied it. Null is used only for the EFAULT probe.
     unsafe { syscall6(SYS_CLONE3, args as usize, size, 0, 0, 0, 0) }
+}
+
+#[cfg(target_arch = "riscv64")]
+#[inline(never)]
+/// Enters clone3 with Cargo/glibc's worker-thread register shape.
+///
+/// # Safety
+///
+/// `args` must remain readable through syscall entry and describe a writable,
+/// exclusively owned child stack. `ready_write_fd` and `release_read_fd` must be
+/// opposite ends of live pipes shared with the new thread. `child_marker` must
+/// remain readable until the child exits. The child path never returns to Rust:
+/// after the kernel switches `sp`, the assembly exchanges one-byte pipe messages,
+/// reports its TLS comparison, writes the marker, and invokes `exit(2)` directly.
+unsafe fn clone3_cargo_thread(
+    args: *const CloneArgs,
+    ready_write_fd: i32,
+    release_read_fd: i32,
+    child_marker: &[u8],
+    expected_tls: usize,
+) -> isize {
+    let ret: isize;
+    // SAFETY: the caller provides the live pointers, descriptors, and exclusive
+    // stack described above. The parent follows the ordinary ABI return path. The
+    // child uses only its new stack and raw syscalls and therefore never lets Rust
+    // observe a changed stack pointer or return through the parent's call frame.
+    unsafe {
+        core::arch::asm!(
+            "ecall",
+            "bnez a0, 3f",
+            "addi sp, sp, -16",
+            "li t0, 70",
+            "bne tp, a6, 5f",
+            "li t0, 82",
+            "5:",
+            "sb t0, 0(sp)",
+            "mv a0, a2",
+            "mv a1, sp",
+            "li a2, 1",
+            "li a7, 64",
+            "ecall",
+            "mv a0, a3",
+            "mv a1, sp",
+            "li a2, 1",
+            "li a7, 63",
+            "ecall",
+            "lbu t0, 0(sp)",
+            "li a0, 82",
+            "bne t0, a0, 8f",
+            "li a0, 1",
+            "mv a1, a4",
+            "mv a2, a5",
+            "li a7, 64",
+            "ecall",
+            "8:",
+            "li a0, 0",
+            "li a7, 93",
+            "ecall",
+            "6:",
+            "j 6b",
+            "3:",
+            inlateout("a0") args as usize => ret,
+            inlateout("a1") core::mem::size_of::<CloneArgs>() => _,
+            inlateout("a2") ready_write_fd as usize => _,
+            inlateout("a3") release_read_fd as usize => _,
+            inlateout("a4") child_marker.as_ptr() as usize => _,
+            inlateout("a5") child_marker.len() => _,
+            inlateout("a6") expected_tls => _,
+            inlateout("a7") SYS_CLONE3 => _,
+            lateout("t0") _,
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[inline(never)]
+/// Enters clone3 with Cargo/glibc's worker-thread register shape.
+///
+/// # Safety
+///
+/// This has the same pointer, descriptor, stack-ownership, and no-return child
+/// contract as the RISC-V64 implementation above. The architecture-specific block
+/// uses only the Linux LA64 syscall ABI and never resumes Rust on the child stack.
+unsafe fn clone3_cargo_thread(
+    args: *const CloneArgs,
+    ready_write_fd: i32,
+    release_read_fd: i32,
+    child_marker: &[u8],
+    expected_tls: usize,
+) -> isize {
+    let ret: isize;
+    // SAFETY: the caller upholds the documented raw ABI and ownership contract.
+    // The child performs no Rust call or return after clone3 changes `$sp`.
+    unsafe {
+        core::arch::asm!(
+            "syscall 0",
+            "bnez $a0, 3f",
+            "addi.d $sp, $sp, -16",
+            "addi.d $t0, $zero, 70",
+            "bne $tp, $a6, 5f",
+            "addi.d $t0, $zero, 82",
+            "5:",
+            "st.b $t0, $sp, 0",
+            "or $a0, $a2, $zero",
+            "or $a1, $sp, $zero",
+            "addi.d $a2, $zero, 1",
+            "addi.d $a7, $zero, 64",
+            "syscall 0",
+            "or $a0, $a3, $zero",
+            "or $a1, $sp, $zero",
+            "addi.d $a2, $zero, 1",
+            "addi.d $a7, $zero, 63",
+            "syscall 0",
+            "ld.bu $t0, $sp, 0",
+            "addi.d $a0, $zero, 82",
+            "bne $t0, $a0, 8f",
+            "addi.d $a0, $zero, 1",
+            "or $a1, $a4, $zero",
+            "or $a2, $a5, $zero",
+            "addi.d $a7, $zero, 64",
+            "syscall 0",
+            "8:",
+            "or $a0, $zero, $zero",
+            "addi.d $a7, $zero, 93",
+            "syscall 0",
+            "6:",
+            "b 6b",
+            "3:",
+            inlateout("$a0") args as usize => ret,
+            inlateout("$a1") core::mem::size_of::<CloneArgs>() => _,
+            inlateout("$a2") ready_write_fd as usize => _,
+            inlateout("$a3") release_read_fd as usize => _,
+            inlateout("$a4") child_marker.as_ptr() as usize => _,
+            inlateout("$a5") child_marker.len() => _,
+            inlateout("$a6") expected_tls => _,
+            inlateout("$a7") SYS_CLONE3 => _,
+            lateout("$t0") _,
+        );
+    }
+    ret
+}
+
+#[inline(always)]
+fn sched_yield() -> isize {
+    // SAFETY: sched_yield has no pointer arguments or memory ownership effects.
+    unsafe { syscall6(SYS_SCHED_YIELD, 0, 0, 0, 0, 0, 0) }
 }
 
 #[inline(always)]
@@ -1467,6 +1679,76 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_CLONE3_PROCESS) != ASSERT_CLONE3_PROCESS.len() as isize {
         fail(USER_FAIL_WRITE, 263);
+    }
+
+    // Current glibc uses this exact clone3 flag and argument shape for the worker
+    // threads that drive Cargo and rustc. The child begins on the supplied stack,
+    // proves that CLONE_SETTLS installed the requested architecture TLS register,
+    // and blocks on a shared pipe while the parent observes CLONE_PARENT_SETTID.
+    // Releasing the child then requires CLONE_CHILD_CLEARTID to publish zero at exit.
+    let mut thread_ready_pipe = [-1_i32; 2];
+    let mut thread_release_pipe = [-1_i32; 2];
+    if pipe2(&mut thread_ready_pipe, 0) != 0 || pipe2(&mut thread_release_pipe, 0) != 0 {
+        fail(USER_FAIL_CLONE3_THREAD, 264);
+    }
+    CLONE3_THREAD_TID.store(0, Ordering::Release);
+    let thread_stack = core::ptr::addr_of_mut!(CLONE3_THREAD_STACK).cast::<u8>() as usize;
+    let thread_tid = CLONE3_THREAD_TID.as_ptr() as usize;
+    let thread_tls = core::ptr::addr_of!(CLONE3_THREAD_TLS_ANCHOR) as usize;
+    let thread_args = CloneArgs::cargo_thread(thread_stack, thread_tid, thread_tls);
+    // SAFETY: both pipes are live, the static stack is exclusively reserved for this
+    // one child until its clear-child-tid publication, and every pointer remains valid.
+    let clone3_thread = unsafe {
+        clone3_cargo_thread(
+            &thread_args,
+            thread_ready_pipe[1],
+            thread_release_pipe[0],
+            CLONE3_THREAD_CHILD,
+            thread_tls,
+        )
+    };
+    if clone3_thread <= 0 {
+        let _ = close(thread_ready_pipe[0]);
+        let _ = close(thread_ready_pipe[1]);
+        let _ = close(thread_release_pipe[0]);
+        let _ = close(thread_release_pipe[1]);
+        fail(USER_FAIL_CLONE3_THREAD, 265);
+    }
+
+    let mut thread_ready = [0_u8; 1];
+    let ready_result = fd_read(thread_ready_pipe[0], &mut thread_ready);
+    let parent_tid_seen = CLONE3_THREAD_TID.load(Ordering::Acquire) == clone3_thread as i32;
+    let release_result = pipe_write(thread_release_pipe[1], b"G");
+    let mut clear_tid_seen = false;
+    let mut yield_failed = false;
+    for _ in 0..100_000 {
+        if CLONE3_THREAD_TID.load(Ordering::Acquire) == 0 {
+            clear_tid_seen = true;
+            break;
+        }
+        if sched_yield() != 0 {
+            yield_failed = true;
+            break;
+        }
+    }
+    // CLONE_FILES shares the descriptor table itself, so descriptors may only be
+    // closed after the child has consumed its release byte and exited.
+    let close_ok = (close(thread_ready_pipe[0]) == 0)
+        & (close(thread_ready_pipe[1]) == 0)
+        & (close(thread_release_pipe[0]) == 0)
+        & (close(thread_release_pipe[1]) == 0);
+    if ready_result != 1
+        || thread_ready != [b'R']
+        || !parent_tid_seen
+        || release_result != 1
+        || !clear_tid_seen
+        || yield_failed
+        || !close_ok
+    {
+        fail(USER_FAIL_CLONE3_THREAD, 266);
+    }
+    if write(ASSERT_CLONE3_THREAD) != ASSERT_CLONE3_THREAD.len() as isize {
+        fail(USER_FAIL_WRITE, 267);
     }
 
     // A libc popen-style operation is built from these same generic primitives:
