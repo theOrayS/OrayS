@@ -50,7 +50,7 @@ use super::posix_mq::{
 };
 use super::process_abi::{sys_getpgid, sys_getsid, sys_personality, sys_setpgid, sys_setsid};
 use super::process_lifecycle::{
-    sys_clone, sys_execve, sys_exit, sys_exit_group, sys_wait4, sys_waitid,
+    sys_clone, sys_clone3, sys_execve, sys_exit, sys_exit_group, sys_wait4, sys_waitid,
     terminate_current_thread_for_exit_group,
 };
 use super::resource_sched::{
@@ -803,6 +803,7 @@ fn user_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
             tf.arg4(),
             tf.arg3(),
         ),
+        general::__NR_clone3 => sys_clone3(&ext.process, tf, tf.arg0(), tf.arg1()),
         general::__NR_execve => sys_execve(process, tf, tf.arg0(), tf.arg1(), tf.arg2()),
         general::__NR_wait4 => {
             sys_wait4(process, tf.arg0() as i32, tf.arg1(), tf.arg2(), tf.arg3())

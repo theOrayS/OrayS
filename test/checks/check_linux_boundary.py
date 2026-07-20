@@ -21,7 +21,7 @@ LEGACY_CALLER_INVENTORY = {
     "validate_user_write": (49, 10),
     "fault_in_user_read": (5, 2),
     "fault_in_user_write": (3, 1),
-    "read_user_bytes_into": (11, 3),
+    "read_user_bytes_into": (14, 4),
     "read_user_bytes": (35, 11),
     "write_user_bytes": (47, 12),
     "read_user_value": (91, 17),
@@ -264,6 +264,7 @@ def scan_boundary_source(root: Path) -> list[str]:
         "assert!(numbers::__NR_write == 64)",
         "assert!(numbers::__NR_ppoll == 73)",
         "assert!(numbers::__NR_clone == 220)",
+        "assert!(numbers::__NR_clone3 == 435)",
         "assert!(numbers::__NR_getrlimit == 163)",
         "assert!(numbers::__NR_setrlimit == 164)",
     ):
@@ -529,6 +530,7 @@ def scan_metadata_and_dispatcher(root: Path) -> list[str]:
         '#[cfg(target_arch="loongarch64")]LOONGARCH_LEGACY_SETRLIMIT=>sys_setrlimit(process,tf.arg0()asu32,tf.arg1()),',
         '#[cfg(not(target_arch="loongarch64"))]general::__NR_clone=>sys_clone(&ext.process,tf,tf.arg0(),tf.arg1(),tf.arg2(),tf.arg3(),tf.arg4(),),',
         '#[cfg(target_arch="loongarch64")]general::__NR_clone=>sys_clone(&ext.process,tf,tf.arg0(),tf.arg1(),tf.arg2(),tf.arg4(),tf.arg3(),),',
+        'general::__NR_clone3=>sys_clone3(&ext.process,tf,tf.arg0(),tf.arg1()),',
         'constLOONGARCH_LEGACY_GETRLIMIT:u32=163;',
         'constLOONGARCH_LEGACY_SETRLIMIT:u32=164;',
     )

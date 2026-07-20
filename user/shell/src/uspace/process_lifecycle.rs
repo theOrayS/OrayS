@@ -59,8 +59,8 @@ use super::task_registry::{
     user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
-    MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_value,
-    write_user_bytes, write_user_value,
+    MAX_USER_IO_CHUNK, read_cstr, read_execve_argv, read_execve_envp, read_user_bytes_into,
+    read_user_value, write_user_bytes, write_user_value,
 };
 use super::{ChildTask, DEFAULT_TIMER_SLACK_NS, NO_EXIT_GROUP_CODE, ProcessFdTable, UserProcess};
 
@@ -2761,6 +2761,213 @@ pub(super) fn sys_clone(
     // CPU while hundreds of runnable peers are being made ready.
     axtask::yield_now();
     tid as isize
+}
+
+const CLONE3_ARGS_SIZE_VER0: usize = general::CLONE_ARGS_SIZE_VER0 as usize;
+const CLONE3_ARGS_SIZE_LATEST: usize = general::CLONE_ARGS_SIZE_VER2 as usize;
+const CLONE3_KNOWN_FLAGS: u64 = general::CLONE_VM as u64
+    | general::CLONE_FS as u64
+    | general::CLONE_FILES as u64
+    | general::CLONE_SIGHAND as u64
+    | general::CLONE_PIDFD as u64
+    | general::CLONE_PTRACE as u64
+    | general::CLONE_VFORK as u64
+    | general::CLONE_PARENT as u64
+    | general::CLONE_THREAD as u64
+    | general::CLONE_NEWNS as u64
+    | general::CLONE_SYSVSEM as u64
+    | general::CLONE_SETTLS as u64
+    | general::CLONE_PARENT_SETTID as u64
+    | general::CLONE_CHILD_CLEARTID as u64
+    | general::CLONE_UNTRACED as u64
+    | general::CLONE_CHILD_SETTID as u64
+    | general::CLONE_NEWCGROUP as u64
+    | general::CLONE_NEWUTS as u64
+    | general::CLONE_NEWIPC as u64
+    | general::CLONE_NEWUSER as u64
+    | general::CLONE_NEWPID as u64
+    | general::CLONE_NEWNET as u64
+    | general::CLONE_IO as u64
+    | general::CLONE_CLEAR_SIGHAND
+    | general::CLONE_INTO_CGROUP
+    | general::CLONE_NEWTIME as u64;
+
+#[derive(Clone, Copy)]
+struct Clone3Args {
+    flags: u64,
+    pidfd: u64,
+    child_tid: u64,
+    parent_tid: u64,
+    exit_signal: u64,
+    stack: u64,
+    stack_size: u64,
+    tls: u64,
+    set_tid: u64,
+    set_tid_size: u64,
+    cgroup: u64,
+}
+
+fn clone3_u64(bytes: &[u8; CLONE3_ARGS_SIZE_LATEST], index: usize) -> u64 {
+    let offset = index * size_of::<u64>();
+    u64::from_ne_bytes([
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3],
+        bytes[offset + 4],
+        bytes[offset + 5],
+        bytes[offset + 6],
+        bytes[offset + 7],
+    ])
+}
+
+fn read_clone3_args(
+    process: &UserProcess,
+    user_args: usize,
+    user_size: usize,
+) -> Result<Clone3Args, LinuxError> {
+    if user_size > PAGE_SIZE_4K {
+        return Err(LinuxError::E2BIG);
+    }
+    if user_size < CLONE3_ARGS_SIZE_VER0 {
+        return Err(LinuxError::EINVAL);
+    }
+
+    // Linux's copy_struct_from_user contract checks an unknown extension before
+    // copying the known prefix. A newer caller is therefore accepted only when
+    // every byte beyond the latest structure version is zero.
+    let mut extension_offset = CLONE3_ARGS_SIZE_LATEST;
+    let mut extension = [0_u8; 64];
+    while extension_offset < user_size {
+        let chunk_len = (user_size - extension_offset).min(extension.len());
+        let extension_ptr = user_args
+            .checked_add(extension_offset)
+            .ok_or(LinuxError::EFAULT)?;
+        read_user_bytes_into(process, extension_ptr, &mut extension[..chunk_len])?;
+        if extension[..chunk_len].iter().any(|byte| *byte != 0) {
+            return Err(LinuxError::E2BIG);
+        }
+        extension_offset += chunk_len;
+    }
+
+    let mut bytes = [0_u8; CLONE3_ARGS_SIZE_LATEST];
+    let known_size = user_size.min(bytes.len());
+    read_user_bytes_into(process, user_args, &mut bytes[..known_size])?;
+    Ok(Clone3Args {
+        flags: clone3_u64(&bytes, 0),
+        pidfd: clone3_u64(&bytes, 1),
+        child_tid: clone3_u64(&bytes, 2),
+        parent_tid: clone3_u64(&bytes, 3),
+        exit_signal: clone3_u64(&bytes, 4),
+        stack: clone3_u64(&bytes, 5),
+        stack_size: clone3_u64(&bytes, 6),
+        tls: clone3_u64(&bytes, 7),
+        set_tid: clone3_u64(&bytes, 8),
+        set_tid_size: clone3_u64(&bytes, 9),
+        cgroup: clone3_u64(&bytes, 10),
+    })
+}
+
+fn clone3_user_usize(value: u64) -> Result<usize, LinuxError> {
+    usize::try_from(value).map_err(|_| LinuxError::EINVAL)
+}
+
+fn clone3_child_stack(args: &Clone3Args) -> Result<usize, LinuxError> {
+    let stack = clone3_user_usize(args.stack)?;
+    let stack_size = clone3_user_usize(args.stack_size)?;
+    if stack == 0 {
+        return if stack_size == 0 {
+            Ok(0)
+        } else {
+            Err(LinuxError::EINVAL)
+        };
+    }
+    if stack_size == 0 {
+        return Err(LinuxError::EINVAL);
+    }
+    let stack_top = stack.checked_add(stack_size).ok_or(LinuxError::EINVAL)?;
+    let user_end = USER_ASPACE_BASE
+        .checked_add(USER_ASPACE_SIZE)
+        .ok_or(LinuxError::EINVAL)?;
+    if stack < USER_ASPACE_BASE || stack_top > user_end {
+        return Err(LinuxError::EINVAL);
+    }
+    Ok(stack_top)
+}
+
+pub(super) fn sys_clone3(
+    process: &Arc<UserProcess>,
+    tf: &TrapFrame,
+    user_args: usize,
+    user_size: usize,
+) -> isize {
+    let args = match read_clone3_args(process.as_ref(), user_args, user_size) {
+        Ok(args) => args,
+        Err(err) => return neg_errno(err),
+    };
+    let clone_signal_bits = (general::CSIGNAL & !general::CLONE_NEWTIME) as u64;
+    if args.flags & !CLONE3_KNOWN_FLAGS != 0
+        || args.flags & general::CLONE_DETACHED as u64 != 0
+        || args.flags & clone_signal_bits != 0
+        || args.exit_signal & !(general::CSIGNAL as u64) != 0
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if args.set_tid == 0 && args.set_tid_size != 0
+        || args.set_tid != 0 && args.set_tid_size == 0
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if args.flags & general::CLONE_SIGHAND as u64 != 0
+        && args.flags & general::CLONE_CLEAR_SIGHAND != 0
+        || args.flags & (general::CLONE_THREAD | general::CLONE_PARENT) as u64 != 0
+            && args.exit_signal != 0
+        || args.flags & (general::CLONE_PIDFD | general::CLONE_PARENT_SETTID) as u64
+            == (general::CLONE_PIDFD | general::CLONE_PARENT_SETTID) as u64
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
+    if args.flags & general::CLONE_INTO_CGROUP != 0
+        && (user_size < CLONE3_ARGS_SIZE_LATEST || args.cgroup > i32::MAX as u64)
+    {
+        return neg_errno(LinuxError::EINVAL);
+    }
+
+    // These valid clone3 extensions need kernel mechanisms that sys_clone does
+    // not yet provide. Reject them explicitly rather than silently ignoring
+    // requested PID, pidfd, signal-handler, or cgroup semantics.
+    if args.set_tid != 0
+        || args.flags
+            & (general::CLONE_PIDFD as u64
+                | general::CLONE_CLEAR_SIGHAND
+                | general::CLONE_INTO_CGROUP)
+            != 0
+    {
+        return neg_errno(LinuxError::ENOSYS);
+    }
+
+    let child_stack = match clone3_child_stack(&args) {
+        Ok(stack) => stack,
+        Err(err) => return neg_errno(err),
+    };
+    let flags = match clone3_user_usize(args.flags | args.exit_signal) {
+        Ok(flags) => flags,
+        Err(err) => return neg_errno(err),
+    };
+    let parent_tid = match clone3_user_usize(args.parent_tid) {
+        Ok(parent_tid) => parent_tid,
+        Err(err) => return neg_errno(err),
+    };
+    let child_tid = match clone3_user_usize(args.child_tid) {
+        Ok(child_tid) => child_tid,
+        Err(err) => return neg_errno(err),
+    };
+    let tls = match clone3_user_usize(args.tls) {
+        Ok(tls) => tls,
+        Err(err) => return neg_errno(err),
+    };
+    let _unused_pidfd = args.pidfd;
+    sys_clone(process, tf, flags, child_stack, parent_tid, tls, child_tid)
 }
 
 pub(super) fn sys_wait4(

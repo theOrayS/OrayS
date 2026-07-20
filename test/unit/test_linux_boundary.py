@@ -173,12 +173,12 @@ class LinuxBoundaryGuardTest(unittest.TestCase):
             tf.arg4(),
             tf.arg3(),
         ),
-        general::__NR_execve"""
+        general::__NR_clone3"""
         new = """            tf.arg2(),
             tf.arg3(),
             tf.arg4(),
         ),
-        general::__NR_execve"""
+        general::__NR_clone3"""
         self.assertIn(old, text)
         path.write_text(text.replace(old, new, 1), encoding="utf-8")
         self.assert_guard_fails(tree, "architecture/handler route changed")
@@ -197,17 +197,31 @@ class LinuxBoundaryGuardTest(unittest.TestCase):
         self.assert_guard_fails(tree, "architecture/handler route changed")
 
     def test_detects_abi_number_guard_drift(self) -> None:
+        for guard in (
+            "    assert!(numbers::__NR_clone == 220);\n",
+            "    assert!(numbers::__NR_clone3 == 435);\n",
+        ):
+            with self.subTest(guard=guard):
+                tree = self.make_tree()
+                path = tree / "api/orays_linux_abi/src/syscall.rs"
+                self.assertIn(guard, path.read_text(encoding="utf-8"))
+                path.write_text(
+                    path.read_text(encoding="utf-8").replace(guard, "", 1),
+                    encoding="utf-8",
+                )
+                self.assert_guard_fails(tree, "syscall number guard missing")
+
+    def test_detects_clone3_dispatch_drift(self) -> None:
         tree = self.make_tree()
-        path = tree / "api/orays_linux_abi/src/syscall.rs"
+        path = tree / "user/shell/src/uspace/syscall_dispatch.rs"
+        route = "general::__NR_clone3 => sys_clone3(&ext.process, tf, tf.arg0(), tf.arg1()),"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn(route, text)
         path.write_text(
-            path.read_text(encoding="utf-8").replace(
-                "    assert!(numbers::__NR_clone == 220);\n",
-                "",
-                1,
-            ),
+            text.replace(route, route.replace("sys_clone3", "sys_clone"), 1),
             encoding="utf-8",
         )
-        self.assert_guard_fails(tree, "syscall number guard missing")
+        self.assert_guard_fails(tree, "architecture/handler route changed")
 
     def test_detects_abi_layout_guard_drift(self) -> None:
         tree = self.make_tree()

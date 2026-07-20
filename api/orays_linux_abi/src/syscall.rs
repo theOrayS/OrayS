@@ -14,6 +14,7 @@ const _: () = {
     assert!(numbers::__NR_write == 64);
     assert!(numbers::__NR_ppoll == 73);
     assert!(numbers::__NR_clone == 220);
+    assert!(numbers::__NR_clone3 == 435);
 };
 
 #[cfg(target_arch = "riscv64")]
