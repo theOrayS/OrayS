@@ -39,6 +39,7 @@
         "unit.evaluation_failure_report",
         "unit.evaluation_runner_and_parser_integrity",
         "unit.evaluator_protocol",
+        "unit.final_2026_result_validation",
         "unit.file_object_event_core",
         "unit.kernel_state_backed_semantics",
         "unit.libc_stateful_semantics",
@@ -373,6 +374,14 @@
       "cwd": "{repo}", "timeout_seconds": 180,
       "result_contract": {"type": "unittest", "expected_tests": 27, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluator_protocol.py", "{repo}/test/evidence/evaluator_protocol.py"], "required_commands": []
+    },
+    {
+      "id": "unit.final_2026_result_validation",
+      "description": "Strict final-2026 CAgent and BuildStorm lifecycle, score, and eligibility fixtures.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_final_2026_result_validation.py"],
+      "cwd": "{repo}", "timeout_seconds": 180,
+      "result_contract": {"type": "unittest", "expected_tests": 24, "identity_binding": true},
+      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_final_2026_result_validation.py", "{repo}/test/evaluation/parse_final_2026_results.py"], "required_commands": []
     },
     {
       "id": "unit.file_object_event_core",
