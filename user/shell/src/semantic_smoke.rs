@@ -3,6 +3,9 @@ use std::io::Write;
 
 const USER_IMAGE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/pr3-semantic-smoke"));
 const USER_PATH: &str = "/tmp/pr3-semantic-smoke";
+const EXEC_HELPER_IMAGE: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/pr3-semantic-exec-helper"));
+const EXEC_HELPER_PATH: &str = "/tmp/pr3-semantic-exec-helper";
 
 #[cfg(target_arch = "riscv64")]
 const ARCH: &str = "riscv64";
@@ -17,6 +20,15 @@ fn harness_fail(reason: &str) -> ! {
 
 pub fn run() -> ! {
     println!("PR3_SMOKE_V1 HARNESS_START arch={ARCH}");
+
+    let mut helper = match File::create(EXEC_HELPER_PATH) {
+        Ok(file) => file,
+        Err(_) => harness_fail("create_exec_helper_elf"),
+    };
+    if helper.write_all(EXEC_HELPER_IMAGE).is_err() {
+        harness_fail("write_exec_helper_elf");
+    }
+    drop(helper);
 
     let mut file = match File::create(USER_PATH) {
         Ok(file) => file,

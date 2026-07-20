@@ -158,12 +158,19 @@ fn validate_semantic_smoke_elf(path: &Path, expected_machine: u16, target_arch: 
     }
 }
 
-fn build_semantic_smoke(out_dir: &Path, target_arch: &str, rust_target: &str, emulation: &str) {
+fn build_semantic_smoke_program(
+    out_dir: &Path,
+    target_arch: &str,
+    rust_target: &str,
+    emulation: &str,
+    source_name: &str,
+    output_name: &str,
+) {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
-    let source = manifest_dir.join("runtime_smoke/semantic_smoke.rs");
+    let source = manifest_dir.join("runtime_smoke").join(source_name);
     let linker_script = manifest_dir.join("runtime_smoke/semantic_smoke.ld");
-    let object = out_dir.join("pr3-semantic-smoke.o");
-    let executable = out_dir.join("pr3-semantic-smoke");
+    let object = out_dir.join(format!("{output_name}.o"));
+    let executable = out_dir.join(output_name);
     let rustc = env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
 
     run(Command::new(&rustc)
@@ -201,6 +208,25 @@ fn build_semantic_smoke(out_dir: &Path, target_arch: &str, rust_target: &str, em
     validate_semantic_smoke_elf(&executable, expected_machine, target_arch);
 }
 
+fn build_semantic_smoke(out_dir: &Path, target_arch: &str, rust_target: &str, emulation: &str) {
+    build_semantic_smoke_program(
+        out_dir,
+        target_arch,
+        rust_target,
+        emulation,
+        "semantic_smoke.rs",
+        "pr3-semantic-smoke",
+    );
+    build_semantic_smoke_program(
+        out_dir,
+        target_arch,
+        rust_target,
+        emulation,
+        "semantic_exec_helper.rs",
+        "pr3-semantic-exec-helper",
+    );
+}
+
 fn set_loongarch_lp64d_flags(path: &Path) {
     let mut bytes = fs::read(path).expect("read generated LoongArch compatibility library");
     if bytes.len() < 0x34 || &bytes[..4] != b"\x7fELF" {
@@ -216,6 +242,7 @@ fn set_loongarch_lp64d_flags(path: &Path) {
 fn main() {
     println!("cargo:rerun-if-changed=../../scripts/rust-lld.sh");
     println!("cargo:rerun-if-changed=runtime_compat/musl_oscompat.rs");
+    println!("cargo:rerun-if-changed=runtime_smoke/semantic_exec_helper.rs");
     println!("cargo:rerun-if-changed=runtime_smoke/semantic_smoke.rs");
     println!("cargo:rerun-if-changed=runtime_smoke/semantic_smoke.ld");
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));

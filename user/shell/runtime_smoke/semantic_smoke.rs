@@ -10,6 +10,7 @@ use core::panic::PanicInfo;
 // The semantic-evidence manifest builds and executes this same source on RV64 and
 // LA64, and requires the ordered syscall assertions plus clean guest shutdown.
 
+const SYS_DUP3: usize = 24;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
@@ -33,6 +34,7 @@ const SYS_SENDTO: usize = 206;
 const SYS_RECVFROM: usize = 207;
 const SYS_SETSOCKOPT: usize = 208;
 const SYS_CLONE: usize = 220;
+const SYS_EXECVE: usize = 221;
 const SYS_WAIT4: usize = 260;
 
 const NEG_EBADF: isize = -9;
@@ -52,6 +54,8 @@ const CPUSET_BYTES: usize = core::mem::size_of::<usize>();
 const AFFINITY_BUFFER_BYTES: usize = 128;
 const TCP_FORK_CLIENTS: usize = 8;
 const TCP_FORK_PORT: u16 = 39_026;
+const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
+const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -90,6 +94,10 @@ const ASSERT_PROC_UPTIME: &[u8] =
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64\n";
@@ -168,6 +176,10 @@ const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 USER_FAIL pipe_fork_exec arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 USER_FAIL pipe_fork_exec arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
@@ -455,6 +467,13 @@ fn pipe2(pipe: &mut [i32; 2], flags: usize) -> isize {
             0,
         )
     }
+}
+
+#[inline(always)]
+fn dup3(oldfd: i32, newfd: i32, flags: usize) -> isize {
+    // SAFETY: dup3 consumes only descriptor and flag scalars. The kernel validates
+    // both descriptors and atomically replaces the destination when required.
+    unsafe { syscall6(SYS_DUP3, oldfd as usize, newfd as usize, flags, 0, 0, 0) }
 }
 
 #[inline(always)]
@@ -800,6 +819,25 @@ fn wait_child(pid: isize, status: &mut i32) -> isize {
             pid as usize,
             status as *mut i32 as usize,
             0,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn exec_helper() -> isize {
+    let argv = [EXEC_HELPER_PATH.as_ptr() as usize, 0];
+    let envp = [0_usize];
+    // SAFETY: the path is NUL-terminated and readable; argv/envp are live arrays of
+    // readable pointers terminated by null. Successful execve never returns.
+    unsafe {
+        syscall6(
+            SYS_EXECVE,
+            EXEC_HELPER_PATH.as_ptr() as usize,
+            argv.as_ptr() as usize,
+            envp.as_ptr() as usize,
             0,
             0,
             0,
@@ -1310,6 +1348,65 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_SPLICE_PIPE) != ASSERT_SPLICE_PIPE.len() as isize {
         fail(USER_FAIL_WRITE, 133);
+    }
+
+    // A libc popen-style operation is built from these same generic primitives:
+    // create a pipe, fork, redirect the child's stdout, replace the child image,
+    // consume output to EOF, and reap the exact pid. The helper is a separately
+    // linked static ELF, so a PASS requires a real exec image transition rather
+    // than continued execution in the forked address space.
+    let mut exec_pipe = [-1_i32; 2];
+    if pipe2(&mut exec_pipe, 0) != 0 {
+        fail(USER_FAIL_PIPE_FORK_EXEC, 252);
+    }
+    let exec_child = fork_process();
+    if exec_child == 0 {
+        if close(exec_pipe[0]) != 0 {
+            exit(31);
+        }
+        if exec_pipe[1] != 1 {
+            if dup3(exec_pipe[1], 1, 0) != 1 || close(exec_pipe[1]) != 0 {
+                exit(32);
+            }
+        }
+        let _ = exec_helper();
+        exit(33);
+    }
+    if exec_child < 0 {
+        let _ = close(exec_pipe[0]);
+        let _ = close(exec_pipe[1]);
+        fail(USER_FAIL_PIPE_FORK_EXEC, 253);
+    }
+    if close(exec_pipe[1]) != 0 {
+        let mut status = 0_i32;
+        let _ = wait_child(exec_child, &mut status);
+        fail(USER_FAIL_PIPE_FORK_EXEC, 254);
+    }
+    let mut helper_output = [0_u8; EXEC_HELPER_PAYLOAD.len()];
+    let mut received = 0usize;
+    while received < helper_output.len() {
+        let result = fd_read(exec_pipe[0], &mut helper_output[received..]);
+        if result <= 0 || result as usize > helper_output.len() - received {
+            break;
+        }
+        received += result as usize;
+    }
+    let mut trailing = [0_u8; 1];
+    let eof = fd_read(exec_pipe[0], &mut trailing);
+    let close_result = close(exec_pipe[0]);
+    let mut exec_status = -1_i32;
+    let wait_result = wait_child(exec_child, &mut exec_status);
+    if received != EXEC_HELPER_PAYLOAD.len()
+        || helper_output != *EXEC_HELPER_PAYLOAD
+        || eof != 0
+        || close_result != 0
+        || wait_result != exec_child
+        || exec_status != 0
+    {
+        fail(USER_FAIL_PIPE_FORK_EXEC, 255);
+    }
+    if write(ASSERT_PIPE_FORK_EXEC) != ASSERT_PIPE_FORK_EXEC.len() as isize {
+        fail(USER_FAIL_WRITE, 256);
     }
 
     // CAgent's server and concurrent clients depend on ordinary process creation and
