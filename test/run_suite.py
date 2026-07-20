@@ -718,7 +718,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.file_object_event_core": 33,
     "unit.kernel_state_backed_semantics": 41,
     "unit.libc_stateful_semantics": 9,
-    "unit.linux_boundary": 16,
+    "unit.linux_boundary": 17,
     "unit.ltp_result_summary": 20,
     "unit.memory_policy_semantics": 3,
     "unit.no_fake_success": 10,
