@@ -31,10 +31,10 @@ const TESTSUITE_STAGE_ROOT: &str = "/tmp";
 const SCRIPT_BUSYBOX_APPLETS: &[&str] = &["basename", "dirname", "kill", "sleep"];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const PATH_BUSYBOX_APPLETS: &[&str] = &[
-    "awk", "basename", "cat", "chmod", "cp", "cut", "date", "dirname", "echo", "expr", "find",
-    "grep", "head", "kill", "ln", "ls", "mkdir", "mktemp", "mv", "printf", "ps", "pwd", "readlink",
-    "rm", "rmdir", "sed", "seq", "setsid", "sh", "sleep", "sort", "tail", "tee", "timeout",
-    "touch", "tr", "true", "uname", "wc", "xargs",
+    "awk", "basename", "cat", "chmod", "cp", "cut", "date", "df", "dirname", "echo", "expr",
+    "find", "grep", "head", "kill", "ln", "ls", "mkdir", "mktemp", "mv", "printf", "ps", "pwd",
+    "readlink", "nproc", "rm", "rmdir", "sed", "seq", "setsid", "sh", "sleep", "sort", "tail",
+    "tee", "timeout", "touch", "tr", "true", "uname", "wc", "xargs",
 ];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const LTP_BUSYBOX_APPLETS: &[&str] = &[
