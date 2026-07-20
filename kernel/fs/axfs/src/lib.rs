@@ -6,8 +6,10 @@
 //!
 //! - `fatfs`: Use [FAT] as the main filesystem and mount it on `/`. This feature
 //!   is **enabled** by default.
-//! - `ext4fs`: Use [ext4] as the main filesystem and mount it on `/`. This feature
-//!   is **enabled** by default for competition images and is read-only.
+//! - `ext4fs`: Use [ext4] as the lower filesystem mounted on `/`. This feature
+//!   is **enabled** by default for competition images.  When `ramfs` is also
+//!   enabled, writes go to a volatile copy-on-write upper layer and the image
+//!   itself remains read-only.
 //! - `devfs`: Mount [`axfs_devfs::DeviceFileSystem`] on `/dev`. This feature is
 //!   **enabled** by default.
 //! - `ramfs`: Mount [`axfs_ramfs::RamFileSystem`] on `/tmp`. This feature is
@@ -36,6 +38,9 @@ mod root;
 
 pub mod api;
 pub mod fops;
+
+#[cfg(all(feature = "ext4fs", feature = "ramfs"))]
+pub use fs::overlayfs;
 
 use axdriver::{AxDeviceContainer, prelude::*};
 

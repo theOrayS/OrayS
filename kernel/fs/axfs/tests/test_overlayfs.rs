@@ -63,8 +63,9 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
 
     assert_eq!(read_all(&root, "/work/source.txt"), b"lower-source");
     let copied = root.clone().lookup("/work/source.txt").unwrap();
+    assert!(copied.parent().is_none());
     assert_eq!(copied.write_at(6, b"UPPER").unwrap(), 5);
-    assert_eq!(read_all(&root, "/work/source.txt"), b"lowerUPPERe");
+    assert_eq!(read_all(&root, "/work/source.txt"), b"lower-UPPERe");
     assert_eq!(read_all(&lower_root, "/work/source.txt"), b"lower-source");
 
     root.create("/work/target", VfsNodeType::Dir).unwrap();
@@ -82,9 +83,25 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
     );
 
     let names = read_dir(&root, "/work");
+    assert_eq!(names.get("."), Some(&VfsNodeType::Dir));
+    assert_eq!(names.get(".."), Some(&VfsNodeType::Dir));
     assert_eq!(names.get("source.txt"), Some(&VfsNodeType::File));
     assert_eq!(names.get("target"), Some(&VfsNodeType::Dir));
     assert_eq!(names.keys().filter(|name| *name == "source.txt").count(), 1);
+    assert!(root.clone().lookup("/work").unwrap().parent().is_some());
+
+    assert_eq!(
+        root.rename("/work/source.txt", "/work/target"),
+        Err(VfsError::IsADirectory)
+    );
+    assert_eq!(
+        root.rename("/work/target", "/work/source.txt"),
+        Err(VfsError::NotADirectory)
+    );
+    assert_eq!(
+        root.rename("/tree", "/work/target"),
+        Err(VfsError::DirectoryNotEmpty)
+    );
 
     root.remove("/work/source.txt").unwrap();
     assert!(matches!(
@@ -92,6 +109,15 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
         Err(VfsError::NotFound)
     ));
     assert_eq!(read_all(&lower_root, "/work/source.txt"), b"lower-source");
+
+    let truncate = root.clone().lookup("/work/rename-src.txt").unwrap();
+    truncate.truncate(0).unwrap();
+    assert_eq!(read_all(&root, "/work/rename-src.txt"), b"");
+    assert_eq!(
+        read_all(&lower_root, "/work/rename-src.txt"),
+        b"rename-source"
+    );
+    assert_eq!(truncate.write_at(0, b"rename-source").unwrap(), 13);
 
     root.rename("/work/rename-src.txt", "/work/rename-dst.txt")
         .unwrap();

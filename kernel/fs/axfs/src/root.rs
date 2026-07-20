@@ -417,7 +417,15 @@ fn init_fat_mainfs(_disk: crate::dev::Disk) -> Arc<dyn VfsOps> {
 
 #[cfg(feature = "ext4fs")]
 fn init_ext4_mainfs(disk: crate::dev::Disk) -> Arc<dyn VfsOps> {
-    Arc::new(fs::ext4fs::Ext4FileSystem::new(disk))
+    let lower: Arc<dyn VfsOps> = Arc::new(fs::ext4fs::Ext4FileSystem::new(disk));
+    #[cfg(feature = "ramfs")]
+    {
+        Arc::new(fs::overlayfs::OverlayFileSystem::new(lower))
+    }
+    #[cfg(not(feature = "ramfs"))]
+    {
+        lower
+    }
 }
 
 #[cfg(not(feature = "ext4fs"))]
