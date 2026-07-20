@@ -25,6 +25,7 @@ const SYS_TEE: usize = 77;
 const SYS_EXIT: usize = 93;
 const SYS_FUTEX: usize = 98;
 const SYS_NANOSLEEP: usize = 101;
+const SYS_CLOCK_GETTIME: usize = 113;
 const SYS_SCHED_SETAFFINITY: usize = 122;
 const SYS_SCHED_GETAFFINITY: usize = 123;
 const SYS_UNAME: usize = 160;
@@ -37,8 +38,11 @@ const SYS_CONNECT: usize = 203;
 const SYS_SENDTO: usize = 206;
 const SYS_RECVFROM: usize = 207;
 const SYS_SETSOCKOPT: usize = 208;
+const SYS_MUNMAP: usize = 215;
 const SYS_CLONE: usize = 220;
 const SYS_EXECVE: usize = 221;
+const SYS_MMAP: usize = 222;
+const SYS_MADVISE: usize = 233;
 const SYS_WAIT4: usize = 260;
 const SYS_CLONE3: usize = 435;
 
@@ -70,6 +74,15 @@ const CLONE_CHILD_CLEARTID: u64 = 0x0020_0000;
 const FUTEX_WAIT_BITSET: usize = 9;
 const FUTEX_CLOCK_REALTIME: usize = 256;
 const FUTEX_BITSET_MATCH_ANY: usize = u32::MAX as usize;
+const CLOCK_MONOTONIC: usize = 1;
+const PROT_READ: usize = 1;
+const PROT_WRITE: usize = 2;
+const MAP_PRIVATE: usize = 2;
+const MAP_ANONYMOUS: usize = 32;
+const MADV_DONTNEED: usize = 4;
+const PAGE_BYTES: usize = 4096;
+const MADVISE_PROBE_BYTES: usize = 8 * 1024 * 1024;
+const MADVISE_PROBE_ITERATIONS: usize = 16;
 const CARGO_THREAD_CLONE_FLAGS: u64 = CLONE_VM
     | CLONE_FS
     | CLONE_FILES
@@ -137,6 +150,12 @@ const ASSERT_PROC_UPTIME: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PROC_UPTIME: &[u8] =
     b"PR3_SMOKE_V1 ASSERT proc_uptime PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_MADVISE_DONTNEED: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_MADVISE_DONTNEED: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -248,6 +267,12 @@ const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL proc_uptime_advance arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_MADVISE_DONTNEED: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL madvise_dontneed arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_MADVISE_DONTNEED: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL madvise_dontneed arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -1340,6 +1365,82 @@ fn futex_wait_clear_tid(tid: &AtomicI32, expected_tid: i32) -> isize {
     }
 }
 
+#[inline(always)]
+fn mmap_private_anonymous(len: usize) -> isize {
+    // SAFETY: this requests a new kernel-selected private anonymous mapping. There
+    // is no file backing or userspace input pointer; the returned raw address is
+    // checked before the test constructs pointers within the mapped byte range.
+    unsafe {
+        syscall6(
+            SYS_MMAP,
+            0,
+            len,
+            PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANONYMOUS,
+            usize::MAX,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn madvise_dontneed(addr: usize, len: usize) -> isize {
+    // SAFETY: callers keep the complete page-aligned mapping live throughout this
+    // synchronous syscall. The remaining arguments are scalar Linux ABI values.
+    unsafe { syscall6(SYS_MADVISE, addr, len, MADV_DONTNEED, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn munmap(addr: usize, len: usize) -> isize {
+    // SAFETY: callers pass the exact base and length of a live standalone mapping
+    // after their last pointer access; no Rust reference survives this call.
+    unsafe { syscall6(SYS_MUNMAP, addr, len, 0, 0, 0, 0) }
+}
+
+fn monotonic_nanoseconds() -> Option<u64> {
+    let mut now = Timespec {
+        seconds: 0,
+        nanoseconds: 0,
+    };
+    // SAFETY: `now` is uniquely borrowed, aligned, and writable for one complete
+    // Linux timespec until the synchronous clock_gettime call returns.
+    if unsafe {
+        syscall6(
+            SYS_CLOCK_GETTIME,
+            CLOCK_MONOTONIC,
+            &mut now as *mut Timespec as usize,
+            0,
+            0,
+            0,
+            0,
+        )
+    } != 0
+        || now.seconds < 0
+        || !(0..1_000_000_000).contains(&now.nanoseconds)
+    {
+        return None;
+    }
+    (now.seconds as u64)
+        .checked_mul(1_000_000_000)?
+        .checked_add(now.nanoseconds as u64)
+}
+
+fn report_madvise_elapsed_nanoseconds(value: u64) {
+    const PREFIX: &[u8] = b"PR3_SMOKE_V1 DIAG madvise_dontneed_elapsed_ns=0x";
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = [b'0'; core::mem::size_of::<u64>() * 2 + 1];
+    for (index, digit) in encoded[..core::mem::size_of::<u64>() * 2]
+        .iter_mut()
+        .enumerate()
+    {
+        let shift = (core::mem::size_of::<u64>() * 2 - index - 1) * 4;
+        *digit = HEX[((value >> shift) & 0xf) as usize];
+    }
+    encoded[encoded.len() - 1] = b'\n';
+    let _ = write(PREFIX);
+    let _ = write(&encoded);
+}
+
 fn report_clone3_thread_write_result(value: isize) {
     const PREFIX: &[u8] = b"PR3_SMOKE_V1 DIAG clone3_thread_write_result=0x";
     const HEX: &[u8; 16] = b"0123456789abcdef";
@@ -1600,6 +1701,70 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_PROC_UPTIME) != ASSERT_PROC_UPTIME.len() as isize {
         fail(USER_FAIL_WRITE, 234);
+    }
+
+    // Cargo/rustc allocators repeatedly discard private anonymous MAP_NORESERVE
+    // ranges with MADV_DONTNEED. Verify the Linux-visible contract without relying
+    // on allocator internals: each populated page becomes zero, can be faulted and
+    // written again, and the mapping remains valid for all iterations. Only time
+    // spent inside madvise is reported, so later page-discard optimizations can be
+    // compared without turning a host-dependent duration into a PASS condition.
+    let madvise_mapping = mmap_private_anonymous(MADVISE_PROBE_BYTES);
+    if madvise_mapping < 0 || madvise_mapping as usize & (PAGE_BYTES - 1) != 0 {
+        fail(USER_FAIL_MADVISE_DONTNEED, 272);
+    }
+    let madvise_mapping = madvise_mapping as usize;
+    let mut madvise_elapsed_ns = 0_u64;
+    for iteration in 0..MADVISE_PROBE_ITERATIONS {
+        for offset in (0..MADVISE_PROBE_BYTES).step_by(PAGE_BYTES) {
+            // SAFETY: mmap returned this complete writable range, `offset` stays on
+            // a page start within it, and no reference is kept across madvise.
+            unsafe {
+                ((madvise_mapping + offset) as *mut u8)
+                    .write_volatile((iteration as u8).wrapping_add(1));
+            }
+        }
+        let before = monotonic_nanoseconds().unwrap_or_else(|| {
+            let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+            fail(USER_FAIL_MADVISE_DONTNEED, 273)
+        });
+        let advice_result = madvise_dontneed(madvise_mapping, MADVISE_PROBE_BYTES);
+        let after = monotonic_nanoseconds().unwrap_or_else(|| {
+            let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+            fail(USER_FAIL_MADVISE_DONTNEED, 274)
+        });
+        let Some(elapsed) = after.checked_sub(before) else {
+            let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+            fail(USER_FAIL_MADVISE_DONTNEED, 275);
+        };
+        let Some(total) = madvise_elapsed_ns.checked_add(elapsed) else {
+            let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+            fail(USER_FAIL_MADVISE_DONTNEED, 276);
+        };
+        madvise_elapsed_ns = total;
+        if advice_result != 0 {
+            let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+            fail(USER_FAIL_MADVISE_DONTNEED, 277);
+        }
+        for offset in (0..MADVISE_PROBE_BYTES).step_by(PAGE_BYTES) {
+            // SAFETY: the successful MADV_DONTNEED preserves the mapping and read
+            // permission. Reading one byte per page checks zero-fill and faults in
+            // discarded pages without creating a reference that outlives the read.
+            if unsafe {
+                ((madvise_mapping + offset) as *const u8).read_volatile()
+            } != 0
+            {
+                let _ = munmap(madvise_mapping, MADVISE_PROBE_BYTES);
+                fail(USER_FAIL_MADVISE_DONTNEED, 278);
+            }
+        }
+    }
+    if munmap(madvise_mapping, MADVISE_PROBE_BYTES) != 0 {
+        fail(USER_FAIL_MADVISE_DONTNEED, 279);
+    }
+    report_madvise_elapsed_nanoseconds(madvise_elapsed_ns);
+    if write(ASSERT_MADVISE_DONTNEED) != ASSERT_MADVISE_DONTNEED.len() as isize {
+        fail(USER_FAIL_WRITE, 280);
     }
 
     // Linux resolves a zero-length splice before flags, descriptors, or user offsets.
