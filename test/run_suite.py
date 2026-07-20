@@ -641,6 +641,7 @@ CANONICAL_UNIT_CASE_IDS = (
     "unit.evaluation_failure_report",
     "unit.evaluation_runner_and_parser_integrity",
     "unit.evaluator_protocol",
+    "unit.final_2026_adapter",
     "unit.final_2026_result_validation",
     "unit.file_object_event_core",
     "unit.kernel_state_backed_semantics",
@@ -670,6 +671,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.evaluation_failure_report": 9,
     "unit.evaluation_runner_and_parser_integrity": 24,
     "unit.evaluator_protocol": 27,
+    "unit.final_2026_adapter": 7,
     "unit.final_2026_result_validation": 32,
     "unit.file_object_event_core": 33,
     "unit.kernel_state_backed_semantics": 41,
@@ -703,6 +705,10 @@ CANONICAL_PYTHON_EXTRA_REQUIRED_PATHS = {
     ],
     "unit.final_2026_result_validation": [
         "{repo}/test/evaluation/parse_final_2026_results.py",
+    ],
+    "unit.final_2026_adapter": [
+        "{repo}/test/evaluation/run_final_2026_evaluation.py",
+        "{repo}/test/images/manifest.final-2026.json",
     ],
     "unit.file_object_event_core": [
         "{repo}/test/checks/check_file_object_event_core.py",
