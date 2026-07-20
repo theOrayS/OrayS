@@ -4,9 +4,9 @@ use axalloc::global_allocator;
 use axhal::mem::{phys_to_virt, virt_to_phys};
 use virtio_drivers::{BufferDirection, Hal, PhysAddr};
 
-pub(super) struct DesktopVirtIoHal;
+use super::{checked_dma_byte_len, require_dma_allocation, zero_dma_bytes};
 
-const DMA_PAGE_SIZE: usize = 0x1000;
+pub(super) struct DesktopVirtIoHal;
 
 // SAFETY: DMA allocations are page-aligned, exclusive kernel page allocations
 // and are zeroed in full before being returned. RV64 and LA64 QEMU virt use the
@@ -18,22 +18,15 @@ const DMA_PAGE_SIZE: usize = 0x1000;
 // queues are exercised by the RV64 and LA64 headless runtime suites.
 unsafe impl Hal for DesktopVirtIoHal {
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (PhysAddr, NonNull<u8>) {
-        let Some(byte_len) = pages.checked_mul(DMA_PAGE_SIZE) else {
-            return (0, NonNull::dangling());
-        };
-        if byte_len == 0 {
-            return (0, NonNull::dangling());
-        }
-        let Ok(vaddr) = global_allocator().alloc_pages(pages, DMA_PAGE_SIZE) else {
-            return (0, NonNull::dangling());
-        };
-        let Some(vaddr_ptr) = NonNull::new(vaddr as *mut u8) else {
-            global_allocator().dealloc_pages(vaddr, pages);
-            return (0, NonNull::dangling());
-        };
+        let byte_len = checked_dma_byte_len(pages);
+        let vaddr = require_dma_allocation(global_allocator().alloc_pages(pages, 0x1000));
+        let vaddr_ptr = NonNull::new(vaddr as *mut u8)
+            .expect("VirtIO DMA allocator returned a null virtual address");
         // SAFETY: `alloc_pages` returned `pages` exclusive contiguous pages at
         // `vaddr`; `byte_len` is the checked size of exactly that allocation.
-        unsafe { core::ptr::write_bytes(vaddr_ptr.as_ptr(), 0, byte_len) };
+        // The temporary slice does not outlive this exclusive initialization.
+        let allocation = unsafe { core::slice::from_raw_parts_mut(vaddr_ptr.as_ptr(), byte_len) };
+        zero_dma_bytes(allocation);
         let paddr = virt_to_phys(vaddr.into());
         (paddr.as_usize() as PhysAddr, vaddr_ptr)
     }

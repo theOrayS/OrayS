@@ -7,6 +7,30 @@ pub mod time;
 #[cfg(feature = "orays")]
 mod virtio;
 
+#[cfg(any(feature = "orays", test))]
+const DMA_PAGE_SIZE: usize = 0x1000;
+
+#[cfg(any(feature = "orays", test))]
+pub(crate) fn checked_dma_byte_len(pages: usize) -> usize {
+    assert!(
+        pages != 0,
+        "VirtIO DMA allocation requires at least one page"
+    );
+    pages
+        .checked_mul(DMA_PAGE_SIZE)
+        .expect("VirtIO DMA allocation size overflow")
+}
+
+#[cfg(any(feature = "orays", test))]
+pub(crate) fn require_dma_allocation<T, E>(allocation: Result<T, E>) -> T {
+    allocation.unwrap_or_else(|_| panic!("VirtIO DMA allocation failed"))
+}
+
+#[cfg(any(feature = "orays", test))]
+pub(crate) fn zero_dma_bytes(bytes: &mut [u8]) {
+    bytes.fill(0);
+}
+
 #[cfg(any(all(feature = "orays", feature = "bus-pci"), test))]
 pub(crate) fn claim_initialized<T, E>(
     result: Result<T, E>,
@@ -146,9 +170,35 @@ pub unsafe extern "C" fn orays_desktop_probe_device_pci(
 #[cfg(test)]
 mod tests {
     use super::{
-        cancel_reservation, claim_initialized, commit_reserved, reserve_first_empty,
-        store_first_empty, store_once,
+        DMA_PAGE_SIZE, cancel_reservation, checked_dma_byte_len, claim_initialized,
+        commit_reserved, require_dma_allocation, reserve_first_empty, store_first_empty,
+        store_once, zero_dma_bytes,
     };
+
+    #[test]
+    #[should_panic(expected = "requires at least one page")]
+    fn zero_page_dma_allocation_is_rejected() {
+        let _ = checked_dma_byte_len(0);
+    }
+
+    #[test]
+    #[should_panic(expected = "allocation size overflow")]
+    fn overflowing_dma_allocation_is_rejected() {
+        let _ = checked_dma_byte_len(usize::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "VirtIO DMA allocation failed")]
+    fn dma_allocator_failure_uses_the_explicit_panic_policy() {
+        let _: usize = require_dma_allocation(Err::<usize, _>("simulated OOM"));
+    }
+
+    #[test]
+    fn dma_zeroing_clears_every_allocated_byte() {
+        let mut allocation = [0xa5; DMA_PAGE_SIZE * 2];
+        zero_dma_bytes(&mut allocation);
+        assert!(allocation.iter().all(|byte| *byte == 0));
+    }
 
     #[test]
     fn initialization_failure_never_claims_a_device() {

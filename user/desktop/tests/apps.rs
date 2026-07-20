@@ -15,7 +15,7 @@ use orays_desktop::graphics::geometry::Point;
 use orays_desktop::graphics::image::{Bitmap, ImageError};
 use orays_desktop::platform::display::MemoryDisplay;
 use orays_desktop::platform::filesystem::{self, FsErrorKind, MAX_TEXT_BYTES};
-use orays_desktop::platform::input::{InputEvent, KeyState, Modifiers, PointerButton};
+use orays_desktop::platform::input::{InputEvent, InputQueue, KeyState, Modifiers, PointerButton};
 
 static NEXT_TEMP: AtomicUsize = AtomicUsize::new(1);
 
@@ -86,6 +86,12 @@ fn bounded_file_reads_reject_oversized_text_and_images_before_loading() {
 fn terminal_executes_real_filesystem_commands_and_preserves_errors() {
     let temp = TempDirectory::new("terminal");
     let mut terminal = Terminal::new(&temp.path);
+    assert!(
+        terminal
+            .output()
+            .iter()
+            .any(|line| line == "NO POSIX PROCESS OR SHELL EXECUTION")
+    );
     terminal.execute_command("write note.txt hello desktop");
     assert_eq!(
         std::fs::read_to_string(temp.join("note.txt")).unwrap(),
@@ -216,6 +222,13 @@ fn ppm_viewer_decodes_real_pixels_clamps_zoom_and_rejects_truncation() {
 }
 
 #[test]
+fn binary_ppm_accepts_crlf_without_consuming_whitespace_pixel_bytes() {
+    let bitmap = Bitmap::parse_ppm(b"P6\r\n1 1\r\n255\r\n\x20\x0a\xff").unwrap();
+    let pixel = bitmap.pixel(0, 0).unwrap();
+    assert_eq!((pixel.r, pixel.g, pixel.b), (0x20, 0x0a, 0xff));
+}
+
+#[test]
 fn monitor_updates_only_from_real_counters_and_marks_unavailable_metrics() {
     let mut monitor = SystemMonitor::new();
     let snapshot = MonitorSnapshot {
@@ -298,4 +311,58 @@ fn window_runtime_routes_text_to_editor_and_guards_dirty_close() {
         panic!("editor model disappeared while close prompt was open");
     };
     assert!(editor.close_prompt_visible());
+}
+
+#[test]
+fn overflow_state_reset_cancels_an_active_window_drag() {
+    let display = MemoryDisplay::new(800, 600, 800 * 4).unwrap();
+    let mut desktop = WindowedDesktop::new(display).unwrap();
+    let id = desktop.launch_application(AppId::Files).unwrap();
+    desktop.render_pending().unwrap();
+
+    desktop
+        .handle_input(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: KeyState::Pressed,
+            position: Point::new(100, 80),
+        })
+        .unwrap();
+    desktop
+        .handle_input(InputEvent::PointerMoved {
+            position: Point::new(120, 100),
+            delta_x: 20,
+            delta_y: 20,
+        })
+        .unwrap();
+    let dragged = desktop.windows().window(id).unwrap().bounds();
+
+    let mut queue = InputQueue::<2>::new();
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Right,
+        state: KeyState::Released,
+        position: Point::new(120, 100),
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position: Point::new(120, 100),
+    });
+    while let Some(event) = queue.pop() {
+        desktop.handle_input(event).unwrap();
+    }
+
+    desktop
+        .handle_input(InputEvent::PointerMoved {
+            position: Point::new(300, 300),
+            delta_x: 180,
+            delta_y: 200,
+        })
+        .unwrap();
+    assert_eq!(desktop.windows().window(id).unwrap().bounds(), dragged);
 }

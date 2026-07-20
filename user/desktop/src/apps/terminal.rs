@@ -1,3 +1,9 @@
+//! Restricted in-process command interpreter for the desktop application.
+//!
+//! This module does not create processes and is not a POSIX shell. Each
+//! accepted command is an explicitly implemented builtin using the desktop's
+//! bounded platform APIs.
+
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
@@ -28,7 +34,8 @@ impl Terminal {
             current_directory: current_directory.to_string(),
             input: TextInput::new(256),
             output: alloc::vec![
-                "ORAYS DESKTOP TERMINAL".to_string(),
+                "ORAYS DESKTOP BUILTIN COMMANDS".to_string(),
+                "NO POSIX PROCESS OR SHELL EXECUTION".to_string(),
                 "TYPE HELP FOR COMMANDS".to_string()
             ],
             history: Vec::new(),

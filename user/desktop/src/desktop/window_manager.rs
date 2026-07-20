@@ -17,6 +17,7 @@ pub enum WindowError {
     BlockedByModal,
     NotClosable,
     NotResizable,
+    IdExhausted,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -94,7 +95,7 @@ pub struct WindowManager {
     workspace: Rect,
     windows: Vec<Window>,
     focused: Option<WindowId>,
-    next_id: u32,
+    next_id: Option<u32>,
     pointer_operation: Option<PointerOperation>,
     damage: DamageTracker,
     animations: Vec<WindowAnimation>,
@@ -111,7 +112,7 @@ impl WindowManager {
             workspace,
             windows: Vec::new(),
             focused: None,
-            next_id: 1,
+            next_id: Some(1),
             pointer_operation: None,
             damage,
             animations: Vec::new(),
@@ -282,13 +283,12 @@ impl WindowManager {
         {
             return Err(WindowError::UnknownModalParent);
         }
-        let id = WindowId(self.next_id);
-        self.next_id = self.next_id.checked_add(1).unwrap_or(1);
+        let id = allocate_window_id(&mut self.next_id)?;
         let bounds = constrain_bounds(spec.bounds, spec.minimum_size, self.workspace);
         let window = Window::from_spec(id, spec, bounds);
         self.damage.add(window.decorated_bounds());
         self.windows.push(window);
-        self.focused = Some(id);
+        self.set_focused(Some(id));
         Ok(id)
     }
 
@@ -319,7 +319,7 @@ impl WindowManager {
         self.animations
             .retain(|animation| !removed.contains(&animation.id));
         self.pointer_operation = None;
-        self.focused = self.topmost_focusable();
+        self.set_focused(self.topmost_focusable());
         Ok(())
     }
 
@@ -335,14 +335,10 @@ impl WindowManager {
         {
             return Err(WindowError::BlockedByModal);
         }
-        let old_focus = self.focused;
         let window = self.windows.remove(index);
         self.damage.add(window.decorated_bounds());
         self.windows.push(window);
-        self.focused = Some(id);
-        if let Some(old) = old_focus.and_then(|old| self.window(old)) {
-            self.damage.add(old.decorated_bounds());
-        }
+        self.set_focused(Some(id));
         Ok(())
     }
 
@@ -354,7 +350,7 @@ impl WindowManager {
         self.animations.retain(|animation| animation.id != id);
         self.damage.add(old);
         self.pointer_operation = None;
-        self.focused = self.topmost_focusable();
+        self.set_focused(self.topmost_focusable());
         Ok(())
     }
 
@@ -385,7 +381,7 @@ impl WindowManager {
 
     pub fn alt_tab(&mut self, reverse: bool) -> Option<WindowId> {
         if let Some(modal) = self.active_modal() {
-            self.focused = Some(modal);
+            self.set_focused(Some(modal));
             return Some(modal);
         }
         let visible: Vec<WindowId> = self
@@ -395,7 +391,7 @@ impl WindowManager {
             .map(Window::id)
             .collect();
         if visible.is_empty() {
-            self.focused = None;
+            self.set_focused(None);
             return None;
         }
         let current = self
@@ -499,7 +495,9 @@ impl WindowManager {
             HitTarget::ModalBackdrop(id) => {
                 let _ = self.focus(id);
             }
-            HitTarget::Desktop => self.focused = None,
+            HitTarget::Desktop => {
+                self.set_focused(None);
+            }
         }
         Ok(target)
     }
@@ -553,6 +551,20 @@ impl WindowManager {
         Ok(())
     }
 
+    fn set_focused(&mut self, focused: Option<WindowId>) -> bool {
+        if self.focused == focused {
+            return false;
+        }
+        if let Some(window) = self.focused.and_then(|id| self.window(id)) {
+            self.damage.add(window.decorated_bounds());
+        }
+        self.focused = focused;
+        if let Some(window) = focused.and_then(|id| self.window(id)) {
+            self.damage.add(window.decorated_bounds());
+        }
+        true
+    }
+
     fn ensure_action_allowed(&self, id: WindowId) -> Result<(), WindowError> {
         self.index_of(id)?;
         if self.active_modal().is_some_and(|modal| modal != id) {
@@ -597,6 +609,12 @@ impl WindowManager {
                 )
         })
     }
+}
+
+fn allocate_window_id(next_id: &mut Option<u32>) -> Result<WindowId, WindowError> {
+    let value = next_id.ok_or(WindowError::IdExhausted)?;
+    *next_id = value.checked_add(1);
+    Ok(WindowId(value))
 }
 
 pub fn close_rect(window: &Window) -> Rect {
@@ -776,4 +794,17 @@ fn lerp_rect(from: Rect, to: Rect, progress: u16) -> Rect {
         interpolate_u32(from.width, to.width),
         interpolate_u32(from.height, to.height),
     )
+}
+
+#[cfg(test)]
+mod id_tests {
+    use super::{WindowError, allocate_window_id};
+    use crate::desktop::window::WindowId;
+
+    #[test]
+    fn final_window_id_is_issued_once_and_then_exhausts() {
+        let mut next = Some(u32::MAX);
+        assert_eq!(allocate_window_id(&mut next), Ok(WindowId(u32::MAX)));
+        assert_eq!(allocate_window_id(&mut next), Err(WindowError::IdExhausted));
+    }
 }

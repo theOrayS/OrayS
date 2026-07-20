@@ -204,7 +204,11 @@ impl<'a> TokenParser<'a> {
         if !byte.is_ascii_whitespace() {
             return None;
         }
-        self.position += 1;
+        self.position += if byte == b'\r' && self.bytes.get(self.position + 1) == Some(&b'\n') {
+            2
+        } else {
+            1
+        };
         Some(&self.bytes[self.position..])
     }
 }

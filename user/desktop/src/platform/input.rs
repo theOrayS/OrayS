@@ -79,6 +79,7 @@ pub enum InputEvent {
         lines: i32,
         position: Point,
     },
+    StateReset,
 }
 
 pub struct InputQueue<const CAPACITY: usize> {
@@ -98,20 +99,61 @@ impl<const CAPACITY: usize> InputQueue<CAPACITY> {
         }
     }
 
-    pub fn push(&mut self, event: InputEvent) {
+    pub fn push(&mut self, event: InputEvent) -> bool {
         if CAPACITY == 0 {
             self.dropped = self.dropped.saturating_add(1);
-            return;
+            return false;
         }
         if self.len == CAPACITY {
-            self.events[self.head] = None;
-            self.head = (self.head + 1) % CAPACITY;
-            self.len -= 1;
+            if is_release_event(event)
+                && let Some(offset) = (0..self.len).find(|offset| {
+                    let index = (self.head + offset) % CAPACITY;
+                    self.events[index].is_some_and(|queued| same_release_identity(queued, event))
+                })
+            {
+                let index = (self.head + offset) % CAPACITY;
+                self.events[index] = Some(event);
+                return false;
+            }
+            let candidate = (0..self.len).find(|offset| {
+                let index = (self.head + offset) % CAPACITY;
+                self.events[index].is_some_and(|queued| {
+                    !is_release_event(queued) && !matches!(queued, InputEvent::StateReset)
+                })
+            });
+            let Some(offset) = candidate else {
+                if !is_release_event(event) {
+                    self.dropped = self.dropped.saturating_add(1);
+                    return false;
+                }
+                let discarded_inputs = (0..self.len)
+                    .filter(|offset| {
+                        let index = (self.head + offset) % CAPACITY;
+                        self.events[index]
+                            .is_some_and(|queued| !matches!(queued, InputEvent::StateReset))
+                    })
+                    .count() as u64;
+                let incoming_was_discarded = u64::from(CAPACITY == 1);
+                self.dropped = self
+                    .dropped
+                    .saturating_add(discarded_inputs.saturating_add(incoming_was_discarded));
+                self.events = [None; CAPACITY];
+                self.head = 0;
+                self.len = 1;
+                self.events[0] = Some(InputEvent::StateReset);
+                if CAPACITY > 1 {
+                    self.events[1] = Some(event);
+                    self.len = 2;
+                }
+                return true;
+            };
             self.dropped = self.dropped.saturating_add(1);
+            self.remove_at(offset);
         }
         let tail = (self.head + self.len) % CAPACITY;
         self.events[tail] = Some(event);
         self.len += 1;
+        false
     }
 
     pub fn pop(&mut self) -> Option<InputEvent> {
@@ -134,6 +176,60 @@ impl<const CAPACITY: usize> InputQueue<CAPACITY> {
 
     pub const fn dropped(&self) -> u64 {
         self.dropped
+    }
+
+    fn remove_at(&mut self, offset: usize) {
+        for current in offset..self.len.saturating_sub(1) {
+            let destination = (self.head + current) % CAPACITY;
+            let source = (self.head + current + 1) % CAPACITY;
+            self.events[destination] = self.events[source].take();
+        }
+        let tail = (self.head + self.len - 1) % CAPACITY;
+        self.events[tail] = None;
+        self.len -= 1;
+    }
+}
+
+const fn is_release_event(event: InputEvent) -> bool {
+    matches!(
+        event,
+        InputEvent::Key {
+            state: KeyState::Released,
+            ..
+        } | InputEvent::PointerButton {
+            state: KeyState::Released,
+            ..
+        }
+    )
+}
+
+const fn same_release_identity(left: InputEvent, right: InputEvent) -> bool {
+    match (left, right) {
+        (
+            InputEvent::Key {
+                code: left_code,
+                state: KeyState::Released,
+                ..
+            },
+            InputEvent::Key {
+                code: right_code,
+                state: KeyState::Released,
+                ..
+            },
+        ) => left_code == right_code,
+        (
+            InputEvent::PointerButton {
+                button: left_button,
+                state: KeyState::Released,
+                ..
+            },
+            InputEvent::PointerButton {
+                button: right_button,
+                state: KeyState::Released,
+                ..
+            },
+        ) => left_button as u8 == right_button as u8,
+        _ => false,
     }
 }
 
@@ -220,6 +316,18 @@ impl<const CAPACITY: usize> InputTranslator<CAPACITY> {
         self.queue.dropped()
     }
 
+    fn enqueue(&mut self, event: InputEvent) {
+        if self.queue.push(event) {
+            self.modifier_mask = 0;
+            self.modifiers = Modifiers::default();
+            self.pending_x = None;
+            self.pending_y = None;
+            self.relative_x = 0;
+            self.relative_y = 0;
+            self.scroll = 0;
+        }
+    }
+
     fn push_key(&mut self, raw: RawInputEvent) {
         let Some(state) = key_state(raw.value) else {
             return;
@@ -241,7 +349,7 @@ impl<const CAPACITY: usize> InputTranslator<CAPACITY> {
         } else {
             None
         };
-        self.queue.push(InputEvent::Key {
+        self.enqueue(InputEvent::Key {
             code: raw.code,
             state,
             modifiers: self.modifiers,
@@ -259,7 +367,7 @@ impl<const CAPACITY: usize> InputTranslator<CAPACITY> {
             BTN_RIGHT => PointerButton::Right,
             _ => PointerButton::Middle,
         };
-        self.queue.push(InputEvent::PointerButton {
+        self.enqueue(InputEvent::PointerButton {
             button,
             state,
             position: self.pointer,
@@ -282,14 +390,14 @@ impl<const CAPACITY: usize> InputTranslator<CAPACITY> {
         let delta_x = self.pointer.x - old.x;
         let delta_y = self.pointer.y - old.y;
         if delta_x != 0 || delta_y != 0 {
-            self.queue.push(InputEvent::PointerMoved {
+            self.enqueue(InputEvent::PointerMoved {
                 position: self.pointer,
                 delta_x,
                 delta_y,
             });
         }
         if self.scroll != 0 {
-            self.queue.push(InputEvent::Scroll {
+            self.enqueue(InputEvent::Scroll {
                 lines: self.scroll,
                 position: self.pointer,
             });

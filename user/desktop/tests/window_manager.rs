@@ -148,6 +148,66 @@ fn damage_render_matches_fresh_full_composition() {
 }
 
 #[test]
+fn creating_a_non_overlapping_window_damages_both_focus_decorations() {
+    let mut manager = manager();
+    manager
+        .create(WindowSpec::new("FILES", Rect::new(40, 70, 260, 200)))
+        .unwrap();
+    let compositor = Compositor::new();
+    let mut incremental = Surface::new(800, 600, 800).unwrap();
+    compositor.render_full(&mut incremental, &manager);
+    manager.clear_damage();
+
+    manager
+        .create(WindowSpec::new("TERMINAL", Rect::new(470, 280, 280, 210)))
+        .unwrap();
+    render_incremental_and_compare(&compositor, &mut incremental, &mut manager);
+}
+
+#[test]
+fn closing_or_minimizing_the_focused_window_damages_the_new_focus() {
+    for minimize in [false, true] {
+        let mut manager = manager();
+        manager
+            .create(WindowSpec::new("FILES", Rect::new(40, 70, 260, 200)))
+            .unwrap();
+        let focused = manager
+            .create(WindowSpec::new("TERMINAL", Rect::new(470, 280, 280, 210)))
+            .unwrap();
+        let compositor = Compositor::new();
+        let mut incremental = Surface::new(800, 600, 800).unwrap();
+        compositor.render_full(&mut incremental, &manager);
+        manager.clear_damage();
+
+        if minimize {
+            manager.minimize(focused).unwrap();
+        } else {
+            manager.close(focused).unwrap();
+        }
+        render_incremental_and_compare(&compositor, &mut incremental, &mut manager);
+    }
+}
+
+#[test]
+fn clicking_the_desktop_to_clear_focus_damages_the_old_decoration() {
+    let mut manager = manager();
+    manager
+        .create(WindowSpec::new("FILES", Rect::new(40, 70, 260, 200)))
+        .unwrap();
+    let compositor = Compositor::new();
+    let mut incremental = Surface::new(800, 600, 800).unwrap();
+    compositor.render_full(&mut incremental, &manager);
+    manager.clear_damage();
+
+    assert_eq!(
+        manager.pointer_press(Point::new(760, 530)).unwrap(),
+        HitTarget::Desktop
+    );
+    assert_eq!(manager.focused(), None);
+    render_incremental_and_compare(&compositor, &mut incremental, &mut manager);
+}
+
+#[test]
 fn cursor_damage_is_bounded_and_incremental() {
     let mut manager = manager();
     manager

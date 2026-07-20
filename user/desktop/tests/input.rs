@@ -1,3 +1,4 @@
+use orays_desktop::graphics::geometry::Point;
 use orays_desktop::platform::input::*;
 
 fn raw(event_type: u16, code: u16, value: i32) -> RawInputEvent {
@@ -190,6 +191,289 @@ fn bounded_queue_reports_and_drops_oldest_event() {
         queue.pop(),
         Some(InputEvent::Scroll { lines: 3, .. })
     ));
+}
+
+#[test]
+fn bounded_queue_never_evicts_a_release_for_non_release_input() {
+    let position = orays_desktop::graphics::geometry::Point::new(0, 0);
+    let release = InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position,
+    };
+    let mut queue = InputQueue::<2>::new();
+    queue.push(release);
+    queue.push(InputEvent::Scroll { lines: 1, position });
+    queue.push(InputEvent::Scroll { lines: 2, position });
+
+    assert_eq!(queue.dropped(), 1);
+    assert_eq!(queue.pop(), Some(release));
+    assert!(matches!(
+        queue.pop(),
+        Some(InputEvent::Scroll { lines: 2, .. })
+    ));
+}
+
+#[test]
+fn incoming_release_evicts_an_older_non_release_event() {
+    let position = orays_desktop::graphics::geometry::Point::new(0, 0);
+    let mut queue = InputQueue::<2>::new();
+    queue.push(InputEvent::Scroll { lines: 1, position });
+    queue.push(InputEvent::Scroll { lines: 2, position });
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+
+    assert_eq!(queue.dropped(), 1);
+    assert!(matches!(
+        queue.pop(),
+        Some(InputEvent::Scroll { lines: 2, .. })
+    ));
+    assert!(matches!(
+        queue.pop(),
+        Some(InputEvent::Key {
+            code: 30,
+            state: KeyState::Released,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn full_release_queue_coalesces_the_same_release_identity() {
+    let old_position = orays_desktop::graphics::geometry::Point::new(1, 1);
+    let new_position = orays_desktop::graphics::geometry::Point::new(9, 7);
+    let mut queue = InputQueue::<2>::new();
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position: old_position,
+    });
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position: new_position,
+    });
+
+    assert_eq!(queue.dropped(), 0);
+    assert_eq!(
+        queue.pop(),
+        Some(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: KeyState::Released,
+            position: new_position,
+        })
+    );
+    assert!(matches!(
+        queue.pop(),
+        Some(InputEvent::Key {
+            code: 30,
+            state: KeyState::Released,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn distinct_release_overflow_emits_state_reset_before_new_release() {
+    let position = orays_desktop::graphics::geometry::Point::new(4, 5);
+    let mut queue = InputQueue::<2>::new();
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Right,
+        state: KeyState::Released,
+        position,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position,
+    });
+
+    assert_eq!(queue.dropped(), 2);
+    assert_eq!(queue.pop(), Some(InputEvent::StateReset));
+    assert_eq!(
+        queue.pop(),
+        Some(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: KeyState::Released,
+            position,
+        })
+    );
+}
+
+#[test]
+fn state_reset_clears_translator_modifiers() {
+    let mut input = InputTranslator::<2>::new(100, 80);
+    input.feed(raw(EV_KEY, 42, 1));
+    assert!(matches!(
+        input.pop(),
+        Some(InputEvent::Key {
+            state: KeyState::Pressed,
+            modifiers: Modifiers { shift: true, .. },
+            ..
+        })
+    ));
+    input.feed(raw(EV_KEY, 30, 0));
+    input.feed(raw(EV_KEY, BTN_RIGHT, 0));
+    input.feed(raw(EV_KEY, BTN_LEFT, 0));
+    assert_eq!(input.pop(), Some(InputEvent::StateReset));
+    input.pop();
+    input.feed(raw(EV_KEY, 48, 1));
+    assert!(matches!(
+        input.pop(),
+        Some(InputEvent::Key {
+            modifiers: Modifiers { shift: false, .. },
+            text: Some('b'),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn pending_state_reset_cannot_be_evicted_before_consumption() {
+    let position = Point::new(9, 11);
+    let mut queue = InputQueue::<2>::new();
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Right,
+        state: KeyState::Released,
+        position,
+    });
+    assert!(queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position,
+    }));
+
+    queue.push(InputEvent::PointerMoved {
+        position: Point::new(20, 21),
+        delta_x: 11,
+        delta_y: 10,
+    });
+    assert_eq!(queue.pop(), Some(InputEvent::StateReset));
+    assert_eq!(
+        queue.pop(),
+        Some(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: KeyState::Released,
+            position,
+        })
+    );
+}
+
+#[test]
+fn repeated_resync_does_not_count_the_internal_reset_as_dropped_input() {
+    let position = Point::new(4, 5);
+    let mut queue = InputQueue::<2>::new();
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Right,
+        state: KeyState::Released,
+        position,
+    });
+    assert!(queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position,
+    }));
+    assert!(queue.push(InputEvent::PointerButton {
+        button: PointerButton::Middle,
+        state: KeyState::Released,
+        position,
+    }));
+
+    assert_eq!(queue.dropped(), 3);
+    assert_eq!(queue.pop(), Some(InputEvent::StateReset));
+    assert_eq!(
+        queue.pop(),
+        Some(InputEvent::PointerButton {
+            button: PointerButton::Middle,
+            state: KeyState::Released,
+            position,
+        })
+    );
+}
+
+#[test]
+fn zero_capacity_queue_drops_each_input_without_panicking() {
+    let mut queue = InputQueue::<0>::new();
+    assert!(!queue.push(InputEvent::StateReset));
+    assert!(!queue.push(InputEvent::Scroll {
+        lines: 1,
+        position: Point::new(0, 0),
+    }));
+    assert_eq!(queue.dropped(), 2);
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.pop(), None);
+}
+
+#[test]
+fn one_capacity_release_overflow_keeps_reset_and_counts_every_lost_input() {
+    let position = Point::new(4, 5);
+    let mut queue = InputQueue::<1>::new();
+    assert!(!queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    }));
+    assert!(queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position,
+    }));
+    assert_eq!(queue.dropped(), 2);
+    assert_eq!(queue.pop(), Some(InputEvent::StateReset));
+    assert_eq!(queue.pop(), None);
+}
+
+#[test]
+fn one_capacity_pending_reset_counts_each_additional_release() {
+    let position = Point::new(4, 5);
+    let mut queue = InputQueue::<1>::new();
+    queue.push(InputEvent::Key {
+        code: 30,
+        state: KeyState::Released,
+        modifiers: Modifiers::default(),
+        text: None,
+    });
+    queue.push(InputEvent::PointerButton {
+        button: PointerButton::Left,
+        state: KeyState::Released,
+        position,
+    });
+    assert!(queue.push(InputEvent::PointerButton {
+        button: PointerButton::Right,
+        state: KeyState::Released,
+        position,
+    }));
+    assert_eq!(queue.dropped(), 3);
+    assert_eq!(queue.pop(), Some(InputEvent::StateReset));
 }
 
 trait KeyEventExt {

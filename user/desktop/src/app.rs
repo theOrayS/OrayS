@@ -117,6 +117,10 @@ impl<D: DisplayBackend> WindowedDesktop<D> {
     }
 
     pub fn handle_input(&mut self, event: InputEvent) -> Result<bool, AppError> {
+        if matches!(event, InputEvent::StateReset) {
+            self.windows.pointer_release();
+            return self.render_pending();
+        }
         let bounds = self.back_buffer.bounds();
         let launcher_was_open = self.compositor.shell().launcher_open();
         let theme_was = self.compositor.shell().theme_kind();

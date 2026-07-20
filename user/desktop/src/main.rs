@@ -34,6 +34,7 @@ fn main() {
     let mut input = InputTranslator::<128>::new(app.surface().width(), app.surface().height());
     let mut previous_tick = std::time::Instant::now();
     let mut launcher_was_fully_open = app.shell().launcher_fully_open();
+    let mut reported_dropped_input = 0;
 
     loop {
         input.resize(app.surface().width(), app.surface().height());
@@ -44,6 +45,15 @@ fn main() {
             };
             input.feed(raw);
             raw_count += 1;
+        }
+        let dropped_input = input.dropped();
+        if dropped_input != reported_dropped_input {
+            println!(
+                "ORAYS_DESKTOP_INPUT_DROPPED total={} delta={}",
+                dropped_input,
+                dropped_input.saturating_sub(reported_dropped_input)
+            );
+            reported_dropped_input = dropped_input;
         }
 
         let mut event_count = 0;
