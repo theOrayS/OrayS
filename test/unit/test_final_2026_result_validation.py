@@ -488,6 +488,84 @@ class Final2026ResultValidationTest(unittest.TestCase):
         self.assertEqual(configured, [])
         self.assertEqual(environment, {"OSCOMP_SKIP_TEST_GROUPS": "cagent"})
 
+    def test_canonical_manifest_registers_four_final_cases(self) -> None:
+        manifest = suite_runner.load_manifest(
+            REPO_ROOT / "test/suite_manifest.json", REPO_ROOT
+        )
+        final_cases = {
+            case["id"]: case
+            for case in manifest["cases"]
+            if case["result_contract"]["type"] == "final_2026"
+        }
+        self.assertEqual(
+            set(final_cases),
+            {
+                "final.cagent.riscv64",
+                "final.buildstorm.riscv64",
+                "final.cagent.loongarch64",
+                "final.buildstorm.loongarch64",
+            },
+        )
+        for case_id, case in final_cases.items():
+            group = case_id.split(".")[1]
+            arch = case_id.split(".")[2]
+            self.assertEqual(case["result_contract"]["expected_group"], group)
+            self.assertEqual(case["result_contract"]["expected_arch"], arch)
+
+    def test_final_profile_and_full_select_all_requested_final_cases(self) -> None:
+        manifest = suite_runner.load_manifest(
+            REPO_ROOT / "test/suite_manifest.json", REPO_ROOT
+        )
+        final_selection = suite_runner.select_cases(manifest, "final-2026", "all")
+        self.assertEqual(
+            [case["id"] for case in final_selection.cases],
+            [
+                "final.cagent.riscv64",
+                "final.buildstorm.riscv64",
+                "final.cagent.loongarch64",
+                "final.buildstorm.loongarch64",
+            ],
+        )
+        full_ids = {
+            case["id"]
+            for case in suite_runner.select_cases(manifest, "full", "all").cases
+        }
+        self.assertTrue({"official.riscv64", "official.loongarch64"} <= full_ids)
+        self.assertTrue(set(case["id"] for case in final_selection.cases) <= full_ids)
+
+    def test_canonical_final_case_execution_fields_are_locked(self) -> None:
+        source = REPO_ROOT / "test/suite_manifest.json"
+        manifest = json.loads(source.read_text(encoding="utf-8"))
+        case = next(
+            case for case in manifest["cases"] if case["id"] == "final.cagent.riscv64"
+        )
+        mutations = (
+            ("command", lambda value: value["command"].append("--untrusted")),
+            (
+                "environment",
+                lambda value: value["environment"].update({"OSCOMP_SKIP_TEST_GROUPS": "cagent"}),
+            ),
+            ("timeout", lambda value: value.update({"timeout_seconds": 1})),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(
+                prefix="final-canonical-mutation-"
+            ) as temporary:
+                mutated = json.loads(json.dumps(manifest))
+                target = next(
+                    item
+                    for item in mutated["cases"]
+                    if item["id"] == "final.cagent.riscv64"
+                )
+                mutate(target)
+                root = Path(temporary)
+                manifest_path = root / "manifest.json"
+                manifest_path.write_text(json.dumps(mutated), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    suite_runner.ManifestError, "canonical final-2026"
+                ):
+                    suite_runner.load_manifest(manifest_path, REPO_ROOT)
+
 
 if __name__ == "__main__":
     unittest.main()
