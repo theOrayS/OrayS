@@ -61,6 +61,7 @@ const CLONE_VM: u64 = 0x0000_0100;
 const CLONE_FS: u64 = 0x0000_0200;
 const CLONE_FILES: u64 = 0x0000_0400;
 const CLONE_SIGHAND: u64 = 0x0000_0800;
+const CLONE_VFORK: u64 = 0x0000_4000;
 const CLONE_THREAD: u64 = 0x0001_0000;
 const CLONE_SYSVSEM: u64 = 0x0004_0000;
 const CLONE_SETTLS: u64 = 0x0008_0000;
@@ -82,6 +83,7 @@ const TCP_FORK_PORT: u16 = 39_026;
 const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
 const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
+const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
 
 // A u128 array gives the clone3 child stack the 16-byte alignment required by
 // both target ABIs. Access is exclusively through raw pointers: the parent never
@@ -90,6 +92,14 @@ static mut CLONE3_THREAD_STACK: [u128; CLONE3_THREAD_STACK_BYTES / 16] =
     [0; CLONE3_THREAD_STACK_BYTES / 16];
 static CLONE3_THREAD_TID: AtomicI32 = AtomicI32::new(0);
 static CLONE3_THREAD_TLS_ANCHOR: AtomicI32 = AtomicI32::new(0);
+
+// glibc's clone3-based posix_spawn path supplies a dedicated stack even though
+// CLONE_VM|CLONE_VFORK keeps the parent suspended until exec or exit. Keep that
+// stack distinct from the worker-thread stack and access it only through raw
+// pointers while the child owns it.
+static mut CLONE3_VFORK_STACK: [u128; CLONE3_VFORK_STACK_BYTES / 16] =
+    [0; CLONE3_VFORK_STACK_BYTES / 16];
+static CLONE3_VFORK_STAGE: AtomicI32 = AtomicI32::new(0);
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -149,6 +159,12 @@ const ASSERT_CLONE3_THREAD: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_CLONE3_THREAD: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_thread PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64\n";
@@ -261,6 +277,12 @@ const USER_FAIL_CLONE3_THREAD_WRITE_OTHER: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_OTHER: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_other arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_VFORK_EXEC: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_vfork_exec arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_VFORK_EXEC: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_vfork_exec arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
@@ -931,6 +953,22 @@ impl CloneArgs {
             cgroup: 0,
         }
     }
+
+    const fn vfork(stack: usize) -> Self {
+        Self {
+            flags: CLONE_VM | CLONE_VFORK,
+            pidfd: 0,
+            child_tid: 0,
+            parent_tid: 0,
+            exit_signal: SIGCHLD as u64,
+            stack: stack as u64,
+            stack_size: CLONE3_VFORK_STACK_BYTES as u64,
+            tls: 0,
+            set_tid: 0,
+            set_tid_size: 0,
+            cgroup: 0,
+        }
+    }
 }
 
 #[repr(C)]
@@ -944,6 +982,159 @@ fn clone3_process(args: *const CloneArgs, size: usize) -> isize {
     // SAFETY: callers keep the complete `size` byte range readable until the
     // synchronous clone3 entry has copied it. Null is used only for the EFAULT probe.
     unsafe { syscall6(SYS_CLONE3, args as usize, size, 0, 0, 0, 0) }
+}
+
+#[repr(C)]
+struct VforkExecContext {
+    stdout_read_fd: usize,
+    stdout_write_fd: usize,
+    path: usize,
+    argv: usize,
+    envp: usize,
+    stage: usize,
+}
+
+#[cfg(target_arch = "riscv64")]
+#[inline(never)]
+/// Enters clone3 with glibc posix_spawn's vfork and explicit-stack shape.
+///
+/// # Safety
+///
+/// `args` and `context` must remain readable until the parent syscall returns.
+/// The stack described by `args` must be writable and exclusively owned by the
+/// child. Every context pointer and descriptor must remain valid in the inherited
+/// child image. The child path uses only its new stack and raw syscalls, then
+/// either successfully execs or exits without returning to Rust.
+unsafe fn clone3_vfork_exec(args: *const CloneArgs, context: *const VforkExecContext) -> isize {
+    let ret: isize;
+    // SAFETY: the caller upholds the pointer, fd, and stack contract above. The
+    // parent follows the ordinary ABI return path; the child never returns through
+    // a Rust frame after the kernel installs its explicit stack.
+    unsafe {
+        core::arch::asm!(
+            "ecall",
+            "bnez a0, 3f",
+            "addi sp, sp, -16",
+            "sd a2, 0(sp)",
+            "ld t0, 0(sp)",
+            "ld a0, 0(t0)",
+            "li a7, 57",
+            "ecall",
+            "bnez a0, 7f",
+            "ld t0, 0(sp)",
+            "ld a0, 8(t0)",
+            "li a1, 1",
+            "beq a0, a1, 5f",
+            "li a2, 0",
+            "li a7, 24",
+            "ecall",
+            "bltz a0, 7f",
+            "ld t0, 0(sp)",
+            "ld a0, 8(t0)",
+            "li a7, 57",
+            "ecall",
+            "bnez a0, 7f",
+            "5:",
+            "ld t0, 0(sp)",
+            "ld t0, 40(t0)",
+            "li a0, 1",
+            "fence rw, w",
+            "sw a0, 0(t0)",
+            "ld t0, 0(sp)",
+            "ld a0, 16(t0)",
+            "ld a1, 24(t0)",
+            "ld a2, 32(t0)",
+            "li a7, 221",
+            "ecall",
+            "7:",
+            "li a0, 44",
+            "li a7, 93",
+            "ecall",
+            "8:",
+            "j 8b",
+            "3:",
+            inlateout("a0") args as usize => ret,
+            inlateout("a1") core::mem::size_of::<CloneArgs>() => _,
+            inlateout("a2") context as usize => _,
+            inlateout("a7") SYS_CLONE3 => _,
+            lateout("a3") _,
+            lateout("a4") _,
+            lateout("a5") _,
+            lateout("a6") _,
+            lateout("t0") _,
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "loongarch64")]
+#[inline(never)]
+/// Enters clone3 with glibc posix_spawn's vfork and explicit-stack shape.
+///
+/// # Safety
+///
+/// This has the same pointer, descriptor, stack-ownership, and no-return child
+/// contract as the RISC-V64 implementation above. The child uses only raw LA64
+/// Linux syscalls after clone3 changes `$sp`.
+unsafe fn clone3_vfork_exec(args: *const CloneArgs, context: *const VforkExecContext) -> isize {
+    let ret: isize;
+    // SAFETY: the caller upholds the documented raw ABI contract. The child
+    // performs no Rust call or return after switching to its explicit stack.
+    unsafe {
+        core::arch::asm!(
+            "syscall 0",
+            "bnez $a0, 3f",
+            "addi.d $sp, $sp, -16",
+            "st.d $a2, $sp, 0",
+            "ld.d $t0, $sp, 0",
+            "ld.d $a0, $t0, 0",
+            "addi.d $a7, $zero, 57",
+            "syscall 0",
+            "bnez $a0, 7f",
+            "ld.d $t0, $sp, 0",
+            "ld.d $a0, $t0, 8",
+            "addi.d $a1, $zero, 1",
+            "beq $a0, $a1, 5f",
+            "or $a2, $zero, $zero",
+            "addi.d $a7, $zero, 24",
+            "syscall 0",
+            "blt $a0, $zero, 7f",
+            "ld.d $t0, $sp, 0",
+            "ld.d $a0, $t0, 8",
+            "addi.d $a7, $zero, 57",
+            "syscall 0",
+            "bnez $a0, 7f",
+            "5:",
+            "ld.d $t0, $sp, 0",
+            "ld.d $t0, $t0, 40",
+            "addi.d $a0, $zero, 1",
+            "dbar 0",
+            "st.w $a0, $t0, 0",
+            "ld.d $t0, $sp, 0",
+            "ld.d $a0, $t0, 16",
+            "ld.d $a1, $t0, 24",
+            "ld.d $a2, $t0, 32",
+            "addi.d $a7, $zero, 221",
+            "syscall 0",
+            "7:",
+            "addi.d $a0, $zero, 44",
+            "addi.d $a7, $zero, 93",
+            "syscall 0",
+            "8:",
+            "b 8b",
+            "3:",
+            inlateout("$a0") args as usize => ret,
+            inlateout("$a1") core::mem::size_of::<CloneArgs>() => _,
+            inlateout("$a2") context as usize => _,
+            inlateout("$a7") SYS_CLONE3 => _,
+            lateout("$a3") _,
+            lateout("$a4") _,
+            lateout("$a5") _,
+            lateout("$a6") _,
+            lateout("$t0") _,
+        );
+    }
+    ret
 }
 
 #[cfg(target_arch = "riscv64")]
@@ -1825,6 +2016,72 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_CLONE3_THREAD) != ASSERT_CLONE3_THREAD.len() as isize {
         fail(USER_FAIL_WRITE, 267);
+    }
+
+    // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
+    // stack and SIGCHLD. The child may touch only async-signal-safe state before
+    // exec, so the raw assembly closes/redirects inherited descriptors, publishes
+    // one shared pre-exec stage, and replaces the image with the independent helper.
+    // The parent must remain suspended until exec commits: clone3 returning before
+    // the stage publication is a vfork contract failure.
+    let mut vfork_pipe = [-1_i32; 2];
+    if pipe2(&mut vfork_pipe, 0) != 0 {
+        fail(USER_FAIL_CLONE3_VFORK_EXEC, 269);
+    }
+    let vfork_stack = core::ptr::addr_of_mut!(CLONE3_VFORK_STACK).cast::<u8>() as usize;
+    let vfork_args = CloneArgs::vfork(vfork_stack);
+    let vfork_argv = [EXEC_HELPER_PATH.as_ptr() as usize, 0];
+    let vfork_envp = [0_usize];
+    CLONE3_VFORK_STAGE.store(0, Ordering::Release);
+    let vfork_context = VforkExecContext {
+        stdout_read_fd: vfork_pipe[0] as usize,
+        stdout_write_fd: vfork_pipe[1] as usize,
+        path: EXEC_HELPER_PATH.as_ptr() as usize,
+        argv: vfork_argv.as_ptr() as usize,
+        envp: vfork_envp.as_ptr() as usize,
+        stage: CLONE3_VFORK_STAGE.as_ptr() as usize,
+    };
+    // SAFETY: the context, argv/envp, and static explicit stack remain live until
+    // clone3 returns after child exec/exit; the child owns the stack exclusively.
+    let vfork_child = unsafe { clone3_vfork_exec(&vfork_args, &vfork_context) };
+    let vfork_stage = CLONE3_VFORK_STAGE.load(Ordering::Acquire);
+    let vfork_parent_write_close = close(vfork_pipe[1]);
+    if vfork_child <= 0 {
+        let _ = close(vfork_pipe[0]);
+        fail(USER_FAIL_CLONE3_VFORK_EXEC, 270);
+    }
+    if vfork_parent_write_close != 0 {
+        let _ = close(vfork_pipe[0]);
+        let mut status = -1_i32;
+        let _ = wait_child(vfork_child, &mut status);
+        fail(USER_FAIL_CLONE3_VFORK_EXEC, 270);
+    }
+    let mut vfork_output = [0_u8; EXEC_HELPER_PAYLOAD.len()];
+    let mut vfork_received = 0usize;
+    while vfork_received < vfork_output.len() {
+        let result = fd_read(vfork_pipe[0], &mut vfork_output[vfork_received..]);
+        if result <= 0 || result as usize > vfork_output.len() - vfork_received {
+            break;
+        }
+        vfork_received += result as usize;
+    }
+    let mut vfork_trailing = [0_u8; 1];
+    let vfork_eof = fd_read(vfork_pipe[0], &mut vfork_trailing);
+    let vfork_close = close(vfork_pipe[0]);
+    let mut vfork_status = -1_i32;
+    let vfork_wait = wait_child(vfork_child, &mut vfork_status);
+    if vfork_stage != 1
+        || vfork_received != EXEC_HELPER_PAYLOAD.len()
+        || vfork_output != *EXEC_HELPER_PAYLOAD
+        || vfork_eof != 0
+        || vfork_close != 0
+        || vfork_wait != vfork_child
+        || vfork_status != 0
+    {
+        fail(USER_FAIL_CLONE3_VFORK_EXEC, 271);
+    }
+    if write(ASSERT_CLONE3_VFORK_EXEC) != ASSERT_CLONE3_VFORK_EXEC.len() as isize {
+        fail(USER_FAIL_WRITE, 272);
     }
 
     // A libc popen-style operation is built from these same generic primitives:
