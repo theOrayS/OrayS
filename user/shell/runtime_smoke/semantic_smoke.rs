@@ -36,7 +36,10 @@ const SYS_SETSOCKOPT: usize = 208;
 const SYS_CLONE: usize = 220;
 const SYS_EXECVE: usize = 221;
 const SYS_WAIT4: usize = 260;
+const SYS_CLONE3: usize = 435;
 
+const NEG_E2BIG: isize = -7;
+const NEG_EFAULT: isize = -14;
 const NEG_EBADF: isize = -9;
 const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
@@ -98,6 +101,11 @@ const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=lo
 const ASSERT_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_CLONE3_PROCESS: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64\n";
@@ -180,6 +188,12 @@ const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=l
 const USER_FAIL_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 USER_FAIL pipe_fork_exec arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 USER_FAIL pipe_fork_exec arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_PROCESS: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_PROCESS: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
@@ -802,6 +816,53 @@ fn socket_recv_exact(fd: i32, bytes: &mut [u8]) -> bool {
     true
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct CloneArgs {
+    flags: u64,
+    pidfd: u64,
+    child_tid: u64,
+    parent_tid: u64,
+    exit_signal: u64,
+    stack: u64,
+    stack_size: u64,
+    tls: u64,
+    set_tid: u64,
+    set_tid_size: u64,
+    cgroup: u64,
+}
+
+impl CloneArgs {
+    const fn fork() -> Self {
+        Self {
+            flags: 0,
+            pidfd: 0,
+            child_tid: 0,
+            parent_tid: 0,
+            exit_signal: SIGCHLD as u64,
+            stack: 0,
+            stack_size: 0,
+            tls: 0,
+            set_tid: 0,
+            set_tid_size: 0,
+            cgroup: 0,
+        }
+    }
+}
+
+#[repr(C)]
+struct ExtendedCloneArgs {
+    args: CloneArgs,
+    future_field: u64,
+}
+
+#[inline(always)]
+fn clone3_process(args: *const CloneArgs, size: usize) -> isize {
+    // SAFETY: callers keep the complete `size` byte range readable until the
+    // synchronous clone3 entry has copied it. Null is used only for the EFAULT probe.
+    unsafe { syscall6(SYS_CLONE3, args as usize, size, 0, 0, 0, 0) }
+}
+
 #[inline(always)]
 fn fork_process() -> isize {
     // SAFETY: SIGCHLD with a null child stack and no clone flags requests ordinary
@@ -1348,6 +1409,64 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_SPLICE_PIPE) != ASSERT_SPLICE_PIPE.len() as isize {
         fail(USER_FAIL_WRITE, 133);
+    }
+
+    // Cargo and rustc use the versioned clone3 ABI for both worker threads and
+    // process spawning on current glibc. Exercise its common process form without
+    // libc fallback, including Linux's extensible struct-size contract: undersized
+    // input is invalid, a zero future tail is accepted, and a nonzero unknown tail
+    // is rejected with E2BIG. Every successful child is reaped by exact pid.
+    if clone3_process(core::ptr::null(), core::mem::size_of::<CloneArgs>()) != NEG_EFAULT
+        || clone3_process(
+            &CloneArgs::fork(),
+            core::mem::size_of::<CloneArgs>() - 4 * core::mem::size_of::<u64>(),
+        ) != NEG_EINVAL
+    {
+        fail(USER_FAIL_CLONE3_PROCESS, 257);
+    }
+    let clone3_child = clone3_process(&CloneArgs::fork(), core::mem::size_of::<CloneArgs>());
+    if clone3_child == 0 {
+        exit(0);
+    }
+    if clone3_child < 0 {
+        fail(USER_FAIL_CLONE3_PROCESS, 258);
+    }
+    let mut clone3_status = -1_i32;
+    if wait_child(clone3_child, &mut clone3_status) != clone3_child || clone3_status != 0 {
+        fail(USER_FAIL_CLONE3_PROCESS, 259);
+    }
+
+    let extended = ExtendedCloneArgs {
+        args: CloneArgs::fork(),
+        future_field: 0,
+    };
+    let extended_child = clone3_process(
+        &extended.args,
+        core::mem::size_of::<ExtendedCloneArgs>(),
+    );
+    if extended_child == 0 {
+        exit(0);
+    }
+    if extended_child < 0 {
+        fail(USER_FAIL_CLONE3_PROCESS, 260);
+    }
+    let mut extended_status = -1_i32;
+    if wait_child(extended_child, &mut extended_status) != extended_child || extended_status != 0 {
+        fail(USER_FAIL_CLONE3_PROCESS, 261);
+    }
+    let nonzero_tail = ExtendedCloneArgs {
+        args: CloneArgs::fork(),
+        future_field: 1,
+    };
+    if clone3_process(
+        &nonzero_tail.args,
+        core::mem::size_of::<ExtendedCloneArgs>(),
+    ) != NEG_E2BIG
+    {
+        fail(USER_FAIL_CLONE3_PROCESS, 262);
+    }
+    if write(ASSERT_CLONE3_PROCESS) != ASSERT_CLONE3_PROCESS.len() as isize {
+        fail(USER_FAIL_WRITE, 263);
     }
 
     // A libc popen-style operation is built from these same generic primitives:
