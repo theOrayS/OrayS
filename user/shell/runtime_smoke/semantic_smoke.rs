@@ -23,10 +23,10 @@ const SYS_VMSPLICE: usize = 75;
 const SYS_SPLICE: usize = 76;
 const SYS_TEE: usize = 77;
 const SYS_EXIT: usize = 93;
+const SYS_FUTEX: usize = 98;
 const SYS_NANOSLEEP: usize = 101;
 const SYS_SCHED_SETAFFINITY: usize = 122;
 const SYS_SCHED_GETAFFINITY: usize = 123;
-const SYS_SCHED_YIELD: usize = 124;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
 const SYS_SOCKET: usize = 198;
@@ -67,6 +67,9 @@ const CLONE_SYSVSEM: u64 = 0x0004_0000;
 const CLONE_SETTLS: u64 = 0x0008_0000;
 const CLONE_PARENT_SETTID: u64 = 0x0010_0000;
 const CLONE_CHILD_CLEARTID: u64 = 0x0020_0000;
+const FUTEX_WAIT_BITSET: usize = 9;
+const FUTEX_CLOCK_REALTIME: usize = 256;
+const FUTEX_BITSET_MATCH_ANY: usize = u32::MAX as usize;
 const CARGO_THREAD_CLONE_FLAGS: u64 = CLONE_VM
     | CLONE_FS
     | CLONE_FILES
@@ -159,6 +162,12 @@ const ASSERT_CLONE3_THREAD: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_CLONE3_THREAD: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_thread PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_CLONE3_FUTEX_JOIN: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_futex_join PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_CLONE3_FUTEX_JOIN: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT clone3_futex_join PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
@@ -259,6 +268,12 @@ const USER_FAIL_CLONE3_THREAD: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_CLONE3_THREAD: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_FUTEX_JOIN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_futex_join arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_FUTEX_JOIN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_futex_join arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -1307,9 +1322,22 @@ unsafe fn clone3_cargo_thread(
 }
 
 #[inline(always)]
-fn sched_yield() -> isize {
-    // SAFETY: sched_yield has no pointer arguments or memory ownership effects.
-    unsafe { syscall6(SYS_SCHED_YIELD, 0, 0, 0, 0, 0, 0) }
+fn futex_wait_clear_tid(tid: &AtomicI32, expected_tid: i32) -> isize {
+    // SAFETY: `tid` is an aligned, live i32-sized atomic shared with the clone3
+    // child through CLONE_VM. FUTEX_WAIT_BITSET reads it only for the duration of
+    // this synchronous call. A null timeout plus MATCH_ANY is the exact glibc
+    // clear-child-tid join shape observed for Cargo worker threads.
+    unsafe {
+        syscall6(
+            SYS_FUTEX,
+            tid.as_ptr() as usize,
+            FUTEX_WAIT_BITSET | FUTEX_CLOCK_REALTIME,
+            expected_tid as u32 as usize,
+            0,
+            0,
+            FUTEX_BITSET_MATCH_ANY,
+        )
+    }
 }
 
 fn report_clone3_thread_write_result(value: isize) {
@@ -1939,7 +1967,8 @@ pub extern "C" fn _start() -> ! {
     // threads that drive Cargo and rustc. The child begins on the supplied stack,
     // proves that CLONE_SETTLS installed the requested architecture TLS register,
     // and blocks on a shared pipe while the parent observes CLONE_PARENT_SETTID.
-    // Releasing the child then requires CLONE_CHILD_CLEARTID to publish zero at exit.
+    // Releasing the child then requires CLONE_CHILD_CLEARTID to publish zero and wake
+    // the exact FUTEX_WAIT_BITSET|FUTEX_CLOCK_REALTIME join used by glibc.
     let mut thread_ready_pipe = [-1_i32; 2];
     let mut thread_release_pipe = [-1_i32; 2];
     if pipe2(&mut thread_ready_pipe, 0) != 0 || pipe2(&mut thread_release_pipe, 0) != 0 {
@@ -1973,21 +2002,15 @@ pub extern "C" fn _start() -> ! {
     let ready_result = fd_read(thread_ready_pipe[0], &mut thread_ready);
     let parent_tid_seen = CLONE3_THREAD_TID.load(Ordering::Acquire) == clone3_thread as i32;
     let release_result = pipe_write(thread_release_pipe[1], b"G");
+    let futex_join_result = futex_wait_clear_tid(&CLONE3_THREAD_TID, clone3_thread as i32);
+    let clear_tid_seen = CLONE3_THREAD_TID.load(Ordering::Acquire) == 0;
+    // Linux permits the child to clear the word just before the waiter enters the
+    // kernel. In that legitimate race the exact futex call returns EAGAIN; accept it
+    // only when the acquire load proves that clear_child_tid already published zero.
+    let futex_join_ok = clear_tid_seen && matches!(futex_join_result, 0 | NEG_EAGAIN);
     let mut thread_write_status = [0_u8; core::mem::size_of::<isize>()];
     let write_status_result = fd_read(thread_ready_pipe[0], &mut thread_write_status);
     let thread_marker_write = isize::from_ne_bytes(thread_write_status);
-    let mut clear_tid_seen = false;
-    let mut yield_failed = false;
-    for _ in 0..100_000 {
-        if CLONE3_THREAD_TID.load(Ordering::Acquire) == 0 {
-            clear_tid_seen = true;
-            break;
-        }
-        if sched_yield() != 0 {
-            yield_failed = true;
-            break;
-        }
-    }
     // CLONE_FILES shares the descriptor table itself, so descriptors may only be
     // closed after the child has consumed its release byte and exited.
     let close_ok = (close(thread_ready_pipe[0]) == 0)
@@ -1999,11 +2022,12 @@ pub extern "C" fn _start() -> ! {
         || !parent_tid_seen
         || release_result != 1
         || write_status_result != core::mem::size_of::<isize>() as isize
-        || !clear_tid_seen
-        || yield_failed
         || !close_ok
     {
         fail(USER_FAIL_CLONE3_THREAD, 266);
+    }
+    if !futex_join_ok {
+        fail(USER_FAIL_CLONE3_FUTEX_JOIN, 270);
     }
     if thread_marker_write != CLONE3_THREAD_CHILD.len() as isize {
         report_clone3_thread_write_result(thread_marker_write);
@@ -2016,6 +2040,9 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_CLONE3_THREAD) != ASSERT_CLONE3_THREAD.len() as isize {
         fail(USER_FAIL_WRITE, 267);
+    }
+    if write(ASSERT_CLONE3_FUTEX_JOIN) != ASSERT_CLONE3_FUTEX_JOIN.len() as isize {
+        fail(USER_FAIL_WRITE, 271);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit

@@ -2913,9 +2913,7 @@ pub(super) fn sys_clone3(
     {
         return neg_errno(LinuxError::EINVAL);
     }
-    if args.set_tid == 0 && args.set_tid_size != 0
-        || args.set_tid != 0 && args.set_tid_size == 0
-    {
+    if args.set_tid == 0 && args.set_tid_size != 0 || args.set_tid != 0 && args.set_tid_size == 0 {
         return neg_errno(LinuxError::EINVAL);
     }
     if args.flags & general::CLONE_SIGHAND as u64 != 0
