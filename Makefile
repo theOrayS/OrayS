@@ -83,6 +83,7 @@ KERNEL_LA_AXCONFIG_WRITES ?= -w plat.phys-memory-size=0x3000_0000
 KERNEL_RV ?= $(CURDIR)/kernel-rv
 KERNEL_LA ?= $(CURDIR)/kernel-la
 PR3_SMOKE_BUILD_DIR ?= $(CURDIR)/build/pr3-smoke
+PR3_SMOKE_SMP ?= 8
 PR3_SMOKE_KERNEL_FEATURES ?= alloc,paging,irq,multitask,fs,net,driver-ramdisk
 PR3_SMOKE_APP_FEATURES ?= semantic-smoke
 PR3_SMOKE_RV_KERNEL ?= $(PR3_SMOKE_BUILD_DIR)/kernel-rv
@@ -450,6 +451,7 @@ pr3-smoke-kernel-rv:
 	$(MAKE) test_build ARCH=riscv64 BUS=mmio \
 		KERNEL_FEATURES="$(PR3_SMOKE_KERNEL_FEATURES)" \
 		APP_FEATURES="$(PR3_SMOKE_APP_FEATURES)" \
+		KERNEL_SMP=$(PR3_SMOKE_SMP) \
 		AXCONFIG_WRITES="$(KERNEL_RV_AXCONFIG_WRITES)" \
 		KERNEL_BUILD_DIR=$(PR3_SMOKE_BUILD_DIR) \
 		KERNEL_RV=$(PR3_SMOKE_RV_KERNEL) \
@@ -461,6 +463,7 @@ pr3-smoke-kernel-la:
 	$(MAKE) test_build ARCH=loongarch64 BUS=pci \
 		KERNEL_FEATURES="$(PR3_SMOKE_KERNEL_FEATURES)" \
 		APP_FEATURES="$(PR3_SMOKE_APP_FEATURES)" \
+		KERNEL_SMP=$(PR3_SMOKE_SMP) \
 		AXCONFIG_WRITES="$(KERNEL_LA_AXCONFIG_WRITES)" \
 		KERNEL_BUILD_DIR=$(PR3_SMOKE_BUILD_DIR) \
 		KERNEL_LA=$(PR3_SMOKE_LA_KERNEL) \
@@ -479,7 +482,7 @@ pr3-smoke-run-rv-raw:
 		printf '%s\n' 'missing supervisor-resolved PR3_QEMU_RV_BIN' >&2; exit 2; \
 	}
 	"$$PR3_QEMU_RV_BIN" -machine virt -kernel $(PR3_SMOKE_RV_KERNEL) \
-		-m 1G -display none -serial stdio -monitor none -smp 1 \
+		-m 1G -display none -serial stdio -monitor none -smp $(PR3_SMOKE_SMP) \
 		-device virtio-net-device,netdev=net -netdev hubport,id=net,hubid=0 \
 		-bios default -no-reboot
 
@@ -494,7 +497,7 @@ pr3-smoke-run-la-raw:
 		printf '%s\n' 'missing supervisor-resolved PR3_QEMU_LA_BIN' >&2; exit 2; \
 	}
 	"$$PR3_QEMU_LA_BIN" -machine virt -kernel $(PR3_SMOKE_LA_KERNEL) \
-		-m 1G -display none -serial stdio -monitor none -smp 1 \
+		-m 1G -display none -serial stdio -monitor none -smp $(PR3_SMOKE_SMP) \
 		-device virtio-net-pci,netdev=net -netdev hubport,id=net,hubid=0 \
 		-no-reboot
 

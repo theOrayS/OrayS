@@ -20,6 +20,8 @@ const SYS_SPLICE: usize = 76;
 const SYS_TEE: usize = 77;
 const SYS_EXIT: usize = 93;
 const SYS_NANOSLEEP: usize = 101;
+const SYS_SCHED_SETAFFINITY: usize = 122;
+const SYS_SCHED_GETAFFINITY: usize = 123;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
 
@@ -31,6 +33,8 @@ const AT_FDCWD: isize = -100;
 const O_RDONLY: usize = 0;
 const O_WRONLY: usize = 1;
 const O_NONBLOCK: usize = 0o4000;
+const CPUSET_BYTES: usize = core::mem::size_of::<usize>();
+const AFFINITY_BUFFER_BYTES: usize = 128;
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -53,6 +57,12 @@ const ASSERT_WRITE: &[u8] = b"PR3_SMOKE_V1 ASSERT write PASS arch=loongarch64\n"
 const ASSERT_GETPID: &[u8] = b"PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_GETPID: &[u8] = b"PR3_SMOKE_V1 ASSERT getpid PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_SCHED_AFFINITY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT sched_affinity PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_SCHED_AFFINITY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT sched_affinity PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_PROC_UPTIME: &[u8] =
     b"PR3_SMOKE_V1 ASSERT proc_uptime PASS arch=riscv64\n";
@@ -83,6 +93,18 @@ const USER_FAIL_WRITE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL write arch=loongarch64\n
 const USER_FAIL_GETPID: &[u8] = b"PR3_SMOKE_V1 USER_FAIL getpid arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_GETPID: &[u8] = b"PR3_SMOKE_V1 USER_FAIL getpid arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_SCHED_AFFINITY_SYSCALL: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL sched_affinity_syscall arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_SCHED_AFFINITY_SYSCALL: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL sched_affinity_syscall arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_SCHED_AFFINITY_MASK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL sched_affinity_mask arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_SCHED_AFFINITY_MASK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL sched_affinity_mask arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_PROC_UPTIME_OPEN: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL proc_uptime_open arch=riscv64\n";
@@ -344,6 +366,49 @@ fn write(bytes: &[u8]) -> isize {
     // SAFETY: `bytes` is readable for exactly `len` bytes and remains live until the
     // synchronous write returns. fd 1 and the length are scalar SYS_WRITE arguments.
     unsafe { syscall6(SYS_WRITE, 1, bytes.as_ptr() as usize, bytes.len(), 0, 0, 0) }
+}
+
+#[inline(always)]
+fn sched_getaffinity(mask: &mut [u8; AFFINITY_BUFFER_BYTES]) -> isize {
+    // SAFETY: `mask` is uniquely borrowed and writable for the complete supplied
+    // cpusetsize until this synchronous syscall returns. pid zero selects the caller.
+    unsafe {
+        syscall6(
+            SYS_SCHED_GETAFFINITY,
+            0,
+            mask.len(),
+            mask.as_mut_ptr() as usize,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn sched_setaffinity(mask: &[u8; CPUSET_BYTES]) -> isize {
+    // SAFETY: `mask` remains readable for exactly `CPUSET_BYTES` until this
+    // synchronous syscall returns. pid zero selects the caller.
+    unsafe {
+        syscall6(
+            SYS_SCHED_SETAFFINITY,
+            0,
+            mask.len(),
+            mask.as_ptr() as usize,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+fn affinity_snapshot_matches(
+    buffer: &[u8; AFFINITY_BUFFER_BYTES],
+    expected_first_byte: u8,
+) -> bool {
+    buffer[0] == expected_first_byte
+        && buffer[1..CPUSET_BYTES].iter().all(|byte| *byte == 0)
+        && buffer[CPUSET_BYTES..].iter().all(|byte| *byte == 0xa5)
 }
 
 #[inline(always)]
@@ -645,6 +710,45 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_GETPID) != ASSERT_GETPID.len() as isize {
         fail(USER_FAIL_WRITE, 104);
+    }
+
+    // The final-2026 workloads run with eight online CPUs. Linux returns the
+    // kernel cpumask width (one unsigned long here), copies only that many bytes,
+    // and reports the live task mask. Pinning the caller to CPU 7 and restoring
+    // the full mask proves setaffinity changes scheduler state rather than merely
+    // acknowledging the request. Sentinel bytes beyond the returned width must
+    // remain untouched.
+    let mut affinity = [0xa5_u8; AFFINITY_BUFFER_BYTES];
+    if sched_getaffinity(&mut affinity) != CPUSET_BYTES as isize {
+        fail(USER_FAIL_SCHED_AFFINITY_SYSCALL, 235);
+    }
+    if !affinity_snapshot_matches(&affinity, 0xff) {
+        fail(USER_FAIL_SCHED_AFFINITY_MASK, 236);
+    }
+    let mut cpu_seven = [0_u8; CPUSET_BYTES];
+    cpu_seven[0] = 0x80;
+    if sched_setaffinity(&cpu_seven) != 0 {
+        fail(USER_FAIL_SCHED_AFFINITY_SYSCALL, 237);
+    }
+    affinity = [0xa5; AFFINITY_BUFFER_BYTES];
+    if sched_getaffinity(&mut affinity) != CPUSET_BYTES as isize
+        || !affinity_snapshot_matches(&affinity, 0x80)
+    {
+        fail(USER_FAIL_SCHED_AFFINITY_MASK, 238);
+    }
+    let mut all_cpus = [0_u8; CPUSET_BYTES];
+    all_cpus[0] = 0xff;
+    if sched_setaffinity(&all_cpus) != 0 {
+        fail(USER_FAIL_SCHED_AFFINITY_SYSCALL, 239);
+    }
+    affinity = [0xa5; AFFINITY_BUFFER_BYTES];
+    if sched_getaffinity(&mut affinity) != CPUSET_BYTES as isize
+        || !affinity_snapshot_matches(&affinity, 0xff)
+    {
+        fail(USER_FAIL_SCHED_AFFINITY_MASK, 240);
+    }
+    if write(ASSERT_SCHED_AFFINITY) != ASSERT_SCHED_AFFINITY.len() as isize {
+        fail(USER_FAIL_WRITE, 241);
     }
 
     let (uptime_before, _) = match read_proc_uptime() {
