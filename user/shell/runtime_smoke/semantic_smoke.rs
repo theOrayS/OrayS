@@ -244,6 +244,24 @@ const USER_FAIL_CLONE3_THREAD: &[u8] =
 const USER_FAIL_CLONE3_THREAD: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_THREAD_WRITE_EFAULT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_efault arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_THREAD_WRITE_EFAULT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_efault arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_CLONE3_THREAD_WRITE_OTHER: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_other arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CLONE3_THREAD_WRITE_OTHER: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_other arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -956,33 +974,45 @@ unsafe fn clone3_cargo_thread(
         core::arch::asm!(
             "ecall",
             "bnez a0, 3f",
-            "addi sp, sp, -32",
-            "sd a4, 8(sp)",
-            "sd a5, 16(sp)",
+            "addi sp, sp, -48",
+            "sd a2, 8(sp)",
+            "sd a3, 16(sp)",
+            "sd a4, 24(sp)",
+            "sd a5, 32(sp)",
             "li t0, 70",
             "bne tp, a6, 5f",
             "li t0, 82",
             "5:",
+            "sb t0, 40(sp)",
             "sb t0, 0(sp)",
-            "mv a0, a2",
+            "ld a0, 8(sp)",
             "mv a1, sp",
             "li a2, 1",
             "li a7, 64",
             "ecall",
-            "mv a0, a3",
+            "ld a0, 16(sp)",
             "mv a1, sp",
             "li a2, 1",
             "li a7, 63",
             "ecall",
-            "lbu t0, 0(sp)",
+            "lbu t0, 40(sp)",
             "li a0, 82",
-            "bne t0, a0, 8f",
+            "bne t0, a0, 7f",
             "li a0, 1",
-            "ld a1, 8(sp)",
-            "ld a2, 16(sp)",
+            "ld a1, 24(sp)",
+            "ld a2, 32(sp)",
             "li a7, 64",
             "ecall",
+            "j 8f",
+            "7:",
+            "li a0, -1",
             "8:",
+            "sd a0, 0(sp)",
+            "ld a0, 8(sp)",
+            "mv a1, sp",
+            "li a2, 8",
+            "li a7, 64",
+            "ecall",
             "li a0, 0",
             "li a7, 93",
             "ecall",
@@ -1026,33 +1056,45 @@ unsafe fn clone3_cargo_thread(
         core::arch::asm!(
             "syscall 0",
             "bnez $a0, 3f",
-            "addi.d $sp, $sp, -32",
-            "st.d $a4, $sp, 8",
-            "st.d $a5, $sp, 16",
+            "addi.d $sp, $sp, -48",
+            "st.d $a2, $sp, 8",
+            "st.d $a3, $sp, 16",
+            "st.d $a4, $sp, 24",
+            "st.d $a5, $sp, 32",
             "addi.d $t0, $zero, 70",
             "bne $tp, $a6, 5f",
             "addi.d $t0, $zero, 82",
             "5:",
+            "st.b $t0, $sp, 40",
             "st.b $t0, $sp, 0",
-            "or $a0, $a2, $zero",
+            "ld.d $a0, $sp, 8",
             "or $a1, $sp, $zero",
             "addi.d $a2, $zero, 1",
             "addi.d $a7, $zero, 64",
             "syscall 0",
-            "or $a0, $a3, $zero",
+            "ld.d $a0, $sp, 16",
             "or $a1, $sp, $zero",
             "addi.d $a2, $zero, 1",
             "addi.d $a7, $zero, 63",
             "syscall 0",
-            "ld.bu $t0, $sp, 0",
+            "ld.bu $t0, $sp, 40",
             "addi.d $a0, $zero, 82",
-            "bne $t0, $a0, 8f",
+            "bne $t0, $a0, 7f",
             "addi.d $a0, $zero, 1",
-            "ld.d $a1, $sp, 8",
-            "ld.d $a2, $sp, 16",
+            "ld.d $a1, $sp, 24",
+            "ld.d $a2, $sp, 32",
             "addi.d $a7, $zero, 64",
             "syscall 0",
+            "b 8f",
+            "7:",
+            "addi.d $a0, $zero, -1",
             "8:",
+            "st.d $a0, $sp, 0",
+            "ld.d $a0, $sp, 8",
+            "or $a1, $sp, $zero",
+            "addi.d $a2, $zero, 8",
+            "addi.d $a7, $zero, 64",
+            "syscall 0",
             "or $a0, $zero, $zero",
             "addi.d $a7, $zero, 93",
             "syscall 0",
@@ -1077,6 +1119,23 @@ unsafe fn clone3_cargo_thread(
 fn sched_yield() -> isize {
     // SAFETY: sched_yield has no pointer arguments or memory ownership effects.
     unsafe { syscall6(SYS_SCHED_YIELD, 0, 0, 0, 0, 0, 0) }
+}
+
+fn report_clone3_thread_write_result(value: isize) {
+    const PREFIX: &[u8] = b"PR3_SMOKE_V1 DIAG clone3_thread_write_result=0x";
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = [b'0'; core::mem::size_of::<usize>() * 2 + 1];
+    let value = value as usize;
+    for (index, digit) in encoded[..core::mem::size_of::<usize>() * 2]
+        .iter_mut()
+        .enumerate()
+    {
+        let shift = (core::mem::size_of::<usize>() * 2 - index - 1) * 4;
+        *digit = HEX[(value >> shift) & 0xf];
+    }
+    encoded[encoded.len() - 1] = b'\n';
+    let _ = write(PREFIX);
+    let _ = write(&encoded);
 }
 
 #[inline(always)]
@@ -1723,6 +1782,9 @@ pub extern "C" fn _start() -> ! {
     let ready_result = fd_read(thread_ready_pipe[0], &mut thread_ready);
     let parent_tid_seen = CLONE3_THREAD_TID.load(Ordering::Acquire) == clone3_thread as i32;
     let release_result = pipe_write(thread_release_pipe[1], b"G");
+    let mut thread_write_status = [0_u8; core::mem::size_of::<isize>()];
+    let write_status_result = fd_read(thread_ready_pipe[0], &mut thread_write_status);
+    let thread_marker_write = isize::from_ne_bytes(thread_write_status);
     let mut clear_tid_seen = false;
     let mut yield_failed = false;
     for _ in 0..100_000 {
@@ -1745,11 +1807,21 @@ pub extern "C" fn _start() -> ! {
         || thread_ready != [b'R']
         || !parent_tid_seen
         || release_result != 1
+        || write_status_result != core::mem::size_of::<isize>() as isize
         || !clear_tid_seen
         || yield_failed
         || !close_ok
     {
         fail(USER_FAIL_CLONE3_THREAD, 266);
+    }
+    if thread_marker_write != CLONE3_THREAD_CHILD.len() as isize {
+        report_clone3_thread_write_result(thread_marker_write);
+        let marker = match thread_marker_write {
+            NEG_EBADF => USER_FAIL_CLONE3_THREAD_WRITE_EBADF,
+            NEG_EFAULT => USER_FAIL_CLONE3_THREAD_WRITE_EFAULT,
+            _ => USER_FAIL_CLONE3_THREAD_WRITE_OTHER,
+        };
+        fail(marker, 268);
     }
     if write(ASSERT_CLONE3_THREAD) != ASSERT_CLONE3_THREAD.len() as isize {
         fail(USER_FAIL_WRITE, 267);
