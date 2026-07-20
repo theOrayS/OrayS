@@ -3,13 +3,21 @@
 
 from __future__ import annotations
 
+import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "evaluation"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from parse_final_2026_results import validate_final_2026_output
+import run_suite as suite_runner
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 CAGENT_CASES = (
@@ -270,6 +278,180 @@ class Final2026ResultValidationTest(unittest.TestCase):
         result = self.validate(cagent_output(), group="buildstorm")
         self.assertEqual(result["status"], "ERROR")
         self.assertTrue(any("group" in error for error in result["errors"]))
+
+    def runner_case(
+        self,
+        *,
+        code: str = "pass",
+        contract: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return {
+            "id": "fixture.final-2026",
+            "description": "final-2026 runner contract fixture",
+            "command": [sys.executable, "-c", code],
+            "cwd": "{repo}",
+            "timeout_seconds": 5,
+            "result_contract": contract
+            or {
+                "type": "final_2026",
+                "expected_group": "cagent",
+                "expected_arch": "riscv64",
+                "buildstorm_baseline_seconds": 400.0,
+            },
+            "required_paths": [],
+            "required_commands": [],
+        }
+
+    def load_runner_contract(self, contract: dict[str, object]) -> dict[str, object]:
+        case = self.runner_case(contract=contract)
+        manifest = {
+            "schema_version": 1,
+            "baseline_ref": "origin/main",
+            "profiles": {
+                "fixture": {
+                    "description": "final-2026 fixture",
+                    "arch_policy": "none",
+                    "include": [],
+                    "cases": [case["id"]],
+                    "arch_cases": {},
+                }
+            },
+            "cases": [case],
+        }
+        with tempfile.TemporaryDirectory(prefix="final-2026-manifest-") as temporary:
+            manifest_path = Path(temporary) / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            return suite_runner.load_manifest(manifest_path, REPO_ROOT)
+
+    def test_runner_contract_accepts_cagent_pass(self) -> None:
+        case = self.runner_case()
+        status, _message, details = suite_runner.parse_contract(
+            case, cagent_output(), ""
+        )
+        self.assertEqual(status, "PASS")
+        self.assertEqual(details["status"], "PASS")
+        self.assertEqual(details["score"], 199.1)
+
+    def test_runner_contract_preserves_cagent_reject(self) -> None:
+        case = self.runner_case()
+        status, _message, details = suite_runner.parse_contract(
+            case, cagent_output(rejected="network"), ""
+        )
+        self.assertEqual(status, "FAIL")
+        self.assertEqual(details["status"], "FAIL")
+        self.assertIn("network", details["failed_items"])
+
+    def test_runner_contract_maps_parser_error_to_infrastructure_error(self) -> None:
+        case = self.runner_case()
+        status, _message, details = suite_runner.parse_contract(
+            case,
+            cagent_output().replace("#### OS COMP TEST GROUP END cagent ####", ""),
+            "",
+        )
+        self.assertEqual(status, "INFRA_ERROR")
+        self.assertEqual(details["status"], "ERROR")
+
+    def test_runner_manifest_validates_final_contract_fields(self) -> None:
+        valid = {
+            "type": "final_2026",
+            "expected_group": "cagent",
+            "expected_arch": "riscv64",
+            "buildstorm_baseline_seconds": 400.0,
+        }
+        self.assertEqual(
+            self.load_runner_contract(valid)["cases"][0]["result_contract"], valid
+        )
+        mutations = (
+            (
+                "missing group",
+                {
+                    key: value
+                    for key, value in valid.items()
+                    if key != "expected_group"
+                },
+                "expected_group",
+            ),
+            ("unknown group", {**valid, "expected_group": "unknown"}, "expected_group"),
+            (
+                "missing arch",
+                {
+                    key: value
+                    for key, value in valid.items()
+                    if key != "expected_arch"
+                },
+                "expected_arch",
+            ),
+            ("unknown arch", {**valid, "expected_arch": "x86_64"}, "expected_arch"),
+            ("zero baseline", {**valid, "buildstorm_baseline_seconds": 0}, "baseline"),
+            (
+                "nonfinite baseline",
+                {**valid, "buildstorm_baseline_seconds": float("inf")},
+                "non-finite",
+            ),
+        )
+        for label, contract, expected_error in mutations:
+            with self.subTest(label=label):
+                with self.assertRaisesRegex(suite_runner.ManifestError, expected_error):
+                    self.load_runner_contract(contract)
+
+    def test_runner_nonzero_exit_still_validates_final_structure(self) -> None:
+        code = (
+            "import sys; "
+            f"print({cagent_output()!r}); "
+            "raise SystemExit(7)"
+        )
+        case = self.runner_case(code=code)
+        with tempfile.TemporaryDirectory(prefix="final-2026-run-") as temporary:
+            record = suite_runner.run_case(
+                case,
+                repo=REPO_ROOT,
+                output_dir=Path(temporary),
+                arch=None,
+            )
+        self.assertEqual(record["status"], "INFRA_ERROR")
+        self.assertEqual(record["return_code"], 7)
+        self.assertEqual(record["details"]["process_exit_code"], 7)
+        self.assertEqual(record["details"]["status"], "PASS")
+
+    def test_runner_inherits_only_final_provenance_environment(self) -> None:
+        allowed = {
+            "RV_FINAL_2026_IMG": "/fixtures/final-rv.img",
+            "LA_FINAL_2026_IMG": "/fixtures/final-la.img",
+            "RV_FINAL_2026_IMG_SHA256": "a" * 64,
+            "LA_FINAL_2026_IMG_SHA256": "b" * 64,
+            "FINAL_2026_PROTOCOL_ROOT": "/fixtures/final-protocol",
+        }
+        forbidden = {
+            "FINAL_2026_FAKE_PASS": "1",
+            "OSCOMP_SKIP_TEST_GROUPS": "cagent",
+        }
+        original = {name: os.environ.get(name) for name in (*allowed, *forbidden)}
+        try:
+            os.environ.update(allowed)
+            os.environ.update(forbidden)
+            environment, error = suite_runner.child_environment(
+                self.runner_case(), repo=REPO_ROOT, cwd=REPO_ROOT
+            )
+        finally:
+            for name, value in original.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        self.assertIsNone(error)
+        for name, value in allowed.items():
+            self.assertEqual(environment.get(name), value)
+        for name in forbidden:
+            self.assertNotIn(name, environment)
+
+    def test_runner_final_contract_does_not_accept_official_scouting_inputs(self) -> None:
+        case = self.runner_case()
+        environment = {"OSCOMP_SKIP_TEST_GROUPS": "cagent"}
+        configured = suite_runner.prepare_official_scouting_environment(
+            case, environment, invocation_cwd=REPO_ROOT
+        )
+        self.assertEqual(configured, [])
+        self.assertEqual(environment, {"OSCOMP_SKIP_TEST_GROUPS": "cagent"})
 
 
 if __name__ == "__main__":
