@@ -123,6 +123,7 @@
         "api/arceos_posix_api/build.rs",
         "api/arceos_posix_api/src/ctypes_gen.rs",
         "api/arceos_posix_api/src/lib.rs",
+        "kernel/fs/axfs/src/mounts.rs",
         "rust-toolchain.toml",
         "scripts/rust-lld.sh",
         "scripts/rust-objcopy.sh"
@@ -170,7 +171,8 @@
         "user/shell/runtime_smoke/semantic_smoke.ld",
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
-        "user/shell/src/semantic_smoke.rs"
+        "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/synthetic_fs.rs"
       ]
     },
     {
@@ -207,6 +209,7 @@
         "api/arceos_posix_api/build.rs",
         "api/arceos_posix_api/src/ctypes_gen.rs",
         "api/arceos_posix_api/src/lib.rs",
+        "kernel/fs/axfs/src/mounts.rs",
         "rust-toolchain.toml",
         "scripts/rust-lld.sh",
         "scripts/rust-objcopy.sh"
@@ -254,7 +257,8 @@
         "user/shell/runtime_smoke/semantic_smoke.ld",
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
-        "user/shell/src/semantic_smoke.rs"
+        "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/synthetic_fs.rs"
       ]
     },
     {
@@ -488,6 +492,7 @@
           "PR3_SMOKE_V1 USER_START arch={arch}",
           "PR3_SMOKE_V1 ASSERT write PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT getpid PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT proc_uptime PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT splice_pipe PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT uname_sysname PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT uname_machine PASS arch={arch}",
@@ -506,12 +511,14 @@
       },
       "provenance": [
         "Makefile",
+        "kernel/fs/axfs/src/mounts.rs",
         "user/shell/Cargo.toml",
         "user/shell/build.rs",
         "user/shell/runtime_smoke/semantic_smoke.ld",
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
-        "user/shell/src/semantic_smoke.rs"
+        "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/synthetic_fs.rs"
       ],
       "environment": {
         "PR3_EVIDENCE_SUPERVISED": "1"
@@ -546,6 +553,7 @@
           "PR3_SMOKE_V1 USER_START arch={arch}",
           "PR3_SMOKE_V1 ASSERT write PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT getpid PASS arch={arch}",
+          "PR3_SMOKE_V1 ASSERT proc_uptime PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT splice_pipe PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT uname_sysname PASS arch={arch}",
           "PR3_SMOKE_V1 ASSERT uname_machine PASS arch={arch}",
@@ -564,12 +572,14 @@
       },
       "provenance": [
         "Makefile",
+        "kernel/fs/axfs/src/mounts.rs",
         "user/shell/Cargo.toml",
         "user/shell/build.rs",
         "user/shell/runtime_smoke/semantic_smoke.ld",
         "user/shell/runtime_smoke/semantic_smoke.rs",
         "user/shell/src/main.rs",
-        "user/shell/src/semantic_smoke.rs"
+        "user/shell/src/semantic_smoke.rs",
+        "user/shell/src/uspace/synthetic_fs.rs"
       ],
       "environment": {
         "PR3_EVIDENCE_SUPERVISED": "1"

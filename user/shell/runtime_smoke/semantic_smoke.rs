@@ -19,6 +19,7 @@ const SYS_VMSPLICE: usize = 75;
 const SYS_SPLICE: usize = 76;
 const SYS_TEE: usize = 77;
 const SYS_EXIT: usize = 93;
+const SYS_NANOSLEEP: usize = 101;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
 
@@ -53,6 +54,12 @@ const ASSERT_GETPID: &[u8] = b"PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_GETPID: &[u8] = b"PR3_SMOKE_V1 ASSERT getpid PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_PROC_UPTIME: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT proc_uptime PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_PROC_UPTIME: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT proc_uptime PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=loongarch64\n";
@@ -76,6 +83,42 @@ const USER_FAIL_WRITE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL write arch=loongarch64\n
 const USER_FAIL_GETPID: &[u8] = b"PR3_SMOKE_V1 USER_FAIL getpid arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_GETPID: &[u8] = b"PR3_SMOKE_V1 USER_FAIL getpid arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_UPTIME_OPEN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_open arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_UPTIME_OPEN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_open arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_UPTIME_READ: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_read arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_UPTIME_READ: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_read arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_UPTIME_CLOSE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_close arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_UPTIME_CLOSE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_close arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_UPTIME_FORMAT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_format arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_UPTIME_FORMAT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_format arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_UPTIME_SLEEP: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_sleep arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_UPTIME_SLEEP: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_sleep arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_advance arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_uptime_advance arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -134,6 +177,68 @@ struct UtsName {
 struct IoVec {
     base: usize,
     len: usize,
+}
+
+#[repr(C)]
+struct Timespec {
+    seconds: i64,
+    nanoseconds: i64,
+}
+
+enum ProcUptimeError {
+    Open,
+    Read,
+    Close,
+    Format,
+}
+
+struct DecimalCentiseconds {
+    value: u64,
+    integer_digits: usize,
+    fractional_digits: usize,
+    decimal_seen: bool,
+}
+
+impl DecimalCentiseconds {
+    const fn new() -> Self {
+        Self {
+            value: 0,
+            integer_digits: 0,
+            fractional_digits: 0,
+            decimal_seen: false,
+        }
+    }
+
+    fn push(&mut self, byte: u8) -> Option<()> {
+        if byte == b'.' {
+            if self.decimal_seen || self.integer_digits == 0 {
+                return None;
+            }
+            self.decimal_seen = true;
+            return Some(());
+        }
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        if self.decimal_seen {
+            self.fractional_digits += 1;
+            if self.fractional_digits > 2 {
+                return None;
+            }
+        } else {
+            self.integer_digits += 1;
+        }
+        self.value = self
+            .value
+            .checked_mul(10)?
+            .checked_add((byte - b'0') as u64)?;
+        Some(())
+    }
+
+    fn finish(&self) -> Option<u64> {
+        (self.integer_digits > 0 && self.decimal_seen && self.fractional_digits == 2)
+            .then_some(self.value)
+    }
 }
 
 impl UtsName {
@@ -276,7 +381,7 @@ fn pipe_write(fd: i32, bytes: &[u8]) -> isize {
 }
 
 #[inline(always)]
-fn pipe_read(fd: i32, bytes: &mut [u8]) -> isize {
+fn fd_read(fd: i32, bytes: &mut [u8]) -> isize {
     // SAFETY: `bytes` is uniquely borrowed and writable for its complete length until
     // the synchronous syscall returns; no Rust reference observes it during the call.
     unsafe {
@@ -290,6 +395,80 @@ fn pipe_read(fd: i32, bytes: &mut [u8]) -> isize {
             0,
         )
     }
+}
+
+fn parse_proc_uptime(bytes: &[u8], length: usize) -> Option<(u64, u64)> {
+    if length > bytes.len() {
+        return None;
+    }
+    let mut current = DecimalCentiseconds::new();
+    let mut in_field = false;
+    let mut fields = 0;
+    let mut uptime = None;
+    let mut idle = None;
+    for byte in bytes.iter().take(length) {
+        if byte.is_ascii_whitespace() {
+            if in_field {
+                let value = current.finish()?;
+                if fields == 0 {
+                    uptime = Some(value);
+                } else if fields == 1 {
+                    idle = Some(value);
+                } else {
+                    return None;
+                }
+                fields += 1;
+                current = DecimalCentiseconds::new();
+                in_field = false;
+            }
+        } else {
+            if fields >= 2 {
+                return None;
+            }
+            current.push(*byte)?;
+            in_field = true;
+        }
+    }
+    if in_field {
+        let value = current.finish()?;
+        if fields == 0 {
+            uptime = Some(value);
+        } else if fields == 1 {
+            idle = Some(value);
+        } else {
+            return None;
+        }
+        fields += 1;
+    }
+    (fields == 2).then_some((uptime?, idle?))
+}
+
+fn read_proc_uptime() -> Result<(u64, u64), ProcUptimeError> {
+    let fd = openat(b"/proc/uptime\0", O_RDONLY);
+    if fd < 0 {
+        return Err(ProcUptimeError::Open);
+    }
+    let fd = fd as i32;
+    let mut buffer = [0_u8; 64];
+    let read = fd_read(fd, &mut buffer);
+    if read <= 0 || read as usize > buffer.len() {
+        let _ = close(fd);
+        return Err(ProcUptimeError::Read);
+    }
+    if close(fd) != 0 {
+        return Err(ProcUptimeError::Close);
+    }
+    parse_proc_uptime(&buffer, read as usize).ok_or(ProcUptimeError::Format)
+}
+
+fn fail_proc_uptime(error: ProcUptimeError, code: usize) -> ! {
+    let marker = match error {
+        ProcUptimeError::Open => USER_FAIL_PROC_UPTIME_OPEN,
+        ProcUptimeError::Read => USER_FAIL_PROC_UPTIME_READ,
+        ProcUptimeError::Close => USER_FAIL_PROC_UPTIME_CLOSE,
+        ProcUptimeError::Format => USER_FAIL_PROC_UPTIME_FORMAT,
+    };
+    fail(marker, code)
 }
 
 #[inline(always)]
@@ -468,6 +647,42 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_WRITE, 104);
     }
 
+    let (uptime_before, _) = match read_proc_uptime() {
+        Ok(uptime) => uptime,
+        Err(error) => fail_proc_uptime(error, 230),
+    };
+    let sleep_request = Timespec {
+        seconds: 0,
+        nanoseconds: 150_000_000,
+    };
+    // SAFETY: `sleep_request` is a live, aligned, readable Linux timespec for the
+    // complete synchronous SYS_NANOSLEEP call. A null remainder pointer explicitly
+    // declines the optional remaining-duration result; all other slots are ignored.
+    if unsafe {
+        syscall6(
+            SYS_NANOSLEEP,
+            &sleep_request as *const Timespec as usize,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    } != 0
+    {
+        fail(USER_FAIL_PROC_UPTIME_SLEEP, 231);
+    }
+    let (uptime_after, _) = match read_proc_uptime() {
+        Ok(uptime) => uptime,
+        Err(error) => fail_proc_uptime(error, 232),
+    };
+    if uptime_after <= uptime_before {
+        fail(USER_FAIL_PROC_UPTIME_ADVANCE, 233);
+    }
+    if write(ASSERT_PROC_UPTIME) != ASSERT_PROC_UPTIME.len() as isize {
+        fail(USER_FAIL_WRITE, 234);
+    }
+
     // Linux resolves a zero-length splice before flags, descriptors, or user offsets.
     // The deliberately invalid scalar pointer values must therefore never be touched.
     // SAFETY: no Rust pointer is constructed or dereferenced; this call intentionally
@@ -559,7 +774,7 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_SPLICE_PIPE, 112);
     }
     let mut spliced = [0_u8; SPLICE_PAYLOAD.len()];
-    if pipe_read(destination_pipe[0], &mut spliced) != spliced.len() as isize
+    if fd_read(destination_pipe[0], &mut spliced) != spliced.len() as isize
         || spliced != *SPLICE_PAYLOAD
     {
         fail(USER_FAIL_SPLICE_PIPE, 113);
@@ -583,7 +798,7 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_SPLICE_PIPE, 115);
     }
     spliced = [0; SPLICE_PAYLOAD.len()];
-    if pipe_read(destination_pipe[0], &mut spliced) != spliced.len() as isize
+    if fd_read(destination_pipe[0], &mut spliced) != spliced.len() as isize
         || spliced != *SPLICE_PAYLOAD
     {
         fail(USER_FAIL_SPLICE_PIPE, 116);
@@ -632,7 +847,7 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_SPLICE_PIPE, 121);
     }
     let mut preserved = [0_u8; SPLICE_PAYLOAD.len()];
-    if pipe_read(preserved_source[0], &mut preserved) != preserved.len() as isize
+    if fd_read(preserved_source[0], &mut preserved) != preserved.len() as isize
         || preserved != *SPLICE_PAYLOAD
     {
         fail(USER_FAIL_SPLICE_PIPE, 122);
@@ -745,7 +960,7 @@ pub extern "C" fn _start() -> ! {
         let mut read_buffer = [0_u8; 512];
         while drained < moved {
             let requested = (moved - drained).min(read_buffer.len());
-            let read = pipe_read(vmsplice_pipe[0], &mut read_buffer[..requested]);
+            let read = fd_read(vmsplice_pipe[0], &mut read_buffer[..requested]);
             if read <= 0 || read as usize > requested {
                 fail(USER_FAIL_SPLICE_PIPE, 129);
             }
