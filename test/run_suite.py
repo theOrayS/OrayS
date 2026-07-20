@@ -669,7 +669,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.evaluation_failure_report": 9,
     "unit.evaluation_runner_and_parser_integrity": 24,
     "unit.evaluator_protocol": 27,
-    "unit.final_2026_result_validation": 31,
+    "unit.final_2026_result_validation": 32,
     "unit.file_object_event_core": 33,
     "unit.kernel_state_backed_semantics": 41,
     "unit.libc_stateful_semantics": 9,

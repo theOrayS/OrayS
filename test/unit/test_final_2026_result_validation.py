@@ -45,13 +45,18 @@ def group_output(group: str, body: list[str]) -> str:
     )
 
 
-def cagent_output(*, slow: bool = False, rejected: str | None = None) -> str:
+def cagent_output(
+    *,
+    slow: bool = False,
+    rejected: str | None = None,
+    lifecycle_label: str = "cagent-glibc",
+) -> str:
     records = []
     for name, _weight, timeout_ms in reversed(CAGENT_CASES):
         elapsed_ms = timeout_ms // 2 + 1 if slow else timeout_ms // 4
         status = "reject" if name == rejected else "pass"
         records.append(f"testcase cagent {name} {status} {elapsed_ms}")
-    return group_output("cagent", records)
+    return group_output(lifecycle_label, records)
 
 
 def buildstorm_output(
@@ -90,11 +95,15 @@ class Final2026ResultValidationTest(unittest.TestCase):
         arch: str = "riscv64",
         stderr: str = "",
         baseline: float = 400.0,
+        group_label: str | None = None,
     ) -> dict[str, object]:
         return validate_final_2026_output(
             stdout,
             stderr,
             expected_group=group,
+            expected_group_label=group_label or (
+                "cagent-glibc" if group == "cagent" else "buildstorm"
+            ),
             expected_arch=arch,
             buildstorm_baseline_seconds=baseline,
         )
@@ -125,8 +134,8 @@ class Final2026ResultValidationTest(unittest.TestCase):
 
     def test_cagent_duplicate_identity_is_an_error(self) -> None:
         output = cagent_output().replace(
-            "#### OS COMP TEST GROUP END cagent ####",
-            "testcase cagent factorial pass 1\n#### OS COMP TEST GROUP END cagent ####",
+            "#### OS COMP TEST GROUP END cagent-glibc ####",
+            "testcase cagent factorial pass 1\n#### OS COMP TEST GROUP END cagent-glibc ####",
         )
         result = self.validate(output, group="cagent")
         self.assertEqual(result["status"], "ERROR")
@@ -134,8 +143,8 @@ class Final2026ResultValidationTest(unittest.TestCase):
 
     def test_cagent_unknown_identity_is_an_error(self) -> None:
         output = cagent_output().replace(
-            "#### OS COMP TEST GROUP END cagent ####",
-            "testcase cagent invented pass 1\n#### OS COMP TEST GROUP END cagent ####",
+            "#### OS COMP TEST GROUP END cagent-glibc ####",
+            "testcase cagent invented pass 1\n#### OS COMP TEST GROUP END cagent-glibc ####",
         )
         result = self.validate(output, group="cagent")
         self.assertEqual(result["status"], "ERROR")
@@ -152,7 +161,7 @@ class Final2026ResultValidationTest(unittest.TestCase):
 
     def test_cagent_requires_exact_group_lifecycle(self) -> None:
         output = cagent_output().replace(
-            "#### OS COMP TEST GROUP END cagent ####", ""
+            "#### OS COMP TEST GROUP END cagent-glibc ####", ""
         )
         result = self.validate(output, group="cagent")
         self.assertEqual(result["status"], "ERROR")
@@ -279,6 +288,14 @@ class Final2026ResultValidationTest(unittest.TestCase):
         self.assertEqual(result["status"], "ERROR")
         self.assertTrue(any("group" in error for error in result["errors"]))
 
+    def test_cagent_rejects_noncanonical_lifecycle_label(self) -> None:
+        result = self.validate(
+            cagent_output(lifecycle_label="cagent"),
+            group="cagent",
+        )
+        self.assertEqual(result["status"], "ERROR")
+        self.assertTrue(any("expected group label" in error for error in result["errors"]))
+
     def runner_case(
         self,
         *,
@@ -295,6 +312,7 @@ class Final2026ResultValidationTest(unittest.TestCase):
             or {
                 "type": "final_2026",
                 "expected_group": "cagent",
+                "expected_group_label": "cagent-glibc",
                 "expected_arch": "riscv64",
                 "buildstorm_baseline_seconds": 400.0,
             },
@@ -345,7 +363,9 @@ class Final2026ResultValidationTest(unittest.TestCase):
         case = self.runner_case()
         status, _message, details = suite_runner.parse_contract(
             case,
-            cagent_output().replace("#### OS COMP TEST GROUP END cagent ####", ""),
+            cagent_output().replace(
+                "#### OS COMP TEST GROUP END cagent-glibc ####", ""
+            ),
             "",
         )
         self.assertEqual(status, "INFRA_ERROR")
@@ -355,6 +375,7 @@ class Final2026ResultValidationTest(unittest.TestCase):
         valid = {
             "type": "final_2026",
             "expected_group": "cagent",
+            "expected_group_label": "cagent-glibc",
             "expected_arch": "riscv64",
             "buildstorm_baseline_seconds": 400.0,
         }
@@ -372,6 +393,20 @@ class Final2026ResultValidationTest(unittest.TestCase):
                 "expected_group",
             ),
             ("unknown group", {**valid, "expected_group": "unknown"}, "expected_group"),
+            (
+                "missing group label",
+                {
+                    key: value
+                    for key, value in valid.items()
+                    if key != "expected_group_label"
+                },
+                "expected_group_label",
+            ),
+            (
+                "wrong group label",
+                {**valid, "expected_group_label": "cagent"},
+                "expected_group_label",
+            ),
             (
                 "missing arch",
                 {
