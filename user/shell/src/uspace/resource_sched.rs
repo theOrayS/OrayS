@@ -16,8 +16,8 @@ use super::task_registry::{
     user_thread_entries_by_process_pid, user_thread_entry_by_process_pid,
 };
 use super::user_memory::{
-    clear_user_bytes, read_user_bytes, read_user_value, validate_user_read, validate_user_write,
-    write_user_bytes, write_user_value,
+    clear_user_bytes, read_user_bytes, read_user_value, validate_user_write, write_user_bytes,
+    write_user_value,
 };
 use super::{UserProcess, task_context::current_tid};
 
@@ -644,16 +644,57 @@ fn set_sched_target_state(
     Ok(())
 }
 
-pub(super) fn is_same_sched_target(process: &UserProcess, pid: i32) -> bool {
-    sched_target_state(process, pid).is_ok()
+fn sched_affinity_target(process: &UserProcess, pid: i32) -> Result<axtask::AxTaskRef, LinuxError> {
+    if pid < 0 {
+        return Err(LinuxError::ESRCH);
+    }
+    if pid == 0 || pid == current_tid() {
+        return Ok(axtask::current().as_task_ref().clone());
+    }
+    if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+        return Ok(entry.task);
+    }
+    if let Some(entry) = user_thread_entry_by_process_pid(pid) {
+        return Ok(entry.task);
+    }
+    if pid == process.pid() {
+        // The initial userspace task can execute before its registry entry is
+        // externally observable. In that narrow interval, the process leader is
+        // necessarily the calling task.
+        return Ok(axtask::current().as_task_ref().clone());
+    }
+    Err(LinuxError::ESRCH)
 }
 
-pub(super) fn sched_affinity_accepts_current_cpu(first_mask_byte: u8) -> bool {
-    first_mask_byte & 1 != 0
+pub(super) fn sched_affinity_result_len() -> usize {
+    // Linux exposes a word-aligned kernel cpumask. AxCpuMask uses the smallest
+    // backing integer that fits the configured maximum, so retain at least one
+    // native word and naturally grow for configurations wider than a word.
+    cmp::max(size_of::<axtask::AxCpuMask>(), size_of::<usize>())
 }
 
-pub(super) fn sched_affinity_result_len(cpusetsize: usize) -> usize {
-    cmp::min(cpusetsize, size_of::<usize>())
+fn sched_affinity_from_user(bytes: &[u8]) -> axtask::AxCpuMask {
+    let online = axtask::cpu_mask_full();
+    let mut affinity = axtask::AxCpuMask::new();
+    for cpu in &online {
+        if bytes
+            .get(cpu / 8)
+            .is_some_and(|byte| byte & (1 << (cpu % 8)) != 0)
+        {
+            affinity.set(cpu, true);
+        }
+    }
+    affinity
+}
+
+fn sched_affinity_to_user(affinity: axtask::AxCpuMask, len: usize) -> Vec<u8> {
+    let mut bytes = vec![0_u8; len];
+    for cpu in &affinity {
+        if let Some(byte) = bytes.get_mut(cpu / 8) {
+            *byte |= 1 << (cpu % 8);
+        }
+    }
+    bytes
 }
 
 pub(super) fn sys_sched_yield(_tf: &TrapFrame) -> isize {
@@ -924,25 +965,37 @@ pub(super) fn sys_sched_setaffinity(
     cpusetsize: usize,
     mask: usize,
 ) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
-    if cpusetsize == 0 || mask == 0 {
+    let target = match sched_affinity_target(process, pid) {
+        Ok(target) => target,
+        Err(err) => return neg_errno(err),
+    };
+    let affinity_len = sched_affinity_result_len();
+    if cpusetsize < affinity_len {
         return neg_errno(LinuxError::EINVAL);
     }
-    if let Err(err) = validate_user_read(process, mask, cpusetsize) {
+    if let Err(err) = can_set_sched_target(process, pid) {
         return neg_errno(err);
     }
-    match read_user_value::<u8>(process, mask) {
-        Ok(first) if sched_affinity_accepts_current_cpu(first) => {
-            match can_set_sched_target(process, pid) {
-                Ok(()) => 0,
-                Err(err) => neg_errno(err),
-            }
-        }
-        Ok(_) => neg_errno(LinuxError::EINVAL),
-        Err(err) => neg_errno(err),
+    let bytes = match read_user_bytes(process, mask, affinity_len) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    let affinity = sched_affinity_from_user(&bytes);
+    if affinity.is_empty() {
+        return neg_errno(LinuxError::EINVAL);
     }
+
+    if target.id() == axtask::current().id() {
+        if !axtask::set_current_affinity(affinity) {
+            return neg_errno(LinuxError::EINVAL);
+        }
+    } else {
+        // The task's cpumask is the scheduler's placement authority. Ready and
+        // blocked tasks observe it on their next placement; a running remote
+        // task observes it when it next re-enters scheduling.
+        target.set_cpumask(affinity);
+    }
+    0
 }
 
 pub(super) fn sys_sched_getaffinity(
@@ -951,19 +1004,19 @@ pub(super) fn sys_sched_getaffinity(
     cpusetsize: usize,
     mask: usize,
 ) -> isize {
-    if !is_same_sched_target(process, pid) {
-        return neg_errno(LinuxError::ESRCH);
-    }
-    if cpusetsize == 0 || mask == 0 {
+    let target = match sched_affinity_target(process, pid) {
+        Ok(target) => target,
+        Err(err) => return neg_errno(err),
+    };
+    let affinity_len = sched_affinity_result_len();
+    if cpusetsize < affinity_len {
         return neg_errno(LinuxError::EINVAL);
     }
-    if let Err(err) = clear_user_bytes(process, mask, cpusetsize) {
+    let bytes = sched_affinity_to_user(target.cpumask(), affinity_len);
+    if let Err(err) = write_user_bytes(process, mask, &bytes) {
         return neg_errno(err);
     }
-    if let Err(err) = write_user_bytes(process, mask, &[1]) {
-        return neg_errno(err);
-    }
-    sched_affinity_result_len(cpusetsize) as isize
+    affinity_len as isize
 }
 
 pub(super) fn sys_prlimit64(

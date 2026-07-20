@@ -117,7 +117,12 @@ fn init_cpu_mask_full() {
     CPU_MASK_FULL.call_once(|| cpumask);
 }
 
-pub(crate) fn cpu_mask_full() -> AxCpuMask {
+/// Returns the mask of CPUs that are online and available to the scheduler.
+///
+/// This is the runtime platform mask, not the compile-time maximum. Linux ABI
+/// adapters use it to intersect user-provided affinity masks with CPUs that can
+/// actually execute tasks.
+pub fn cpu_mask_full() -> AxCpuMask {
     *CPU_MASK_FULL.get().expect("CPU mask not initialized")
 }
 
