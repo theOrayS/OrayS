@@ -212,6 +212,7 @@ CANONICAL_PROFILE_NAMES = frozenset(
         "evidence-required",
         "baseline",
         "official",
+        "final-2026",
         "full",
     }
 )
@@ -572,12 +573,19 @@ OFFICIAL_CALLER_ENVIRONMENT = (
     "OSCOMP_SKIP_TEST_GROUPS",
 )
 FINAL_2026_CALLER_ENVIRONMENT = (
-    "RV_FINAL_2026_IMG",
-    "LA_FINAL_2026_IMG",
-    "RV_FINAL_2026_IMG_SHA256",
-    "LA_FINAL_2026_IMG_SHA256",
+    "RV_CAGENT_FINAL_2026_IMG",
+    "RV_CAGENT_FINAL_2026_IMG_SHA256",
+    "RV_BUILDSTORM_FINAL_2026_IMG",
+    "RV_BUILDSTORM_FINAL_2026_IMG_SHA256",
+    "LA_CAGENT_FINAL_2026_IMG",
+    "LA_CAGENT_FINAL_2026_IMG_SHA256",
+    "LA_BUILDSTORM_FINAL_2026_IMG",
+    "LA_BUILDSTORM_FINAL_2026_IMG_SHA256",
     "FINAL_2026_PROTOCOL_ROOT",
 )
+CANONICAL_FINAL_2026_ENVIRONMENT = {
+    "ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}",
+}
 CANONICAL_OFFICIAL_EXECUTION = {
     "rv": {
         "timeout_seconds": 21600,
@@ -612,6 +620,40 @@ CANONICAL_OFFICIAL_EXECUTION = {
             }
         ],
         "infrastructure_exit_codes": [125],
+    },
+}
+CANONICAL_FINAL_2026_ARCH_CASES = {
+    "rv": ["final.cagent.riscv64", "final.buildstorm.riscv64"],
+    "la": ["final.cagent.loongarch64", "final.buildstorm.loongarch64"],
+}
+CANONICAL_FINAL_2026_EXECUTION = {
+    "final.cagent.riscv64": {
+        "architecture": "riscv64",
+        "group": "cagent",
+        "image_environment": "RV_CAGENT_FINAL_2026_IMG",
+        "timeout_seconds": 1800,
+        "qemu": "qemu-system-riscv64",
+    },
+    "final.buildstorm.riscv64": {
+        "architecture": "riscv64",
+        "group": "buildstorm",
+        "image_environment": "RV_BUILDSTORM_FINAL_2026_IMG",
+        "timeout_seconds": 21600,
+        "qemu": "qemu-system-riscv64",
+    },
+    "final.cagent.loongarch64": {
+        "architecture": "loongarch64",
+        "group": "cagent",
+        "image_environment": "LA_CAGENT_FINAL_2026_IMG",
+        "timeout_seconds": 1800,
+        "qemu": "qemu-system-loongarch64",
+    },
+    "final.buildstorm.loongarch64": {
+        "architecture": "loongarch64",
+        "group": "buildstorm",
+        "image_environment": "LA_BUILDSTORM_FINAL_2026_IMG",
+        "timeout_seconds": 21600,
+        "qemu": "qemu-system-loongarch64",
     },
 }
 CANONICAL_CHECK_CASE_IDS = (
@@ -1587,6 +1629,7 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
         "check.": "check",
         "unit.": "unittest",
         "official.": "official",
+        "final.": "final_2026",
     }
     exact_case_contracts = {"baseline.workspace_unit_tests": "cargo_test"}
     for case_id, result_type in contract_by_id.items():
@@ -1620,6 +1663,7 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
         "checks": "check",
         "unit": "unittest",
         "official": "official",
+        "final-2026": "final_2026",
     }
     for profile_name, required_type in profile_contracts.items():
         if profile_name not in profiles:
@@ -1637,12 +1681,24 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
         "rv": ["official.riscv64"],
         "la": ["official.loongarch64"],
     }
+    canonical_full_arch_cases = {
+        architecture: [
+            *canonical_arch_cases[architecture],
+            *CANONICAL_FINAL_2026_ARCH_CASES[architecture],
+        ]
+        for architecture in ("rv", "la")
+    }
     canonical_case_ids = {
         *CANONICAL_CHECK_CASE_IDS,
         *CANONICAL_UNIT_CASE_IDS,
         *CANONICAL_EVIDENCE_CASE_IDS,
         *CANONICAL_BASELINE_CASE_IDS,
         *(case_id for values in canonical_arch_cases.values() for case_id in values),
+        *(
+            case_id
+            for values in CANONICAL_FINAL_2026_ARCH_CASES.values()
+            for case_id in values
+        ),
     }
     is_canonical_plan = canonical_manifest or bool(case_ids & canonical_case_ids)
     reserved_profile_collisions = sorted(CANONICAL_PROFILE_NAMES & set(profiles))
@@ -1693,7 +1749,8 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                 {},
             ),
             "official": ("one", [], [], canonical_arch_cases),
-            "full": ("one_or_all", ["baseline"], [], canonical_arch_cases),
+            "final-2026": ("one_or_all", [], [], CANONICAL_FINAL_2026_ARCH_CASES),
+            "full": ("one_or_all", ["baseline"], [], canonical_full_arch_cases),
         }
         for profile_name, (policy, includes, direct_cases, arch_cases) in canonical_profile_shapes.items():
             profile = profiles[profile_name]
@@ -1869,6 +1926,66 @@ def load_manifest(path: Path, repo: Path) -> dict[str, Any]:
                     raise ManifestError(
                         f"case {case_id} must preserve canonical official {field}={expected_value!r}"
                     )
+        actual_final_ids = {
+            case_id
+            for case_id, result_type in contract_by_id.items()
+            if result_type == "final_2026"
+        }
+        if actual_final_ids != set(CANONICAL_FINAL_2026_EXECUTION):
+            raise ManifestError(
+                "manifest final-2026 cases must be exactly the canonical four cases"
+            )
+        for case_id, execution in CANONICAL_FINAL_2026_EXECUTION.items():
+            case = cases_by_id[case_id]
+            architecture = execution["architecture"]
+            group = execution["group"]
+            expected_contract = {
+                "type": "final_2026",
+                "expected_group": group,
+                "expected_group_label": FINAL_2026_GROUP_LABELS[group],
+                "expected_arch": architecture,
+                "buildstorm_baseline_seconds": 400.0,
+            }
+            expected_command = [
+                "{python}",
+                "-I",
+                "-S",
+                "-B",
+                "-X",
+                "pycache_prefix=/dev/null",
+                "{repo}/test/evaluation/run_final_2026_evaluation.py",
+                architecture,
+                group,
+            ]
+            expected_paths = [
+                "{repo}/test/evaluation/run_final_2026_evaluation.py",
+                "{repo}/test/evaluation/parse_final_2026_results.py",
+                "{repo}/test/images/manifest.final-2026.json",
+            ]
+            expected_commands = [
+                "python3",
+                "git",
+                "make",
+                "cargo",
+                "qemu-img",
+                "debugfs",
+                execution["qemu"],
+            ]
+            expected_files = [{"environment": execution["image_environment"]}]
+            if (
+                case.get("command") != expected_command
+                or case.get("cwd", "{repo}") != "{repo}"
+                or case.get("timeout_seconds") != execution["timeout_seconds"]
+                or case.get("result_contract") != expected_contract
+                or case.get("required_paths", []) != expected_paths
+                or case.get("required_commands", []) != expected_commands
+                or case.get("required_files", []) != expected_files
+                or case.get("environment", {}) != CANONICAL_FINAL_2026_ENVIRONMENT
+                or case.get("infrastructure_exit_codes", []) != [125]
+            ):
+                raise ManifestError(
+                    f"case {case_id} must preserve canonical final-2026 execution fields"
+                )
     return manifest
 
 

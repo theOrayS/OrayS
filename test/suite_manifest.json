@@ -133,14 +133,24 @@
         "la": ["official.loongarch64"]
       }
     },
+    "final-2026": {
+      "description": "Final-2026 CAgent and BuildStorm with strict provenance and scoring for one or both architectures.",
+      "arch_policy": "one_or_all",
+      "include": [],
+      "cases": [],
+      "arch_cases": {
+        "rv": ["final.cagent.riscv64", "final.buildstorm.riscv64"],
+        "la": ["final.cagent.loongarch64", "final.buildstorm.loongarch64"]
+      }
+    },
     "full": {
-      "description": "Baseline followed by the requested RV, LA, or both official local paths.",
+      "description": "Baseline followed by every requested preliminary and final official local path.",
       "arch_policy": "one_or_all",
       "include": ["baseline"],
       "cases": [],
       "arch_cases": {
-        "rv": ["official.riscv64"],
-        "la": ["official.loongarch64"]
+        "rv": ["official.riscv64", "final.cagent.riscv64", "final.buildstorm.riscv64"],
+        "la": ["official.loongarch64", "final.cagent.loongarch64", "final.buildstorm.loongarch64"]
       }
     }
   },
@@ -752,6 +762,82 @@
         "LTP_CASE_TIMEOUT_SECS": "180",
         "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },
+      "infrastructure_exit_codes": [125]
+    },
+    {
+      "id": "final.cagent.riscv64",
+      "description": "Canonical final-2026 RISC-V64 CAgent evaluation.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evaluation/run_final_2026_evaluation.py", "riscv64", "cagent"],
+      "cwd": "{repo}",
+      "timeout_seconds": 1800,
+      "result_contract": {
+        "type": "final_2026",
+        "expected_group": "cagent",
+        "expected_group_label": "cagent-glibc",
+        "expected_arch": "riscv64",
+        "buildstorm_baseline_seconds": 400.0
+      },
+      "required_paths": ["{repo}/test/evaluation/run_final_2026_evaluation.py", "{repo}/test/evaluation/parse_final_2026_results.py", "{repo}/test/images/manifest.final-2026.json"],
+      "required_commands": ["python3", "git", "make", "cargo", "qemu-img", "debugfs", "qemu-system-riscv64"],
+      "required_files": [{"environment": "RV_CAGENT_FINAL_2026_IMG"}],
+      "environment": {"ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}"},
+      "infrastructure_exit_codes": [125]
+    },
+    {
+      "id": "final.buildstorm.riscv64",
+      "description": "Canonical final-2026 RISC-V64 BuildStorm evaluation.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evaluation/run_final_2026_evaluation.py", "riscv64", "buildstorm"],
+      "cwd": "{repo}",
+      "timeout_seconds": 21600,
+      "result_contract": {
+        "type": "final_2026",
+        "expected_group": "buildstorm",
+        "expected_group_label": "buildstorm",
+        "expected_arch": "riscv64",
+        "buildstorm_baseline_seconds": 400.0
+      },
+      "required_paths": ["{repo}/test/evaluation/run_final_2026_evaluation.py", "{repo}/test/evaluation/parse_final_2026_results.py", "{repo}/test/images/manifest.final-2026.json"],
+      "required_commands": ["python3", "git", "make", "cargo", "qemu-img", "debugfs", "qemu-system-riscv64"],
+      "required_files": [{"environment": "RV_BUILDSTORM_FINAL_2026_IMG"}],
+      "environment": {"ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}"},
+      "infrastructure_exit_codes": [125]
+    },
+    {
+      "id": "final.cagent.loongarch64",
+      "description": "Canonical final-2026 LoongArch64 CAgent evaluation.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evaluation/run_final_2026_evaluation.py", "loongarch64", "cagent"],
+      "cwd": "{repo}",
+      "timeout_seconds": 1800,
+      "result_contract": {
+        "type": "final_2026",
+        "expected_group": "cagent",
+        "expected_group_label": "cagent-glibc",
+        "expected_arch": "loongarch64",
+        "buildstorm_baseline_seconds": 400.0
+      },
+      "required_paths": ["{repo}/test/evaluation/run_final_2026_evaluation.py", "{repo}/test/evaluation/parse_final_2026_results.py", "{repo}/test/images/manifest.final-2026.json"],
+      "required_commands": ["python3", "git", "make", "cargo", "qemu-img", "debugfs", "qemu-system-loongarch64"],
+      "required_files": [{"environment": "LA_CAGENT_FINAL_2026_IMG"}],
+      "environment": {"ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}"},
+      "infrastructure_exit_codes": [125]
+    },
+    {
+      "id": "final.buildstorm.loongarch64",
+      "description": "Canonical final-2026 LoongArch64 BuildStorm evaluation.",
+      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evaluation/run_final_2026_evaluation.py", "loongarch64", "buildstorm"],
+      "cwd": "{repo}",
+      "timeout_seconds": 21600,
+      "result_contract": {
+        "type": "final_2026",
+        "expected_group": "buildstorm",
+        "expected_group_label": "buildstorm",
+        "expected_arch": "loongarch64",
+        "buildstorm_baseline_seconds": 400.0
+      },
+      "required_paths": ["{repo}/test/evaluation/run_final_2026_evaluation.py", "{repo}/test/evaluation/parse_final_2026_results.py", "{repo}/test/images/manifest.final-2026.json"],
+      "required_commands": ["python3", "git", "make", "cargo", "qemu-img", "debugfs", "qemu-system-loongarch64"],
+      "required_files": [{"environment": "LA_BUILDSTORM_FINAL_2026_IMG"}],
+      "environment": {"ORAYS_TEST_OUTPUT_DIR": "{case_output_dir}"},
       "infrastructure_exit_codes": [125]
     }
   ]

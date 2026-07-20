@@ -450,10 +450,14 @@ class Final2026ResultValidationTest(unittest.TestCase):
 
     def test_runner_inherits_only_final_provenance_environment(self) -> None:
         allowed = {
-            "RV_FINAL_2026_IMG": "/fixtures/final-rv.img",
-            "LA_FINAL_2026_IMG": "/fixtures/final-la.img",
-            "RV_FINAL_2026_IMG_SHA256": "a" * 64,
-            "LA_FINAL_2026_IMG_SHA256": "b" * 64,
+            "RV_CAGENT_FINAL_2026_IMG": "/fixtures/final-rv-cagent.img",
+            "RV_CAGENT_FINAL_2026_IMG_SHA256": "a" * 64,
+            "RV_BUILDSTORM_FINAL_2026_IMG": "/fixtures/final-rv-buildstorm.img",
+            "RV_BUILDSTORM_FINAL_2026_IMG_SHA256": "b" * 64,
+            "LA_CAGENT_FINAL_2026_IMG": "/fixtures/final-la-cagent.img",
+            "LA_CAGENT_FINAL_2026_IMG_SHA256": "c" * 64,
+            "LA_BUILDSTORM_FINAL_2026_IMG": "/fixtures/final-la-buildstorm.img",
+            "LA_BUILDSTORM_FINAL_2026_IMG_SHA256": "d" * 64,
             "FINAL_2026_PROTOCOL_ROOT": "/fixtures/final-protocol",
         }
         forbidden = {
