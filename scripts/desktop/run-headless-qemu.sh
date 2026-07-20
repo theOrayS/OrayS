@@ -6,6 +6,7 @@ arch=
 scenario=
 run_dir=
 timeout_seconds=${DESKTOP_QEMU_TIMEOUT_SECS:-90}
+required_qemu_version=9.2.4
 
 usage() {
     printf '%s\n' \
@@ -57,14 +58,6 @@ if [[ ! "$timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
     exit 2
 fi
 
-unset DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
-for command_name in python3 qemu-img mkfs.fat timeout sha256sum; do
-    command -v "$command_name" >/dev/null 2>&1 || {
-        printf 'missing required command: %s\n' "$command_name" >&2
-        exit 3
-    }
-done
-
 qemu_binary=qemu-system-riscv64
 artifact="$repo_root/build/desktop/rv/artifacts/orays-desktop-rv.bin"
 vdev_suffix=device
@@ -75,10 +68,6 @@ if [[ "$arch" == la ]]; then
     vdev_suffix=pci
     vnc_display=${DESKTOP_VNC_DISPLAY:-43}
 fi
-command -v "$qemu_binary" >/dev/null 2>&1 || {
-    printf 'missing required QEMU: %s\n' "$qemu_binary" >&2
-    exit 3
-}
 if [[ ! "$vnc_display" =~ ^[0-9]+$ ]]; then
     printf 'DESKTOP_VNC_DISPLAY must be a non-negative integer\n' >&2
     exit 2
@@ -92,14 +81,123 @@ else
         --repo-root "$repo_root" --candidate "$run_dir")
 fi
 
+qemu_pid=
+qemu_started=false
+qemu_exit=
+qmp_runtime_dir=
+failure_stage=runtime-prerequisites
+failure_reason=
+cleanup() {
+    if [[ -n "$qemu_pid" ]]; then
+        if kill -0 "$qemu_pid" 2>/dev/null; then
+            kill "$qemu_pid" 2>/dev/null || true
+        fi
+        local stopped_exit=0
+        wait "$qemu_pid" 2>/dev/null || stopped_exit=$?
+        if [[ -z "$qemu_exit" || "$qemu_exit" == 0 ]]; then
+            qemu_exit=$stopped_exit
+        fi
+        qemu_pid=
+    fi
+    if [[ -n "$qmp_runtime_dir" ]]; then
+        rm -f "$qmp_runtime_dir/qmp.sock"
+        rmdir "$qmp_runtime_dir" 2>/dev/null || true
+        qmp_runtime_dir=
+    fi
+}
+finalize() {
+    runner_exit=$?
+    trap - EXIT INT TERM
+    cleanup
+    set +e
+    finalizer_args=(
+        --repo-root "$repo_root"
+        --run-dir "$run_dir"
+        --arch "$arch"
+        --scenario "$scenario"
+        --qemu-binary "$qemu_binary"
+        --required-qemu-version "$required_qemu_version"
+        --qemu-started "$qemu_started"
+        --runner-exit "$runner_exit"
+        --failure-stage "$failure_stage"
+    )
+    if [[ -n "$failure_reason" ]]; then
+        finalizer_args+=(--failure-reason "$failure_reason")
+    fi
+    if [[ "$qemu_started" == true ]]; then
+        finalizer_args+=(--qemu-exit "$qemu_exit")
+    fi
+    python3 "$repo_root/scripts/desktop/finalize-runtime-evidence.py" \
+        "${finalizer_args[@]}"
+    finalize_exit=$?
+    if (( finalize_exit >= 70 )); then
+        printf 'runtime evidence finalization failed; exit=%s evidence=%s\n' \
+            "$finalize_exit" "$run_dir" >&2
+        runner_exit=$finalize_exit
+    elif (( runner_exit == 0 && finalize_exit != 0 )); then
+        runner_exit=$finalize_exit
+    fi
+    exit "$runner_exit"
+}
+trap finalize EXIT
+trap 'failure_stage=runner-signal; failure_reason=signal_interrupted; exit 130' INT
+trap 'failure_stage=runner-signal; failure_reason=signal_terminated; exit 143' TERM
+
+sequence="$repo_root/test/desktop/fixtures/input/${scenario}.json"
+cp "$sequence" "$run_dir/input-sequence.json"
+: >"$run_dir/serial.log"
+: >"$run_dir/qmp-input.jsonl"
+: >"$run_dir/qmp-capture.jsonl"
+
+unset DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
+if [[ -n "${DESKTOP_REQUIRED_QEMU_VERSION+x}" \
+    && "$DESKTOP_REQUIRED_QEMU_VERSION" != "$required_qemu_version" ]]; then
+    failure_reason=qemu_version_override_rejected
+    printf 'DESKTOP_REQUIRED_QEMU_VERSION must be exactly %s\n' \
+        "$required_qemu_version" >&2
+    exit 3
+fi
+for command_name in python3 qemu-img mkfs.fat timeout sha256sum; do
+    command -v "$command_name" >/dev/null 2>&1 || {
+        failure_reason=missing_runtime_prerequisite
+        printf 'missing required command: %s\n' "$command_name" >&2
+        exit 3
+    }
+done
+command -v "$qemu_binary" >/dev/null 2>&1 || {
+    failure_reason=missing_qemu_binary
+    printf 'missing required QEMU: %s\n' "$qemu_binary" >&2
+    exit 3
+}
+qemu_version=$($qemu_binary --version | sed -n '1p')
+if [[ "$qemu_version" != "QEMU emulator version ${required_qemu_version}" ]]; then
+    failure_reason=qemu_version_mismatch
+    printf 'required QEMU %s, got: %s\n' "$required_qemu_version" "$qemu_version" >&2
+    exit 3
+fi
+
+failure_stage=runtime-metadata-initial
+python3 "$repo_root/scripts/desktop/collect-runtime-metadata.py" \
+    --repo-root "$repo_root" \
+    --output "$run_dir/runtime-metadata.json" \
+    --arch "$arch" \
+    --scenario "$scenario" \
+    --qemu-binary "$qemu_binary" \
+    --required-qemu-version "$required_qemu_version" \
+    --run-dir "$run_dir"
+
+failure_stage=desktop-build
 "$repo_root/scripts/desktop/build.sh" "$arch"
 test -s "$artifact"
 
-qmp_socket="$run_dir/qmp.sock"
+failure_stage=qmp-runtime-setup
+qmp_runtime_dir=$(python3 "$repo_root/scripts/desktop/create-qmp-runtime-dir.py")
+qmp_socket="$qmp_runtime_dir/qmp.sock"
 serial_log="$run_dir/serial.log"
 disk_image="$run_dir/disk.img"
 frame="$run_dir/frame.ppm"
 
+failure_stage=disk-setup
 qemu-img create -q -f raw "$disk_image" 64M
 mkfs.fat -F 32 "$disk_image" >"$run_dir/mkfs.log"
 
@@ -128,19 +226,12 @@ else
     qemu_args+=(-nic none)
 fi
 
-qemu_pid=
-cleanup() {
-    if [[ -n "$qemu_pid" ]] && kill -0 "$qemu_pid" 2>/dev/null; then
-        kill "$qemu_pid" 2>/dev/null || true
-        wait "$qemu_pid" 2>/dev/null || true
-    fi
-}
-trap cleanup EXIT INT TERM
-
 printf 'QEMU_RUN_DIR=%s\n' "$run_dir"
+failure_stage=qemu-boot
 timeout --signal=TERM --kill-after=5 "$timeout_seconds" \
     "$qemu_binary" "${qemu_args[@]}" >"$serial_log" 2>&1 &
 qemu_pid=$!
+qemu_started=true
 
 boot_deadline=$((SECONDS + 35))
 while ! grep -q 'ORAYS_DESKTOP_FRAME boot ' "$serial_log" 2>/dev/null; do
@@ -164,6 +255,7 @@ if [[ -z "$display_width" || -z "$display_height" ]]; then
     exit 1
 fi
 printf 'DISPLAY_GEOMETRY=%sx%s\n' "$display_width" "$display_height" >"$run_dir/display-geometry.txt"
+initial_display_marker="ORAYS_DESKTOP_DISPLAY width=${display_width} height=${display_height}"
 
 input_deadline=$((SECONDS + 10))
 while ! grep -aFq 'ORAYS_DESKTOP_INPUT_READY devices=2' "$serial_log" 2>/dev/null; do
@@ -179,8 +271,7 @@ while ! grep -aFq 'ORAYS_DESKTOP_INPUT_READY devices=2' "$serial_log" 2>/dev/nul
     sleep 0.2
 done
 
-sequence="$repo_root/test/desktop/fixtures/input/${scenario}.json"
-cp "$sequence" "$run_dir/input-sequence.json"
+failure_stage=input-injection
 if [[ "$scenario" != resize ]]; then
     python3 "$repo_root/scripts/desktop/inject-input.py" \
         --sequence "$run_dir/input-sequence.json" \
@@ -192,6 +283,7 @@ if [[ "$scenario" != resize ]]; then
 fi
 
 if [[ "$scenario" == resize ]]; then
+    failure_stage=runtime-resize
     resize_width=900
     resize_height=650
     python3 "$repo_root/scripts/desktop/vnc-resize.py" \
@@ -242,6 +334,7 @@ if [[ "$scenario" == resize ]]; then
 fi
 
 if [[ "$scenario" != boot ]]; then
+    failure_stage=guest-action
     expected_marker=
     case "$scenario" in
         launcher) expected_marker='ORAYS_DESKTOP_ACTION LAUNCHER OPEN' ;;
@@ -288,8 +381,18 @@ if [[ "$scenario" == launcher ]]; then
         --stable-marker "$stable_marker"
         --precondition-output "$run_dir/capture-precondition.json"
     )
+else
+    capture_precondition_args=(
+        --serial-log "$serial_log"
+        --required-marker "$initial_display_marker"
+        --precondition-output "$run_dir/capture-precondition.json"
+    )
+    if [[ "$scenario" != boot ]]; then
+        capture_precondition_args+=(--required-marker "$expected_marker")
+    fi
 fi
 
+failure_stage=frame-capture
 python3 "$repo_root/scripts/desktop/qmp_screendump.py" \
     --socket "$qmp_socket" \
     --output "$frame" \
@@ -298,12 +401,11 @@ python3 "$repo_root/scripts/desktop/qmp_screendump.py" \
     "${capture_precondition_args[@]}" \
     --quit-after
 
+failure_stage=qemu-shutdown
 qemu_exit=0
 wait "$qemu_pid" || qemu_exit=$?
 qemu_pid=
-python3 "$repo_root/scripts/desktop/summarize-run.py" \
-    --run-dir "$run_dir" \
-    --arch "$arch" \
-    --scenario "$scenario" \
-    --qemu-exit "$qemu_exit"
-trap - EXIT INT TERM
+if (( qemu_exit != 0 )); then
+    exit 1
+fi
+failure_stage=complete

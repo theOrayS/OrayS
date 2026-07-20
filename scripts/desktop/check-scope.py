@@ -100,10 +100,17 @@ def default_base(root: Path) -> str:
 def changed_paths(root: Path, base: str) -> set[str]:
     paths: set[str] = set()
     commands = (
-        ("git", "diff", "--name-only", f"{base}...HEAD"),
-        ("git", "diff", "--name-only"),
-        ("git", "diff", "--name-only", "--cached"),
-        ("git", "ls-files", "--others", "--exclude-standard"),
+        ("git", "-c", "core.quotepath=false", "diff", "--name-only", f"{base}...HEAD"),
+        ("git", "-c", "core.quotepath=false", "diff", "--name-only"),
+        ("git", "-c", "core.quotepath=false", "diff", "--name-only", "--cached"),
+        (
+            "git",
+            "-c",
+            "core.quotepath=false",
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+        ),
     )
     for cmd in commands:
         for line in run(*cmd, cwd=root).splitlines():

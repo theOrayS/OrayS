@@ -8,7 +8,21 @@ import hashlib
 import json
 import re
 from pathlib import Path
+import sys
 from typing import Any
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from runtime_evidence_contract import (  # noqa: E402
+    RUNTIME_METADATA_SCHEMA,
+    RUN_SUMMARY_SCHEMA,
+    default_failure_reason,
+    qemu_version_is_canonical,
+    validate_runtime_status,
+)
 
 
 EXPECTED_MARKERS = {
@@ -35,6 +49,13 @@ POST_ACTION_STABLE_MARKERS = {
     ),
 }
 
+CAPTURE_READY_MARKERS = {
+    "boot": [],
+    "overlap": ["ORAYS_DESKTOP_ACTION ALT_TAB reverse=false"],
+    "applications": ["ORAYS_DESKTOP_ACTION THEME Light"],
+    "resize": ["ORAYS_DESKTOP_DISPLAY_CHANGED width=900 height=650"],
+}
+
 
 def digest(path: Path) -> str:
     value = hashlib.sha256()
@@ -42,6 +63,94 @@ def digest(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             value.update(chunk)
     return value.hexdigest()
+
+
+def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or value.get("schema") != RUNTIME_METADATA_SCHEMA:
+        raise ValueError("runtime metadata schema is invalid")
+    if value.get("architecture") != arch or value.get("scenario") != scenario:
+        raise ValueError("runtime metadata architecture or scenario is invalid")
+    before_commit = value.get("source_commit_before")
+    after_commit = value.get("source_commit_after")
+    before_status = value.get("source_status_before")
+    after_status = value.get("source_status_after")
+    if any(
+        re.fullmatch(r"[0-9a-f]{40}", str(commit)) is None
+        for commit in (before_commit, after_commit)
+    ):
+        raise ValueError("runtime metadata source commits are invalid")
+    if not all(
+        isinstance(status, list) and all(isinstance(line, str) for line in status)
+        for status in (before_status, after_status)
+    ):
+        raise ValueError("runtime metadata source statuses are invalid")
+    if any(
+        not isinstance(value.get(name), bool)
+        for name in ("source_dirty_before", "source_dirty_after", "provenance_stable")
+    ):
+        raise ValueError("runtime metadata provenance flags are invalid")
+    if (
+        value.get("source_dirty_before") != bool(before_status)
+        or value.get("source_dirty_after") != bool(after_status)
+    ):
+        raise ValueError("runtime metadata dirty flags disagree with source statuses")
+    if (
+        value.get("source_commit") != before_commit
+        or value.get("source_status") != before_status
+        or value.get("source_dirty") != value.get("source_dirty_before")
+    ):
+        raise ValueError("runtime metadata compatibility source fields disagree")
+    expected_stable = (
+        before_commit == after_commit
+        and before_status == after_status
+        and not before_status
+        and not after_status
+    )
+    if value.get("provenance_stable") is not expected_stable:
+        raise ValueError("runtime metadata provenance_stable is inconsistent")
+    errors = value.get("collection_errors")
+    if not isinstance(errors, list) or not all(isinstance(error, str) for error in errors):
+        raise ValueError("runtime metadata collection errors are invalid")
+    if errors:
+        raise ValueError("runtime metadata collection was incomplete: " + "; ".join(errors))
+    if not expected_stable:
+        raise ValueError("source commit or status changed during the run")
+    run_dir_value = value.get("run_dir")
+    if not isinstance(run_dir_value, str) or not Path(run_dir_value).is_absolute():
+        raise ValueError("runtime metadata run directory is invalid")
+    if not isinstance(value.get("qemu_binary"), str) or not value.get("qemu_version"):
+        raise ValueError("runtime metadata QEMU identity is invalid")
+    required_qemu_version = value.get("required_qemu_version")
+    observed_qemu_version = value.get("observed_qemu_version")
+    expected_version_match = qemu_version_is_canonical(
+        required_qemu_version, observed_qemu_version
+    )
+    if value.get("qemu_version") != observed_qemu_version:
+        raise ValueError("runtime metadata observed QEMU version fields disagree")
+    if value.get("qemu_version_matches_required") is not expected_version_match:
+        raise ValueError("runtime metadata QEMU version match flag is inconsistent")
+    if not expected_version_match:
+        raise ValueError(
+            "QEMU version mismatch: "
+            f"required {required_qemu_version}, observed {observed_qemu_version}"
+        )
+    toolchains = value.get("toolchain_versions")
+    if not isinstance(toolchains, dict) or any(
+        not isinstance(toolchains.get(name), str) or not toolchains[name]
+        for name in ("rustc", "cargo", "python")
+    ):
+        raise ValueError("runtime metadata toolchain versions are invalid")
+    command = value.get("generation_command")
+    if not isinstance(command, list) or command[:5] != [
+        "scripts/desktop/run-headless-qemu.sh",
+        "--arch",
+        arch,
+        "--scenario",
+        scenario,
+    ]:
+        raise ValueError("runtime metadata generation command is invalid")
+    return value
 
 
 def validate_capture_precondition(
@@ -76,6 +185,44 @@ def validate_capture_precondition(
         raise ValueError("capture precondition stable line is missing or ambiguous")
     if stable_lines[0] <= action_lines[0]:
         raise ValueError("capture precondition stable marker is not after the action")
+
+
+def validate_required_markers_precondition(
+    path: Path,
+    serial_path: Path,
+    required_markers: list[str],
+) -> None:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != 1
+        or value.get("kind") != "required-markers"
+    ):
+        raise ValueError("capture marker precondition schema is invalid")
+    prefix_size = value.get("serial_prefix_bytes")
+    if not isinstance(prefix_size, int) or prefix_size <= 0:
+        raise ValueError("capture marker precondition serial prefix size is invalid")
+    serial = serial_path.read_bytes()
+    if prefix_size > len(serial):
+        raise ValueError("capture marker precondition prefix exceeds the final log")
+    prefix = serial[:prefix_size]
+    if hashlib.sha256(prefix).hexdigest() != value.get("serial_prefix_sha256"):
+        raise ValueError("capture marker precondition prefix hash does not match")
+    lines = prefix.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
+    records = value.get("markers")
+    if not isinstance(records, list) or len(records) != len(required_markers):
+        raise ValueError("capture marker precondition list is invalid")
+    previous_line = 0
+    for marker, record in zip(required_markers, records, strict=True):
+        matches = [index for index, line in enumerate(lines, 1) if line == marker]
+        if (
+            len(matches) != 1
+            or not isinstance(record, dict)
+            or record != {"marker": marker, "line": matches[0]}
+            or matches[0] <= previous_line
+        ):
+            raise ValueError("capture marker precondition is missing, ambiguous, or unordered")
+        previous_line = matches[0]
 
 
 def validate_presented_input_order(
@@ -225,7 +372,11 @@ def validate_input_evidence(
             raise ValueError("input QMP command does not match the sequence")
 
 
-def validate_capture_evidence(transcript_path: Path, screenshot: Path) -> None:
+def validate_capture_evidence(
+    transcript_path: Path,
+    screenshot: Path,
+    original_screenshot: Path | None = None,
+) -> None:
     commands = successful_qmp_commands(transcript_path)
     if [command.get("execute") for command in commands] != [
         "qmp_capabilities",
@@ -234,7 +385,8 @@ def validate_capture_evidence(transcript_path: Path, screenshot: Path) -> None:
     ]:
         raise ValueError("capture QMP command sequence is invalid")
     filename = commands[1].get("arguments", {}).get("filename")
-    if not isinstance(filename, str) or Path(filename).resolve() != screenshot.resolve():
+    expected_target = original_screenshot or screenshot
+    if not isinstance(filename, str) or Path(filename).resolve() != expected_target.resolve():
         raise ValueError("screendump target does not match the captured frame")
 
 
@@ -286,19 +438,35 @@ def validate_run(
     run_dir: Path,
     arch: str,
     scenario: str,
-    qemu_exit: int,
+    qemu_exit: int | None,
+    *,
+    qemu_started: bool = True,
+    original_screenshot: Path | None = None,
+    additional_failures: list[str] | None = None,
 ) -> tuple[list[str], tuple[int, int] | None, dict[str, str]]:
     serial = run_dir / "serial.log"
     screenshot = run_dir / "frame.ppm"
     capture_transcript = run_dir / "qmp-capture.jsonl"
     input_transcript = run_dir / "qmp-input.jsonl"
     sequence = run_dir / "input-sequence.json"
+    metadata_path = run_dir / "runtime-metadata.json"
 
-    failures: list[str] = []
+    failures: list[str] = list(additional_failures or [])
+    try:
+        validate_runtime_metadata(metadata_path, arch, scenario)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        failures.append(f"invalid runtime metadata: {error}")
     serial_text = serial.read_text(encoding="utf-8", errors="replace") if serial.exists() else ""
     serial_lines = serial_text.replace("\x00", "").splitlines()
-    if qemu_exit != 0:
-        failures.append(f"qemu exit was {qemu_exit}, expected 0")
+    if qemu_started:
+        if not isinstance(qemu_exit, int):
+            failures.append("QEMU started but exit status is unavailable")
+        elif qemu_exit != 0:
+            failures.append(f"qemu exit was {qemu_exit}, expected 0")
+    elif qemu_exit is not None:
+        failures.append("QEMU was not started but an exit status was recorded")
+    else:
+        failures.append("QEMU was not started")
     if "ORAYS_DESKTOP_FRAME boot " not in serial_text:
         failures.append("guest boot frame marker missing")
     if "ORAYS_DESKTOP_INPUT_READY devices=2" not in serial_lines:
@@ -372,6 +540,30 @@ def validate_run(
     elif changed_geometries:
         failures.append("unexpected guest runtime resize marker")
 
+    if stable_pair is None and initial_geometry is not None:
+        required_markers = [
+            f"ORAYS_DESKTOP_DISPLAY width={initial_geometry[0]} height={initial_geometry[1]}",
+            *CAPTURE_READY_MARKERS[scenario],
+        ]
+        try:
+            validate_required_markers_precondition(
+                run_dir / "capture-precondition.json", serial, required_markers
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            failures.append(f"invalid capture precondition evidence: {error}")
+
+    try:
+        geometry_text = (run_dir / "display-geometry.txt").read_text(encoding="utf-8")
+        expected_geometry_text = (
+            f"DISPLAY_GEOMETRY={display_geometry[0]}x{display_geometry[1]}\n"
+            if display_geometry is not None
+            else None
+        )
+        if expected_geometry_text is None or geometry_text != expected_geometry_text:
+            raise ValueError("display geometry sidecar does not match guest markers")
+    except (OSError, ValueError) as error:
+        failures.append(f"invalid display geometry evidence: {error}")
+
     geometry: tuple[int, int] | None = None
     try:
         geometry = ppm_geometry(screenshot)
@@ -394,7 +586,7 @@ def validate_run(
         except (OSError, ValueError, json.JSONDecodeError) as error:
             failures.append(f"invalid input evidence: {error}")
     try:
-        validate_capture_evidence(capture_transcript, screenshot)
+        validate_capture_evidence(capture_transcript, screenshot, original_screenshot)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         failures.append(f"invalid capture evidence: {error}")
 
@@ -404,9 +596,10 @@ def validate_run(
         "qmp-input.jsonl",
         "input-sequence.json",
         "frame.ppm",
+        "runtime-metadata.json",
+        "display-geometry.txt",
+        "capture-precondition.json",
     ]
-    if scenario in POST_ACTION_STABLE_MARKERS:
-        evidence_names.append("capture-precondition.json")
     if scenario == "resize":
         evidence_names.append("vnc-resize.json")
     hashes = {
@@ -417,22 +610,70 @@ def validate_run(
     return failures, geometry, hashes
 
 
+def parse_bool(value: str) -> bool:
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise argparse.ArgumentTypeError("expected true or false")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--arch", choices=("rv", "la"), required=True)
     parser.add_argument("--scenario", choices=tuple(EXPECTED_MARKERS), required=True)
-    parser.add_argument("--qemu-exit", type=int, required=True)
+    parser.add_argument("--qemu-started", type=parse_bool, default=True)
+    parser.add_argument("--qemu-exit", type=int)
+    parser.add_argument("--runner-exit", type=int, default=0)
+    parser.add_argument("--failure-stage")
+    parser.add_argument("--failure-reason")
     args = parser.parse_args()
+    if args.qemu_started and args.qemu_exit is None:
+        parser.error("--qemu-exit is required when --qemu-started=true")
+    if not args.qemu_started and args.qemu_exit is not None:
+        parser.error("--qemu-exit must be omitted when --qemu-started=false")
+
+    failure_stage = args.failure_stage
+    if failure_stage is None and args.runner_exit == 0:
+        failure_stage = "complete"
+    failure_reason = args.failure_reason
+    if failure_reason is None and failure_stage is not None:
+        try:
+            failure_reason = default_failure_reason(failure_stage, args.runner_exit)
+        except ValueError as error:
+            parser.error(str(error))
+    try:
+        validate_runtime_status(
+            qemu_started=args.qemu_started,
+            qemu_exit=args.qemu_exit,
+            runner_exit=args.runner_exit,
+            failure_stage=failure_stage,
+            failure_reason=failure_reason,
+        )
+    except ValueError as error:
+        parser.error(str(error))
 
     run_dir = args.run_dir.resolve()
+    additional_failures = []
+    if args.runner_exit != 0:
+        additional_failures.append(
+            f"runtime runner exited {args.runner_exit} during stage {failure_stage}"
+        )
     failures, geometry, hashes = validate_run(
         run_dir,
         args.arch,
         args.scenario,
         args.qemu_exit,
+        qemu_started=args.qemu_started,
+        additional_failures=additional_failures,
     )
-    serial_text = (run_dir / "serial.log").read_text(encoding="utf-8", errors="replace")
+    serial_path = run_dir / "serial.log"
+    serial_text = (
+        serial_path.read_text(encoding="utf-8", errors="replace")
+        if serial_path.is_file()
+        else ""
+    )
     (run_dir / "hashes.sha256").write_text(
         "".join(f"{value}  {name}\n" for name, value in sorted(hashes.items())),
         encoding="utf-8",
@@ -440,11 +681,15 @@ def main() -> int:
 
     result = "PASS" if not failures else "FAIL"
     summary = {
-        "schema": 1,
+        "schema": RUN_SUMMARY_SCHEMA,
         "result": result,
         "architecture": args.arch,
         "scenario": args.scenario,
+        "qemu_started": args.qemu_started,
         "qemu_exit": args.qemu_exit,
+        "runner_exit": args.runner_exit,
+        "failure_stage": failure_stage,
+        "failure_reason": failure_reason,
         "frame_marker_count": serial_text.count("ORAYS_DESKTOP_FRAME "),
         "input_marker_count": serial_text.count("ORAYS_DESKTOP_INPUT "),
         "post_action_state_marker_count": serial_text.count(

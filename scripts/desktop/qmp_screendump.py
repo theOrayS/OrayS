@@ -50,6 +50,37 @@ def record_capture_precondition(
     output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def record_required_markers_precondition(
+    serial_log: Path,
+    required_markers: list[str],
+    output: Path,
+) -> None:
+    serial_prefix = serial_log.read_bytes()
+    lines = serial_prefix.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
+    records: list[dict[str, Any]] = []
+    previous_line = 0
+    for marker in required_markers:
+        matches = [index for index, line in enumerate(lines, 1) if line == marker]
+        if len(matches) != 1:
+            raise QmpError(
+                f"capture precondition requires exactly one marker {marker!r}, "
+                f"got {len(matches)}"
+            )
+        if matches[0] <= previous_line:
+            raise QmpError("capture precondition markers are not in required order")
+        records.append({"marker": marker, "line": matches[0]})
+        previous_line = matches[0]
+    value = {
+        "schema": 1,
+        "kind": "required-markers",
+        "markers": records,
+        "serial_prefix_bytes": len(serial_prefix),
+        "serial_prefix_sha256": hashlib.sha256(serial_prefix).hexdigest(),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def recv_message(stream, transcript: list[dict[str, Any]]) -> dict[str, Any]:
     while True:
         line = stream.readline()
@@ -86,6 +117,7 @@ def main() -> int:
     parser.add_argument("--action-marker")
     parser.add_argument("--stable-marker")
     parser.add_argument("--precondition-output", type=Path)
+    parser.add_argument("--required-marker", action="append", default=[])
     args = parser.parse_args()
 
     precondition_values = (
@@ -94,13 +126,23 @@ def main() -> int:
         args.stable_marker,
         args.precondition_output,
     )
-    if any(value is not None for value in precondition_values) and not all(
-        value is not None for value in precondition_values
+    legacy_precondition = any(value is not None for value in precondition_values)
+    if (
+        legacy_precondition
+        and not args.required_marker
+        and not all(value is not None for value in precondition_values)
     ):
         parser.error(
             "--serial-log, --action-marker, --stable-marker, and "
             "--precondition-output must be provided together"
         )
+    if args.required_marker:
+        if args.action_marker is not None or args.stable_marker is not None:
+            parser.error("--required-marker cannot be combined with action/stable markers")
+        if args.serial_log is None or args.precondition_output is None:
+            parser.error(
+                "--required-marker requires --serial-log and --precondition-output"
+            )
 
     socket_path = Path(args.socket)
     output = Path(args.output).resolve()
@@ -125,7 +167,13 @@ def main() -> int:
 
             send_message(stream, {"execute": "qmp_capabilities"}, transcript)
             time.sleep(max(args.settle, 0.0))
-            if args.serial_log is not None:
+            if args.required_marker:
+                record_required_markers_precondition(
+                    args.serial_log,
+                    args.required_marker,
+                    args.precondition_output,
+                )
+            elif args.serial_log is not None:
                 record_capture_precondition(
                     args.serial_log,
                     args.action_marker,

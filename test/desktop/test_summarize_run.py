@@ -58,6 +58,52 @@ class SummarizeRunTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        (run / "display-geometry.txt").write_text(
+            "DISPLAY_GEOMETRY=2x2\n", encoding="utf-8"
+        )
+        (run / "runtime-metadata.json").write_text(
+            json.dumps(
+                {
+                    "schema": 3,
+                    "created_at_utc": "2026-07-19T00:00:00+00:00",
+                    "finalized_at_utc": "2026-07-19T00:01:00+00:00",
+                    "source_commit": "a" * 40,
+                    "source_dirty": False,
+                    "source_status": [],
+                    "source_commit_before": "a" * 40,
+                    "source_dirty_before": False,
+                    "source_status_before": [],
+                    "source_commit_after": "a" * 40,
+                    "source_dirty_after": False,
+                    "source_status_after": [],
+                    "provenance_stable": True,
+                    "collection_errors": [],
+                    "architecture": "rv",
+                    "scenario": "launcher",
+                    "run_dir": str(run),
+                    "qemu_binary": "/usr/bin/qemu-system-riscv64",
+                    "qemu_version": "QEMU emulator version 9.2.4",
+                    "required_qemu_version": "9.2.4",
+                    "observed_qemu_version": "QEMU emulator version 9.2.4",
+                    "qemu_version_matches_required": True,
+                    "toolchain_versions": {
+                        "rustc": "rustc test",
+                        "cargo": "cargo test",
+                        "python": "Python 3.10",
+                    },
+                    "generation_command": [
+                        "scripts/desktop/run-headless-qemu.sh",
+                        "--arch",
+                        "rv",
+                        "--scenario",
+                        "launcher",
+                        "--output",
+                        "test/output/desktop/run",
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         serial = (run / "serial.log").read_bytes()
         (run / "capture-precondition.json").write_text(
             json.dumps(
@@ -126,6 +172,8 @@ class SummarizeRunTests(unittest.TestCase):
                 "input-sequence.json",
                 "frame.ppm",
                 "capture-precondition.json",
+                "runtime-metadata.json",
+                "display-geometry.txt",
             })
 
     def test_cli_writes_pass_summary_for_complete_evidence(self) -> None:
@@ -152,8 +200,110 @@ class SummarizeRunTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             summary = json.loads((run / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["schema"], 2)
             self.assertEqual(summary["result"], "PASS")
+            self.assertEqual(summary["failure_stage"], "complete")
+            self.assertEqual(summary["failure_reason"], "none")
             self.assertEqual(summary["post_action_state_marker_count"], 1)
+
+    def test_qemu_not_started_cannot_pass_with_complete_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCRIPT),
+                    "--run-dir",
+                    str(run),
+                    "--arch",
+                    "rv",
+                    "--scenario",
+                    "launcher",
+                    "--qemu-started",
+                    "false",
+                    "--runner-exit",
+                    "0",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            if (run / "summary.json").exists():
+                summary = json.loads((run / "summary.json").read_text(encoding="utf-8"))
+                self.assertEqual(summary["result"], "FAIL")
+
+    def test_status_tokens_reject_empty_illegal_unknown_and_inconsistent_values(self) -> None:
+        cases = (
+            ("", "qemu_version_mismatch"),
+            ("   ", "qemu_version_mismatch"),
+            ("runtime prerequisites", "qemu_version_mismatch"),
+            ("unknown-stage", "qemu_version_mismatch"),
+            ("runtime-prerequisites", ""),
+            ("runtime-prerequisites", "   "),
+            ("runtime-prerequisites", "reason with spaces"),
+            ("runtime-prerequisites", "desktop_build_failure"),
+        )
+        for stage, reason in cases:
+            with self.subTest(stage=stage, reason=reason), tempfile.TemporaryDirectory() as directory:
+                run = self.make_run(Path(directory))
+                (run / "summary.json").unlink(missing_ok=True)
+                (run / "hashes.sha256").unlink(missing_ok=True)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCRIPT),
+                        "--run-dir",
+                        str(run),
+                        "--arch",
+                        "rv",
+                        "--scenario",
+                        "launcher",
+                        "--qemu-started",
+                        "false",
+                        "--runner-exit",
+                        "3",
+                        "--failure-stage",
+                        stage,
+                        "--failure-reason",
+                        reason,
+                    ],
+                    check=False,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertFalse((run / "summary.json").exists())
+
+    def test_only_exact_canonical_qemu_version_is_accepted(self) -> None:
+        cases = (
+            ("9.2.4", "QEMU emulator version 9.2.40"),
+            ("9.2.4", "QEMU emulator version 9.2.4-rc0"),
+            ("6.2.0", "QEMU emulator version 6.2.0"),
+        )
+        for required, observed in cases:
+            with self.subTest(required=required, observed=observed), tempfile.TemporaryDirectory() as directory:
+                run = self.make_run(Path(directory))
+                metadata_path = run / "runtime-metadata.json"
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                metadata.update(
+                    {
+                        "required_qemu_version": required,
+                        "observed_qemu_version": observed,
+                        "qemu_version": observed,
+                        "qemu_version_matches_required": True,
+                    }
+                )
+                metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+                failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+                self.assertTrue(
+                    any("QEMU version" in failure for failure in failures),
+                    failures,
+                )
 
     def test_missing_stable_marker_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -167,6 +317,17 @@ class SummarizeRunTests(unittest.TestCase):
             )
             failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
             self.assertTrue(any("stable marker" in failure for failure in failures))
+
+    def test_source_change_during_run_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            path = run / "runtime-metadata.json"
+            metadata = json.loads(path.read_text(encoding="utf-8"))
+            metadata["source_commit_after"] = "b" * 40
+            metadata["provenance_stable"] = False
+            path.write_text(json.dumps(metadata), encoding="utf-8")
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(any("changed during the run" in failure for failure in failures))
 
     def test_stable_marker_before_action_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -237,6 +398,22 @@ class SummarizeRunTests(unittest.TestCase):
                     "ORAYS_DESKTOP_STATE LAUNCHER OPEN_STABLE",
                     root / "capture-precondition.json",
                 )
+
+    def test_generic_capture_precondition_binds_ordered_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            serial = root / "serial.log"
+            markers = ["DISPLAY READY", "ACTION COMPLETE"]
+            serial.write_text("DISPLAY READY\nACTION COMPLETE\n", encoding="utf-8")
+            precondition = root / "capture-precondition.json"
+            QMP_MODULE.record_required_markers_precondition(
+                serial, markers, precondition
+            )
+            with serial.open("a", encoding="utf-8") as stream:
+                stream.write("QEMU shutdown completed\n")
+            MODULE.validate_required_markers_precondition(
+                precondition, serial, markers
+            )
 
     def test_resize_input_marker_requires_a_preceding_presented_frame(self) -> None:
         display = "ORAYS_DESKTOP_DISPLAY_CHANGED width=900 height=650"

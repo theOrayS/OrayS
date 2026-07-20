@@ -14,6 +14,7 @@ concurrency:
 
 env:
   FIXED_RUST_TOOLCHAIN: nightly-2025-05-20
+  FIXED_QEMU_VERSION: 9.2.4
 
 jobs:
   desktop:
@@ -50,3 +51,43 @@ jobs:
           scripts/desktop/build.sh la
       - name: Enforce desktop isolation budget
         run: python3 scripts/desktop/check-scope.py
+
+  desktop-runtime:
+    name: Fixed-QEMU ${{ matrix.arch }} desktop boot (trusted runtime)
+    needs: desktop
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+      (github.ref == 'refs/heads/feature/orays-desktop-environment' ||
+      github.ref == 'refs/heads/develop/post-integration-next'))
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [rv, la]
+    runs-on: [self-hosted, Linux, X64, orays-desktop-qemu-9.2.4]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
+          components: rust-src, llvm-tools
+          targets: riscv64gc-unknown-none-elf, loongarch64-unknown-none-softfloat
+      - name: Run required architecture boot smoke
+        env:
+          DESKTOP_QEMU_TIMEOUT_SECS: 120
+          DESKTOP_REQUIRED_QEMU_VERSION: ${{ env.FIXED_QEMU_VERSION }}
+        run: >-
+          scripts/desktop/run-headless-qemu.sh
+          --arch ${{ matrix.arch }} --scenario boot
+          --output test/output/desktop/ci/${{ matrix.arch }}-boot
+      - name: Upload auditable raw boot evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desktop-runtime-${{ matrix.arch }}-${{ github.sha }}
+          path: test/output/desktop/ci/${{ matrix.arch }}-boot/review-package
+          if-no-files-found: error
+          retention-days: 14
