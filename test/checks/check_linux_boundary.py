@@ -17,14 +17,14 @@ METADATA_REL = USPACE_REL / "syscall_metadata.rs"
 DISPATCH_REL = USPACE_REL / "syscall_dispatch.rs"
 
 LEGACY_CALLER_INVENTORY = {
-    "validate_user_read": (21, 6),
+    "validate_user_read": (19, 5),
     "validate_user_write": (49, 10),
     "fault_in_user_read": (5, 2),
     "fault_in_user_write": (3, 1),
     "read_user_bytes_into": (11, 3),
-    "read_user_bytes": (34, 11),
+    "read_user_bytes": (35, 11),
     "write_user_bytes": (47, 12),
-    "read_user_value": (92, 17),
+    "read_user_value": (91, 17),
     "write_user_value": (118, 18),
     "read_cstr": (46, 6),
 }
