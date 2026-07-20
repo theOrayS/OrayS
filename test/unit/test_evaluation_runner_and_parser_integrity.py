@@ -165,6 +165,19 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("PASS", result.stdout)
 
+    def test_detects_missing_system_information_path_applets(self) -> None:
+        for applet in ("df", "nproc"):
+            with self.subTest(applet=applet):
+                tree = self.make_tree()
+                path = tree / "user/shell/src/cmd.rs"
+                text = path.read_text(encoding="utf-8")
+                token = f'"{applet}", '
+                self.assertIn(token, text)
+                path.write_text(text.replace(token, "", 1), encoding="utf-8")
+                result = self.run_guard(tree)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"BusyBox {applet} applet", result.stdout)
+
     def test_official_executor_absolutizes_paths_and_fixes_consumed_resources(self) -> None:
         directory, environment, args_log, environment_log = self.fake_official_environment()
         blacklist_directory = directory / "blacklists"

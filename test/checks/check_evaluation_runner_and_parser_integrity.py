@@ -65,6 +65,11 @@ def rust_function_names(text: str) -> set[str]:
 def scan_busybox_runtime_boundary(root: Path) -> list[str]:
     findings: list[str] = []
     cmd = read(root / "user/shell/src/cmd.rs")
+    path_applet_match = re.search(
+        r"const\s+PATH_BUSYBOX_APPLETS\s*:\s*&\[&str\]\s*=\s*&\[(?P<body>.*?)\];",
+        cmd,
+        flags=re.S,
+    )
     runtime_wrappers = function_block(cmd, "ensure_runtime_busybox_wrappers")
     suite_runtime_wrappers = function_block(cmd, "prepare_suite_runtime_busybox_wrappers")
     autorun_body = function_body(cmd, "maybe_run_official_tests")
@@ -79,6 +84,16 @@ def scan_busybox_runtime_boundary(root: Path) -> list[str]:
     ):
         if token not in cmd:
             findings.append(f"user/shell/src/cmd.rs: missing filesystem-visible busybox wrapper support token {token}")
+    if path_applet_match is None:
+        findings.append("user/shell/src/cmd.rs: missing PATH_BUSYBOX_APPLETS definition")
+    else:
+        path_applets = path_applet_match.group("body")
+        for applet in ("df", "nproc"):
+            if f'"{applet}"' not in path_applets:
+                findings.append(
+                    "user/shell/src/cmd.rs: PATH_BUSYBOX_APPLETS must expose the real "
+                    f"BusyBox {applet} applet required by ordinary system-information commands"
+                )
     if not runtime_wrappers:
         findings.append("user/shell/src/cmd.rs: missing ensure_runtime_busybox_wrappers")
     else:
