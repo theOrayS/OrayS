@@ -114,6 +114,7 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
 
     let truncate = root.clone().lookup("/work/rename-src.txt").unwrap();
     let rename_peer = root.clone().lookup("/work/rename-src.txt").unwrap();
+    let replaced_destination = root.clone().lookup("/work/rename-dst.txt").unwrap();
     truncate.truncate(0).unwrap();
     assert_eq!(read_all(&root, "/work/rename-src.txt"), b"");
     assert_eq!(
@@ -140,6 +141,20 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
     assert_eq!(truncate.read_at(0, &mut open_data).unwrap(), 13);
     assert_eq!(&open_data, b"rename-source");
     assert_eq!(rename_peer.write_at(0, b"moved-").unwrap(), 6);
+    assert_eq!(read_all(&root, "/work/rename-dst.txt"), b"moved--source");
+    let mut replaced_data = [0; 15];
+    assert_eq!(
+        replaced_destination.read_at(0, &mut replaced_data).unwrap(),
+        15
+    );
+    assert_eq!(&replaced_data, b"old-destination");
+    assert_eq!(replaced_destination.write_at(0, b"detached").unwrap(), 8);
+    replaced_data.fill(0);
+    assert_eq!(
+        replaced_destination.read_at(0, &mut replaced_data).unwrap(),
+        15
+    );
+    assert_eq!(&replaced_data, b"detachedination");
     assert_eq!(read_all(&root, "/work/rename-dst.txt"), b"moved--source");
     root.remove("/work/rename-dst.txt").unwrap();
     assert!(matches!(
