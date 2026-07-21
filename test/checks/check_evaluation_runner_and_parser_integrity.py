@@ -209,6 +209,22 @@ def scan_cmd_rs(root: Path) -> list[str]:
     forbidden_functions = {
         token for token in forbidden_runner_rewrite_tokens if token.startswith(("rewrite_", "restore_", "normalize_", "prepare_"))
     }
+    for token, detail in (
+        (
+            'option_env!("OSCOMP_EXTRA_TESTSUITE_DIRS")',
+            "official autorun must consume adapter-provided additional suite directories",
+        ),
+        (
+            '"buildstorm" => BUILDSTORM_GROUP_TIMEOUT_SECS',
+            "BuildStorm must have an explicit in-kernel timeout instead of the generic group budget",
+        ),
+        (
+            "const BUILDSTORM_GROUP_TIMEOUT_SECS: u64 = 18_000",
+            "BuildStorm in-kernel timeout must cover its 14400-second compiler timeout and setup",
+        ),
+    ):
+        if token not in text:
+            findings.append(f"user/shell/src/cmd.rs: {detail}")
     for function_name in sorted(function_names & forbidden_functions):
         findings.append(
             f"user/shell/src/cmd.rs: forbidden suite/script-specific helper still defined: {function_name}"

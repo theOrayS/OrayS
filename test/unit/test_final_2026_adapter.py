@@ -17,6 +17,7 @@ from run_final_2026_evaluation import (
     OFFICIAL_SOURCE_URL,
     HostResources,
     InfrastructureError,
+    _closed_make_environment,
     build_make_command,
     load_image_manifest,
     require_buildstorm_host,
@@ -179,6 +180,16 @@ class Final2026AdapterTest(unittest.TestCase):
         self.assertIn("RV_MEM=1G", command)
         self.assertIn("OSCOMP_TEST_GROUPS=cagent", command)
         self.assertNotIn("LA_MEM=8G", command)
+
+    def test_buildstorm_compile_environment_discovers_script_and_preserves_timeout(self) -> None:
+        environment = _closed_make_environment("buildstorm")
+        self.assertEqual(environment["OSCOMP_EXTRA_TESTSUITE_DIRS"], "/scripts")
+        self.assertGreaterEqual(
+            int(environment["OSCOMP_GROUP_TIMEOUT_CEILING_SECS"]),
+            14_400,
+        )
+        cagent = _closed_make_environment("cagent")
+        self.assertNotIn("OSCOMP_EXTRA_TESTSUITE_DIRS", cagent)
 
 
 if __name__ == "__main__":
