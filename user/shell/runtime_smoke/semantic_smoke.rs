@@ -48,6 +48,7 @@ const SYS_MMAP: usize = 222;
 const SYS_MADVISE: usize = 233;
 const SYS_WAIT4: usize = 260;
 const SYS_RENAMEAT2: usize = 276;
+const SYS_STATX: usize = 291;
 const SYS_CLONE3: usize = 435;
 
 const NEG_ENOENT: isize = -2;
@@ -90,6 +91,11 @@ const PROT_WRITE: usize = 2;
 const MAP_PRIVATE: usize = 2;
 const MAP_ANONYMOUS: usize = 32;
 const MADV_DONTNEED: usize = 4;
+const AT_EMPTY_PATH: usize = 0x1000;
+const STATX_BASIC_STATS: usize = 0x07ff;
+const STATX_TYPE: u32 = 0x0001;
+const S_IFMT: u16 = 0o170000;
+const S_IFREG: u16 = 0o100000;
 const PAGE_BYTES: usize = 4096;
 const MADVISE_PROBE_BYTES: usize = 8 * 1024 * 1024;
 const MADVISE_PROBE_ITERATIONS: usize = 16;
@@ -166,6 +172,10 @@ const ASSERT_PROC_UPTIME: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PROC_UPTIME: &[u8] =
     b"PR3_SMOKE_V1 ASSERT proc_uptime PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_PROC_STATM: &[u8] = b"PR3_SMOKE_V1 ASSERT proc_statm PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_PROC_STATM: &[u8] = b"PR3_SMOKE_V1 ASSERT proc_statm PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=riscv64\n";
@@ -295,6 +305,36 @@ const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_PROC_UPTIME_ADVANCE: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL proc_uptime_advance arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_STATM_OPEN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_open arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_STATM_OPEN: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_open arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_STATM_STATX: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_statx arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_STATM_STATX: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_statx arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_STATM_READ: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_read arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_STATM_READ: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_read arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_STATM_CLOSE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_close arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_STATM_CLOSE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_close arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PROC_STATM_FORMAT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_format arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PROC_STATM_FORMAT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL proc_statm_format arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL madvise_dontneed arch=riscv64\n";
@@ -433,6 +473,14 @@ struct Timespec {
 
 enum ProcUptimeError {
     Open,
+    Read,
+    Close,
+    Format,
+}
+
+enum ProcStatmError {
+    Open,
+    Statx,
     Read,
     Close,
     Format,
@@ -763,6 +811,115 @@ fn fail_proc_uptime(error: ProcUptimeError, code: usize) -> ! {
         ProcUptimeError::Read => USER_FAIL_PROC_UPTIME_READ,
         ProcUptimeError::Close => USER_FAIL_PROC_UPTIME_CLOSE,
         ProcUptimeError::Format => USER_FAIL_PROC_UPTIME_FORMAT,
+    };
+    fail(marker, code)
+}
+
+fn parse_proc_statm(bytes: &[u8], length: usize) -> Option<[u64; 7]> {
+    if length > bytes.len() {
+        return None;
+    }
+    let mut values = [0_u64; 7];
+    let mut fields = 0_usize;
+    let mut value = 0_u64;
+    let mut in_field = false;
+    for byte in bytes.iter().take(length) {
+        if byte.is_ascii_whitespace() {
+            if in_field {
+                if fields >= values.len() {
+                    return None;
+                }
+                values[fields] = value;
+                fields += 1;
+                value = 0;
+                in_field = false;
+            }
+        } else {
+            if fields >= values.len() || !byte.is_ascii_digit() {
+                return None;
+            }
+            value = value.checked_mul(10)?.checked_add((byte - b'0') as u64)?;
+            in_field = true;
+        }
+    }
+    if in_field {
+        if fields >= values.len() {
+            return None;
+        }
+        values[fields] = value;
+        fields += 1;
+    }
+    (fields == values.len()).then_some(values)
+}
+
+fn read_proc_statm() -> Result<[u64; 7], ProcStatmError> {
+    let fd = openat(b"/proc/self/statm\0", O_RDONLY);
+    if fd < 0 {
+        return Err(ProcStatmError::Open);
+    }
+    let fd = fd as i32;
+
+    // Linux's statx structure is 256 bytes and naturally 8-byte aligned. Only the
+    // stable leading mask and mode fields are inspected here; the remaining words
+    // stay available for the kernel's complete ABI write.
+    let mut statx = [0_u64; 32];
+    // SAFETY: the empty path is a live NUL-terminated byte string, `statx` is an
+    // aligned writable 256-byte output object, and AT_EMPTY_PATH selects `fd`.
+    let statx_result = unsafe {
+        syscall6(
+            SYS_STATX,
+            fd as usize,
+            b"\0".as_ptr() as usize,
+            AT_EMPTY_PATH,
+            STATX_BASIC_STATS,
+            statx.as_mut_ptr() as usize,
+            0,
+        )
+    };
+    let statx_mask = statx[0] as u32;
+    let statx_mode = ((statx[3] >> 32) & u16::MAX as u64) as u16;
+    if statx_result != 0
+        || statx_mask & STATX_TYPE == 0
+        || statx_mode & S_IFMT != S_IFREG
+    {
+        let _ = close(fd);
+        return Err(ProcStatmError::Statx);
+    }
+
+    let mut buffer = [0_u8; 160];
+    let read = fd_read(fd, &mut buffer);
+    if read <= 0 || read as usize > buffer.len() {
+        let _ = close(fd);
+        return Err(ProcStatmError::Read);
+    }
+    if close(fd) != 0 {
+        return Err(ProcStatmError::Close);
+    }
+    let values = parse_proc_statm(&buffer, read as usize).ok_or(ProcStatmError::Format)?;
+    let [size, resident, shared, text, library, data, dirty] = values;
+    if size == 0
+        || resident == 0
+        || resident > size
+        || shared > resident
+        || text == 0
+        || text > size
+        || library != 0
+        || data == 0
+        || data > size
+        || dirty != 0
+    {
+        return Err(ProcStatmError::Format);
+    }
+    Ok(values)
+}
+
+fn fail_proc_statm(error: ProcStatmError, code: usize) -> ! {
+    let marker = match error {
+        ProcStatmError::Open => USER_FAIL_PROC_STATM_OPEN,
+        ProcStatmError::Statx => USER_FAIL_PROC_STATM_STATX,
+        ProcStatmError::Read => USER_FAIL_PROC_STATM_READ,
+        ProcStatmError::Close => USER_FAIL_PROC_STATM_CLOSE,
+        ProcStatmError::Format => USER_FAIL_PROC_STATM_FORMAT,
     };
     fail(marker, code)
 }
@@ -1852,6 +2009,13 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_PROC_UPTIME) != ASSERT_PROC_UPTIME.len() as isize {
         fail(USER_FAIL_WRITE, 234);
+    }
+
+    if let Err(error) = read_proc_statm() {
+        fail_proc_statm(error, 242);
+    }
+    if write(ASSERT_PROC_STATM) != ASSERT_PROC_STATM.len() as isize {
+        fail(USER_FAIL_WRITE, 243);
     }
 
     // Cargo/rustc allocators repeatedly discard private anonymous MAP_NORESERVE
