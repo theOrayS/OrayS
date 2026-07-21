@@ -75,6 +75,7 @@ const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
 const NEG_ENOTEMPTY: isize = -39;
+const NEG_ETIMEDOUT: isize = -110;
 const AT_FDCWD: isize = -100;
 const AT_REMOVEDIR: usize = 0x200;
 const O_RDONLY: usize = 0;
@@ -377,6 +378,12 @@ const ASSERT_FUTEX_SA_RESTART: &[u8] =
 const ASSERT_FUTEX_SA_RESTART: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_sa_restart PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_RELATIVE_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_relative_restart PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_RELATIVE_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_relative_restart PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -602,6 +609,12 @@ const USER_FAIL_FUTEX_SA_RESTART: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_SA_RESTART: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_sa_restart arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_RELATIVE_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_relative_restart arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_RELATIVE_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_relative_restart arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -2810,6 +2823,109 @@ fn run_futex_sa_restart_probe() -> bool {
         && unmapped
 }
 
+fn run_futex_relative_restart_probe() -> bool {
+    const WAIT_NANOSECONDS: u64 = 1_500_000_000;
+    const SIGNAL_DELAY_NANOSECONDS: i64 = 750_000_000;
+    const MIN_ELAPSED_NANOSECONDS: u64 = 1_250_000_000;
+    const MAX_ELAPSED_NANOSECONDS: u64 = 2_000_000_000;
+
+    let mapping = mmap_shared_anonymous(PAGE_BYTES);
+    if mapping <= 0 {
+        return false;
+    }
+    let shared_ptr = mapping as *mut FutexRestartShared;
+    // SAFETY: the fresh shared page is aligned, writable, and large enough for
+    // the complete object. It remains mapped until the child has been reaped.
+    unsafe {
+        shared_ptr.write(FutexRestartShared {
+            word: AtomicI32::new(0),
+            handler_entered: AtomicI32::new(0),
+        });
+    }
+    FUTEX_RESTART_SHARED_ADDR.store(mapping as usize, Ordering::Release);
+
+    let mut ready_pipe = [-1_i32; 2];
+    if pipe2(&mut ready_pipe, 0) != 0 {
+        FUTEX_RESTART_SHARED_ADDR.store(0, Ordering::Release);
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+    let child = fork_process();
+    if child == 0 {
+        let _ = close(ready_pipe[0]);
+        let action = KernelSigaction {
+            handler: futex_restart_signal_handler as usize,
+            flags: SA_RESTART,
+            mask: 0,
+        };
+        let timeout = Timespec {
+            seconds: (WAIT_NANOSECONDS / 1_000_000_000) as i64,
+            nanoseconds: (WAIT_NANOSECONDS % 1_000_000_000) as i64,
+        };
+        let Some(started) = monotonic_nanoseconds() else {
+            exit(54);
+        };
+        if rt_sigaction(SIGUSR1, &action) != 0 || pipe_write(ready_pipe[1], b"R") != 1 {
+            exit(55);
+        }
+        // SAFETY: the shared word and relative timespec remain aligned and live
+        // for the complete wait. No wake is issued: a standards-compliant
+        // SA_RESTART path must preserve the original deadline and return
+        // ETIMEDOUT, rather than EINTR or a fresh full-duration timeout.
+        let wait_result = unsafe {
+            syscall6(
+                SYS_FUTEX,
+                (*shared_ptr).word.as_ptr() as usize,
+                FUTEX_WAIT,
+                0,
+                &timeout as *const Timespec as usize,
+                0,
+                0,
+            )
+        };
+        let elapsed = monotonic_nanoseconds().and_then(|ended| ended.checked_sub(started));
+        let handled = unsafe { &*shared_ptr }
+            .handler_entered
+            .load(Ordering::Acquire)
+            == 1;
+        let closed = close(ready_pipe[1]) == 0;
+        exit(if wait_result == NEG_ETIMEDOUT
+            && handled
+            && elapsed.is_some_and(|duration| {
+                (MIN_ELAPSED_NANOSECONDS..=MAX_ELAPSED_NANOSECONDS).contains(&duration)
+            })
+            && closed
+        {
+            0
+        } else {
+            56
+        });
+    }
+
+    let parent_write_close = close(ready_pipe[1]);
+    if child < 0 || parent_write_close != 0 {
+        let _ = close(ready_pipe[0]);
+        FUTEX_RESTART_SHARED_ADDR.store(0, Ordering::Release);
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+    let mut ready = [0_u8; 1];
+    let ready_ok = fd_read(ready_pipe[0], &mut ready) == 1 && ready == [b'R'];
+    let signal_delay = Timespec {
+        seconds: 0,
+        nanoseconds: SIGNAL_DELAY_NANOSECONDS,
+    };
+    let signaled = ready_ok
+        && nanosleep(&signal_delay) == 0
+        && send_signal(child as usize, SIGUSR1) == 0;
+    let mut status = -1_i32;
+    let waited = wait_child(child, &mut status) == child;
+    let closed = close(ready_pipe[0]) == 0;
+    FUTEX_RESTART_SHARED_ADDR.store(0, Ordering::Release);
+    let unmapped = munmap(mapping as usize, PAGE_BYTES) == 0;
+    ready_ok && signaled && waited && status == 0 && closed && unmapped
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -3857,6 +3973,12 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FUTEX_SA_RESTART) != ASSERT_FUTEX_SA_RESTART.len() as isize {
         fail(USER_FAIL_WRITE, 344);
+    }
+    if !run_futex_relative_restart_probe() {
+        fail(USER_FAIL_FUTEX_RELATIVE_RESTART, 345);
+    }
+    if write(ASSERT_FUTEX_RELATIVE_RESTART) != ASSERT_FUTEX_RELATIVE_RESTART.len() as isize {
+        fail(USER_FAIL_WRITE, 346);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
