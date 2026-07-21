@@ -111,6 +111,42 @@ def scan(root: Path) -> list[str]:
         require(token in run_ltp, findings, f"LTP setup/selection failure path missing {token}")
     require("PASS LTP CASE" not in cmd, findings, "runner must not synthesize PASS LTP CASE")
 
+    program_loader = read(root, "user/shell/src/uspace/program_loader.rs")
+    effective_exec_root = function_block(program_loader, "effective_exec_root")
+    require(
+        "ld-linux-" not in effective_exec_root
+        and "ld-musl-" not in effective_exec_root
+        and "exec_loader_owned_string(path_root" in effective_exec_root,
+        findings,
+        "a rootfs ELF must retain its standard runtime root instead of being remapped by interpreter basename",
+    )
+
+    runtime_paths = read(root, "user/shell/src/uspace/runtime_paths.rs")
+    runtime_roots = function_block(runtime_paths, "runtime_root_candidates")
+    try_runtime_roots = function_block(runtime_paths, "try_runtime_root_candidates")
+    standard_root = runtime_roots.find('if exec_root == "/"')
+    glibc_fallback = runtime_roots.find("is_glibc_runtime_name")
+    require(
+        standard_root >= 0
+        and glibc_fallback >= 0
+        and standard_root < glibc_fallback
+        and "push(exec_root)" in runtime_roots[standard_root:glibc_fallback],
+        findings,
+        "bare runtime SONAME lookup must search the standard root before compatibility roots",
+    )
+    try_standard_root = try_runtime_roots.find('if exec_root == "/"')
+    try_glibc_fallback = try_runtime_roots.find("is_glibc_runtime_name")
+    require(
+        try_standard_root >= 0
+        and try_glibc_fallback >= 0
+        and try_standard_root < try_glibc_fallback
+        and "try_push_candidate_from_str" in try_runtime_roots[
+            try_standard_root:try_glibc_fallback
+        ],
+        findings,
+        "fallible runtime SONAME lookup must search the standard root before compatibility roots",
+    )
+
     utils = read(root, "api/arceos_posix_api/src/utils.rs")
     for token in ("validate_user_range", "checked_mul", "checked_add", "align_of", "user_ref"):
         require(token in utils, findings, f"user pointer helpers missing {token}")

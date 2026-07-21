@@ -16,6 +16,8 @@ TARGETS = [
     Path("Cargo.toml"),
     Path("kernel/fs/axfs/src/mounts.rs"),
     Path("user/shell/src/cmd.rs"),
+    Path("user/shell/src/uspace/program_loader.rs"),
+    Path("user/shell/src/uspace/runtime_paths.rs"),
     Path("api/arceos_posix_api/src/utils.rs"),
     Path("api/arceos_posix_api/src/imp/pthread/mutex.rs"),
     Path("api/arceos_posix_api/src/imp/task.rs"),
@@ -117,7 +119,6 @@ class ComplianceRegressionsGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("accept4", result.stdout)
-
 
 if __name__ == "__main__":
     unittest.main()
