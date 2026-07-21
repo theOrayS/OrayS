@@ -10,7 +10,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     format,
     string::{String, ToString},
-    sync::Arc,
+    sync::{Arc, Weak},
     vec::Vec,
 };
 use axfs_ramfs::RamFileSystem;
@@ -33,12 +33,25 @@ struct OverlayState {
     lower_root: VfsNodeRef,
     upper_root: VfsNodeRef,
     whiteouts: Mutex<BTreeSet<String>>,
+    nodes: Mutex<NodeCache>,
     mutation: Mutex<()>,
+}
+
+struct NodeCache {
+    entries: BTreeMap<String, Weak<OverlayNode>>,
+    sweep_at: usize,
 }
 
 struct OverlayNode {
     state: Arc<OverlayState>,
+    location: Mutex<NodeLocation>,
+}
+
+struct NodeLocation {
     path: String,
+    backing: VfsNodeRef,
+    upper: bool,
+    linked: bool,
 }
 
 impl OverlayFileSystem {
@@ -50,12 +63,26 @@ impl OverlayFileSystem {
             upper_root: upper.root_dir(),
             lower,
             whiteouts: Mutex::new(BTreeSet::new()),
+            nodes: Mutex::new(NodeCache {
+                entries: BTreeMap::new(),
+                sweep_at: 4096,
+            }),
             mutation: Mutex::new(()),
         });
         let root = Arc::new(OverlayNode {
             state: state.clone(),
-            path: "/".into(),
+            location: Mutex::new(NodeLocation {
+                path: "/".into(),
+                backing: state.upper_root.clone(),
+                upper: true,
+                linked: true,
+            }),
         });
+        state
+            .nodes
+            .lock()
+            .entries
+            .insert("/".into(), Arc::downgrade(&root));
         Self { state, root }
     }
 }
@@ -110,7 +137,107 @@ impl OverlayState {
     }
 
     fn visible_node(&self, path: &str) -> Option<VfsNodeRef> {
-        self.upper_node(path).or_else(|| self.lower_node(path))
+        self.visible_binding(path).map(|(node, _)| node)
+    }
+
+    fn visible_binding(&self, path: &str) -> Option<(VfsNodeRef, bool)> {
+        self.upper_node(path)
+            .map(|node| (node, true))
+            .or_else(|| self.lower_node(path).map(|node| (node, false)))
+    }
+
+    fn node_at_locked(self: &Arc<Self>, path: String) -> VfsResult<VfsNodeRef> {
+        let mut cache = self.nodes.lock();
+        if let Some(node) = cache.entries.get(path.as_str()).and_then(Weak::upgrade) {
+            return Ok(node);
+        }
+        cache.entries.remove(path.as_str());
+
+        if cache.entries.len() >= cache.sweep_at {
+            cache.entries.retain(|_, node| node.strong_count() > 0);
+            cache.sweep_at = cache.entries.len().saturating_mul(2).max(4096);
+        }
+
+        let (backing, upper) = self
+            .visible_binding(path.as_str())
+            .ok_or(VfsError::NotFound)?;
+        let node = Arc::new(OverlayNode {
+            state: self.clone(),
+            location: Mutex::new(NodeLocation {
+                path: path.clone(),
+                backing,
+                upper,
+                linked: true,
+            }),
+        });
+        cache.entries.insert(path, Arc::downgrade(&node));
+        Ok(node)
+    }
+
+    fn cached_node(&self, path: &str) -> Option<Arc<OverlayNode>> {
+        self.nodes.lock().entries.get(path).and_then(Weak::upgrade)
+    }
+
+    fn update_cached_binding(&self, path: &str, backing: VfsNodeRef, upper: bool) {
+        let Some(node) = self.cached_node(path) else {
+            return;
+        };
+        let mut location = node.location.lock();
+        if location.linked && location.path == path {
+            location.backing = backing;
+            location.upper = upper;
+        }
+    }
+
+    fn detach_cached_tree(&self, path: &str) {
+        let prefix = format!("{path}/");
+        let mut cache = self.nodes.lock();
+        let paths: Vec<_> = cache
+            .entries
+            .keys()
+            .filter(|entry| entry.as_str() == path || entry.starts_with(prefix.as_str()))
+            .cloned()
+            .collect();
+        for old_path in paths {
+            if let Some(node) = cache
+                .entries
+                .remove(old_path.as_str())
+                .and_then(|node| node.upgrade())
+            {
+                node.location.lock().linked = false;
+            }
+        }
+    }
+
+    fn move_cached_tree(&self, src: &str, dst: &str) {
+        let prefix = format!("{src}/");
+        let mut cache = self.nodes.lock();
+        let paths: Vec<_> = cache
+            .entries
+            .keys()
+            .filter(|entry| entry.as_str() == src || entry.starts_with(prefix.as_str()))
+            .cloned()
+            .collect();
+        for old_path in paths {
+            let Some(node) = cache
+                .entries
+                .remove(old_path.as_str())
+                .and_then(|node| node.upgrade())
+            else {
+                continue;
+            };
+            let new_path = if old_path == src {
+                dst.to_string()
+            } else {
+                format!("{dst}{}", &old_path[src.len()..])
+            };
+            {
+                let mut location = node.location.lock();
+                location.path = new_path.clone();
+                location.linked = true;
+            }
+            cache.entries.insert(new_path, Arc::downgrade(&node));
+        }
     }
 
     fn ensure_upper_dir_locked(&self, path: &str) -> VfsResult<VfsNodeRef> {
@@ -126,6 +253,7 @@ impl OverlayState {
                 if !node.get_attr()?.is_dir() {
                     return Err(VfsError::NotADirectory);
                 }
+                self.update_cached_binding(current.as_str(), node, true);
                 continue;
             }
 
@@ -144,13 +272,17 @@ impl OverlayState {
                     Err(err) => return Err(err),
                 }
             }
+            self.update_cached_binding(current.as_str(), upper, true);
         }
-        self.upper_node(path).ok_or(VfsError::NotFound)
+        let upper = self.upper_node(path).ok_or(VfsError::NotFound)?;
+        self.update_cached_binding(path, upper.clone(), true);
+        Ok(upper)
     }
 
     fn ensure_copy_up_file_locked(&self, path: &str) -> VfsResult<VfsNodeRef> {
         if let Some(upper) = self.upper_node(path) {
             return if upper.get_attr()?.is_file() {
+                self.update_cached_binding(path, upper.clone(), true);
                 Ok(upper)
             } else {
                 Err(VfsError::IsADirectory)
@@ -206,6 +338,7 @@ impl OverlayState {
             };
             offset = next_offset;
         }
+        self.update_cached_binding(path, upper.clone(), true);
         Ok(upper)
     }
 
@@ -215,6 +348,7 @@ impl OverlayState {
                 return Err(VfsError::IsADirectory);
             }
             upper.truncate(0)?;
+            self.update_cached_binding(path, upper.clone(), true);
             return Ok(upper);
         }
 
@@ -232,7 +366,10 @@ impl OverlayState {
             .create(Self::relative(path), VfsNodeType::File)?;
         let upper = self.upper_node(path).ok_or(VfsError::NotFound)?;
         match upper.set_perm(attr.perm()) {
-            Ok(()) | Err(VfsError::Unsupported) => Ok(upper),
+            Ok(()) | Err(VfsError::Unsupported) => {
+                self.update_cached_binding(path, upper.clone(), true);
+                Ok(upper)
+            }
             Err(err) => {
                 let _ = self.upper_root.remove(Self::relative(path));
                 Err(err)
@@ -301,37 +438,45 @@ impl OverlayState {
 }
 
 impl OverlayNode {
+    fn snapshot(&self) -> (String, VfsNodeRef, bool, bool) {
+        let location = self.location.lock();
+        (
+            location.path.clone(),
+            location.backing.clone(),
+            location.upper,
+            location.linked,
+        )
+    }
+
     fn resolve(&self, path: &str) -> String {
         if path.starts_with('/') {
             axfs_vfs::path::canonicalize(path)
         } else {
-            join_path(self.path.as_str(), path)
+            let location = self.location.lock();
+            join_path(location.path.as_str(), path)
         }
-    }
-
-    fn new_at(&self, path: String) -> VfsNodeRef {
-        Arc::new(Self {
-            state: self.state.clone(),
-            path,
-        })
     }
 }
 
 impl VfsNodeOps for OverlayNode {
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
-        self.state
-            .visible_node(self.path.as_str())
-            .ok_or(VfsError::NotFound)?
-            .get_attr()
+        self.location.lock().backing.get_attr()
     }
 
     fn set_perm(&self, perm: axfs_vfs::VfsNodePerm) -> VfsResult {
         let _guard = self.state.mutation.lock();
-        let attr = self.get_attr()?;
+        let (path, backing, upper, linked) = self.snapshot();
+        if upper {
+            return backing.set_perm(perm);
+        }
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
+        let attr = backing.get_attr()?;
         let upper = if attr.is_dir() {
-            self.state.ensure_upper_dir_locked(self.path.as_str())?
+            self.state.ensure_upper_dir_locked(path.as_str())?
         } else if attr.is_file() {
-            self.state.ensure_copy_up_file_locked(self.path.as_str())?
+            self.state.ensure_copy_up_file_locked(path.as_str())?
         } else {
             return Err(VfsError::Unsupported);
         };
@@ -339,64 +484,85 @@ impl VfsNodeOps for OverlayNode {
     }
 
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> VfsResult<usize> {
-        self.state
-            .visible_node(self.path.as_str())
-            .ok_or(VfsError::NotFound)?
-            .read_at(offset, buf)
+        self.location.lock().backing.read_at(offset, buf)
     }
 
     fn write_at(&self, offset: u64, buf: &[u8]) -> VfsResult<usize> {
         let _guard = self.state.mutation.lock();
-        self.state
-            .ensure_copy_up_file_locked(self.path.as_str())?
-            .write_at(offset, buf)
-    }
-
-    fn fsync(&self) -> VfsResult {
-        if let Some(upper) = self.state.upper_node(self.path.as_str()) {
-            upper.fsync()
-        } else if self.state.lower_node(self.path.as_str()).is_some() {
-            Ok(())
+        let (path, backing, upper, linked) = self.snapshot();
+        if upper {
+            backing.write_at(offset, buf)
+        } else if linked {
+            self.state
+                .ensure_copy_up_file_locked(path.as_str())?
+                .write_at(offset, buf)
         } else {
             Err(VfsError::NotFound)
         }
     }
 
+    fn fsync(&self) -> VfsResult {
+        let (_, backing, upper, _) = self.snapshot();
+        if upper { backing.fsync() } else { Ok(()) }
+    }
+
     fn truncate(&self, size: u64) -> VfsResult {
         let _guard = self.state.mutation.lock();
+        let (path, backing, upper, linked) = self.snapshot();
+        if upper {
+            return backing.truncate(size);
+        }
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
         if size == 0 {
-            self.state
-                .ensure_empty_upper_file_locked(self.path.as_str())?;
+            self.state.ensure_empty_upper_file_locked(path.as_str())?;
             Ok(())
         } else {
             self.state
-                .ensure_copy_up_file_locked(self.path.as_str())?
+                .ensure_copy_up_file_locked(path.as_str())?
                 .truncate(size)
         }
     }
 
     fn parent(&self) -> Option<VfsNodeRef> {
-        if self.path == "/" || !self.get_attr().ok()?.is_dir() {
+        let _guard = self.state.mutation.lock();
+        let (path, backing, _, linked) = self.snapshot();
+        if path == "/" || !linked || !backing.get_attr().ok()?.is_dir() {
             None
         } else {
-            Some(self.new_at(parent_path(self.path.as_str()).to_string()))
+            self.state
+                .node_at_locked(parent_path(path.as_str()).to_string())
+                .ok()
         }
     }
 
     fn lookup(self: Arc<Self>, path: &str) -> VfsResult<VfsNodeRef> {
+        let _guard = self.state.mutation.lock();
+        let (_, backing, _, linked) = self.snapshot();
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
+        if !backing.get_attr()?.is_dir() {
+            return Err(VfsError::NotADirectory);
+        }
         let resolved = self.resolve(path);
-        self.state
-            .visible_node(resolved.as_str())
-            .ok_or(VfsError::NotFound)?;
-        Ok(self.new_at(resolved))
+        self.state.node_at_locked(resolved)
     }
 
     fn create(&self, path: &str, ty: VfsNodeType) -> VfsResult {
         if !matches!(ty, VfsNodeType::File | VfsNodeType::Dir) {
             return Err(VfsError::Unsupported);
         }
-        let resolved = self.resolve(path);
         let _guard = self.state.mutation.lock();
+        let (_, backing, _, linked) = self.snapshot();
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
+        if !backing.get_attr()?.is_dir() {
+            return Err(VfsError::NotADirectory);
+        }
+        let resolved = self.resolve(path);
         if self.state.visible_node(resolved.as_str()).is_some() {
             return Err(VfsError::AlreadyExists);
         }
@@ -408,8 +574,15 @@ impl VfsNodeOps for OverlayNode {
     }
 
     fn remove(&self, path: &str) -> VfsResult {
-        let resolved = self.resolve(path);
         let _guard = self.state.mutation.lock();
+        let (_, backing, _, linked) = self.snapshot();
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
+        if !backing.get_attr()?.is_dir() {
+            return Err(VfsError::NotADirectory);
+        }
+        let resolved = self.resolve(path);
         let node = self
             .state
             .visible_node(resolved.as_str())
@@ -419,6 +592,12 @@ impl VfsNodeOps for OverlayNode {
         }
 
         let has_lower = self.state.lower_node_raw(resolved.as_str()).is_some();
+        if let Some(open_node) = self.state.cached_node(resolved.as_str()) {
+            let (_, backing, upper, _) = open_node.snapshot();
+            if !upper && backing.get_attr()?.is_file() {
+                self.state.ensure_copy_up_file_locked(resolved.as_str())?;
+            }
+        }
         if self.state.upper_node(resolved.as_str()).is_some() {
             self.state
                 .upper_root
@@ -427,11 +606,20 @@ impl VfsNodeOps for OverlayNode {
         if has_lower {
             self.state.add_whiteout(resolved.as_str());
         }
+        self.state.detach_cached_tree(resolved.as_str());
         Ok(())
     }
 
     fn read_dir(&self, start_idx: usize, dirents: &mut [VfsDirEntry]) -> VfsResult<usize> {
-        let entries = self.state.merged_entries(self.path.as_str())?;
+        let _guard = self.state.mutation.lock();
+        let (path, backing, _, linked) = self.snapshot();
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
+        if !backing.get_attr()?.is_dir() {
+            return Err(VfsError::NotADirectory);
+        }
+        let entries = self.state.merged_entries(path.as_str())?;
         let mut iter = entries.iter().skip(start_idx.saturating_sub(2));
         for (index, out) in dirents.iter_mut().enumerate() {
             match start_idx + index {
@@ -454,18 +642,25 @@ impl VfsNodeOps for OverlayNode {
     }
 
     fn rename(&self, src_path: &str, dst_path: &str) -> VfsResult {
+        let _guard = self.state.mutation.lock();
+        let (_, backing, _, linked) = self.snapshot();
+        if !linked {
+            return Err(VfsError::NotFound);
+        }
+        if !backing.get_attr()?.is_dir() {
+            return Err(VfsError::NotADirectory);
+        }
         let src = self.resolve(src_path);
         let dst = self.resolve(dst_path);
-        if src == dst {
-            return Ok(());
-        }
-
-        let _guard = self.state.mutation.lock();
         let src_attr = self
             .state
             .visible_node(src.as_str())
             .ok_or(VfsError::NotFound)?
             .get_attr()?;
+        if src == dst {
+            return Ok(());
+        }
+
         if let Some(dst_node) = self.state.visible_node(dst.as_str()) {
             let dst_attr = dst_node.get_attr()?;
             match (src_attr.is_dir(), dst_attr.is_dir()) {
@@ -477,6 +672,17 @@ impl VfsNodeOps for OverlayNode {
                 (true, false) => return Err(VfsError::NotADirectory),
                 (false, true) => return Err(VfsError::IsADirectory),
                 (false, false) => {}
+            }
+            if self.state.cached_node(dst.as_str()).is_some() {
+                if dst_attr.is_file() {
+                    self.state.ensure_copy_up_file_locked(dst.as_str())?;
+                } else if dst_attr.is_dir() {
+                    let upper = self.state.ensure_upper_dir_locked(dst.as_str())?;
+                    match upper.set_perm(dst_attr.perm()) {
+                        Ok(()) | Err(VfsError::Unsupported) => {}
+                        Err(err) => return Err(err),
+                    }
+                }
             }
         }
         self.state.ensure_copy_up_tree_locked(src.as_str())?;
@@ -494,6 +700,8 @@ impl VfsNodeOps for OverlayNode {
         if dst_has_lower {
             self.state.add_whiteout(dst.as_str());
         }
+        self.state.detach_cached_tree(dst.as_str());
+        self.state.move_cached_tree(src.as_str(), dst.as_str());
         Ok(())
     }
 
