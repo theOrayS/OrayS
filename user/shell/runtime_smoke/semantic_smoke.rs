@@ -1928,6 +1928,23 @@ fn report_clone3_thread_write_result(value: isize) {
     let _ = write(&encoded);
 }
 
+fn report_rename_virtual_nonempty_result(value: isize, state: u8) {
+    const PREFIX: &[u8] = b"PR3_SMOKE_V1 DIAG rename_virtual_nonempty_result=0x";
+    const STATE_PREFIX: &[u8] = b" state=0x";
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = [b'0'; core::mem::size_of::<usize>() * 2];
+    let value = value as usize;
+    for (index, digit) in encoded.iter_mut().enumerate() {
+        let shift = (core::mem::size_of::<usize>() * 2 - index - 1) * 4;
+        *digit = HEX[(value >> shift) & 0xf];
+    }
+    let state_encoded = [HEX[(state >> 4) as usize], HEX[(state & 0xf) as usize], b'\n'];
+    let _ = write(PREFIX);
+    let _ = write(&encoded);
+    let _ = write(STATE_PREFIX);
+    let _ = write(&state_encoded);
+}
+
 #[inline(always)]
 fn fork_process() -> isize {
     // SAFETY: SIGCHLD with a null child stack and no clone flags requests ordinary
@@ -3161,6 +3178,12 @@ pub extern "C" fn _start() -> ! {
         || rename_source_close != 0
         || !rename_nonempty_cleanup
     {
+        let state = u8::from(rename_target_preserved)
+            | u8::from(rename_target_close == 0) << 1
+            | u8::from(rename_source_preserved) << 2
+            | u8::from(rename_source_close == 0) << 3
+            | u8::from(rename_nonempty_cleanup) << 4;
+        report_rename_virtual_nonempty_result(rename_nonempty_result, state);
         fail(USER_FAIL_RENAME_VIRTUAL_NONEMPTY, 289);
     }
     if write(ASSERT_RENAME_VIRTUAL_NONEMPTY) != ASSERT_RENAME_VIRTUAL_NONEMPTY.len() as isize {
