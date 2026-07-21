@@ -337,9 +337,9 @@ impl WaitQueue {
         requeue_count: usize,
         target: &WaitQueue,
         resched: bool,
-        mut predicate: F,
-        mut on_wake: G,
-        mut on_requeue: H,
+        predicate: F,
+        on_wake: G,
+        on_requeue: H,
     ) -> (usize, usize)
     where
         F: FnMut(&AxTaskRef) -> bool,
@@ -350,61 +350,100 @@ impl WaitQueue {
             return (0, 0);
         }
 
-        let mut operate =
-            |source: &mut VecDeque<AxTaskRef>,
-             mut destination: Option<&mut VecDeque<AxTaskRef>>| {
-                let mut selected = BTreeSet::new();
-                let mut notified_len = 0usize;
-                let mut index = 0;
-                while index < source.len() && notified_len < wake_count {
-                    let Some(task) = source.get(index).cloned() else {
+        match self.notify_and_requeue_where_checked(
+            wake_count,
+            requeue_count,
+            target,
+            resched,
+            predicate,
+            on_wake,
+            on_requeue,
+            || Ok::<(), core::convert::Infallible>(()),
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
+        }
+    }
+
+    /// Checked variant of [`Self::notify_and_requeue_where`].
+    ///
+    /// `check` runs after every involved queue lock has been acquired and
+    /// before any waiter is woken or moved. If it fails, both queues remain
+    /// unchanged. Futex compare-and-requeue uses this to serialize its value
+    /// comparison with waiter enqueue, wake, and requeue operations.
+    pub fn notify_and_requeue_where_checked<F, G, H, C, E>(
+        &self,
+        wake_count: usize,
+        requeue_count: usize,
+        target: &WaitQueue,
+        resched: bool,
+        mut predicate: F,
+        mut on_wake: G,
+        mut on_requeue: H,
+        mut check: C,
+    ) -> Result<(usize, usize), E>
+    where
+        F: FnMut(&AxTaskRef) -> bool,
+        G: FnMut(&AxTaskRef),
+        H: FnMut(&AxTaskRef),
+        C: FnMut() -> Result<(), E>,
+    {
+        let mut operate = |source: &mut VecDeque<AxTaskRef>,
+                           mut destination: Option<&mut VecDeque<AxTaskRef>>|
+         -> Result<(usize, usize), E> {
+            check()?;
+            let mut selected = BTreeSet::new();
+            let mut notified_len = 0usize;
+            let mut index = 0;
+            while index < source.len() && notified_len < wake_count {
+                let Some(task) = source.get(index).cloned() else {
+                    break;
+                };
+                let key = task_ptr_key(&task);
+                if selected.contains(&key) {
+                    let _ = source.remove(index);
+                    continue;
+                }
+                if !predicate(&task) {
+                    index += 1;
+                    continue;
+                }
+                let Some(task) = source.remove(index) else {
+                    break;
+                };
+                selected.insert(key);
+                if unblock_one_task_with(task, resched, |task| on_wake(task)) {
+                    notified_len += 1;
+                }
+            }
+
+            let mut requeued = BTreeSet::new();
+            let requeued_len = if let Some(destination) = destination.as_deref_mut() {
+                let mut requeued_len = 0usize;
+                while !source.is_empty() && requeued_len < requeue_count {
+                    let Some(task) = source.pop_front() else {
                         break;
                     };
                     let key = task_ptr_key(&task);
-                    if selected.contains(&key) {
-                        let _ = source.remove(index);
+                    if selected.contains(&key) || !requeued.insert(key) {
                         continue;
                     }
-                    if !predicate(&task) {
-                        index += 1;
-                        continue;
-                    }
-                    let Some(task) = source.remove(index) else {
-                        break;
-                    };
-                    selected.insert(key);
-                    if unblock_one_task_with(task, resched, |task| on_wake(task)) {
-                        notified_len += 1;
-                    }
+                    on_requeue(&task);
+                    destination.push_back(task);
+                    requeued_len += 1;
                 }
-
-                let mut requeued = BTreeSet::new();
-                let requeued_len = if let Some(destination) = destination.as_deref_mut() {
-                    let mut requeued_len = 0usize;
-                    while !source.is_empty() && requeued_len < requeue_count {
-                        let Some(task) = source.pop_front() else {
-                            break;
-                        };
-                        let key = task_ptr_key(&task);
-                        if selected.contains(&key) || !requeued.insert(key) {
-                            continue;
-                        }
-                        on_requeue(&task);
-                        destination.push_back(task);
-                        requeued_len += 1;
-                    }
-                    requeued_len
-                } else {
-                    count_same_queue_requeues(
-                        source,
-                        &selected,
-                        requeue_count,
-                        &mut predicate,
-                        &mut on_requeue,
-                    )
-                };
-                (notified_len, requeued_len)
+                requeued_len
+            } else {
+                count_same_queue_requeues(
+                    source,
+                    &selected,
+                    requeue_count,
+                    &mut predicate,
+                    &mut on_requeue,
+                )
             };
+            Ok((notified_len, requeued_len))
+        };
 
         if core::ptr::eq(self, target) {
             let mut source = self.queue.lock();

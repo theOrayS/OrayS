@@ -105,6 +105,34 @@ fn test_wait_queue() {
 }
 
 #[test]
+fn test_checked_requeue_rejects_without_queue_mutation() {
+    let _lock = SERIAL.lock();
+    INIT.call_once(axtask::init_scheduler);
+
+    let source = WaitQueue::new();
+    let target = WaitQueue::new();
+    let mut checked = false;
+    let result = source.notify_and_requeue_where_checked(
+        1,
+        1,
+        &target,
+        false,
+        |_| true,
+        |_| {},
+        |_| {},
+        || {
+            checked = true;
+            Err(7_u8)
+        },
+    );
+
+    assert_eq!(result, Err(7));
+    assert!(checked);
+    assert!(source.is_empty());
+    assert!(target.is_empty());
+}
+
+#[test]
 fn test_task_join() {
     let _lock = SERIAL.lock();
     INIT.call_once(axtask::init_scheduler);

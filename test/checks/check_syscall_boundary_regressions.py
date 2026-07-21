@@ -14,7 +14,7 @@ def read(root: Path, rel: str) -> str:
 
 def rust_function_block(text: str, name: str) -> str:
     match = re.search(
-        rf"(?:^|\n)(?:pub\([^)]*\)\s+|pub\s+)?fn\s+{re.escape(name)}(?:<[^>{{}}]*>)?\s*\([^{{]*\)\s*(?:->[^{{]+)?\{{",
+        rf"(?:^|\n)[ \t]*(?:pub\([^)]*\)\s+|pub\s+)?fn\s+{re.escape(name)}(?:<[^>{{}}]*>)?\s*\([^{{]*\)\s*(?:->[^{{]+)?\{{",
         text,
     )
     if not match:
@@ -472,6 +472,38 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
             "return operate(&mut source, None);",
         ),
     )
+    checked_requeue = rust_function_block(wait_queue, "notify_and_requeue_where_checked")
+    require_tokens(
+        findings,
+        checked_requeue,
+        "checked WaitQueue requeue must validate after locking and before changing either queue",
+        (
+            "C: FnMut() -> Result<(), E>",
+            "check()?;",
+            "let mut source = self.queue.lock();",
+            "let mut destination = target.queue.lock();",
+            "operate(&mut source, Some(&mut destination))",
+        ),
+    )
+    checked_validate = checked_requeue.find("check()?;")
+    checked_select = checked_requeue.find("let mut selected = BTreeSet::new();")
+    if not (0 <= checked_validate < checked_select):
+        findings.append("checked WaitQueue requeue changes queue state before validating")
+    require_tokens(
+        findings,
+        wake_requeue,
+        "FUTEX_CMP_REQUEUE comparison must execute through the checked queue-lock path",
+        (
+            "source.queue.notify_and_requeue_where_checked(",
+            "if let Some(expected) = cmp",
+            "let current = read_user_value::<u32>(process, uaddr)?;",
+            "return Err(LinuxError::EAGAIN);",
+        ),
+    )
+    checked_call = wake_requeue.find("source.queue.notify_and_requeue_where_checked(")
+    checked_compare = wake_requeue.find("if let Some(expected) = cmp")
+    if not (0 <= checked_call < checked_compare):
+        findings.append("FUTEX_CMP_REQUEUE reads the comparison value outside the checked queue-lock path")
 
     lifecycle = read(root, "user/shell/src/uspace/process_lifecycle.rs")
     require_tokens(

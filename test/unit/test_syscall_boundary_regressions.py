@@ -342,7 +342,40 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/futex.rs"
         text = path.read_text(encoding="utf-8")
-        original = """    let source_key = futex_key(process, uaddr, private)?;
+        key_block = """    let source_key = futex_key(process, uaddr, private)?;
+    let target_key = futex_key(process, uaddr2, private)?;
+"""
+        compare_block = """            if let Some(expected) = cmp {
+                let current = read_user_value::<u32>(process, uaddr)?;
+                if current != expected {
+                    return Err(LinuxError::EAGAIN);
+                }
+            }
+"""
+        early_compare = """    if let Some(expected) = cmp {
+        let current = read_user_value::<u32>(process, uaddr)?;
+        if current != expected {
+            return Err(LinuxError::EAGAIN);
+        }
+    }
+"""
+        self.assertIn(key_block, text)
+        self.assertIn(compare_block, text)
+        text = text.replace(key_block, early_compare + key_block, 1)
+        text = text.replace(compare_block, "", 1)
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("before validating both futex keys", result.stdout)
+
+    def test_detects_futex_cmp_requeue_compare_outside_lock(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        key_block = """    let source_key = futex_key(process, uaddr, private)?;
+    let target_key = futex_key(process, uaddr2, private)?;
+"""
+        early_compare = """    let source_key = futex_key(process, uaddr, private)?;
     let target_key = futex_key(process, uaddr2, private)?;
     if let Some(expected) = cmp {
         let current = read_user_value::<u32>(process, uaddr)?;
@@ -351,20 +384,48 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         }
     }
 """
-        mutated = """    if let Some(expected) = cmp {
-        let current = read_user_value::<u32>(process, uaddr)?;
-        if current != expected {
-            return Err(LinuxError::EAGAIN);
-        }
-    }
-    let source_key = futex_key(process, uaddr, private)?;
-    let target_key = futex_key(process, uaddr2, private)?;
+        compare_block = """            if let Some(expected) = cmp {
+                let current = read_user_value::<u32>(process, uaddr)?;
+                if current != expected {
+                    return Err(LinuxError::EAGAIN);
+                }
+            }
 """
-        self.assertIn(original, text)
-        path.write_text(text.replace(original, mutated, 1), encoding="utf-8")
+        self.assertIn(key_block, text)
+        self.assertIn(compare_block, text)
+        text = text.replace(key_block, early_compare, 1)
+        text = text.replace(compare_block, "", 1)
+        path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("before validating both futex keys", result.stdout)
+        self.assertIn("outside the checked queue-lock path", result.stdout)
+
+    def test_detects_futex_cmp_requeue_unchecked_queue_path(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "source.queue.notify_and_requeue_where_checked(",
+                "source.queue.notify_and_requeue_where(",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("checked queue-lock path", result.stdout)
+
+    def test_detects_checked_requeue_validation_removal(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/task/axtask/src/wait_queue.rs"
+        text = path.read_text(encoding="utf-8")
+        validation = "            check()?;\n"
+        self.assertIn(validation, text)
+        path.write_text(text.replace(validation, "", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("before validating", result.stdout)
 
     def test_detects_wait4_ignored_rusage(self) -> None:
         tree = self.make_tree()

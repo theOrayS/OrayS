@@ -201,14 +201,13 @@ fn wake_requeue_addr_checked(
     }
     let source_key = futex_key(process, uaddr, private)?;
     let target_key = futex_key(process, uaddr2, private)?;
-    if let Some(expected) = cmp {
-        let current = read_user_value::<u32>(process, uaddr)?;
-        if current != expected {
-            return Err(LinuxError::EAGAIN);
-        }
-    }
-    let Some(source) = table().lock().get(&source_key).cloned() else {
-        return Ok((0, 0));
+    let source = if cmp.is_some() {
+        state(source_key)
+    } else {
+        let Some(source) = table().lock().get(&source_key).cloned() else {
+            return Ok((0, 0));
+        };
+        source
     };
     let target = if source_key == target_key {
         source.clone()
@@ -216,8 +215,7 @@ fn wake_requeue_addr_checked(
         state(target_key)
     };
 
-    source.seq.fetch_add(1, Ordering::Release);
-    let (woken, requeued) = source.queue.notify_and_requeue_where(
+    let outcome = source.queue.notify_and_requeue_where_checked(
         wake_count,
         requeue_count,
         &target.queue,
@@ -231,11 +229,22 @@ fn wake_requeue_addr_checked(
                 ext.futex_wait.store(uaddr2, Ordering::Release);
             }
         },
+        || {
+            if let Some(expected) = cmp {
+                let current = read_user_value::<u32>(process, uaddr)?;
+                if current != expected {
+                    return Err(LinuxError::EAGAIN);
+                }
+            }
+            source.seq.fetch_add(1, Ordering::Release);
+            Ok(())
+        },
     );
     drop(source);
     drop(target);
     prune_empty_key(source_key);
     prune_empty_key(target_key);
+    let (woken, requeued) = outcome?;
     Ok((woken, requeued))
 }
 
