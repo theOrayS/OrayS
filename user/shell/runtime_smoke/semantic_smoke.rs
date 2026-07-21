@@ -58,6 +58,7 @@ const SYS_MUNMAP: usize = 215;
 const SYS_CLONE: usize = 220;
 const SYS_EXECVE: usize = 221;
 const SYS_MMAP: usize = 222;
+const SYS_MSYNC: usize = 227;
 const SYS_MINCORE: usize = 232;
 const SYS_MADVISE: usize = 233;
 const SYS_WAIT4: usize = 260;
@@ -125,6 +126,7 @@ const PROT_READ: usize = 1;
 const PROT_WRITE: usize = 2;
 const MAP_PRIVATE: usize = 2;
 const MAP_ANONYMOUS: usize = 32;
+const MS_SYNC: usize = 4;
 const MADV_DONTNEED: usize = 4;
 const AT_EMPTY_PATH: usize = 0x1000;
 const STATX_BASIC_STATS: usize = 0x07ff;
@@ -2261,6 +2263,14 @@ fn mincore(addr: usize, len: usize, residency: &mut [u8]) -> isize {
 }
 
 #[inline(always)]
+fn msync(addr: usize, len: usize) -> isize {
+    // SAFETY: callers keep the complete page-aligned mapping live throughout this
+    // synchronous syscall. MS_SYNC requests completion but does not alter pointer
+    // ownership or permit the kernel to write outside the supplied range.
+    unsafe { syscall6(SYS_MSYNC, addr, len, MS_SYNC, 0, 0, 0) }
+}
+
+#[inline(always)]
 fn madvise_dontneed(addr: usize, len: usize) -> isize {
     // SAFETY: callers keep the complete page-aligned mapping live throughout this
     // synchronous syscall. The remaining arguments are scalar Linux ABI values.
@@ -2769,7 +2779,8 @@ pub extern "C" fn _start() -> ! {
     }
     let private_file_mapping = private_file_mapping as usize;
     let mut residency = [0_u8; PRIVATE_FILE_MMAP_PAGES];
-    if mincore(
+    if msync(private_file_mapping, PRIVATE_FILE_MMAP_BYTES) != 0
+        || mincore(
         private_file_mapping,
         PRIVATE_FILE_MMAP_BYTES,
         &mut residency,
@@ -2817,14 +2828,32 @@ pub extern "C" fn _start() -> ! {
         let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
         fail(USER_FAIL_MMAP_PRIVATE_LAZY, 356);
     }
+    residency.fill(0);
+    if madvise_dontneed(private_file_mapping, PRIVATE_FILE_MMAP_BYTES) != 0
+        || mincore(
+            private_file_mapping,
+            PRIVATE_FILE_MMAP_BYTES,
+            &mut residency,
+        ) != 0
+        || residency.iter().any(|value| value & 1 != 0)
+        // SAFETY: MADV_DONTNEED preserves the live mapping. Reloading its first
+        // byte must observe the backing file, not the discarded private write.
+        || unsafe { (private_file_mapping as *const u8).read_volatile() }
+            != first_file_byte[0]
+    {
+        let _ = munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES);
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 357);
+    }
     if munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES) != 0
         || close(mmap_file) != 0
         || unlinkat(PRIVATE_FILE_MMAP_PATH) != 0
     {
-        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 357);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 358);
     }
     if write(ASSERT_MMAP_PRIVATE_LAZY) != ASSERT_MMAP_PRIVATE_LAZY.len() as isize {
-        fail(USER_FAIL_WRITE, 358);
+        fail(USER_FAIL_WRITE, 359);
     }
 
     // Cargo/rustc allocators repeatedly discard private anonymous MAP_NORESERVE
