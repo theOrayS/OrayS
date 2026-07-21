@@ -202,6 +202,9 @@ fn runtime_root_candidates(exec_root: &str, path: &str) -> Vec<String> {
             roots.push(root.to_string());
         }
     };
+    if exec_root == "/" {
+        push(exec_root);
+    }
     if is_glibc_runtime_name(name) {
         push("/glibc");
     }
@@ -594,6 +597,9 @@ fn try_push_staged_cwd_roots(
 fn try_runtime_root_candidates(exec_root: &str, path: &str) -> Result<Vec<String>, String> {
     let name = path.rsplit('/').next().unwrap_or(path);
     let mut roots = Vec::new();
+    if exec_root == "/" {
+        try_push_candidate_from_str(&mut roots, exec_root, "record standard runtime root")?;
+    }
     if is_glibc_runtime_name(name) {
         try_push_candidate_from_str(&mut roots, "/glibc", "record glibc runtime root")?;
     }

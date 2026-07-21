@@ -561,7 +561,7 @@ pub(super) fn load_program_image(
     let prepared = prepare_program(process, cwd, program_path, argv, 0, &mut main_image)?;
     let elf = ElfFile::new(main_image.as_slice()).map_err(|err| format!("invalid ELF: {err}"))?;
     let main = analyze_elf(&elf, USER_PIE_LOAD_BASE)?;
-    let exec_root = effective_exec_root(prepared.exec_root.as_str(), main.interpreter.as_deref())?;
+    let exec_root = effective_exec_root(prepared.exec_root.as_str())?;
 
     aspace.clear();
 
@@ -676,21 +676,8 @@ pub(super) fn load_program_image(
     })
 }
 
-fn effective_exec_root(path_root: &str, interpreter: Option<&str>) -> Result<String, String> {
-    if path_root != "/" {
-        return exec_loader_owned_string(path_root, "copy exec root");
-    }
-    let Some(interpreter) = interpreter else {
-        return exec_loader_owned_string(path_root, "copy exec root");
-    };
-    let name = interpreter.rsplit('/').next().unwrap_or(interpreter);
-    if name.starts_with("ld-musl-") {
-        exec_loader_owned_string("/musl", "copy interpreter exec root")
-    } else if name.starts_with("ld-linux-") {
-        exec_loader_owned_string("/glibc", "copy interpreter exec root")
-    } else {
-        exec_loader_owned_string(path_root, "copy exec root")
-    }
+fn effective_exec_root(path_root: &str) -> Result<String, String> {
+    exec_loader_owned_string(path_root, "copy exec root")
 }
 
 fn resolve_program_exec_path(
