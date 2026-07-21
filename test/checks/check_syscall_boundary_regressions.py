@@ -442,9 +442,46 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
     )
     operation_decode = sys_futex.find("let op = futex_op as u32;")
     operation_reject = sys_futex.find("if unsupported_operation")
+    timeout_validation = sys_futex.find("let timeout_result = match cmd")
+    clock_reject = sys_futex.find("if unsupported_clock_operation")
     source_alignment = sys_futex.find("if uaddr % size_of::<u32>() != 0")
-    if not (0 <= operation_decode < operation_reject < source_alignment):
-        findings.append("futex operation validation must precede source-address validation")
+    if not (
+        0
+        <= operation_decode
+        < timeout_validation
+        < operation_reject
+        < clock_reject
+        < source_alignment
+    ):
+        findings.append(
+            "futex timed-command validation must follow command decoding and precede operation/clock/source rejection"
+        )
+    timeout_region = (
+        sys_futex[timeout_validation:operation_reject]
+        if 0 <= timeout_validation < operation_reject
+        else ""
+    )
+    require_tokens(
+        findings,
+        timeout_region,
+        "all Linux timed futex commands must validate a non-null timeout before operation dispatch",
+        (
+            "general::FUTEX_WAIT",
+            "general::FUTEX_LOCK_PI",
+            "general::FUTEX_LOCK_PI2",
+            "general::FUTEX_WAIT_BITSET",
+            "general::FUTEX_WAIT_REQUEUE_PI",
+        ),
+    )
+    wait_addr = rust_function_block(futex, "wait_addr")
+    require_tokens(
+        findings,
+        wait_addr,
+        "futex wait must consume a timeout validated before source-word access",
+        ("timeout: Option<Duration>",),
+    )
+    if "read_futex_timeout(" in wait_addr or "read_relative_futex_timeout(" in wait_addr:
+        findings.append("futex wait must not defer timeout validation until after source-word access")
     requeue_start = sys_futex.find("general::FUTEX_REQUEUE =>")
     cmp_requeue_start = sys_futex.find("general::FUTEX_CMP_REQUEUE =>")
     wake_bitset_start = sys_futex.find("general::FUTEX_WAKE_BITSET =>")

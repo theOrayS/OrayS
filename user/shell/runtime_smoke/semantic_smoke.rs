@@ -125,7 +125,10 @@ const FUTEX_WAIT: usize = 0;
 const FUTEX_WAKE: usize = 1;
 const FUTEX_REQUEUE: usize = 3;
 const FUTEX_CMP_REQUEUE: usize = 4;
+const FUTEX_LOCK_PI: usize = 6;
 const FUTEX_WAIT_BITSET: usize = 9;
+const FUTEX_WAIT_REQUEUE_PI: usize = 11;
+const FUTEX_LOCK_PI2: usize = 13;
 const FUTEX_PRIVATE_FLAG: usize = 128;
 const FUTEX_CLOCK_REALTIME: usize = 256;
 const FUTEX_UNKNOWN_FLAG: usize = 0x400;
@@ -3451,6 +3454,39 @@ fn run_futex_timeout_validation_probe() -> bool {
             0,
         )
     };
+    let lock_pi_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_LOCK_PI,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
+    let lock_pi2_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_LOCK_PI2,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
+    let wait_requeue_pi_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT_REQUEUE_PI,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
     let unknown_command_bad_pointer =
         unsafe { syscall6(SYS_FUTEX, word_addr, 2, 0, invalid_timeout, 0, 0) };
 
@@ -3461,6 +3497,9 @@ fn run_futex_timeout_validation_probe() -> bool {
         && realtime_valid_timeout == NEG_ENOSYS
         && bitset_bad_pointer == NEG_EFAULT
         && bitset_zero_bad_pointer == NEG_EFAULT
+        && lock_pi_bad_pointer == NEG_EFAULT
+        && lock_pi2_bad_pointer == NEG_EFAULT
+        && wait_requeue_pi_bad_pointer == NEG_EFAULT
         && unknown_command_bad_pointer == NEG_ENOSYS
 }
 

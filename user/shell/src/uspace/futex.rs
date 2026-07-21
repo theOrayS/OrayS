@@ -378,9 +378,7 @@ fn wait_addr(
     process: &UserProcess,
     uaddr: usize,
     val: usize,
-    timeout: usize,
-    absolute_timeout: bool,
-    realtime_timeout: bool,
+    timeout: Option<Duration>,
     bitset: u32,
     private: bool,
     restart_key: Option<RelativeFutexRestartKey>,
@@ -398,18 +396,6 @@ fn wait_addr(
     }
     let key = match futex_key(process, uaddr, private) {
         Ok(key) => key,
-        Err(err) => {
-            finish_relative_futex_wait(restart_key);
-            return neg_errno(err);
-        }
-    };
-    let timeout_result = if let Some(restart_key) = restart_key {
-        read_relative_futex_timeout(process, timeout, restart_key)
-    } else {
-        read_futex_timeout(process, timeout, absolute_timeout, realtime_timeout)
-    };
-    let timeout = match timeout_result {
-        Ok(timeout) => timeout,
         Err(err) => {
             finish_relative_futex_wait(restart_key);
             return neg_errno(err);
@@ -545,16 +531,47 @@ pub(super) fn sys_futex(
             | general::FUTEX_REQUEUE
             | general::FUTEX_CMP_REQUEUE
     );
-    let unsupported_operation = op & !allowed_operation_bits != 0
-        || !supported_command
-        || (op & general::FUTEX_CLOCK_REALTIME as u32 != 0 && cmd != general::FUTEX_WAIT_BITSET);
+    let private = op & general::FUTEX_PRIVATE_FLAG as u32 != 0;
+    let restart_key = (cmd == general::FUTEX_WAIT && timeout != 0)
+        .then(|| relative_restart_key(uaddr, futex_op, val, timeout));
+    let timeout_result = match cmd {
+        general::FUTEX_WAIT => match restart_key {
+            Some(restart_key) => read_relative_futex_timeout(process, timeout, restart_key),
+            None => Ok(None),
+        },
+        general::FUTEX_LOCK_PI
+        | general::FUTEX_LOCK_PI2
+        | general::FUTEX_WAIT_BITSET
+        | general::FUTEX_WAIT_REQUEUE_PI => read_futex_timeout(
+            process,
+            timeout,
+            true,
+            op & general::FUTEX_CLOCK_REALTIME as u32 != 0,
+        ),
+        _ => Ok(None),
+    };
+    let parsed_timeout = match timeout_result {
+        Ok(timeout) => timeout,
+        Err(err) => {
+            finish_relative_futex_wait(restart_key);
+            return neg_errno(err);
+        }
+    };
+    let unsupported_operation = op & !allowed_operation_bits != 0 || !supported_command;
     if unsupported_operation {
+        finish_relative_futex_wait(restart_key);
+        return neg_errno(LinuxError::ENOSYS);
+    }
+    let unsupported_clock_operation =
+        op & general::FUTEX_CLOCK_REALTIME as u32 != 0 && cmd != general::FUTEX_WAIT_BITSET;
+    if unsupported_clock_operation {
+        finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::ENOSYS);
     }
     if uaddr % size_of::<u32>() != 0 {
+        finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::EINVAL);
     }
-    let private = op & general::FUTEX_PRIVATE_FLAG as u32 != 0;
     perf_counters::record_futex_call(matches!(
         cmd,
         general::FUTEX_WAIT | general::FUTEX_WAIT_BITSET
@@ -570,21 +587,15 @@ pub(super) fn sys_futex(
         );
     }
     match cmd {
-        general::FUTEX_WAIT => {
-            let restart_key =
-                (timeout != 0).then(|| relative_restart_key(uaddr, futex_op, val, timeout));
-            wait_addr(
-                process,
-                uaddr,
-                val,
-                timeout,
-                false,
-                false,
-                u32::MAX,
-                private,
-                restart_key,
-            )
-        }
+        general::FUTEX_WAIT => wait_addr(
+            process,
+            uaddr,
+            val,
+            parsed_timeout,
+            u32::MAX,
+            private,
+            restart_key,
+        ),
         general::FUTEX_WAIT_BITSET => {
             if _val3 == 0 {
                 return neg_errno(LinuxError::EINVAL);
@@ -593,9 +604,7 @@ pub(super) fn sys_futex(
                 process,
                 uaddr,
                 val,
-                timeout,
-                true,
-                op & general::FUTEX_CLOCK_REALTIME != 0,
+                parsed_timeout,
                 _val3 as u32,
                 private,
                 None,

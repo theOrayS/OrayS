@@ -389,6 +389,7 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         path = tree / "user/shell/src/uspace/futex.rs"
         text = path.read_text(encoding="utf-8")
         alignment = """    if uaddr % size_of::<u32>() != 0 {
+        finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::EINVAL);
     }
 """
@@ -399,7 +400,70 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("precede source-address validation", result.stdout)
+        self.assertIn("timed-command validation", result.stdout)
+
+    def test_detects_futex_timeout_validation_after_source_alignment(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        alignment = """    if uaddr % size_of::<u32>() != 0 {
+        finish_relative_futex_wait(restart_key);
+        return neg_errno(LinuxError::EINVAL);
+    }
+"""
+        timeout_decode = "    let timeout_result = match cmd {\n"
+        self.assertIn(alignment, text)
+        self.assertIn(timeout_decode, text)
+        text = text.replace(alignment, "", 1).replace(
+            timeout_decode, alignment + timeout_decode, 1
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("timed-command validation", result.stdout)
+
+    def test_detects_futex_timeout_validation_after_clock_rejection(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        timeout_start = text.index("    let timeout_result = match cmd {\n")
+        timeout_end = text.index("    let unsupported_clock_operation", timeout_start)
+        timeout_block = text[timeout_start:timeout_end]
+        clock_start = timeout_end
+        clock_end = text.index("    if uaddr % size_of::<u32>() != 0", clock_start)
+        clock_block = text[clock_start:clock_end]
+        text = text[:timeout_start] + clock_block + timeout_block + text[clock_end:]
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("timed-command validation", result.stdout)
+
+    def test_detects_futex_wait_revalidating_timeout_after_source_read(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        signature = "    timeout: Option<Duration>,\n"
+        self.assertIn(signature, text)
+        path.write_text(
+            text.replace(signature, "    timeout: usize,\n", 1), encoding="utf-8"
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("validated before source-word access", result.stdout)
+
+    def test_detects_missing_unsupported_timed_futex_timeout_validation(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        timed_command = "        | general::FUTEX_WAIT_REQUEUE_PI => read_futex_timeout(\n"
+        self.assertIn(timed_command, text)
+        path.write_text(
+            text.replace(timed_command, "        => read_futex_timeout(\n", 1),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("all Linux timed futex commands", result.stdout)
 
     def test_detects_futex_cmp_requeue_compare_before_target_key(self) -> None:
         tree = self.make_tree()
