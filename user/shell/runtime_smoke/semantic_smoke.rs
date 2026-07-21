@@ -37,6 +37,7 @@ const SYS_CLOCK_GETTIME: usize = 113;
 const SYS_SCHED_SETAFFINITY: usize = 122;
 const SYS_SCHED_GETAFFINITY: usize = 123;
 const SYS_UNAME: usize = 160;
+const SYS_PRCTL: usize = 167;
 const SYS_GETPID: usize = 172;
 const SYS_SOCKET: usize = 198;
 const SYS_SOCKETPAIR: usize = 199;
@@ -92,6 +93,8 @@ const F_GETFD: usize = 1;
 const F_GETFL: usize = 3;
 const FIONBIO: usize = 0x5421;
 const FD_CLOEXEC: isize = 1;
+const PR_SET_NAME: usize = 15;
+const PR_GET_NAME: usize = 16;
 const SIGCHLD: usize = 17;
 const CLONE_VM: u64 = 0x0000_0100;
 const CLONE_FS: u64 = 0x0000_0200;
@@ -167,6 +170,7 @@ const RENAME_NONEMPTY_TARGET_ALIAS: &[u8] =
 const RENAME_NONEMPTY_ENTRY_NAME: &[u8] = b"retained.o";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
 const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
+const PARENT_THREAD_NAME: &[u8; 16] = b"orays-parent\0\0\0\0";
 
 // A u128 array gives the clone3 child stack the 16-byte alignment required by
 // both target ABIs. Access is exclusively through raw pointers: the parent never
@@ -300,6 +304,12 @@ const ASSERT_CLONE3_THREAD: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_CLONE3_THREAD: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_thread PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_PRCTL_THREAD_NAME: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT prctl_thread_name PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_PRCTL_THREAD_NAME: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT prctl_thread_name PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_FUTEX_JOIN: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_futex_join PASS arch=riscv64\n";
@@ -490,6 +500,12 @@ const USER_FAIL_CLONE3_THREAD: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_CLONE3_THREAD: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PRCTL_THREAD_NAME: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL prctl_thread_name arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PRCTL_THREAD_NAME: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL prctl_thread_name arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_FUTEX_JOIN: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_futex_join arch=riscv64\n";
@@ -768,6 +784,13 @@ fn write(bytes: &[u8]) -> isize {
     // SAFETY: `bytes` is readable for exactly `len` bytes and remains live until the
     // synchronous write returns. fd 1 and the length are scalar SYS_WRITE arguments.
     unsafe { syscall6(SYS_WRITE, 1, bytes.as_ptr() as usize, bytes.len(), 0, 0, 0) }
+}
+
+#[inline(always)]
+fn prctl(option: usize, arg2: usize) -> isize {
+    // SAFETY: the caller supplies the pointer contract required by the selected
+    // prctl operation; all remaining raw arguments are scalar zero values.
+    unsafe { syscall6(SYS_PRCTL, option, arg2, 0, 0, 0, 0) }
 }
 
 #[inline(always)]
@@ -1790,9 +1813,10 @@ unsafe fn clone3_vfork_exec(args: *const CloneArgs, context: *const VforkExecCon
 /// `args` must remain readable through syscall entry and describe a writable,
 /// exclusively owned child stack. `ready_write_fd` and `release_read_fd` must be
 /// opposite ends of live pipes shared with the new thread. `child_marker` must
-/// remain readable until the child exits. The child path never returns to Rust:
-/// after the kernel switches `sp`, the assembly exchanges one-byte pipe messages,
-/// reports its TLS comparison, writes the marker, and invokes `exit(2)` directly.
+/// remain readable through at least its first 16 bytes until the child exits. The
+/// child path never returns to Rust: after the kernel switches `sp`, the assembly
+/// checks TLS, sets the calling thread's name from that buffer, exchanges one-byte
+/// pipe messages, writes the marker, and invokes `exit(2)` directly.
 unsafe fn clone3_cargo_thread(
     args: *const CloneArgs,
     ready_write_fd: i32,
@@ -1816,6 +1840,11 @@ unsafe fn clone3_cargo_thread(
             "sd a5, 32(sp)",
             "li t0, 70",
             "bne tp, a6, 5f",
+            "ld a1, 24(sp)",
+            "li a0, 15",
+            "li a7, 167",
+            "ecall",
+            "bnez a0, 5f",
             "li t0, 82",
             "5:",
             "sb t0, 40(sp)",
@@ -1898,6 +1927,11 @@ unsafe fn clone3_cargo_thread(
             "st.d $a5, $sp, 32",
             "addi.d $t0, $zero, 70",
             "bne $tp, $a6, 5f",
+            "ld.d $a1, $sp, 24",
+            "addi.d $a0, $zero, 15",
+            "addi.d $a7, $zero, 167",
+            "syscall 0",
+            "bnez $a0, 5f",
             "addi.d $t0, $zero, 82",
             "5:",
             "st.b $t0, $sp, 40",
@@ -2925,7 +2959,8 @@ pub extern "C" fn _start() -> ! {
     // Current glibc uses this exact clone3 flag and argument shape for the worker
     // threads that drive Cargo and rustc. The child begins on the supplied stack,
     // proves that CLONE_SETTLS installed the requested architecture TLS register,
-    // and blocks on a shared pipe while the parent observes CLONE_PARENT_SETTID.
+    // gives itself a distinct PR_SET_NAME value, and blocks on a shared pipe while
+    // the parent observes CLONE_PARENT_SETTID and retains its own PR_GET_NAME value.
     // Releasing the child then requires CLONE_CHILD_CLEARTID to publish zero and wake
     // the exact FUTEX_WAIT_BITSET|FUTEX_CLOCK_REALTIME join used by glibc.
     let mut thread_ready_pipe = [-1_i32; 2];
@@ -2938,6 +2973,9 @@ pub extern "C" fn _start() -> ! {
     let thread_tid = CLONE3_THREAD_TID.as_ptr() as usize;
     let thread_tls = core::ptr::addr_of!(CLONE3_THREAD_TLS_ANCHOR) as usize;
     let thread_args = CloneArgs::cargo_thread(thread_stack, thread_tid, thread_tls);
+    if prctl(PR_SET_NAME, PARENT_THREAD_NAME.as_ptr() as usize) != 0 {
+        fail(USER_FAIL_PRCTL_THREAD_NAME, 272);
+    }
     // SAFETY: both pipes are live, the static stack is exclusively reserved for this
     // one child until its clear-child-tid publication, and every pointer remains valid.
     let clone3_thread = unsafe {
@@ -2997,8 +3035,17 @@ pub extern "C" fn _start() -> ! {
         };
         fail(marker, 268);
     }
+    let mut parent_thread_name = [0_u8; 16];
+    if prctl(PR_GET_NAME, parent_thread_name.as_mut_ptr() as usize) != 0
+        || parent_thread_name != *PARENT_THREAD_NAME
+    {
+        fail(USER_FAIL_PRCTL_THREAD_NAME, 273);
+    }
     if write(ASSERT_CLONE3_THREAD) != ASSERT_CLONE3_THREAD.len() as isize {
         fail(USER_FAIL_WRITE, 267);
+    }
+    if write(ASSERT_PRCTL_THREAD_NAME) != ASSERT_PRCTL_THREAD_NAME.len() as isize {
+        fail(USER_FAIL_WRITE, 274);
     }
     if write(ASSERT_CLONE3_FUTEX_JOIN) != ASSERT_CLONE3_FUTEX_JOIN.len() as isize {
         fail(USER_FAIL_WRITE, 271);

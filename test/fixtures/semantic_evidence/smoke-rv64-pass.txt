@@ -12,6 +12,7 @@ PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_thread_child PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_thread PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT prctl_thread_name PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_futex_join PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=riscv64
