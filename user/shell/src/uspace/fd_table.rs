@@ -19,6 +19,7 @@ use axsync::{Mutex as AxMutex, MutexGuard as AxMutexGuard};
 use axtask::WaitQueue;
 use lazyinit::LazyInit;
 use linux_raw_sys::{general, ioctl};
+use orays_linux::user::{Read, UserAddr, UserPtr};
 use std::boxed::Box;
 use std::collections::BTreeMap;
 use std::string::{String, ToString};
@@ -89,7 +90,7 @@ use super::time_abi::{
 };
 use super::user_memory::{
     MAX_USER_IO_CHUNK, fill_pseudo_random_bytes, read_cstr, read_iovec_entries, read_user_bytes,
-    read_user_bytes_into, read_user_value, validate_user_read, validate_user_write,
+    read_user_bytes_into, read_user_ptr, read_user_value, validate_user_read, validate_user_write,
     with_readable_user_buffer, with_writable_user_buffer, write_user_bytes, write_user_value,
 };
 use super::{PathTimes, UserProcess};
@@ -4777,7 +4778,8 @@ pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize
         return write_user_value(process, arg, &size);
     }
     if req as u32 == FIONBIO {
-        let enabled: i32 = match read_user_value(process, arg) {
+        let enabled_ptr = UserPtr::<i32, Read>::new(UserAddr::new(arg));
+        let enabled: i32 = match read_user_ptr(process, enabled_ptr) {
             Ok(enabled) => enabled,
             Err(err) => return neg_errno(err),
         };

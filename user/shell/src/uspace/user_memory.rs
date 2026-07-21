@@ -15,7 +15,7 @@ use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
 use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use orays_linux::backend::UserMemoryBackend;
-use orays_linux::user::{Access, Read, UserAddr, UserRange, UserSlice, Write};
+use orays_linux::user::{Access, Read, UserAddr, UserPtr, UserRange, UserSlice, Write};
 use std::string::String;
 use std::vec::Vec;
 
@@ -482,6 +482,14 @@ pub(super) fn write_user_value<T: Copy>(process: &UserProcess, ptr: usize, value
 }
 
 pub(super) fn read_user_value<T: Copy>(process: &UserProcess, ptr: usize) -> Result<T, LinuxError> {
+    read_user_ptr(process, UserPtr::new(UserAddr::new(ptr)))
+}
+
+pub(super) fn read_user_ptr<T: Copy>(
+    process: &UserProcess,
+    src: UserPtr<T, Read>,
+) -> Result<T, LinuxError> {
+    let ptr = src.addr().get();
     fault_in_user_read(process, ptr, size_of::<T>())?;
 
     let mut value = MaybeUninit::<T>::uninit();
