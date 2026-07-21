@@ -723,7 +723,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.memory_policy_semantics": 3,
     "unit.no_fake_success": 10,
     "unit.official_result_validation": 111,
-    "unit.posix_state_integrity": 15,
+    "unit.posix_state_integrity": 16,
     "unit.rlimit_and_fd_semantics": 13,
     "unit.qemu_setup": 9,
     "unit.runtime_binary_patch_prohibition": 9,
