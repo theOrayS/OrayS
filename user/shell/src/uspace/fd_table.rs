@@ -4760,6 +4760,7 @@ pub(super) fn sys_fchdir(process: &UserProcess, fd: usize) -> isize {
 
 pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize) -> isize {
     const BLKGETSIZE64: u32 = 0x8008_1272;
+    const FIONBIO: u32 = 0x5421;
     const FIONREAD: u32 = 0x541b;
     const SIOCATMARK: u32 = 0x8905;
     const SIOCGIFCONF: u32 = 0x8912;
@@ -4774,6 +4775,28 @@ pub(super) fn sys_ioctl(process: &UserProcess, fd: usize, req: usize, arg: usize
     if req as u32 == BLKGETSIZE64 && process.fds.lock().is_block_device(fd as i32) {
         let size: u64 = SYNTHETIC_BLOCK_DEVICE_SIZE;
         return write_user_value(process, arg, &size);
+    }
+    if req as u32 == FIONBIO {
+        let enabled: i32 = match read_user_value(process, arg) {
+            Ok(enabled) => enabled,
+            Err(err) => return neg_errno(err),
+        };
+        let result = {
+            let mut table = process.fds.lock();
+            match table.fcntl(process, fd as i32, general::F_GETFL, 0) {
+                Ok(current) => {
+                    let mut updated = current as u32;
+                    if enabled == 0 {
+                        updated &= !general::O_NONBLOCK;
+                    } else {
+                        updated |= general::O_NONBLOCK;
+                    }
+                    table.fcntl(process, fd as i32, general::F_SETFL, updated as usize)
+                }
+                Err(err) => Err(err),
+            }
+        };
+        return result.map_or_else(|err| neg_errno(err), |value| value as isize);
     }
     if req as u32 == FIONREAD {
         let available = match process.fds.lock().pipe_available_read(fd as i32) {
