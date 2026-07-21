@@ -19,6 +19,7 @@ PR3_SMOKE_V1 ASSERT private_futex_cow PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT futex_sa_restart PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT futex_relative_restart PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT futex_requeue_count PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT futex_requeue_same_addr PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT sigaltstack_onstack PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT sigaltstack_fork_exec PASS arch=riscv64
