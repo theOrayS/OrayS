@@ -187,7 +187,8 @@
         "user/shell/src/uspace/process_lifecycle.rs",
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
-        "user/shell/src/uspace/syscall_dispatch.rs"
+        "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/user_memory.rs"
       ]
     },
     {
@@ -288,7 +289,8 @@
         "user/shell/src/uspace/process_lifecycle.rs",
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
-        "user/shell/src/uspace/syscall_dispatch.rs"
+        "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/user_memory.rs"
       ]
     },
     {
@@ -582,7 +584,8 @@
         "user/shell/src/uspace/program_loader.rs",
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
-        "user/shell/src/uspace/syscall_dispatch.rs"
+        "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/user_memory.rs"
       ],
       "environment": {
         "PR3_EVIDENCE_SUPERVISED": "1"
@@ -677,7 +680,8 @@
         "user/shell/src/uspace/program_loader.rs",
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
-        "user/shell/src/uspace/syscall_dispatch.rs"
+        "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/user_memory.rs"
       ],
       "environment": {
         "PR3_EVIDENCE_SUPERVISED": "1"
