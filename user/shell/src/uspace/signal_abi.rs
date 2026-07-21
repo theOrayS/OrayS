@@ -139,15 +139,27 @@ fn first_unblocked_pending_signal(ext: &UserTaskExt) -> i32 {
     0
 }
 
-fn restartable_blocking_syscall(syscall_num: u32) -> bool {
-    matches!(syscall_num, general::__NR_wait4 | general::__NR_waitid)
+fn restartable_blocking_syscall(tf: &TrapFrame, syscall_num: u32) -> bool {
+    if matches!(syscall_num, general::__NR_wait4 | general::__NR_waitid) {
+        return true;
+    }
+    if syscall_num != general::__NR_futex {
+        return false;
+    }
+
+    // FUTEX_WAIT_BITSET uses an absolute timeout (or no timeout), so replaying
+    // the original syscall frame after an SA_RESTART handler preserves its
+    // deadline. FUTEX_WAIT instead accepts a relative timeout; replaying that
+    // pointer would extend the wait, so timed WAIT needs a dedicated Linux-style
+    // restart block before it can be included here.
+    tf.arg1() as u32 & general::FUTEX_CMD_MASK as u32 == general::FUTEX_WAIT_BITSET
 }
 
 pub(super) fn note_syscall_restart_candidate(tf: &TrapFrame, syscall_num: u32, ret: isize) {
     let Some(ext) = current_task_ext() else {
         return;
     };
-    if ret == neg_errno(LinuxError::EINTR) && restartable_blocking_syscall(syscall_num) {
+    if ret == neg_errno(LinuxError::EINTR) && restartable_blocking_syscall(tf, syscall_num) {
         ext.store_syscall_restart_frame(*tf);
     } else {
         // A restart frame is tied to the syscall that was just interrupted.
