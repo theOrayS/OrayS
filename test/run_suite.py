@@ -732,7 +732,7 @@ CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.semantic_evidence": 75,
     "unit.suite_runner": 135,
     "unit.synthetic_capability_integrity": 5,
-    "unit.syscall_boundary_regressions": 27,
+    "unit.syscall_boundary_regressions": 29,
     "unit.test_asset_integrity": 36,
     "unit.timer_semantics": 3,
     "unit.user_memory_copy_boundaries": 13,
