@@ -14,6 +14,8 @@ use core::{
 // LA64, and requires the ordered syscall assertions plus clean guest shutdown.
 
 const SYS_DUP3: usize = 24;
+const SYS_FLOCK: usize = 32;
+const SYS_UNLINKAT: usize = 35;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
@@ -55,7 +57,12 @@ const NEG_ESPIPE: isize = -29;
 const AT_FDCWD: isize = -100;
 const O_RDONLY: usize = 0;
 const O_WRONLY: usize = 1;
+const O_RDWR: usize = 2;
+const O_CREAT: usize = 0o100;
 const O_NONBLOCK: usize = 0o4000;
+const LOCK_EX: usize = 2;
+const LOCK_UN: usize = 8;
+const WNOHANG: usize = 1;
 const AF_INET: usize = 2;
 const SOCK_STREAM: usize = 1;
 const SOL_SOCKET: usize = 1;
@@ -98,6 +105,7 @@ const TCP_FORK_CLIENTS: usize = 8;
 const TCP_FORK_PORT: u16 = 39_026;
 const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
 const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
+const FLOCK_PROBE_PATH: &[u8] = b"/tmp/pr3-semantic-flock-lock\0";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
 const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
 
@@ -164,6 +172,12 @@ const ASSERT_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=lo
 const ASSERT_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_FLOCK_BLOCKING: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT flock_blocking PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FLOCK_BLOCKING: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT flock_blocking PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -281,6 +295,12 @@ const USER_FAIL_SPLICE_PIPE: &[u8] = b"PR3_SMOKE_V1 USER_FAIL splice_pipe arch=l
 const USER_FAIL_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 USER_FAIL pipe_fork_exec arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_PIPE_FORK_EXEC: &[u8] = b"PR3_SMOKE_V1 USER_FAIL pipe_fork_exec arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FLOCK_BLOCKING: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL flock_blocking arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FLOCK_BLOCKING: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL flock_blocking arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=riscv64\n";
@@ -789,15 +809,44 @@ fn close(fd: i32) -> isize {
 
 #[inline(always)]
 fn openat(path: &[u8], flags: usize) -> isize {
+    openat_mode(path, flags, 0)
+}
+
+#[inline(always)]
+fn openat_mode(path: &[u8], flags: usize, mode: usize) -> isize {
     // SAFETY: callers provide a readable NUL-terminated pathname that remains live
     // until this synchronous syscall returns. AT_FDCWD, flags, and mode are scalars;
-    // mode is ignored because these probes do not request O_CREAT.
+    // callers requesting O_CREAT supply the intended permission bits explicitly.
     unsafe {
         syscall6(
             SYS_OPENAT,
             AT_FDCWD as usize,
             path.as_ptr() as usize,
             flags,
+            mode,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn flock(fd: i32, operation: usize) -> isize {
+    // SAFETY: flock consumes only a scalar descriptor and operation bitmask; all
+    // remaining raw argument slots are ignored by the Linux syscall contract.
+    unsafe { syscall6(SYS_FLOCK, fd as usize, operation, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn unlinkat(path: &[u8]) -> isize {
+    // SAFETY: `path` is a live readable NUL-terminated pathname for the complete
+    // synchronous call. AT_FDCWD and zero flags request ordinary file unlink.
+    unsafe {
+        syscall6(
+            SYS_UNLINKAT,
+            AT_FDCWD as usize,
+            path.as_ptr() as usize,
+            0,
             0,
             0,
             0,
@@ -1474,6 +1523,40 @@ fn wait_child(pid: isize, status: &mut i32) -> isize {
             SYS_WAIT4,
             pid as usize,
             status as *mut i32 as usize,
+            0,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn wait_child_nohang(pid: isize, status: &mut i32) -> isize {
+    // SAFETY: `status` remains uniquely writable for the synchronous wait4 call;
+    // WNOHANG requests an immediate observation of this exact positive child pid.
+    unsafe {
+        syscall6(
+            SYS_WAIT4,
+            pid as usize,
+            status as *mut i32 as usize,
+            WNOHANG,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn nanosleep(request: &Timespec) -> isize {
+    // SAFETY: `request` is aligned and readable for the complete syscall. A null
+    // remainder pointer explicitly declines the optional interrupted duration.
+    unsafe {
+        syscall6(
+            SYS_NANOSLEEP,
+            request as *const Timespec as usize,
+            0,
             0,
             0,
             0,
@@ -2369,6 +2452,78 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_PIPE_FORK_EXEC) != ASSERT_PIPE_FORK_EXEC.len() as isize {
         fail(USER_FAIL_WRITE, 256);
+    }
+
+    // Cargo serializes shared cache/package state with blocking flock. Hold an
+    // exclusive lock in the parent, then make a child use an independently opened
+    // description for the same file. WNOHANG must observe the child still blocked;
+    // only the parent's unlock may let it acquire, unlock, and exit successfully.
+    let flock_parent_fd = openat_mode(FLOCK_PROBE_PATH, O_CREAT | O_RDWR, 0o600);
+    if flock_parent_fd < 0 || flock(flock_parent_fd as i32, LOCK_EX) != 0 {
+        fail(USER_FAIL_FLOCK_BLOCKING, 273);
+    }
+    let mut flock_ready_pipe = [-1_i32; 2];
+    if pipe2(&mut flock_ready_pipe, 0) != 0 {
+        let _ = flock(flock_parent_fd as i32, LOCK_UN);
+        let _ = close(flock_parent_fd as i32);
+        fail(USER_FAIL_FLOCK_BLOCKING, 274);
+    }
+    let flock_child = fork_process();
+    if flock_child == 0 {
+        let mut code = 41;
+        if close(flock_ready_pipe[0]) == 0 && close(flock_parent_fd as i32) == 0 {
+            let child_fd = openat_mode(FLOCK_PROBE_PATH, O_RDWR, 0);
+            if child_fd >= 0 && pipe_write(flock_ready_pipe[1], b"R") == 1 {
+                if flock(child_fd as i32, LOCK_EX) == 0
+                    && flock(child_fd as i32, LOCK_UN) == 0
+                    && close(child_fd as i32) == 0
+                {
+                    code = 0;
+                } else {
+                    code = 42;
+                }
+            }
+        }
+        let _ = close(flock_ready_pipe[1]);
+        exit(code);
+    }
+    if flock_child < 0 || close(flock_ready_pipe[1]) != 0 {
+        let _ = flock(flock_parent_fd as i32, LOCK_UN);
+        let _ = close(flock_parent_fd as i32);
+        let _ = close(flock_ready_pipe[0]);
+        fail(USER_FAIL_FLOCK_BLOCKING, 275);
+    }
+    let mut flock_ready = [0_u8; 1];
+    let ready = fd_read(flock_ready_pipe[0], &mut flock_ready);
+    let settle = Timespec {
+        seconds: 0,
+        nanoseconds: 50_000_000,
+    };
+    let sleep_result = nanosleep(&settle);
+    let mut early_status = -1_i32;
+    let early_wait = wait_child_nohang(flock_child, &mut early_status);
+    let unlock_result = flock(flock_parent_fd as i32, LOCK_UN);
+    if ready != 1
+        || flock_ready != [b'R']
+        || sleep_result != 0
+        || early_wait != 0
+        || unlock_result != 0
+    {
+        let _ = close(flock_parent_fd as i32);
+        let _ = close(flock_ready_pipe[0]);
+        let _ = unlinkat(FLOCK_PROBE_PATH);
+        fail(USER_FAIL_FLOCK_BLOCKING, 276);
+    }
+    let mut flock_status = -1_i32;
+    let flock_wait = wait_child(flock_child, &mut flock_status);
+    let flock_cleanup = (close(flock_parent_fd as i32) == 0)
+        & (close(flock_ready_pipe[0]) == 0)
+        & (unlinkat(FLOCK_PROBE_PATH) == 0);
+    if flock_wait != flock_child || flock_status != 0 || !flock_cleanup {
+        fail(USER_FAIL_FLOCK_BLOCKING, 277);
+    }
+    if write(ASSERT_FLOCK_BLOCKING) != ASSERT_FLOCK_BLOCKING.len() as isize {
+        fail(USER_FAIL_WRITE, 278);
     }
 
     // CAgent's server and concurrent clients depend on ordinary process creation and
