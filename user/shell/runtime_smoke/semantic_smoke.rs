@@ -16,6 +16,7 @@ use core::{
 const SYS_DUP3: usize = 24;
 const SYS_FLOCK: usize = 32;
 const SYS_UNLINKAT: usize = 35;
+const SYS_LINKAT: usize = 37;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
@@ -46,8 +47,10 @@ const SYS_EXECVE: usize = 221;
 const SYS_MMAP: usize = 222;
 const SYS_MADVISE: usize = 233;
 const SYS_WAIT4: usize = 260;
+const SYS_RENAMEAT2: usize = 276;
 const SYS_CLONE3: usize = 435;
 
+const NEG_ENOENT: isize = -2;
 const NEG_E2BIG: isize = -7;
 const NEG_EFAULT: isize = -14;
 const NEG_EBADF: isize = -9;
@@ -106,6 +109,11 @@ const TCP_FORK_PORT: u16 = 39_026;
 const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
 const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
 const FLOCK_PROBE_PATH: &[u8] = b"/tmp/pr3-semantic-flock-lock\0";
+const HARDLINK_RENAME_SOURCE: &[u8] = b"/tmp/pr3-semantic-hardlink-source\0";
+const HARDLINK_RENAME_ALIAS: &[u8] = b"/tmp/pr3-semantic-hardlink-alias\0";
+const HARDLINK_RENAME_TARGET: &[u8] = b"/tmp/pr3-semantic-hardlink-target\0";
+const HARDLINK_RENAME_SOURCE_DATA: &[u8] = b"SRC!";
+const HARDLINK_RENAME_TARGET_DATA: &[u8] = b"DST?";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
 const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
 
@@ -178,6 +186,12 @@ const ASSERT_FLOCK_BLOCKING: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_FLOCK_BLOCKING: &[u8] =
     b"PR3_SMOKE_V1 ASSERT flock_blocking PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_HARDLINK_RENAME_REPLACE: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT hardlink_rename_replace PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_HARDLINK_RENAME_REPLACE: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT hardlink_rename_replace PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -301,6 +315,12 @@ const USER_FAIL_FLOCK_BLOCKING: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FLOCK_BLOCKING: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL flock_blocking arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_HARDLINK_RENAME_REPLACE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL hardlink_rename_replace arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_HARDLINK_RENAME_REPLACE: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL hardlink_rename_replace arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=riscv64\n";
@@ -852,6 +872,54 @@ fn unlinkat(path: &[u8]) -> isize {
             0,
         )
     }
+}
+
+#[inline(always)]
+fn linkat(old_path: &[u8], new_path: &[u8]) -> isize {
+    // SAFETY: both slices are readable NUL-terminated pathnames that remain live for
+    // the synchronous syscall. AT_FDCWD selects the current directory namespace for
+    // each absolute pathname, and zero flags request an ordinary hard link.
+    unsafe {
+        syscall6(
+            SYS_LINKAT,
+            AT_FDCWD as usize,
+            old_path.as_ptr() as usize,
+            AT_FDCWD as usize,
+            new_path.as_ptr() as usize,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn renameat2(old_path: &[u8], new_path: &[u8]) -> isize {
+    // SAFETY: both slices are readable NUL-terminated pathnames for the complete
+    // synchronous call. AT_FDCWD and zero flags request ordinary replacement rename.
+    unsafe {
+        syscall6(
+            SYS_RENAMEAT2,
+            AT_FDCWD as usize,
+            old_path.as_ptr() as usize,
+            AT_FDCWD as usize,
+            new_path.as_ptr() as usize,
+            0,
+            0,
+        )
+    }
+}
+
+fn path_has_exact_data(path: &[u8], expected: &[u8]) -> bool {
+    let fd = openat(path, O_RDONLY);
+    if fd < 0 {
+        return false;
+    }
+    let mut data = [0_u8; 8];
+    let read_result = fd_read(fd as i32, &mut data);
+    let close_result = close(fd as i32);
+    read_result == expected.len() as isize
+        && data[..expected.len()] == *expected
+        && close_result == 0
 }
 
 fn loopback_sockaddr() -> [u8; 16] {
@@ -2524,6 +2592,65 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FLOCK_BLOCKING) != ASSERT_FLOCK_BLOCKING.len() as isize {
         fail(USER_FAIL_WRITE, 278);
+    }
+
+    // Rust build tools publish temporary artifacts with ordinary replacement rename.
+    // Exercise the namespace shape where the source name is a hardlink alias and the
+    // destination is a different existing regular file. The destination must become
+    // another name for the source inode; RENAME_NOREPLACE is deliberately not used.
+    let _ = unlinkat(HARDLINK_RENAME_ALIAS);
+    let _ = unlinkat(HARDLINK_RENAME_TARGET);
+    let _ = unlinkat(HARDLINK_RENAME_SOURCE);
+    let source_fd = openat_mode(HARDLINK_RENAME_SOURCE, O_CREAT | O_RDWR, 0o600);
+    if source_fd < 0
+        || pipe_write(source_fd as i32, HARDLINK_RENAME_SOURCE_DATA)
+            != HARDLINK_RENAME_SOURCE_DATA.len() as isize
+        || close(source_fd as i32) != 0
+        || linkat(HARDLINK_RENAME_SOURCE, HARDLINK_RENAME_ALIAS) != 0
+    {
+        let _ = unlinkat(HARDLINK_RENAME_ALIAS);
+        let _ = unlinkat(HARDLINK_RENAME_SOURCE);
+        fail(USER_FAIL_HARDLINK_RENAME_REPLACE, 279);
+    }
+    let target_fd = openat_mode(HARDLINK_RENAME_TARGET, O_CREAT | O_RDWR, 0o600);
+    if target_fd < 0
+        || pipe_write(target_fd as i32, HARDLINK_RENAME_TARGET_DATA)
+            != HARDLINK_RENAME_TARGET_DATA.len() as isize
+        || close(target_fd as i32) != 0
+    {
+        let _ = unlinkat(HARDLINK_RENAME_ALIAS);
+        let _ = unlinkat(HARDLINK_RENAME_TARGET);
+        let _ = unlinkat(HARDLINK_RENAME_SOURCE);
+        fail(USER_FAIL_HARDLINK_RENAME_REPLACE, 280);
+    }
+    let replace_result = renameat2(HARDLINK_RENAME_ALIAS, HARDLINK_RENAME_TARGET);
+    let replaced_data_ok = path_has_exact_data(
+        HARDLINK_RENAME_TARGET,
+        HARDLINK_RENAME_SOURCE_DATA,
+    );
+    let source_data_ok = path_has_exact_data(
+        HARDLINK_RENAME_SOURCE,
+        HARDLINK_RENAME_SOURCE_DATA,
+    );
+    let old_alias_result = openat(HARDLINK_RENAME_ALIAS, O_RDONLY);
+    if old_alias_result >= 0 {
+        let _ = close(old_alias_result as i32);
+    }
+    let cleanup_ok = (unlinkat(HARDLINK_RENAME_TARGET) == 0)
+        & (unlinkat(HARDLINK_RENAME_SOURCE) == 0);
+    if replace_result != 0
+        || !replaced_data_ok
+        || !source_data_ok
+        || old_alias_result != NEG_ENOENT
+        || !cleanup_ok
+    {
+        let _ = unlinkat(HARDLINK_RENAME_ALIAS);
+        let _ = unlinkat(HARDLINK_RENAME_TARGET);
+        let _ = unlinkat(HARDLINK_RENAME_SOURCE);
+        fail(USER_FAIL_HARDLINK_RENAME_REPLACE, 281);
+    }
+    if write(ASSERT_HARDLINK_RENAME_REPLACE) != ASSERT_HARDLINK_RENAME_REPLACE.len() as isize {
+        fail(USER_FAIL_WRITE, 282);
     }
 
     // CAgent's server and concurrent clients depend on ordinary process creation and
