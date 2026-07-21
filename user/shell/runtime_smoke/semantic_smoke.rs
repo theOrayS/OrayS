@@ -21,12 +21,14 @@ const SYS_FLOCK: usize = 32;
 const SYS_MKDIRAT: usize = 34;
 const SYS_UNLINKAT: usize = 35;
 const SYS_LINKAT: usize = 37;
+const SYS_FTRUNCATE: usize = 46;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
 const SYS_GETDENTS64: usize = 61;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
+const SYS_PWRITE64: usize = 68;
 const SYS_VMSPLICE: usize = 75;
 const SYS_SPLICE: usize = 76;
 const SYS_TEE: usize = 77;
@@ -56,6 +58,7 @@ const SYS_MUNMAP: usize = 215;
 const SYS_CLONE: usize = 220;
 const SYS_EXECVE: usize = 221;
 const SYS_MMAP: usize = 222;
+const SYS_MINCORE: usize = 232;
 const SYS_MADVISE: usize = 233;
 const SYS_WAIT4: usize = 260;
 const SYS_PRLIMIT64: usize = 261;
@@ -133,6 +136,8 @@ const RLIMIT_STACK: usize = 3;
 const PAGE_BYTES: usize = 4096;
 const MADVISE_PROBE_BYTES: usize = 8 * 1024 * 1024;
 const MADVISE_PROBE_ITERATIONS: usize = 16;
+const PRIVATE_FILE_MMAP_BYTES: usize = 16 * 1024 * 1024;
+const PRIVATE_FILE_MMAP_PAGES: usize = PRIVATE_FILE_MMAP_BYTES / PAGE_BYTES;
 const EXPANDED_STACK_LIMIT_BYTES: u64 = 64 * 1024 * 1024;
 const STACK_GROWTH_PROBE_BYTES: usize = 12 * 1024 * 1024;
 const CARGO_THREAD_CLONE_FLAGS: u64 = CLONE_VM
@@ -151,6 +156,7 @@ const TCP_FORK_PORT: u16 = 39_026;
 const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
 const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
 const FLOCK_PROBE_PATH: &[u8] = b"/tmp/pr3-semantic-flock-lock\0";
+const PRIVATE_FILE_MMAP_PATH: &[u8] = b"/tmp/pr3-semantic-private-file-mmap\0";
 const FLOCK_RENAME_OLD_PATH: &[u8] = b"/tmp/pr3-semantic-flock-rename-old\0";
 const FLOCK_RENAME_NEW_PATH: &[u8] = b"/tmp/pr3-semantic-flock-rename-new\0";
 const HARDLINK_RENAME_SOURCE: &[u8] = b"/tmp/pr3-semantic-hardlink-source\0";
@@ -253,6 +259,12 @@ const ASSERT_PIPE_FIONBIO: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PIPE_FIONBIO: &[u8] =
     b"PR3_SMOKE_V1 ASSERT pipe_fionbio PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_MMAP_PRIVATE_LAZY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT mmap_private_lazy PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_MMAP_PRIVATE_LAZY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT mmap_private_lazy PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=riscv64\n";
@@ -466,6 +478,12 @@ const USER_FAIL_PIPE_FIONBIO: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_PIPE_FIONBIO: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL pipe_fionbio arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_MMAP_PRIVATE_LAZY: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL mmap_private_lazy arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_MMAP_PRIVATE_LAZY: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL mmap_private_lazy arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL madvise_dontneed arch=riscv64\n";
@@ -1245,6 +1263,30 @@ fn openat_mode(path: &[u8], flags: usize, mode: usize) -> isize {
             path.as_ptr() as usize,
             flags,
             mode,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn ftruncate(fd: i32, len: usize) -> isize {
+    // SAFETY: ftruncate consumes only the live scalar descriptor and requested
+    // length; no userspace pointer is passed to the kernel.
+    unsafe { syscall6(SYS_FTRUNCATE, fd as usize, len, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn pwrite(fd: i32, bytes: &[u8], offset: usize) -> isize {
+    // SAFETY: `bytes` remains readable for the complete synchronous pwrite64;
+    // descriptor, length, and offset are bounded scalar ABI values.
+    unsafe {
+        syscall6(
+            SYS_PWRITE64,
+            fd as usize,
+            bytes.as_ptr() as usize,
+            bytes.len(),
+            offset,
             0,
             0,
         )
@@ -2184,6 +2226,41 @@ fn mmap_private_anonymous(len: usize) -> isize {
 }
 
 #[inline(always)]
+fn mmap_private_file(fd: i32, len: usize) -> isize {
+    // SAFETY: this requests a kernel-selected mapping of the live readable file
+    // descriptor at offset zero. The returned raw address is checked before any
+    // pointer access and remains live until the matching munmap.
+    unsafe {
+        syscall6(
+            SYS_MMAP,
+            0,
+            len,
+            PROT_READ | PROT_WRITE,
+            MAP_PRIVATE,
+            fd as usize,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn mincore(addr: usize, len: usize, residency: &mut [u8]) -> isize {
+    // SAFETY: `addr..addr+len` names the live page-aligned mapping under test and
+    // `residency` has one writable byte per page for the whole synchronous call.
+    unsafe {
+        syscall6(
+            SYS_MINCORE,
+            addr,
+            len,
+            residency.as_mut_ptr() as usize,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
 fn madvise_dontneed(addr: usize, len: usize) -> isize {
     // SAFETY: callers keep the complete page-aligned mapping live throughout this
     // synchronous syscall. The remaining arguments are scalar Linux ABI values.
@@ -2655,6 +2732,99 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_PIPE_FIONBIO) != ASSERT_PIPE_FIONBIO.len() as isize {
         fail(USER_FAIL_WRITE, 349);
+    }
+
+    // rustc's dynamic loader maps very large shared objects with private fixed
+    // file mappings. A plain MAP_PRIVATE request without MAP_POPULATE or locking
+    // must remain nonresident until accessed; eager population multiplies both
+    // memory use and startup I/O across concurrent compiler processes. Use a
+    // sparse regular file so this contract measures mapping policy, not host data.
+    let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+    let mmap_file = openat_mode(PRIVATE_FILE_MMAP_PATH, O_CREAT | O_RDWR, 0o600);
+    if mmap_file < 0 {
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 350);
+    }
+    let mmap_file = mmap_file as i32;
+    let first_file_byte = [0x31_u8];
+    let last_file_byte = [0x7a_u8];
+    if ftruncate(mmap_file, PRIVATE_FILE_MMAP_BYTES) != 0
+        || pwrite(mmap_file, &first_file_byte, 0) != 1
+        || pwrite(
+            mmap_file,
+            &last_file_byte,
+            PRIVATE_FILE_MMAP_BYTES - PAGE_BYTES,
+        ) != 1
+    {
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 351);
+    }
+    let private_file_mapping = mmap_private_file(mmap_file, PRIVATE_FILE_MMAP_BYTES);
+    if private_file_mapping < 0
+        || private_file_mapping as usize & (PAGE_BYTES - 1) != 0
+    {
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 352);
+    }
+    let private_file_mapping = private_file_mapping as usize;
+    let mut residency = [0_u8; PRIVATE_FILE_MMAP_PAGES];
+    if mincore(
+        private_file_mapping,
+        PRIVATE_FILE_MMAP_BYTES,
+        &mut residency,
+    ) != 0
+        || residency.iter().any(|value| value & 1 != 0)
+    {
+        let _ = munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES);
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 353);
+    }
+    // SAFETY: both volatile reads are within the live readable mapping and do not
+    // create references that outlive the access or the later munmap.
+    if unsafe { (private_file_mapping as *const u8).read_volatile() } != first_file_byte[0]
+        || unsafe {
+            ((private_file_mapping + PRIVATE_FILE_MMAP_BYTES - PAGE_BYTES) as *const u8)
+                .read_volatile()
+        } != last_file_byte[0]
+    {
+        let _ = munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES);
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 354);
+    }
+    residency.fill(0);
+    if mincore(
+        private_file_mapping,
+        PRIVATE_FILE_MMAP_BYTES,
+        &mut residency,
+    ) != 0
+        || residency.iter().filter(|value| **value & 1 != 0).count() != 2
+    {
+        let _ = munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES);
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 355);
+    }
+    // SAFETY: the first byte remains inside the live private writable mapping.
+    // The following descriptor read proves this mutation is not written through.
+    unsafe { (private_file_mapping as *mut u8).write_volatile(0xa5) };
+    let mut backing_byte = [0_u8; 1];
+    if fd_read(mmap_file, &mut backing_byte) != 1 || backing_byte != first_file_byte {
+        let _ = munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES);
+        let _ = close(mmap_file);
+        let _ = unlinkat(PRIVATE_FILE_MMAP_PATH);
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 356);
+    }
+    if munmap(private_file_mapping, PRIVATE_FILE_MMAP_BYTES) != 0
+        || close(mmap_file) != 0
+        || unlinkat(PRIVATE_FILE_MMAP_PATH) != 0
+    {
+        fail(USER_FAIL_MMAP_PRIVATE_LAZY, 357);
+    }
+    if write(ASSERT_MMAP_PRIVATE_LAZY) != ASSERT_MMAP_PRIVATE_LAZY.len() as isize {
+        fail(USER_FAIL_WRITE, 358);
     }
 
     // Cargo/rustc allocators repeatedly discard private anonymous MAP_NORESERVE
