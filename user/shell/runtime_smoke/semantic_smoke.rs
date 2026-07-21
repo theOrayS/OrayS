@@ -4,7 +4,7 @@
 use core::{
     mem::MaybeUninit,
     panic::PanicInfo,
-    sync::atomic::{AtomicI32, Ordering},
+    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
 };
 
 // This freestanding program is the userspace side of the repository-contained ABI
@@ -36,7 +36,9 @@ const SYS_NANOSLEEP: usize = 101;
 const SYS_CLOCK_GETTIME: usize = 113;
 const SYS_SCHED_SETAFFINITY: usize = 122;
 const SYS_SCHED_GETAFFINITY: usize = 123;
+const SYS_KILL: usize = 129;
 const SYS_SIGALTSTACK: usize = 132;
+const SYS_RT_SIGACTION: usize = 134;
 const SYS_UNAME: usize = 160;
 const SYS_PRCTL: usize = 167;
 const SYS_GETPID: usize = 172;
@@ -97,7 +99,11 @@ const FD_CLOEXEC: isize = 1;
 const PR_SET_NAME: usize = 15;
 const PR_GET_NAME: usize = 16;
 const SIGCHLD: usize = 17;
+const SIGUSR1: usize = 10;
+const SS_ONSTACK: i32 = 1;
 const SS_DISABLE: i32 = 2;
+const SA_ONSTACK: usize = 0x0800_0000;
+const KERNEL_SIGSET_BYTES: usize = 8;
 const CLONE_VM: u64 = 0x0000_0100;
 const CLONE_FS: u64 = 0x0000_0200;
 const CLONE_FILES: u64 = 0x0000_0400;
@@ -196,6 +202,7 @@ static CLONE3_VFORK_STAGE: AtomicI32 = AtomicI32::new(0);
 // sufficient and no Rust reference aliases kernel access to the range.
 static mut SIGNAL_ALT_STACK: [u128; SIGNAL_ALT_STACK_BYTES / 16] =
     [0; SIGNAL_ALT_STACK_BYTES / 16];
+static SIGNAL_ALT_STACK_HANDLER_STATE: AtomicUsize = AtomicUsize::new(0);
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -337,6 +344,12 @@ const ASSERT_SIGALTSTACK_FORK_EXEC: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_SIGALTSTACK_FORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT sigaltstack_fork_exec PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_SIGALTSTACK_ONSTACK: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT sigaltstack_onstack PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_SIGALTSTACK_ONSTACK: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT sigaltstack_onstack PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64\n";
@@ -558,6 +571,12 @@ const USER_FAIL_SIGALTSTACK_FORK_EXEC: &[u8] =
 const USER_FAIL_SIGALTSTACK_FORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL sigaltstack_fork_exec arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const USER_FAIL_SIGALTSTACK_ONSTACK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL sigaltstack_onstack arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_SIGALTSTACK_ONSTACK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL sigaltstack_onstack arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const USER_FAIL_TCP_FORK_LOOPBACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL tcp_fork_loopback arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -650,6 +669,13 @@ impl SignalStack {
             size: 0,
         }
     }
+}
+
+#[repr(C)]
+struct KernelSigaction {
+    handler: usize,
+    flags: usize,
+    mask: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -1707,6 +1733,50 @@ fn sigaltstack(new_stack: *const SignalStack, old_stack: *mut SignalStack) -> is
             0,
         )
     }
+}
+
+#[inline(always)]
+fn rt_sigaction(signal: usize, action: *const KernelSigaction) -> isize {
+    // SAFETY: `action` is either null or points to a complete kernel_sigaction
+    // whose three native-width fields match both supported 64-bit Linux ABIs.
+    unsafe {
+        syscall6(
+            SYS_RT_SIGACTION,
+            signal,
+            action as usize,
+            0,
+            KERNEL_SIGSET_BYTES,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn send_signal(pid: usize, signal: usize) -> isize {
+    // SAFETY: kill consumes only the scalar pid and signal arguments.
+    unsafe { syscall6(SYS_KILL, pid, signal, 0, 0, 0, 0) }
+}
+
+extern "C" fn altstack_signal_handler(_signal: usize) {
+    let local = 0_u8;
+    let local_addr = core::ptr::addr_of!(local) as usize;
+    let stack_start = core::ptr::addr_of_mut!(SIGNAL_ALT_STACK).cast::<u8>() as usize;
+    let stack_end = stack_start + SIGNAL_ALT_STACK_BYTES;
+    let mut observed = SignalStack::disabled();
+    let query = sigaltstack(core::ptr::null(), &mut observed);
+    let mut state = 1;
+    if (stack_start..stack_end).contains(&local_addr) {
+        state |= 2;
+    }
+    if query == 0
+        && observed.sp == stack_start
+        && observed.flags & SS_ONSTACK != 0
+        && observed.size == SIGNAL_ALT_STACK_BYTES
+    {
+        state |= 4;
+    }
+    SIGNAL_ALT_STACK_HANDLER_STATE.store(state, Ordering::Release);
 }
 
 #[repr(C)]
@@ -3237,6 +3307,26 @@ pub extern "C" fn _start() -> ! {
     if write(ASSERT_CLONE3_VFORK_EXEC) != ASSERT_CLONE3_VFORK_EXEC.len() as isize {
         fail(USER_FAIL_WRITE, 272);
     }
+
+    // SA_ONSTACK must move the handler frame onto the configured alternate stack.
+    // The handler independently checks both its local address and Linux's dynamic
+    // SS_ONSTACK query state; a successful rt_sigaction/kill alone is insufficient.
+    let altstack_action = KernelSigaction {
+        handler: altstack_signal_handler as usize,
+        flags: SA_ONSTACK,
+        mask: 0,
+    };
+    SIGNAL_ALT_STACK_HANDLER_STATE.store(0, Ordering::Release);
+    if rt_sigaction(SIGUSR1, &altstack_action) != 0
+        || send_signal(pid as usize, SIGUSR1) != 0
+        || SIGNAL_ALT_STACK_HANDLER_STATE.load(Ordering::Acquire) != 7
+    {
+        fail(USER_FAIL_SIGALTSTACK_ONSTACK, 279);
+    }
+    if write(ASSERT_SIGALTSTACK_ONSTACK) != ASSERT_SIGALTSTACK_ONSTACK.len() as isize {
+        fail(USER_FAIL_WRITE, 280);
+    }
+
     let disabled_altstack = SignalStack::disabled();
     let mut observed_disabled_altstack = configured_altstack;
     if sigaltstack(&disabled_altstack, core::ptr::null_mut()) != 0
