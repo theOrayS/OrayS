@@ -565,6 +565,65 @@ fn ensure_signal_frame_pages(
         .map_err(LinuxError::from)
 }
 
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
+fn sigaltstack_range(ext: &UserTaskExt) -> Option<(usize, usize)> {
+    let flags = ext.sigaltstack_flags.load(Ordering::Acquire) as u32;
+    if flags & SS_DISABLE as u32 != 0 {
+        return None;
+    }
+    let start = ext.sigaltstack_sp.load(Ordering::Acquire);
+    let size = usize::try_from(ext.sigaltstack_size.load(Ordering::Acquire)).ok()?;
+    let end = start.checked_add(size)?;
+    (start < end).then_some((start, end))
+}
+
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
+fn pointer_on_sigaltstack(ext: &UserTaskExt, pointer: usize) -> bool {
+    pointer != 0
+        && sigaltstack_range(ext).is_some_and(|(start, end)| (start..end).contains(&pointer))
+}
+
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
+fn sigaltstack_at_pointer(ext: &UserTaskExt, pointer: usize) -> general::sigaltstack {
+    let mut stack = general::sigaltstack {
+        ss_sp: ext.sigaltstack_sp.load(Ordering::Acquire) as *mut core::ffi::c_void,
+        ss_flags: ext.sigaltstack_flags.load(Ordering::Acquire),
+        ss_size: ext.sigaltstack_size.load(Ordering::Acquire),
+    };
+    if stack.ss_flags as u32 & SS_DISABLE as u32 == 0 && pointer_on_sigaltstack(ext, pointer) {
+        stack.ss_flags |= general::SS_ONSTACK as i32;
+    }
+    stack
+}
+
+#[cfg(any(target_arch = "riscv64", target_arch = "loongarch64"))]
+fn signal_frame_layout(
+    ext: &UserTaskExt,
+    action_flags: u64,
+    current_sp: usize,
+    frame_size: usize,
+) -> Result<(usize, general::sigaltstack), LinuxError> {
+    let interrupted_stack = sigaltstack_at_pointer(ext, current_sp);
+    let already_on_altstack = interrupted_stack.ss_flags & general::SS_ONSTACK as i32 != 0;
+    let use_altstack = action_flags & general::SA_ONSTACK as u64 != 0
+        && interrupted_stack.ss_flags & SS_DISABLE == 0
+        && !already_on_altstack;
+    let (stack_top, altstack_start) = if use_altstack {
+        let (start, end) = sigaltstack_range(ext).ok_or(LinuxError::EFAULT)?;
+        (end, Some(start))
+    } else {
+        (current_sp, None)
+    };
+    let frame_addr = stack_top
+        .checked_sub(frame_size)
+        .map(|address| align_down(address, 16))
+        .ok_or(LinuxError::EFAULT)?;
+    if altstack_start.is_some_and(|start| frame_addr < start) {
+        return Err(LinuxError::EFAULT);
+    }
+    Ok((frame_addr, interrupted_stack))
+}
+
 #[cfg(target_arch = "riscv64")]
 fn inject_pending_signal(
     tf: &mut TrapFrame,
@@ -612,7 +671,8 @@ fn inject_pending_signal(
         *tf
     };
     let frame_size = riscv_signal_frame_size();
-    let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
+    let (frame_addr, interrupted_stack) =
+        signal_frame_layout(ext, action.sa_flags, tf.regs.sp, frame_size)?;
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
 
     let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
@@ -626,7 +686,9 @@ fn inject_pending_signal(
         sender_uid,
         value,
         restore_mask,
-        SS_DISABLE,
+        interrupted_stack.ss_sp as usize,
+        interrupted_stack.ss_flags,
+        usize::try_from(interrupted_stack.ss_size).map_err(|_| LinuxError::EFAULT)?,
         RISCV_SIGTRAMP_CODE,
         trap_frame_to_riscv_sigcontext(&saved_tf),
     );
@@ -700,7 +762,8 @@ fn inject_pending_signal(
         *tf
     };
     let frame_size = loongarch_signal_frame_size();
-    let frame_addr = align_down(tf.regs.sp.saturating_sub(frame_size), 16);
+    let (frame_addr, interrupted_stack) =
+        signal_frame_layout(ext, action.sa_flags, tf.regs.sp, frame_size)?;
     ensure_signal_frame_pages(ext.process.as_ref(), frame_addr, frame_size)?;
 
     let sender_pid = ext.pending_signal_sender.load(Ordering::Acquire);
@@ -714,7 +777,9 @@ fn inject_pending_signal(
         sender_uid,
         value,
         restore_mask,
-        SS_DISABLE,
+        interrupted_stack.ss_sp as usize,
+        interrupted_stack.ss_flags,
+        usize::try_from(interrupted_stack.ss_size).map_err(|_| LinuxError::EFAULT)?,
         LOONGARCH_SIGTRAMP_CODE,
         trap_frame_to_loongarch_sigcontext(&saved_tf),
     );
@@ -806,15 +871,7 @@ pub(super) fn sys_rt_sigaction(
 }
 
 fn current_sigaltstack(ext: &UserTaskExt) -> general::sigaltstack {
-    let mut flags = ext.sigaltstack_flags.load(Ordering::Acquire);
-    if flags & SS_DISABLE == 0 && ext.signal_frame.load(Ordering::Acquire) != 0 {
-        flags |= general::SS_ONSTACK as i32;
-    }
-    general::sigaltstack {
-        ss_sp: ext.sigaltstack_sp.load(Ordering::Acquire) as *mut core::ffi::c_void,
-        ss_flags: flags,
-        ss_size: ext.sigaltstack_size.load(Ordering::Acquire),
-    }
+    sigaltstack_at_pointer(ext, ext.signal_frame.load(Ordering::Acquire))
 }
 
 pub(super) fn sys_sigaltstack(process: &UserProcess, ss: usize, old_ss: usize) -> isize {
@@ -833,7 +890,7 @@ pub(super) fn sys_sigaltstack(process: &UserProcess, ss: usize, old_ss: usize) -
     if ss == 0 {
         return 0;
     }
-    if ext.signal_frame.load(Ordering::Acquire) != 0 {
+    if pointer_on_sigaltstack(ext, ext.signal_frame.load(Ordering::Acquire)) {
         return neg_errno(LinuxError::EPERM);
     }
 
@@ -1499,7 +1556,9 @@ pub(super) fn make_riscv_signal_frame(
     uid: u32,
     value: usize,
     current_mask: u64,
+    stack_sp: usize,
     stack_flags: i32,
+    stack_size: usize,
     trampoline: [u32; 3],
     mcontext: RiscvSignalSigcontext,
 ) -> RiscvSignalFrame {
@@ -1509,10 +1568,10 @@ pub(super) fn make_riscv_signal_frame(
             flags: 0,
             link: 0,
             stack: RiscvSignalStack {
-                sp: 0,
+                sp: stack_sp,
                 stack_flags,
                 stack_pad: 0,
-                size: 0,
+                size: stack_size,
             },
             sigmask: RiscvKernelSigset {
                 sig: [current_mask],
@@ -1698,7 +1757,9 @@ pub(super) fn make_loongarch_signal_frame(
     uid: u32,
     value: usize,
     current_mask: u64,
+    stack_sp: usize,
     stack_flags: i32,
+    stack_size: usize,
     trampoline: [u32; 3],
     mcontext: LoongArchSigcontext,
 ) -> LoongArchSignalFrame {
@@ -1708,10 +1769,10 @@ pub(super) fn make_loongarch_signal_frame(
             flags: 0,
             link: 0,
             stack: LoongArchSignalStack {
-                sp: 0,
+                sp: stack_sp,
                 stack_flags,
                 stack_pad: 0,
-                size: 0,
+                size: stack_size,
             },
             sigmask: LoongArchKernelSigset {
                 sig: [current_mask],
