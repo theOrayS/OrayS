@@ -10,6 +10,7 @@ use axsync::Mutex;
 use axtask::WaitQueue;
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
+use orays_linux::user::{UserAddr, UserPtr, Write};
 use std::collections::VecDeque;
 use std::string::String;
 use std::sync::Arc;
@@ -31,7 +32,8 @@ use super::signal_abi::current_unblocked_signal_pending;
 use super::time_abi::{socket_duration_to_timeval, socket_timeval_to_duration};
 use super::user_memory::{
     MAX_USER_IO_CHUNK, read_iovec_entries, read_user_bytes, read_user_bytes_into, read_user_value,
-    user_io_buffer, validate_user_read, validate_user_write, write_user_bytes, write_user_value,
+    user_io_buffer, validate_user_read, validate_user_write, with_writable_user_slice,
+    write_user_bytes, write_user_value,
 };
 use super::{SelectMode, UserProcess, neg_errno, posix_ret_i32, posix_ret_usize};
 
@@ -1391,24 +1393,11 @@ fn recv_local_socket_data_to_user(
         return neg_errno(LinuxError::EFAULT);
     }
     let len = len.min(MAX_USER_IO_CHUNK);
-    if let Err(err) = validate_user_write(process, buf, len) {
-        return neg_errno(err);
-    }
-    let mut bytes = match user_io_buffer(len) {
-        Ok(bytes) => bytes,
-        Err(err) => return neg_errno(err),
+    let user_ptr = UserPtr::<u8, Write>::new(UserAddr::new(buf));
+    let Some(dst) = user_ptr.slice(len) else {
+        return neg_errno(LinuxError::EFAULT);
     };
-    let received = match socket.recv(process, &mut bytes, flags) {
-        Ok(received) => received,
-        Err(err) => return neg_errno(err),
-    };
-    if received == 0 {
-        return 0;
-    }
-    match write_user_bytes(process, buf, &bytes[..received]) {
-        Ok(()) => received as isize,
-        Err(err) => neg_errno(err),
-    }
+    with_writable_user_slice(process, dst, |bytes| socket.recv(process, bytes, flags))
 }
 
 pub(super) fn recv_socket_data_to_user_with_addr(

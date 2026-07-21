@@ -329,6 +329,14 @@ pub(super) fn write_user_slice(
     write_user_bytes(process, dst.ptr().addr().get(), bytes)
 }
 
+pub(super) fn with_writable_user_slice(
+    process: &UserProcess,
+    dst: UserSlice<u8, Write>,
+    f: impl FnOnce(&mut [u8]) -> Result<usize, LinuxError>,
+) -> isize {
+    with_writable_user_buffer(process, dst.ptr().addr().get(), dst.byte_len(), f)
+}
+
 fn write_user_bytes_raw(process: &UserProcess, ptr: usize, bytes: &[u8]) -> Result<(), LinuxError> {
     if bytes.is_empty() {
         return Ok(());
