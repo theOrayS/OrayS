@@ -73,6 +73,7 @@ const O_CREAT: usize = 0o100;
 const O_NONBLOCK: usize = 0o4000;
 const O_DIRECTORY: usize = 0o200000;
 const LOCK_EX: usize = 2;
+const LOCK_NB: usize = 4;
 const LOCK_UN: usize = 8;
 const WNOHANG: usize = 1;
 const AF_UNIX: usize = 1;
@@ -132,6 +133,8 @@ const TCP_FORK_PORT: u16 = 39_026;
 const EXEC_HELPER_PATH: &[u8] = b"/tmp/pr3-semantic-exec-helper\0";
 const EXEC_HELPER_PAYLOAD: &[u8] = b"orays-exec-helper\n";
 const FLOCK_PROBE_PATH: &[u8] = b"/tmp/pr3-semantic-flock-lock\0";
+const FLOCK_RENAME_OLD_PATH: &[u8] = b"/tmp/pr3-semantic-flock-rename-old\0";
+const FLOCK_RENAME_NEW_PATH: &[u8] = b"/tmp/pr3-semantic-flock-rename-new\0";
 const HARDLINK_RENAME_SOURCE: &[u8] = b"/tmp/pr3-semantic-hardlink-source\0";
 const HARDLINK_RENAME_ALIAS: &[u8] = b"/tmp/pr3-semantic-hardlink-alias\0";
 const HARDLINK_RENAME_TARGET: &[u8] = b"/tmp/pr3-semantic-hardlink-target\0";
@@ -231,6 +234,12 @@ const ASSERT_FLOCK_BLOCKING: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_FLOCK_BLOCKING: &[u8] =
     b"PR3_SMOKE_V1 ASSERT flock_blocking PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_FLOCK_RENAME_IDENTITY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT flock_rename_identity PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FLOCK_RENAME_IDENTITY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT flock_rename_identity PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_HARDLINK_RENAME_REPLACE: &[u8] =
     b"PR3_SMOKE_V1 ASSERT hardlink_rename_replace PASS arch=riscv64\n";
@@ -408,6 +417,12 @@ const USER_FAIL_FLOCK_BLOCKING: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FLOCK_BLOCKING: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL flock_blocking arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FLOCK_RENAME_IDENTITY: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL flock_rename_identity arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FLOCK_RENAME_IDENTITY: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL flock_rename_identity arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_HARDLINK_RENAME_REPLACE: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL hardlink_rename_replace arch=riscv64\n";
@@ -3033,6 +3048,61 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FLOCK_BLOCKING) != ASSERT_FLOCK_BLOCKING.len() as isize {
         fail(USER_FAIL_WRITE, 278);
+    }
+
+    // Linux binds flock state to the underlying file object, not to the pathname
+    // used by a particular open. Keep an exclusive lock across rename, then open
+    // the renamed path through a new description: nonblocking acquisition must
+    // conflict until the original description releases its lock.
+    let _ = unlinkat(FLOCK_RENAME_NEW_PATH);
+    let _ = unlinkat(FLOCK_RENAME_OLD_PATH);
+    let old_lock_fd = openat_mode(FLOCK_RENAME_OLD_PATH, O_CREAT | O_RDWR, 0o600);
+    if old_lock_fd < 0 || flock(old_lock_fd as i32, LOCK_EX) != 0 {
+        let _ = close(old_lock_fd as i32);
+        let _ = unlinkat(FLOCK_RENAME_OLD_PATH);
+        fail(USER_FAIL_FLOCK_RENAME_IDENTITY, 336);
+    }
+    if renameat2(FLOCK_RENAME_OLD_PATH, FLOCK_RENAME_NEW_PATH) != 0 {
+        let _ = flock(old_lock_fd as i32, LOCK_UN);
+        let _ = close(old_lock_fd as i32);
+        let _ = unlinkat(FLOCK_RENAME_OLD_PATH);
+        let _ = unlinkat(FLOCK_RENAME_NEW_PATH);
+        fail(USER_FAIL_FLOCK_RENAME_IDENTITY, 337);
+    }
+    let new_lock_fd = openat_mode(FLOCK_RENAME_NEW_PATH, O_RDWR, 0);
+    if new_lock_fd < 0 {
+        let _ = flock(old_lock_fd as i32, LOCK_UN);
+        let _ = close(old_lock_fd as i32);
+        let _ = unlinkat(FLOCK_RENAME_NEW_PATH);
+        fail(USER_FAIL_FLOCK_RENAME_IDENTITY, 338);
+    }
+    let conflict = flock(new_lock_fd as i32, LOCK_EX | LOCK_NB);
+    let unexpected_lock_cleanup = if conflict == 0 {
+        flock(new_lock_fd as i32, LOCK_UN)
+    } else {
+        0
+    };
+    let old_unlock = flock(old_lock_fd as i32, LOCK_UN);
+    let acquire_after_unlock = flock(new_lock_fd as i32, LOCK_EX | LOCK_NB);
+    let new_unlock = if acquire_after_unlock == 0 {
+        flock(new_lock_fd as i32, LOCK_UN)
+    } else {
+        0
+    };
+    let rename_lock_cleanup = (close(new_lock_fd as i32) == 0)
+        & (close(old_lock_fd as i32) == 0)
+        & (unlinkat(FLOCK_RENAME_NEW_PATH) == 0);
+    if conflict != NEG_EAGAIN
+        || unexpected_lock_cleanup != 0
+        || old_unlock != 0
+        || acquire_after_unlock != 0
+        || new_unlock != 0
+        || !rename_lock_cleanup
+    {
+        fail(USER_FAIL_FLOCK_RENAME_IDENTITY, 339);
+    }
+    if write(ASSERT_FLOCK_RENAME_IDENTITY) != ASSERT_FLOCK_RENAME_IDENTITY.len() as isize {
+        fail(USER_FAIL_WRITE, 340);
     }
 
     // Rust build tools publish temporary artifacts with ordinary replacement rename.
