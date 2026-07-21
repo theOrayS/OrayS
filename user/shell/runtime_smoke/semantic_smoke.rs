@@ -123,6 +123,7 @@ const CLONE_CHILD_CLEARTID: u64 = 0x0020_0000;
 const FUTEX_WAIT: usize = 0;
 const FUTEX_WAKE: usize = 1;
 const FUTEX_REQUEUE: usize = 3;
+const FUTEX_CMP_REQUEUE: usize = 4;
 const FUTEX_WAIT_BITSET: usize = 9;
 const FUTEX_PRIVATE_FLAG: usize = 128;
 const FUTEX_CLOCK_REALTIME: usize = 256;
@@ -397,6 +398,12 @@ const ASSERT_FUTEX_REQUEUE_SAME_ADDR: &[u8] =
 const ASSERT_FUTEX_REQUEUE_SAME_ADDR: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_requeue_same_addr PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_cmp_requeue_validation PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_cmp_requeue_validation PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -640,6 +647,12 @@ const USER_FAIL_FUTEX_REQUEUE_SAME_ADDR: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_REQUEUE_SAME_ADDR: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_requeue_same_addr arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_cmp_requeue_validation arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_cmp_requeue_validation arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -3133,6 +3146,75 @@ fn run_futex_requeue_same_addr_probe() -> bool {
         && unmapped
 }
 
+fn run_futex_cmp_requeue_validation_probe() -> bool {
+    let source = AtomicI32::new(1);
+    let target = AtomicI32::new(0);
+    let source_addr = source.as_ptr() as usize;
+    let target_addr = target.as_ptr() as usize;
+
+    let mapping = mmap_shared_anonymous(PAGE_BYTES);
+    if mapping <= 0 || munmap(mapping as usize, PAGE_BYTES) != 0 {
+        return false;
+    }
+
+    // Linux validates the target futex before comparing the source value.
+    // Therefore inaccessible aligned targets report EFAULT even though the
+    // source value differs, while alignment errors report EINVAL and a valid
+    // target reaches the comparison and reports EAGAIN.
+    // SAFETY: source and valid-target words are aligned and live for every raw
+    // syscall. The null, stale mapping, and misaligned values are intentional
+    // kernel-boundary inputs and are never dereferenced by this userspace code.
+    let null_target = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            source_addr,
+            FUTEX_CMP_REQUEUE,
+            0,
+            0,
+            0,
+            0,
+        )
+    };
+    let unmapped_target = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            source_addr,
+            FUTEX_CMP_REQUEUE,
+            0,
+            0,
+            mapping as usize,
+            0,
+        )
+    };
+    let misaligned_target = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            source_addr,
+            FUTEX_CMP_REQUEUE,
+            0,
+            0,
+            target_addr + 1,
+            0,
+        )
+    };
+    let valid_target = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            source_addr,
+            FUTEX_CMP_REQUEUE,
+            0,
+            0,
+            target_addr,
+            0,
+        )
+    };
+
+    null_target == NEG_EFAULT
+        && unmapped_target == NEG_EFAULT
+        && misaligned_target == NEG_EINVAL
+        && valid_target == NEG_EAGAIN
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -4198,6 +4280,14 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FUTEX_REQUEUE_SAME_ADDR) != ASSERT_FUTEX_REQUEUE_SAME_ADDR.len() as isize {
         fail(USER_FAIL_WRITE, 361);
+    }
+    if !run_futex_cmp_requeue_validation_probe() {
+        fail(USER_FAIL_FUTEX_CMP_REQUEUE_VALIDATION, 362);
+    }
+    if write(ASSERT_FUTEX_CMP_REQUEUE_VALIDATION)
+        != ASSERT_FUTEX_CMP_REQUEUE_VALIDATION.len() as isize
+    {
+        fail(USER_FAIL_WRITE, 363);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
