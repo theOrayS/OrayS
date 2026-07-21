@@ -6,6 +6,7 @@ use axalloc::global_allocator;
 use axerrno::LinuxError;
 use axfs::fops::{FileAttr, FileType, OpenOptions};
 use linux_raw_sys::general;
+use orays_linux::user::{UserAddr, UserPtr, Write};
 use std::string::{String, ToString};
 use std::vec::Vec;
 
@@ -25,7 +26,8 @@ use super::runtime_paths::normalize_path;
 use super::synthetic_fs::{dev_shm_host_path, proc_exe_link_target};
 use super::time_abi::clock_gettime_timespec;
 use super::user_memory::{
-    read_cstr, read_user_bytes, read_user_value, write_user_bytes, write_user_value,
+    read_cstr, read_user_bytes, read_user_value, write_user_bytes, write_user_slice,
+    write_user_value,
 };
 use super::{PathTimes, UserProcess};
 
@@ -2635,8 +2637,8 @@ pub(super) fn sys_readlinkat(
             Err(err) => return neg_errno(err),
         }
     }
-    if let Some(fd) = proc_self_fd_number(resolved_path.as_str()) {
-        let target = {
+    let target = if let Some(fd) = proc_self_fd_number(resolved_path.as_str()) {
+        {
             let table = process.fds.lock();
             match table.entry(fd) {
                 Ok(entry) => match fd_entry_path(entry) {
@@ -2645,32 +2647,25 @@ pub(super) fn sys_readlinkat(
                 },
                 Err(err) => return neg_errno(err),
             }
-        };
-        let bytes = target.as_bytes();
-        let copy_len = cmp::min(bytes.len(), bufsiz);
-        return write_user_bytes(process, buf, &bytes[..copy_len])
-            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
-    }
-    if let Some(target) = proc_exe_link_target(process, resolved_path.as_str()) {
-        let bytes = target.as_bytes();
-        let copy_len = cmp::min(bytes.len(), bufsiz);
-        return write_user_bytes(process, buf, &bytes[..copy_len])
-            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
-    }
-    if let Some(target) = process.path_symlink(resolved_path.as_str()) {
-        let bytes = target.as_bytes();
-        let copy_len = cmp::min(bytes.len(), bufsiz);
-        return write_user_bytes(process, buf, &bytes[..copy_len])
-            .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
-    }
-    match axfs::api::read_link(resolved_path.as_str()) {
-        Ok(target) => {
-            let bytes = target.as_bytes();
-            let copy_len = cmp::min(bytes.len(), bufsiz);
-            write_user_bytes(process, buf, &bytes[..copy_len])
-                .map_or_else(|err| neg_errno(err), |_| copy_len as isize)
         }
-        Err(err) => neg_errno(LinuxError::from(err)),
+    } else if let Some(target) = proc_exe_link_target(process, resolved_path.as_str()) {
+        target
+    } else if let Some(target) = process.path_symlink(resolved_path.as_str()) {
+        target
+    } else {
+        match axfs::api::read_link(resolved_path.as_str()) {
+            Ok(target) => target,
+            Err(err) => return neg_errno(LinuxError::from(err)),
+        }
+    };
+    let bytes = target.as_bytes();
+    let copy_len = cmp::min(bytes.len(), bufsiz);
+    let Some(dst) = UserPtr::<u8, Write>::new(UserAddr::new(buf)).slice(copy_len) else {
+        return neg_errno(LinuxError::EFAULT);
+    };
+    match write_user_slice(process, dst, &bytes[..copy_len]) {
+        Ok(()) => copy_len as isize,
+        Err(err) => neg_errno(err),
     }
 }
 

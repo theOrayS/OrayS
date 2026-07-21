@@ -23,7 +23,7 @@ LEGACY_CALLER_INVENTORY = {
     "fault_in_user_write": (3, 1),
     "read_user_bytes_into": (14, 4),
     "read_user_bytes": (35, 11),
-    "write_user_bytes": (47, 12),
+    "write_user_bytes": (45, 12),
     "read_user_value": (91, 17),
     "write_user_value": (118, 18),
     "read_cstr": (46, 6),

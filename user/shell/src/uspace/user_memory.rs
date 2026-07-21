@@ -15,7 +15,7 @@ use axhal::trap::PageFaultFlags;
 use linux_raw_sys::general;
 use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PageIter4K, VirtAddr};
 use orays_linux::backend::UserMemoryBackend;
-use orays_linux::user::{Access, Read, UserAddr, UserRange, Write};
+use orays_linux::user::{Access, Read, UserAddr, UserRange, UserSlice, Write};
 use std::string::String;
 use std::vec::Vec;
 
@@ -316,6 +316,17 @@ pub(super) fn write_user_bytes(
     }
     let range = typed_user_range::<Write>(ptr, bytes.len())?;
     ProcessUserMemory { process }.write_bytes(range, bytes)
+}
+
+pub(super) fn write_user_slice(
+    process: &UserProcess,
+    dst: UserSlice<u8, Write>,
+    bytes: &[u8],
+) -> Result<(), LinuxError> {
+    if dst.byte_len() != bytes.len() {
+        return Err(LinuxError::EINVAL);
+    }
+    write_user_bytes(process, dst.ptr().addr().get(), bytes)
 }
 
 fn write_user_bytes_raw(process: &UserProcess, ptr: usize, bytes: &[u8]) -> Result<(), LinuxError> {
