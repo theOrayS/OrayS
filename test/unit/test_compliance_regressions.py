@@ -20,6 +20,8 @@ TARGETS = [
     Path("user/shell/src/uspace/runtime_paths.rs"),
     Path("user/shell/src/uspace/mod.rs"),
     Path("user/shell/src/uspace/process_lifecycle.rs"),
+    Path("user/shell/src/uspace/metadata.rs"),
+    Path("user/shell/src/uspace/fd_table.rs"),
     Path("api/arceos_posix_api/src/utils.rs"),
     Path("api/arceos_posix_api/src/imp/pthread/mutex.rs"),
     Path("api/arceos_posix_api/src/imp/task.rs"),
@@ -169,6 +171,30 @@ class ComplianceRegressionsGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("deep-copying", result.stdout)
+
+    def test_detects_missing_hardlink_canonical_promotion(self) -> None:
+        tree = self.make_tree()
+        self.mutate(
+            tree,
+            "user/shell/src/uspace/fd_table.rs",
+            "if let Some(promoted_path) = process.path_hardlink_promotion(abs_path.as_str()) {",
+            "if let Some(promoted_path) = None::<String> {",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preserve remaining links", result.stdout)
+
+    def test_detects_missing_hardlink_canonical_rename_update(self) -> None:
+        tree = self.make_tree()
+        self.mutate(
+            tree,
+            "user/shell/src/uspace/metadata.rs",
+            "self.move_path_hardlink_metadata(old_path, new_path.as_str());",
+            "// hardlink metadata update omitted",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("canonical metadata", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

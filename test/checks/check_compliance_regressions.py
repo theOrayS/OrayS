@@ -187,6 +187,39 @@ def scan(root: Path) -> list[str]:
         f"deep-copied fields: {', '.join(deep_copied_metadata)}",
     )
 
+    metadata = read(root, "user/shell/src/uspace/metadata.rs")
+    move_metadata = function_block(metadata, "move_path_metadata")
+    move_hardlink_metadata = function_block(metadata, "move_path_hardlink_metadata")
+    require(
+        "self.move_path_hardlink_metadata(old_path, new_path.as_str())" in move_metadata,
+        findings,
+        "path rename must update hardlink canonical metadata",
+    )
+    for token in (
+        "links.remove(old_path)",
+        "target == old_path",
+        "*target = new_path.to_string()",
+        "counts.remove(old_path)",
+    ):
+        require(
+            token in move_hardlink_metadata,
+            findings,
+            f"hardlink canonical rename is missing metadata update token {token}",
+        )
+
+    fd_table = read(root, "user/shell/src/uspace/fd_table.rs")
+    unlinkat = function_block(fd_table, "unlinkat")
+    for token in (
+        "path_hardlink_promotion",
+        "axfs::api::rename",
+        "move_path_metadata",
+    ):
+        require(
+            token in unlinkat,
+            findings,
+            f"unlinking a hardlink canonical name must preserve remaining links via {token}",
+        )
+
     utils = read(root, "api/arceos_posix_api/src/utils.rs")
     for token in ("validate_user_range", "checked_mul", "checked_add", "align_of", "user_ref"):
         require(token in utils, findings, f"user pointer helpers missing {token}")
