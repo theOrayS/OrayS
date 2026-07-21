@@ -4304,8 +4304,8 @@ fn renameat2_paths(
             &new_st,
         );
     }
+    let old_is_dir = old_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR;
     if let Some(new_st) = new_st.as_ref() {
-        let old_is_dir = old_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR;
         let new_is_dir = new_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR;
         if old_is_dir && !new_is_dir {
             return Err(LinuxError::ENOTDIR);
@@ -4355,7 +4355,11 @@ fn renameat2_paths(
     axfs::api::rename(old_abs_path.as_str(), new_abs_path.as_str()).map_err(LinuxError::from)?;
     invalidate_exec_image_cache(old_abs_path.as_str());
     invalidate_exec_image_cache(new_abs_path.as_str());
-    process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
+    if old_is_dir {
+        process.move_path_metadata_tree(old_abs_path.as_str(), new_abs_path);
+    } else {
+        process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
+    }
     Ok(())
 }
 
@@ -4423,9 +4427,21 @@ fn rename_exchange(
     invalidate_exec_image_cache(old_abs_path);
     invalidate_exec_image_cache(new_abs_path);
     invalidate_exec_image_cache(tmp_path.as_str());
-    process.move_path_metadata(old_abs_path, tmp_path.clone());
-    process.move_path_metadata(new_abs_path, old_abs_path.to_string());
-    process.move_path_metadata(tmp_path.as_str(), new_abs_path.to_string());
+    if old_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
+        process.move_path_metadata_tree(old_abs_path, tmp_path.clone());
+    } else {
+        process.move_path_metadata(old_abs_path, tmp_path.clone());
+    }
+    if new_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
+        process.move_path_metadata_tree(new_abs_path, old_abs_path.to_string());
+    } else {
+        process.move_path_metadata(new_abs_path, old_abs_path.to_string());
+    }
+    if old_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
+        process.move_path_metadata_tree(tmp_path.as_str(), new_abs_path.to_string());
+    } else {
+        process.move_path_metadata(tmp_path.as_str(), new_abs_path.to_string());
+    }
     Ok(())
 }
 
@@ -6670,6 +6686,9 @@ impl FdTable {
             let mut synthetic_dirents = Vec::new();
             for name in process.path_symlink_names_in_dir(dir.path.as_str()) {
                 synthetic_dirents.push((name, general::DT_LNK as u8));
+            }
+            for name in process.path_hardlink_names_in_dir(dir.path.as_str()) {
+                synthetic_dirents.push((name, general::DT_REG as u8));
             }
             for &name in synthetic_block_device_names_in_dir(dir.path.as_str()) {
                 synthetic_dirents.push((name.to_string(), general::DT_BLK as u8));

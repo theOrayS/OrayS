@@ -7,6 +7,7 @@ use axerrno::LinuxError;
 use axfs::fops::{FileAttr, FileType, OpenOptions};
 use linux_raw_sys::general;
 use orays_linux::user::{UserAddr, UserPtr, Write};
+use std::collections::BTreeMap;
 use std::string::{String, ToString};
 use std::vec::Vec;
 
@@ -51,6 +52,30 @@ const PATH_FREE_BLOCK_CREDIT_BASE: u64 = 1 << 63;
 // metadata/data extent per tiny sequential write (iozone commonly writes 1 KiB
 // records into tmpfs files).
 const SPARSE_BYTE_EXTENT_MERGE_LIMIT: usize = 64 * 1024;
+
+fn moved_descendant_path(path: &str, old_prefix: &str, new_prefix: &str) -> Option<String> {
+    path.strip_prefix(old_prefix)
+        .map(|suffix| format!("{new_prefix}{suffix}"))
+}
+
+fn move_descendant_entries<V>(
+    entries: &mut BTreeMap<String, V>,
+    old_prefix: &str,
+    new_prefix: &str,
+) {
+    let moves = entries
+        .keys()
+        .filter_map(|path| {
+            moved_descendant_path(path, old_prefix, new_prefix)
+                .map(|new_path| (path.clone(), new_path))
+        })
+        .collect::<Vec<_>>();
+    for (old_path, new_path) in moves {
+        if let Some(value) = entries.remove(old_path.as_str()) {
+            entries.insert(new_path, value);
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum UtimeSelection {
@@ -225,6 +250,100 @@ impl UserProcess {
         drop(times);
 
         self.move_path_sparse_file(old_path, new_path);
+    }
+
+    pub(super) fn move_path_metadata_tree(&self, old_path: &str, new_path: String) {
+        self.move_path_metadata(old_path, new_path.clone());
+
+        let old_prefix = format!("{}/", old_path.trim_end_matches('/'));
+        let new_prefix = format!("{}/", new_path.trim_end_matches('/'));
+        move_descendant_entries(
+            &mut self.path_modes.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_inodes.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_special_modes.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_rdevs.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_owners.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_symlinks.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_inode_flags.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_xattrs.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_times.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_sparse_sizes.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_sparse_data.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_sparse_repeats.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        move_descendant_entries(
+            &mut self.path_data_ranges.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+
+        let mut hardlinks = self.path_hardlinks.lock();
+        move_descendant_entries(
+            &mut hardlinks,
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
+        for canonical in hardlinks.values_mut() {
+            if let Some(new_canonical) = moved_descendant_path(
+                canonical.as_str(),
+                old_prefix.as_str(),
+                new_prefix.as_str(),
+            ) {
+                *canonical = new_canonical;
+            }
+        }
+        drop(hardlinks);
+        move_descendant_entries(
+            &mut self.path_hardlink_counts.lock(),
+            old_prefix.as_str(),
+            new_prefix.as_str(),
+        );
     }
 
     fn move_path_hardlink_metadata(&self, old_path: &str, new_path: &str) {
@@ -424,6 +543,31 @@ impl UserProcess {
             .lock()
             .keys()
             .filter_map(|path| {
+                let name = path.strip_prefix(prefix.as_str())?;
+                if name.is_empty() || name.contains('/') {
+                    None
+                } else {
+                    Some(name.to_string())
+                }
+            })
+            .collect()
+    }
+
+    pub(super) fn path_hardlink_names_in_dir(&self, dir: &str) -> Vec<String> {
+        let prefix = if dir == "/" {
+            String::from("/")
+        } else {
+            let mut prefix = dir.trim_end_matches('/').to_string();
+            prefix.push('/');
+            prefix
+        };
+        self.path_hardlinks
+            .lock()
+            .iter()
+            .filter_map(|(path, canonical)| {
+                if path == canonical {
+                    return None;
+                }
                 let name = path.strip_prefix(prefix.as_str())?;
                 if name.is_empty() || name.contains('/') {
                     None
