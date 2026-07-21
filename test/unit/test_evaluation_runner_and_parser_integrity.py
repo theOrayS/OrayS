@@ -961,6 +961,18 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ordinary POSIX shells", result.stdout)
 
+    def test_detects_final_suite_label_suffixing(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "SUITE_DIRS.contains(&suite_dir)",
+            "false",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("judge-visible group label", result.stdout)
+
     def test_detects_runner_layer_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/cmd.rs"

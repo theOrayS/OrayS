@@ -187,6 +187,7 @@ def scan_cmd_rs(root: Path) -> list[str]:
     env_block = function_block(text, "ltp_case_env")
     autorun_body = function_body(text, "maybe_run_official_tests")
     official_shell_block = function_block(text, "official_shell_for_suite")
+    suite_label_block = function_block(text, "suite_label")
     run_dir_block = function_block(text, "prepare_ltp_case_run_dir")
     helper_cases_block = function_block(text, "ltp_resource_helper_cases")
     copy_block = function_block(text, "copy_script_file")
@@ -245,6 +246,13 @@ def scan_cmd_rs(root: Path) -> list[str]:
     if "busybox shell not found" in autorun_body:
         findings.append(
             "user/shell/src/cmd.rs: official autorun must not exit before trying a real POSIX /bin/sh"
+        )
+    if not suite_label_block or any(
+        token not in suite_label_block
+        for token in ("SUITE_DIRS.contains(&suite_dir)", "group.to_string()")
+    ):
+        findings.append(
+            "user/shell/src/cmd.rs: configured final suite directories must retain the judge-visible group label"
         )
     for token, detail in (
         (
