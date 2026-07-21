@@ -4146,8 +4146,16 @@ fn fcntl_setlk_record(
 }
 
 pub(super) fn sys_flock(process: &UserProcess, fd: usize, operation: usize) -> isize {
-    match process.fds.lock().flock(fd as i32, operation as u32) {
-        Ok(v) => v as isize,
+    let file = {
+        let table = process.fds.lock();
+        match table.entry(fd as i32) {
+            Ok(FdEntry::File(file)) => file.clone(),
+            Ok(_) => return neg_errno(LinuxError::EBADF),
+            Err(err) => return neg_errno(err),
+        }
+    };
+    match apply_flock_operation(process, &file, operation as u32) {
+        Ok(()) => 0,
         Err(err) => neg_errno(err),
     }
 }
@@ -7818,15 +7826,6 @@ impl FdTable {
         }
     }
 
-    pub(super) fn flock(&mut self, fd: i32, operation: u32) -> Result<i32, LinuxError> {
-        let (key, owner) = match self.entry(fd)? {
-            FdEntry::File(file) => (flock_key(file), flock_owner(file)),
-            _ => return Err(LinuxError::EBADF),
-        };
-        apply_flock_operation(key, owner, operation)?;
-        Ok(0)
-    }
-
     fn fcntl_getlk(
         &mut self,
         process: &UserProcess,
@@ -9091,21 +9090,27 @@ fn release_flock_owner(key: u64, owner: usize) {
     }
 }
 
-fn apply_flock_operation(key: u64, owner: usize, operation: u32) -> Result<(), LinuxError> {
+fn apply_flock_operation(
+    process: &UserProcess,
+    file: &FileEntry,
+    operation: u32,
+) -> Result<(), LinuxError> {
     if operation & !(general::LOCK_SH | general::LOCK_EX | general::LOCK_NB | general::LOCK_UN) != 0
     {
         return Err(LinuxError::EINVAL);
     }
     let mode = operation & !general::LOCK_NB;
+    let key = flock_key(file);
+    let owner = flock_owner(file);
     match mode {
         general::LOCK_UN => {
             release_flock_owner(key, owner);
             Ok(())
         }
-        general::LOCK_SH | general::LOCK_EX => {
+        general::LOCK_SH | general::LOCK_EX => loop {
             let mut table = flock_table().lock();
             let state = table.entry(key).or_insert_with(FlockState::new);
-            let ret = if mode == general::LOCK_SH {
+            let result = if mode == general::LOCK_SH {
                 state.lock_shared(owner)
             } else {
                 state.lock_exclusive(owner)
@@ -9113,8 +9118,21 @@ fn apply_flock_operation(key: u64, owner: usize, operation: u32) -> Result<(), L
             if state.is_empty() {
                 table.remove(&key);
             }
-            ret
-        }
+            match result {
+                Ok(()) => return Ok(()),
+                Err(LinuxError::EAGAIN) if operation & general::LOCK_NB == 0 => {
+                    drop(table);
+                    if process.pending_exit_group().is_some()
+                        || process.eval_watchdog_expired()
+                        || current_unblocked_signal_pending()
+                    {
+                        return Err(LinuxError::EINTR);
+                    }
+                    yield_poll_wait();
+                }
+                Err(err) => return Err(err),
+            }
+        },
         _ => Err(LinuxError::EINVAL),
     }
 }
