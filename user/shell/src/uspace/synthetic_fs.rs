@@ -905,8 +905,14 @@ pub(super) fn proc_task_dir_path_entry(process: &UserProcess, path: &str) -> Opt
 
 fn proc_comm_target_process(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
     let normalized = normalize_path("/", path)?;
+    let process_comm = |target: &UserProcess| {
+        user_thread_entry_by_tid(target.pid())
+            .filter(|entry| entry.process.pid() == target.pid())
+            .and_then(|entry| task_ext(&entry.task).map(|ext| ext.comm()))
+            .unwrap_or_else(|| target.prctl_name())
+    };
     let process_comm_content = |target: &UserProcess| {
-        let mut content = target.prctl_name();
+        let mut content = process_comm(target);
         content.push('\n');
         Some((normalized.clone(), content.into_bytes()))
     };
@@ -931,13 +937,12 @@ fn proc_comm_target_process(process: &UserProcess, path: &str) -> Option<(String
     if let Some((rest, task_pid)) = task_rest {
         let tid_text = rest.strip_suffix("/comm")?;
         let tid = tid_text.parse::<i32>().ok()?;
-        let target_name = if task_pid == process.pid() && tid == process.pid() {
-            Some(process.prctl_name())
-        } else if let Some(entry) = user_thread_entry_by_tid(tid) {
-            (entry.process.pid() == task_pid).then(|| entry.process.prctl_name())
-        } else {
-            None
-        }?;
+        let target_name = user_thread_entry_by_tid(tid)
+            .filter(|entry| entry.process.pid() == task_pid)
+            .and_then(|entry| task_ext(&entry.task).map(|ext| ext.comm()))
+            .or_else(|| {
+                (task_pid == process.pid() && tid == process.pid()).then(|| process.prctl_name())
+            })?;
         let mut content = target_name;
         content.push('\n');
         return Some((normalized, content.into_bytes()));

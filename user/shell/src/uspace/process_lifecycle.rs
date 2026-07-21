@@ -478,7 +478,13 @@ fn run_user_program_in_with_env_and_timeout(
     );
     let root = loaded.process.aspace.lock().page_table_root();
     task.ctx_mut().set_page_table_root(root);
-    task.init_task_ext(UserTaskExt::new(loaded.process.clone(), context, 0, 0));
+    task.init_task_ext(UserTaskExt::new(
+        loaded.process.clone(),
+        loaded.process.prctl_name(),
+        context,
+        0,
+        0,
+    ));
     let task = axtask::spawn_task(task);
     process.set_pid(task.id().as_u64() as i32);
     register_user_task(task.clone(), process.clone());
@@ -1802,7 +1808,10 @@ impl UserProcess {
         let fs_root = self.fs_root();
         let exec_root = self.exec_root();
         let exec_path = self.exec_path();
-        let prctl_name = self.prctl_name();
+        let prctl_name = current_task_ext()
+            .filter(|ext| ext.process.pid() == self.pid())
+            .map(UserTaskExt::comm)
+            .unwrap_or_else(|| self.prctl_name());
         let groups = self.groups();
         let timer_slack_ns = self.timer_slack_ns();
         let parent_task_id = axtask::current().id().as_u64() as i32;
@@ -2517,14 +2526,15 @@ pub(super) fn sys_clone(
         tf.regs.sp,
         tf.regs.tp,
     );
-    let (inherited_signal_mask, fork_signal_mask_restore) = current_task_ext()
+    let (inherited_signal_mask, fork_signal_mask_restore, inherited_comm) = current_task_ext()
         .map(|ext| {
             (
                 ext.signal_mask.load(Ordering::Acquire),
                 ext.fork_signal_mask_restore.load(Ordering::Acquire),
+                ext.comm(),
             )
         })
-        .unwrap_or((0, u64::MAX));
+        .unwrap_or_else(|| (0, u64::MAX, process.prctl_name()));
     let vfork_flags = general::CLONE_VM as usize | general::CLONE_VFORK as usize;
     let process_allowed_flags = vfork_flags
         | general::CLONE_FILES as usize
@@ -2623,6 +2633,7 @@ pub(super) fn sys_clone(
         };
         task.init_task_ext(UserTaskExt::new(
             child_process.clone(),
+            child_process.prctl_name(),
             child_context,
             child_clear_tid,
             child_signal_mask,
@@ -2731,6 +2742,7 @@ pub(super) fn sys_clone(
     task.ctx_mut().set_page_table_root(root);
     task.init_task_ext(UserTaskExt::new(
         process.clone(),
+        inherited_comm,
         child_context,
         child_clear_tid,
         inherited_signal_mask,

@@ -8,7 +8,7 @@ use axerrno::LinuxError;
 use linux_raw_sys::{general, system};
 
 use super::linux_abi::PERSONALITY_UNAME26;
-use super::task_context::current_task_ext;
+use super::task_context::{current_task_ext, current_tid};
 use super::task_registry::live_user_thread_count;
 use super::time_abi::{
     USER_HZ, current_thread_runtime_micros, process_runtime_micros, process_times,
@@ -501,14 +501,24 @@ pub(super) fn sys_prctl(
                 .position(|&byte| byte == 0)
                 .unwrap_or(TASK_COMM_LEN - 1)
                 .min(TASK_COMM_LEN - 1);
-            process.set_prctl_name(String::from_utf8_lossy(&bytes[..name_len]).into_owned());
+            let name = String::from_utf8_lossy(&bytes[..name_len]).into_owned();
+            if let Some(ext) = current_task_ext() {
+                ext.set_comm(name.clone());
+            }
+            // Keep the process-level value as a leader-name fallback for the
+            // brief intervals where the leader is not present in the registry.
+            if current_tid() == process.pid() {
+                process.set_prctl_name(name);
+            }
             0
         }
         PR_GET_NAME => {
             if arg2 == 0 {
                 return neg_errno(LinuxError::EFAULT);
             }
-            let name = process.prctl_name();
+            let name = current_task_ext()
+                .map(|ext| ext.comm())
+                .unwrap_or_else(|| process.prctl_name());
             let mut bytes = [0u8; TASK_COMM_LEN];
             let copy_len = cmp::min(name.as_bytes().len(), TASK_COMM_LEN - 1);
             bytes[..copy_len].copy_from_slice(&name.as_bytes()[..copy_len]);

@@ -5,6 +5,7 @@ use axerrno::LinuxError;
 use axhal::context::{TrapFrame, UspaceContext};
 use axsync::Mutex;
 use axtask::AxTaskRef;
+use std::string::String;
 use std::sync::Arc;
 
 #[cfg(target_arch = "riscv64")]
@@ -30,6 +31,7 @@ static USER_TASK_EXT_DROPPED: AtomicUsize = AtomicUsize::new(0);
 
 pub(super) struct UserTaskExt {
     pub(super) process: Arc<UserProcess>,
+    comm: Mutex<String>,
     pub(super) initial_context: Mutex<Option<UspaceContext>>,
     pub(super) clear_child_tid: AtomicUsize,
     pub(super) pending_signal_mask: AtomicU64,
@@ -71,6 +73,7 @@ pub(super) struct UserTaskExt {
 impl UserTaskExt {
     pub(super) fn new(
         process: Arc<UserProcess>,
+        comm: String,
         initial_context: UspaceContext,
         clear_child_tid: usize,
         signal_mask: u64,
@@ -82,6 +85,7 @@ impl UserTaskExt {
         }
         Self {
             process,
+            comm: Mutex::new(comm),
             initial_context: Mutex::new(Some(initial_context)),
             clear_child_tid: AtomicUsize::new(clear_child_tid),
             pending_signal_mask: AtomicU64::new(0),
@@ -114,6 +118,14 @@ impl UserTaskExt {
             last_reported_user_micros: AtomicU64::new(0),
             last_reported_system_micros: AtomicU64::new(0),
         }
+    }
+
+    pub(super) fn comm(&self) -> String {
+        self.comm.lock().clone()
+    }
+
+    pub(super) fn set_comm(&self, comm: String) {
+        *self.comm.lock() = comm;
     }
 
     pub(super) fn store_syscall_restart_frame(&self, frame: TrapFrame) {
