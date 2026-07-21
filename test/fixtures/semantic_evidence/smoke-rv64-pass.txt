@@ -23,6 +23,7 @@ PR3_SMOKE_V1 ASSERT futex_requeue_same_addr PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT futex_cmp_requeue_validation PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT futex_source_validation PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT futex_operation_validation PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT futex_timeout_validation PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT sigaltstack_onstack PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT sigaltstack_fork_exec PASS arch=riscv64

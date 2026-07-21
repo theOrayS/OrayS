@@ -418,6 +418,12 @@ const ASSERT_FUTEX_OPERATION_VALIDATION: &[u8] =
 const ASSERT_FUTEX_OPERATION_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_operation_validation PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_TIMEOUT_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_timeout_validation PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_TIMEOUT_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_timeout_validation PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -679,6 +685,12 @@ const USER_FAIL_FUTEX_OPERATION_VALIDATION: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_OPERATION_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_operation_validation arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_TIMEOUT_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_timeout_validation arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_TIMEOUT_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_timeout_validation arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -3343,6 +3355,115 @@ fn run_futex_operation_validation_probe() -> bool {
         && supported_realtime == NEG_ETIMEDOUT
 }
 
+fn run_futex_timeout_validation_probe() -> bool {
+    let mismatch = AtomicI32::new(1);
+    let invalid_nsec = Timespec {
+        seconds: 0,
+        nanoseconds: 1_000_000_000,
+    };
+    let valid_zero = Timespec {
+        seconds: 0,
+        nanoseconds: 0,
+    };
+    let word_addr = mismatch.as_ptr() as usize;
+    let invalid_timeout = 1_usize;
+
+    // Linux copies and validates a non-null timeout for timed futex commands
+    // before operation-specific source-word, alignment, or bitset checks. An
+    // unknown command remains an operation error and is the ENOSYS control.
+    // SAFETY: live values stay allocated and aligned. Address 1 and the
+    // one-byte-offset futex are deliberate syscall-boundary fault inputs and
+    // are never dereferenced by this userspace program.
+    let wait_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
+    let wait_invalid_nsec = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT,
+            0,
+            &invalid_nsec as *const Timespec as usize,
+            0,
+            0,
+        )
+    };
+    let misaligned_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr + 1,
+            FUTEX_WAIT,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
+    let realtime_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT | FUTEX_CLOCK_REALTIME,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
+    let realtime_valid_timeout = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT | FUTEX_CLOCK_REALTIME,
+            0,
+            &valid_zero as *const Timespec as usize,
+            0,
+            0,
+        )
+    };
+    let bitset_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT_BITSET,
+            0,
+            invalid_timeout,
+            0,
+            FUTEX_BITSET_MATCH_ANY,
+        )
+    };
+    let bitset_zero_bad_pointer = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word_addr,
+            FUTEX_WAIT_BITSET,
+            0,
+            invalid_timeout,
+            0,
+            0,
+        )
+    };
+    let unknown_command_bad_pointer =
+        unsafe { syscall6(SYS_FUTEX, word_addr, 2, 0, invalid_timeout, 0, 0) };
+
+    wait_bad_pointer == NEG_EFAULT
+        && wait_invalid_nsec == NEG_EINVAL
+        && misaligned_bad_pointer == NEG_EFAULT
+        && realtime_bad_pointer == NEG_EFAULT
+        && realtime_valid_timeout == NEG_ENOSYS
+        && bitset_bad_pointer == NEG_EFAULT
+        && bitset_zero_bad_pointer == NEG_EFAULT
+        && unknown_command_bad_pointer == NEG_ENOSYS
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -4430,6 +4551,12 @@ pub extern "C" fn _start() -> ! {
         != ASSERT_FUTEX_OPERATION_VALIDATION.len() as isize
     {
         fail(USER_FAIL_WRITE, 367);
+    }
+    if !run_futex_timeout_validation_probe() {
+        fail(USER_FAIL_FUTEX_TIMEOUT_VALIDATION, 368);
+    }
+    if write(ASSERT_FUTEX_TIMEOUT_VALIDATION) != ASSERT_FUTEX_TIMEOUT_VALIDATION.len() as isize {
+        fail(USER_FAIL_WRITE, 369);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
