@@ -8666,7 +8666,7 @@ fn record_lock_wait_would_deadlock(
 }
 
 fn record_lock_key(file: &FileEntry) -> u64 {
-    path_inode(Some(file.path.as_str()))
+    file.file.object_identity() as u64
 }
 
 fn ofd_record_lock_owner(file: &FileEntry) -> i64 {
@@ -9008,7 +9008,7 @@ fn file_lease_table() -> &'static Mutex<BTreeMap<u64, FileLeaseState>> {
 }
 
 fn file_lease_key(file: &FileEntry) -> u64 {
-    path_inode(Some(file.path.as_str()))
+    file.file.object_identity() as u64
 }
 
 fn file_lease_owner(file: &FileEntry) -> usize {
@@ -9133,7 +9133,7 @@ fn flock_table() -> &'static Mutex<BTreeMap<u64, FlockState>> {
 }
 
 fn flock_key(file: &FileEntry) -> u64 {
-    path_inode(Some(file.path.as_str()))
+    file.file.object_identity() as u64
 }
 
 fn flock_owner(file: &FileEntry) -> usize {

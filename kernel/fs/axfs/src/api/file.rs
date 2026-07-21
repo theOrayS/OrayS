@@ -172,6 +172,13 @@ impl File {
     pub fn metadata(&self) -> Result<Metadata> {
         self.inner.get_attr().map(Metadata)
     }
+
+    /// Returns an opaque identity for the resolved VFS object backing this
+    /// open file. This is intended for in-kernel object-scoped state and is
+    /// not an externally visible inode number.
+    pub const fn object_identity(&self) -> usize {
+        self.inner.object_identity()
+    }
 }
 
 impl Read for File {

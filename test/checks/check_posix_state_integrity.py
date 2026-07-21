@@ -170,6 +170,30 @@ def scan_file_lease(root: Path) -> list[str]:
     return findings
 
 
+def scan_file_lock_identity(root: Path) -> list[str]:
+    fops = read(root / "kernel/fs/axfs/src/fops.rs")
+    api = read(root / "kernel/fs/axfs/src/api/file.rs")
+    fd_table = read(root / "user/shell/src/uspace/fd_table.rs")
+    findings: list[str] = []
+    for token in (
+        "node_identity: usize",
+        "Arc::as_ptr(&node) as *const () as usize",
+        "node_identity: self.node_identity",
+        "pub const fn object_identity(&self) -> usize",
+    ):
+        if token not in fops:
+            findings.append(f"axfs File must preserve resolved VFS object identity; missing {token}")
+    if "self.inner.object_identity()" not in api:
+        findings.append("axfs API File must expose the resolved VFS object identity")
+    for function in ("record_lock_key", "file_lease_key", "flock_key"):
+        block = function_block(fd_table, function)
+        if "file.file.object_identity() as u64" not in block:
+            findings.append(f"{function} must key state by the opened VFS object")
+        if "path_inode" in block or "file.path" in block:
+            findings.append(f"{function} must not key state by a rename-sensitive pathname")
+    return findings
+
+
 def scan_synthetic_pid1_state(root: Path) -> list[str]:
     text = read(root / "user/shell/src/uspace/resource_sched.rs")
     findings: list[str] = []
@@ -228,6 +252,7 @@ def main() -> int:
     findings.extend(scan_adjtimex(root))
     findings.extend(scan_api_stat(root))
     findings.extend(scan_file_lease(root))
+    findings.extend(scan_file_lock_identity(root))
     findings.extend(scan_synthetic_pid1_state(root))
     if findings:
         print("POSIX state integrity check: FAIL")

@@ -1,5 +1,6 @@
 //! Low-level filesystem operations.
 
+use alloc::sync::Arc;
 use axerrno::{AxError, AxResult, ax_err, ax_err_type};
 use axfs_vfs::{VfsError, VfsNodeRef};
 use axio::SeekFrom;
@@ -23,6 +24,7 @@ pub type FilePerm = axfs_vfs::VfsNodePerm;
 /// An opened file object, with open permissions and a cursor.
 pub struct File {
     node: WithCap<VfsNodeRef>,
+    node_identity: usize,
     is_append: bool,
     offset: u64,
 }
@@ -40,6 +42,7 @@ impl Clone for File {
         node.open().expect("failed to reopen cloned file node");
         Self {
             node: WithCap::new(node, self.node.cap()),
+            node_identity: self.node_identity,
             is_append: self.is_append,
             offset: self.offset,
         }
@@ -199,8 +202,14 @@ impl File {
         if opts.truncate {
             node.truncate(0)?;
         }
+        // The opened Arc keeps this resolved VFS object alive, so its data
+        // pointer is stable for the full lifetime of this File and its clones.
+        // Unlike a pathname hash, it is unchanged by rename and distinguishes
+        // an unlinked open file from a later replacement at the same path.
+        let node_identity = Arc::as_ptr(&node) as *const () as usize;
         Ok(Self {
             node: WithCap::new(node, access_cap),
+            node_identity,
             is_append: opts.append,
             offset: 0,
         })
@@ -288,6 +297,13 @@ impl File {
     /// Gets the file attributes.
     pub fn get_attr(&self) -> AxResult<FileAttr> {
         self.access_node(Cap::empty())?.get_attr()
+    }
+
+    /// Returns an opaque identity for the resolved VFS object backing this
+    /// open file. The value is process-local and is not an on-disk inode
+    /// number, but remains stable while this file or one of its clones lives.
+    pub const fn object_identity(&self) -> usize {
+        self.node_identity
     }
 }
 

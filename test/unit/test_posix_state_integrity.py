@@ -16,6 +16,8 @@ TARGETS = [
     Path("api/arceos_posix_api/src/imp/fd_ops.rs"),
     Path("api/arceos_posix_api/src/imp/fs.rs"),
     Path("api/arceos_posix_api/src/imp/net.rs"),
+    Path("kernel/fs/axfs/src/api/file.rs"),
+    Path("kernel/fs/axfs/src/fops.rs"),
     Path("ulib/axlibc/src/net.rs"),
     Path("user/shell/src/uspace/fd_table.rs"),
     Path("user/shell/src/uspace/linux_abi.rs"),
@@ -172,6 +174,21 @@ class PosixStateIntegrityGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("F_SETLEASE", result.stdout)
+
+    def test_detects_pathname_keyed_file_locks(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/fd_table.rs"
+        text = path.read_text(encoding="utf-8")
+        text = text.replace(
+            "file.file.object_identity() as u64",
+            "path_inode(Some(file.path.as_str()))",
+            1,
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("record_lock_key", result.stdout)
+        self.assertIn("rename-sensitive pathname", result.stdout)
 
     def test_detects_synthetic_pid1_noop_success(self) -> None:
         tree = self.make_tree()
