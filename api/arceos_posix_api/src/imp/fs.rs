@@ -116,46 +116,11 @@ fn stat_path(path: &str) -> LinuxResult<ctypes::stat> {
     Ok(api_metadata_to_stat(axfs::api::metadata(path)?, Some(path)))
 }
 
-fn parent_and_basename(path: &str) -> (&str, &str) {
-    match path.rsplit_once('/') {
-        Some(("", name)) => ("/", name),
-        Some((parent, name)) => (parent, name),
-        None => (".", path),
-    }
-}
-
-fn final_component_is_symlink(path: &str) -> LinuxResult<bool> {
-    if path.ends_with('/') {
-        return Ok(false);
-    }
-
-    let trimmed = path.trim_end_matches('/');
-    if trimmed.is_empty() || matches!(trimmed, "." | "..") {
-        return Ok(false);
-    }
-
-    let (parent, name) = parent_and_basename(trimmed);
-    if name.is_empty() || matches!(name, "." | "..") {
-        return Ok(false);
-    }
-
-    for entry in axfs::api::read_dir(parent)? {
-        let entry = entry?;
-        if entry.file_name() == name {
-            return Ok(entry.file_type().is_symlink());
-        }
-    }
-    Ok(false)
-}
-
 fn lstat_path(path: &str) -> LinuxResult<ctypes::stat> {
-    // axfs currently exposes only following path metadata.  If the parent
-    // directory says the final component is a symlink, fail honestly instead
-    // of reporting the symlink target as lstat(2) metadata.
-    if final_component_is_symlink(path)? {
-        return Err(LinuxError::EOPNOTSUPP);
-    }
-    stat_path(path)
+    Ok(api_metadata_to_stat(
+        axfs::api::symlink_metadata(path)?,
+        Some(path),
+    ))
 }
 
 impl FileLike for File {

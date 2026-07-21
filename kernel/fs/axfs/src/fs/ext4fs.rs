@@ -118,6 +118,18 @@ impl LockedExt4 {
         Ok(metadata)
     }
 
+    fn symlink_metadata(&self, path: &str) -> VfsResult<Metadata> {
+        self.with(|fs| fs.symlink_metadata(path).map_err(as_vfs_err))
+    }
+
+    fn read_link(&self, path: &str) -> VfsResult<String> {
+        self.with(|fs| {
+            fs.read_link(path)
+                .map(|target| target.display().to_string())
+                .map_err(as_vfs_err)
+        })
+    }
+
     fn read_at(&self, path: &str, offset: u64, buf: &mut [u8]) -> VfsResult<usize> {
         if !buf.is_empty()
             && let Some(data) = self.read_cache.lock().get(path)
@@ -599,6 +611,15 @@ impl VfsNodeOps for Ext4FileNode {
         Ok(vfs_attr_from_metadata(&metadata))
     }
 
+    fn get_link_attr(&self) -> VfsResult<VfsNodeAttr> {
+        let metadata = self.fs.symlink_metadata(self.path.as_str())?;
+        Ok(vfs_attr_from_metadata(&metadata))
+    }
+
+    fn read_link(&self) -> VfsResult<String> {
+        self.fs.read_link(self.path.as_str())
+    }
+
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> VfsResult<usize> {
         self.fs.read_at(self.path.as_str(), offset, buf)
     }
@@ -622,6 +643,15 @@ impl VfsNodeOps for Ext4DirNode {
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
         let metadata = self.metadata()?;
         Ok(vfs_attr_from_metadata(&metadata))
+    }
+
+    fn get_link_attr(&self) -> VfsResult<VfsNodeAttr> {
+        let metadata = self.fs.symlink_metadata(self.path.as_str())?;
+        Ok(vfs_attr_from_metadata(&metadata))
+    }
+
+    fn read_link(&self) -> VfsResult<String> {
+        self.fs.read_link(self.path.as_str())
     }
 
     fn parent(&self) -> Option<VfsNodeRef> {

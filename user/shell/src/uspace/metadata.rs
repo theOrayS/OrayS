@@ -10,7 +10,9 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 
 use super::credentials::{access_allowed, apply_chown_metadata, chown_ids};
-use super::fd_table::{FdEntry, check_parent_write_search_permission, resolve_dirfd_path};
+use super::fd_table::{
+    FdEntry, check_parent_write_search_permission, lstat_absolute_path, resolve_dirfd_path,
+};
 use super::linux_abi::{
     ACCESS_MODE_MASK, ACCESS_W_OK, DEVFS_MAGIC, EXT4_SUPER_MAGIC, FILE_MODE_GROUP_EXECUTE,
     FILE_MODE_PERMISSION_MASK, FILE_MODE_SET_GID, FILE_MODE_SET_UID, LINUX_EACCES,
@@ -1354,6 +1356,23 @@ pub(super) fn sys_faccessat(
                 Err(err) => return neg_errno(err),
             }
         }
+    } else if flags & general::AT_SYMLINK_NOFOLLOW as usize != 0 {
+        let resolved_path = match fds.resolve_path(process, dirfd as i32, path.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
+        let resolved_path = match process.resolve_parent_symlinks(resolved_path.as_str()) {
+            Ok(path) => path,
+            Err(err) => return neg_errno(err),
+        };
+        let stat = match process.path_symlink_stat(resolved_path.as_str()) {
+            Some(stat) => stat,
+            None => match lstat_absolute_path(process, resolved_path.as_str()) {
+                Ok(stat) => stat,
+                Err(err) => return neg_errno(err),
+            },
+        };
+        (resolved_path, stat, false)
     } else {
         match fds.path_stat(process, dirfd as i32, path.as_str()) {
             Ok((path, stat)) => (path, stat, false),
@@ -2093,9 +2112,13 @@ pub(super) fn sys_fchownat(
                 Ok(path) => path,
                 Err(err) => return neg_errno(err),
             };
+            let resolved_path = match process.resolve_parent_symlinks(resolved_path.as_str()) {
+                Ok(path) => path,
+                Err(err) => return neg_errno(err),
+            };
             let st = match process.path_symlink_stat(resolved_path.as_str()) {
                 Some(st) => st,
-                None => match fds.stat_path(process, dirfd as i32, path.as_str()) {
+                None => match lstat_absolute_path(process, resolved_path.as_str()) {
                     Ok(st) => st,
                     Err(err) => return neg_errno(err),
                 },
@@ -2273,8 +2296,10 @@ pub(super) fn path_inode(path: Option<&str>) -> u64 {
 pub(super) fn file_type_mode(ty: FileType) -> u32 {
     match ty {
         FileType::Dir => ST_MODE_DIR,
+        FileType::BlockDevice => ST_MODE_BLK,
         FileType::CharDevice => ST_MODE_CHR,
         FileType::Fifo => ST_MODE_FIFO,
+        FileType::SymLink => ST_MODE_LNK,
         FileType::Socket => ST_MODE_SOCKET,
         _ => ST_MODE_FILE,
     }
@@ -2332,11 +2357,7 @@ pub(super) fn sys_newfstatat(
             if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
                 st
             } else {
-                match process.fds.lock().stat_path(
-                    process,
-                    general::AT_FDCWD,
-                    resolved_path.as_str(),
-                ) {
+                match lstat_absolute_path(process, resolved_path.as_str()) {
                     Ok(st) => st,
                     Err(err) => return neg_errno(err),
                 }
@@ -2478,17 +2499,17 @@ pub(super) fn sys_statx(
                     Err(err) => return neg_errno(err),
                 }
             };
+            let resolved_path = match process.resolve_parent_symlinks(resolved_path.as_str()) {
+                Ok(path) => path,
+                Err(err) => return neg_errno(err),
+            };
             let inode_flags = process.path_inode_flags(resolved_path.as_str());
             let attributes =
                 statx_attributes_for_path(process, Some(resolved_path.as_str()), inode_flags);
             if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
                 (st, attributes)
             } else {
-                match process
-                    .fds
-                    .lock()
-                    .stat_path(process, dirfd as i32, path.as_str())
-                {
+                match lstat_absolute_path(process, resolved_path.as_str()) {
                     Ok(st) => (st, attributes),
                     Err(err) => return neg_errno(err),
                 }
@@ -2642,8 +2663,13 @@ pub(super) fn sys_readlinkat(
         return write_user_bytes(process, buf, &bytes[..copy_len])
             .map_or_else(|err| neg_errno(err), |_| copy_len as isize);
     }
-    match axfs::api::metadata(resolved_path.as_str()) {
-        Ok(_) => neg_errno(LinuxError::EINVAL),
+    match axfs::api::read_link(resolved_path.as_str()) {
+        Ok(target) => {
+            let bytes = target.as_bytes();
+            let copy_len = cmp::min(bytes.len(), bufsiz);
+            write_user_bytes(process, buf, &bytes[..copy_len])
+                .map_or_else(|err| neg_errno(err), |_| copy_len as isize)
+        }
         Err(err) => neg_errno(LinuxError::from(err)),
     }
 }
@@ -2767,11 +2793,7 @@ fn utimensat_target(
         if let Some(st) = process.path_symlink_stat(resolved_path.as_str()) {
             return Ok((Some(resolved_path), st));
         }
-        let st =
-            process
-                .fds
-                .lock()
-                .stat_path(process, general::AT_FDCWD, resolved_path.as_str())?;
+        let st = lstat_absolute_path(process, resolved_path.as_str())?;
         return Ok((Some(resolved_path), st));
     }
 

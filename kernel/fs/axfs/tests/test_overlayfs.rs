@@ -262,10 +262,7 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
 
     let symlink_lower: Arc<dyn VfsOps> = Arc::new(SymlinkLowerFs::new());
     let symlink_overlay = OverlayFileSystem::new(symlink_lower);
-    let symlink = symlink_overlay
-        .root_dir()
-        .lookup("/toolchain")
-        .unwrap();
+    let symlink = symlink_overlay.root_dir().lookup("/toolchain").unwrap();
     assert_eq!(symlink.get_attr().unwrap().file_type(), VfsNodeType::File);
     assert_eq!(
         symlink.get_link_attr().unwrap().file_type(),

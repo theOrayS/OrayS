@@ -463,6 +463,14 @@ impl VfsNodeOps for OverlayNode {
         self.location.lock().backing.get_attr()
     }
 
+    fn get_link_attr(&self) -> VfsResult<VfsNodeAttr> {
+        self.location.lock().backing.get_link_attr()
+    }
+
+    fn read_link(&self) -> VfsResult<String> {
+        self.location.lock().backing.read_link()
+    }
+
     fn set_perm(&self, perm: axfs_vfs::VfsNodePerm) -> VfsResult {
         let _guard = self.state.mutation.lock();
         let (path, backing, upper, linked) = self.snapshot();

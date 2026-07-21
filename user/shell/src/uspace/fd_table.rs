@@ -10087,6 +10087,29 @@ fn stat_absolute_path(process: &UserProcess, path: &str) -> Result<general::stat
     ))
 }
 
+pub(super) fn lstat_absolute_path(
+    process: &UserProcess,
+    path: &str,
+) -> Result<general::stat, LinuxError> {
+    let stat_path = process
+        .path_hardlink_backing(path)
+        .unwrap_or_else(|| path.to_string());
+    let attr = axfs::api::symlink_metadata(stat_path.as_str()).map_err(LinuxError::from)?;
+    let mut st: general::stat = unsafe { core::mem::zeroed() };
+    st.st_dev = 1;
+    st.st_ino = path_inode(Some(stat_path.as_str()));
+    st.st_mode = file_type_mode(attr.file_type()) | attr.permissions().bits() as u32;
+    st.st_nlink = 1;
+    st.st_size = attr.size() as _;
+    st.st_blksize = 512;
+    st.st_blocks = attr.blocks() as _;
+    Ok(apply_recorded_path_metadata(
+        process,
+        stat_path.as_str(),
+        st,
+    ))
+}
+
 fn parent_dirs_searchable_absolute(
     process: &UserProcess,
     path: &str,

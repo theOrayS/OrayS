@@ -78,6 +78,25 @@ pub fn metadata(path: &str) -> io::Result<Metadata> {
         .map_err(Into::into)
 }
 
+/// Query metadata without following a symbolic link in the final path
+/// component.
+pub fn symlink_metadata(path: &str) -> io::Result<Metadata> {
+    let node = crate::root::lookup(None, path)?;
+    let attr = if path.ends_with('/') {
+        node.get_attr()
+    } else {
+        node.get_link_attr()
+    };
+    attr.map(Metadata::from_attr).map_err(Into::into)
+}
+
+/// Read the target stored in a symbolic link.
+pub fn read_link(path: &str) -> io::Result<String> {
+    crate::root::lookup(None, path)?
+        .read_link()
+        .map_err(Into::into)
+}
+
 /// Creates a new, empty directory at the provided path.
 pub fn create_dir(path: &str) -> io::Result<()> {
     DirBuilder::new().create(path)

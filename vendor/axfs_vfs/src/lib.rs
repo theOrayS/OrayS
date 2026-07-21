@@ -1,10 +1,9 @@
 //! Virtual filesystem interfaces used by [ArceOS](https://github.com/arceos-org/arceos).
 //!
-//! A filesystem is a set of files and directories (symbol links are not
-//! supported currently), collectively referred to as **nodes**, which are
-//! conceptually similar to [inodes] in Linux. A file system needs to implement
-//! the [`VfsOps`] trait, its files and directories need to implement the
-//! [`VfsNodeOps`] trait.
+//! A filesystem is a set of files, directories, and other node types such as
+//! symbolic links, collectively referred to as **nodes**, which are conceptually
+//! similar to [inodes] in Linux. A file system needs to implement the [`VfsOps`]
+//! trait, and its nodes need to implement the [`VfsNodeOps`] trait.
 //!
 //! The [`VfsOps`] trait provides the following operations on a filesystem:
 //!
@@ -22,6 +21,8 @@
 //! | [`open()`](VfsNodeOps::open) | Do something when the node is opened | both |
 //! | [`release()`](VfsNodeOps::release) | Do something when the node is closed | both |
 //! | [`get_attr()`](VfsNodeOps::get_attr) | Get the attributes of the node | both |
+//! | [`get_link_attr()`](VfsNodeOps::get_link_attr) | Get attributes without following the final symbolic link | both |
+//! | [`read_link()`](VfsNodeOps::read_link) | Read a symbolic-link target | symlink |
 //! | [`read_at()`](VfsNodeOps::read_at) | Read data from the file | file |
 //! | [`write_at()`](VfsNodeOps::write_at) | Write data to the file | file |
 //! | [`fsync()`](VfsNodeOps::fsync) | Synchronize the file data to disk | file |
@@ -43,7 +44,7 @@ mod structs;
 
 pub mod path;
 
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 use axerrno::{ax_err, AxError, AxResult};
 
 pub use self::structs::{FileSystemInfo, VfsDirEntry, VfsNodeAttr, VfsNodePerm, VfsNodeType};
@@ -98,6 +99,18 @@ pub trait VfsNodeOps: Send + Sync {
     /// Get the attributes of the node.
     fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
         ax_err!(Unsupported)
+    }
+
+    /// Get attributes without following a symbolic link in the final path
+    /// component. Filesystems without symbolic links may use the ordinary
+    /// attributes.
+    fn get_link_attr(&self) -> VfsResult<VfsNodeAttr> {
+        self.get_attr()
+    }
+
+    /// Read the target stored in a symbolic-link node.
+    fn read_link(&self) -> VfsResult<String> {
+        ax_err!(InvalidInput)
     }
 
     /// Set the node permission bits when the backing filesystem supports
