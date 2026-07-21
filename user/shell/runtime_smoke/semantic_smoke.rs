@@ -15,11 +15,13 @@ use core::{
 
 const SYS_DUP3: usize = 24;
 const SYS_FLOCK: usize = 32;
+const SYS_MKDIRAT: usize = 34;
 const SYS_UNLINKAT: usize = 35;
 const SYS_LINKAT: usize = 37;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
+const SYS_GETDENTS64: usize = 61;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_VMSPLICE: usize = 75;
@@ -59,11 +61,13 @@ const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
 const AT_FDCWD: isize = -100;
+const AT_REMOVEDIR: usize = 0x200;
 const O_RDONLY: usize = 0;
 const O_WRONLY: usize = 1;
 const O_RDWR: usize = 2;
 const O_CREAT: usize = 0o100;
 const O_NONBLOCK: usize = 0o4000;
+const O_DIRECTORY: usize = 0o200000;
 const LOCK_EX: usize = 2;
 const LOCK_UN: usize = 8;
 const WNOHANG: usize = 1;
@@ -94,6 +98,7 @@ const MADV_DONTNEED: usize = 4;
 const AT_EMPTY_PATH: usize = 0x1000;
 const STATX_BASIC_STATS: usize = 0x07ff;
 const STATX_TYPE: u32 = 0x0001;
+const STATX_NLINK: u32 = 0x0004;
 const S_IFMT: u16 = 0o170000;
 const S_IFREG: u16 = 0o100000;
 const PAGE_BYTES: usize = 4096;
@@ -120,6 +125,15 @@ const HARDLINK_RENAME_ALIAS: &[u8] = b"/tmp/pr3-semantic-hardlink-alias\0";
 const HARDLINK_RENAME_TARGET: &[u8] = b"/tmp/pr3-semantic-hardlink-target\0";
 const HARDLINK_RENAME_SOURCE_DATA: &[u8] = b"SRC!";
 const HARDLINK_RENAME_TARGET_DATA: &[u8] = b"DST?";
+const CARGO_LINK_SOURCE: &[u8] = b"/tmp/pr3-semantic-cargo-link-source\0";
+const CARGO_LINK_WORKING_DIR: &[u8] = b"/tmp/pr3-semantic-cargo-link-working\0";
+const CARGO_LINK_WORKING_ALIAS: &[u8] =
+    b"/tmp/pr3-semantic-cargo-link-working/object.o\0";
+const CARGO_LINK_PUBLISHED_DIR: &[u8] = b"/tmp/pr3-semantic-cargo-link-published\0";
+const CARGO_LINK_PUBLISHED_ALIAS: &[u8] =
+    b"/tmp/pr3-semantic-cargo-link-published/object.o\0";
+const CARGO_LINK_ENTRY_NAME: &[u8] = b"object.o";
+const CARGO_LINK_SOURCE_DATA: &[u8] = b"OBJ!";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
 const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
 
@@ -202,6 +216,12 @@ const ASSERT_HARDLINK_RENAME_REPLACE: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_HARDLINK_RENAME_REPLACE: &[u8] =
     b"PR3_SMOKE_V1 ASSERT hardlink_rename_replace PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_CARGO_LINK_PUBLISH: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT cargo_link_publish PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_CARGO_LINK_PUBLISH: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT cargo_link_publish PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -362,6 +382,12 @@ const USER_FAIL_HARDLINK_RENAME_REPLACE: &[u8] =
 const USER_FAIL_HARDLINK_RENAME_REPLACE: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL hardlink_rename_replace arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const USER_FAIL_CARGO_LINK_PUBLISH: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL cargo_link_publish arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_CARGO_LINK_PUBLISH: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL cargo_link_publish arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -469,6 +495,12 @@ struct IoVec {
 struct Timespec {
     seconds: i64,
     nanoseconds: i64,
+}
+
+#[derive(Clone, Copy)]
+struct StatIdentity {
+    inode: u64,
+    nlink: u32,
 }
 
 enum ProcUptimeError {
@@ -1029,6 +1061,148 @@ fn unlinkat(path: &[u8]) -> isize {
             0,
         )
     }
+}
+
+#[inline(always)]
+fn mkdirat(path: &[u8], mode: usize) -> isize {
+    // SAFETY: `path` is a live readable NUL-terminated pathname for the complete
+    // synchronous call. AT_FDCWD and mode are scalar Linux mkdirat arguments.
+    unsafe {
+        syscall6(
+            SYS_MKDIRAT,
+            AT_FDCWD as usize,
+            path.as_ptr() as usize,
+            mode,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn unlinkat_dir(path: &[u8]) -> isize {
+    // SAFETY: `path` is a live readable NUL-terminated pathname for the complete
+    // synchronous call. AT_REMOVEDIR requests removal of an empty directory.
+    unsafe {
+        syscall6(
+            SYS_UNLINKAT,
+            AT_FDCWD as usize,
+            path.as_ptr() as usize,
+            AT_REMOVEDIR,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn getdents64(fd: i32, buffer: &mut [u8]) -> isize {
+    // SAFETY: `buffer` is uniquely borrowed and writable for its complete length
+    // until the synchronous syscall returns; fd and length are scalar arguments.
+    unsafe {
+        syscall6(
+            SYS_GETDENTS64,
+            fd as usize,
+            buffer.as_mut_ptr() as usize,
+            buffer.len(),
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+fn directory_contains(fd: i32, expected_name: &[u8]) -> bool {
+    let mut buffer = [0_u8; 512];
+    loop {
+        let count = getdents64(fd, &mut buffer);
+        if count < 0 || count as usize > buffer.len() {
+            return false;
+        }
+        if count == 0 {
+            return false;
+        }
+        let count = count as usize;
+        let mut offset = 0_usize;
+        while offset < count {
+            if count - offset < 20 {
+                return false;
+            }
+            let Some(record_len_offset) = offset.checked_add(16) else {
+                return false;
+            };
+            let Some(record_len_low) = buffer.get(record_len_offset).copied() else {
+                return false;
+            };
+            let Some(record_len_high) = buffer.get(record_len_offset + 1).copied() else {
+                return false;
+            };
+            let record_len = u16::from_ne_bytes([record_len_low, record_len_high]) as usize;
+            if record_len < 20 || record_len > count - offset {
+                return false;
+            }
+            let Some(name_start) = offset.checked_add(19) else {
+                return false;
+            };
+            let Some(record_end) = offset.checked_add(record_len) else {
+                return false;
+            };
+            let mut cursor = name_start;
+            let mut name_len = 0_usize;
+            let mut name_matches = true;
+            let mut terminated = false;
+            while cursor < record_end {
+                let Some(byte) = buffer.get(cursor).copied() else {
+                    return false;
+                };
+                if byte == 0 {
+                    terminated = true;
+                    break;
+                }
+                if expected_name.get(name_len).copied() != Some(byte) {
+                    name_matches = false;
+                }
+                name_len = name_len.saturating_add(1);
+                cursor = cursor.saturating_add(1);
+            }
+            if !terminated {
+                return false;
+            }
+            if name_matches && name_len == expected_name.len() {
+                return true;
+            }
+            offset = record_end;
+        }
+    }
+}
+
+fn statx_identity(path: &[u8]) -> Option<StatIdentity> {
+    // Linux's statx structure is 256 bytes and naturally 8-byte aligned. The nlink
+    // and inode fields occupy stable offsets in the UAPI layout.
+    let mut statx = [0_u64; 32];
+    // SAFETY: `path` is a live NUL-terminated pathname and `statx` is an aligned,
+    // uniquely borrowed writable 256-byte output object for this synchronous call.
+    let result = unsafe {
+        syscall6(
+            SYS_STATX,
+            AT_FDCWD as usize,
+            path.as_ptr() as usize,
+            0,
+            STATX_BASIC_STATS,
+            statx.as_mut_ptr() as usize,
+            0,
+        )
+    };
+    let mask = statx[0] as u32;
+    if result != 0 || mask & STATX_NLINK == 0 {
+        return None;
+    }
+    Some(StatIdentity {
+        nlink: (statx[2] & u32::MAX as u64) as u32,
+        inode: statx[4],
+    })
 }
 
 #[inline(always)]
@@ -2815,6 +2989,98 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_HARDLINK_RENAME_REPLACE) != ASSERT_HARDLINK_RENAME_REPLACE.len() as isize {
         fail(USER_FAIL_WRITE, 282);
+    }
+
+    // rustc publishes incremental object files by hard-linking them into a working
+    // directory and then renaming that directory as a unit. The linked directory
+    // entry must be enumerable before publication, and every descendant name must
+    // follow the parent rename while preserving inode identity and link counts.
+    let _ = unlinkat(CARGO_LINK_PUBLISHED_ALIAS);
+    let _ = unlinkat(CARGO_LINK_WORKING_ALIAS);
+    let _ = unlinkat_dir(CARGO_LINK_PUBLISHED_DIR);
+    let _ = unlinkat_dir(CARGO_LINK_WORKING_DIR);
+    let _ = unlinkat(CARGO_LINK_SOURCE);
+    let cargo_source_fd = openat_mode(CARGO_LINK_SOURCE, O_CREAT | O_RDWR, 0o600);
+    if cargo_source_fd < 0
+        || pipe_write(cargo_source_fd as i32, CARGO_LINK_SOURCE_DATA)
+            != CARGO_LINK_SOURCE_DATA.len() as isize
+        || close(cargo_source_fd as i32) != 0
+        || mkdirat(CARGO_LINK_WORKING_DIR, 0o700) != 0
+        || linkat(CARGO_LINK_SOURCE, CARGO_LINK_WORKING_ALIAS) != 0
+    {
+        let _ = unlinkat(CARGO_LINK_WORKING_ALIAS);
+        let _ = unlinkat_dir(CARGO_LINK_WORKING_DIR);
+        let _ = unlinkat(CARGO_LINK_SOURCE);
+        fail(USER_FAIL_CARGO_LINK_PUBLISH, 283);
+    }
+    let cargo_working_fd = openat(CARGO_LINK_WORKING_DIR, O_RDONLY | O_DIRECTORY);
+    let cargo_entry_visible = cargo_working_fd >= 0
+        && directory_contains(cargo_working_fd as i32, CARGO_LINK_ENTRY_NAME);
+    let cargo_working_close = if cargo_working_fd >= 0 {
+        close(cargo_working_fd as i32)
+    } else {
+        NEG_EBADF
+    };
+    let cargo_pre_identity_ok = match (
+        statx_identity(CARGO_LINK_SOURCE),
+        statx_identity(CARGO_LINK_WORKING_ALIAS),
+    ) {
+        (Some(source), Some(alias)) => {
+            source.inode == alias.inode && source.nlink == 2 && alias.nlink == 2
+        }
+        _ => false,
+    };
+    if !cargo_entry_visible || cargo_working_close != 0 || !cargo_pre_identity_ok {
+        let _ = unlinkat(CARGO_LINK_WORKING_ALIAS);
+        let _ = unlinkat_dir(CARGO_LINK_WORKING_DIR);
+        let _ = unlinkat(CARGO_LINK_SOURCE);
+        fail(USER_FAIL_CARGO_LINK_PUBLISH, 284);
+    }
+
+    let cargo_publish_result =
+        renameat2(CARGO_LINK_WORKING_DIR, CARGO_LINK_PUBLISHED_DIR);
+    let cargo_published_data_ok =
+        path_has_exact_data(CARGO_LINK_PUBLISHED_ALIAS, CARGO_LINK_SOURCE_DATA);
+    let cargo_old_alias = openat(CARGO_LINK_WORKING_ALIAS, O_RDONLY);
+    if cargo_old_alias >= 0 {
+        let _ = close(cargo_old_alias as i32);
+    }
+    let cargo_post_identity_ok = match (
+        statx_identity(CARGO_LINK_SOURCE),
+        statx_identity(CARGO_LINK_PUBLISHED_ALIAS),
+    ) {
+        (Some(source), Some(alias)) => {
+            source.inode == alias.inode && source.nlink == 2 && alias.nlink == 2
+        }
+        _ => false,
+    };
+    if cargo_publish_result != 0
+        || !cargo_published_data_ok
+        || cargo_old_alias != NEG_ENOENT
+        || !cargo_post_identity_ok
+    {
+        let _ = unlinkat(CARGO_LINK_PUBLISHED_ALIAS);
+        let _ = unlinkat(CARGO_LINK_WORKING_ALIAS);
+        let _ = unlinkat_dir(CARGO_LINK_PUBLISHED_DIR);
+        let _ = unlinkat_dir(CARGO_LINK_WORKING_DIR);
+        let _ = unlinkat(CARGO_LINK_SOURCE);
+        fail(USER_FAIL_CARGO_LINK_PUBLISH, 285);
+    }
+
+    let cargo_alias_cleanup = unlinkat(CARGO_LINK_PUBLISHED_ALIAS);
+    let cargo_final_identity_ok = statx_identity(CARGO_LINK_SOURCE)
+        .is_some_and(|source| source.nlink == 1);
+    let cargo_source_cleanup = unlinkat(CARGO_LINK_SOURCE);
+    let cargo_dir_cleanup = unlinkat_dir(CARGO_LINK_PUBLISHED_DIR);
+    if cargo_alias_cleanup != 0
+        || !cargo_final_identity_ok
+        || cargo_source_cleanup != 0
+        || cargo_dir_cleanup != 0
+    {
+        fail(USER_FAIL_CARGO_LINK_PUBLISH, 286);
+    }
+    if write(ASSERT_CARGO_LINK_PUBLISH) != ASSERT_CARGO_LINK_PUBLISH.len() as isize {
+        fail(USER_FAIL_WRITE, 287);
     }
 
     // CAgent's server and concurrent clients depend on ordinary process creation and
