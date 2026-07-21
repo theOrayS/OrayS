@@ -89,6 +89,143 @@ pub(super) fn align_up_checked(value: usize, align: usize) -> Option<usize> {
     }
 }
 
+#[derive(Clone)]
+struct LazyMmapFilePage {
+    file: super::fd_table::MmapFileBacking,
+    file_offset: u64,
+    read_len: usize,
+}
+
+fn lazy_mmap_file_page(
+    process: &UserProcess,
+    page: usize,
+) -> Result<Option<LazyMmapFilePage>, LinuxError> {
+    let page = align_down(page, PAGE_SIZE_4K);
+    let Some(region) = process
+        .mmap_regions()
+        .into_iter()
+        .find(|region| region.start <= page && page < region.end())
+    else {
+        return Ok(None);
+    };
+    let Some(backing) = region.file_backing.filter(|backing| backing.lazy) else {
+        return Ok(None);
+    };
+    let delta = page.checked_sub(region.start).ok_or(LinuxError::EFAULT)?;
+    let accessible_len =
+        align_up_checked(backing.valid_len, PAGE_SIZE_4K).ok_or(LinuxError::EFAULT)?;
+    if delta >= accessible_len {
+        return Err(LinuxError::EIO);
+    }
+    let file_offset = backing
+        .offset
+        .checked_add(delta as u64)
+        .ok_or(LinuxError::EFAULT)?;
+    Ok(Some(LazyMmapFilePage {
+        file: backing.file,
+        file_offset,
+        read_len: backing.valid_len.saturating_sub(delta).min(PAGE_SIZE_4K),
+    }))
+}
+
+fn fault_in_lazy_mmap_file_page(
+    process: &UserProcess,
+    vaddr: VirtAddr,
+    fault_flags: PageFaultFlags,
+) -> Result<bool, LinuxError> {
+    let page = VirtAddr::from(align_down(vaddr.as_usize(), PAGE_SIZE_4K));
+    {
+        let query = process.aspace.lock().query_address(page);
+        let requested_access = MappingFlags::from_bits_truncate(fault_flags.bits());
+        if query.pte_mapped || !query.area_found || !query.area_flags.contains(requested_access) {
+            return Ok(false);
+        }
+    }
+    let Some(mut page_source) = lazy_mmap_file_page(process, page.as_usize())? else {
+        return Ok(false);
+    };
+
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(PAGE_SIZE_4K)
+        .map_err(|_| LinuxError::ENOMEM)?;
+    bytes.resize(PAGE_SIZE_4K, 0);
+    let mut read = 0usize;
+    while read < page_source.read_len {
+        let read_offset = page_source
+            .file_offset
+            .checked_add(read as u64)
+            .ok_or(LinuxError::EFAULT)?;
+        let n = read_mmap_file_backing(
+            process,
+            &mut page_source.file,
+            read_offset,
+            &mut bytes[read..page_source.read_len],
+        )?;
+        if n == 0 {
+            return Err(LinuxError::EIO);
+        }
+        read += n;
+    }
+
+    // Filesystem I/O above intentionally happens without the address-space lock.
+    // Revalidate the VMA and backing after taking it so an overlapping mmap or
+    // munmap cannot install bytes into a different mapping at the same address.
+    let mut aspace = process.aspace.lock();
+    if aspace.query_address(page).pte_mapped {
+        return Ok(false);
+    }
+    let Some(current) = lazy_mmap_file_page(process, page.as_usize())? else {
+        return Ok(false);
+    };
+    if current.file_offset != page_source.file_offset
+        || current.read_len != page_source.read_len
+        || !current.file.same_backing(&page_source.file)
+    {
+        return Ok(false);
+    }
+    let query = aspace.query_address(page);
+    let requested_access = MappingFlags::from_bits_truncate(fault_flags.bits());
+    if !query.area_found || !query.area_flags.contains(requested_access) {
+        return Ok(false);
+    }
+    if !aspace.handle_page_fault(page, fault_flags) {
+        return Ok(false);
+    }
+    aspace
+        .write(page, bytes.as_slice())
+        .map_err(|_| LinuxError::EFAULT)?;
+    Ok(true)
+}
+
+pub(super) fn fault_in_lazy_mmap_file_range(
+    process: &UserProcess,
+    ptr: usize,
+    len: usize,
+    write: bool,
+) -> Result<(), LinuxError> {
+    if len == 0 {
+        return Ok(());
+    }
+    let end = ptr.checked_add(len).ok_or(LinuxError::EFAULT)?;
+    let end_page = align_up_checked(end, PAGE_SIZE_4K).ok_or(LinuxError::EFAULT)?;
+    let fault_flags = if write {
+        PageFaultFlags::WRITE
+    } else {
+        PageFaultFlags::READ
+    };
+    let Some(pages) = PageIter4K::new(
+        VirtAddr::from(align_down(ptr, PAGE_SIZE_4K)),
+        VirtAddr::from(end_page),
+    ) else {
+        return Err(LinuxError::EFAULT);
+    };
+    for page in pages {
+        let _ = fault_in_lazy_mmap_file_page(process, page, fault_flags)?;
+    }
+    Ok(())
+}
+
 #[register_trap_handler(PAGE_FAULT)]
 fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> bool {
     let Some(ext) = current_task_ext() else {
@@ -110,7 +247,13 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         perf_counters::record_mmap_page_fault();
         let _ = process.handle_mmap_grow_down_fault(vaddr.as_usize(), flags);
     }
-    let handled = {
+    let lazy_fault = fault_in_lazy_mmap_file_page(process, vaddr, flags);
+    let lazy_fault_failed = lazy_fault.is_err();
+    let handled = if matches!(lazy_fault, Ok(true)) {
+        true
+    } else if lazy_fault_failed {
+        false
+    } else {
         let mut aspace = process.aspace.lock();
         if should_trace {
             let query = aspace
@@ -133,7 +276,7 @@ fn user_page_fault(vaddr: VirtAddr, flags: PageFaultFlags, _from_user: bool) -> 
         handled
     };
     if !handled && _from_user {
-        let signal = if process.fault_in_mmap_sigbus_range(vaddr.as_usize()) {
+        let signal = if lazy_fault_failed || process.fault_in_mmap_sigbus_range(vaddr.as_usize()) {
             general::SIGBUS as i32
         } else {
             SIGSEGV_NUM
@@ -187,6 +330,8 @@ pub(super) fn sys_mmap(
     let map_fixed = flags_u32 & general::MAP_FIXED != 0;
     let locked =
         flags_u32 & general::MAP_LOCKED != 0 || process.mlock_future.load(Ordering::Acquire);
+    let populate_requested =
+        flags_u32 & general::MAP_POPULATE != 0 && flags_u32 & general::MAP_NONBLOCK == 0;
     if len == 0 {
         if !anonymous {
             if let Err(err) = process.fds.lock().mmap_validate_file_fd_exists(fd as i32) {
@@ -276,21 +421,37 @@ pub(super) fn sys_mmap(
     }
     let file_backed = !anonymous && !dev_zero;
     perf_counters::record_mmap(file_backed);
-    let mut file_backing = if file_backed && shared && shared_write_allowed {
+    let lazy_file_mapping = file_backed && !shared && !locked && !populate_requested;
+    let mut file_backing = if file_backed && (lazy_file_mapping || shared && shared_write_allowed) {
         let file = match process.fds.lock().mmap_file_backing(fd as i32) {
             Ok(file) => file,
             Err(err) => return neg_errno(err),
         };
+        let valid_len = if lazy_file_mapping {
+            let file_size = match file.logical_size(process) {
+                Ok(size) => size,
+                Err(err) => return neg_errno(err),
+            };
+            let available = file_size.saturating_sub(offset as u64).min(len as u64);
+            match usize::try_from(available) {
+                Ok(len) => len,
+                Err(_) => return neg_errno(LinuxError::ENOMEM),
+            }
+        } else {
+            0
+        };
         Some(super::UserMmapFileBacking {
             file,
             offset: offset as u64,
-            valid_len: 0,
+            valid_len,
+            lazy: lazy_file_mapping,
         })
     } else {
         None
     };
     if let Some(mut cache) = file_backing
         .as_ref()
+        .filter(|_| shared)
         .and_then(|backing| process.take_exec_shared_mmap_cache(&backing.file, offset as u64, size))
     {
         let mut pages = BTreeMap::new();
@@ -339,7 +500,7 @@ pub(super) fn sys_mmap(
         process.record_self_maxrss_kb(rss_kb_from_bytes(size));
         return target as isize;
     }
-    let populate = file_backed || shared || locked;
+    let populate = populate_requested || shared || locked || file_backed && !lazy_file_mapping;
     {
         let mut aspace = process.aspace.lock();
         if map_fixed {
@@ -352,7 +513,33 @@ pub(super) fn sys_mmap(
     }
 
     let mut sigbus_range = None;
-    if file_backed {
+    if lazy_file_mapping {
+        let valid_len = file_backing
+            .as_ref()
+            .map(|backing| backing.valid_len)
+            .unwrap_or(0);
+        if valid_len < len {
+            let Some(accessible_len) = align_up_checked(valid_len, PAGE_SIZE_4K) else {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::ENOMEM);
+            };
+            let Some(invalid_start) = target.checked_add(accessible_len) else {
+                let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                return neg_errno(LinuxError::ENOMEM);
+            };
+            if invalid_start < target_end {
+                if let Err(err) = process.aspace.lock().protect(
+                    VirtAddr::from(invalid_start),
+                    target_end - invalid_start,
+                    MappingFlags::USER,
+                ) {
+                    let _ = process.aspace.lock().unmap(VirtAddr::from(target), size);
+                    return neg_errno(LinuxError::from(err));
+                }
+                sigbus_range = Some((invalid_start, target_end));
+            }
+        }
+    } else if file_backed {
         let mut copied = 0usize;
         let mut buf = match user_io_buffer(len) {
             Ok(buf) => buf,
@@ -604,7 +791,12 @@ fn mremap_try_expand_in_place(
     }
     let preserved_sigbus = process.mmap_sigbus_segments(old_addr, old_end);
     let map_flags = mmap_prot_to_flags(source.prot);
-    let populate = source.file_backing.is_some() || source.shared || source.locked;
+    let populate = source
+        .file_backing
+        .as_ref()
+        .is_some_and(|backing| !backing.lazy)
+        || source.shared
+        || source.locked;
     let mut aspace = process.aspace.lock();
     if aspace
         .map_alloc(VirtAddr::from(old_end), extension, map_flags, populate)
@@ -618,7 +810,9 @@ fn mremap_try_expand_in_place(
     region.start = old_addr;
     region.size = new_size;
     if let Some(backing) = region.file_backing.as_mut() {
-        backing.valid_len = backing.valid_len.max(new_size);
+        if !backing.lazy {
+            backing.valid_len = backing.valid_len.max(new_size);
+        }
     }
     let region_size = region.size;
     process.record_mmap_region_entry(region);
@@ -673,7 +867,12 @@ fn mremap_move(
     }
     let copy_size = old_size.min(new_size);
     let map_flags = mmap_prot_to_flags(source.prot);
-    let populate = source.file_backing.is_some() || source.shared || source.locked;
+    let populate = source
+        .file_backing
+        .as_ref()
+        .is_some_and(|backing| !backing.lazy)
+        || source.shared
+        || source.locked;
     let moved_sigbus: Vec<(usize, usize)> = process
         .mmap_sigbus_segments(old_addr, old_addr + copy_size)
         .into_iter()
@@ -694,7 +893,13 @@ fn mremap_move(
             .map_err(LinuxError::from)?;
     }
 
-    if let Err(err) = mremap_copy_user_range(process, old_addr, target, copy_size) {
+    let copy_only_resident = source
+        .file_backing
+        .as_ref()
+        .is_some_and(|backing| backing.lazy);
+    if let Err(err) =
+        mremap_copy_user_range(process, old_addr, target, copy_size, copy_only_resident)
+    {
         let _ = process
             .aspace
             .lock()
@@ -714,7 +919,9 @@ fn mremap_move(
     region.start = target;
     region.size = new_size;
     if let Some(backing) = region.file_backing.as_mut() {
-        backing.valid_len = backing.valid_len.max(new_size);
+        if !backing.lazy {
+            backing.valid_len = backing.valid_len.max(new_size);
+        }
     }
     let region_size = region.size;
     process.record_mmap_region_entry(region);
@@ -731,8 +938,13 @@ fn mremap_copy_user_range(
     src: usize,
     dst: usize,
     len: usize,
+    copy_only_resident: bool,
 ) -> Result<(), LinuxError> {
-    let chunk = MAX_USER_IO_CHUNK.min(PAGE_SIZE_4K * 16);
+    let chunk = if copy_only_resident {
+        PAGE_SIZE_4K
+    } else {
+        MAX_USER_IO_CHUNK.min(PAGE_SIZE_4K * 16)
+    };
     let mut buf = Vec::new();
     buf.try_reserve_exact(chunk)
         .map_err(|_| LinuxError::ENOMEM)?;
@@ -743,6 +955,10 @@ fn mremap_copy_user_range(
         let src_addr = src.checked_add(copied).ok_or(LinuxError::ENOMEM)?;
         let dst_addr = dst.checked_add(copied).ok_or(LinuxError::ENOMEM)?;
         let mut aspace = process.aspace.lock();
+        if copy_only_resident && !aspace.query_address(VirtAddr::from(src_addr)).pte_mapped {
+            copied += chunk_len;
+            continue;
+        }
         aspace
             .read(VirtAddr::from(src_addr), &mut buf[..chunk_len])
             .map_err(LinuxError::from)?;
@@ -838,13 +1054,9 @@ pub(super) fn sys_msync(process: &UserProcess, addr: usize, len: usize, flags: u
         return neg_errno(LinuxError::ENOMEM);
     }
 
-    let aspace = process.aspace.lock();
-    for page in PageIter4K::new(VirtAddr::from(addr), VirtAddr::from(end)).unwrap() {
-        if aspace.page_table().query(page).is_err() {
-            return neg_errno(LinuxError::ENOMEM);
-        }
+    if !madvise_mapped_range(process, addr, end) {
+        return neg_errno(LinuxError::ENOMEM);
     }
-    drop(aspace);
     if flags & MS_INVALIDATE != 0 && process.mmap_range_has_locked(addr, end) {
         return neg_errno(LinuxError::EBUSY);
     }
@@ -903,7 +1115,9 @@ pub(super) fn sys_madvise(process: &UserProcess, addr: usize, len: usize, advice
             {
                 return neg_errno(LinuxError::EINVAL);
             }
-            if madvise_range_is_private_anonymous(process, addr, end) {
+            if madvise_range_is_private_anonymous(process, addr, end)
+                || madvise_range_is_lazy_private_file(process, addr, end)
+            {
                 return process
                     .aspace
                     .lock()
@@ -1009,6 +1223,17 @@ fn madvise_range_is_private_anonymous(process: &UserProcess, start: usize, end: 
     })
 }
 
+fn madvise_range_is_lazy_private_file(process: &UserProcess, start: usize, end: usize) -> bool {
+    madvise_range_satisfies(process, start, end, |region| {
+        !region.shared
+            && !region.anonymous
+            && region
+                .file_backing
+                .as_ref()
+                .is_some_and(|backing| backing.lazy)
+    })
+}
+
 fn madvise_range_is_tracked(process: &UserProcess, start: usize, end: usize) -> bool {
     madvise_range_satisfies(process, start, end, |_| true)
 }
@@ -1057,12 +1282,16 @@ fn madvise_populate_range(
     } else {
         PageFaultFlags::READ
     };
-    let mut aspace = process.aspace.lock();
-    if !aspace.contains_range(VirtAddr::from(start), size)
-        || !aspace.can_access_range(VirtAddr::from(start), size, access)
     {
-        return Err(LinuxError::ENOMEM);
+        let aspace = process.aspace.lock();
+        if !aspace.contains_range(VirtAddr::from(start), size)
+            || !aspace.can_access_range(VirtAddr::from(start), size, access)
+        {
+            return Err(LinuxError::ENOMEM);
+        }
     }
+    fault_in_lazy_mmap_file_range(process, start, size, write).map_err(|_| LinuxError::ENOMEM)?;
+    let mut aspace = process.aspace.lock();
     let Some(pages) = PageIter4K::new(VirtAddr::from(start), VirtAddr::from(end)) else {
         return Err(LinuxError::ENOMEM);
     };
@@ -1294,6 +1523,9 @@ fn mlock_range(process: &UserProcess, addr: usize, len: usize, populate: bool) -
         return neg_errno(err);
     }
     if populate {
+        if fault_in_lazy_mmap_file_range(process, start, end - start, false).is_err() {
+            return neg_errno(LinuxError::ENOMEM);
+        }
         let mut aspace = process.aspace.lock();
         if aspace
             .populate_range(VirtAddr::from(start), end - start, PageFaultFlags::READ)
@@ -1421,8 +1653,11 @@ pub(super) fn sys_mprotect(
         return neg_errno(LinuxError::EACCES);
     }
     let prot_flags = mmap_prot_to_flags(_prot as u32);
-    let mut aspace = _process.aspace.lock();
     let size = end - start;
+    let prefault_private_anonymous = _prot as u32 & general::PROT_WRITE != 0
+        && size <= 0x40000
+        && madvise_range_is_private_anonymous(_process, start, end);
+    let mut aspace = _process.aspace.lock();
     if !aspace.contains_range(VirtAddr::from(start), size)
         || !aspace.can_access_range(VirtAddr::from(start), size, MappingFlags::empty())
     {
@@ -1436,7 +1671,7 @@ pub(super) fn sys_mprotect(
             // flipped to writable with mprotect(). Pre-fault only the stack-top
             // pages so the first user-space writes succeed without turning the
             // whole stack into eagerly allocated memory.
-            if _prot as u32 & general::PROT_WRITE != 0 && end - start <= 0x40000 {
+            if prefault_private_anonymous {
                 let prefault_start = end.saturating_sub(PAGE_SIZE_4K * 2).max(start);
                 for page in
                     PageIter4K::new(VirtAddr::from(prefault_start), VirtAddr::from(end)).unwrap()

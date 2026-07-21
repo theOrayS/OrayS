@@ -20,6 +20,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use super::linux_abi::IOV_MAX;
+use super::memory_map::fault_in_lazy_mmap_file_range;
 use super::perf_counters;
 use super::{UserProcess, neg_errno};
 
@@ -185,6 +186,7 @@ fn fault_in_user_range(
             let _ = process.handle_mmap_grow_down_fault(page.as_usize(), fault_flags);
         }
     }
+    fault_in_lazy_mmap_file_range(process, ptr, len, write).map_err(|_| LinuxError::EFAULT)?;
 
     let mut aspace = process.aspace.lock();
     if !aspace.can_access_range(VirtAddr::from(ptr), len, access_flags) {

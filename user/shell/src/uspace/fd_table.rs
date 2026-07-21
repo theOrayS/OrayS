@@ -508,6 +508,13 @@ impl MmapFileBacking {
             _ => false,
         }
     }
+
+    pub(super) fn logical_size(&self, process: &UserProcess) -> Result<u64, LinuxError> {
+        match self {
+            Self::File(file) => file_logical_size(process, file),
+            Self::Memfd(file) => Ok(file.size()),
+        }
+    }
 }
 
 struct MemfdState {

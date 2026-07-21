@@ -242,6 +242,9 @@ struct UserMmapFileBacking {
     /// Linux keeps the zero-filled tail of the final partial page accessible for
     /// MAP_SHARED, but dirty bytes past EOF must not be written back to the file.
     valid_len: usize,
+    /// Load absent pages from the backing object on first access. Shared,
+    /// locked, and explicitly populated mappings keep their eager behavior.
+    lazy: bool,
 }
 
 #[derive(Clone)]
