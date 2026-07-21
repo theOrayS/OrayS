@@ -3032,7 +3032,13 @@ pub extern "C" fn _start() -> ! {
         fail(USER_FAIL_CLONE3_PROCESS, 258);
     }
     let mut clone3_status = -1_i32;
-    if wait_child(clone3_child, &mut clone3_status) != clone3_child || clone3_status != 0 {
+    if wait_child(clone3_child, &mut clone3_status) != clone3_child {
+        fail(USER_FAIL_CLONE3_PROCESS, 259);
+    }
+    if clone3_status == 45 << 8 {
+        fail(USER_FAIL_SIGALTSTACK_FORK_EXEC, 278);
+    }
+    if clone3_status != 0 {
         fail(USER_FAIL_CLONE3_PROCESS, 259);
     }
 
