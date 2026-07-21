@@ -22,6 +22,21 @@ use super::user_memory::write_user_value;
 const ROBUST_LIST_HEAD_LEN: usize = size_of::<usize>() * 3;
 const SYNTHETIC_INIT_PID: i32 = 1;
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(super) struct RelativeFutexRestartKey {
+    pub(super) uaddr: usize,
+    pub(super) futex_op: usize,
+    pub(super) val: usize,
+    pub(super) timeout: usize,
+}
+
+#[derive(Clone, Copy)]
+struct RelativeFutexRestartState {
+    key: RelativeFutexRestartKey,
+    deadline: core::time::Duration,
+    armed: bool,
+}
+
 #[cfg(feature = "auto-run-tests")]
 static USER_TASK_EXT_LIVE: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "auto-run-tests")]
@@ -65,6 +80,7 @@ pub(super) struct UserTaskExt {
     // mutex; the mutex remains the owner of the actual trap frame.
     syscall_restart_frame_valid: AtomicBool,
     syscall_restart_frame: Mutex<Option<TrapFrame>>,
+    relative_futex_restart: Mutex<Option<RelativeFutexRestartState>>,
     pub(super) syscall_runtime_micros: AtomicU64,
     pub(super) last_reported_user_micros: AtomicU64,
     pub(super) last_reported_system_micros: AtomicU64,
@@ -114,6 +130,7 @@ impl UserTaskExt {
             pending_sigreturn: Mutex::new(None),
             syscall_restart_frame_valid: AtomicBool::new(false),
             syscall_restart_frame: Mutex::new(None),
+            relative_futex_restart: Mutex::new(None),
             syscall_runtime_micros: AtomicU64::new(0),
             last_reported_user_micros: AtomicU64::new(0),
             last_reported_system_micros: AtomicU64::new(0),
@@ -154,6 +171,7 @@ impl UserTaskExt {
         self.signal_frame.store(0, Ordering::Release);
         *self.pending_sigreturn.lock() = None;
         self.clear_syscall_restart_frame();
+        self.clear_relative_futex_restart();
     }
 
     pub(super) fn store_syscall_restart_frame(&self, frame: TrapFrame) {
@@ -177,6 +195,59 @@ impl UserTaskExt {
         {
             *self.syscall_restart_frame.lock() = None;
         }
+    }
+
+    pub(super) fn start_relative_futex_wait(
+        &self,
+        key: RelativeFutexRestartKey,
+        now: core::time::Duration,
+        requested: core::time::Duration,
+    ) {
+        let deadline = now
+            .checked_add(requested)
+            .unwrap_or(core::time::Duration::MAX);
+        *self.relative_futex_restart.lock() = Some(RelativeFutexRestartState {
+            key,
+            deadline,
+            armed: false,
+        });
+    }
+
+    pub(super) fn resume_relative_futex_wait(
+        &self,
+        key: RelativeFutexRestartKey,
+        now: core::time::Duration,
+    ) -> Option<core::time::Duration> {
+        let mut slot = self.relative_futex_restart.lock();
+        let state = slot.as_mut()?;
+        if state.key != key || !state.armed {
+            return None;
+        }
+        state.armed = false;
+        Some(state.deadline.saturating_sub(now))
+    }
+
+    pub(super) fn arm_relative_futex_restart(&self, key: RelativeFutexRestartKey) -> bool {
+        let mut slot = self.relative_futex_restart.lock();
+        let Some(state) = slot.as_mut() else {
+            return false;
+        };
+        if state.key != key {
+            return false;
+        }
+        state.armed = true;
+        true
+    }
+
+    pub(super) fn finish_relative_futex_wait(&self, key: RelativeFutexRestartKey) {
+        let mut slot = self.relative_futex_restart.lock();
+        if slot.as_ref().is_some_and(|state| state.key == key) {
+            *slot = None;
+        }
+    }
+
+    pub(super) fn clear_relative_futex_restart(&self) {
+        *self.relative_futex_restart.lock() = None;
     }
 }
 

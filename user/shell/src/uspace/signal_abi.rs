@@ -147,12 +147,20 @@ fn restartable_blocking_syscall(tf: &TrapFrame, syscall_num: u32) -> bool {
         return false;
     }
 
-    // FUTEX_WAIT_BITSET uses an absolute timeout (or no timeout), so replaying
-    // the original syscall frame after an SA_RESTART handler preserves its
-    // deadline. FUTEX_WAIT instead accepts a relative timeout; replaying that
-    // pointer would extend the wait, so timed WAIT needs a dedicated Linux-style
-    // restart block before it can be included here.
-    tf.arg1() as u32 & general::FUTEX_CMD_MASK as u32 == general::FUTEX_WAIT_BITSET
+    let cmd = tf.arg1() as u32 & general::FUTEX_CMD_MASK as u32;
+    match cmd {
+        // FUTEX_WAIT_BITSET uses an absolute timeout (or no timeout), so replaying
+        // the original syscall frame preserves its deadline.
+        general::FUTEX_WAIT_BITSET => true,
+        // Untimed FUTEX_WAIT is safe to replay directly. Timed WAIT is restartable
+        // only when the futex path retained and now arms its monotonic deadline.
+        general::FUTEX_WAIT => {
+            tf.arg3() == 0
+                || current_task_ext()
+                    .is_some_and(|ext| futex::arm_relative_futex_restart(ext, tf))
+        }
+        _ => false,
+    }
 }
 
 pub(super) fn note_syscall_restart_candidate(tf: &TrapFrame, syscall_num: u32, ret: isize) {
@@ -166,6 +174,15 @@ pub(super) fn note_syscall_restart_candidate(tf: &TrapFrame, syscall_num: u32, r
         // Once any later syscall reaches a non-restartable result, stale wait
         // state must not be reused by a future SA_RESTART signal delivery.
         ext.clear_syscall_restart_frame();
+        // Handler syscalls execute while the outer signal frame is live; they
+        // must not discard the interrupted relative wait's deadline. rt_sigreturn
+        // clears signal_frame before dispatch returns but immediately restores
+        // the saved syscall frame, so it is the other exception here.
+        if ext.signal_frame.load(Ordering::Acquire) == 0
+            && syscall_num != general::__NR_rt_sigreturn
+        {
+            futex::clear_relative_futex_restart(ext);
+        }
     }
 }
 
@@ -175,6 +192,11 @@ fn take_syscall_restart_frame(ext: &UserTaskExt) -> Option<TrapFrame> {
 
 fn clear_syscall_restart_frame(ext: &UserTaskExt) {
     ext.clear_syscall_restart_frame();
+}
+
+fn clear_syscall_restart_state(ext: &UserTaskExt) {
+    clear_syscall_restart_frame(ext);
+    futex::clear_relative_futex_restart(ext);
 }
 
 fn signal_action_restarts_syscall(action: &general::kernel_sigaction) -> bool {
@@ -663,7 +685,7 @@ fn inject_pending_signal(
         );
     }
     if handler <= 1 {
-        clear_syscall_restart_frame(ext);
+        clear_syscall_restart_state(ext);
         clear_pending_signal(ext, sig);
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
@@ -679,7 +701,7 @@ fn inject_pending_signal(
     let saved_tf = if signal_action_restarts_syscall(&action) {
         take_syscall_restart_frame(ext).unwrap_or(*tf)
     } else {
-        clear_syscall_restart_frame(ext);
+        clear_syscall_restart_state(ext);
         *tf
     };
     let frame_size = riscv_signal_frame_size();
@@ -753,7 +775,7 @@ fn inject_pending_signal(
         .map(|func| func as usize)
         .unwrap_or(0);
     if handler <= 1 {
-        clear_syscall_restart_frame(ext);
+        clear_syscall_restart_state(ext);
         clear_pending_signal(ext, sig);
         let current_mask = ext.signal_mask.load(Ordering::Acquire);
         let restore_mask = take_sigsuspend_restore_mask(ext, current_mask);
@@ -770,7 +792,7 @@ fn inject_pending_signal(
     let saved_tf = if signal_action_restarts_syscall(&action) {
         take_syscall_restart_frame(ext).unwrap_or(*tf)
     } else {
-        clear_syscall_restart_frame(ext);
+        clear_syscall_restart_state(ext);
         *tf
     };
     let frame_size = loongarch_signal_frame_size();

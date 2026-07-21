@@ -16,7 +16,9 @@ use super::UserProcess;
 use super::linux_abi::{USER_MMAP_BASE, neg_errno};
 use super::perf_counters;
 use super::signal_abi::current_unblocked_signal_pending;
-use super::task_context::{current_task_ext, current_tid, task_ext, user_pc};
+use super::task_context::{
+    RelativeFutexRestartKey, UserTaskExt, current_task_ext, current_tid, task_ext, user_pc,
+};
 use super::time_abi::{clock_now_duration, timespec_to_duration};
 use super::user_memory::{fault_in_user_read, read_user_value};
 
@@ -262,6 +264,67 @@ fn read_futex_timeout(
     Ok(Some(dur))
 }
 
+fn relative_restart_key(
+    uaddr: usize,
+    futex_op: usize,
+    val: usize,
+    timeout: usize,
+) -> RelativeFutexRestartKey {
+    RelativeFutexRestartKey {
+        uaddr,
+        futex_op,
+        val,
+        timeout,
+    }
+}
+
+fn read_relative_futex_timeout(
+    process: &UserProcess,
+    timeout: usize,
+    restart_key: RelativeFutexRestartKey,
+) -> Result<Option<Duration>, LinuxError> {
+    let Some(ext) = current_task_ext() else {
+        return read_futex_timeout(process, timeout, false, false);
+    };
+    let now = axhal::time::monotonic_time();
+    // A handler may issue unrelated syscalls while an interrupted wait's signal
+    // frame is active. Do not let those syscalls consume or replace the outer
+    // wait's restart deadline.
+    if ext.signal_frame.load(Ordering::Acquire) == 0 {
+        if let Some(remaining) = ext.resume_relative_futex_wait(restart_key, now) {
+            return Ok(Some(remaining));
+        }
+    }
+
+    let requested = read_futex_timeout(process, timeout, false, false)?;
+    if ext.signal_frame.load(Ordering::Acquire) == 0 {
+        if let Some(requested) = requested {
+            ext.start_relative_futex_wait(restart_key, now, requested);
+        }
+    }
+    Ok(requested)
+}
+
+fn finish_relative_futex_wait(restart_key: Option<RelativeFutexRestartKey>) {
+    let (Some(ext), Some(restart_key)) = (current_task_ext(), restart_key) else {
+        return;
+    };
+    ext.finish_relative_futex_wait(restart_key);
+}
+
+pub(super) fn arm_relative_futex_restart(ext: &UserTaskExt, tf: &TrapFrame) -> bool {
+    ext.arm_relative_futex_restart(relative_restart_key(
+        tf.arg0(),
+        tf.arg1(),
+        tf.arg2(),
+        tf.arg3(),
+    ))
+}
+
+pub(super) fn clear_relative_futex_restart(ext: &UserTaskExt) {
+    ext.clear_relative_futex_restart();
+}
+
 fn wait_timeout_until_precise<F>(state: &FutexState, dur: Duration, condition: F) -> bool
 where
     F: Fn() -> bool,
@@ -311,21 +374,37 @@ fn wait_addr(
     realtime_timeout: bool,
     bitset: u32,
     private: bool,
+    restart_key: Option<RelativeFutexRestartKey>,
 ) -> isize {
     let current = match read_user_value::<u32>(process, uaddr) {
         Ok(value) => value,
-        Err(err) => return neg_errno(err),
+        Err(err) => {
+            finish_relative_futex_wait(restart_key);
+            return neg_errno(err);
+        }
     };
     if current != val as u32 {
+        finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::EAGAIN);
     }
     let key = match futex_key(process, uaddr, private) {
         Ok(key) => key,
-        Err(err) => return neg_errno(err),
+        Err(err) => {
+            finish_relative_futex_wait(restart_key);
+            return neg_errno(err);
+        }
     };
-    let timeout = match read_futex_timeout(process, timeout, absolute_timeout, realtime_timeout) {
+    let timeout_result = if let Some(restart_key) = restart_key {
+        read_relative_futex_timeout(process, timeout, restart_key)
+    } else {
+        read_futex_timeout(process, timeout, absolute_timeout, realtime_timeout)
+    };
+    let timeout = match timeout_result {
         Ok(timeout) => timeout,
-        Err(err) => return neg_errno(err),
+        Err(err) => {
+            finish_relative_futex_wait(restart_key);
+            return neg_errno(err);
+        }
     };
     let state = state(key);
     if let Some(ext) = current_task_ext() {
@@ -354,12 +433,14 @@ fn wait_addr(
             {
                 return neg_errno(LinuxError::EINTR);
             }
+            finish_relative_futex_wait(restart_key);
             return neg_errno(LinuxError::ETIMEDOUT);
         }
         clear_current_futex_wait(process, uaddr, private);
         if current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
+        finish_relative_futex_wait(restart_key);
         return 0;
     }
     if let Some(dur) = process.eval_watchdog_remaining() {
@@ -376,6 +457,7 @@ fn wait_addr(
     {
         return neg_errno(LinuxError::EINTR);
     }
+    finish_relative_futex_wait(restart_key);
     0
 }
 
@@ -461,16 +543,21 @@ pub(super) fn sys_futex(
         );
     }
     match cmd {
-        general::FUTEX_WAIT => wait_addr(
-            process,
-            uaddr,
-            val,
-            timeout,
-            false,
-            false,
-            u32::MAX,
-            private,
-        ),
+        general::FUTEX_WAIT => {
+            let restart_key = (timeout != 0)
+                .then(|| relative_restart_key(uaddr, futex_op, val, timeout));
+            wait_addr(
+                process,
+                uaddr,
+                val,
+                timeout,
+                false,
+                false,
+                u32::MAX,
+                private,
+                restart_key,
+            )
+        }
         general::FUTEX_WAIT_BITSET => {
             if _val3 == 0 {
                 return neg_errno(LinuxError::EINVAL);
@@ -484,6 +571,7 @@ pub(super) fn sys_futex(
                 op & general::FUTEX_CLOCK_REALTIME != 0,
                 _val3 as u32,
                 private,
+                None,
             )
         }
         general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val, private) {
