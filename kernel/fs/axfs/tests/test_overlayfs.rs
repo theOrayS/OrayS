@@ -3,7 +3,71 @@ use std::sync::Arc;
 
 use axfs::overlayfs::OverlayFileSystem;
 use axfs_ramfs::RamFileSystem;
-use axfs_vfs::{VfsDirEntry, VfsError, VfsNodePerm, VfsNodeRef, VfsNodeType, VfsOps};
+use axfs_vfs::{
+    VfsDirEntry, VfsError, VfsNodeAttr, VfsNodeOps, VfsNodePerm, VfsNodeRef, VfsNodeType, VfsOps,
+    VfsResult,
+};
+
+struct SymlinkLowerFs {
+    root: Arc<SymlinkLowerRoot>,
+}
+
+struct SymlinkLowerRoot;
+
+struct SymlinkLowerNode;
+
+impl SymlinkLowerFs {
+    fn new() -> Self {
+        Self {
+            root: Arc::new(SymlinkLowerRoot),
+        }
+    }
+}
+
+impl VfsOps for SymlinkLowerFs {
+    fn root_dir(&self) -> VfsNodeRef {
+        self.root.clone()
+    }
+}
+
+impl VfsNodeOps for SymlinkLowerRoot {
+    axfs_vfs::impl_vfs_dir_default! {}
+
+    fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
+        Ok(VfsNodeAttr::new_dir(0, 0))
+    }
+
+    fn lookup(self: Arc<Self>, path: &str) -> VfsResult<VfsNodeRef> {
+        match path.trim_matches('/') {
+            "" | "." => Ok(self),
+            "toolchain" => Ok(Arc::new(SymlinkLowerNode)),
+            _ => Err(VfsError::NotFound),
+        }
+    }
+}
+
+impl VfsNodeOps for SymlinkLowerNode {
+    axfs_vfs::impl_vfs_non_dir_default! {}
+
+    // Following metadata describes the regular-file target, while lstat-style
+    // metadata must describe the final symlink component itself.
+    fn get_attr(&self) -> VfsResult<VfsNodeAttr> {
+        Ok(VfsNodeAttr::new_file(4096, 8))
+    }
+
+    fn get_link_attr(&self) -> VfsResult<VfsNodeAttr> {
+        Ok(VfsNodeAttr::new(
+            VfsNodePerm::from_bits_truncate(0o777),
+            VfsNodeType::SymLink,
+            9,
+            0,
+        ))
+    }
+
+    fn read_link(&self) -> VfsResult<String> {
+        Ok("bin/rustc".into())
+    }
+}
 
 fn create_dir(root: &VfsNodeRef, path: &str) {
     root.create(path, VfsNodeType::Dir).unwrap();
@@ -195,4 +259,17 @@ fn readonly_lower_has_general_copy_up_and_whiteout_semantics() {
         b"fn lower() {}\n"
     );
     assert_eq!(read_all(&open_nested_dir, "input.rs"), b"fn lower() {}\n");
+
+    let symlink_lower: Arc<dyn VfsOps> = Arc::new(SymlinkLowerFs::new());
+    let symlink_overlay = OverlayFileSystem::new(symlink_lower);
+    let symlink = symlink_overlay
+        .root_dir()
+        .lookup("/toolchain")
+        .unwrap();
+    assert_eq!(symlink.get_attr().unwrap().file_type(), VfsNodeType::File);
+    assert_eq!(
+        symlink.get_link_attr().unwrap().file_type(),
+        VfsNodeType::SymLink
+    );
+    assert_eq!(symlink.read_link().unwrap(), "bin/rustc");
 }
