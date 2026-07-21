@@ -15,6 +15,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
+PATH_METADATA_FIELDS = (
+    "path_modes",
+    "path_inodes",
+    "path_special_modes",
+    "path_rdevs",
+    "path_owners",
+    "path_symlinks",
+    "path_hardlinks",
+    "path_hardlink_counts",
+    "path_inode_flags",
+    "path_xattrs",
+    "path_times",
+)
+
 
 def read(root: Path, rel: str) -> str:
     return (root / rel).read_text(encoding="utf-8", errors="ignore")
@@ -145,6 +159,32 @@ def scan(root: Path) -> list[str]:
         ],
         findings,
         "fallible runtime SONAME lookup must search the standard root before compatibility roots",
+    )
+
+    uspace = read(root, "user/shell/src/uspace/mod.rs")
+    process_lifecycle = read(root, "user/shell/src/uspace/process_lifecycle.rs")
+    fork = function_block(process_lifecycle, "fork_with_fd_sharing")
+    process_local_metadata = [
+        field for field in PATH_METADATA_FIELDS if f"{field}: Arc<Mutex<" not in uspace
+    ]
+    require(
+        not process_local_metadata,
+        findings,
+        "filesystem path metadata must use a shared namespace across fork; "
+        f"process-local fields: {', '.join(process_local_metadata)}",
+    )
+    deep_copied_metadata = [
+        field
+        for field in PATH_METADATA_FIELDS
+        if f"{field}: Mutex::new(self.{field}.lock().clone())" in fork
+        or f"{field}: Arc::new(Mutex::new(self.{field}.lock().clone()))" in fork
+    ]
+    require(
+        not deep_copied_metadata
+        and all(f"{field}: self.{field}.clone()" in fork for field in PATH_METADATA_FIELDS),
+        findings,
+        "fork must share filesystem path metadata instead of deep-copying it; "
+        f"deep-copied fields: {', '.join(deep_copied_metadata)}",
     )
 
     utils = read(root, "api/arceos_posix_api/src/utils.rs")

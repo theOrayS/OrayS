@@ -351,7 +351,7 @@
       "description": "Compliance guard unit fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
+      "result_contract": {"type": "unittest", "expected_tests": 11, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"], "required_commands": []
     },
     {

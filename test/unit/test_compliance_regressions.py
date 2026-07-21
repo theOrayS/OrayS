@@ -18,6 +18,8 @@ TARGETS = [
     Path("user/shell/src/cmd.rs"),
     Path("user/shell/src/uspace/program_loader.rs"),
     Path("user/shell/src/uspace/runtime_paths.rs"),
+    Path("user/shell/src/uspace/mod.rs"),
+    Path("user/shell/src/uspace/process_lifecycle.rs"),
     Path("api/arceos_posix_api/src/utils.rs"),
     Path("api/arceos_posix_api/src/imp/pthread/mutex.rs"),
     Path("api/arceos_posix_api/src/imp/task.rs"),
@@ -143,6 +145,30 @@ class ComplianceRegressionsGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SONAME", result.stdout)
+
+    def test_detects_process_local_path_metadata_field(self) -> None:
+        tree = self.make_tree()
+        self.mutate(
+            tree,
+            "user/shell/src/uspace/mod.rs",
+            "path_hardlinks: Arc<Mutex<BTreeMap<String, String>>>",
+            "path_hardlinks: Mutex<BTreeMap<String, String>>",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("shared namespace", result.stdout)
+
+    def test_detects_fork_path_metadata_deep_copy(self) -> None:
+        tree = self.make_tree()
+        self.mutate(
+            tree,
+            "user/shell/src/uspace/process_lifecycle.rs",
+            "path_hardlinks: self.path_hardlinks.clone()",
+            "path_hardlinks: Arc::new(Mutex::new(self.path_hardlinks.lock().clone()))",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("deep-copying", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()
