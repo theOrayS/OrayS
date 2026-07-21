@@ -188,6 +188,8 @@
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
         "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/system_info.rs",
+        "user/shell/src/uspace/task_context.rs",
         "user/shell/src/uspace/user_memory.rs"
       ]
     },
@@ -290,6 +292,8 @@
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
         "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/system_info.rs",
+        "user/shell/src/uspace/task_context.rs",
         "user/shell/src/uspace/user_memory.rs"
       ]
     },
@@ -586,6 +590,8 @@
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
         "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/system_info.rs",
+        "user/shell/src/uspace/task_context.rs",
         "user/shell/src/uspace/user_memory.rs"
       ],
       "environment": {
@@ -683,6 +689,8 @@
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
         "user/shell/src/uspace/syscall_dispatch.rs",
+        "user/shell/src/uspace/system_info.rs",
+        "user/shell/src/uspace/task_context.rs",
         "user/shell/src/uspace/user_memory.rs"
       ],
       "environment": {
