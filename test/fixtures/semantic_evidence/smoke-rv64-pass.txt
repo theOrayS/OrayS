@@ -16,6 +16,7 @@ PR3_SMOKE_V1 ASSERT pipe_fork_exec PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT flock_blocking PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT hardlink_rename_replace PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT cargo_link_publish PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT rename_virtual_nonempty PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT tcp_fork_loopback PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT uname_sysname PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT uname_machine PASS arch=riscv64

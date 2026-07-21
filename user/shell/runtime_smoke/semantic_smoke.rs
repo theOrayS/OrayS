@@ -60,6 +60,7 @@ const NEG_EBADF: isize = -9;
 const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
+const NEG_ENOTEMPTY: isize = -39;
 const AT_FDCWD: isize = -100;
 const AT_REMOVEDIR: usize = 0x200;
 const O_RDONLY: usize = 0;
@@ -134,6 +135,15 @@ const CARGO_LINK_PUBLISHED_ALIAS: &[u8] =
     b"/tmp/pr3-semantic-cargo-link-published/object.o\0";
 const CARGO_LINK_ENTRY_NAME: &[u8] = b"object.o";
 const CARGO_LINK_SOURCE_DATA: &[u8] = b"OBJ!";
+const RENAME_NONEMPTY_SOURCE_DIR: &[u8] =
+    b"/tmp/pr3-semantic-rename-nonempty-source\0";
+const RENAME_NONEMPTY_TARGET_DIR: &[u8] =
+    b"/tmp/pr3-semantic-rename-nonempty-target\0";
+const RENAME_NONEMPTY_CANONICAL: &[u8] =
+    b"/tmp/pr3-semantic-rename-nonempty-canonical\0";
+const RENAME_NONEMPTY_TARGET_ALIAS: &[u8] =
+    b"/tmp/pr3-semantic-rename-nonempty-target/retained.o\0";
+const RENAME_NONEMPTY_ENTRY_NAME: &[u8] = b"retained.o";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
 const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
 
@@ -222,6 +232,12 @@ const ASSERT_CARGO_LINK_PUBLISH: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_CARGO_LINK_PUBLISH: &[u8] =
     b"PR3_SMOKE_V1 ASSERT cargo_link_publish PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_RENAME_VIRTUAL_NONEMPTY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT rename_virtual_nonempty PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_RENAME_VIRTUAL_NONEMPTY: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT rename_virtual_nonempty PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -387,6 +403,12 @@ const USER_FAIL_CARGO_LINK_PUBLISH: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_CARGO_LINK_PUBLISH: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL cargo_link_publish arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_RENAME_VIRTUAL_NONEMPTY: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL rename_virtual_nonempty arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_RENAME_VIRTUAL_NONEMPTY: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL rename_virtual_nonempty arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=riscv64\n";
@@ -3081,6 +3103,68 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_CARGO_LINK_PUBLISH) != ASSERT_CARGO_LINK_PUBLISH.len() as isize {
         fail(USER_FAIL_WRITE, 287);
+    }
+
+    // A directory containing a metadata-backed hardlink is non-empty from the
+    // userspace namespace perspective even when the lower VFS directory has no
+    // physical child. Ordinary rename must reject replacing that directory with
+    // ENOTEMPTY and preserve both namespaces; Cargo may encounter this shape when
+    // an earlier incremental publication remains at the destination.
+    let _ = unlinkat(RENAME_NONEMPTY_TARGET_ALIAS);
+    let _ = unlinkat_dir(RENAME_NONEMPTY_TARGET_DIR);
+    let _ = unlinkat_dir(RENAME_NONEMPTY_SOURCE_DIR);
+    let _ = unlinkat(RENAME_NONEMPTY_CANONICAL);
+    let rename_canonical_fd =
+        openat_mode(RENAME_NONEMPTY_CANONICAL, O_CREAT | O_RDWR, 0o600);
+    if rename_canonical_fd < 0
+        || close(rename_canonical_fd as i32) != 0
+        || mkdirat(RENAME_NONEMPTY_SOURCE_DIR, 0o700) != 0
+        || mkdirat(RENAME_NONEMPTY_TARGET_DIR, 0o700) != 0
+        || linkat(
+            RENAME_NONEMPTY_CANONICAL,
+            RENAME_NONEMPTY_TARGET_ALIAS,
+        ) != 0
+    {
+        let _ = unlinkat(RENAME_NONEMPTY_TARGET_ALIAS);
+        let _ = unlinkat_dir(RENAME_NONEMPTY_TARGET_DIR);
+        let _ = unlinkat_dir(RENAME_NONEMPTY_SOURCE_DIR);
+        let _ = unlinkat(RENAME_NONEMPTY_CANONICAL);
+        fail(USER_FAIL_RENAME_VIRTUAL_NONEMPTY, 288);
+    }
+    let rename_nonempty_result = renameat2(
+        RENAME_NONEMPTY_SOURCE_DIR,
+        RENAME_NONEMPTY_TARGET_DIR,
+    );
+    let rename_target_fd = openat(RENAME_NONEMPTY_TARGET_DIR, O_RDONLY | O_DIRECTORY);
+    let rename_target_preserved = rename_target_fd >= 0
+        && directory_contains(rename_target_fd as i32, RENAME_NONEMPTY_ENTRY_NAME);
+    let rename_target_close = if rename_target_fd >= 0 {
+        close(rename_target_fd as i32)
+    } else {
+        NEG_EBADF
+    };
+    let rename_source_fd = openat(RENAME_NONEMPTY_SOURCE_DIR, O_RDONLY | O_DIRECTORY);
+    let rename_source_preserved = rename_source_fd >= 0;
+    let rename_source_close = if rename_source_fd >= 0 {
+        close(rename_source_fd as i32)
+    } else {
+        NEG_EBADF
+    };
+    let rename_nonempty_cleanup = (unlinkat(RENAME_NONEMPTY_TARGET_ALIAS) == 0)
+        & (unlinkat_dir(RENAME_NONEMPTY_TARGET_DIR) == 0)
+        & (unlinkat_dir(RENAME_NONEMPTY_SOURCE_DIR) == 0)
+        & (unlinkat(RENAME_NONEMPTY_CANONICAL) == 0);
+    if rename_nonempty_result != NEG_ENOTEMPTY
+        || !rename_target_preserved
+        || rename_target_close != 0
+        || !rename_source_preserved
+        || rename_source_close != 0
+        || !rename_nonempty_cleanup
+    {
+        fail(USER_FAIL_RENAME_VIRTUAL_NONEMPTY, 289);
+    }
+    if write(ASSERT_RENAME_VIRTUAL_NONEMPTY) != ASSERT_RENAME_VIRTUAL_NONEMPTY.len() as isize {
+        fail(USER_FAIL_WRITE, 290);
     }
 
     // CAgent's server and concurrent clients depend on ordinary process creation and
