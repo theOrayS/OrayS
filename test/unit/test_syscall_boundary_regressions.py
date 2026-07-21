@@ -289,14 +289,14 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SIGBUS", result.stdout)
 
-    def test_detects_futex_requeue_total_return(self) -> None:
+    def test_detects_futex_requeue_discarded_requeue_count(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/futex.rs"
         text = path.read_text(encoding="utf-8")
         path.write_text(
             text.replace(
-                "Ok((woken, _requeued)) => woken as isize",
                 "Ok((woken, requeued)) => woken.saturating_add(requeued) as isize",
+                "Ok((woken, _requeued)) => woken as isize",
                 1,
             ),
             encoding="utf-8",

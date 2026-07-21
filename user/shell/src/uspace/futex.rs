@@ -580,7 +580,7 @@ pub(super) fn sys_futex(
         },
         general::FUTEX_REQUEUE => {
             match wake_requeue_addr_checked(process, uaddr, val, timeout, _uaddr2, None, private) {
-                Ok((woken, _requeued)) => woken as isize,
+                Ok((woken, requeued)) => woken.saturating_add(requeued) as isize,
                 Err(err) => neg_errno(err),
             }
         }

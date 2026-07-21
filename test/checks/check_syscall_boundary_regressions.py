@@ -395,13 +395,33 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
         ),
     )
     sys_futex = rust_function_block(futex, "sys_futex")
+    requeue_start = sys_futex.find("general::FUTEX_REQUEUE =>")
+    cmp_requeue_start = sys_futex.find("general::FUTEX_CMP_REQUEUE =>")
+    wake_bitset_start = sys_futex.find("general::FUTEX_WAKE_BITSET =>")
+    requeue_arm = (
+        sys_futex[requeue_start:cmp_requeue_start]
+        if 0 <= requeue_start < cmp_requeue_start
+        else ""
+    )
+    cmp_requeue_arm = (
+        sys_futex[cmp_requeue_start:wake_bitset_start]
+        if 0 <= cmp_requeue_start < wake_bitset_start
+        else ""
+    )
     require_tokens(
         findings,
-        sys_futex,
-        "FUTEX_REQUEUE must return only woken count while CMP_REQUEUE returns woken+requeued",
+        requeue_arm,
+        "FUTEX_REQUEUE must return woken+requeued affected waiters",
         (
             "general::FUTEX_REQUEUE",
-            "Ok((woken, _requeued)) => woken as isize",
+            "Ok((woken, requeued)) => woken.saturating_add(requeued) as isize",
+        ),
+    )
+    require_tokens(
+        findings,
+        cmp_requeue_arm,
+        "FUTEX_CMP_REQUEUE must return woken+requeued affected waiters",
+        (
             "general::FUTEX_CMP_REQUEUE",
             "Ok((woken, requeued)) => woken.saturating_add(requeued) as isize",
         ),
