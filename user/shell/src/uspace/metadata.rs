@@ -324,17 +324,11 @@ impl UserProcess {
         );
 
         let mut hardlinks = self.path_hardlinks.lock();
-        move_descendant_entries(
-            &mut hardlinks,
-            old_prefix.as_str(),
-            new_prefix.as_str(),
-        );
+        move_descendant_entries(&mut hardlinks, old_prefix.as_str(), new_prefix.as_str());
         for canonical in hardlinks.values_mut() {
-            if let Some(new_canonical) = moved_descendant_path(
-                canonical.as_str(),
-                old_prefix.as_str(),
-                new_prefix.as_str(),
-            ) {
+            if let Some(new_canonical) =
+                moved_descendant_path(canonical.as_str(), old_prefix.as_str(), new_prefix.as_str())
+            {
                 *canonical = new_canonical;
             }
         }
@@ -576,6 +570,11 @@ impl UserProcess {
                 }
             })
             .collect()
+    }
+
+    pub(super) fn path_has_virtual_dirents(&self, dir: &str) -> bool {
+        !self.path_symlink_names_in_dir(dir).is_empty()
+            || !self.path_hardlink_names_in_dir(dir).is_empty()
     }
 
     pub(super) fn resolve_path_symlink(&self, path: &str) -> Result<Option<String>, LinuxError> {

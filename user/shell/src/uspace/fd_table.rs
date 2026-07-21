@@ -68,11 +68,11 @@ use super::synthetic_fs::{
     proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
     proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_statm_fd_entry,
     proc_statm_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
-    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
-    proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
-    proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
-    proc_timerslack_fd_entry, proc_timerslack_path_entry, proc_uptime_fd_entry,
-    proc_uptime_path_entry, synthetic_file_is_writable_open, synthetic_kernel_config_content,
+    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry, proc_sysvipc_sem_fd_entry,
+    proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry, proc_sysvipc_shm_path_entry,
+    proc_task_dir_fd_entry, proc_task_dir_path_entry, proc_timerslack_fd_entry,
+    proc_timerslack_path_entry, proc_uptime_fd_entry, proc_uptime_path_entry,
+    synthetic_file_is_writable_open, synthetic_kernel_config_content,
     synthetic_kernel_config_fd_entry, synthetic_kernel_config_path_entry,
     synthetic_proc_sys_content, synthetic_proc_sys_fd_entry, synthetic_proc_sys_path_entry,
     synthetic_proc_version_content, synthetic_proc_version_fd_entry,
@@ -4312,6 +4312,9 @@ fn renameat2_paths(
         }
         if !old_is_dir && new_is_dir {
             return Err(LinuxError::EISDIR);
+        }
+        if old_is_dir && process.path_has_virtual_dirents(new_abs_path.as_str()) {
+            return Err(LinuxError::ENOTEMPTY);
         }
     }
 
