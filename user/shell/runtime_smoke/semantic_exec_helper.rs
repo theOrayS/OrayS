@@ -8,7 +8,17 @@ use core::panic::PanicInfo;
 // while exercising the same fork/exec/pipe/wait boundary used by popen callers.
 const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
+const SYS_SIGALTSTACK: usize = 132;
+const SS_DISABLE: i32 = 2;
 const PAYLOAD: &[u8] = b"orays-exec-helper\n";
+
+#[repr(C)]
+struct SignalStack {
+    sp: usize,
+    flags: i32,
+    padding: i32,
+    size: usize,
+}
 
 /// Issues one Linux syscall using the RISC-V64 userspace ABI.
 ///
@@ -98,6 +108,32 @@ fn exit(code: usize) -> ! {
 // the C ABI and non-returning signature match that contract.
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
+    let mut altstack = SignalStack {
+        sp: usize::MAX,
+        flags: 0,
+        padding: 0,
+        size: usize::MAX,
+    };
+    // SAFETY: arg0 is null for a query and arg1 names one live writable stack_t.
+    let altstack_result = unsafe {
+        syscall6(
+            SYS_SIGALTSTACK,
+            0,
+            core::ptr::addr_of_mut!(altstack) as usize,
+            0,
+            0,
+            0,
+            0,
+        )
+    };
+    if altstack_result != 0
+        || altstack.sp != 0
+        || altstack.flags != SS_DISABLE
+        || altstack.size != 0
+    {
+        exit(3);
+    }
+
     let mut written = 0usize;
     while written < PAYLOAD.len() {
         // SAFETY: the remaining suffix is readable and live for the synchronous
