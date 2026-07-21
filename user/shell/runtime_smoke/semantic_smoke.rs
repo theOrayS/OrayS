@@ -404,6 +404,12 @@ const ASSERT_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
 const ASSERT_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_cmp_requeue_validation PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_SOURCE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_source_validation PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_SOURCE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_source_validation PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -653,6 +659,12 @@ const USER_FAIL_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_CMP_REQUEUE_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_cmp_requeue_validation arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_SOURCE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_source_validation arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_SOURCE_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_source_validation arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -3215,6 +3227,28 @@ fn run_futex_cmp_requeue_validation_probe() -> bool {
         && valid_target == NEG_EAGAIN
 }
 
+fn run_futex_source_validation_probe() -> bool {
+    let word = AtomicI32::new(0);
+    let word_addr = word.as_ptr() as usize;
+
+    // Linux reports EFAULT for an inaccessible aligned source word and EINVAL
+    // only for misalignment. Check both wait and wake because the source is a
+    // common dispatcher boundary, then retain a valid no-waiter wake control.
+    // SAFETY: the live atomic and its intentionally misaligned interior address
+    // remain allocated for every syscall. Null is a deliberate kernel-boundary
+    // input and is never dereferenced by this userspace program.
+    let null_wait = unsafe { syscall6(SYS_FUTEX, 0, FUTEX_WAIT, 0, 0, 0, 0) };
+    let null_wake = unsafe { syscall6(SYS_FUTEX, 0, FUTEX_WAKE, 1, 0, 0, 0) };
+    let misaligned_wake =
+        unsafe { syscall6(SYS_FUTEX, word_addr + 1, FUTEX_WAKE, 1, 0, 0, 0) };
+    let valid_wake = unsafe { syscall6(SYS_FUTEX, word_addr, FUTEX_WAKE, 1, 0, 0, 0) };
+
+    null_wait == NEG_EFAULT
+        && null_wake == NEG_EFAULT
+        && misaligned_wake == NEG_EINVAL
+        && valid_wake == 0
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -4288,6 +4322,12 @@ pub extern "C" fn _start() -> ! {
         != ASSERT_FUTEX_CMP_REQUEUE_VALIDATION.len() as isize
     {
         fail(USER_FAIL_WRITE, 363);
+    }
+    if !run_futex_source_validation_probe() {
+        fail(USER_FAIL_FUTEX_SOURCE_VALIDATION, 364);
+    }
+    if write(ASSERT_FUTEX_SOURCE_VALIDATION) != ASSERT_FUTEX_SOURCE_VALIDATION.len() as isize {
+        fail(USER_FAIL_WRITE, 365);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
