@@ -120,5 +120,29 @@ class ComplianceRegressionsGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("accept4", result.stdout)
 
+    def test_detects_rootfs_dynamic_loader_remap(self) -> None:
+        tree = self.make_tree()
+        self.mutate(
+            tree,
+            "user/shell/src/uspace/program_loader.rs",
+            'exec_loader_owned_string(path_root, "copy exec root")',
+            'exec_loader_owned_string("/glibc", "copy exec root")',
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("standard runtime root", result.stdout)
+
+    def test_detects_missing_standard_soname_root(self) -> None:
+        tree = self.make_tree()
+        self.mutate(
+            tree,
+            "user/shell/src/uspace/runtime_paths.rs",
+            'if exec_root == "/" {\n        push(exec_root);\n    }',
+            'if false && exec_root == "/" {\n        push(exec_root);\n    }',
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SONAME", result.stdout)
+
 if __name__ == "__main__":
     unittest.main()

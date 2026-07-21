@@ -708,7 +708,7 @@ CANONICAL_UNIT_CASE_IDS = (
     "unit.user_memory_copy_boundaries",
 )
 CANONICAL_UNIT_EXPECTED_TESTS = {
-    "unit.compliance_regressions": 7,
+    "unit.compliance_regressions": 9,
     "unit.competition_semantic_evidence": 33,
     "unit.evaluation_failure_report": 9,
     "unit.evaluation_runner_and_parser_integrity": 29,
