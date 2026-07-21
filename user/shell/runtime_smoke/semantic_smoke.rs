@@ -2,6 +2,7 @@
 #![no_main]
 
 use core::{
+    mem::MaybeUninit,
     panic::PanicInfo,
     sync::atomic::{AtomicI32, Ordering},
 };
@@ -52,6 +53,7 @@ const SYS_EXECVE: usize = 221;
 const SYS_MMAP: usize = 222;
 const SYS_MADVISE: usize = 233;
 const SYS_WAIT4: usize = 260;
+const SYS_PRLIMIT64: usize = 261;
 const SYS_RENAMEAT2: usize = 276;
 const SYS_STATX: usize = 291;
 const SYS_CLONE3: usize = 435;
@@ -114,9 +116,12 @@ const STATX_TYPE: u32 = 0x0001;
 const STATX_NLINK: u32 = 0x0004;
 const S_IFMT: u16 = 0o170000;
 const S_IFREG: u16 = 0o100000;
+const RLIMIT_STACK: usize = 3;
 const PAGE_BYTES: usize = 4096;
 const MADVISE_PROBE_BYTES: usize = 8 * 1024 * 1024;
 const MADVISE_PROBE_ITERATIONS: usize = 16;
+const EXPANDED_STACK_LIMIT_BYTES: u64 = 64 * 1024 * 1024;
+const STACK_GROWTH_PROBE_BYTES: usize = 12 * 1024 * 1024;
 const CARGO_THREAD_CLONE_FLAGS: u64 = CLONE_VM
     | CLONE_FS
     | CLONE_FILES
@@ -214,6 +219,12 @@ const ASSERT_PROC_UPTIME: &[u8] =
 const ASSERT_PROC_STATM: &[u8] = b"PR3_SMOKE_V1 ASSERT proc_statm PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PROC_STATM: &[u8] = b"PR3_SMOKE_V1 ASSERT proc_statm PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_RLIMIT_STACK: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT rlimit_stack_growth PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_RLIMIT_STACK: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT rlimit_stack_growth PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=riscv64\n";
@@ -398,6 +409,12 @@ const USER_FAIL_PROC_STATM_FORMAT: &[u8] =
 const USER_FAIL_PROC_STATM_FORMAT: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL proc_statm_format arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const USER_FAIL_RLIMIT_STACK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL rlimit_stack_growth arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_RLIMIT_STACK: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL rlimit_stack_growth arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const USER_FAIL_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL madvise_dontneed arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -555,6 +572,13 @@ struct IoVec {
 struct Timespec {
     seconds: i64,
     nanoseconds: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Rlimit {
+    current: u64,
+    maximum: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -2066,6 +2090,43 @@ fn wait_child_nohang(pid: isize, status: &mut i32) -> isize {
 }
 
 #[inline(always)]
+fn set_stack_limit(limit: &Rlimit) -> isize {
+    // SAFETY: `limit` is an aligned, readable Linux rlimit64 object that remains
+    // live for the synchronous call. pid zero selects the calling process and a
+    // null old-limit pointer declines the optional output.
+    unsafe {
+        syscall6(
+            SYS_PRLIMIT64,
+            0,
+            RLIMIT_STACK,
+            limit as *const Rlimit as usize,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(never)]
+fn touch_expanded_stack() -> u8 {
+    let mut stack = MaybeUninit::<[u8; STACK_GROWTH_PROBE_BYTES]>::uninit();
+    let base = stack.as_mut_ptr().cast::<u8>();
+    let mut checksum = 0_u8;
+    for offset in (0..STACK_GROWTH_PROBE_BYTES).step_by(PAGE_BYTES) {
+        let value = (offset / PAGE_BYTES) as u8;
+        // SAFETY: `base` points to this function's complete uninitialized stack
+        // array and every page-aligned offset is strictly within that allocation.
+        // Volatile access forces real page faults instead of allowing the compiler
+        // to remove a stack-capacity probe whose values are otherwise unobservable.
+        unsafe {
+            base.add(offset).write_volatile(value);
+            checksum ^= base.add(offset).read_volatile();
+        }
+    }
+    checksum
+}
+
+#[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
     // remainder pointer explicitly declines the optional interrupted duration.
@@ -2308,6 +2369,35 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_PROC_STATM) != ASSERT_PROC_STATM.len() as isize {
         fail(USER_FAIL_WRITE, 243);
+    }
+
+    // rustc raises its main-thread soft stack limit to 64 MiB before compiling.
+    // Validate that a successful prlimit64 request grants real stack capacity:
+    // the child touches one byte on every page of a 12 MiB frame, while the parent
+    // converts a SIGSEGV or nonzero exit into an explicit protocol failure.
+    let stack_child = fork_process();
+    if stack_child == 0 {
+        let limit = Rlimit {
+            current: EXPANDED_STACK_LIMIT_BYTES,
+            maximum: u64::MAX,
+        };
+        if set_stack_limit(&limit) != 0 {
+            exit(51);
+        }
+        let _ = touch_expanded_stack();
+        exit(0);
+    }
+    if stack_child < 0 {
+        fail(USER_FAIL_RLIMIT_STACK, 340);
+    }
+    let mut stack_child_status = -1_i32;
+    if wait_child(stack_child, &mut stack_child_status) != stack_child
+        || stack_child_status != 0
+    {
+        fail(USER_FAIL_RLIMIT_STACK, 341);
+    }
+    if write(ASSERT_RLIMIT_STACK) != ASSERT_RLIMIT_STACK.len() as isize {
+        fail(USER_FAIL_WRITE, 342);
     }
 
     // Cargo/rustc allocators repeatedly discard private anonymous MAP_NORESERVE

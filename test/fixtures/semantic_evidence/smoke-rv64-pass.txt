@@ -5,6 +5,7 @@ PR3_SMOKE_V1 ASSERT getpid PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT sched_affinity PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT proc_uptime PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT proc_statm PASS arch=riscv64
+PR3_SMOKE_V1 ASSERT rlimit_stack_growth PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT splice_pipe PASS arch=riscv64
 PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64
