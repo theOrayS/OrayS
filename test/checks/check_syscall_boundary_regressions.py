@@ -397,6 +397,24 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
             "Ok((woken, requeued))",
         ),
     )
+    require_tokens(
+        findings,
+        wake_requeue,
+        "FUTEX_CMP_REQUEUE must validate both futex keys before comparing the source value",
+        (
+            "if uaddr2 % size_of::<u32>() != 0",
+            "let source_key = futex_key(process, uaddr, private)?;",
+            "let target_key = futex_key(process, uaddr2, private)?;",
+            "if let Some(expected) = cmp",
+        ),
+    )
+    if "uaddr2 == 0" in wake_requeue:
+        findings.append("FUTEX_CMP_REQUEUE null target must be reported by futex_key as EFAULT")
+    requeue_source_key = wake_requeue.find("let source_key = futex_key(process, uaddr, private)?;")
+    requeue_target_key = wake_requeue.find("let target_key = futex_key(process, uaddr2, private)?;")
+    requeue_compare = wake_requeue.find("if let Some(expected) = cmp")
+    if not (0 <= requeue_source_key < requeue_target_key < requeue_compare):
+        findings.append("FUTEX_CMP_REQUEUE compares the source value before validating both futex keys")
     sys_futex = rust_function_block(futex, "sys_futex")
     requeue_start = sys_futex.find("general::FUTEX_REQUEUE =>")
     cmp_requeue_start = sys_futex.find("general::FUTEX_CMP_REQUEUE =>")

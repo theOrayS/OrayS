@@ -196,17 +196,17 @@ fn wake_requeue_addr_checked(
     cmp: Option<u32>,
     private: bool,
 ) -> Result<(usize, usize), LinuxError> {
-    if uaddr2 == 0 || uaddr2 % size_of::<u32>() != 0 {
+    if uaddr2 % size_of::<u32>() != 0 {
         return Err(LinuxError::EINVAL);
     }
+    let source_key = futex_key(process, uaddr, private)?;
+    let target_key = futex_key(process, uaddr2, private)?;
     if let Some(expected) = cmp {
         let current = read_user_value::<u32>(process, uaddr)?;
         if current != expected {
             return Err(LinuxError::EAGAIN);
         }
     }
-    let source_key = futex_key(process, uaddr, private)?;
-    let target_key = futex_key(process, uaddr2, private)?;
     let Some(source) = table().lock().get(&source_key).cloned() else {
         return Ok((0, 0));
     };

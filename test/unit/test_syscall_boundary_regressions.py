@@ -322,6 +322,50 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("same-address futex requeue", result.stdout)
 
+    def test_detects_futex_cmp_requeue_null_target_einval(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "if uaddr2 % size_of::<u32>() != 0",
+                "if uaddr2 == 0 || uaddr2 % size_of::<u32>() != 0",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("null target", result.stdout)
+
+    def test_detects_futex_cmp_requeue_compare_before_target_key(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        original = """    let source_key = futex_key(process, uaddr, private)?;
+    let target_key = futex_key(process, uaddr2, private)?;
+    if let Some(expected) = cmp {
+        let current = read_user_value::<u32>(process, uaddr)?;
+        if current != expected {
+            return Err(LinuxError::EAGAIN);
+        }
+    }
+"""
+        mutated = """    if let Some(expected) = cmp {
+        let current = read_user_value::<u32>(process, uaddr)?;
+        if current != expected {
+            return Err(LinuxError::EAGAIN);
+        }
+    }
+    let source_key = futex_key(process, uaddr, private)?;
+    let target_key = futex_key(process, uaddr2, private)?;
+"""
+        self.assertIn(original, text)
+        path.write_text(text.replace(original, mutated, 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("before validating both futex keys", result.stdout)
+
     def test_detects_wait4_ignored_rusage(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/process_lifecycle.rs"
