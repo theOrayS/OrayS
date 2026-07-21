@@ -122,6 +122,7 @@ const CLONE_PARENT_SETTID: u64 = 0x0010_0000;
 const CLONE_CHILD_CLEARTID: u64 = 0x0020_0000;
 const FUTEX_WAIT: usize = 0;
 const FUTEX_WAKE: usize = 1;
+const FUTEX_REQUEUE: usize = 3;
 const FUTEX_WAIT_BITSET: usize = 9;
 const FUTEX_PRIVATE_FLAG: usize = 128;
 const FUTEX_CLOCK_REALTIME: usize = 256;
@@ -384,6 +385,12 @@ const ASSERT_FUTEX_RELATIVE_RESTART: &[u8] =
 const ASSERT_FUTEX_RELATIVE_RESTART: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_relative_restart PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_REQUEUE_COUNT: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_requeue_count PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_REQUEUE_COUNT: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_requeue_count PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -615,6 +622,12 @@ const USER_FAIL_FUTEX_RELATIVE_RESTART: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_RELATIVE_RESTART: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_relative_restart arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_REQUEUE_COUNT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_requeue_count arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_REQUEUE_COUNT: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_requeue_count arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -2926,6 +2939,99 @@ fn run_futex_relative_restart_probe() -> bool {
     ready_ok && signaled && waited && status == 0 && closed && unmapped
 }
 
+fn run_futex_requeue_count_probe() -> bool {
+    let mapping = mmap_shared_anonymous(PAGE_BYTES);
+    if mapping <= 0 {
+        return false;
+    }
+    let source = mapping as *mut AtomicI32;
+    // SAFETY: both naturally aligned words fit in the new writable shared page.
+    // They are initialized before fork and remain mapped until the child exits.
+    let target = unsafe { source.add(1) };
+    unsafe {
+        source.write(AtomicI32::new(0));
+        target.write(AtomicI32::new(0));
+    }
+
+    let mut ready_pipe = [-1_i32; 2];
+    if pipe2(&mut ready_pipe, 0) != 0 {
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+    let child = fork_process();
+    if child == 0 {
+        let _ = close(ready_pipe[0]);
+        let timeout = Timespec {
+            seconds: 2,
+            nanoseconds: 0,
+        };
+        if pipe_write(ready_pipe[1], b"R") != 1 {
+            exit(57);
+        }
+        // SAFETY: the source word and timeout stay live and aligned throughout
+        // the wait. The parent either requeues this waiter and wakes the target,
+        // or the bounded timeout guarantees eventual cleanup.
+        let wait_result = unsafe {
+            syscall6(
+                SYS_FUTEX,
+                (*source).as_ptr() as usize,
+                FUTEX_WAIT,
+                0,
+                &timeout as *const Timespec as usize,
+                0,
+                0,
+            )
+        };
+        let closed = close(ready_pipe[1]) == 0;
+        exit(if wait_result == 0 && closed { 0 } else { 58 });
+    }
+
+    let parent_write_close = close(ready_pipe[1]);
+    if child < 0 || parent_write_close != 0 {
+        let _ = close(ready_pipe[0]);
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+    let mut ready = [0_u8; 1];
+    let ready_ok = fd_read(ready_pipe[0], &mut ready) == 1 && ready == [b'R'];
+    let settle = Timespec {
+        seconds: 0,
+        nanoseconds: 20_000_000,
+    };
+    let settled = ready_ok && nanosleep(&settle) == 0;
+    // Linux returns every waiter affected by FUTEX_REQUEUE. With wake_count=0
+    // and requeue_count=1, a successfully moved waiter therefore returns one;
+    // the following target wake independently proves that a real move occurred.
+    let requeue_result = if settled {
+        unsafe {
+            syscall6(
+                SYS_FUTEX,
+                (*source).as_ptr() as usize,
+                FUTEX_REQUEUE,
+                0,
+                1,
+                (*target).as_ptr() as usize,
+                0,
+            )
+        }
+    } else {
+        -1
+    };
+    let woken = unsafe { futex_wake_shared(&*target) };
+    let mut status = -1_i32;
+    let waited = wait_child(child, &mut status) == child;
+    let closed = close(ready_pipe[0]) == 0;
+    let unmapped = munmap(mapping as usize, PAGE_BYTES) == 0;
+    ready_ok
+        && settled
+        && requeue_result == 1
+        && woken == 1
+        && waited
+        && status == 0
+        && closed
+        && unmapped
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -3979,6 +4085,12 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FUTEX_RELATIVE_RESTART) != ASSERT_FUTEX_RELATIVE_RESTART.len() as isize {
         fail(USER_FAIL_WRITE, 346);
+    }
+    if !run_futex_requeue_count_probe() {
+        fail(USER_FAIL_FUTEX_REQUEUE_COUNT, 347);
+    }
+    if write(ASSERT_FUTEX_REQUEUE_COUNT) != ASSERT_FUTEX_REQUEUE_COUNT.len() as isize {
+        fail(USER_FAIL_WRITE, 348);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
