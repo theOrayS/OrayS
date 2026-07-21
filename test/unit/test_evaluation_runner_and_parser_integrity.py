@@ -906,6 +906,18 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertNotEqual(framing_result.returncode, 0)
         self.assertIn("status-bound PASS/FAIL", framing_result.stdout)
 
+    def test_detects_rejection_of_control_flow_end_markers(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "start_count == 0 || end_count == 0",
+            "start_count != 1 || end_count != 1",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("every derived start/end branch", result.stdout)
+
     def test_detects_busybox_execve_magic_fallback(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/process_lifecycle.rs"

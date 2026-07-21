@@ -254,18 +254,14 @@ def scan_cmd_rs(root: Path) -> list[str]:
         findings.append(
             "user/shell/src/cmd.rs: configured final suite directories must retain the judge-visible group label"
         )
-    for token, detail in (
-        (
-            "copy_posix_script_file",
-            "stage Debian-rootfs scripts without rewriting utilities as BusyBox applets",
-        ),
-        (
-            "run_official_shell_command",
-            "invoke ordinary POSIX shells without BusyBox's extra sh applet argument",
-        ),
-    ):
-        if token not in autorun_body:
-            findings.append(f"user/shell/src/cmd.rs: official autorun must {detail}")
+    if "copy_posix_script_file" not in unstaged_block:
+        findings.append(
+            "user/shell/src/cmd.rs: official autorun must stage Debian-rootfs scripts without rewriting utilities as BusyBox applets"
+        )
+    if "run_official_shell_command" not in autorun_body:
+        findings.append(
+            "user/shell/src/cmd.rs: official autorun must invoke ordinary POSIX shells without BusyBox's extra sh applet argument"
+        )
     for function_name in sorted(function_names & forbidden_functions):
         findings.append(
             f"user/shell/src/cmd.rs: forbidden suite/script-specific helper still defined: {function_name}"
@@ -324,12 +320,12 @@ def scan_cmd_rs(root: Path) -> list[str]:
     else:
         required_framing_tokens = (
             "shell_echoes_exact_text",
-            "start_count != 1 || end_count != 1",
+            "start_count == 0 || end_count == 0",
             "File::create(script_path)",
         )
         if any(token not in framing_block for token in required_framing_tokens):
             findings.append(
-                "user/shell/src/cmd.rs: official group framing must remove exactly one derived start/end pair from the staged script"
+                "user/shell/src/cmd.rs: official group framing must remove every derived start/end branch while requiring both marker kinds"
             )
         if any(name in framing_block for name in ("basic", "iperf", "cyclictest", "iozone")):
             findings.append(
