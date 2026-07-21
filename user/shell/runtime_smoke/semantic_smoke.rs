@@ -107,6 +107,7 @@ const SIGUSR1: usize = 10;
 const SS_ONSTACK: i32 = 1;
 const SS_DISABLE: i32 = 2;
 const SA_ONSTACK: usize = 0x0800_0000;
+const SA_RESTART: usize = 0x1000_0000;
 const KERNEL_SIGSET_BYTES: usize = 8;
 const CLONE_VM: u64 = 0x0000_0100;
 const CLONE_FS: u64 = 0x0000_0200;
@@ -127,6 +128,7 @@ const FUTEX_BITSET_MATCH_ANY: usize = u32::MAX as usize;
 const CLOCK_MONOTONIC: usize = 1;
 const PROT_READ: usize = 1;
 const PROT_WRITE: usize = 2;
+const MAP_SHARED: usize = 1;
 const MAP_PRIVATE: usize = 2;
 const MAP_ANONYMOUS: usize = 32;
 const MS_SYNC: usize = 4;
@@ -221,6 +223,12 @@ static CLONE3_VFORK_STAGE: AtomicI32 = AtomicI32::new(0);
 static mut SIGNAL_ALT_STACK: [u128; SIGNAL_ALT_STACK_BYTES / 16] =
     [0; SIGNAL_ALT_STACK_BYTES / 16];
 static SIGNAL_ALT_STACK_HANDLER_STATE: AtomicUsize = AtomicUsize::new(0);
+
+// The address is published before fork and points to a MAP_SHARED anonymous
+// page. The SIGUSR1 handler records delivery in that page so the parent can wait
+// until the interrupted child has returned through the handler before issuing
+// the real futex wake.
+static FUTEX_RESTART_SHARED_ADDR: AtomicUsize = AtomicUsize::new(0);
 
 // The first vector is exactly the largest pipe capacity supported by OrayS. A
 // blocking vmsplice that fills it must return its progress rather than wait on
@@ -362,6 +370,12 @@ const ASSERT_PRIVATE_FUTEX_COW: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_PRIVATE_FUTEX_COW: &[u8] =
     b"PR3_SMOKE_V1 ASSERT private_futex_cow PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_SA_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_sa_restart PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_SA_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_sa_restart PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
@@ -583,6 +597,12 @@ const USER_FAIL_PRIVATE_FUTEX_COW: &[u8] =
 const USER_FAIL_PRIVATE_FUTEX_COW: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL private_futex_cow arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_SA_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_sa_restart arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_SA_RESTART: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_sa_restart arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -718,6 +738,12 @@ struct KernelSigaction {
     handler: usize,
     flags: usize,
     mask: usize,
+}
+
+#[repr(C)]
+struct FutexRestartShared {
+    word: AtomicI32,
+    handler_entered: AtomicI32,
 }
 
 #[derive(Clone, Copy)]
@@ -1845,6 +1871,19 @@ extern "C" fn altstack_signal_handler(_signal: usize) {
     SIGNAL_ALT_STACK_HANDLER_STATE.store(state, Ordering::Release);
 }
 
+extern "C" fn futex_restart_signal_handler(_signal: usize) {
+    let shared_addr = FUTEX_RESTART_SHARED_ADDR.load(Ordering::Acquire);
+    if shared_addr != 0 {
+        // SAFETY: the probe publishes the address of a live page-aligned
+        // FutexRestartShared before installing this handler and does not unmap it
+        // until the signaled child has exited. The object is shared across fork,
+        // and this handler accesses only its lock-free AtomicI32 field.
+        unsafe { &*(shared_addr as *const FutexRestartShared) }
+            .handler_entered
+            .store(1, Ordering::Release);
+    }
+}
+
 #[repr(C)]
 struct VforkExecContext {
     stdout_read_fd: usize,
@@ -2317,6 +2356,24 @@ fn mmap_private_anonymous(len: usize) -> isize {
 }
 
 #[inline(always)]
+fn mmap_shared_anonymous(len: usize) -> isize {
+    // SAFETY: this requests a new kernel-selected shared anonymous mapping. There
+    // is no file backing or userspace input pointer; the returned raw address is
+    // checked before the test initializes an object in the mapped byte range.
+    unsafe {
+        syscall6(
+            SYS_MMAP,
+            0,
+            len,
+            PROT_READ | PROT_WRITE,
+            MAP_SHARED | MAP_ANONYMOUS,
+            usize::MAX,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
 fn mmap_private_file(fd: i32, len: usize) -> isize {
     // SAFETY: this requests a kernel-selected mapping of the live readable file
     // descriptor at offset zero. The returned raw address is checked before any
@@ -2633,6 +2690,126 @@ fn run_private_futex_cow_probe() -> bool {
     waited && status == 0 && unmapped
 }
 
+fn run_futex_sa_restart_probe() -> bool {
+    let mapping = mmap_shared_anonymous(PAGE_BYTES);
+    if mapping <= 0 {
+        return false;
+    }
+    let shared_ptr = mapping as *mut FutexRestartShared;
+    // SAFETY: the new page is writable, page-aligned, and large enough for the
+    // complete shared probe object. It is initialized before either process can
+    // access it and remains mapped until the child has exited.
+    unsafe {
+        shared_ptr.write(FutexRestartShared {
+            word: AtomicI32::new(0),
+            handler_entered: AtomicI32::new(0),
+        });
+    }
+    FUTEX_RESTART_SHARED_ADDR.store(mapping as usize, Ordering::Release);
+
+    let mut ready_pipe = [-1_i32; 2];
+    if pipe2(&mut ready_pipe, 0) != 0 {
+        FUTEX_RESTART_SHARED_ADDR.store(0, Ordering::Release);
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+    let child = fork_process();
+    if child == 0 {
+        let _ = close(ready_pipe[0]);
+        let action = KernelSigaction {
+            handler: futex_restart_signal_handler as usize,
+            flags: SA_RESTART,
+            mask: 0,
+        };
+        let Some(deadline_ns) = monotonic_nanoseconds().and_then(|now| {
+            now.checked_add(2_000_000_000)
+        }) else {
+            exit(51);
+        };
+        let deadline = Timespec {
+            seconds: (deadline_ns / 1_000_000_000) as i64,
+            nanoseconds: (deadline_ns % 1_000_000_000) as i64,
+        };
+        if rt_sigaction(SIGUSR1, &action) != 0 || pipe_write(ready_pipe[1], b"R") != 1 {
+            exit(52);
+        }
+        // SAFETY: the shared object was initialized before fork and remains live
+        // until the parent reaps this child. FUTEX_WAIT_BITSET reads the aligned
+        // word and the absolute CLOCK_MONOTONIC deadline synchronously.
+        let wait_result = unsafe {
+            syscall6(
+                SYS_FUTEX,
+                (*shared_ptr).word.as_ptr() as usize,
+                FUTEX_WAIT_BITSET,
+                0,
+                &deadline as *const Timespec as usize,
+                0,
+                FUTEX_BITSET_MATCH_ANY,
+            )
+        };
+        let handled = unsafe { &*shared_ptr }
+            .handler_entered
+            .load(Ordering::Acquire)
+            == 1;
+        let published = unsafe { &*shared_ptr }.word.load(Ordering::Acquire) == 1;
+        let closed = close(ready_pipe[1]) == 0;
+        exit(if wait_result == 0 && handled && published && closed {
+            0
+        } else {
+            53
+        });
+    }
+
+    let parent_write_close = close(ready_pipe[1]);
+    if child < 0 || parent_write_close != 0 {
+        let _ = close(ready_pipe[0]);
+        FUTEX_RESTART_SHARED_ADDR.store(0, Ordering::Release);
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+    let mut ready = [0_u8; 1];
+    let ready_ok = fd_read(ready_pipe[0], &mut ready) == 1 && ready == [b'R'];
+    let settle = Timespec {
+        seconds: 0,
+        nanoseconds: 20_000_000,
+    };
+    let signaled = ready_ok && nanosleep(&settle) == 0 && send_signal(child as usize, SIGUSR1) == 0;
+    let shared = unsafe { &*shared_ptr };
+    let mut handler_seen = false;
+    if signaled {
+        for _ in 0..100 {
+            if shared.handler_entered.load(Ordering::Acquire) == 1 {
+                handler_seen = true;
+                break;
+            }
+            let poll = Timespec {
+                seconds: 0,
+                nanoseconds: 1_000_000,
+            };
+            if nanosleep(&poll) != 0 {
+                break;
+            }
+        }
+    }
+    let restart_settle = handler_seen && nanosleep(&settle) == 0;
+    shared.word.store(1, Ordering::Release);
+    let woken = futex_wake_shared(&shared.word);
+    let mut status = -1_i32;
+    let waited = wait_child(child, &mut status) == child;
+    let closed = close(ready_pipe[0]) == 0;
+    FUTEX_RESTART_SHARED_ADDR.store(0, Ordering::Release);
+    let unmapped = munmap(mapping as usize, PAGE_BYTES) == 0;
+    ready_ok
+        && signaled
+        && handler_seen
+        && restart_settle
+        && woken == 1
+        && waited
+        && status == 0
+        && closed
+        && unmapped
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -2660,6 +2837,24 @@ fn futex_wake_private(word: &AtomicI32) -> isize {
             SYS_FUTEX,
             word.as_ptr() as usize,
             FUTEX_WAKE | FUTEX_PRIVATE_FLAG,
+            1,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn futex_wake_shared(word: &AtomicI32) -> isize {
+    // SAFETY: `word` is naturally aligned in a live MAP_SHARED page and remains
+    // mapped for this synchronous FUTEX_WAKE operation. No timeout or secondary
+    // address is used.
+    unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word.as_ptr() as usize,
+            FUTEX_WAKE,
             1,
             0,
             0,
@@ -3656,6 +3851,12 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_PRIVATE_FUTEX_COW) != ASSERT_PRIVATE_FUTEX_COW.len() as isize {
         fail(USER_FAIL_WRITE, 342);
+    }
+    if !run_futex_sa_restart_probe() {
+        fail(USER_FAIL_FUTEX_SA_RESTART, 343);
+    }
+    if write(ASSERT_FUTEX_SA_RESTART) != ASSERT_FUTEX_SA_RESTART.len() as isize {
+        fail(USER_FAIL_WRITE, 344);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
