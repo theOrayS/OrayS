@@ -158,6 +158,8 @@ impl UserProcess {
     }
 
     pub(super) fn move_path_metadata(&self, old_path: &str, new_path: String) {
+        self.move_path_hardlink_metadata(old_path, new_path.as_str());
+
         let fallback_ino = path_inode(Some(old_path));
         let ino = self
             .path_inodes
@@ -231,6 +233,33 @@ impl UserProcess {
         drop(times);
 
         self.move_path_sparse_file(old_path, new_path);
+    }
+
+    fn move_path_hardlink_metadata(&self, old_path: &str, new_path: &str) {
+        let moved_canonical = {
+            let mut links = self.path_hardlinks.lock();
+            let Some(canonical) = links.remove(old_path) else {
+                return;
+            };
+            if canonical == old_path {
+                for target in links.values_mut() {
+                    if target == old_path {
+                        *target = new_path.to_string();
+                    }
+                }
+                links.insert(new_path.to_string(), new_path.to_string());
+                true
+            } else {
+                links.insert(new_path.to_string(), canonical);
+                false
+            }
+        };
+        if moved_canonical {
+            let mut counts = self.path_hardlink_counts.lock();
+            if let Some(count) = counts.remove(old_path) {
+                counts.insert(new_path.to_string(), count);
+            }
+        }
     }
 
     pub(super) fn set_path_special_mode(&self, path: String, ty: u32) {
@@ -320,6 +349,16 @@ impl UserProcess {
 
     pub(super) fn path_hardlink_exists(&self, path: &str) -> bool {
         self.path_hardlinks.lock().contains_key(path)
+    }
+
+    pub(super) fn path_hardlink_promotion(&self, path: &str) -> Option<String> {
+        let links = self.path_hardlinks.lock();
+        if links.get(path).is_none_or(|canonical| canonical != path) {
+            return None;
+        }
+        links.iter().find_map(|(candidate, canonical)| {
+            (candidate != path && canonical == path).then(|| candidate.clone())
+        })
     }
 
     pub(super) fn path_hardlink_count(&self, path: &str) -> Option<u64> {

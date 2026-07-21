@@ -7353,6 +7353,20 @@ impl FdTable {
                 invalidate_exec_image_cache(abs_path.as_str());
                 return Ok(());
             }
+            if let Some(promoted_path) = process.path_hardlink_promotion(abs_path.as_str()) {
+                if remove_dir {
+                    return Err(LinuxError::ENOTDIR);
+                }
+                let st = stat_absolute_path(process, backing_path.as_str())?;
+                check_inode_flags_allow_unlink(process, backing_path.as_str())?;
+                check_sticky_parent_permission(process, &parent_st, &st)?;
+                axfs::api::rename(abs_path.as_str(), promoted_path.as_str())
+                    .map_err(LinuxError::from)?;
+                process.move_path_metadata(abs_path.as_str(), promoted_path.clone());
+                invalidate_exec_image_cache(abs_path.as_str());
+                invalidate_exec_image_cache(promoted_path.as_str());
+                return Ok(());
+            }
         }
         let target_st = if let Some(st) = process.path_symlink_stat(abs_path.as_str()) {
             Some(apply_recorded_path_metadata(process, abs_path.as_str(), st))
