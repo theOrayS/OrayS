@@ -16,6 +16,7 @@ use core::{
 
 const SYS_DUP3: usize = 24;
 const SYS_FCNTL: usize = 25;
+const SYS_IOCTL: usize = 29;
 const SYS_FLOCK: usize = 32;
 const SYS_MKDIRAT: usize = 34;
 const SYS_UNLINKAT: usize = 35;
@@ -89,6 +90,7 @@ const SO_REUSEADDR: usize = 2;
 const SO_TYPE: usize = 3;
 const F_GETFD: usize = 1;
 const F_GETFL: usize = 3;
+const FIONBIO: usize = 0x5421;
 const FD_CLOEXEC: isize = 1;
 const SIGCHLD: usize = 17;
 const CLONE_VM: u64 = 0x0000_0100;
@@ -225,6 +227,12 @@ const ASSERT_RLIMIT_STACK: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_RLIMIT_STACK: &[u8] =
     b"PR3_SMOKE_V1 ASSERT rlimit_stack_growth PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_PIPE_FIONBIO: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT pipe_fionbio PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_PIPE_FIONBIO: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT pipe_fionbio PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 ASSERT madvise_dontneed PASS arch=riscv64\n";
@@ -414,6 +422,12 @@ const USER_FAIL_RLIMIT_STACK: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_RLIMIT_STACK: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL rlimit_stack_growth arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PIPE_FIONBIO: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL pipe_fionbio arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PIPE_FIONBIO: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL pipe_fionbio arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_MADVISE_DONTNEED: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL madvise_dontneed arch=riscv64\n";
@@ -1105,6 +1119,23 @@ fn fcntl_get(fd: i32, command: usize) -> isize {
     // SAFETY: F_GETFD and F_GETFL consume only the descriptor and command scalars;
     // neither command dereferences the unused third argument.
     unsafe { syscall6(SYS_FCNTL, fd as usize, command, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn ioctl_fionbio(fd: i32, enabled: &i32) -> isize {
+    // SAFETY: `enabled` is an aligned readable C int that remains live for the
+    // synchronous ioctl. The request and descriptor are scalar values.
+    unsafe {
+        syscall6(
+            SYS_IOCTL,
+            fd as usize,
+            FIONBIO,
+            enabled as *const i32 as usize,
+            0,
+            0,
+            0,
+        )
+    }
 }
 
 #[inline(always)]
@@ -2398,6 +2429,36 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_RLIMIT_STACK) != ASSERT_RLIMIT_STACK.len() as isize {
         fail(USER_FAIL_WRITE, 342);
+    }
+
+    // Rust's process/async plumbing uses FIONBIO on pipe descriptors. Validate
+    // both the shared file-status flag and its observable empty-read behavior,
+    // then restore blocking mode without depending on libc or a named workload.
+    let mut fionbio_pipe = [-1_i32; 2];
+    if pipe2(&mut fionbio_pipe, 0) != 0 {
+        fail(USER_FAIL_PIPE_FIONBIO, 344);
+    }
+    let enabled = 1_i32;
+    if ioctl_fionbio(fionbio_pipe[0], &enabled) != 0
+        || fcntl_get(fionbio_pipe[0], F_GETFL) & O_NONBLOCK as isize == 0
+    {
+        fail(USER_FAIL_PIPE_FIONBIO, 345);
+    }
+    let mut empty_byte = [0_u8; 1];
+    if fd_read(fionbio_pipe[0], &mut empty_byte) != NEG_EAGAIN {
+        fail(USER_FAIL_PIPE_FIONBIO, 346);
+    }
+    let disabled = 0_i32;
+    if ioctl_fionbio(fionbio_pipe[0], &disabled) != 0
+        || fcntl_get(fionbio_pipe[0], F_GETFL) & O_NONBLOCK as isize != 0
+    {
+        fail(USER_FAIL_PIPE_FIONBIO, 347);
+    }
+    if close(fionbio_pipe[0]) != 0 || close(fionbio_pipe[1]) != 0 {
+        fail(USER_FAIL_PIPE_FIONBIO, 348);
+    }
+    if write(ASSERT_PIPE_FIONBIO) != ASSERT_PIPE_FIONBIO.len() as isize {
+        fail(USER_FAIL_WRITE, 349);
     }
 
     // Cargo/rustc allocators repeatedly discard private anonymous MAP_NORESERVE
