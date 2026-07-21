@@ -10,6 +10,7 @@ use axsync::Mutex;
 use axtask::WaitQueue;
 use lazyinit::LazyInit;
 use linux_raw_sys::general;
+use std::collections::VecDeque;
 use std::string::String;
 use std::sync::Arc;
 use std::vec::Vec;
@@ -62,15 +63,20 @@ pub(super) struct LocalSocketEntry {
 
 static NEXT_LOCAL_SOCKET_ID: AtomicUsize = AtomicUsize::new(1);
 const LOCAL_SOCKET_INITIAL_BUFFER_SIZE: usize = 4096;
+// Linux UAPI SOCK_SEQPACKET. The generated POSIX ctypes currently expose only
+// the socket types implemented by the lower inet backend.
+const LOCAL_SOCKET_SEQPACKET: u32 = 5;
 // AF_UNIX stream sockets have their own socket buffer, not a single PIPE_BUF
 // slot.  Allow the in-kernel local socket buffer to grow enough to carry a full
 // default pipe-sized splice without requiring a peer read in the middle of the
 // producer's syscall.
 const LOCAL_SOCKET_MAX_BUFFER_SIZE: usize = 64 * 1024;
+const LOCAL_SOCKET_MAX_PACKET_COUNT: usize = 1024;
 const LOCAL_SOCKET_BLOCK_QUANTUM: Duration = Duration::from_millis(1);
 const SOCKET_ADDR_STORAGE_MAX: usize = 128;
 const SOCKET_OPTLEN_MAX: usize = TCP_INFO_COMPAT_SIZE;
 const MSG_ERRQUEUE_FLAG: i32 = 0x2000;
+const MSG_DONTWAIT_FLAG: i32 = 0x40;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum LocalSocketBufferStatus {
@@ -87,8 +93,14 @@ struct LocalSocketBuffer {
     status: LocalSocketBufferStatus,
 }
 
+struct LocalSocketPacketBuffer {
+    packets: VecDeque<Vec<u8>>,
+    used: usize,
+}
+
 struct LocalSocketPairState {
     buffers: [Mutex<LocalSocketBuffer>; 2],
+    packet_buffers: [Mutex<LocalSocketPacketBuffer>; 2],
     open_ends: Mutex<[usize; 2]>,
     read_wait: [Arc<WaitQueue>; 2],
     write_wait: [Arc<WaitQueue>; 2],
@@ -334,12 +346,72 @@ impl LocalSocketBuffer {
     }
 }
 
+impl LocalSocketPacketBuffer {
+    fn new() -> Self {
+        Self {
+            packets: VecDeque::new(),
+            used: 0,
+        }
+    }
+
+    fn has_packet(&self) -> bool {
+        !self.packets.is_empty()
+    }
+
+    fn next_packet_len(&self) -> usize {
+        self.packets.front().map_or(0, Vec::len)
+    }
+
+    fn available_write(&self) -> usize {
+        if self.packets.len() >= LOCAL_SOCKET_MAX_PACKET_COUNT {
+            0
+        } else {
+            LOCAL_SOCKET_MAX_BUFFER_SIZE.saturating_sub(self.used)
+        }
+    }
+
+    fn can_write(&self, len: usize) -> bool {
+        self.packets.len() < LOCAL_SOCKET_MAX_PACKET_COUNT && len <= self.available_write()
+    }
+
+    fn write_packet(&mut self, src: &[u8]) -> Result<(), LinuxError> {
+        if src.len() > LOCAL_SOCKET_MAX_BUFFER_SIZE {
+            return Err(LinuxError::EMSGSIZE);
+        }
+        if !self.can_write(src.len()) {
+            return Err(LinuxError::EAGAIN);
+        }
+        let mut packet = Vec::new();
+        packet
+            .try_reserve_exact(src.len())
+            .map_err(|_| LinuxError::ENOMEM)?;
+        packet.extend_from_slice(src);
+        self.used += packet.len();
+        self.packets.push_back(packet);
+        Ok(())
+    }
+
+    fn read_packet(&mut self, dst: &mut [u8]) -> usize {
+        let Some(packet) = self.packets.pop_front() else {
+            return 0;
+        };
+        self.used = self.used.saturating_sub(packet.len());
+        let copied = cmp::min(packet.len(), dst.len());
+        dst[..copied].copy_from_slice(&packet[..copied]);
+        copied
+    }
+}
+
 impl LocalSocketPairState {
     fn new() -> Arc<Self> {
         Arc::new(Self {
             buffers: [
                 Mutex::new(LocalSocketBuffer::new()),
                 Mutex::new(LocalSocketBuffer::new()),
+            ],
+            packet_buffers: [
+                Mutex::new(LocalSocketPacketBuffer::new()),
+                Mutex::new(LocalSocketPacketBuffer::new()),
             ],
             open_ends: Mutex::new([1, 1]),
             read_wait: [Arc::new(WaitQueue::new()), Arc::new(WaitQueue::new())],
@@ -387,31 +459,59 @@ impl LocalSocketPairState {
         self.write_wait[side].notify_all(true);
     }
 
-    fn readable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) -> bool {
-        let readable = self.buffers[side].lock().available_read() > 0;
+    fn readable_or_peer_closed_or_interrupted(
+        &self,
+        side: usize,
+        process: &UserProcess,
+        packet_oriented: bool,
+    ) -> bool {
+        let readable = if packet_oriented {
+            self.packet_buffers[side].lock().has_packet()
+        } else {
+            self.buffers[side].lock().available_read() > 0
+        };
         readable || !self.peer_open(side) || socket_block_interrupt_pending(process)
     }
 
-    fn writable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) -> bool {
+    fn writable_or_peer_closed_or_interrupted(
+        &self,
+        side: usize,
+        process: &UserProcess,
+        packet_oriented: bool,
+    ) -> bool {
         let peer_side = 1 - side;
-        let writable = self.buffers[peer_side]
-            .lock()
-            .available_write_after_growth()
-            > 0;
+        let writable = if packet_oriented {
+            self.packet_buffers[peer_side].lock().available_write() > 0
+        } else {
+            self.buffers[peer_side]
+                .lock()
+                .available_write_after_growth()
+                > 0
+        };
         writable || !self.peer_open(side) || socket_block_interrupt_pending(process)
     }
 
-    fn wait_readable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) {
+    fn wait_readable_or_peer_closed_or_interrupted(
+        &self,
+        side: usize,
+        process: &UserProcess,
+        packet_oriented: bool,
+    ) {
         let wait = self.read_wait[side].clone();
         wait.wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
-            self.readable_or_peer_closed_or_interrupted(side, process)
+            self.readable_or_peer_closed_or_interrupted(side, process, packet_oriented)
         });
     }
 
-    fn wait_writable_or_peer_closed_or_interrupted(&self, side: usize, process: &UserProcess) {
+    fn wait_writable_or_peer_closed_or_interrupted(
+        &self,
+        side: usize,
+        process: &UserProcess,
+        packet_oriented: bool,
+    ) {
         let wait = self.write_wait[side].clone();
         wait.wait_timeout_until(LOCAL_SOCKET_BLOCK_QUANTUM, || {
-            self.writable_or_peer_closed_or_interrupted(side, process)
+            self.writable_or_peer_closed_or_interrupted(side, process, packet_oriented)
         });
     }
 }
@@ -547,10 +647,66 @@ impl LocalSocketEntry {
         *self.peer_cred.lock() = Some(peer_cred);
     }
 
+    fn packet_oriented(&self) -> bool {
+        matches!(
+            self.socktype as u32,
+            posix_ctypes::SOCK_DGRAM | LOCAL_SOCKET_SEQPACKET
+        )
+    }
+
     pub(super) fn read(&self, process: &UserProcess, dst: &mut [u8]) -> Result<usize, LinuxError> {
+        self.read_with_nonblocking(process, dst, self.nonblocking)
+    }
+
+    fn recv(&self, process: &UserProcess, dst: &mut [u8], flags: i32) -> Result<usize, LinuxError> {
+        if flags & MSG_ERRQUEUE_FLAG != 0 {
+            return Err(LinuxError::EAGAIN);
+        }
+        if flags & !MSG_DONTWAIT_FLAG != 0 {
+            return Err(LinuxError::EOPNOTSUPP);
+        }
+        self.read_with_nonblocking(
+            process,
+            dst,
+            self.nonblocking || flags & MSG_DONTWAIT_FLAG != 0,
+        )
+    }
+
+    fn read_with_nonblocking(
+        &self,
+        process: &UserProcess,
+        dst: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, LinuxError> {
+        if dst.is_empty() {
+            return Ok(0);
+        }
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
+        if self.packet_oriented() {
+            loop {
+                let mut buffer = pair.state.packet_buffers[pair.side].lock();
+                if buffer.has_packet() {
+                    let read_len = buffer.read_packet(dst);
+                    drop(buffer);
+                    pair.state.notify_writable(1 - pair.side);
+                    return Ok(read_len);
+                }
+                if !pair.state.peer_open(pair.side) {
+                    return Ok(0);
+                }
+                if nonblocking {
+                    return Err(LinuxError::EAGAIN);
+                }
+                if socket_block_interrupt_pending(process) {
+                    return Err(LinuxError::EINTR);
+                }
+                drop(buffer);
+                pair.state
+                    .wait_readable_or_peer_closed_or_interrupted(pair.side, process, true);
+            }
+        }
         let mut read_len = 0usize;
         while read_len < dst.len() {
             let mut buffer = pair.state.buffers[pair.side].lock();
@@ -559,7 +715,7 @@ impl LocalSocketEntry {
                 if read_len > 0 || !pair.state.peer_open(pair.side) {
                     return Ok(read_len);
                 }
-                if self.nonblocking {
+                if nonblocking {
                     return Err(LinuxError::EAGAIN);
                 }
                 if socket_block_interrupt_pending(process) {
@@ -567,7 +723,7 @@ impl LocalSocketEntry {
                 }
                 drop(buffer);
                 pair.state
-                    .wait_readable_or_peer_closed_or_interrupted(pair.side, process);
+                    .wait_readable_or_peer_closed_or_interrupted(pair.side, process, false);
                 continue;
             }
             let take = cmp::min(available, dst.len() - read_len);
@@ -589,6 +745,20 @@ impl LocalSocketEntry {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
+        if self.packet_oriented() {
+            let mut buffer = pair.state.packet_buffers[pair.side].lock();
+            if !buffer.has_packet() {
+                return if pair.state.peer_open(pair.side) {
+                    Err(LinuxError::EAGAIN)
+                } else {
+                    Ok(0)
+                };
+            }
+            let read_len = buffer.read_packet(dst);
+            drop(buffer);
+            pair.state.notify_writable(1 - pair.side);
+            return Ok(read_len);
+        }
         let mut buffer = pair.state.buffers[pair.side].lock();
         let available = buffer.available_read();
         if available == 0 {
@@ -609,7 +779,13 @@ impl LocalSocketEntry {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
-        let available = pair.state.buffers[pair.side].lock().available_read();
+        let available = if self.packet_oriented() {
+            pair.state.packet_buffers[pair.side]
+                .lock()
+                .next_packet_len()
+        } else {
+            pair.state.buffers[pair.side].lock().available_read()
+        };
         Ok((available, pair.state.peer_open(pair.side)))
     }
 
@@ -617,10 +793,39 @@ impl LocalSocketEntry {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
+        if self.packet_oriented() && src.len() > LOCAL_SOCKET_MAX_BUFFER_SIZE {
+            return Err(LinuxError::EMSGSIZE);
+        }
         if !pair.state.peer_open(pair.side) {
             return Err(LinuxError::EPIPE);
         }
         let peer_side = 1 - pair.side;
+        if self.packet_oriented() {
+            loop {
+                if !pair.state.peer_open(pair.side) {
+                    return Err(LinuxError::EPIPE);
+                }
+                let mut buffer = pair.state.packet_buffers[peer_side].lock();
+                match buffer.write_packet(src) {
+                    Ok(()) => {
+                        drop(buffer);
+                        pair.state.notify_readable(peer_side);
+                        return Ok(src.len());
+                    }
+                    Err(LinuxError::EAGAIN) if self.nonblocking => {
+                        return Err(LinuxError::EAGAIN);
+                    }
+                    Err(LinuxError::EAGAIN) => {}
+                    Err(err) => return Err(err),
+                }
+                if socket_block_interrupt_pending(process) {
+                    return Err(LinuxError::EINTR);
+                }
+                drop(buffer);
+                pair.state
+                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process, true);
+            }
+        }
         let mut written = 0usize;
         while written < src.len() {
             if !pair.state.peer_open(pair.side) {
@@ -650,7 +855,7 @@ impl LocalSocketEntry {
                 }
                 drop(buffer);
                 pair.state
-                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process);
+                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process, false);
                 continue;
             }
             let take = cmp::min(available, src.len() - written);
@@ -673,6 +878,13 @@ impl LocalSocketEntry {
             return Err(LinuxError::EPIPE);
         }
         let peer_side = 1 - pair.side;
+        if self.packet_oriented() {
+            let mut buffer = pair.state.packet_buffers[peer_side].lock();
+            buffer.write_packet(src)?;
+            drop(buffer);
+            pair.state.notify_readable(peer_side);
+            return Ok(src.len());
+        }
         let mut buffer = pair.state.buffers[peer_side].lock();
         buffer.grow_for_write(src.len());
         let available = buffer.available_write();
@@ -700,6 +912,11 @@ impl LocalSocketEntry {
         let Some(pair) = &self.pair else {
             return Err(LinuxError::EINVAL);
         };
+        if self.packet_oriented() {
+            // splice is a byte-stream operation. Keeping it out of record sockets
+            // avoids consuming pipe bytes before an atomic packet can be committed.
+            return Err(LinuxError::EINVAL);
+        }
         if !pair.state.peer_open(pair.side) {
             return Err(LinuxError::EPIPE);
         }
@@ -735,7 +952,7 @@ impl LocalSocketEntry {
                     return Err(LinuxError::EINTR);
                 }
                 pair.state
-                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process);
+                    .wait_writable_or_peer_closed_or_interrupted(pair.side, process, false);
                 continue;
             }
 
@@ -774,8 +991,15 @@ impl LocalSocketEntry {
             return Err(LinuxError::EPIPE);
         }
         let peer_side = 1 - pair.side;
-        let buffer = pair.state.buffers[peer_side].lock();
-        Ok(buffer.available_write_after_growth())
+        if self.packet_oriented() {
+            Ok(pair.state.packet_buffers[peer_side]
+                .lock()
+                .available_write())
+        } else {
+            Ok(pair.state.buffers[peer_side]
+                .lock()
+                .available_write_after_growth())
+        }
     }
 
     pub(super) fn poll(&self, mode: SelectMode) -> bool {
@@ -787,9 +1011,18 @@ impl LocalSocketEntry {
             };
         };
         match mode {
+            SelectMode::Read if self.packet_oriented() => {
+                let buffer = pair.state.packet_buffers[pair.side].lock();
+                buffer.has_packet() || !pair.state.peer_open(pair.side)
+            }
             SelectMode::Read => {
                 let buffer = pair.state.buffers[pair.side].lock();
                 buffer.available_read() > 0 || !pair.state.peer_open(pair.side)
+            }
+            SelectMode::Write if self.packet_oriented() => {
+                let peer_side = 1 - pair.side;
+                let buffer = pair.state.packet_buffers[peer_side].lock();
+                buffer.available_write() > 0 && pair.state.peer_open(pair.side)
             }
             SelectMode::Write => {
                 let peer_side = 1 - pair.side;
@@ -969,6 +1202,15 @@ pub(super) fn is_local_socket_fd(process: &UserProcess, fd: usize) -> Result<boo
     Ok(matches!(table.entry(fd as i32)?, FdEntry::LocalSocket(_)))
 }
 
+fn local_socket_entry(process: &UserProcess, fd: usize) -> Result<LocalSocketEntry, LinuxError> {
+    let table = process.fds.lock();
+    match table.entry(fd as i32)? {
+        FdEntry::LocalSocket(socket) => Ok(socket.duplicate()),
+        FdEntry::Path(_) => Err(LinuxError::EBADF),
+        _ => Err(LinuxError::ENOTSOCK),
+    }
+}
+
 pub(super) fn socket_addr_call<F>(
     process: &UserProcess,
     fd: usize,
@@ -1136,6 +1378,37 @@ pub(super) fn recv_socket_data_to_user(
     recv_socket_data_to_user_inner(process, posix_fd, buf, len, |dst| unsafe {
         arceos_posix_api::sys_recv(posix_fd, dst, len, flags)
     })
+}
+
+fn recv_local_socket_data_to_user(
+    process: &UserProcess,
+    socket: &LocalSocketEntry,
+    buf: usize,
+    len: usize,
+    flags: i32,
+) -> isize {
+    if buf == 0 {
+        return neg_errno(LinuxError::EFAULT);
+    }
+    let len = len.min(MAX_USER_IO_CHUNK);
+    if let Err(err) = validate_user_write(process, buf, len) {
+        return neg_errno(err);
+    }
+    let mut bytes = match user_io_buffer(len) {
+        Ok(bytes) => bytes,
+        Err(err) => return neg_errno(err),
+    };
+    let received = match socket.recv(process, &mut bytes, flags) {
+        Ok(received) => received,
+        Err(err) => return neg_errno(err),
+    };
+    if received == 0 {
+        return 0;
+    }
+    match write_user_bytes(process, buf, &bytes[..received]) {
+        Ok(()) => received as isize,
+        Err(err) => neg_errno(err),
+    }
 }
 
 pub(super) fn recv_socket_data_to_user_with_addr(
@@ -1423,6 +1696,7 @@ pub(super) fn sys_socketpair_bridge(
     }
     if base_socktype as u32 != posix_ctypes::SOCK_STREAM
         && base_socktype as u32 != posix_ctypes::SOCK_DGRAM
+        && base_socktype as u32 != LOCAL_SOCKET_SEQPACKET
     {
         return neg_errno_code(LINUX_ESOCKTNOSUPPORT);
     }
@@ -2075,6 +2349,23 @@ pub(super) fn sys_recvfrom_bridge(
     addr: usize,
     addrlen: usize,
 ) -> isize {
+    match is_local_socket_fd(process, fd) {
+        Ok(true) => {
+            if addr != 0 && addrlen != 0 {
+                // Pathname-peer reporting needs peer-address state that local sockets
+                // do not yet retain. Fail before consuming a record instead of
+                // fabricating an address.
+                return neg_errno(LinuxError::EOPNOTSUPP);
+            }
+            let socket = match local_socket_entry(process, fd) {
+                Ok(socket) => socket,
+                Err(err) => return neg_errno(err),
+            };
+            return recv_local_socket_data_to_user(process, &socket, buf, len, flags as i32);
+        }
+        Ok(false) => {}
+        Err(err) => return neg_errno(err),
+    }
     let socket = socket_entry_or_return!(process, fd);
     if addr == 0 || addrlen == 0 {
         recv_socket_data_to_user(process, socket.posix_fd, buf, len, flags as i32)
