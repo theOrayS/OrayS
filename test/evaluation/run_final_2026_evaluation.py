@@ -32,6 +32,7 @@ EXPECTED_GUEST_SCRIPTS = {
 MIN_BUILDSTORM_PHYSICAL_CORES = 8
 MIN_BUILDSTORM_AVAILABLE_MEMORY_BYTES = 9 * 1024**3
 MIN_BUILDSTORM_OUTPUT_FREE_BYTES = 4 * 1024**3
+BUILDSTORM_GUEST_TIMEOUT_CEILING_SECONDS = 18_000
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 
@@ -355,7 +356,7 @@ def _validate_guest_script(image: Path, guest_script: str) -> None:
 
 
 def _closed_make_environment(group: str) -> dict[str, str]:
-    return {
+    environment = {
         "PATH": os.environ.get("PATH", os.defpath),
         "HOME": os.environ.get("HOME", str(Path.home())),
         "LC_ALL": "C",
@@ -366,6 +367,14 @@ def _closed_make_environment(group: str) -> dict[str, str]:
         "PYTHONPYCACHEPREFIX": "/dev/null",
         "OSCOMP_TEST_GROUPS": group,
     }
+    if group == "buildstorm":
+        environment["OSCOMP_EXTRA_TESTSUITE_DIRS"] = str(
+            Path(EXPECTED_GUEST_SCRIPTS[group]).parent
+        )
+        environment["OSCOMP_GROUP_TIMEOUT_CEILING_SECS"] = str(
+            BUILDSTORM_GUEST_TIMEOUT_CEILING_SECONDS
+        )
+    return environment
 
 
 def _usage() -> str:

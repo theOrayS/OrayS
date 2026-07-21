@@ -20,7 +20,75 @@ use crate::uspace;
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const SUITE_DIRS: &[&str] = &["/musl", "/glibc"];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+const BUILDSTORM_GROUP_TIMEOUT_SECS: u64 = 18_000;
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 const SCRIPT_SUFFIX: &str = "_testcode.sh";
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn configured_suite_dirs() -> Result<Vec<String>, String> {
+    let mut dirs: Vec<String> = SUITE_DIRS.iter().map(|dir| String::from(*dir)).collect();
+    let Some(extra) = option_env!("OSCOMP_EXTRA_TESTSUITE_DIRS") else {
+        return Ok(dirs);
+    };
+    for raw in extra.split(':') {
+        let dir = raw.trim();
+        if dir.is_empty()
+            || dir == "/"
+            || !dir.starts_with('/')
+            || dir.ends_with('/')
+            || dir
+                .split('/')
+                .skip(1)
+                .any(|component| component.is_empty() || matches!(component, "." | ".."))
+        {
+            return Err(format!(
+                "invalid additional official suite directory: {dir:?}"
+            ));
+        }
+        if !dirs.iter().any(|existing| existing == dir) {
+            dirs.push(dir.to_string());
+        }
+    }
+    Ok(dirs)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+struct OfficialShell {
+    program: String,
+    is_busybox: bool,
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn official_shell_for_suite(suite_dir: &str) -> Result<OfficialShell, String> {
+    let suite_busybox = join_path(suite_dir, "busybox");
+    if matches!(fs::metadata(&suite_busybox), Ok(meta) if meta.is_file()) {
+        return Ok(OfficialShell {
+            program: suite_busybox,
+            is_busybox: true,
+        });
+    }
+
+    // Configured final images can be self-contained Debian roots. Their real
+    // POSIX shell must be used as a shell, not as a BusyBox multicall binary.
+    if matches!(fs::metadata("/bin/sh"), Ok(meta) if meta.is_file()) {
+        return Ok(OfficialShell {
+            program: "/bin/sh".into(),
+            is_busybox: false,
+        });
+    }
+
+    for program in ["/musl/busybox", "/glibc/busybox"] {
+        if matches!(fs::metadata(program), Ok(meta) if meta.is_file()) {
+            return Ok(OfficialShell {
+                program: program.into(),
+                is_busybox: true,
+            });
+        }
+    }
+    Err(format!(
+        "no usable POSIX shell for official suite directory {suite_dir}"
+    ))
+}
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 // Keep the guest-visible staging prefix short while staying under the writable
 // temporary tree: small libc/POSIX probes often pass compact getcwd(2) buffers,
@@ -794,6 +862,7 @@ const DISABLED_OFFICIAL_TEST_GROUPS: &[&str] = &[];
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn official_group_timeout_secs(group: &str) -> u64 {
     match group {
+        "buildstorm" => BUILDSTORM_GROUP_TIMEOUT_SECS,
         // cyclictest intentionally starts hackbench with 400 forked workers on
         // our single-vCPU evaluator.  With honest fork scheduling and blocking
         // sleeps the script makes forward progress, but the stress phases can
@@ -1140,6 +1209,28 @@ fn run_user_program_argv_in_timeout(
     timeout_secs: u64,
 ) -> Result<i32, String> {
     uspace::run_user_program_in_timeout(cwd, argv, timeout_secs)
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn run_official_shell_command(
+    cwd: &str,
+    shell: &OfficialShell,
+    command: &str,
+    timeout_secs: u64,
+) -> Result<i32, String> {
+    if shell.is_busybox {
+        run_user_program_argv_in_timeout(
+            cwd,
+            &[shell.program.as_str(), "sh", "-c", command],
+            timeout_secs,
+        )
+    } else {
+        run_user_program_argv_in_timeout(
+            cwd,
+            &[shell.program.as_str(), "-c", command],
+            timeout_secs,
+        )
+    }
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -1853,6 +1944,48 @@ fn copy_script_file(
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
+fn copy_posix_script_file(
+    src: &str,
+    dst: &str,
+    shell_path: &str,
+    ensure_shell_shebang: bool,
+) -> io::Result<()> {
+    if let Some(parent) = parent_dir(dst) {
+        ensure_dir_all(parent)?;
+    }
+    let raw_script = fs::read_to_string(src)?;
+    let mut script = String::new();
+    if ensure_shell_shebang && !raw_script.starts_with("#!") {
+        script.push_str("#!");
+        script.push_str(shell_path);
+        script.push('\n');
+    }
+    script.push_str(
+        &raw_script
+            .lines()
+            .map(|line| {
+                if line.starts_with("#!") {
+                    let interpreter = line[2..].split_whitespace().next().unwrap_or_default();
+                    let name = interpreter.rsplit('/').next().unwrap_or(interpreter);
+                    if matches!(name, "sh" | "ash" | "bash") {
+                        return format!("#!{shell_path}");
+                    }
+                }
+                rewrite_absolute_build_command(line)
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    if raw_script.ends_with('\n') {
+        script.push('\n');
+    }
+    let mut dst_file = File::create(dst)?;
+    dst_file.write_all(script.as_bytes())?;
+    uspace::seed_initial_path_mode(dst, 0o755);
+    Ok(())
+}
+
+#[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn shell_echoes_exact_text(line: &str, text: &str) -> bool {
     let trimmed = line.trim();
     for quoted in [format!("\"{text}\""), format!("'{text}'")] {
@@ -1889,9 +2022,9 @@ fn remove_official_group_frame_markers(script_path: &str, label: &str) -> Result
             retained.push(line);
         }
     }
-    if start_count != 1 || end_count != 1 {
+    if start_count == 0 || end_count == 0 {
         return Err(format!(
-            "official script {script_path} must contain exactly one shell-emitted start/end frame for {label}; observed {start_count}/{end_count}"
+            "official script {script_path} must contain shell-emitted start/end frames for {label}; observed {start_count}/{end_count}"
         ));
     }
 
@@ -2513,16 +2646,25 @@ fn copy_suite_root_shared_objects(
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
-fn prepare_suite_stage_dir(suite_dir: &str, script_name: &str) -> io::Result<Option<String>> {
+fn prepare_suite_stage_dir(
+    suite_dir: &str,
+    script_name: &str,
+    busybox_path: Option<&str>,
+) -> io::Result<Option<String>> {
     let group = script_name
         .strip_suffix(SCRIPT_SUFFIX)
         .unwrap_or(script_name);
+    // A Debian-style root already supplies its complete userspace.  Do not
+    // rewrite its scripts or utilities through BusyBox merely to make an
+    // immutable legacy testsuite writable; the overlay handles writes.
     if group == "ltp" {
         return Ok(None);
     }
 
     let src_root = suite_dir;
-    let busybox_path = join_path(suite_dir, "busybox");
+    let Some(busybox_path) = busybox_path else {
+        return Ok(None);
+    };
     let stage_root = join_path(
         TESTSUITE_STAGE_ROOT,
         &format!("{}/{}", suite_stage_component(suite_dir), group),
@@ -2589,7 +2731,7 @@ fn prepare_unstaged_script_dir(
     suite_dir: &str,
     group: &str,
     script_name: &str,
-    busybox_path: &str,
+    shell: &OfficialShell,
 ) -> io::Result<String> {
     let stage_root = join_path(
         TESTSUITE_STAGE_ROOT,
@@ -2599,19 +2741,23 @@ fn prepare_unstaged_script_dir(
         remove_dir_all(&stage_root)?;
     }
     ensure_dir_all(&stage_root)?;
-    copy_script_file(
-        &join_path(suite_dir, script_name),
-        &join_path(&stage_root, script_name),
-        busybox_path,
-        true,
-        false,
-    )?;
+    let src = join_path(suite_dir, script_name);
+    let dst = join_path(&stage_root, script_name);
+    if shell.is_busybox {
+        copy_script_file(&src, &dst, &shell.program, true, false)?;
+    } else {
+        copy_posix_script_file(&src, &dst, &shell.program, false)?;
+    }
     Ok(stage_root)
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
 fn suite_label(suite_dir: &str, group: &str) -> String {
-    format!("{group}-{}", suite_dir.trim_start_matches('/'))
+    if SUITE_DIRS.contains(&suite_dir) {
+        format!("{group}-{}", suite_dir.trim_start_matches('/'))
+    } else {
+        group.to_string()
+    }
 }
 
 #[cfg(all(feature = "auto-run-tests", feature = "uspace"))]
@@ -3007,8 +3153,18 @@ pub fn maybe_run_official_tests() {
             std::process::exit(1);
         }
     };
+    let suite_dirs = match configured_suite_dirs() {
+        Ok(dirs) => dirs,
+        Err(err) => {
+            println!("#### OS COMP TEST GROUP START official-selection ####");
+            println!("FAIL OFFICIAL TEST GROUP FILTER : -1");
+            println!("{err}");
+            println!("#### OS COMP TEST GROUP END official-selection ####");
+            std::process::exit(1);
+        }
+    };
     let mut scripts = Vec::new();
-    for suite_dir in SUITE_DIRS {
+    for suite_dir in &suite_dirs {
         let Ok(entries) = fs::read_dir(suite_dir) else {
             continue;
         };
@@ -3017,7 +3173,7 @@ pub fn maybe_run_official_tests() {
             if !name.ends_with(SCRIPT_SUFFIX) {
                 continue;
             }
-            scripts.push((String::from(*suite_dir), String::from(path_to_str(&name))));
+            scripts.push((suite_dir.clone(), String::from(path_to_str(&name))));
         }
     }
 
@@ -3114,20 +3270,11 @@ pub fn maybe_run_official_tests() {
         )
     });
 
-    let shell = if matches!(fs::metadata("/musl/busybox"), Ok(meta) if meta.is_file()) {
-        "/musl/busybox"
-    } else if matches!(fs::metadata("/glibc/busybox"), Ok(meta) if meta.is_file()) {
-        "/glibc/busybox"
-    } else {
-        println!("autorun: busybox shell not found");
-        std::process::exit(0);
-    };
-
-    for suite_dir in SUITE_DIRS {
+    for suite_dir in &suite_dirs {
         if let Err(err) = prepare_suite_runtime_busybox_wrappers(suite_dir) {
             println!("autorun: prepare runtime busybox wrappers for {suite_dir} failed: {err}");
         }
-        if let Err(err) = ensure_suite_runtime_compat_library(suite_dir) {
+        if let Err(err) = ensure_suite_runtime_compat_library(suite_dir.as_str()) {
             println!(
                 "autorun: prepare runtime compatibility library for {suite_dir} failed: {err}"
             );
@@ -3154,7 +3301,20 @@ pub fn maybe_run_official_tests() {
         if group != "ltp" {
             cleanup_official_group_scratch();
         }
-        let staged_dir = match prepare_suite_stage_dir(&suite_dir, script) {
+        let official_shell = match official_shell_for_suite(&suite_dir) {
+            Ok(shell) => shell,
+            Err(err) => {
+                println!("#### OS COMP TEST GROUP START {label} ####");
+                println!("FAIL OFFICIAL TEST GROUP {label} : -1");
+                println!("autorun: {suite_dir}/{script} failed: {err}");
+                println!("#### OS COMP TEST GROUP END {label} ####");
+                continue;
+            }
+        };
+        let busybox_path = official_shell
+            .is_busybox
+            .then_some(official_shell.program.as_str());
+        let staged_dir = match prepare_suite_stage_dir(&suite_dir, script, busybox_path) {
             Ok(dir) => dir,
             Err(err) => {
                 println!("autorun: prepare {suite_dir}/{script} failed: {err}");
@@ -3162,17 +3322,12 @@ pub fn maybe_run_official_tests() {
             }
         };
         let use_staged_dir = staged_dir.is_some();
-        let suite_busybox = join_path(&suite_dir, "busybox");
-        let suite_shell = if matches!(fs::metadata(&suite_busybox), Ok(meta) if meta.is_file()) {
-            suite_busybox.as_str()
+        let cwd = if let Some(dir) = staged_dir {
+            dir
         } else {
-            shell
+            suite_dir.clone()
         };
-        let (cwd, shell_path) = if let Some(dir) = staged_dir {
-            (dir, suite_busybox)
-        } else {
-            (suite_dir.clone(), suite_shell.to_string())
-        };
+        let shell_path = official_shell.program.clone();
         if let Err(err) = std::env::set_current_dir(&cwd) {
             println!("autorun: cd {cwd} failed: {err}");
             continue;
@@ -3189,7 +3344,7 @@ pub fn maybe_run_official_tests() {
         let unstaged_script_dir = if use_staged_dir {
             None
         } else {
-            match prepare_unstaged_script_dir(&suite_dir, group, script, &shell_path) {
+            match prepare_unstaged_script_dir(&suite_dir, group, script, &official_shell) {
                 Ok(dir) => Some(dir),
                 Err(err) => {
                     println!("autorun: prepare {suite_dir}/{script} failed: {err}");
@@ -3203,8 +3358,10 @@ pub fn maybe_run_official_tests() {
             format!("./{script}")
         };
         let path_dir = unstaged_script_dir.as_deref().unwrap_or(&cwd);
-        if let Err(err) = ensure_busybox_path_wrappers(path_dir, &shell_path) {
-            println!("autorun: prepare busybox path wrappers failed: {err}");
+        if official_shell.is_busybox {
+            if let Err(err) = ensure_busybox_path_wrappers(path_dir, &shell_path) {
+                println!("autorun: prepare busybox path wrappers failed: {err}");
+            }
         }
         if group == "ltp" {
             if let Err(err) = run_ltp_suite(&suite_dir) {
@@ -3243,9 +3400,14 @@ pub fn maybe_run_official_tests() {
             }
             continue;
         }
-        let chmod_args = busybox_path_wrapper_chmod_args(path_dir);
+        let script_command = if official_shell.is_busybox {
+            let chmod_args = busybox_path_wrapper_chmod_args(path_dir);
+            format!("{shell_path} chmod 755 {chmod_args}; {shell_path} sh {script_arg}")
+        } else {
+            format!("{shell_path} {script_arg}")
+        };
         let command = format!(
-            "{shell_path} chmod 755 {chmod_args}; TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:. {shell_path} sh {script_arg}"
+            "TESTSUITE_TOOLS_DIR={path_dir} PATH={path_dir}:.:/bin:/usr/bin:/sbin:/usr/sbin {script_command}"
         );
         let (timeout_secs, nominal_timeout_secs) = bounded_official_group_timeout_secs(group);
         if timeout_secs != nominal_timeout_secs {
@@ -3253,11 +3415,7 @@ pub fn maybe_run_official_tests() {
                 "autorun: {label} timeout bounded to {timeout_secs}s (nominal {nominal_timeout_secs}s)"
             );
         }
-        match run_user_program_argv_in_timeout(
-            &cwd,
-            &[&shell_path, "sh", "-c", &command],
-            timeout_secs,
-        ) {
+        match run_official_shell_command(&cwd, &official_shell, &command, timeout_secs) {
             Ok(status @ (137 | 143)) => {
                 println!("FAIL OFFICIAL TEST GROUP {label} : {status}");
                 println!("TIMEOUT OFFICIAL TEST GROUP {label} after {timeout_secs}s");

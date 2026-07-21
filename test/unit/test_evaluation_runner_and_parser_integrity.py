@@ -952,9 +952,9 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
     def test_detects_removal_of_debian_posix_shell_support(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/cmd.rs"
-        text = path.read_text(encoding="utf-8") + (
-            '\nfn official_shell_for_suite(suite_dir: &str) { '
-            'let _ = join_path(suite_dir, "busybox"); }\n'
+        text = path.read_text(encoding="utf-8").replace(
+            '"/bin/sh"',
+            '"/missing-posix-shell"',
         )
         path.write_text(text, encoding="utf-8")
         result = self.run_guard(tree)
