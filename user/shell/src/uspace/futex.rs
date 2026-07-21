@@ -531,11 +531,29 @@ pub(super) fn sys_futex(
     _uaddr2: usize,
     _val3: usize,
 ) -> isize {
+    let op = futex_op as u32;
+    let cmd = op & general::FUTEX_CMD_MASK as u32;
+    let allowed_operation_bits = general::FUTEX_CMD_MASK as u32
+        | general::FUTEX_PRIVATE_FLAG as u32
+        | general::FUTEX_CLOCK_REALTIME as u32;
+    let supported_command = matches!(
+        cmd,
+        general::FUTEX_WAIT
+            | general::FUTEX_WAIT_BITSET
+            | general::FUTEX_WAKE
+            | general::FUTEX_WAKE_BITSET
+            | general::FUTEX_REQUEUE
+            | general::FUTEX_CMP_REQUEUE
+    );
+    let unsupported_operation = op & !allowed_operation_bits != 0
+        || !supported_command
+        || (op & general::FUTEX_CLOCK_REALTIME as u32 != 0 && cmd != general::FUTEX_WAIT_BITSET);
+    if unsupported_operation {
+        return neg_errno(LinuxError::ENOSYS);
+    }
     if uaddr % size_of::<u32>() != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
-    let op = futex_op as u32;
-    let cmd = op & general::FUTEX_CMD_MASK as u32;
     let private = op & general::FUTEX_PRIVATE_FLAG as u32 != 0;
     perf_counters::record_futex_call(matches!(
         cmd,

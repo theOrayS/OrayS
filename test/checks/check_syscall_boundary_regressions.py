@@ -424,6 +424,27 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
     )
     if "uaddr == 0" in sys_futex:
         findings.append("null futex source must be reported by user-memory access as EFAULT")
+    require_tokens(
+        findings,
+        sys_futex,
+        "futex operation validation must reject unsupported commands and flags with ENOSYS",
+        (
+            "let allowed_operation_bits = general::FUTEX_CMD_MASK as u32",
+            "| general::FUTEX_PRIVATE_FLAG as u32",
+            "| general::FUTEX_CLOCK_REALTIME as u32;",
+            "let supported_command = matches!(",
+            "let unsupported_operation = op & !allowed_operation_bits != 0",
+            "|| !supported_command",
+            "&& cmd != general::FUTEX_WAIT_BITSET",
+            "if unsupported_operation",
+            "return neg_errno(LinuxError::ENOSYS);",
+        ),
+    )
+    operation_decode = sys_futex.find("let op = futex_op as u32;")
+    operation_reject = sys_futex.find("if unsupported_operation")
+    source_alignment = sys_futex.find("if uaddr % size_of::<u32>() != 0")
+    if not (0 <= operation_decode < operation_reject < source_alignment):
+        findings.append("futex operation validation must precede source-address validation")
     requeue_start = sys_futex.find("general::FUTEX_REQUEUE =>")
     cmp_requeue_start = sys_futex.find("general::FUTEX_CMP_REQUEUE =>")
     wake_bitset_start = sys_futex.find("general::FUTEX_WAKE_BITSET =>")
