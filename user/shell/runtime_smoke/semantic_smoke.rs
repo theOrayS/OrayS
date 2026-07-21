@@ -74,6 +74,7 @@ const NEG_EBADF: isize = -9;
 const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
+const NEG_ENOSYS: isize = -38;
 const NEG_ENOTEMPTY: isize = -39;
 const NEG_ETIMEDOUT: isize = -110;
 const AT_FDCWD: isize = -100;
@@ -127,6 +128,7 @@ const FUTEX_CMP_REQUEUE: usize = 4;
 const FUTEX_WAIT_BITSET: usize = 9;
 const FUTEX_PRIVATE_FLAG: usize = 128;
 const FUTEX_CLOCK_REALTIME: usize = 256;
+const FUTEX_UNKNOWN_FLAG: usize = 0x400;
 const FUTEX_BITSET_MATCH_ANY: usize = u32::MAX as usize;
 const CLOCK_MONOTONIC: usize = 1;
 const PROT_READ: usize = 1;
@@ -410,6 +412,12 @@ const ASSERT_FUTEX_SOURCE_VALIDATION: &[u8] =
 const ASSERT_FUTEX_SOURCE_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_source_validation PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_OPERATION_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_operation_validation PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_OPERATION_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_operation_validation PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -665,6 +673,12 @@ const USER_FAIL_FUTEX_SOURCE_VALIDATION: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_SOURCE_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_source_validation arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_OPERATION_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_operation_validation arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_OPERATION_VALIDATION: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_operation_validation arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -3249,6 +3263,86 @@ fn run_futex_source_validation_probe() -> bool {
         && valid_wake == 0
 }
 
+fn run_futex_operation_validation_probe() -> bool {
+    let mismatch = AtomicI32::new(1);
+    let zero = AtomicI32::new(0);
+    let target = AtomicI32::new(0);
+    let absolute_zero = Timespec {
+        seconds: 0,
+        nanoseconds: 0,
+    };
+
+    // Linux rejects unsupported command/flag combinations with ENOSYS before
+    // touching the futex word. WAIT_BITSET is the implemented operation that
+    // does accept CLOCK_REALTIME and provides a non-ENOSYS control.
+    // SAFETY: every non-null address and the timeout remain live and aligned.
+    // Address 1 is an intentional unsupported-command input; operation
+    // validation must reject it before any user-memory access.
+    let wait_realtime = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            mismatch.as_ptr() as usize,
+            FUTEX_WAIT | FUTEX_CLOCK_REALTIME,
+            0,
+            &absolute_zero as *const Timespec as usize,
+            0,
+            0,
+        )
+    };
+    let wake_realtime = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            mismatch.as_ptr() as usize,
+            FUTEX_WAKE | FUTEX_CLOCK_REALTIME,
+            1,
+            0,
+            0,
+            0,
+        )
+    };
+    let requeue_realtime = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            mismatch.as_ptr() as usize,
+            FUTEX_REQUEUE | FUTEX_CLOCK_REALTIME,
+            0,
+            0,
+            target.as_ptr() as usize,
+            0,
+        )
+    };
+    let unknown_flag = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            mismatch.as_ptr() as usize,
+            FUTEX_WAKE | FUTEX_UNKNOWN_FLAG,
+            1,
+            0,
+            0,
+            0,
+        )
+    };
+    let unsupported_misaligned = unsafe { syscall6(SYS_FUTEX, 1, 2, 0, 0, 0, 0) };
+    let supported_realtime = unsafe {
+        syscall6(
+            SYS_FUTEX,
+            zero.as_ptr() as usize,
+            FUTEX_WAIT_BITSET | FUTEX_CLOCK_REALTIME,
+            0,
+            &absolute_zero as *const Timespec as usize,
+            0,
+            FUTEX_BITSET_MATCH_ANY,
+        )
+    };
+
+    wait_realtime == NEG_ENOSYS
+        && wake_realtime == NEG_ENOSYS
+        && requeue_realtime == NEG_ENOSYS
+        && unknown_flag == NEG_ENOSYS
+        && unsupported_misaligned == NEG_ENOSYS
+        && supported_realtime == NEG_ETIMEDOUT
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -4328,6 +4422,14 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FUTEX_SOURCE_VALIDATION) != ASSERT_FUTEX_SOURCE_VALIDATION.len() as isize {
         fail(USER_FAIL_WRITE, 365);
+    }
+    if !run_futex_operation_validation_probe() {
+        fail(USER_FAIL_FUTEX_OPERATION_VALIDATION, 366);
+    }
+    if write(ASSERT_FUTEX_OPERATION_VALIDATION)
+        != ASSERT_FUTEX_OPERATION_VALIDATION.len() as isize
+    {
+        fail(USER_FAIL_WRITE, 367);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
