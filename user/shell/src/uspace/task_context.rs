@@ -128,6 +128,34 @@ impl UserTaskExt {
         *self.comm.lock() = comm;
     }
 
+    pub(super) fn sigaltstack_state(&self) -> (usize, i32, u64) {
+        // A task cannot concurrently execute another sigaltstack syscall on
+        // itself while it is in clone. The individual atomics preserve the
+        // existing lock-free signal-delivery reads without inventing shared
+        // process state for this per-thread Linux setting.
+        (
+            self.sigaltstack_sp.load(Ordering::Acquire),
+            self.sigaltstack_flags.load(Ordering::Acquire),
+            self.sigaltstack_size.load(Ordering::Acquire),
+        )
+    }
+
+    pub(super) fn inherit_sigaltstack(&self, state: (usize, i32, u64)) {
+        self.sigaltstack_sp.store(state.0, Ordering::Release);
+        self.sigaltstack_flags.store(state.1, Ordering::Release);
+        self.sigaltstack_size.store(state.2, Ordering::Release);
+    }
+
+    pub(super) fn reset_signal_state_for_exec(&self) {
+        self.sigaltstack_sp.store(0, Ordering::Release);
+        self.sigaltstack_flags
+            .store(linux_raw_sys::general::SS_DISABLE as i32, Ordering::Release);
+        self.sigaltstack_size.store(0, Ordering::Release);
+        self.signal_frame.store(0, Ordering::Release);
+        *self.pending_sigreturn.lock() = None;
+        self.clear_syscall_restart_frame();
+    }
+
     pub(super) fn store_syscall_restart_frame(&self, frame: TrapFrame) {
         *self.syscall_restart_frame.lock() = Some(frame);
         self.syscall_restart_frame_valid

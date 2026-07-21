@@ -2497,6 +2497,12 @@ pub(super) fn sys_execve(
             }
             Err(ExecProgramError::FdTable(err)) => return neg_errno(err),
         };
+    if let Some(ext) = current_task_ext() {
+        // Linux removes the calling thread's alternate signal stack on a
+        // successful exec. The old image's in-flight signal/restart frames are
+        // likewise no longer meaningful once its address space is replaced.
+        ext.reset_signal_state_for_exec();
+    }
     process.reset_caught_signal_handlers_for_exec();
     let context = make_uspace_context(entry, stack_ptr, argc);
     let closed_cloexec = { process.fds.lock().close_cloexec() };
@@ -2526,15 +2532,24 @@ pub(super) fn sys_clone(
         tf.regs.sp,
         tf.regs.tp,
     );
-    let (inherited_signal_mask, fork_signal_mask_restore, inherited_comm) = current_task_ext()
-        .map(|ext| {
-            (
-                ext.signal_mask.load(Ordering::Acquire),
-                ext.fork_signal_mask_restore.load(Ordering::Acquire),
-                ext.comm(),
-            )
-        })
-        .unwrap_or_else(|| (0, u64::MAX, process.prctl_name()));
+    let (inherited_signal_mask, fork_signal_mask_restore, inherited_comm, inherited_sigaltstack) =
+        current_task_ext()
+            .map(|ext| {
+                (
+                    ext.signal_mask.load(Ordering::Acquire),
+                    ext.fork_signal_mask_restore.load(Ordering::Acquire),
+                    ext.comm(),
+                    ext.sigaltstack_state(),
+                )
+            })
+            .unwrap_or_else(|| {
+                (
+                    0,
+                    u64::MAX,
+                    process.prctl_name(),
+                    (0, general::SS_DISABLE as i32, 0),
+                )
+            });
     let vfork_flags = general::CLONE_VM as usize | general::CLONE_VFORK as usize;
     let process_allowed_flags = vfork_flags
         | general::CLONE_FILES as usize
@@ -2631,13 +2646,18 @@ pub(super) fn sys_clone(
         } else {
             inherited_signal_mask
         };
-        task.init_task_ext(UserTaskExt::new(
+        let child_ext = UserTaskExt::new(
             child_process.clone(),
             child_process.prctl_name(),
             child_context,
             child_clear_tid,
             child_signal_mask,
-        ));
+        );
+        // fork and CLONE_VM|CLONE_VFORK inherit the calling thread's alternate
+        // stack. Ordinary CLONE_VM threads intentionally keep the constructor's
+        // disabled state in the separate thread path below.
+        child_ext.inherit_sigaltstack(inherited_sigaltstack);
+        task.init_task_ext(child_ext);
         let task = axtask::spawn_task(task);
         apply_process_scheduler_state_to_task(child_process.as_ref(), &task);
         register_user_task(task.clone(), child_process.clone());
