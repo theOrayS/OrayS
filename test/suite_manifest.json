@@ -351,7 +351,7 @@
       "description": "Compliance guard unit fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 8, "identity_binding": true},
+      "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"], "required_commands": []
     },
     {
@@ -375,7 +375,7 @@
       "description": "Evaluation execution and parser static guard fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 25, "identity_binding": true},
+      "result_contract": {"type": "unittest", "expected_tests": 29, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
     },
     {
@@ -391,7 +391,7 @@
       "description": "Final-2026 image provenance, host eligibility, and exact launch mutation fixtures.",
       "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_final_2026_adapter.py"],
       "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
+      "result_contract": {"type": "unittest", "expected_tests": 8, "identity_binding": true},
       "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_final_2026_adapter.py", "{repo}/test/evaluation/run_final_2026_evaluation.py", "{repo}/test/images/manifest.final-2026.json"], "required_commands": []
     },
     {
