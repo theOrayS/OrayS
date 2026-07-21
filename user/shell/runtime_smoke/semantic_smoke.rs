@@ -118,7 +118,10 @@ const CLONE_SYSVSEM: u64 = 0x0004_0000;
 const CLONE_SETTLS: u64 = 0x0008_0000;
 const CLONE_PARENT_SETTID: u64 = 0x0010_0000;
 const CLONE_CHILD_CLEARTID: u64 = 0x0020_0000;
+const FUTEX_WAIT: usize = 0;
+const FUTEX_WAKE: usize = 1;
 const FUTEX_WAIT_BITSET: usize = 9;
+const FUTEX_PRIVATE_FLAG: usize = 128;
 const FUTEX_CLOCK_REALTIME: usize = 256;
 const FUTEX_BITSET_MATCH_ANY: usize = u32::MAX as usize;
 const CLOCK_MONOTONIC: usize = 1;
@@ -185,6 +188,7 @@ const RENAME_NONEMPTY_TARGET_ALIAS: &[u8] =
     b"/tmp/pr3-semantic-rename-nonempty-target/retained.o\0";
 const RENAME_NONEMPTY_ENTRY_NAME: &[u8] = b"retained.o";
 const CLONE3_THREAD_STACK_BYTES: usize = 64 * 1024;
+const PRIVATE_FUTEX_COW_STACK_BYTES: usize = 64 * 1024;
 const CLONE3_VFORK_STACK_BYTES: usize = 64 * 1024;
 const SIGNAL_ALT_STACK_BYTES: usize = 64 * 1024;
 const PARENT_THREAD_NAME: &[u8; 16] = b"orays-parent\0\0\0\0";
@@ -196,6 +200,12 @@ static mut CLONE3_THREAD_STACK: [u128; CLONE3_THREAD_STACK_BYTES / 16] =
     [0; CLONE3_THREAD_STACK_BYTES / 16];
 static CLONE3_THREAD_TID: AtomicI32 = AtomicI32::new(0);
 static CLONE3_THREAD_TLS_ANCHOR: AtomicI32 = AtomicI32::new(0);
+
+// A forked child uses this distinct stack for a CLONE_VM waiter. The futex word
+// itself lives in a private anonymous page allocated before fork, so the sibling
+// thread's first store must exercise private-futex identity across a COW remap.
+static mut PRIVATE_FUTEX_COW_STACK: [u128; PRIVATE_FUTEX_COW_STACK_BYTES / 16] =
+    [0; PRIVATE_FUTEX_COW_STACK_BYTES / 16];
 
 // glibc's clone3-based posix_spawn path supplies a dedicated stack even though
 // CLONE_VM|CLONE_VFORK keeps the parent suspended until exec or exit. Keep that
@@ -346,6 +356,12 @@ const ASSERT_CLONE3_FUTEX_JOIN: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_CLONE3_FUTEX_JOIN: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_futex_join PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_PRIVATE_FUTEX_COW: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT private_futex_cow PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_PRIVATE_FUTEX_COW: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT private_futex_cow PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
@@ -560,6 +576,12 @@ const USER_FAIL_CLONE3_FUTEX_JOIN: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_CLONE3_FUTEX_JOIN: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_futex_join arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_PRIVATE_FUTEX_COW: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL private_futex_cow arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_PRIVATE_FUTEX_COW: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL private_futex_cow arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -2020,6 +2042,9 @@ unsafe fn clone3_vfork_exec(args: *const CloneArgs, context: *const VforkExecCon
 /// exclusively owned child stack. `ready_write_fd` and `release_read_fd` must be
 /// opposite ends of live pipes shared with the new thread. `child_marker` must
 /// remain readable through at least its first 16 bytes until the child exits. The
+/// optional `futex_probe` and `futex_timeout` identify an aligned live futex word
+/// and relative timeout; when nonnull, the child reports `W`, performs one private
+/// futex wait, and writes its raw result instead of the marker-write result. The
 /// child path never returns to Rust: after the kernel switches `sp`, the assembly
 /// checks TLS, sets the calling thread's name from that buffer, exchanges one-byte
 /// pipe messages, writes the marker, and invokes `exit(2)` directly.
@@ -2029,6 +2054,8 @@ unsafe fn clone3_cargo_thread(
     release_read_fd: i32,
     child_marker: &[u8],
     expected_tls: usize,
+    futex_probe: usize,
+    futex_timeout: *const Timespec,
 ) -> isize {
     let ret: isize;
     // SAFETY: the caller provides the live pointers, descriptors, and exclusive
@@ -2039,11 +2066,13 @@ unsafe fn clone3_cargo_thread(
         core::arch::asm!(
             "ecall",
             "bnez a0, 3f",
-            "addi sp, sp, -48",
+            "addi sp, sp, -80",
             "sd a2, 8(sp)",
             "sd a3, 16(sp)",
             "sd a4, 24(sp)",
             "sd a5, 32(sp)",
+            "sd t1, 48(sp)",
+            "sd t2, 56(sp)",
             "li t0, 70",
             "bne tp, a6, 5f",
             "ld a1, 24(sp)",
@@ -2065,6 +2094,31 @@ unsafe fn clone3_cargo_thread(
             "li a2, 1",
             "li a7, 63",
             "ecall",
+            "ld t1, 48(sp)",
+            "beqz t1, 9f",
+            "li t0, 87",
+            "sb t0, 0(sp)",
+            "ld a0, 8(sp)",
+            "mv a1, sp",
+            "li a2, 1",
+            "li a7, 64",
+            "ecall",
+            "ld a0, 48(sp)",
+            "li a1, 128",
+            "li a2, 0",
+            "ld a3, 56(sp)",
+            "li a4, 0",
+            "li a5, 0",
+            "li a7, 98",
+            "ecall",
+            "sd a0, 0(sp)",
+            "ld a0, 8(sp)",
+            "mv a1, sp",
+            "li a2, 8",
+            "li a7, 64",
+            "ecall",
+            "j 10f",
+            "9:",
             "lbu t0, 40(sp)",
             "li a0, 82",
             "bne t0, a0, 7f",
@@ -2083,6 +2137,7 @@ unsafe fn clone3_cargo_thread(
             "li a2, 8",
             "li a7, 64",
             "ecall",
+            "10:",
             "li a0, 0",
             "li a7, 93",
             "ecall",
@@ -2097,6 +2152,8 @@ unsafe fn clone3_cargo_thread(
             inlateout("a5") child_marker.len() => _,
             inlateout("a6") expected_tls => _,
             inlateout("a7") SYS_CLONE3 => _,
+            inlateout("t1") futex_probe => _,
+            inlateout("t2") futex_timeout as usize => _,
             lateout("t0") _,
         );
     }
@@ -2118,6 +2175,8 @@ unsafe fn clone3_cargo_thread(
     release_read_fd: i32,
     child_marker: &[u8],
     expected_tls: usize,
+    futex_probe: usize,
+    futex_timeout: *const Timespec,
 ) -> isize {
     let ret: isize;
     // SAFETY: the caller upholds the documented raw ABI and ownership contract.
@@ -2126,11 +2185,13 @@ unsafe fn clone3_cargo_thread(
         core::arch::asm!(
             "syscall 0",
             "bnez $a0, 3f",
-            "addi.d $sp, $sp, -48",
+            "addi.d $sp, $sp, -80",
             "st.d $a2, $sp, 8",
             "st.d $a3, $sp, 16",
             "st.d $a4, $sp, 24",
             "st.d $a5, $sp, 32",
+            "st.d $t1, $sp, 48",
+            "st.d $t2, $sp, 56",
             "addi.d $t0, $zero, 70",
             "bne $tp, $a6, 5f",
             "ld.d $a1, $sp, 24",
@@ -2152,6 +2213,31 @@ unsafe fn clone3_cargo_thread(
             "addi.d $a2, $zero, 1",
             "addi.d $a7, $zero, 63",
             "syscall 0",
+            "ld.d $t1, $sp, 48",
+            "beqz $t1, 9f",
+            "addi.d $t0, $zero, 87",
+            "st.b $t0, $sp, 0",
+            "ld.d $a0, $sp, 8",
+            "or $a1, $sp, $zero",
+            "addi.d $a2, $zero, 1",
+            "addi.d $a7, $zero, 64",
+            "syscall 0",
+            "ld.d $a0, $sp, 48",
+            "addi.d $a1, $zero, 128",
+            "or $a2, $zero, $zero",
+            "ld.d $a3, $sp, 56",
+            "or $a4, $zero, $zero",
+            "or $a5, $zero, $zero",
+            "addi.d $a7, $zero, 98",
+            "syscall 0",
+            "st.d $a0, $sp, 0",
+            "ld.d $a0, $sp, 8",
+            "or $a1, $sp, $zero",
+            "addi.d $a2, $zero, 8",
+            "addi.d $a7, $zero, 64",
+            "syscall 0",
+            "b 10f",
+            "9:",
             "ld.bu $t0, $sp, 40",
             "addi.d $a0, $zero, 82",
             "bne $t0, $a0, 7f",
@@ -2170,6 +2256,7 @@ unsafe fn clone3_cargo_thread(
             "addi.d $a2, $zero, 8",
             "addi.d $a7, $zero, 64",
             "syscall 0",
+            "10:",
             "or $a0, $zero, $zero",
             "addi.d $a7, $zero, 93",
             "syscall 0",
@@ -2184,6 +2271,8 @@ unsafe fn clone3_cargo_thread(
             inlateout("$a5") child_marker.len() => _,
             inlateout("$a6") expected_tls => _,
             inlateout("$a7") SYS_CLONE3 => _,
+            inlateout("$t1") futex_probe => _,
+            inlateout("$t2") futex_timeout as usize => _,
             lateout("$t0") _,
         );
     }
@@ -2440,6 +2529,110 @@ fn touch_expanded_stack() -> u8 {
     checksum
 }
 
+fn run_private_futex_cow_probe() -> bool {
+    let mapping = mmap_private_anonymous(PAGE_BYTES);
+    if mapping <= 0 {
+        return false;
+    }
+    let word_ptr = mapping as *mut AtomicI32;
+    // SAFETY: the new page is writable and aligned to PAGE_BYTES. This initializes
+    // the sole AtomicI32 object used in the mapping before fork creates COW state.
+    unsafe { word_ptr.write(AtomicI32::new(0)) };
+
+    let child = fork_process();
+    if child == 0 {
+        let mut ready_pipe = [-1_i32; 2];
+        let mut release_pipe = [-1_i32; 2];
+        if pipe2(&mut ready_pipe, 0) != 0 || pipe2(&mut release_pipe, 0) != 0 {
+            exit(46);
+        }
+
+        let thread_stack =
+            core::ptr::addr_of_mut!(PRIVATE_FUTEX_COW_STACK).cast::<u8>() as usize;
+        let thread_tid = AtomicI32::new(0);
+        let thread_tls = AtomicI32::new(0);
+        let thread_args = CloneArgs::cargo_thread(
+            thread_stack,
+            thread_tid.as_ptr() as usize,
+            thread_tls.as_ptr() as usize,
+        );
+        let timeout = Timespec {
+            seconds: 0,
+            nanoseconds: 250_000_000,
+        };
+        // SAFETY: the dedicated stack is exclusively owned by this one thread;
+        // both pipes and all pointers remain live until the raw child reports its
+        // futex result and clear_child_tid publishes thread exit.
+        let waiter = unsafe {
+            clone3_cargo_thread(
+                &thread_args,
+                ready_pipe[1],
+                release_pipe[0],
+                CLONE3_THREAD_CHILD,
+                thread_tls.as_ptr() as usize,
+                word_ptr as usize,
+                &timeout,
+            )
+        };
+        if waiter <= 0 {
+            exit(47);
+        }
+
+        let mut phase = [0_u8; 1];
+        if fd_read(ready_pipe[0], &mut phase) != 1
+            || phase != [b'R']
+            || pipe_write(release_pipe[1], b"G") != 1
+            || fd_read(ready_pipe[0], &mut phase) != 1
+            || phase != [b'W']
+        {
+            exit(48);
+        }
+        let settle = Timespec {
+            seconds: 0,
+            nanoseconds: 20_000_000,
+        };
+        if nanosleep(&settle) != 0 {
+            exit(49);
+        }
+
+        // SAFETY: the object was initialized before fork and remains live. This
+        // first child-side store intentionally resolves the inherited private COW
+        // page after the sibling waiter has queued on the same virtual address.
+        let word = unsafe { &*word_ptr };
+        word.store(1, Ordering::Release);
+        let woken = futex_wake_private(word);
+        let mut wait_result_bytes = [0_u8; core::mem::size_of::<isize>()];
+        let result_read = fd_read(ready_pipe[0], &mut wait_result_bytes);
+        let wait_result = isize::from_ne_bytes(wait_result_bytes);
+        let join_result = futex_wait_clear_tid(&thread_tid, waiter as i32);
+        let joined = thread_tid.load(Ordering::Acquire) == 0
+            && matches!(join_result, 0 | NEG_EAGAIN);
+        let close_ok = (close(ready_pipe[0]) == 0)
+            & (close(ready_pipe[1]) == 0)
+            & (close(release_pipe[0]) == 0)
+            & (close(release_pipe[1]) == 0);
+        exit(if woken == 1
+            && result_read == core::mem::size_of::<isize>() as isize
+            && wait_result == 0
+            && joined
+            && close_ok
+        {
+            0
+        } else {
+            50
+        });
+    }
+    if child < 0 {
+        let _ = munmap(mapping as usize, PAGE_BYTES);
+        return false;
+    }
+
+    let mut status = -1_i32;
+    let waited = wait_child(child, &mut status) == child;
+    let unmapped = munmap(mapping as usize, PAGE_BYTES) == 0;
+    waited && status == 0 && unmapped
+}
+
 #[inline(always)]
 fn nanosleep(request: &Timespec) -> isize {
     // SAFETY: `request` is aligned and readable for the complete syscall. A null
@@ -2450,6 +2643,24 @@ fn nanosleep(request: &Timespec) -> isize {
             request as *const Timespec as usize,
             0,
             0,
+            0,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn futex_wake_private(word: &AtomicI32) -> isize {
+    // SAFETY: `word` is naturally aligned, writable, and remains live for this
+    // synchronous FUTEX_WAKE_PRIVATE operation. No timeout or secondary address
+    // is used.
+    unsafe {
+        syscall6(
+            SYS_FUTEX,
+            word.as_ptr() as usize,
+            FUTEX_WAKE | FUTEX_PRIVATE_FLAG,
+            1,
             0,
             0,
             0,
@@ -3373,6 +3584,8 @@ pub extern "C" fn _start() -> ! {
             thread_release_pipe[0],
             CLONE3_THREAD_CHILD,
             thread_tls,
+            0,
+            core::ptr::null(),
         )
     };
     if clone3_thread <= 0 {
@@ -3437,6 +3650,12 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_CLONE3_FUTEX_JOIN) != ASSERT_CLONE3_FUTEX_JOIN.len() as isize {
         fail(USER_FAIL_WRITE, 271);
+    }
+    if !run_private_futex_cow_probe() {
+        fail(USER_FAIL_PRIVATE_FUTEX_COW, 341);
+    }
+    if write(ASSERT_PRIVATE_FUTEX_COW) != ASSERT_PRIVATE_FUTEX_COW.len() as isize {
+        fail(USER_FAIL_WRITE, 342);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
