@@ -427,6 +427,12 @@ const ASSERT_FUTEX_TIMEOUT_VALIDATION: &[u8] =
 const ASSERT_FUTEX_TIMEOUT_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 ASSERT futex_timeout_validation PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
+const ASSERT_FUTEX_U32_ARGUMENTS: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_u32_arguments PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_FUTEX_U32_ARGUMENTS: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT futex_u32_arguments PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_VFORK_EXEC: &[u8] =
     b"PR3_SMOKE_V1 ASSERT clone3_vfork_exec PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -694,6 +700,12 @@ const USER_FAIL_FUTEX_TIMEOUT_VALIDATION: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_FUTEX_TIMEOUT_VALIDATION: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL futex_timeout_validation arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_FUTEX_U32_ARGUMENTS: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_u32_arguments arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_FUTEX_U32_ARGUMENTS: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL futex_u32_arguments arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_THREAD_WRITE_EBADF: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_thread_write_ebadf arch=riscv64\n";
@@ -3098,6 +3110,188 @@ fn run_futex_requeue_count_probe() -> bool {
         && unmapped
 }
 
+fn spawn_shared_futex_waiter(word: &AtomicI32, failure_status: usize) -> (isize, i32) {
+    let mut ready_pipe = [-1_i32; 2];
+    if pipe2(&mut ready_pipe, 0) != 0 {
+        return (-1, -1);
+    }
+    let child = fork_process();
+    if child == 0 {
+        let _ = close(ready_pipe[0]);
+        let timeout = Timespec {
+            seconds: 2,
+            nanoseconds: 0,
+        };
+        if pipe_write(ready_pipe[1], b"R") != 1 {
+            exit(failure_status);
+        }
+        // SAFETY: the caller keeps this shared, aligned word mapped until the
+        // child has returned from the bounded futex wait and has been reaped.
+        let wait_result = unsafe {
+            syscall6(
+                SYS_FUTEX,
+                word.as_ptr() as usize,
+                FUTEX_WAIT,
+                0,
+                &timeout as *const Timespec as usize,
+                0,
+                0,
+            )
+        };
+        let closed = close(ready_pipe[1]) == 0;
+        exit(if wait_result == 0 && closed {
+            0
+        } else {
+            failure_status + 1
+        });
+    }
+
+    let write_closed = close(ready_pipe[1]) == 0;
+    if child < 0 || !write_closed {
+        let _ = close(ready_pipe[0]);
+        return (-1, -1);
+    }
+    (child, ready_pipe[0])
+}
+
+fn futex_waiter_ready(ready_fd: i32) -> bool {
+    let mut ready = [0_u8; 1];
+    let read_ok = fd_read(ready_fd, &mut ready) == 1 && ready == [b'R'];
+    read_ok && close(ready_fd) == 0
+}
+
+fn reap_futex_waiter(child: isize) -> bool {
+    let mut status = -1_i32;
+    child > 0 && wait_child(child, &mut status) == child && status == 0
+}
+
+fn run_futex_requeue_u32_case(
+    source: &AtomicI32,
+    target: &AtomicI32,
+    wake_count: usize,
+    requeue_count: usize,
+    expected_requeue: isize,
+    expected_target_wake: isize,
+    expected_source_wake: isize,
+    failure_status: usize,
+) -> bool {
+    source.store(0, Ordering::Release);
+    target.store(0, Ordering::Release);
+    let (child, ready_fd) = spawn_shared_futex_waiter(source, failure_status);
+    let ready = child > 0 && ready_fd >= 0 && futex_waiter_ready(ready_fd);
+    let settle = Timespec {
+        seconds: 0,
+        nanoseconds: 20_000_000,
+    };
+    let settled = ready && nanosleep(&settle) == 0;
+    // SAFETY: both words are live, naturally aligned shared mappings. The raw
+    // count values deliberately exercise the 64-bit syscall-register boundary.
+    let requeue_result = if settled {
+        unsafe {
+            syscall6(
+                SYS_FUTEX,
+                source.as_ptr() as usize,
+                FUTEX_REQUEUE,
+                wake_count,
+                requeue_count,
+                target.as_ptr() as usize,
+                0,
+            )
+        }
+    } else {
+        -1
+    };
+    let target_wake = futex_wake_shared(target);
+    let source_wake = futex_wake_shared(source);
+    let reaped = reap_futex_waiter(child);
+    settled
+        && requeue_result == expected_requeue
+        && target_wake == expected_target_wake
+        && source_wake == expected_source_wake
+        && reaped
+}
+
+fn run_futex_u32_arguments_probe() -> bool {
+    let mapping = mmap_shared_anonymous(PAGE_BYTES);
+    if mapping <= 0 {
+        return false;
+    }
+    let source = mapping as *mut AtomicI32;
+    // SAFETY: two naturally aligned atomic words fit in this fresh shared page
+    // and remain mapped until every child below has been reaped.
+    let target = unsafe { source.add(1) };
+    unsafe {
+        source.write(AtomicI32::new(0));
+        target.write(AtomicI32::new(0));
+    }
+    let source = unsafe { &*source };
+    let target = unsafe { &*target };
+    let high_word = 1_usize << 32;
+
+    let (wake_child1, wake_ready1) = spawn_shared_futex_waiter(source, 61);
+    let (wake_child2, wake_ready2) = spawn_shared_futex_waiter(source, 63);
+    let wake_ready = wake_child1 > 0
+        && wake_child2 > 0
+        && wake_ready1 >= 0
+        && wake_ready2 >= 0
+        && futex_waiter_ready(wake_ready1)
+        && futex_waiter_ready(wake_ready2);
+    let settle = Timespec {
+        seconds: 0,
+        nanoseconds: 20_000_000,
+    };
+    let wake_settled = wake_ready && nanosleep(&settle) == 0;
+    // Linux truncates the raw register to u32 before the legacy wake path sees
+    // it. Thus 1<<32 becomes zero, whose historical non-strict behavior wakes
+    // exactly one waiter; the ordinary follow-up wake must release the second.
+    let high_wake = if wake_settled {
+        unsafe {
+            syscall6(
+                SYS_FUTEX,
+                source.as_ptr() as usize,
+                FUTEX_WAKE,
+                high_word,
+                0,
+                0,
+                0,
+            )
+        }
+    } else {
+        -1
+    };
+    let normal_wake = futex_wake_shared(source);
+    let wake_reaped = reap_futex_waiter(wake_child1) & reap_futex_waiter(wake_child2);
+    let wake_ok = wake_settled && high_wake == 1 && normal_wake == 1 && wake_reaped;
+
+    // The fourth raw argument is val2 for requeue commands, not a pointer. It
+    // is truncated to u32, so 1<<32 is zero. Both u32 counts are then interpreted
+    // as signed int values; a low word of 0xffffffff is therefore EINVAL and
+    // must leave the waiter on the source queue.
+    let high_requeue_ok = run_futex_requeue_u32_case(source, target, 0, high_word, 0, 0, 1, 65);
+    let signed_requeue_ok = run_futex_requeue_u32_case(
+        source,
+        target,
+        0,
+        u32::MAX as usize,
+        NEG_EINVAL,
+        0,
+        1,
+        67,
+    );
+    let signed_wake_ok = run_futex_requeue_u32_case(
+        source,
+        target,
+        u32::MAX as usize,
+        0,
+        NEG_EINVAL,
+        0,
+        1,
+        69,
+    );
+    let unmapped = munmap(mapping as usize, PAGE_BYTES) == 0;
+    wake_ok && high_requeue_ok && signed_requeue_ok && signed_wake_ok && unmapped
+}
+
 fn run_futex_requeue_same_addr_probe() -> bool {
     let mapping = mmap_shared_anonymous(PAGE_BYTES);
     if mapping <= 0 {
@@ -4596,6 +4790,12 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_FUTEX_TIMEOUT_VALIDATION) != ASSERT_FUTEX_TIMEOUT_VALIDATION.len() as isize {
         fail(USER_FAIL_WRITE, 369);
+    }
+    if !run_futex_u32_arguments_probe() {
+        fail(USER_FAIL_FUTEX_U32_ARGUMENTS, 370);
+    }
+    if write(ASSERT_FUTEX_U32_ARGUMENTS) != ASSERT_FUTEX_U32_ARGUMENTS.len() as isize {
+        fail(USER_FAIL_WRITE, 371);
     }
 
     // glibc's posix_spawn path uses clone3(CLONE_VM|CLONE_VFORK) with an explicit
