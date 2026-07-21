@@ -25,6 +25,16 @@ pub(super) struct FutexState {
     pub(super) queue: WaitQueue,
 }
 
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+enum FutexKey {
+    // Linux private futexes are scoped to the shared address-space object and
+    // virtual address.  Their identity must survive a private page's COW remap.
+    Private { aspace: usize, uaddr: usize },
+    // Process-shared futexes rendezvous through the backing frame even when
+    // different processes map it at different virtual addresses.
+    Shared { paddr: usize },
+}
+
 // Keep short timed futex waits out of the task timer queue.  The timer backend
 // intentionally protects near-expired one-shot deadlines with a one-millisecond
 // minimum programming window; if a 1ms userspace futex timeout first blocks for
@@ -34,37 +44,50 @@ pub(super) struct FutexState {
 // scheduler/timer rounding on precision probes.
 const FUTEX_TIMEOUT_SPIN_WINDOW: Duration = Duration::from_millis(2);
 
-fn table() -> &'static Mutex<BTreeMap<usize, Arc<FutexState>>> {
-    static FUTEXES: LazyInit<Mutex<BTreeMap<usize, Arc<FutexState>>>> = LazyInit::new();
+fn table() -> &'static Mutex<BTreeMap<FutexKey, Arc<FutexState>>> {
+    static FUTEXES: LazyInit<Mutex<BTreeMap<FutexKey, Arc<FutexState>>>> = LazyInit::new();
     let _ = FUTEXES.call_once(|| Mutex::new(BTreeMap::new()));
     &FUTEXES
 }
 
-fn mapped_futex_key(process: &UserProcess, uaddr: usize) -> Result<usize, LinuxError> {
+fn mapped_futex_key(
+    process: &UserProcess,
+    uaddr: usize,
+    private: bool,
+) -> Result<FutexKey, LinuxError> {
     let query = process.aspace.lock().query_address(VirtAddr::from(uaddr));
     if !query.pte_mapped {
         return Err(LinuxError::EFAULT);
     }
-    Ok(query.paddr | (uaddr & 0xfff))
+    if private {
+        Ok(FutexKey::Private {
+            aspace: Arc::as_ptr(&process.aspace) as usize,
+            uaddr,
+        })
+    } else {
+        Ok(FutexKey::Shared {
+            paddr: query.paddr | (uaddr & 0xfff),
+        })
+    }
 }
 
-fn futex_key(process: &UserProcess, uaddr: usize) -> Result<usize, LinuxError> {
-    // Futex wait queues are keyed by the backing frame, not just the user
-    // virtual address: independent processes may reuse the same mmap addresses,
-    // while forked MAP_SHARED checkpoint pages retain the same
-    // physical frame and must still rendezvous across parent/child processes.
+fn futex_key(process: &UserProcess, uaddr: usize, private: bool) -> Result<FutexKey, LinuxError> {
     fault_in_user_read(process, uaddr, size_of::<u32>())?;
-    mapped_futex_key(process, uaddr)
+    mapped_futex_key(process, uaddr, private)
 }
 
-fn mapped_futex_state(process: &UserProcess, uaddr: usize) -> Option<(usize, Arc<FutexState>)> {
-    let Ok(key) = mapped_futex_key(process, uaddr) else {
+fn mapped_futex_state(
+    process: &UserProcess,
+    uaddr: usize,
+    private: bool,
+) -> Option<(FutexKey, Arc<FutexState>)> {
+    let Ok(key) = mapped_futex_key(process, uaddr, private) else {
         return None;
     };
     table().lock().get(&key).cloned().map(|state| (key, state))
 }
 
-fn state(key: usize) -> Arc<FutexState> {
+fn state(key: FutexKey) -> Arc<FutexState> {
     let mut table = table().lock();
     table
         .entry(key)
@@ -77,7 +100,7 @@ fn state(key: usize) -> Arc<FutexState> {
         .clone()
 }
 
-fn prune_empty_key(key: usize) {
+fn prune_empty_key(key: FutexKey) {
     let mut table = table().lock();
     let should_remove = table
         .get(&key)
@@ -92,7 +115,7 @@ pub(super) fn prune_empty_futexes() {
     table.retain(|_, state| !state.queue.is_empty() || Arc::strong_count(state) > 1);
 }
 
-fn clear_current_futex_wait(process: &UserProcess, original_uaddr: usize) {
+fn clear_current_futex_wait(process: &UserProcess, original_uaddr: usize, private: bool) {
     let Some(ext) = current_task_ext() else {
         return;
     };
@@ -102,7 +125,7 @@ fn clear_current_futex_wait(process: &UserProcess, original_uaddr: usize) {
         return;
     }
     let current = axtask::current();
-    let Some((key, state)) = mapped_futex_state(process, queued_uaddr) else {
+    let Some((key, state)) = mapped_futex_state(process, queued_uaddr, private) else {
         return;
     };
     state.queue.remove_task(current.as_task_ref());
@@ -121,8 +144,9 @@ fn wake_addr_checked(
     process: &UserProcess,
     uaddr: usize,
     count: usize,
+    private: bool,
 ) -> Result<usize, LinuxError> {
-    wake_addr_bitset_checked(process, uaddr, count, u32::MAX)
+    wake_addr_bitset_checked(process, uaddr, count, u32::MAX, private)
 }
 
 fn futex_waiter_matches(task: &AxTaskRef, bitset: u32) -> bool {
@@ -141,8 +165,9 @@ fn wake_addr_bitset_checked(
     uaddr: usize,
     count: usize,
     bitset: u32,
+    private: bool,
 ) -> Result<usize, LinuxError> {
-    let key = futex_key(process, uaddr)?;
+    let key = futex_key(process, uaddr, private)?;
     let Some(state) = table().lock().get(&key).cloned() else {
         return Ok(0);
     };
@@ -167,6 +192,7 @@ fn wake_requeue_addr_checked(
     requeue_count: usize,
     uaddr2: usize,
     cmp: Option<u32>,
+    private: bool,
 ) -> Result<(usize, usize), LinuxError> {
     if uaddr2 == 0 || uaddr2 % size_of::<u32>() != 0 {
         return Err(LinuxError::EINVAL);
@@ -177,8 +203,8 @@ fn wake_requeue_addr_checked(
             return Err(LinuxError::EAGAIN);
         }
     }
-    let source_key = futex_key(process, uaddr)?;
-    let target_key = futex_key(process, uaddr2)?;
+    let source_key = futex_key(process, uaddr, private)?;
+    let target_key = futex_key(process, uaddr2, private)?;
     let Some(source) = table().lock().get(&source_key).cloned() else {
         return Ok((0, 0));
     };
@@ -284,6 +310,7 @@ fn wait_addr(
     absolute_timeout: bool,
     realtime_timeout: bool,
     bitset: u32,
+    private: bool,
 ) -> isize {
     let current = match read_user_value::<u32>(process, uaddr) {
         Ok(value) => value,
@@ -292,7 +319,7 @@ fn wait_addr(
     if current != val as u32 {
         return neg_errno(LinuxError::EAGAIN);
     }
-    let key = match futex_key(process, uaddr) {
+    let key = match futex_key(process, uaddr, private) {
         Ok(key) => key,
         Err(err) => return neg_errno(err),
     };
@@ -320,7 +347,7 @@ fn wait_addr(
         drop(state);
         prune_empty_key(key);
         if timed_out {
-            clear_current_futex_wait(process, uaddr);
+            clear_current_futex_wait(process, uaddr, private);
             if current_unblocked_signal_pending()
                 || process.eval_watchdog_expired()
                 || process.pending_exit_group().is_some()
@@ -329,7 +356,7 @@ fn wait_addr(
             }
             return neg_errno(LinuxError::ETIMEDOUT);
         }
-        clear_current_futex_wait(process, uaddr);
+        clear_current_futex_wait(process, uaddr, private);
         if current_unblocked_signal_pending() {
             return neg_errno(LinuxError::EINTR);
         }
@@ -342,7 +369,7 @@ fn wait_addr(
     }
     drop(state);
     prune_empty_key(key);
-    clear_current_futex_wait(process, uaddr);
+    clear_current_futex_wait(process, uaddr, private);
     if current_unblocked_signal_pending()
         || process.pending_exit_group().is_some()
         || process.eval_watchdog_expired()
@@ -356,7 +383,9 @@ pub(super) fn wake_addr(process: &UserProcess, uaddr: usize, count: usize) -> us
     // Best-effort kernel-internal wake path for teardown/cancellation cleanup:
     // if the user address has already been unmapped, there is no futex queue to
     // wake and no syscall return value to report.
-    let Some((key, state)) = mapped_futex_state(process, uaddr) else {
+    // Linux's kernel-generated clear-child-tid and robust-list wakes use the
+    // process-shared futex identity, matching the non-private glibc join wait.
+    let Some((key, state)) = mapped_futex_state(process, uaddr, false) else {
         return 0;
     };
     state.seq.fetch_add(1, Ordering::Release);
@@ -374,21 +403,31 @@ pub(super) fn wake_addr(process: &UserProcess, uaddr: usize, count: usize) -> us
 }
 
 pub(super) fn futex_waiter_is_queued(process: &UserProcess, uaddr: usize) -> bool {
-    mapped_futex_state(process, uaddr)
-        .map(|(_, state)| !state.queue.is_empty())
-        .unwrap_or(false)
+    [true, false].into_iter().any(|private| {
+        mapped_futex_state(process, uaddr, private)
+            .map(|(_, state)| !state.queue.is_empty())
+            .unwrap_or(false)
+    })
 }
 
 pub(super) fn wake_task(process: &UserProcess, uaddr: usize, task: &AxTaskRef) {
-    let Some((_, state)) = mapped_futex_state(process, uaddr) else {
-        return;
-    };
-    state.seq.fetch_add(1, Ordering::Release);
-    if let Some(ext) = task_ext(task) {
-        ext.futex_wait.store(0, Ordering::Release);
-        ext.futex_bitset.store(0, Ordering::Release);
+    for private in [true, false] {
+        let Some((key, state)) = mapped_futex_state(process, uaddr, private) else {
+            continue;
+        };
+        state.seq.fetch_add(1, Ordering::Release);
+        let woken = state.queue.notify_many_where(
+            1,
+            true,
+            |queued| Arc::ptr_eq(queued, task),
+            |queued| clear_futex_waiter(queued),
+        );
+        drop(state);
+        prune_empty_key(key);
+        if woken != 0 {
+            return;
+        }
     }
-    let _ = state.queue.notify_task(true, task);
 }
 
 pub(super) fn sys_futex(
@@ -406,6 +445,7 @@ pub(super) fn sys_futex(
     }
     let op = futex_op as u32;
     let cmd = op & general::FUTEX_CMD_MASK as u32;
+    let private = op & general::FUTEX_PRIVATE_FLAG as u32 != 0;
     perf_counters::record_futex_call(matches!(
         cmd,
         general::FUTEX_WAIT | general::FUTEX_WAIT_BITSET
@@ -421,7 +461,16 @@ pub(super) fn sys_futex(
         );
     }
     match cmd {
-        general::FUTEX_WAIT => wait_addr(process, uaddr, val, timeout, false, false, u32::MAX),
+        general::FUTEX_WAIT => wait_addr(
+            process,
+            uaddr,
+            val,
+            timeout,
+            false,
+            false,
+            u32::MAX,
+            private,
+        ),
         general::FUTEX_WAIT_BITSET => {
             if _val3 == 0 {
                 return neg_errno(LinuxError::EINVAL);
@@ -434,14 +483,15 @@ pub(super) fn sys_futex(
                 true,
                 op & general::FUTEX_CLOCK_REALTIME != 0,
                 _val3 as u32,
+                private,
             )
         }
-        general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val) {
+        general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val, private) {
             Ok(woken) => woken as isize,
             Err(err) => neg_errno(err),
         },
         general::FUTEX_REQUEUE => {
-            match wake_requeue_addr_checked(process, uaddr, val, timeout, _uaddr2, None) {
+            match wake_requeue_addr_checked(process, uaddr, val, timeout, _uaddr2, None, private) {
                 Ok((woken, _requeued)) => woken as isize,
                 Err(err) => neg_errno(err),
             }
@@ -453,6 +503,7 @@ pub(super) fn sys_futex(
             timeout,
             _uaddr2,
             Some(_val3 as u32),
+            private,
         ) {
             Ok((woken, requeued)) => woken.saturating_add(requeued) as isize,
             Err(err) => neg_errno(err),
@@ -461,7 +512,7 @@ pub(super) fn sys_futex(
             if _val3 == 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
-            match wake_addr_bitset_checked(process, uaddr, val, _val3 as u32) {
+            match wake_addr_bitset_checked(process, uaddr, val, _val3 as u32, private) {
                 Ok(woken) => woken as isize,
                 Err(err) => neg_errno(err),
             }
