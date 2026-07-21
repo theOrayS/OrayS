@@ -21,6 +21,7 @@ from runtime_evidence_contract import (  # noqa: E402
     RUN_SUMMARY_SCHEMA,
     default_failure_reason,
     qemu_version_is_canonical,
+    validate_runtime_identity,
     validate_runtime_status,
 )
 
@@ -65,7 +66,19 @@ def digest(path: Path) -> str:
     return value.hexdigest()
 
 
-def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str, Any]:
+def stable_error(error: BaseException, run_dir: Path) -> str:
+    """Remove the relocatable package root from deterministic failure details."""
+    return str(error).replace(str(run_dir), "<run-dir>")
+
+
+def validate_runtime_metadata(
+    path: Path,
+    arch: str,
+    scenario: str,
+    *,
+    verify_identity_files: bool = True,
+    require_complete_identity: bool = True,
+) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != RUNTIME_METADATA_SCHEMA:
         raise ValueError("runtime metadata schema is invalid")
@@ -119,7 +132,7 @@ def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str,
     run_dir_value = value.get("run_dir")
     if not isinstance(run_dir_value, str) or not Path(run_dir_value).is_absolute():
         raise ValueError("runtime metadata run directory is invalid")
-    if not isinstance(value.get("qemu_binary"), str) or not value.get("qemu_version"):
+    if not isinstance(value.get("qemu_binary"), str):
         raise ValueError("runtime metadata QEMU identity is invalid")
     required_qemu_version = value.get("required_qemu_version")
     observed_qemu_version = value.get("observed_qemu_version")
@@ -130,11 +143,18 @@ def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str,
         raise ValueError("runtime metadata observed QEMU version fields disagree")
     if value.get("qemu_version_matches_required") is not expected_version_match:
         raise ValueError("runtime metadata QEMU version match flag is inconsistent")
-    if not expected_version_match:
+    if require_complete_identity and not expected_version_match:
         raise ValueError(
             "QEMU version mismatch: "
             f"required {required_qemu_version}, observed {observed_qemu_version}"
         )
+    if not require_complete_identity and (
+        required_qemu_version != "9.2.4"
+        or observed_qemu_version is not None
+        or value.get("qemu_version") is not None
+        or value.get("qemu_version_matches_required") is not False
+    ):
+        raise ValueError("partial runtime metadata makes an unverified QEMU claim")
     toolchains = value.get("toolchain_versions")
     if not isinstance(toolchains, dict) or any(
         not isinstance(toolchains.get(name), str) or not toolchains[name]
@@ -150,6 +170,13 @@ def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str,
         scenario,
     ]:
         raise ValueError("runtime metadata generation command is invalid")
+    validate_runtime_identity(
+        value,
+        path.with_name("runtime-policy.json"),
+        arch,
+        verify_files=verify_identity_files,
+        require_complete=require_complete_identity,
+    )
     return value
 
 
@@ -443,6 +470,7 @@ def validate_run(
     qemu_started: bool = True,
     original_screenshot: Path | None = None,
     additional_failures: list[str] | None = None,
+    verify_identity_files: bool = True,
 ) -> tuple[list[str], tuple[int, int] | None, dict[str, str]]:
     serial = run_dir / "serial.log"
     screenshot = run_dir / "frame.ppm"
@@ -453,9 +481,15 @@ def validate_run(
 
     failures: list[str] = list(additional_failures or [])
     try:
-        validate_runtime_metadata(metadata_path, arch, scenario)
+        validate_runtime_metadata(
+            metadata_path,
+            arch,
+            scenario,
+            verify_identity_files=verify_identity_files,
+            require_complete_identity=qemu_started,
+        )
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        failures.append(f"invalid runtime metadata: {error}")
+        failures.append(f"invalid runtime metadata: {stable_error(error, run_dir)}")
     serial_text = serial.read_text(encoding="utf-8", errors="replace") if serial.exists() else ""
     serial_lines = serial_text.replace("\x00", "").splitlines()
     if qemu_started:
@@ -482,7 +516,9 @@ def validate_run(
                 EXPECTED_MARKERS["resize"][1],
             )
         except ValueError as error:
-            failures.append(f"invalid resize input presentation order: {error}")
+            failures.append(
+                f"invalid resize input presentation order: {stable_error(error, run_dir)}"
+            )
     stable_pair = POST_ACTION_STABLE_MARKERS.get(scenario)
     if stable_pair is not None:
         action_marker, stable_marker = stable_pair
@@ -502,7 +538,9 @@ def validate_run(
                 stable_marker,
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid capture precondition evidence: {error}")
+            failures.append(
+                f"invalid capture precondition evidence: {stable_error(error, run_dir)}"
+            )
 
     initial_display_matches = re.findall(
         r"^ORAYS_DESKTOP_DISPLAY width=([0-9]+) height=([0-9]+)$",
@@ -536,7 +574,7 @@ def validate_run(
                 run_dir / "vnc-resize.json", initial_geometry, (900, 650)
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid resize evidence: {error}")
+            failures.append(f"invalid resize evidence: {stable_error(error, run_dir)}")
     elif changed_geometries:
         failures.append("unexpected guest runtime resize marker")
 
@@ -550,7 +588,9 @@ def validate_run(
                 run_dir / "capture-precondition.json", serial, required_markers
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid capture precondition evidence: {error}")
+            failures.append(
+                f"invalid capture precondition evidence: {stable_error(error, run_dir)}"
+            )
 
     try:
         geometry_text = (run_dir / "display-geometry.txt").read_text(encoding="utf-8")
@@ -562,7 +602,9 @@ def validate_run(
         if expected_geometry_text is None or geometry_text != expected_geometry_text:
             raise ValueError("display geometry sidecar does not match guest markers")
     except (OSError, ValueError) as error:
-        failures.append(f"invalid display geometry evidence: {error}")
+        failures.append(
+            f"invalid display geometry evidence: {stable_error(error, run_dir)}"
+        )
 
     geometry: tuple[int, int] | None = None
     try:
@@ -577,18 +619,18 @@ def validate_run(
         if screenshot_is_uniform(screenshot):
             failures.append("screenshot is a uniform frame")
     except (OSError, ValueError) as error:
-        failures.append(f"invalid screenshot: {error}")
+        failures.append(f"invalid screenshot: {stable_error(error, run_dir)}")
 
     input_geometry = display_geometry if scenario == "resize" else initial_geometry
     if input_geometry is not None:
         try:
             validate_input_evidence(sequence, input_transcript, input_geometry)
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid input evidence: {error}")
+            failures.append(f"invalid input evidence: {stable_error(error, run_dir)}")
     try:
         validate_capture_evidence(capture_transcript, screenshot, original_screenshot)
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        failures.append(f"invalid capture evidence: {error}")
+        failures.append(f"invalid capture evidence: {stable_error(error, run_dir)}")
 
     evidence_names = [
         "serial.log",
@@ -597,6 +639,7 @@ def validate_run(
         "input-sequence.json",
         "frame.ppm",
         "runtime-metadata.json",
+        "runtime-policy.json",
         "display-geometry.txt",
         "capture-precondition.json",
     ]
@@ -680,6 +723,12 @@ def main() -> int:
     )
 
     result = "PASS" if not failures else "FAIL"
+    try:
+        runtime_identity = json.loads(
+            (run_dir / "runtime-metadata.json").read_text(encoding="utf-8")
+        ).get("runtime_identity")
+    except (OSError, AttributeError, json.JSONDecodeError):
+        runtime_identity = None
     summary = {
         "schema": RUN_SUMMARY_SCHEMA,
         "result": result,
@@ -690,6 +739,7 @@ def main() -> int:
         "runner_exit": args.runner_exit,
         "failure_stage": failure_stage,
         "failure_reason": failure_reason,
+        "runtime_identity": runtime_identity,
         "frame_marker_count": serial_text.count("ORAYS_DESKTOP_FRAME "),
         "input_marker_count": serial_text.count("ORAYS_DESKTOP_INPUT "),
         "post_action_state_marker_count": serial_text.count(

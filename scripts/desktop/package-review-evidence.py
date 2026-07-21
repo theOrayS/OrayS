@@ -31,6 +31,7 @@ RAW_EVIDENCE_ALLOWLIST = {
     "input-sequence.json",
     "frame.ppm",
     "runtime-metadata.json",
+    "runtime-policy.json",
     "display-geometry.txt",
     "capture-precondition.json",
     "vnc-resize.json",
@@ -42,6 +43,7 @@ FAILURE_CORE_FILES = {
     "qmp-capture.jsonl",
     "input-sequence.json",
     "runtime-metadata.json",
+    "runtime-policy.json",
 }
 
 
@@ -224,6 +226,7 @@ def main() -> int:
         "runner_exit": summary.get("runner_exit"),
         "failure_stage": summary.get("failure_stage"),
         "failure_reason": summary.get("failure_reason"),
+        "runtime_identity": summary.get("runtime_identity"),
         "capture_binding": capture_binding(
             run_dir, files, required=summary["result"] == "PASS"
         ),

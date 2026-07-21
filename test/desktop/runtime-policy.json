@@ -1,0 +1,24 @@
+{
+  "architectures": {
+    "la": {
+      "artifact": "build/desktop/la/artifacts/orays-desktop-la.elf",
+      "build_invocation": [
+        "scripts/desktop/build.sh",
+        "la"
+      ],
+      "qemu_binary": "qemu-system-loongarch64",
+      "qemu_sha256": "9df8237128d340e34c491fdf76616240a604b3f3fbdbca769a1ab991f4d4a35a"
+    },
+    "rv": {
+      "artifact": "build/desktop/rv/artifacts/orays-desktop-rv.bin",
+      "build_invocation": [
+        "scripts/desktop/build.sh",
+        "rv"
+      ],
+      "qemu_binary": "qemu-system-riscv64",
+      "qemu_sha256": "194d645ab5063833b35512c2d15364070401f63a4f97baf4b7da2244d44efeee"
+    }
+  },
+  "qemu_version": "9.2.4",
+  "schema": 1
+}

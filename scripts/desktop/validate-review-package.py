@@ -22,6 +22,7 @@ from runtime_evidence_contract import (  # noqa: E402
     REVIEW_PACKAGE_SCHEMA,
     RUNTIME_METADATA_SCHEMA,
     RUN_SUMMARY_SCHEMA,
+    validate_runtime_identity,
     validate_runtime_status,
 )
 
@@ -130,6 +131,18 @@ def validate(package_dir: Path) -> tuple[str, list[str]]:
         raise ValueError("summary schema is invalid")
     if metadata.get("schema") != RUNTIME_METADATA_SCHEMA:
         raise ValueError("runtime metadata schema is invalid")
+    validate_runtime_identity(
+        metadata,
+        package_dir / "runtime-policy.json",
+        arch,
+        verify_files=False,
+        require_complete=result == "PASS" or summary.get("qemu_started") is True,
+    )
+    if (
+        package.get("runtime_identity") != metadata.get("runtime_identity")
+        or summary.get("runtime_identity") != metadata.get("runtime_identity")
+    ):
+        raise ValueError("runtime identity differs across metadata, summary, and package")
     if any(
         package.get(name) != summary.get(name)
         for name in ("result", "architecture", "scenario")
@@ -180,6 +193,7 @@ def validate(package_dir: Path) -> tuple[str, list[str]]:
         qemu_exit,
         qemu_started=qemu_started,
         original_screenshot=original_screenshot,
+        verify_identity_files=False,
     )
     if hashes != summary.get("hashes"):
         raise ValueError("semantic evidence hashes do not match summary")
@@ -188,9 +202,16 @@ def validate(package_dir: Path) -> tuple[str, list[str]]:
         isinstance(failure, str) for failure in recorded_failures
     ):
         raise ValueError("summary failures are invalid")
-    recorded_categories = {failure.split(":", 1)[0] for failure in recorded_failures}
-    if any(failure.split(":", 1)[0] not in recorded_categories for failure in failures):
-        raise ValueError("summary omits a reproducible semantic failure")
+    replayed_failures = list(failures)
+    if runner_exit != 0:
+        replayed_failures.insert(
+            0, f"runtime runner exited {runner_exit} during stage {failure_stage}"
+        )
+    if recorded_failures != replayed_failures:
+        raise ValueError(
+            "summary failures do not match exact deterministic failures: "
+            f"recorded={recorded_failures!r}, replayed={replayed_failures!r}"
+        )
     if result == "PASS":
         if (
             failures
@@ -212,14 +233,8 @@ def validate(package_dir: Path) -> tuple[str, list[str]]:
         ):
             raise ValueError("PASS package screenshot geometry is inconsistent")
     else:
-        if not recorded_failures or (not failures and runner_exit == 0):
+        if not recorded_failures:
             raise ValueError("FAIL package does not reproduce or record a runner failure")
-        if runner_exit != 0:
-            runner_failure = (
-                f"runtime runner exited {runner_exit} during stage {failure_stage}"
-            )
-            if runner_failure not in recorded_failures:
-                raise ValueError("FAIL package runner status is not bound to its summary")
     return result, recorded_failures
 
 

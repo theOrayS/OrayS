@@ -52,6 +52,8 @@ def main() -> int:
         required=True,
     )
     parser.add_argument("--qemu-binary", required=True)
+    parser.add_argument("--qemu-path", type=Path)
+    parser.add_argument("--runtime-policy", type=Path)
     parser.add_argument("--required-qemu-version", default=CANONICAL_QEMU_VERSION)
     parser.add_argument("--qemu-started", type=parse_bool, default=True)
     parser.add_argument("--qemu-exit", type=int)
@@ -71,6 +73,7 @@ def main() -> int:
     repo = args.repo_root.resolve(strict=True)
     run_dir = args.run_dir.resolve(strict=True)
     scripts = repo / "scripts/desktop"
+    runtime_policy = args.runtime_policy or repo / "test/desktop/runtime-policy.json"
     for name in CORE_FILES:
         path = run_dir / name
         if not path.exists():
@@ -84,8 +87,7 @@ def main() -> int:
     metadata = run_dir / "runtime-metadata.json"
     metadata_error = 0
     if not metadata.is_file():
-        metadata_error = run(
-            [
+        collector_argv = [
                 sys.executable,
                 "-B",
                 str(scripts / "collect-runtime-metadata.py"),
@@ -101,10 +103,14 @@ def main() -> int:
                 args.qemu_binary,
                 "--required-qemu-version",
                 args.required_qemu_version,
+                "--runtime-policy",
+                str(runtime_policy),
                 "--run-dir",
                 str(run_dir),
             ]
-        )
+        if args.qemu_path is not None:
+            collector_argv.extend(("--qemu-path", str(args.qemu_path)))
+        metadata_error = run(collector_argv)
     if metadata_error == 0:
         metadata_error = run(
             [

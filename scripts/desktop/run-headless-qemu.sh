@@ -7,6 +7,8 @@ scenario=
 run_dir=
 timeout_seconds=${DESKTOP_QEMU_TIMEOUT_SECS:-90}
 required_qemu_version=9.2.4
+runtime_policy="$repo_root/test/desktop/runtime-policy.json"
+identity_helper="$repo_root/scripts/desktop/runtime-identity.py"
 
 usage() {
     printf '%s\n' \
@@ -73,34 +75,86 @@ if [[ ! "$vnc_display" =~ ^[0-9]+$ ]]; then
     exit 2
 fi
 
+python_command=$(command -v python3 || true)
+if [[ -z "$python_command" ]]; then
+    printf 'DESKTOP_RUNTIME_EVIDENCE=UNAVAILABLE stage=output-setup reason=missing_python\n' >&2
+    exit 127
+fi
+set +e
 if [[ -z "$run_dir" ]]; then
-    run_dir=$(python3 "$repo_root/scripts/desktop/create-run-dir.py" \
+    run_dir=$($python_command "$repo_root/scripts/desktop/create-run-dir.py" \
         --repo-root "$repo_root" --prefix "qemu-${arch}-${scenario}.")
+    output_status=$?
 else
-    run_dir=$(python3 "$repo_root/scripts/desktop/create-run-dir.py" \
+    run_dir=$($python_command "$repo_root/scripts/desktop/create-run-dir.py" \
         --repo-root "$repo_root" --candidate "$run_dir")
+    output_status=$?
+fi
+set -e
+if (( output_status != 0 )); then
+    printf 'DESKTOP_RUNTIME_EVIDENCE=UNAVAILABLE stage=output-setup reason=output_creation_failed exit=%s\n' \
+        "$output_status" >&2
+    exit "$output_status"
 fi
 
 qemu_pid=
 qemu_started=false
 qemu_exit=
+qemu_path=
+required_qemu_sha256=
 qmp_runtime_dir=
+timeout_marker=
+watchdog_pid=
 failure_stage=runtime-prerequisites
 failure_reason=
+stop_watchdog() {
+    if [[ -n "$watchdog_pid" ]]; then
+        if kill -0 "$watchdog_pid" 2>/dev/null; then
+            kill "$watchdog_pid" 2>/dev/null || true
+        fi
+        wait "$watchdog_pid" 2>/dev/null || true
+        watchdog_pid=
+    fi
+}
+wait_qemu_once() {
+    local waited_exit
+    if wait "$qemu_pid"; then
+        waited_exit=0
+    else
+        waited_exit=$?
+    fi
+    stop_watchdog
+    if [[ -n "$timeout_marker" && -e "$timeout_marker" ]]; then
+        waited_exit=124
+    fi
+    qemu_exit=$waited_exit
+    qemu_pid=
+}
 cleanup() {
+    stop_watchdog
     if [[ -n "$qemu_pid" ]]; then
         if kill -0 "$qemu_pid" 2>/dev/null; then
-            kill "$qemu_pid" 2>/dev/null || true
+            kill -TERM -- "-$qemu_pid" 2>/dev/null \
+                || kill "$qemu_pid" 2>/dev/null \
+                || true
         fi
-        local stopped_exit=0
-        wait "$qemu_pid" 2>/dev/null || stopped_exit=$?
-        if [[ -z "$qemu_exit" || "$qemu_exit" == 0 ]]; then
+        local stopped_exit
+        if wait "$qemu_pid" 2>/dev/null; then
+            stopped_exit=0
+        else
+            stopped_exit=$?
+        fi
+        if [[ -z "$qemu_exit" ]]; then
             qemu_exit=$stopped_exit
         fi
         qemu_pid=
     fi
     if [[ -n "$qmp_runtime_dir" ]]; then
         rm -f "$qmp_runtime_dir/qmp.sock"
+        if [[ -n "$timeout_marker" ]]; then
+            rm -f "$timeout_marker"
+            timeout_marker=
+        fi
         rmdir "$qmp_runtime_dir" 2>/dev/null || true
         qmp_runtime_dir=
     fi
@@ -121,13 +175,17 @@ finalize() {
         --runner-exit "$runner_exit"
         --failure-stage "$failure_stage"
     )
+    if [[ -n "$qemu_path" ]]; then
+        finalizer_args+=(--qemu-path "$qemu_path")
+    fi
+    finalizer_args+=(--runtime-policy "$runtime_policy")
     if [[ -n "$failure_reason" ]]; then
         finalizer_args+=(--failure-reason "$failure_reason")
     fi
     if [[ "$qemu_started" == true ]]; then
         finalizer_args+=(--qemu-exit "$qemu_exit")
     fi
-    python3 "$repo_root/scripts/desktop/finalize-runtime-evidence.py" \
+    "$python_command" -B "$repo_root/scripts/desktop/finalize-runtime-evidence.py" \
         "${finalizer_args[@]}"
     finalize_exit=$?
     if (( finalize_exit >= 70 )); then
@@ -157,19 +215,24 @@ if [[ -n "${DESKTOP_REQUIRED_QEMU_VERSION+x}" \
         "$required_qemu_version" >&2
     exit 3
 fi
-for command_name in python3 qemu-img mkfs.fat timeout sha256sum; do
+for command_name in qemu-img mkfs.fat sha256sum; do
     command -v "$command_name" >/dev/null 2>&1 || {
         failure_reason=missing_runtime_prerequisite
         printf 'missing required command: %s\n' "$command_name" >&2
         exit 3
     }
 done
-command -v "$qemu_binary" >/dev/null 2>&1 || {
+qemu_candidate=$(command -v "$qemu_binary") || {
     failure_reason=missing_qemu_binary
     printf 'missing required QEMU: %s\n' "$qemu_binary" >&2
     exit 3
 }
-qemu_version=$($qemu_binary --version | sed -n '1p')
+qemu_path=$($python_command -B "$identity_helper" resolve --candidate "$qemu_candidate")
+required_qemu_sha256=$($python_command -B "$identity_helper" policy-qemu-sha256 \
+    --policy "$runtime_policy" --arch "$arch")
+qemu_version=$($python_command -B "$identity_helper" exec \
+    --canonical-path "$qemu_path" \
+    --required-sha256 "$required_qemu_sha256" -- --version | sed -n '1p')
 if [[ "$qemu_version" != "QEMU emulator version ${required_qemu_version}" ]]; then
     failure_reason=qemu_version_mismatch
     printf 'required QEMU %s, got: %s\n' "$required_qemu_version" "$qemu_version" >&2
@@ -177,13 +240,15 @@ if [[ "$qemu_version" != "QEMU emulator version ${required_qemu_version}" ]]; th
 fi
 
 failure_stage=runtime-metadata-initial
-python3 "$repo_root/scripts/desktop/collect-runtime-metadata.py" \
+$python_command -B "$repo_root/scripts/desktop/collect-runtime-metadata.py" \
     --repo-root "$repo_root" \
     --output "$run_dir/runtime-metadata.json" \
     --arch "$arch" \
     --scenario "$scenario" \
     --qemu-binary "$qemu_binary" \
+    --qemu-path "$qemu_path" \
     --required-qemu-version "$required_qemu_version" \
+    --runtime-policy "$runtime_policy" \
     --run-dir "$run_dir"
 
 failure_stage=desktop-build
@@ -191,8 +256,9 @@ failure_stage=desktop-build
 test -s "$artifact"
 
 failure_stage=qmp-runtime-setup
-qmp_runtime_dir=$(python3 "$repo_root/scripts/desktop/create-qmp-runtime-dir.py")
+qmp_runtime_dir=$($python_command -B "$repo_root/scripts/desktop/create-qmp-runtime-dir.py")
 qmp_socket="$qmp_runtime_dir/qmp.sock"
+timeout_marker="$qmp_runtime_dir/timed-out"
 serial_log="$run_dir/serial.log"
 disk_image="$run_dir/disk.img"
 frame="$run_dir/frame.ppm"
@@ -226,17 +292,31 @@ else
     qemu_args+=(-nic none)
 fi
 
+qemu_launch_argv_json=$($python_command -B "$identity_helper" argv-json -- \
+    "$qemu_path" "${qemu_args[@]}")
+$python_command -B "$repo_root/scripts/desktop/collect-runtime-metadata.py" \
+    --repo-root "$repo_root" \
+    --output "$run_dir/runtime-metadata.json" \
+    --bind-runtime \
+    --artifact "$artifact" \
+    --qemu-launch-argv-json "$qemu_launch_argv_json"
+
 printf 'QEMU_RUN_DIR=%s\n' "$run_dir"
 failure_stage=qemu-boot
-timeout --signal=TERM --kill-after=5 "$timeout_seconds" \
-    "$qemu_binary" "${qemu_args[@]}" >"$serial_log" 2>&1 &
+"$python_command" -B "$identity_helper" exec --new-session \
+    --canonical-path "$qemu_path" --required-sha256 "$required_qemu_sha256" \
+    -- "${qemu_args[@]}" >"$serial_log" 2>&1 &
 qemu_pid=$!
 qemu_started=true
+$python_command -B "$repo_root/scripts/desktop/runtime-watchdog.py" \
+    --process-group "$qemu_pid" --timeout "$timeout_seconds" \
+    --marker "$timeout_marker" &
+watchdog_pid=$!
 
 boot_deadline=$((SECONDS + 35))
 while ! grep -q 'ORAYS_DESKTOP_FRAME boot ' "$serial_log" 2>/dev/null; do
     if ! kill -0 "$qemu_pid" 2>/dev/null; then
-        wait "$qemu_pid" || qemu_exit=$?
+        wait_qemu_once
         printf 'QEMU exited before desktop boot marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
         exit 1
     fi
@@ -260,7 +340,7 @@ initial_display_marker="ORAYS_DESKTOP_DISPLAY width=${display_width} height=${di
 input_deadline=$((SECONDS + 10))
 while ! grep -aFq 'ORAYS_DESKTOP_INPUT_READY devices=2' "$serial_log" 2>/dev/null; do
     if ! kill -0 "$qemu_pid" 2>/dev/null; then
-        wait "$qemu_pid" || qemu_exit=$?
+        wait_qemu_once
         printf 'QEMU exited before desktop input readiness; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
         exit 1
     fi
@@ -297,7 +377,7 @@ if [[ "$scenario" == resize ]]; then
     resize_marker="ORAYS_DESKTOP_DISPLAY_CHANGED width=${resize_width} height=${resize_height}"
     while ! grep -aFq "$resize_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
-            wait "$qemu_pid" || qemu_exit=$?
+            wait_qemu_once
             printf 'QEMU exited before runtime resize marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -321,7 +401,7 @@ if [[ "$scenario" == resize ]]; then
     input_after_resize_deadline=$((SECONDS + 10))
     while ! grep -aFq "$resize_input_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
-            wait "$qemu_pid" || qemu_exit=$?
+            wait_qemu_once
             printf 'QEMU exited before post-resize input marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -345,7 +425,7 @@ if [[ "$scenario" != boot ]]; then
     action_deadline=$((SECONDS + 25))
     while ! grep -aFq "$expected_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
-            wait "$qemu_pid" || qemu_exit=$?
+            wait_qemu_once
             printf 'QEMU exited before action marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -365,7 +445,7 @@ if [[ "$scenario" == launcher ]]; then
     # require one exact logical line after universal-newline decoding.
     while ! grep -aFq "$stable_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
-            wait "$qemu_pid" || qemu_exit=$?
+            wait_qemu_once
             printf 'QEMU exited before launcher stable marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -403,8 +483,7 @@ python3 "$repo_root/scripts/desktop/qmp_screendump.py" \
 
 failure_stage=qemu-shutdown
 qemu_exit=0
-wait "$qemu_pid" || qemu_exit=$?
-qemu_pid=
+wait_qemu_once
 if (( qemu_exit != 0 )); then
     exit 1
 fi

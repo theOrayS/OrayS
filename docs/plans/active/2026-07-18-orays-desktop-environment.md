@@ -588,3 +588,32 @@ commit/status 相同、provenance stable。证据保存在忽略目录
 `FileExistsError`，该次没有启动 guest，父目录就绪后单独重跑才得到真实 PASS。两张官方镜像仍
 不可读，GitHub workflow/required check 未实跑，第三轮独立人工审查尚未进行，因此仍不可称
 PR Ready、merge-ready 或完整 `full --arch all` PASS。
+
+## Checkpoint 12：post-merge 独立复审 blocker 整改
+
+2026-07-20 以 `/tmp/codex-post-merge-review-fixes.txt` 为最新权威复审输入。保留用户授权的
+`d9891d02`、`b3242815`、`55b5040a`，不 reset/rebase/revert，不操作 `main` 或本地
+`stabilize`，不修改 `tee_device_mode`，不 commit/push，也不触发 GitHub Actions。
+
+- [x] scope 改用 Git `-z` 输出和 bytes 边界，覆盖空白、tab、换行与非 UTF-8 pathname；
+- [x] scope 不再读取 ignored `.codex/state` 或回退 `HEAD`，可信 base 不可解析时 fail closed；
+- [x] QEMU 以 tracked policy 固定精确 9.2.4 和 approved SHA-256，canonical path 只解析一次，
+  通过已打开且核验的文件描述符对应对象执行，metadata/summary/package/validator 全链绑定；
+- [x] guest artifact 绑定架构、source commit、canonical path、SHA-256、build invocation 和完整
+  QEMU argv，篡改 digest/path/argv 均 fail closed；
+- [x] runner 在 output 创建后安装 finalizer，覆盖 build fail、QEMU 早退 0/非零、timeout、
+  SIGINT/SIGTERM、缺 Python 和 output 无法创建；QEMU 是可单次 wait 的直系 session leader；
+- [x] FAIL validator 精确重放有序的完整确定性失败列表，运行目录统一为可迁移占位符；
+- [ ] 按最新复审删除持久 self-hosted `desktop-runtime` 与 `FIXED_QEMU_VERSION`。对应 RED 测试已
+  加入，但共享 workflow 内容补丁被权限审查拒绝；在用户再次明确授权前不绕过该拒绝。
+
+evidence schema 升级为 metadata 4、summary 3、package 4。当前 Desktop Python discovery 为
+87 项中的 86 PASS / 1 FAIL；唯一失败就是上述 workflow RED。其余本地结果：Rust host-tools
+73/73、clippy `-D warnings`、desktop rustfmt、golden 5/5、asset/license、全部 desktop shell
+syntax、`git diff --check` 和 scope 均退出 0。scope 记录 base `c776ceff…`、119 changed paths、
+3 bridge paths、3 existing bridge files、74 churn。
+
+最终 clean snapshot 与 RV64/LA64 五场景 10/10 `VALID_PASS` 尚未执行：live 源码按用户要求保留
+dirty，且用户禁止 commit；伪造 clean provenance 或用 dirty run 冒充 PASS 均不允许。canonical
+quick、official/full 也未在本 checkpoint 宣称 PASS。完成 blocker 8 并获得仅用于隔离验证的
+clean-snapshot 授权前，状态保持 `BLOCKED_WITH_EVIDENCE`，不是 PR Ready 或 merge-ready。

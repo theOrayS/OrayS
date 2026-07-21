@@ -25,6 +25,90 @@ def qmp_exchange(commands: list[dict]) -> bytes:
 
 
 class ReviewPackageTests(unittest.TestCase):
+    def bind_runtime_identity(self, run: Path) -> None:
+        repository = run.parent
+        qemu = repository / "qemu-system-riscv64"
+        artifact = repository / "build/desktop/rv/artifacts/orays-desktop-rv.bin"
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        qemu.write_bytes(b"approved-qemu-object")
+        qemu.chmod(0o755)
+        artifact.write_bytes(b"guest-artifact-object")
+        qemu_digest = hashlib.sha256(qemu.read_bytes()).hexdigest()
+        policy = {
+            "schema": 1,
+            "qemu_version": "9.2.4",
+            "architectures": {
+                "rv": {
+                    "qemu_binary": "qemu-system-riscv64",
+                    "qemu_sha256": qemu_digest,
+                    "artifact": "build/desktop/rv/artifacts/orays-desktop-rv.bin",
+                    "build_invocation": ["scripts/desktop/build.sh", "rv"],
+                }
+            },
+        }
+        policy_path = run / "runtime-policy.json"
+        policy_path.write_text(
+            json.dumps(policy, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        metadata_path = run / "runtime-metadata.json"
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata.update(
+            {
+                "schema": 4,
+                "repository_root": str(repository),
+                "runtime_identity": {
+                    "schema": 1,
+                    "policy_repository_path": "test/desktop/runtime-policy.json",
+                    "policy_sha256": hashlib.sha256(policy_path.read_bytes()).hexdigest(),
+                    "qemu": {
+                        "canonical_path": str(qemu),
+                        "required_version": "9.2.4",
+                        "observed_banner": "QEMU emulator version 9.2.4",
+                        "required_sha256": qemu_digest,
+                        "observed_sha256": qemu_digest,
+                    },
+                    "guest_artifact": {
+                        "architecture": "rv",
+                        "repository_path": "build/desktop/rv/artifacts/orays-desktop-rv.bin",
+                        "canonical_path": str(artifact),
+                        "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+                        "source_commit": metadata["source_commit_before"],
+                    },
+                    "build_invocation": ["scripts/desktop/build.sh", "rv"],
+                    "qemu_launch_argv": [
+                        str(qemu),
+                        "-machine",
+                        "virt",
+                        "-kernel",
+                        str(artifact),
+                    ],
+                },
+            }
+        )
+        metadata_path.write_text(
+            json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    def summarize_bound_run(self, run: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(SUMMARY_SCRIPT),
+                "--run-dir",
+                str(run),
+                "--arch",
+                "rv",
+                "--scenario",
+                "boot",
+                "--qemu-exit",
+                "0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
     def make_run(self, root: Path) -> Path:
         run = root / "run"
         run.mkdir()
@@ -112,6 +196,7 @@ class ReviewPackageTests(unittest.TestCase):
         (run / "runtime-metadata.json").write_text(
             json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8"
         )
+        self.bind_runtime_identity(run)
         summary = subprocess.run(
             [
                 sys.executable,
@@ -173,6 +258,115 @@ class ReviewPackageTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def rehash_packaged_file(self, package: Path, name: str) -> None:
+        manifest_path = package / "review-package.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["files"][name] = hashlib.sha256((package / name).read_bytes()).hexdigest()
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (package / "package-files.sha256").write_text(
+            "".join(
+                f"{digest}  {filename}\n"
+                for filename, digest in sorted(manifest["files"].items())
+            ),
+            encoding="utf-8",
+        )
+
+    def test_bound_runtime_identity_survives_full_package_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            summary = self.summarize_bound_run(run)
+            self.assertEqual(summary.returncode, 0, summary.stdout + summary.stderr)
+            self.assertEqual(self.invoke_package(run).returncode, 0)
+            package = run / "review-package"
+            summary_value = json.loads(
+                (package / "summary.json").read_text(encoding="utf-8")
+            )
+            package_value = json.loads(
+                (package / "review-package.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(summary_value["schema"], 3)
+            self.assertEqual(package_value["schema"], 4)
+            self.assertEqual(
+                package_value["runtime_identity"], summary_value["runtime_identity"]
+            )
+            self.assertIn("runtime-policy.json", package_value["files"])
+            validation = self.invoke_validator(package)
+            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
+            self.assertIn("VALID_PASS", validation.stdout)
+
+    def test_validator_rejects_packaged_runtime_identity_tampering(self) -> None:
+        mutations = (
+            (
+                lambda identity: identity["qemu"].__setitem__(
+                    "observed_sha256", "0" * 64
+                ),
+                "QEMU digest",
+            ),
+            (
+                lambda identity: identity["guest_artifact"].__setitem__(
+                    "sha256", "0" * 64
+                ),
+                "runtime identity differs",
+            ),
+            (
+                lambda identity: identity["guest_artifact"].__setitem__(
+                    "canonical_path", "/tmp/forged-artifact"
+                ),
+                "artifact canonical path",
+            ),
+            (
+                lambda identity: identity["qemu_launch_argv"].__setitem__(
+                    identity["qemu_launch_argv"].index("-kernel") + 1,
+                    "/tmp/forged-kernel",
+                ),
+                "QEMU launch artifact",
+            ),
+        )
+        for mutate, message in mutations:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                run = self.make_run(Path(directory))
+                self.assertEqual(self.summarize_bound_run(run).returncode, 0)
+                self.assertEqual(self.invoke_package(run).returncode, 0)
+                package = run / "review-package"
+                metadata_path = package / "runtime-metadata.json"
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                mutate(metadata["runtime_identity"])
+                metadata_path.write_text(
+                    json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8"
+                )
+                self.rehash_packaged_file(package, "runtime-metadata.json")
+                result = self.invoke_validator(package)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(message, result.stderr)
+
+    def test_validator_rejects_failure_detail_with_matching_category(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            (run / "input-sequence.json").write_text("not-json\n", encoding="utf-8")
+            summary_result = self.summarize_bound_run(run)
+            self.assertEqual(summary_result.returncode, 1, summary_result.stdout)
+            self.assertEqual(self.invoke_package(run).returncode, 0)
+            package = run / "review-package"
+            summary = json.loads(
+                (package / "summary.json").read_text(encoding="utf-8")
+            )
+            index = next(
+                index
+                for index, failure in enumerate(summary["failures"])
+                if failure.startswith("invalid input evidence:")
+            )
+            summary["failures"][index] = (
+                "invalid input evidence: forged detail with the same category"
+            )
+            self.rewrite_packaged_summary(package, summary, {})
+            validation = self.invoke_validator(package)
+            self.assertNotEqual(
+                validation.returncode, 0, validation.stdout + validation.stderr
+            )
+            self.assertIn("exact deterministic failures", validation.stderr)
+
     def test_complete_raw_evidence_is_packaged_with_outer_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run = self.make_run(Path(directory))
@@ -183,15 +377,15 @@ class ReviewPackageTests(unittest.TestCase):
             self.assertTrue((package / "package-files.sha256").is_file())
             self.assertEqual(
                 json.loads((package / "runtime-metadata.json").read_text(encoding="utf-8"))["schema"],
-                3,
+                4,
             )
             self.assertEqual(
                 json.loads((package / "summary.json").read_text(encoding="utf-8"))["schema"],
-                2,
+                3,
             )
             self.assertEqual(
                 json.loads((package / "review-package.json").read_text(encoding="utf-8"))["schema"],
-                3,
+                4,
             )
             self.assertFalse((package / "disk.img").exists())
             validation = self.invoke_validator(package)
@@ -452,7 +646,7 @@ class ReviewPackageTests(unittest.TestCase):
             self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
             self.assertIn("VALID_FAIL", validation.stdout)
 
-    def test_qemu_abnormal_exit_is_preserved_in_failure_package(self) -> None:
+    def test_qemu_started_without_prebound_identity_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory) / "failed-qemu"
             run.mkdir()
@@ -482,7 +676,7 @@ class ReviewPackageTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.returncode, 70, result.stdout + result.stderr)
             package = run / "review-package"
             summary = json.loads((package / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["qemu_exit"], 42)
@@ -491,8 +685,10 @@ class ReviewPackageTests(unittest.TestCase):
                 any("qemu exit was 42, expected 0" in failure for failure in summary["failures"])
             )
             validation = self.invoke_validator(package)
-            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
-            self.assertIn("VALID_FAIL", validation.stdout)
+            self.assertNotEqual(
+                validation.returncode, 0, validation.stdout + validation.stderr
+            )
+            self.assertIn("no verified QEMU object", validation.stderr)
 
     def test_qemu_not_started_uses_null_exit_and_structured_reason(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

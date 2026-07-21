@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -46,6 +47,21 @@ def run(*args: str, check: bool = True, cwd: Path | None = None) -> str:
     return p.stdout
 
 
+def run_bytes(*args: str, check: bool = True, cwd: Path | None = None) -> bytes:
+    p = subprocess.run(
+        args,
+        cwd=cwd,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if check and p.returncode != 0:
+        raise RuntimeError(
+            f"command failed ({p.returncode}): {args!r}\n{os.fsdecode(p.stderr)}"
+        )
+    return p.stdout
+
+
 def repo_root() -> Path:
     script_root = Path(__file__).resolve().parents[2]
     return Path(
@@ -79,44 +95,40 @@ def any_match(path: str, patterns: tuple[str, ...] | list[str]) -> bool:
 
 
 def default_base(root: Path) -> str:
-    state = root / ".codex/state/desktop-base-sha"
-    if state.exists():
-        value = state.read_text(encoding="utf-8").strip()
-        if value:
-            return value
-    for candidate in ("origin/develop/post-integration-next", "HEAD"):
-        p = subprocess.run(
-            ["git", "rev-parse", "--verify", candidate],
-            cwd=root,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-        if p.returncode == 0:
-            return p.stdout.strip()
+    candidate = "origin/develop/post-integration-next^{commit}"
+    p = subprocess.run(
+        ["git", "rev-parse", "--verify", candidate],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if p.returncode == 0:
+        return p.stdout.rstrip("\n")
     raise RuntimeError("unable to resolve desktop base")
 
 
 def changed_paths(root: Path, base: str) -> set[str]:
     paths: set[str] = set()
     commands = (
-        ("git", "-c", "core.quotepath=false", "diff", "--name-only", f"{base}...HEAD"),
-        ("git", "-c", "core.quotepath=false", "diff", "--name-only"),
-        ("git", "-c", "core.quotepath=false", "diff", "--name-only", "--cached"),
+        ("git", "diff", "--name-only", "-z", f"{base}...HEAD"),
+        ("git", "diff", "--name-only", "-z"),
+        ("git", "diff", "--name-only", "-z", "--cached"),
         (
             "git",
-            "-c",
-            "core.quotepath=false",
             "ls-files",
+            "-z",
             "--others",
             "--exclude-standard",
         ),
     )
     for cmd in commands:
-        for line in run(*cmd, cwd=root).splitlines():
-            line = line.strip()
-            if line:
-                paths.add(line)
+        output = run_bytes(*cmd, cwd=root)
+        if output and not output.endswith(b"\0"):
+            raise RuntimeError(f"Git path output is not NUL terminated: {cmd!r}")
+        for raw_path in output.split(b"\0"):
+            if raw_path:
+                paths.add(os.fsdecode(raw_path))
     return paths
 
 
@@ -133,17 +145,27 @@ def existed_at_base(root: Path, base: str, path: str) -> bool:
 def bridge_churn(root: Path, base: str, paths: list[str]) -> int:
     if not paths:
         return 0
-    out = run("git", "diff", "--numstat", base, "--", *paths, cwd=root)
+    out = run_bytes("git", "diff", "--numstat", "-z", base, "--", *paths, cwd=root)
+    if out and not out.endswith(b"\0"):
+        raise RuntimeError("Git numstat output is not NUL terminated")
     total = 0
-    for line in out.splitlines():
-        parts = line.split("\t")
+    records = out.split(b"\0")
+    index = 0
+    while index < len(records) - 1:
+        record = records[index]
+        index += 1
+        parts = record.split(b"\t", 2)
         if len(parts) < 3:
-            continue
+            raise RuntimeError("Git numstat output is malformed")
         a, d = parts[0], parts[1]
         if a.isdigit():
             total += int(a)
         if d.isdigit():
             total += int(d)
+        if parts[2] == b"":
+            if index + 1 >= len(records):
+                raise RuntimeError("Git rename numstat output is truncated")
+            index += 2
     return total
 
 
@@ -170,14 +192,14 @@ def main() -> int:
 
     for path in changed:
         if any_match(path, FORBIDDEN):
-            failures.append(f"forbidden path: {path}")
+            failures.append(f"forbidden path: {path!r}")
             continue
         if any_match(path, allowed):
             continue
         if any_match(path, bridges):
             bridge_changed.append(path)
             continue
-        failures.append(f"outside desktop allowlist: {path}")
+        failures.append(f"outside desktop allowlist: {path!r}")
 
     existing_bridge = [
         p for p in bridge_changed if existed_at_base(root, base, p)

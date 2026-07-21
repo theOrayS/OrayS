@@ -61,10 +61,33 @@ class SummarizeRunTests(unittest.TestCase):
         (run / "display-geometry.txt").write_text(
             "DISPLAY_GEOMETRY=2x2\n", encoding="utf-8"
         )
+        qemu = root / "qemu-system-riscv64"
+        qemu.write_bytes(b"approved-qemu-object")
+        qemu.chmod(0o755)
+        artifact = root / "build/desktop/rv/artifacts/orays-desktop-rv.bin"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_bytes(b"guest-artifact-object")
+        qemu_digest = hashlib.sha256(qemu.read_bytes()).hexdigest()
+        policy = {
+            "schema": 1,
+            "qemu_version": "9.2.4",
+            "architectures": {
+                "rv": {
+                    "qemu_binary": qemu.name,
+                    "qemu_sha256": qemu_digest,
+                    "artifact": "build/desktop/rv/artifacts/orays-desktop-rv.bin",
+                    "build_invocation": ["scripts/desktop/build.sh", "rv"],
+                }
+            },
+        }
+        policy_path = run / "runtime-policy.json"
+        policy_path.write_text(
+            json.dumps(policy, sort_keys=True) + "\n", encoding="utf-8"
+        )
         (run / "runtime-metadata.json").write_text(
             json.dumps(
                 {
-                    "schema": 3,
+                    "schema": 4,
                     "created_at_utc": "2026-07-19T00:00:00+00:00",
                     "finalized_at_utc": "2026-07-19T00:01:00+00:00",
                     "source_commit": "a" * 40,
@@ -78,10 +101,11 @@ class SummarizeRunTests(unittest.TestCase):
                     "source_status_after": [],
                     "provenance_stable": True,
                     "collection_errors": [],
+                    "repository_root": str(root),
                     "architecture": "rv",
                     "scenario": "launcher",
                     "run_dir": str(run),
-                    "qemu_binary": "/usr/bin/qemu-system-riscv64",
+                    "qemu_binary": str(qemu),
                     "qemu_version": "QEMU emulator version 9.2.4",
                     "required_qemu_version": "9.2.4",
                     "observed_qemu_version": "QEMU emulator version 9.2.4",
@@ -100,6 +124,37 @@ class SummarizeRunTests(unittest.TestCase):
                         "--output",
                         "test/output/desktop/run",
                     ],
+                    "runtime_identity": {
+                        "schema": 1,
+                        "policy_repository_path": "test/desktop/runtime-policy.json",
+                        "policy_sha256": hashlib.sha256(
+                            policy_path.read_bytes()
+                        ).hexdigest(),
+                        "qemu": {
+                            "canonical_path": str(qemu),
+                            "required_version": "9.2.4",
+                            "observed_banner": "QEMU emulator version 9.2.4",
+                            "required_sha256": qemu_digest,
+                            "observed_sha256": qemu_digest,
+                        },
+                        "guest_artifact": {
+                            "architecture": "rv",
+                            "repository_path": "build/desktop/rv/artifacts/orays-desktop-rv.bin",
+                            "canonical_path": str(artifact),
+                            "sha256": hashlib.sha256(
+                                artifact.read_bytes()
+                            ).hexdigest(),
+                            "source_commit": "a" * 40,
+                        },
+                        "build_invocation": ["scripts/desktop/build.sh", "rv"],
+                        "qemu_launch_argv": [
+                            str(qemu),
+                            "-machine",
+                            "virt",
+                            "-kernel",
+                            str(artifact),
+                        ],
+                    },
                 }
             ),
             encoding="utf-8",
@@ -173,6 +228,7 @@ class SummarizeRunTests(unittest.TestCase):
                 "frame.ppm",
                 "capture-precondition.json",
                 "runtime-metadata.json",
+                "runtime-policy.json",
                 "display-geometry.txt",
             })
 
@@ -200,7 +256,7 @@ class SummarizeRunTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             summary = json.loads((run / "summary.json").read_text(encoding="utf-8"))
-            self.assertEqual(summary["schema"], 2)
+            self.assertEqual(summary["schema"], 3)
             self.assertEqual(summary["result"], "PASS")
             self.assertEqual(summary["failure_stage"], "complete")
             self.assertEqual(summary["failure_reason"], "none")
