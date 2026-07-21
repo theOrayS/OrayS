@@ -30,6 +30,39 @@ where
     removed
 }
 
+fn count_same_queue_requeues<F, H>(
+    source: &mut VecDeque<AxTaskRef>,
+    already_selected: &BTreeSet<usize>,
+    requeue_count: usize,
+    predicate: &mut F,
+    on_requeue: &mut H,
+) -> usize
+where
+    F: FnMut(&AxTaskRef) -> bool,
+    H: FnMut(&AxTaskRef),
+{
+    let source_len = source.len();
+    let mut retained = BTreeSet::new();
+    let mut requeued_len = 0usize;
+    for _ in 0..source_len {
+        let Some(task) = source.pop_front() else {
+            break;
+        };
+        let key = task_ptr_key(&task);
+        if already_selected.contains(&key) || !retained.insert(key) {
+            continue;
+        }
+        if requeued_len < requeue_count && predicate(&task) {
+            on_requeue(&task);
+            requeued_len = requeued_len.saturating_add(1);
+        }
+        // A same-address futex requeue affects and counts the waiter without
+        // moving it to a different queue. Preserve its relative queue order.
+        source.push_back(task);
+    }
+    requeued_len
+}
+
 /// A queue to store sleeping tasks.
 ///
 /// # Examples
@@ -346,8 +379,8 @@ impl WaitQueue {
                 }
 
                 let mut requeued = BTreeSet::new();
-                let mut requeued_len = 0usize;
-                if let Some(destination) = destination.as_deref_mut() {
+                let requeued_len = if let Some(destination) = destination.as_deref_mut() {
+                    let mut requeued_len = 0usize;
                     while !source.is_empty() && requeued_len < requeue_count {
                         let Some(task) = source.pop_front() else {
                             break;
@@ -360,7 +393,16 @@ impl WaitQueue {
                         destination.push_back(task);
                         requeued_len += 1;
                     }
-                }
+                    requeued_len
+                } else {
+                    count_same_queue_requeues(
+                        source,
+                        &selected,
+                        requeue_count,
+                        &mut predicate,
+                        &mut on_requeue,
+                    )
+                };
                 (notified_len, requeued_len)
             };
 

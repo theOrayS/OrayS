@@ -29,6 +29,7 @@ TARGETS = [
     Path("user/shell/src/uspace/linux_abi.rs"),
     Path("user/shell/src/uspace/process_abi.rs"),
     Path("api/arceos_posix_api/src/imp/pthread/mod.rs"),
+    Path("kernel/task/axtask/src/wait_queue.rs"),
 ]
 
 
@@ -304,6 +305,22 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         result = self.run_guard(tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("FUTEX_REQUEUE", result.stdout)
+
+    def test_detects_same_address_futex_requeue_not_counted(self) -> None:
+        tree = self.make_tree()
+        path = tree / "kernel/task/axtask/src/wait_queue.rs"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "requeued_len = requeued_len.saturating_add(1);",
+                "requeued_len = requeued_len.saturating_add(0);",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("same-address futex requeue", result.stdout)
 
     def test_detects_wait4_ignored_rusage(self) -> None:
         tree = self.make_tree()

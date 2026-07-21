@@ -13,7 +13,10 @@ def read(root: Path, rel: str) -> str:
 
 
 def rust_function_block(text: str, name: str) -> str:
-    match = re.search(rf"(?:^|\n)(?:pub\([^)]*\)\s+|pub\s+)?fn\s+{re.escape(name)}\s*\([^{{]*\)\s*(?:->[^{{]+)?\{{", text)
+    match = re.search(
+        rf"(?:^|\n)(?:pub\([^)]*\)\s+|pub\s+)?fn\s+{re.escape(name)}(?:<[^>{{}}]*>)?\s*\([^{{]*\)\s*(?:->[^{{]+)?\{{",
+        text,
+    )
     if not match:
         return ""
     brace = text.find("{", match.start())
@@ -424,6 +427,31 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
         (
             "general::FUTEX_CMP_REQUEUE",
             "Ok((woken, requeued)) => woken.saturating_add(requeued) as isize",
+        ),
+    )
+    wait_queue = read(root, "kernel/task/axtask/src/wait_queue.rs")
+    same_queue_requeue = rust_function_block(wait_queue, "count_same_queue_requeues")
+    require_tokens(
+        findings,
+        same_queue_requeue,
+        "same-address futex requeue must count matching waiters without dropping them",
+        (
+            "already_selected.contains(&key)",
+            "requeued_len < requeue_count && predicate(&task)",
+            "on_requeue(&task);",
+            "requeued_len = requeued_len.saturating_add(1);",
+            "source.push_back(task);",
+        ),
+    )
+    notify_requeue = wait_queue
+    require_tokens(
+        findings,
+        notify_requeue,
+        "same-target WaitQueue requeue must use the in-place counting path",
+        (
+            "count_same_queue_requeues(",
+            "if core::ptr::eq(self, target)",
+            "return operate(&mut source, None);",
         ),
     )
 
