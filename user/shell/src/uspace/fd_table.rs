@@ -66,8 +66,9 @@ use super::synthetic_fs::{
     proc_meminfo_path_entry, proc_pagemap_fd_entry, proc_pagemap_path_entry,
     proc_pid_stat_fd_entry, proc_pid_stat_path_entry, proc_pid_status_fd_entry,
     proc_pid_status_path_entry, proc_self_maps_fd_entry, proc_self_maps_is_writable_open,
-    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_sys_file_fd_entry,
-    proc_sys_file_path_entry, proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
+    proc_self_maps_path_entry, proc_smaps_fd_entry, proc_smaps_path_entry, proc_statm_fd_entry,
+    proc_statm_path_entry, proc_sys_file_fd_entry, proc_sys_file_path_entry,
+    proc_sysvipc_msg_fd_entry, proc_sysvipc_msg_path_entry,
     proc_sysvipc_sem_fd_entry, proc_sysvipc_sem_path_entry, proc_sysvipc_shm_fd_entry,
     proc_sysvipc_shm_path_entry, proc_task_dir_fd_entry, proc_task_dir_path_entry,
     proc_timerslack_fd_entry, proc_timerslack_path_entry, proc_uptime_fd_entry,
@@ -10626,6 +10627,19 @@ fn open_candidates(
             });
         }
         if let Some(entry) = if path_only {
+            proc_statm_path_entry(process, path.as_str())
+        } else {
+            proc_statm_fd_entry(process, path.as_str())
+        } {
+            if prefer_dir {
+                return Err(LinuxError::ENOTDIR);
+            }
+            if !path_only && synthetic_file_is_writable_open(flags) {
+                return Err(LinuxError::EPERM);
+            }
+            return Ok(entry);
+        }
+        if let Some(entry) = if path_only {
             proc_smaps_path_entry(process, path.as_str())
         } else {
             proc_smaps_fd_entry(process, path.as_str())
@@ -11183,6 +11197,7 @@ fn proc_pid_dir_entry(process: &UserProcess, path: &str, path_only: bool) -> Opt
 
     let dirents = [
         ("stat", general::DT_REG as u8),
+        ("statm", general::DT_REG as u8),
         ("status", general::DT_REG as u8),
         ("task", general::DT_DIR as u8),
         ("comm", general::DT_REG as u8),

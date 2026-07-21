@@ -33,6 +33,7 @@ use super::task_registry::{
 
 const PROC_SELF_PAGEMAP_PATH: &str = "/proc/self/pagemap";
 const PROC_SELF_SMAPS_PATH: &str = "/proc/self/smaps";
+const PROC_SELF_STATM_PATH: &str = "/proc/self/statm";
 const PROC_SELF_TIMERSLACK_PATH: &str = "/proc/self/timerslack_ns";
 const PROC_CMDLINE_PATH: &str = "/proc/cmdline";
 const PROC_VERSION_PATH: &str = "/proc/version";
@@ -67,7 +68,10 @@ fn proc_self_maps_content(process: &UserProcess) -> Vec<u8> {
     let text_start = USER_ASPACE_BASE;
     let text_end = text_start + PAGE_SIZE_4K;
     let heap_start = align_down(brk.start, PAGE_SIZE_4K);
-    let heap_end = align_up(brk.end.max(brk.start + PAGE_SIZE_4K), PAGE_SIZE_4K);
+    let heap_end = align_up(
+        brk.end.max(brk.start.saturating_add(PAGE_SIZE_4K)),
+        PAGE_SIZE_4K,
+    );
     let stack_top = align_down(USER_STACK_TOP, PAGE_SIZE_4K);
     let stack_base = stack_top - USER_STACK_SIZE;
     let regions = process.mmap_regions();
@@ -146,6 +150,145 @@ pub(super) fn proc_self_maps_fd_entry(process: &UserProcess) -> FdEntry {
 pub(super) fn proc_self_maps_path_entry(process: &UserProcess) -> FdEntry {
     let content_len = proc_self_maps_content(process).len();
     FdEntry::Path(PathEntry::synthetic_file(PROC_SELF_MAPS_PATH, content_len))
+}
+
+fn merged_page_ranges(mut ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    for (start, end) in ranges.iter_mut() {
+        *start = align_down(*start, PAGE_SIZE_4K);
+        *end = align_up(*end, PAGE_SIZE_4K);
+    }
+    ranges.retain(|(start, end)| start < end);
+    ranges.sort_by_key(|(start, _)| *start);
+
+    let mut merged = Vec::<(usize, usize)>::new();
+    for (start, end) in ranges {
+        if let Some((_, previous_end)) = merged.last_mut()
+            && start <= *previous_end
+        {
+            *previous_end = (*previous_end).max(end);
+            continue;
+        }
+        merged.push((start, end));
+    }
+    merged
+}
+
+fn page_range_count(ranges: &[(usize, usize)]) -> usize {
+    ranges.iter().fold(0_usize, |pages, (start, end)| {
+        pages.saturating_add(end.saturating_sub(*start) / PAGE_SIZE_4K)
+    })
+}
+
+fn proc_statm_content_for_target(target: &UserProcess) -> Vec<u8> {
+    let regions = target.mmap_regions();
+    let brk = *target.brk.lock();
+    let heap_start = align_down(brk.start, PAGE_SIZE_4K);
+    let heap_end = align_up(brk.end.max(brk.start + PAGE_SIZE_4K), PAGE_SIZE_4K);
+    let stack_top = align_down(USER_STACK_TOP, PAGE_SIZE_4K);
+    let stack_base = stack_top.saturating_sub(USER_STACK_SIZE);
+
+    let mut visible_ranges = regions
+        .iter()
+        .map(|region| (region.start, region.end()))
+        .collect::<Vec<_>>();
+    visible_ranges.push((heap_start, heap_end));
+    visible_ranges.push((stack_base, stack_top));
+    let visible_ranges = merged_page_ranges(visible_ranges);
+
+    let text_ranges = merged_page_ranges(
+        regions
+            .iter()
+            .filter(|region| region.prot & general::PROT_EXEC != 0)
+            .map(|region| (region.start, region.end()))
+            .collect(),
+    );
+    let mut data_ranges = regions
+        .iter()
+        .filter(|region| region.prot & general::PROT_WRITE != 0)
+        .map(|region| (region.start, region.end()))
+        .collect::<Vec<_>>();
+    data_ranges.push((heap_start, heap_end));
+    data_ranges.push((stack_base, stack_top));
+    let data_ranges = merged_page_ranges(data_ranges);
+    let shared_ranges = merged_page_ranges(
+        regions
+            .iter()
+            .filter(|region| region.shared)
+            .map(|region| (region.start, region.end()))
+            .collect(),
+    );
+
+    let aspace = target.aspace.lock();
+    let resident_page_count = |ranges: &[(usize, usize)]| {
+        let mut resident = 0_usize;
+        for (start, end) in ranges {
+            let mut page = *start;
+            while page < *end {
+                if aspace.page_table().query(VirtAddr::from(page)).is_ok() {
+                    resident = resident.saturating_add(1);
+                }
+                let Some(next_page) = page.checked_add(PAGE_SIZE_4K) else {
+                    break;
+                };
+                page = next_page;
+            }
+        }
+        resident
+    };
+    let resident_pages = resident_page_count(visible_ranges.as_slice());
+    let shared_pages = resident_page_count(shared_ranges.as_slice());
+
+    format!(
+        "{} {} {} {} 0 {} 0\n",
+        page_range_count(visible_ranges.as_slice()),
+        resident_pages,
+        shared_pages,
+        page_range_count(text_ranges.as_slice()),
+        page_range_count(data_ranges.as_slice()),
+    )
+    .into_bytes()
+}
+
+fn proc_statm_content(process: &UserProcess, path: &str) -> Option<(String, Vec<u8>)> {
+    let normalized = normalize_path("/", path)?;
+    let pid = if normalized == PROC_SELF_STATM_PATH {
+        process.pid()
+    } else {
+        let rest = normalized.strip_prefix("/proc/")?;
+        let pid_text = rest.strip_suffix("/statm")?;
+        pid_text.parse::<i32>().ok()?
+    };
+    if pid == process.pid() {
+        return Some((normalized, proc_statm_content_for_target(process)));
+    }
+    if let Some(entry) = process.child_thread_entry_by_pid(pid) {
+        return Some((
+            normalized,
+            proc_statm_content_for_target(entry.process.as_ref()),
+        ));
+    }
+    let entry = user_thread_entry_by_process_pid(pid)?;
+    Some((
+        normalized,
+        proc_statm_content_for_target(entry.process.as_ref()),
+    ))
+}
+
+pub(super) fn proc_statm_fd_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_statm_content(process, path)?;
+    Some(FdEntry::MemoryFile(MemoryFileEntry {
+        path,
+        data: Arc::new(data),
+        offset: 0,
+    }))
+}
+
+pub(super) fn proc_statm_path_entry(process: &UserProcess, path: &str) -> Option<FdEntry> {
+    let (path, data) = proc_statm_content(process, path)?;
+    Some(FdEntry::Path(PathEntry::synthetic_file(
+        path.as_str(),
+        data.len(),
+    )))
 }
 
 fn proc_smaps_content_for_target(target: &UserProcess) -> Vec<u8> {
