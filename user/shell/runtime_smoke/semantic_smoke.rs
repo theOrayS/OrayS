@@ -14,6 +14,7 @@ use core::{
 // LA64, and requires the ordered syscall assertions plus clean guest shutdown.
 
 const SYS_DUP3: usize = 24;
+const SYS_FCNTL: usize = 25;
 const SYS_FLOCK: usize = 32;
 const SYS_MKDIRAT: usize = 34;
 const SYS_UNLINKAT: usize = 35;
@@ -36,6 +37,7 @@ const SYS_SCHED_GETAFFINITY: usize = 123;
 const SYS_UNAME: usize = 160;
 const SYS_GETPID: usize = 172;
 const SYS_SOCKET: usize = 198;
+const SYS_SOCKETPAIR: usize = 199;
 const SYS_BIND: usize = 200;
 const SYS_LISTEN: usize = 201;
 const SYS_ACCEPT: usize = 202;
@@ -43,6 +45,7 @@ const SYS_CONNECT: usize = 203;
 const SYS_SENDTO: usize = 206;
 const SYS_RECVFROM: usize = 207;
 const SYS_SETSOCKOPT: usize = 208;
+const SYS_GETSOCKOPT: usize = 209;
 const SYS_MUNMAP: usize = 215;
 const SYS_CLONE: usize = 220;
 const SYS_EXECVE: usize = 221;
@@ -72,10 +75,18 @@ const O_DIRECTORY: usize = 0o200000;
 const LOCK_EX: usize = 2;
 const LOCK_UN: usize = 8;
 const WNOHANG: usize = 1;
+const AF_UNIX: usize = 1;
 const AF_INET: usize = 2;
 const SOCK_STREAM: usize = 1;
+const SOCK_SEQPACKET: usize = 5;
+const SOCK_NONBLOCK: usize = O_NONBLOCK;
+const SOCK_CLOEXEC: usize = 0o2000000;
 const SOL_SOCKET: usize = 1;
 const SO_REUSEADDR: usize = 2;
+const SO_TYPE: usize = 3;
+const F_GETFD: usize = 1;
+const F_GETFL: usize = 3;
+const FD_CLOEXEC: isize = 1;
 const SIGCHLD: usize = 17;
 const CLONE_VM: u64 = 0x0000_0100;
 const CLONE_FS: u64 = 0x0000_0200;
@@ -238,6 +249,12 @@ const ASSERT_RENAME_VIRTUAL_NONEMPTY: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const ASSERT_RENAME_VIRTUAL_NONEMPTY: &[u8] =
     b"PR3_SMOKE_V1 ASSERT rename_virtual_nonempty PASS arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const ASSERT_UNIX_SEQPACKET: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT unix_seqpacket PASS arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const ASSERT_UNIX_SEQPACKET: &[u8] =
+    b"PR3_SMOKE_V1 ASSERT unix_seqpacket PASS arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const ASSERT_CLONE3_PROCESS: &[u8] = b"PR3_SMOKE_V1 ASSERT clone3_process PASS arch=riscv64\n";
 #[cfg(target_arch = "loongarch64")]
@@ -409,6 +426,12 @@ const USER_FAIL_RENAME_VIRTUAL_NONEMPTY: &[u8] =
 #[cfg(target_arch = "loongarch64")]
 const USER_FAIL_RENAME_VIRTUAL_NONEMPTY: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL rename_virtual_nonempty arch=loongarch64\n";
+#[cfg(target_arch = "riscv64")]
+const USER_FAIL_UNIX_SEQPACKET: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL unix_seqpacket arch=riscv64\n";
+#[cfg(target_arch = "loongarch64")]
+const USER_FAIL_UNIX_SEQPACKET: &[u8] =
+    b"PR3_SMOKE_V1 USER_FAIL unix_seqpacket arch=loongarch64\n";
 #[cfg(target_arch = "riscv64")]
 const USER_FAIL_CLONE3_PROCESS: &[u8] =
     b"PR3_SMOKE_V1 USER_FAIL clone3_process arch=riscv64\n";
@@ -1039,6 +1062,13 @@ fn close(fd: i32) -> isize {
 }
 
 #[inline(always)]
+fn fcntl_get(fd: i32, command: usize) -> isize {
+    // SAFETY: F_GETFD and F_GETFL consume only the descriptor and command scalars;
+    // neither command dereferences the unused third argument.
+    unsafe { syscall6(SYS_FCNTL, fd as usize, command, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
 fn openat(path: &[u8], flags: usize) -> isize {
     openat_mode(path, flags, 0)
 }
@@ -1290,6 +1320,40 @@ fn socket_stream() -> isize {
     // SAFETY: socket consumes only scalar domain, type, and protocol values. AF_INET
     // plus SOCK_STREAM and protocol zero requests an ordinary IPv4 TCP socket.
     unsafe { syscall6(SYS_SOCKET, AF_INET, SOCK_STREAM, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn socketpair_seqpacket(descriptors: &mut [i32; 2]) -> isize {
+    // SAFETY: `descriptors` is aligned and writable for two i32 values until the
+    // synchronous socketpair call returns. The remaining arguments are scalars.
+    unsafe {
+        syscall6(
+            SYS_SOCKETPAIR,
+            AF_UNIX,
+            SOCK_SEQPACKET | SOCK_NONBLOCK | SOCK_CLOEXEC,
+            0,
+            descriptors.as_mut_ptr() as usize,
+            0,
+            0,
+        )
+    }
+}
+
+#[inline(always)]
+fn socket_type(fd: i32, value: &mut i32, length: &mut u32) -> isize {
+    // SAFETY: `value` and `length` are aligned, uniquely borrowed output objects and
+    // remain writable until the synchronous getsockopt call returns.
+    unsafe {
+        syscall6(
+            SYS_GETSOCKOPT,
+            fd as usize,
+            SOL_SOCKET,
+            SO_TYPE,
+            value as *mut i32 as usize,
+            length as *mut u32 as usize,
+            0,
+        )
+    }
 }
 
 #[inline(always)]
@@ -3188,6 +3252,67 @@ pub extern "C" fn _start() -> ! {
     }
     if write(ASSERT_RENAME_VIRTUAL_NONEMPTY) != ASSERT_RENAME_VIRTUAL_NONEMPTY.len() as isize {
         fail(USER_FAIL_WRITE, 290);
+    }
+
+    // Cargo's rustc supervision path uses an AF_UNIX SOCK_SEQPACKET pair with
+    // CLOEXEC to observe child exec/exit through recvfrom. Exercise Linux record
+    // boundaries independently of Cargo: a short receive must discard the unread
+    // tail of that record, leaving the next complete record for the following call.
+    let mut seqpacket_fds = [-1_i32; 2];
+    if socketpair_seqpacket(&mut seqpacket_fds) != 0
+        || seqpacket_fds[0] < 0
+        || seqpacket_fds[1] < 0
+    {
+        fail(USER_FAIL_UNIX_SEQPACKET, 291);
+    }
+    let mut reported_type = 0_i32;
+    let mut reported_type_length = core::mem::size_of::<i32>() as u32;
+    let descriptor_flags = fcntl_get(seqpacket_fds[0], F_GETFD);
+    let status_flags = fcntl_get(seqpacket_fds[0], F_GETFL);
+    if descriptor_flags < 0
+        || descriptor_flags & FD_CLOEXEC == 0
+        || status_flags < 0
+        || status_flags as usize & O_NONBLOCK == 0
+        || socket_type(
+            seqpacket_fds[0],
+            &mut reported_type,
+            &mut reported_type_length,
+        ) != 0
+        || reported_type != SOCK_SEQPACKET as i32
+        || reported_type_length != core::mem::size_of::<i32>() as u32
+    {
+        let _ = close(seqpacket_fds[0]);
+        let _ = close(seqpacket_fds[1]);
+        fail(USER_FAIL_UNIX_SEQPACKET, 292);
+    }
+    if pipe_write(seqpacket_fds[0], b"ABC") != 3
+        || pipe_write(seqpacket_fds[0], b"DEFG") != 4
+    {
+        let _ = close(seqpacket_fds[0]);
+        let _ = close(seqpacket_fds[1]);
+        fail(USER_FAIL_UNIX_SEQPACKET, 293);
+    }
+    let mut first_record = [0_u8; 2];
+    let mut second_record = [0_u8; 4];
+    let mut empty_record = [0_u8; 1];
+    if socket_recv(seqpacket_fds[1], &mut first_record) != first_record.len() as isize
+        || first_record != *b"AB"
+        || socket_recv(seqpacket_fds[1], &mut second_record) != second_record.len() as isize
+        || second_record != *b"DEFG"
+        || socket_recv(seqpacket_fds[1], &mut empty_record) != NEG_EAGAIN
+    {
+        let _ = close(seqpacket_fds[0]);
+        let _ = close(seqpacket_fds[1]);
+        fail(USER_FAIL_UNIX_SEQPACKET, 294);
+    }
+    if close(seqpacket_fds[0]) != 0
+        || socket_recv(seqpacket_fds[1], &mut empty_record) != 0
+        || close(seqpacket_fds[1]) != 0
+    {
+        fail(USER_FAIL_UNIX_SEQPACKET, 295);
+    }
+    if write(ASSERT_UNIX_SEQPACKET) != ASSERT_UNIX_SEQPACKET.len() as isize {
+        fail(USER_FAIL_WRITE, 296);
     }
 
     // CAgent's server and concurrent clients depend on ordinary process creation and
