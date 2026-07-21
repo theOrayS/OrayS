@@ -137,20 +137,12 @@ impl UserProcess {
         self.path_times.lock().insert(path, times);
     }
 
-    pub(super) fn remove_path_times(&self, path: &str) {
-        self.path_times.lock().remove(path);
-    }
-
     pub(super) fn path_times(&self, path: &str) -> Option<PathTimes> {
         self.path_times.lock().get(path).copied()
     }
 
     pub(super) fn set_path_inode(&self, path: String, ino: u64) {
         self.path_inodes.lock().insert(path, ino.max(1));
-    }
-
-    pub(super) fn remove_path_inode(&self, path: &str) {
-        self.path_inodes.lock().remove(path);
     }
 
     pub(super) fn path_inode_override(&self, path: &str) -> Option<u64> {
@@ -323,20 +315,12 @@ impl UserProcess {
         }
     }
 
-    pub(super) fn remove_path_inode_flags(&self, path: &str) {
-        self.path_inode_flags.lock().remove(path);
-    }
-
     pub(super) fn path_inode_flags(&self, path: &str) -> u32 {
         self.path_inode_flags.lock().get(path).copied().unwrap_or(0)
     }
 
     pub(super) fn set_path_symlink(&self, path: String, target: String) {
         self.path_symlinks.lock().insert(path, target);
-    }
-
-    pub(super) fn remove_path_symlink(&self, path: &str) -> bool {
-        self.path_symlinks.lock().remove(path).is_some()
     }
 
     pub(super) fn path_symlink(&self, path: &str) -> Option<String> {
@@ -412,6 +396,20 @@ impl UserProcess {
             counts.remove(canonical.as_str());
         }
         Some((canonical, remaining))
+    }
+
+    pub(super) fn clear_unlinked_path_metadata(&self, path: &str) {
+        self.remove_path_hardlink(path);
+        self.path_modes.lock().remove(path);
+        self.path_inodes.lock().remove(path);
+        self.path_special_modes.lock().remove(path);
+        self.path_rdevs.lock().remove(path);
+        self.path_owners.lock().remove(path);
+        self.path_symlinks.lock().remove(path);
+        self.path_inode_flags.lock().remove(path);
+        self.path_xattrs.lock().remove(path);
+        self.path_times.lock().remove(path);
+        self.clear_path_sparse_file(path);
     }
 
     pub(super) fn path_symlink_names_in_dir(&self, dir: &str) -> Vec<String> {

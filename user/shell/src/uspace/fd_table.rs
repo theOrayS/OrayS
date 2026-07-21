@@ -4303,6 +4303,16 @@ fn renameat2_paths(
             &new_st,
         );
     }
+    if let Some(new_st) = new_st.as_ref() {
+        let old_is_dir = old_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR;
+        let new_is_dir = new_st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR;
+        if old_is_dir && !new_is_dir {
+            return Err(LinuxError::ENOTDIR);
+        }
+        if !old_is_dir && new_is_dir {
+            return Err(LinuxError::EISDIR);
+        }
+    }
 
     let old_parent_st = check_parent_write_search_permission(process, old_abs_path.as_str())?;
     let new_parent_st = check_parent_write_search_permission(process, new_abs_path.as_str())?;
@@ -4313,17 +4323,31 @@ fn renameat2_paths(
     if process.paths_cross_mount(old_abs_path.as_str(), new_abs_path.as_str()) {
         return Err(LinuxError::EXDEV);
     }
+    if process.path_on_readonly_mount(old_abs_path.as_str())
+        || process.path_on_readonly_mount(new_abs_path.as_str())
+    {
+        return Err(LinuxError::EROFS);
+    }
 
     if let Some(backing_path) = process.path_hardlink_backing(old_abs_path.as_str()) {
         if backing_path != old_abs_path {
-            if new_st.is_some() {
-                return Err(LinuxError::EEXIST);
+            if let Some(new_st) = new_st.as_ref() {
+                remove_rename_destination(process, new_abs_path.as_str(), new_st)?;
             }
-            process.remove_path_hardlink(old_abs_path.as_str());
-            process.remove_path_inode(old_abs_path.as_str());
+            process.clear_unlinked_path_metadata(old_abs_path.as_str());
             process.set_path_hardlink(backing_path.as_str(), new_abs_path, old_st.st_ino as u64);
             invalidate_exec_image_cache(old_abs_path.as_str());
             return Ok(());
+        }
+    }
+
+    if let Some(new_st) = new_st.as_ref() {
+        let target_uses_recorded_namespace = process.path_symlink(new_abs_path.as_str()).is_some()
+            || process
+                .path_hardlink_backing(new_abs_path.as_str())
+                .is_some();
+        if target_uses_recorded_namespace {
+            remove_rename_destination(process, new_abs_path.as_str(), new_st)?;
         }
     }
 
@@ -4331,6 +4355,42 @@ fn renameat2_paths(
     invalidate_exec_image_cache(old_abs_path.as_str());
     invalidate_exec_image_cache(new_abs_path.as_str());
     process.move_path_metadata(old_abs_path.as_str(), new_abs_path);
+    Ok(())
+}
+
+fn remove_rename_destination(
+    process: &UserProcess,
+    path: &str,
+    st: &general::stat,
+) -> Result<(), LinuxError> {
+    if st.st_mode & ST_MODE_TYPE_MASK == ST_MODE_DIR {
+        return Err(LinuxError::EISDIR);
+    }
+    check_inode_flags_allow_unlink(process, path)?;
+
+    if process.path_symlink(path).is_some() {
+        process.clear_unlinked_path_metadata(path);
+        invalidate_exec_image_cache(path);
+        return Ok(());
+    }
+    if let Some(backing_path) = process.path_hardlink_backing(path) {
+        if backing_path != path {
+            process.clear_unlinked_path_metadata(path);
+            invalidate_exec_image_cache(path);
+            return Ok(());
+        }
+        if let Some(promoted_path) = process.path_hardlink_promotion(path) {
+            axfs::api::rename(path, promoted_path.as_str()).map_err(LinuxError::from)?;
+            process.move_path_metadata(path, promoted_path.clone());
+            invalidate_exec_image_cache(path);
+            invalidate_exec_image_cache(promoted_path.as_str());
+            return Ok(());
+        }
+    }
+
+    directory_remove_file(path)?;
+    process.clear_unlinked_path_metadata(path);
+    invalidate_exec_image_cache(path);
     Ok(())
 }
 
@@ -7351,13 +7411,7 @@ impl FdTable {
                 let st = stat_absolute_path(process, backing_path.as_str())?;
                 check_inode_flags_allow_unlink(process, backing_path.as_str())?;
                 check_sticky_parent_permission(process, &parent_st, &st)?;
-                process.remove_path_hardlink(abs_path.as_str());
-                process.remove_path_inode(abs_path.as_str());
-                process.remove_path_inode_flags(abs_path.as_str());
-                process.remove_path_special_mode(abs_path.as_str());
-                process.remove_path_rdev(abs_path.as_str());
-                process.remove_path_times(abs_path.as_str());
-                process.clear_path_sparse_file(abs_path.as_str());
+                process.clear_unlinked_path_metadata(abs_path.as_str());
                 invalidate_exec_image_cache(abs_path.as_str());
                 return Ok(());
             }
@@ -7393,9 +7447,7 @@ impl FdTable {
             if remove_dir {
                 return Err(LinuxError::ENOTDIR);
             }
-            process.remove_path_symlink(abs_path.as_str());
-            process.remove_path_inode_flags(abs_path.as_str());
-            process.remove_path_times(abs_path.as_str());
+            process.clear_unlinked_path_metadata(abs_path.as_str());
             invalidate_exec_image_cache(abs_path.as_str());
             return Ok(());
         }
@@ -7408,13 +7460,7 @@ impl FdTable {
             directory_remove_file(abs_path.as_str())
         };
         if removed.is_ok() {
-            process.remove_path_hardlink(abs_path.as_str());
-            process.remove_path_inode(abs_path.as_str());
-            process.remove_path_inode_flags(abs_path.as_str());
-            process.remove_path_special_mode(abs_path.as_str());
-            process.remove_path_rdev(abs_path.as_str());
-            process.remove_path_times(abs_path.as_str());
-            process.clear_path_sparse_file(abs_path.as_str());
+            process.clear_unlinked_path_metadata(abs_path.as_str());
             invalidate_exec_image_cache(abs_path.as_str());
         }
         removed
