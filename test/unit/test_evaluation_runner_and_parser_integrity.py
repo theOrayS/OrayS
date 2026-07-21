@@ -937,6 +937,30 @@ class EvaluationRunnerAndParserIntegrityGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("busybox wrapper preparation", result.stdout)
 
+    def test_detects_removal_of_debian_posix_shell_support(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8") + (
+            '\nfn official_shell_for_suite(suite_dir: &str) { '
+            'let _ = join_path(suite_dir, "busybox"); }\n'
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("real POSIX /bin/sh", result.stdout)
+
+    def test_detects_busybox_only_official_autorun(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/cmd.rs"
+        text = path.read_text(encoding="utf-8").replace(
+            "run_official_shell_command",
+            "missing_official_shell_command",
+        )
+        path.write_text(text, encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ordinary POSIX shells", result.stdout)
+
     def test_detects_runner_layer_missing_runtime_busybox_wrapper_preparation(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/cmd.rs"

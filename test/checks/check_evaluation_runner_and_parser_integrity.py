@@ -186,6 +186,7 @@ def scan_cmd_rs(root: Path) -> list[str]:
     findings: list[str] = []
     env_block = function_block(text, "ltp_case_env")
     autorun_body = function_body(text, "maybe_run_official_tests")
+    official_shell_block = function_block(text, "official_shell_for_suite")
     run_dir_block = function_block(text, "prepare_ltp_case_run_dir")
     helper_cases_block = function_block(text, "ltp_resource_helper_cases")
     copy_block = function_block(text, "copy_script_file")
@@ -225,6 +226,38 @@ def scan_cmd_rs(root: Path) -> list[str]:
     ):
         if token not in text:
             findings.append(f"user/shell/src/cmd.rs: {detail}")
+    if not official_shell_block:
+        findings.append(
+            "user/shell/src/cmd.rs: official autorun must select a suite runtime shell explicitly"
+        )
+    else:
+        for token, detail in (
+            ('"/bin/sh"', "accept a real POSIX /bin/sh from Debian-style final images"),
+            (
+                'join_path(suite_dir, "busybox")',
+                "preserve suite-local BusyBox support for legacy official images",
+            ),
+        ):
+            if token not in official_shell_block:
+                findings.append(
+                    f"user/shell/src/cmd.rs: official shell selection must {detail}"
+                )
+    if "busybox shell not found" in autorun_body:
+        findings.append(
+            "user/shell/src/cmd.rs: official autorun must not exit before trying a real POSIX /bin/sh"
+        )
+    for token, detail in (
+        (
+            "copy_posix_script_file",
+            "stage Debian-rootfs scripts without rewriting utilities as BusyBox applets",
+        ),
+        (
+            "run_official_shell_command",
+            "invoke ordinary POSIX shells without BusyBox's extra sh applet argument",
+        ),
+    ):
+        if token not in autorun_body:
+            findings.append(f"user/shell/src/cmd.rs: official autorun must {detail}")
     for function_name in sorted(function_names & forbidden_functions):
         findings.append(
             f"user/shell/src/cmd.rs: forbidden suite/script-specific helper still defined: {function_name}"
