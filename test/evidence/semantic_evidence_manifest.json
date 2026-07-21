@@ -575,8 +575,10 @@
         "user/shell/src/semantic_smoke.rs",
         "user/shell/src/uspace/fd_socket.rs",
         "user/shell/src/uspace/fd_table.rs",
+        "user/shell/src/uspace/linux_abi.rs",
         "user/shell/src/uspace/metadata.rs",
         "user/shell/src/uspace/process_lifecycle.rs",
+        "user/shell/src/uspace/program_loader.rs",
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
         "user/shell/src/uspace/syscall_dispatch.rs"
@@ -667,8 +669,10 @@
         "user/shell/src/semantic_smoke.rs",
         "user/shell/src/uspace/fd_socket.rs",
         "user/shell/src/uspace/fd_table.rs",
+        "user/shell/src/uspace/linux_abi.rs",
         "user/shell/src/uspace/metadata.rs",
         "user/shell/src/uspace/process_lifecycle.rs",
+        "user/shell/src/uspace/program_loader.rs",
         "user/shell/src/uspace/resource_sched.rs",
         "user/shell/src/uspace/synthetic_fs.rs",
         "user/shell/src/uspace/syscall_dispatch.rs"

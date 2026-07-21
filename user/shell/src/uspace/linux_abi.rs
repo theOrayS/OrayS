@@ -38,7 +38,10 @@ pub use orays_linux::abi::constants::{
 
 pub(super) const USER_ASPACE_BASE: usize = 0x1_0000;
 pub(super) const USER_ASPACE_SIZE: usize = 0x3f_0000_0000;
-pub(super) const USER_STACK_SIZE: usize = 8 * 1024 * 1024;
+// Reserve enough lazy virtual stack for toolchains that raise RLIMIT_STACK before
+// starting memory-intensive work. `program_loader` maps this range with
+// `populate = false`, so untouched stack pages consume no physical frames.
+pub(super) const USER_STACK_SIZE: usize = 64 * 1024 * 1024;
 pub(super) const USER_STACK_GUARD: usize = 0x1_0000;
 pub(super) const USER_STACK_TOP: usize = USER_ASPACE_BASE + USER_ASPACE_SIZE - USER_STACK_GUARD;
 pub(super) const USER_MMAP_BASE: usize = 0x10_0000_0000;
