@@ -544,8 +544,8 @@ pub(super) fn sys_futex(
     }
     match cmd {
         general::FUTEX_WAIT => {
-            let restart_key = (timeout != 0)
-                .then(|| relative_restart_key(uaddr, futex_op, val, timeout));
+            let restart_key =
+                (timeout != 0).then(|| relative_restart_key(uaddr, futex_op, val, timeout));
             wait_addr(
                 process,
                 uaddr,

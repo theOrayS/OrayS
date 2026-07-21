@@ -156,8 +156,7 @@ fn restartable_blocking_syscall(tf: &TrapFrame, syscall_num: u32) -> bool {
         // only when the futex path retained and now arms its monotonic deadline.
         general::FUTEX_WAIT => {
             tf.arg3() == 0
-                || current_task_ext()
-                    .is_some_and(|ext| futex::arm_relative_futex_restart(ext, tf))
+                || current_task_ext().is_some_and(|ext| futex::arm_relative_futex_restart(ext, tf))
         }
         _ => false,
     }
