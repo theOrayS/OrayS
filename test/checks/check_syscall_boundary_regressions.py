@@ -416,6 +416,14 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
     if not (0 <= requeue_source_key < requeue_target_key < requeue_compare):
         findings.append("FUTEX_CMP_REQUEUE compares the source value before validating both futex keys")
     sys_futex = rust_function_block(futex, "sys_futex")
+    require_tokens(
+        findings,
+        sys_futex,
+        "futex source validation must reserve EINVAL for misalignment and let memory access report EFAULT",
+        ("if uaddr % size_of::<u32>() != 0",),
+    )
+    if "uaddr == 0" in sys_futex:
+        findings.append("null futex source must be reported by user-memory access as EFAULT")
     requeue_start = sys_futex.find("general::FUTEX_REQUEUE =>")
     cmp_requeue_start = sys_futex.find("general::FUTEX_CMP_REQUEUE =>")
     wake_bitset_start = sys_futex.find("general::FUTEX_WAKE_BITSET =>")

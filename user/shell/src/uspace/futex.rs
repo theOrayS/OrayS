@@ -531,7 +531,7 @@ pub(super) fn sys_futex(
     _uaddr2: usize,
     _val3: usize,
 ) -> isize {
-    if uaddr == 0 || uaddr % size_of::<u32>() != 0 {
+    if uaddr % size_of::<u32>() != 0 {
         return neg_errno(LinuxError::EINVAL);
     }
     let op = futex_op as u32;

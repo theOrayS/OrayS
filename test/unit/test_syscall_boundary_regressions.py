@@ -338,6 +338,24 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("null target", result.stdout)
 
+    def test_detects_futex_null_source_einval(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        alignment = "if uaddr % size_of::<u32>() != 0"
+        self.assertIn(alignment, text)
+        path.write_text(
+            text.replace(
+                alignment,
+                "if uaddr == 0 || uaddr % size_of::<u32>() != 0",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("null futex source", result.stdout)
+
     def test_detects_futex_cmp_requeue_compare_before_target_key(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/futex.rs"
