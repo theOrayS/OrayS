@@ -631,7 +631,7 @@ CANONICAL_UNIT_CASE_IDS = (
 )
 CANONICAL_UNIT_EXPECTED_TESTS = {
     "unit.compliance_regressions": 7,
-    "unit.competition_semantic_evidence": 33,
+    "unit.competition_semantic_evidence": 34,
     "unit.evaluation_failure_report": 9,
     "unit.evaluation_runner_and_parser_integrity": 24,
     "unit.evaluator_protocol": 27,
