@@ -408,20 +408,24 @@ impl Socket {
     }
 }
 
+/// Sets the receive timeout (SO_RCVTIMEO) of the socket behind `sockfd`.
 pub fn set_socket_recv_timeout(sockfd: c_int, timeout: Option<Duration>) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_recv_timeout(timeout);
     Ok(())
 }
 
+/// Returns the current receive timeout of the socket behind `sockfd`.
 pub fn socket_recv_timeout(sockfd: c_int) -> LinuxResult<Option<Duration>> {
     Ok(Socket::from_fd(sockfd)?.recv_timeout())
 }
 
+/// Sets the send timeout (SO_SNDTIMEO) of the socket behind `sockfd`.
 pub fn set_socket_send_timeout(sockfd: c_int, timeout: Option<Duration>) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_send_timeout(timeout);
     Ok(())
 }
 
+/// Returns the current send timeout of the socket behind `sockfd`.
 pub fn socket_send_timeout(sockfd: c_int) -> LinuxResult<Option<Duration>> {
     Ok(Socket::from_fd(sockfd)?.send_timeout())
 }
@@ -450,51 +454,62 @@ fn socket_buffer_option_error(err: impl Into<LinuxError>) -> LinuxError {
     }
 }
 
+/// Sets the receive buffer size (SO_RCVBUF) of the socket behind `sockfd`.
 pub fn set_socket_recv_buffer_size(sockfd: c_int, size: c_int) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_recv_buffer_size(validate_socket_buffer_size(size)?)
 }
 
+/// Sets the receive buffer size (SO_RCVBUFFORCE) without the sysctl cap.
 pub fn force_socket_recv_buffer_size(sockfd: c_int, size: u32) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_recv_buffer_size(validate_forced_socket_buffer_size(size))
 }
 
+/// Returns the receive buffer size of the socket behind `sockfd`.
 pub fn socket_recv_buffer_size(sockfd: c_int) -> LinuxResult<c_int> {
     Ok(Socket::from_fd(sockfd)?
         .recv_buffer_size()
         .min(c_int::MAX as usize) as c_int)
 }
 
+/// Sets the send buffer size (SO_SNDBUF) of the socket behind `sockfd`.
 pub fn set_socket_send_buffer_size(sockfd: c_int, size: c_int) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_send_buffer_size(validate_socket_buffer_size(size)?)
 }
 
+/// Sets the send buffer size (SO_SNDBUFFORCE) without the sysctl cap.
 pub fn force_socket_send_buffer_size(sockfd: c_int, size: u32) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_send_buffer_size(validate_forced_socket_buffer_size(size))
 }
 
+/// Returns the send buffer size of the socket behind `sockfd`.
 pub fn socket_send_buffer_size(sockfd: c_int) -> LinuxResult<c_int> {
     Ok(Socket::from_fd(sockfd)?
         .send_buffer_size()
         .min(c_int::MAX as usize) as c_int)
 }
 
+/// Sets the SO_REUSEADDR flag of the socket behind `sockfd`.
 pub fn set_socket_reuse_addr(sockfd: c_int, enabled: bool) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_reuse_addr(enabled);
     Ok(())
 }
 
+/// Returns the SO_REUSEADDR flag of the socket behind `sockfd`.
 pub fn socket_reuse_addr(sockfd: c_int) -> LinuxResult<bool> {
     Ok(Socket::from_fd(sockfd)?.reuse_addr())
 }
 
+/// Sets the TCP_NODELAY flag of the socket behind `sockfd`.
 pub fn set_socket_tcp_nodelay(sockfd: c_int, enabled: bool) -> LinuxResult {
     Socket::from_fd(sockfd)?.set_tcp_nodelay(enabled)
 }
 
+/// Returns the TCP_NODELAY flag of the socket behind `sockfd`.
 pub fn socket_tcp_nodelay(sockfd: c_int) -> LinuxResult<bool> {
     Socket::from_fd(sockfd)?.tcp_nodelay()
 }
 
+/// Returns the TCP maximum segment size of the socket behind `sockfd`.
 pub fn socket_tcp_max_segment_size(sockfd: c_int) -> LinuxResult<c_int> {
     Ok(Socket::from_fd(sockfd)?
         .tcp_max_segment_size()?

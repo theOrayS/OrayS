@@ -23,7 +23,7 @@ multitask = [
     "dep:crate_interface",
     "dep:cpumask",
 ]
-irq = []
+irq = ["axhal/irq"]
 tls = ["axhal/tls"]
 uspace = ["axhal/uspace"]
 preempt = ["irq", "percpu?/preempt", "kernel_guard/preempt"]

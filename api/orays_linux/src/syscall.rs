@@ -9,10 +9,12 @@ pub const MAX_SYSCALL_ARGUMENTS: usize = 6;
 pub struct SyscallNumber(u32);
 
 impl SyscallNumber {
+    /// Wraps a raw target syscall number.
     pub const fn new(value: u32) -> Self {
         Self(value)
     }
 
+    /// Returns the raw target syscall number.
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -28,10 +30,12 @@ impl SyscallNumber {
 pub struct SyscallArgs([usize; MAX_SYSCALL_ARGUMENTS]);
 
 impl SyscallArgs {
+    /// Wraps the six raw register arguments supplied by the entry path.
     pub const fn new(values: [usize; MAX_SYSCALL_ARGUMENTS]) -> Self {
         Self(values)
     }
 
+    /// Returns the argument at `index`, or `None` when out of range.
     pub const fn get(&self, index: usize) -> Option<usize> {
         if index < MAX_SYSCALL_ARGUMENTS {
             Some(self.0[index])
@@ -40,6 +44,7 @@ impl SyscallArgs {
         }
     }
 
+    /// Borrows the raw arguments as an array.
     pub const fn as_array(&self) -> &[usize; MAX_SYSCALL_ARGUMENTS] {
         &self.0
     }
@@ -48,21 +53,29 @@ impl SyscallArgs {
 /// Architecture labels used by metadata; they do not select a backend.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SyscallArchitecture {
+    /// 64-bit RISC-V target.
     Riscv64,
+    /// 64-bit ARM target.
     Aarch64,
+    /// 64-bit LoongArch target.
     LoongArch64,
+    /// Any other target.
     Other,
 }
 
 /// The target set on which a dispatcher registration exists.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SyscallAvailability {
+    /// Registered for every target.
     All,
+    /// Registered for exactly one target.
     Only(SyscallArchitecture),
+    /// Registered for every target except the listed ones.
     Except(&'static [SyscallArchitecture]),
 }
 
 impl SyscallAvailability {
+    /// Returns whether the registration exists on `architecture`.
     pub fn supports(self, architecture: SyscallArchitecture) -> bool {
         match self {
             Self::All => true,
@@ -87,6 +100,7 @@ pub struct SyscallMeta {
 }
 
 impl SyscallMeta {
+    /// Builds one metadata record, rejecting more than six declared arguments.
     pub const fn new(
         number: SyscallNumber,
         name: &'static str,
@@ -111,30 +125,37 @@ impl SyscallMeta {
         }
     }
 
+    /// Returns the target syscall number.
     pub const fn number(&self) -> SyscallNumber {
         self.number
     }
 
+    /// Returns the canonical syscall name.
     pub const fn name(&self) -> &'static str {
         self.name
     }
 
+    /// Returns the declared register argument count.
     pub const fn argument_count(&self) -> u8 {
         self.argument_count
     }
 
+    /// Returns the target set on which the registration exists.
     pub const fn availability(&self) -> SyscallAvailability {
         self.availability
     }
 
+    /// Returns the dispatcher handler symbol name.
     pub const fn handler(&self) -> &'static str {
         self.handler
     }
 
+    /// Returns the canonical name this registration aliases, when any.
     pub const fn alias_of(&self) -> Option<&'static str> {
         self.alias_of
     }
 
+    /// Returns the stable audit identifier of the registration.
     pub const fn audit_id(&self) -> &'static str {
         self.audit_id
     }

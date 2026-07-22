@@ -14,9 +14,13 @@ use super::{Backend, SharedPages, pte_flags_for_mapping};
 static SHARED_FRAMES: LazyInit<SpinNoIrq<BTreeMap<usize, usize>>> = LazyInit::new();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// /// Reference-count statistics for shared physical frames.
 pub struct SharedFrameStats {
+/// /// Number of tracked shared frames.
     pub entries: usize,
+/// /// Sum of reference counts over all tracked frames.
     pub total_refs: usize,
+/// /// Highest reference count of any tracked frame.
     pub max_refcount: usize,
 }
 

@@ -66,6 +66,7 @@ pub struct DescriptionIdentity {
 }
 
 impl DescriptionIdentity {
+    /// Creates the shared identity for one open description.
     pub fn new(id: OpenFileId) -> Self {
         Self {
             id,
@@ -73,10 +74,12 @@ impl DescriptionIdentity {
         }
     }
 
+    /// Returns the stable identity of the description.
     pub const fn id(&self) -> OpenFileId {
         self.id
     }
 
+    /// Returns the event source signalled when the last alias closes.
     pub const fn close_events(&self) -> &EventSource {
         &self.close_events
     }
@@ -174,13 +177,21 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for OpenFile<T> {
 pub struct ReadyEvents(u32);
 
 impl ReadyEvents {
+    /// No readiness bits.
     pub const EMPTY: Self = Self(0);
+    /// The object is readable without blocking.
     pub const READABLE: Self = Self(1 << 0);
+    /// The object is writable without blocking.
     pub const WRITABLE: Self = Self(1 << 1);
+    /// Priority (out-of-band) data is available.
     pub const PRIORITY: Self = Self(1 << 2);
+    /// The object reports an error condition.
     pub const ERROR: Self = Self(1 << 3);
+    /// The object reports a hangup.
     pub const HANGUP: Self = Self(1 << 4);
+    /// The referring descriptor is invalid.
     pub const INVALID: Self = Self(1 << 5);
+    /// Every defined readiness bit.
     pub const ALL: Self = Self(
         Self::READABLE.0
             | Self::WRITABLE.0
@@ -190,22 +201,27 @@ impl ReadyEvents {
             | Self::INVALID.0,
     );
 
+    /// Wraps raw readiness bits.
     pub const fn from_bits(bits: u32) -> Self {
         Self(bits)
     }
 
+    /// Returns the raw readiness bits.
     pub const fn bits(self) -> u32 {
         self.0
     }
 
+    /// Returns whether no readiness bit is set.
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
 
+    /// Returns whether every bit of `other` is set.
     pub const fn contains(self, other: Self) -> bool {
         self.0 & other.0 == other.0
     }
 
+    /// Returns whether any bit is shared with `other`.
     pub const fn intersects(self, other: Self) -> bool {
         self.0 & other.0 != 0
     }
@@ -261,10 +277,12 @@ pub struct EventDeliveryState {
 }
 
 impl EventDeliveryState {
+    /// Returns whether delivery has been disabled (one-shot consumed).
     pub const fn is_disabled(self) -> bool {
         self.disabled
     }
 
+    /// Decides whether a fresh level query produces an event for this consumer.
     pub const fn should_emit(self, ready: u32, notification: u64, edge: bool) -> bool {
         ready != 0
             && (!edge || ready & !self.last_ready != 0 || notification != self.last_notification)
@@ -309,8 +327,11 @@ impl EventDeliveryState {
 /// Result of resolving a fresh level query against a deadline.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LevelWaitDecision {
+    /// Readiness was observed; report it even at the deadline.
     Ready,
+    /// The deadline was reached without readiness.
     TimedOut,
+    /// Neither ready nor timed out; keep waiting.
     Wait,
 }
 
@@ -357,12 +378,15 @@ impl ReentrancyGate {
     const ACTIVE: u32 = 1;
     const PENDING: u32 = 2;
 
+    /// Creates an idle gate.
     pub const fn new() -> Self {
         Self {
             state: AtomicU32::new(Self::IDLE),
         }
     }
 
+    /// Attempts to become the active notification walk; a concurrent attempt
+    /// is coalesced into a pending round instead of entering recursively.
     pub fn try_enter(&self) -> Option<ReentrancyGuard<'_>> {
         loop {
             let state = self.state.load(Ordering::Acquire);
@@ -507,17 +531,28 @@ pub fn with_ordered_arc_mutex_pair<T, R>(
 /// sharing object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileTableGroup {
+    /// The shared base table group.
     Base,
+    /// A private copy group keyed by its owner pid.
     Private(i32),
 }
 
 /// Table-map update required after a process leaves its sharing group.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileTableDetach {
+    /// The existing mapping stays valid.
     Keep,
+    /// The base table mapping must be dropped.
     DropBase,
+    /// The private table mapping for this owner must be dropped.
     DropPrivate(i32),
-    MovePrivate { from: i32, to: i32 },
+    /// The private table mapping must move to a new owner.
+    MovePrivate {
+        /// Previous owner pid of the private group.
+        from: i32,
+        /// New owner pid of the private group.
+        to: i32,
+    },
 }
 
 /// Explicit CLONE_FILES membership tracking.
@@ -533,12 +568,14 @@ pub struct FileTableShareTracker {
 }
 
 impl FileTableShareTracker {
+    /// Records `pid` as a base-table user unless it already owns a private group.
     pub fn register_base(&mut self, pid: i32) {
         if !self.private_owner.contains_key(&pid) {
             self.base_users.insert(pid);
         }
     }
 
+    /// Returns the sharing group `pid` currently belongs to.
     pub fn group(&self, pid: i32) -> FileTableGroup {
         self.private_owner
             .get(&pid)
@@ -546,6 +583,7 @@ impl FileTableShareTracker {
             .map_or(FileTableGroup::Base, FileTableGroup::Private)
     }
 
+    /// Records a CLONE_FILES share between parent and child.
     pub fn share(&mut self, parent_pid: i32, child_pid: i32) {
         match self.group(parent_pid) {
             FileTableGroup::Base => {
@@ -559,6 +597,7 @@ impl FileTableShareTracker {
         }
     }
 
+    /// Returns whether the table used by `pid` has more than one user.
     pub fn is_shared(&self, pid: i32) -> bool {
         match self.group(pid) {
             FileTableGroup::Base => self.base_users.len() > 1,
@@ -586,6 +625,7 @@ impl FileTableShareTracker {
         owner_move
     }
 
+    /// Removes `pid` from tracking and reports the required table-map update.
     pub fn detach(&mut self, pid: i32) -> FileTableDetach {
         match self.group(pid) {
             FileTableGroup::Base => {
@@ -635,11 +675,14 @@ impl FileTableShareTracker {
 /// A persistent registration key that cannot be retargeted by FD-slot reuse.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct RegistrationKey {
+    /// Descriptor number used at registration time.
     pub registered_fd: i32,
+    /// Stable open-description identity; survives descriptor-slot reuse.
     pub open_file_id: OpenFileId,
 }
 
 impl RegistrationKey {
+    /// Creates a registration key from a descriptor and a description identity.
     pub const fn new(registered_fd: i32, open_file_id: OpenFileId) -> Self {
         Self {
             registered_fd,
@@ -650,6 +693,7 @@ impl RegistrationKey {
 
 /// A readiness consumer. Notifications are hints to query current readiness.
 pub trait EventObserver: Send + Sync {
+    /// Receives a readiness hint; implementations must query current readiness.
     fn on_event(&self, events: ReadyEvents);
 }
 
@@ -658,6 +702,7 @@ pub trait EventObserver: Send + Sync {
 pub struct EventToken(u64);
 
 impl EventToken {
+    /// Returns the raw token value.
     pub const fn get(self) -> u64 {
         self.0
     }
@@ -666,14 +711,18 @@ impl EventToken {
 /// State sampled immediately after an observer has been registered.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EventSnapshot {
+    /// Event-source generation sampled after registration.
     pub generation: u64,
+    /// Whether the source was already closed at registration time.
     pub closed: bool,
 }
 
 /// Failure to add an event observer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RegistrationError {
+    /// The event source is already closed.
     SourceClosed,
+    /// The registration token space is exhausted.
     TokenExhausted,
 }
 
@@ -695,6 +744,7 @@ pub struct EventSource {
 }
 
 impl EventSource {
+    /// Creates an open event source with no observers.
     pub fn new() -> Self {
         Self {
             inner: Arc::new(EventSourceInner {
@@ -815,6 +865,7 @@ pub struct EventSubscription {
 }
 
 impl EventSubscription {
+    /// Returns the registration token while the subscription is active.
     pub fn token(&self) -> Option<EventToken> {
         self.token
     }

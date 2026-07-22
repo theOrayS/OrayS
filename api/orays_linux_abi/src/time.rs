@@ -3,28 +3,44 @@
 use core::ffi::c_long;
 use core::mem::{align_of, offset_of, size_of};
 
+/// Clock ticks per second reported by `times(2)` (`USER_HZ`).
 pub const USER_HZ: c_long = 100;
 
+/// `struct tms` returned by `times(2)`.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Tms {
+    /// User CPU time of the caller, in clock ticks.
     pub tms_utime: c_long,
+    /// System CPU time of the caller, in clock ticks.
     pub tms_stime: c_long,
+    /// User CPU time of waited-for children, in clock ticks.
     pub tms_cutime: c_long,
+    /// System CPU time of waited-for children, in clock ticks.
     pub tms_cstime: c_long,
 }
 
+/// `struct rtc_time` filled by the `RTC_RD_TIME` ioctl.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct RtcTime {
+    /// Seconds (0-59).
     pub tm_sec: i32,
+    /// Minutes (0-59).
     pub tm_min: i32,
+    /// Hours (0-23).
     pub tm_hour: i32,
+    /// Day of the month (1-31).
     pub tm_mday: i32,
+    /// Months since January (0-11).
     pub tm_mon: i32,
+    /// Years since 1900.
     pub tm_year: i32,
+    /// Days since Sunday (0-6).
     pub tm_wday: i32,
+    /// Days since January 1 (0-365).
     pub tm_yday: i32,
+    /// Daylight saving time flag.
     pub tm_isdst: i32,
 }
 

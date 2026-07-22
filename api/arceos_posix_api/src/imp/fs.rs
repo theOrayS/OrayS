@@ -264,6 +264,8 @@ fn flags_to_options(flags: c_int, mode: ctypes::mode_t) -> LinuxResult<OpenOptio
     Ok(options)
 }
 
+/// `umask(2)`: sets the process file-mode creation mask and returns the
+/// previous mask.
 pub fn sys_umask(mask: ctypes::mode_t) -> ctypes::mode_t {
     FILE_MODE_UMASK.swap((mask as u32) & 0o777, Ordering::AcqRel) as ctypes::mode_t
 }

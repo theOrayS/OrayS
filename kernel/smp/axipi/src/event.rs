@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
 /// A callback function that will be called when an [`IpiEvent`] is received and handled.
+/// A one-shot callback invoked when an [`IpiEvent`] is received and handled.
 pub struct Callback(Box<dyn FnOnce()>);
 
 impl Callback {

@@ -78,6 +78,8 @@ static ETH0: LazyInit<InterfaceWrapper> = LazyInit::new();
 
 struct SocketSetWrapper<'a>(Mutex<SocketSet<'a>>);
 
+/// Returns whether `local_addr` names one of this node's local addresses
+/// (or the unspecified address, which binds every local address).
 pub fn is_local_addr(local_addr: SocketAddr) -> bool {
     let local_endpoint = IpEndpoint::from(local_addr);
     local_endpoint.addr.is_unspecified()
@@ -346,6 +348,7 @@ pub fn poll_interfaces() {
     SOCKET_SET.poll_interfaces();
 }
 
+/// Returns the number of sockets currently allocated in the global socket set.
 pub fn socket_count() -> usize {
     SOCKET_SET.0.lock().iter().count()
 }

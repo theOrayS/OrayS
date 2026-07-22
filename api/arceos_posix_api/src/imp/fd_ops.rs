@@ -61,6 +61,8 @@ pub fn get_file_like(fd: c_int) -> LinuxResult<Arc<dyn FileLike>> {
         .ok_or(LinuxError::EBADF)
 }
 
+/// Polls the file-like object behind `fd`, refreshing network interfaces first
+/// when the `net` feature is enabled.
 pub fn poll_file_like(fd: c_int) -> LinuxResult<PollState> {
     #[cfg(feature = "net")]
     axnet::poll_interfaces();
@@ -94,6 +96,8 @@ pub fn close_file_like(fd: c_int) -> LinuxResult {
     Ok(())
 }
 
+/// Returns the number of currently assigned entries in the process file
+/// descriptor table.
 pub fn fd_table_assigned_count() -> usize {
     FD_TABLE.read().count()
 }

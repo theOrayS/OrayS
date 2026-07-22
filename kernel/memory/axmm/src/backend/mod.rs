@@ -65,7 +65,9 @@ pub enum Backend {
     },
     /// Shared physical mappings owned by another address space.
     Shared {
+        /// Shared frame table of the owning address space.
         pages: SharedPages,
+        /// Whether frames absent from the table may be allocated privately.
         alloc_missing: bool,
     },
 }

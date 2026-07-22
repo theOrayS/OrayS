@@ -8,14 +8,19 @@ use crate::user::{Read, UserRange, Write};
 /// supplied slice length. Mapping, fault-in and errno behavior remain backend
 /// responsibilities.
 pub trait UserMemoryBackend {
+    /// Backend-specific copy/validation error carried back to the caller.
     type Error;
 
+    /// Validates that `range` may be read from by subsequent copy operations.
     fn validate_read(&self, range: UserRange<Read>) -> Result<(), Self::Error>;
 
+    /// Validates that `range` may be written to by subsequent copy operations.
     fn validate_write(&self, range: UserRange<Write>) -> Result<(), Self::Error>;
 
+    /// Copies bytes from a readable user range into `dst`.
     fn read_bytes(&self, src: UserRange<Read>, dst: &mut [u8]) -> Result<(), Self::Error>;
 
+    /// Copies bytes from `src` into a writable user range.
     fn write_bytes(&self, dst: UserRange<Write>, src: &[u8]) -> Result<(), Self::Error>;
 }
 

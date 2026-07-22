@@ -7,10 +7,12 @@
 /// real signal for the current task.
 #[crate_interface::def_interface]
 pub trait PosixSignalIf {
+    /// Delivers `SIGPIPE` to the current task; returns whether it was delivered.
     fn raise_sigpipe() -> bool {
         false
     }
 
+    /// Returns whether a signal is pending that should interrupt blocking calls.
     fn has_interrupting_signal() -> bool {
         false
     }

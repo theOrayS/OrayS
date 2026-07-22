@@ -145,6 +145,7 @@ impl UdpSocket {
         Ok(())
     }
 
+    /// Returns the configured receive buffer size in bytes.
     pub fn recv_buffer_size(&self) -> usize {
         self.recv_buffer_size
     }
@@ -163,6 +164,7 @@ impl UdpSocket {
         Ok(())
     }
 
+    /// Returns the configured send buffer size in bytes.
     pub fn send_buffer_size(&self) -> usize {
         self.send_buffer_size
     }

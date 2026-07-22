@@ -30,14 +30,17 @@ impl Access for Write {}
 pub struct UserAddr(usize);
 
 impl UserAddr {
+    /// Wraps an integer address without validating any mapping.
     pub const fn new(value: usize) -> Self {
         Self(value)
     }
 
+    /// Returns the raw integer address.
     pub const fn get(self) -> usize {
         self.0
     }
 
+    /// Returns the address advanced by `offset`, or `None` on overflow.
     pub const fn checked_add(self, offset: usize) -> Option<Self> {
         match self.0.checked_add(offset) {
             Some(value) => Some(Self(value)),
@@ -69,18 +72,22 @@ impl<A: Access> UserRange<A> {
         }
     }
 
+    /// Returns the inclusive start address of the range.
     pub const fn start(self) -> UserAddr {
         self.start
     }
 
+    /// Returns the length of the range in bytes.
     pub const fn len(self) -> usize {
         self.len
     }
 
+    /// Returns whether the range is empty.
     pub const fn is_empty(self) -> bool {
         self.len == 0
     }
 
+    /// Returns the exclusive end address of the range.
     pub const fn end(self) -> UserAddr {
         // The constructor proves this addition cannot overflow.
         match self.start.checked_add(self.len) {
@@ -122,6 +129,7 @@ pub struct UserPtr<T, A: Access> {
 }
 
 impl<T, A: Access> UserPtr<T, A> {
+    /// Wraps a typed userspace address without dereferencing it.
     pub const fn new(addr: UserAddr) -> Self {
         Self {
             addr,
@@ -129,6 +137,7 @@ impl<T, A: Access> UserPtr<T, A> {
         }
     }
 
+    /// Returns the underlying userspace address.
     pub const fn addr(self) -> UserAddr {
         self.addr
     }
@@ -179,22 +188,27 @@ pub struct UserSlice<T, A: Access> {
 }
 
 impl<T, A: Access> UserSlice<T, A> {
+    /// Returns the typed start pointer of the slice.
     pub const fn ptr(self) -> UserPtr<T, A> {
         self.ptr
     }
 
+    /// Returns the element count of the slice.
     pub const fn len(self) -> usize {
         self.len
     }
 
+    /// Returns whether the slice contains no elements.
     pub const fn is_empty(self) -> bool {
         self.len == 0
     }
 
+    /// Returns the length of the slice in bytes.
     pub const fn byte_len(self) -> usize {
         self.byte_len
     }
 
+    /// Returns the checked byte range backing this slice.
     pub const fn byte_range(self) -> UserRange<A> {
         // `UserPtr::slice` validated this exact pair.
         match UserRange::new(self.ptr.addr, self.byte_len) {
