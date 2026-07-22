@@ -54,6 +54,21 @@ SHA-256/行号写入 sidecar；resize 必须满足
 输入序列、合法 P6 截图或 QEMU exit 0 中任何一项都会失败。boot 保存只有等待步骤的显式序列
 和 QMP handshake，不会把零输入记作键鼠交互。
 
+### Runtime 证据绑定与本地执行策略
+
+- 运行时验证只在本地或人工控制的机器上执行；仓库不保留任何持久化 self-hosted
+  GitHub Actions runtime job，也不接受 PR 触发的 self-hosted 运行。
+- runner 固定要求 QEMU `9.2.4` banner，并把证据绑定到实际执行的身份：解析后的
+  QEMU 绝对路径、其二进制 SHA-256、完整有序 argv、guest artifact 的
+  路径/类型/大小/SHA-256/架构，以及运行前后一致且干净的 source provenance。
+- runner 对解析后的同一 QEMU 路径采集身份、校验 banner、计算 digest 并执行，
+  身份采集与执行之间的替换会在 `--record-invocation` 阶段硬性失败。
+- 可选 digest 策略：设置 `DESKTOP_QEMU_AUTHORIZED_SHA256=<lowercase sha256>` 后，
+  runner 只接受 digest 完全相等的 QEMU 二进制；不设置时按 `unpinned` 记录，
+  digest 仍强制记录并参与验证。
+- PASS package 要求 provenance 稳定（运行前后 commit 一致且无未提交改动）；
+  任何失败都产生严格校验的 `VALID_FAIL` package，而不是成功结论。
+
 禁止：
 
 - `-vnc 0.0.0.0:*`；
