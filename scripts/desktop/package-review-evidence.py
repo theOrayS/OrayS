@@ -219,6 +219,15 @@ def main() -> int:
         "required_qemu_version": metadata.get("required_qemu_version"),
         "observed_qemu_version": metadata.get("observed_qemu_version"),
         "qemu_version_matches_required": metadata.get("qemu_version_matches_required"),
+        "qemu_sha256": metadata.get("qemu_sha256"),
+        "qemu_digest_policy": metadata.get("qemu_digest_policy"),
+        "qemu_authorized_sha256": metadata.get("qemu_authorized_sha256"),
+        "qemu_digest_matches_authorized": metadata.get(
+            "qemu_digest_matches_authorized"
+        ),
+        "qemu_argv": metadata.get("qemu_argv"),
+        "guest_artifact": metadata.get("guest_artifact"),
+        "runner_inputs": metadata.get("runner_inputs"),
         "qemu_started": summary.get("qemu_started"),
         "qemu_exit": summary.get("qemu_exit"),
         "runner_exit": summary.get("runner_exit"),

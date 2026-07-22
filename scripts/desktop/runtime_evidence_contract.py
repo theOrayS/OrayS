@@ -8,22 +8,26 @@ import re
 
 CANONICAL_QEMU_VERSION = "9.2.4"
 CANONICAL_QEMU_BANNER = f"QEMU emulator version {CANONICAL_QEMU_VERSION}"
-RUNTIME_METADATA_SCHEMA = 3
+RUNTIME_METADATA_SCHEMA = 4
 RUN_SUMMARY_SCHEMA = 2
-REVIEW_PACKAGE_SCHEMA = 3
+REVIEW_PACKAGE_SCHEMA = 4
 
 FAILURE_REASONS_BY_STAGE = {
     "runtime-prerequisites": {
         "runtime_prerequisites_failure",
         "missing_runtime_prerequisite",
         "missing_qemu_binary",
+        "qemu_resolution_failure",
         "qemu_version_mismatch",
         "qemu_version_override_rejected",
+        "qemu_authorized_digest_invalid",
+        "qemu_digest_mismatch",
     },
     "runtime-metadata-initial": {"runtime_metadata_initial_failure"},
     "desktop-build": {"desktop_build_failure"},
     "qmp-runtime-setup": {"qmp_runtime_setup_failure"},
     "disk-setup": {"disk_setup_failure"},
+    "runtime-metadata-invocation": {"runtime_metadata_invocation_failure"},
     "qemu-boot": {"qemu_boot_failure"},
     "input-injection": {"input_injection_failure"},
     "runtime-resize": {"runtime_resize_failure"},
@@ -45,11 +49,39 @@ PRE_START_STAGES = {
     "desktop-build",
     "qmp-runtime-setup",
     "disk-setup",
+    "runtime-metadata-invocation",
     "runner-signal",
 }
 
 STAGE_TOKEN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 REASON_TOKEN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+SHA256_TOKEN = re.compile(r"[0-9a-f]{64}")
+QEMU_DIGEST_POLICIES = ("unpinned", "authorized-sha256")
+
+
+def validate_qemu_digest_policy(
+    *,
+    policy: object,
+    authorized_sha256: object,
+    matches_authorized: object,
+    qemu_sha256: object,
+) -> None:
+    """Fail closed on the executed-QEMU digest identity and its policy."""
+    if not isinstance(qemu_sha256, str) or SHA256_TOKEN.fullmatch(qemu_sha256) is None:
+        raise ValueError("executed QEMU binary digest is missing or invalid")
+    if policy == "unpinned":
+        if authorized_sha256 is not None or matches_authorized is not None:
+            raise ValueError("unpinned QEMU digest policy carries an authorized digest")
+    elif policy == "authorized-sha256":
+        if (
+            not isinstance(authorized_sha256, str)
+            or SHA256_TOKEN.fullmatch(authorized_sha256) is None
+        ):
+            raise ValueError("authorized QEMU digest is missing or invalid")
+        if matches_authorized is not True or authorized_sha256 != qemu_sha256:
+            raise ValueError("executed QEMU digest does not match the authorized digest")
+    else:
+        raise ValueError("QEMU digest policy is invalid")
 
 
 def qemu_version_is_canonical(required: object, observed: object) -> bool:

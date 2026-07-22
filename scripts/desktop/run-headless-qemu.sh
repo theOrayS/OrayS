@@ -94,7 +94,9 @@ cleanup() {
         fi
         local stopped_exit=0
         wait "$qemu_pid" 2>/dev/null || stopped_exit=$?
-        if [[ -z "$qemu_exit" || "$qemu_exit" == 0 ]]; then
+        # Only fill in a missing status; never overwrite the exit status
+        # already recorded from the real wait that reaped the process.
+        if [[ -z "$qemu_exit" ]]; then
             qemu_exit=$stopped_exit
         fi
         qemu_pid=
@@ -169,11 +171,36 @@ command -v "$qemu_binary" >/dev/null 2>&1 || {
     printf 'missing required QEMU: %s\n' "$qemu_binary" >&2
     exit 3
 }
-qemu_version=$($qemu_binary --version | sed -n '1p')
+qemu_binary_resolved=$(readlink -f "$(command -v "$qemu_binary")") || {
+    failure_reason=qemu_resolution_failure
+    printf 'cannot resolve QEMU binary: %s\n' "$qemu_binary" >&2
+    exit 3
+}
+if [[ ! -x "$qemu_binary_resolved" || ! -f "$qemu_binary_resolved" ]]; then
+    failure_reason=qemu_resolution_failure
+    printf 'resolved QEMU path is not a regular executable: %s\n' \
+        "$qemu_binary_resolved" >&2
+    exit 3
+fi
+qemu_version=$("$qemu_binary_resolved" --version | sed -n '1p')
 if [[ "$qemu_version" != "QEMU emulator version ${required_qemu_version}" ]]; then
     failure_reason=qemu_version_mismatch
     printf 'required QEMU %s, got: %s\n' "$required_qemu_version" "$qemu_version" >&2
     exit 3
+fi
+qemu_sha256=$(sha256sum "$qemu_binary_resolved" | cut -d' ' -f1)
+if [[ -n "${DESKTOP_QEMU_AUTHORIZED_SHA256:-}" ]]; then
+    if [[ ! "$DESKTOP_QEMU_AUTHORIZED_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+        failure_reason=qemu_authorized_digest_invalid
+        printf 'DESKTOP_QEMU_AUTHORIZED_SHA256 must be a lowercase SHA-256 digest\n' >&2
+        exit 3
+    fi
+    if [[ "$qemu_sha256" != "$DESKTOP_QEMU_AUTHORIZED_SHA256" ]]; then
+        failure_reason=qemu_digest_mismatch
+        printf 'QEMU digest %s does not match DESKTOP_QEMU_AUTHORIZED_SHA256 %s\n' \
+            "$qemu_sha256" "$DESKTOP_QEMU_AUTHORIZED_SHA256" >&2
+        exit 3
+    fi
 fi
 
 failure_stage=runtime-metadata-initial
@@ -182,7 +209,7 @@ python3 "$repo_root/scripts/desktop/collect-runtime-metadata.py" \
     --output "$run_dir/runtime-metadata.json" \
     --arch "$arch" \
     --scenario "$scenario" \
-    --qemu-binary "$qemu_binary" \
+    --qemu-binary "$qemu_binary_resolved" \
     --required-qemu-version "$required_qemu_version" \
     --run-dir "$run_dir"
 
@@ -227,16 +254,28 @@ else
 fi
 
 printf 'QEMU_RUN_DIR=%s\n' "$run_dir"
+failure_stage=runtime-metadata-invocation
+python3 "$repo_root/scripts/desktop/collect-runtime-metadata.py" \
+    --repo-root "$repo_root" \
+    --output "$run_dir/runtime-metadata.json" \
+    --record-invocation \
+    --guest-artifact "$artifact" \
+    --vnc-display "$vnc_display" \
+    --qemu-timeout-seconds "$timeout_seconds" \
+    --qemu-argv "$qemu_binary_resolved" "${qemu_args[@]}"
+
 failure_stage=qemu-boot
 timeout --signal=TERM --kill-after=5 "$timeout_seconds" \
-    "$qemu_binary" "${qemu_args[@]}" >"$serial_log" 2>&1 &
+    "$qemu_binary_resolved" "${qemu_args[@]}" >"$serial_log" 2>&1 &
 qemu_pid=$!
 qemu_started=true
 
 boot_deadline=$((SECONDS + 35))
 while ! grep -q 'ORAYS_DESKTOP_FRAME boot ' "$serial_log" 2>/dev/null; do
     if ! kill -0 "$qemu_pid" 2>/dev/null; then
+        qemu_exit=0
         wait "$qemu_pid" || qemu_exit=$?
+        qemu_pid=
         printf 'QEMU exited before desktop boot marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
         exit 1
     fi
@@ -260,7 +299,9 @@ initial_display_marker="ORAYS_DESKTOP_DISPLAY width=${display_width} height=${di
 input_deadline=$((SECONDS + 10))
 while ! grep -aFq 'ORAYS_DESKTOP_INPUT_READY devices=2' "$serial_log" 2>/dev/null; do
     if ! kill -0 "$qemu_pid" 2>/dev/null; then
+        qemu_exit=0
         wait "$qemu_pid" || qemu_exit=$?
+        qemu_pid=
         printf 'QEMU exited before desktop input readiness; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
         exit 1
     fi
@@ -297,7 +338,9 @@ if [[ "$scenario" == resize ]]; then
     resize_marker="ORAYS_DESKTOP_DISPLAY_CHANGED width=${resize_width} height=${resize_height}"
     while ! grep -aFq "$resize_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
+            qemu_exit=0
             wait "$qemu_pid" || qemu_exit=$?
+            qemu_pid=
             printf 'QEMU exited before runtime resize marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -321,7 +364,9 @@ if [[ "$scenario" == resize ]]; then
     input_after_resize_deadline=$((SECONDS + 10))
     while ! grep -aFq "$resize_input_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
+            qemu_exit=0
             wait "$qemu_pid" || qemu_exit=$?
+            qemu_pid=
             printf 'QEMU exited before post-resize input marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -345,7 +390,9 @@ if [[ "$scenario" != boot ]]; then
     action_deadline=$((SECONDS + 25))
     while ! grep -aFq "$expected_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
+            qemu_exit=0
             wait "$qemu_pid" || qemu_exit=$?
+            qemu_pid=
             printf 'QEMU exited before action marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi
@@ -365,7 +412,9 @@ if [[ "$scenario" == launcher ]]; then
     # require one exact logical line after universal-newline decoding.
     while ! grep -aFq "$stable_marker" "$serial_log" 2>/dev/null; do
         if ! kill -0 "$qemu_pid" 2>/dev/null; then
+            qemu_exit=0
             wait "$qemu_pid" || qemu_exit=$?
+            qemu_pid=
             printf 'QEMU exited before launcher stable marker; exit=%s evidence=%s\n' "${qemu_exit:-0}" "$run_dir" >&2
             exit 1
         fi

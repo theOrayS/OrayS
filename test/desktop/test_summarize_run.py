@@ -61,10 +61,11 @@ class SummarizeRunTests(unittest.TestCase):
         (run / "display-geometry.txt").write_text(
             "DISPLAY_GEOMETRY=2x2\n", encoding="utf-8"
         )
+        artifact = run / "orays-desktop-rv.bin"
         (run / "runtime-metadata.json").write_text(
             json.dumps(
                 {
-                    "schema": 3,
+                    "schema": 4,
                     "created_at_utc": "2026-07-19T00:00:00+00:00",
                     "finalized_at_utc": "2026-07-19T00:01:00+00:00",
                     "source_commit": "a" * 40,
@@ -81,8 +82,27 @@ class SummarizeRunTests(unittest.TestCase):
                     "architecture": "rv",
                     "scenario": "launcher",
                     "run_dir": str(run),
-                    "qemu_binary": "/usr/bin/qemu-system-riscv64",
+                    "qemu_binary": "/opt/orays-test-qemu/bin/qemu-system-riscv64",
                     "qemu_version": "QEMU emulator version 9.2.4",
+                    "qemu_sha256": "a" * 64,
+                    "qemu_digest_policy": "unpinned",
+                    "qemu_authorized_sha256": None,
+                    "qemu_digest_matches_authorized": None,
+                    "qemu_argv": [
+                        "/opt/orays-test-qemu/bin/qemu-system-riscv64",
+                        "-machine",
+                        "virt",
+                        "-kernel",
+                        str(artifact),
+                    ],
+                    "guest_artifact": {
+                        "path": str(artifact),
+                        "type": "raw-binary",
+                        "size": 4096,
+                        "sha256": "c" * 64,
+                        "architecture": "rv",
+                    },
+                    "runner_inputs": {"vnc_display": 42, "qemu_timeout_seconds": 90},
                     "required_qemu_version": "9.2.4",
                     "observed_qemu_version": "QEMU emulator version 9.2.4",
                     "qemu_version_matches_required": True,
@@ -158,6 +178,119 @@ class SummarizeRunTests(unittest.TestCase):
             ),
         )
         return run
+
+    def mutate_metadata(self, run: Path, **updates: object) -> None:
+        path = run / "runtime-metadata.json"
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+        metadata.update(updates)
+        path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    def test_legacy_schema3_metadata_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            self.mutate_metadata(run, schema=3)
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(any("schema" in failure for failure in failures))
+
+    def test_missing_qemu_digest_identity_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            self.mutate_metadata(run, qemu_sha256=None)
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(any("QEMU" in failure for failure in failures))
+
+    def test_qemu_argv_not_bound_to_guest_artifact_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            metadata_path = run / "runtime-metadata.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["qemu_argv"] = [
+                metadata["qemu_binary"],
+                "-machine",
+                "virt",
+                "-kernel",
+                "/elsewhere/substituted.bin",
+            ]
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(any("guest artifact" in failure for failure in failures))
+
+    def test_qemu_argv_zero_substitution_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            metadata_path = run / "runtime-metadata.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["qemu_argv"][0] = "/usr/bin/other-qemu"
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(any("argv[0]" in failure for failure in failures))
+
+    def test_guest_artifact_file_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            (run / "orays-desktop-rv.bin").write_bytes(b"\x00" * 4096)
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(
+                any("guest artifact identity does not match" in f for f in failures)
+            )
+
+    def test_guest_artifact_file_match_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            content = b"\x7fELF" + b"\x01" * 124
+            artifact = run / "orays-desktop-rv.bin"
+            artifact.write_bytes(content)
+            metadata_path = run / "runtime-metadata.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["guest_artifact"] = {
+                "path": str(artifact),
+                "type": "elf",
+                "size": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "architecture": "rv",
+            }
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertEqual(failures, [])
+
+    def test_authorized_digest_policy_is_strictly_enforced(self) -> None:
+        valid = {
+            "qemu_digest_policy": "authorized-sha256",
+            "qemu_authorized_sha256": "a" * 64,
+            "qemu_digest_matches_authorized": True,
+        }
+        invalid_cases = (
+            {"qemu_digest_policy": "authorized-sha256"},
+            {**valid, "qemu_authorized_sha256": "b" * 64},
+            {**valid, "qemu_digest_matches_authorized": False},
+            {**valid, "qemu_digest_matches_authorized": None},
+            {
+                "qemu_digest_policy": "unpinned",
+                "qemu_authorized_sha256": "a" * 64,
+                "qemu_digest_matches_authorized": None,
+            },
+            {"qemu_digest_policy": "bogus"},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            self.mutate_metadata(run, **valid)
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertEqual(failures, [])
+        for updates in invalid_cases:
+            with self.subTest(updates=updates), tempfile.TemporaryDirectory() as directory:
+                run = self.make_run(Path(directory))
+                self.mutate_metadata(run, **updates)
+                failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+                self.assertTrue(
+                    any("QEMU" in failure for failure in failures), failures
+                )
+
+    def test_missing_runner_inputs_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.make_run(Path(directory))
+            self.mutate_metadata(run, runner_inputs=None)
+            failures, _, _ = MODULE.validate_run(run, "rv", "launcher", 0)
+            self.assertTrue(any("runner inputs" in failure for failure in failures))
 
     def test_complete_evidence_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

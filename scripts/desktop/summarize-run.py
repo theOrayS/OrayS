@@ -19,8 +19,10 @@ if str(SCRIPT_DIR) not in sys.path:
 from runtime_evidence_contract import (  # noqa: E402
     RUNTIME_METADATA_SCHEMA,
     RUN_SUMMARY_SCHEMA,
+    SHA256_TOKEN,
     default_failure_reason,
     qemu_version_is_canonical,
+    validate_qemu_digest_policy,
     validate_runtime_status,
 )
 
@@ -63,6 +65,19 @@ def digest(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             value.update(chunk)
     return value.hexdigest()
+
+
+def failure_detail(error: Exception) -> str:
+    """Return a location-independent failure description.
+
+    OSError messages embed the absolute path of the missing/unreadable file,
+    which would make an otherwise identical failure look different between
+    the original run directory and a relocated review package. The recorded
+    failure identity must not depend on where the evidence lives.
+    """
+    if isinstance(error, OSError):
+        return error.strerror or str(error)
+    return str(error)
 
 
 def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str, Any]:
@@ -135,6 +150,89 @@ def validate_runtime_metadata(path: Path, arch: str, scenario: str) -> dict[str,
             "QEMU version mismatch: "
             f"required {required_qemu_version}, observed {observed_qemu_version}"
         )
+    validate_qemu_digest_policy(
+        policy=value.get("qemu_digest_policy"),
+        authorized_sha256=value.get("qemu_authorized_sha256"),
+        matches_authorized=value.get("qemu_digest_matches_authorized"),
+        qemu_sha256=value.get("qemu_sha256"),
+    )
+    qemu_binary_path = Path(value["qemu_binary"])
+    if not qemu_binary_path.is_absolute():
+        raise ValueError("runtime metadata QEMU binary path is not absolute")
+    if qemu_binary_path.is_file() and digest(qemu_binary_path) != value["qemu_sha256"]:
+        raise ValueError("runtime metadata QEMU digest does not match the binary")
+    argv = value.get("qemu_argv")
+    if (
+        not isinstance(argv, list)
+        or not argv
+        or not all(isinstance(item, str) and item for item in argv)
+    ):
+        raise ValueError("runtime metadata QEMU argv is invalid")
+    if argv[0] != value["qemu_binary"]:
+        raise ValueError("runtime metadata QEMU argv[0] does not match the QEMU binary")
+    artifact = value.get("guest_artifact")
+    if not isinstance(artifact, dict) or set(artifact) != {
+        "path",
+        "type",
+        "size",
+        "sha256",
+        "architecture",
+    }:
+        raise ValueError("runtime metadata guest artifact identity is invalid")
+    if artifact["architecture"] != arch:
+        raise ValueError("runtime metadata guest artifact architecture is invalid")
+    if artifact["type"] not in {"elf", "raw-binary"}:
+        raise ValueError("runtime metadata guest artifact type is invalid")
+    if (
+        not isinstance(artifact["size"], int)
+        or isinstance(artifact["size"], bool)
+        or artifact["size"] <= 0
+    ):
+        raise ValueError("runtime metadata guest artifact size is invalid")
+    if (
+        not isinstance(artifact["path"], str)
+        or not Path(artifact["path"]).is_absolute()
+        or not isinstance(artifact["sha256"], str)
+        or SHA256_TOKEN.fullmatch(artifact["sha256"]) is None
+    ):
+        raise ValueError("runtime metadata guest artifact path or digest is invalid")
+    kernel_index = [index for index, item in enumerate(argv) if item == "-kernel"]
+    if (
+        len(kernel_index) != 1
+        or kernel_index[0] + 1 >= len(argv)
+        or argv[kernel_index[0] + 1] != artifact["path"]
+    ):
+        raise ValueError("runtime metadata QEMU argv is not bound to the guest artifact")
+    artifact_path = Path(artifact["path"])
+    if artifact_path.is_file():
+        if (
+            artifact_path.stat().st_size != artifact["size"]
+            or digest(artifact_path) != artifact["sha256"]
+        ):
+            raise ValueError(
+                "runtime metadata guest artifact identity does not match the file"
+            )
+        with artifact_path.open("rb") as stream:
+            magic = stream.read(4)
+        if (magic == b"\x7fELF") != (artifact["type"] == "elf"):
+            raise ValueError("runtime metadata guest artifact type does not match the file")
+    runner_inputs = value.get("runner_inputs")
+    if not isinstance(runner_inputs, dict) or set(runner_inputs) != {
+        "vnc_display",
+        "qemu_timeout_seconds",
+    }:
+        raise ValueError("runtime metadata runner inputs are invalid")
+    vnc_display = runner_inputs["vnc_display"]
+    qemu_timeout = runner_inputs["qemu_timeout_seconds"]
+    if (
+        not isinstance(vnc_display, int)
+        or isinstance(vnc_display, bool)
+        or vnc_display < 0
+        or not isinstance(qemu_timeout, int)
+        or isinstance(qemu_timeout, bool)
+        or qemu_timeout <= 0
+    ):
+        raise ValueError("runtime metadata runner input values are invalid")
     toolchains = value.get("toolchain_versions")
     if not isinstance(toolchains, dict) or any(
         not isinstance(toolchains.get(name), str) or not toolchains[name]
@@ -455,7 +553,7 @@ def validate_run(
     try:
         validate_runtime_metadata(metadata_path, arch, scenario)
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        failures.append(f"invalid runtime metadata: {error}")
+        failures.append(f"invalid runtime metadata: {failure_detail(error)}")
     serial_text = serial.read_text(encoding="utf-8", errors="replace") if serial.exists() else ""
     serial_lines = serial_text.replace("\x00", "").splitlines()
     if qemu_started:
@@ -482,7 +580,7 @@ def validate_run(
                 EXPECTED_MARKERS["resize"][1],
             )
         except ValueError as error:
-            failures.append(f"invalid resize input presentation order: {error}")
+            failures.append(f"invalid resize input presentation order: {failure_detail(error)}")
     stable_pair = POST_ACTION_STABLE_MARKERS.get(scenario)
     if stable_pair is not None:
         action_marker, stable_marker = stable_pair
@@ -502,7 +600,7 @@ def validate_run(
                 stable_marker,
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid capture precondition evidence: {error}")
+            failures.append(f"invalid capture precondition evidence: {failure_detail(error)}")
 
     initial_display_matches = re.findall(
         r"^ORAYS_DESKTOP_DISPLAY width=([0-9]+) height=([0-9]+)$",
@@ -536,7 +634,7 @@ def validate_run(
                 run_dir / "vnc-resize.json", initial_geometry, (900, 650)
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid resize evidence: {error}")
+            failures.append(f"invalid resize evidence: {failure_detail(error)}")
     elif changed_geometries:
         failures.append("unexpected guest runtime resize marker")
 
@@ -550,7 +648,7 @@ def validate_run(
                 run_dir / "capture-precondition.json", serial, required_markers
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid capture precondition evidence: {error}")
+            failures.append(f"invalid capture precondition evidence: {failure_detail(error)}")
 
     try:
         geometry_text = (run_dir / "display-geometry.txt").read_text(encoding="utf-8")
@@ -562,7 +660,7 @@ def validate_run(
         if expected_geometry_text is None or geometry_text != expected_geometry_text:
             raise ValueError("display geometry sidecar does not match guest markers")
     except (OSError, ValueError) as error:
-        failures.append(f"invalid display geometry evidence: {error}")
+        failures.append(f"invalid display geometry evidence: {failure_detail(error)}")
 
     geometry: tuple[int, int] | None = None
     try:
@@ -577,18 +675,18 @@ def validate_run(
         if screenshot_is_uniform(screenshot):
             failures.append("screenshot is a uniform frame")
     except (OSError, ValueError) as error:
-        failures.append(f"invalid screenshot: {error}")
+        failures.append(f"invalid screenshot: {failure_detail(error)}")
 
     input_geometry = display_geometry if scenario == "resize" else initial_geometry
     if input_geometry is not None:
         try:
             validate_input_evidence(sequence, input_transcript, input_geometry)
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            failures.append(f"invalid input evidence: {error}")
+            failures.append(f"invalid input evidence: {failure_detail(error)}")
     try:
         validate_capture_evidence(capture_transcript, screenshot, original_screenshot)
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        failures.append(f"invalid capture evidence: {error}")
+        failures.append(f"invalid capture evidence: {failure_detail(error)}")
 
     evidence_names = [
         "serial.log",

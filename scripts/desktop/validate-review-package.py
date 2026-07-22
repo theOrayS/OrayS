@@ -146,6 +146,13 @@ def validate(package_dir: Path) -> tuple[str, list[str]]:
         ("required_qemu_version", "required_qemu_version"),
         ("observed_qemu_version", "observed_qemu_version"),
         ("qemu_version_matches_required", "qemu_version_matches_required"),
+        ("qemu_sha256", "qemu_sha256"),
+        ("qemu_digest_policy", "qemu_digest_policy"),
+        ("qemu_authorized_sha256", "qemu_authorized_sha256"),
+        ("qemu_digest_matches_authorized", "qemu_digest_matches_authorized"),
+        ("qemu_argv", "qemu_argv"),
+        ("guest_artifact", "guest_artifact"),
+        ("runner_inputs", "runner_inputs"),
     ):
         if package.get(package_name) != metadata.get(metadata_name):
             raise ValueError(f"package {package_name} does not match runtime metadata")
@@ -188,9 +195,15 @@ def validate(package_dir: Path) -> tuple[str, list[str]]:
         isinstance(failure, str) for failure in recorded_failures
     ):
         raise ValueError("summary failures are invalid")
-    recorded_categories = {failure.split(":", 1)[0] for failure in recorded_failures}
-    if any(failure.split(":", 1)[0] not in recorded_categories for failure in failures):
-        raise ValueError("summary omits a reproducible semantic failure")
+    expected_failures = list(failures)
+    if runner_exit != 0:
+        expected_failures.insert(
+            0, f"runtime runner exited {runner_exit} during stage {failure_stage}"
+        )
+    if recorded_failures != expected_failures:
+        raise ValueError(
+            "summary failures do not exactly match the reproducible semantic failures"
+        )
     if result == "PASS":
         if (
             failures

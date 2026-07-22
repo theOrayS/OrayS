@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,9 +20,18 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from runtime_evidence_contract import (  # noqa: E402
     RUNTIME_METADATA_SCHEMA,
+    SHA256_TOKEN,
     qemu_version_is_canonical,
     require_canonical_qemu_version,
 )
+
+
+def sha256_path(path: Path) -> str:
+    value = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            value.update(chunk)
+    return value.hexdigest()
 
 
 def command_output(argv: list[str], cwd: Path) -> str:
@@ -99,11 +110,72 @@ def finalize(repo: Path, output: Path) -> int:
     return 0
 
 
+def guest_artifact_identity(path: Path, architecture: str) -> dict:
+    resolved = path.resolve(strict=True)
+    with resolved.open("rb") as stream:
+        magic = stream.read(4)
+    return {
+        "path": str(resolved),
+        "type": "elf" if magic == b"\x7fELF" else "raw-binary",
+        "size": resolved.stat().st_size,
+        "sha256": sha256_path(resolved),
+        "architecture": architecture,
+    }
+
+
+def record_invocation(output: Path, args: argparse.Namespace) -> int:
+    """Bind the exact executed QEMU argv and guest artifact into the metadata.
+
+    The QEMU binary recorded during initial collection is re-digested here so
+    a substitution between identity collection and execution is a hard error,
+    and argv[0] must be that same resolved path.
+    """
+    value = json.loads(output.read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or value.get("schema") != RUNTIME_METADATA_SCHEMA:
+        raise ValueError("runtime metadata schema is invalid for invocation recording")
+    argv = args.qemu_argv
+    if not argv or not all(isinstance(item, str) and item for item in argv):
+        raise ValueError("QEMU argv must be a non-empty list of non-empty strings")
+    qemu_binary = value.get("qemu_binary")
+    if argv[0] != qemu_binary:
+        raise ValueError("executed QEMU argv[0] does not match the resolved QEMU identity")
+    qemu_path = Path(qemu_binary)
+    if not qemu_path.is_file():
+        raise ValueError("resolved QEMU binary is unavailable at invocation time")
+    if sha256_path(qemu_path) != value.get("qemu_sha256"):
+        raise ValueError("QEMU binary changed between identity collection and execution")
+    artifact = guest_artifact_identity(args.guest_artifact, value["architecture"])
+    if artifact["size"] <= 0:
+        raise ValueError("guest artifact is empty")
+    kernel_index = [index for index, item in enumerate(argv) if item == "-kernel"]
+    if len(kernel_index) != 1 or kernel_index[0] + 1 >= len(argv):
+        raise ValueError("QEMU argv must contain exactly one -kernel with a value")
+    if argv[kernel_index[0] + 1] != artifact["path"]:
+        raise ValueError("QEMU -kernel argument does not match the guest artifact")
+    if args.vnc_display < 0:
+        raise ValueError("VNC display must be a non-negative integer")
+    if args.qemu_timeout_seconds <= 0:
+        raise ValueError("QEMU timeout must be a positive integer")
+    value.update(
+        {
+            "qemu_argv": argv,
+            "guest_artifact": artifact,
+            "runner_inputs": {
+                "vnc_display": args.vnc_display,
+                "qemu_timeout_seconds": args.qemu_timeout_seconds,
+            },
+        }
+    )
+    output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--finalize", action="store_true")
+    parser.add_argument("--record-invocation", action="store_true")
     parser.add_argument("--arch", choices=("rv", "la"))
     parser.add_argument(
         "--scenario",
@@ -112,12 +184,32 @@ def main() -> int:
     parser.add_argument("--qemu-binary")
     parser.add_argument("--required-qemu-version")
     parser.add_argument("--run-dir", type=Path)
+    parser.add_argument("--guest-artifact", type=Path)
+    parser.add_argument("--vnc-display", type=int)
+    parser.add_argument("--qemu-timeout-seconds", type=int)
+    parser.add_argument("--qemu-argv", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
     repo = args.repo_root.resolve(strict=True)
     output = args.output.resolve()
     if args.finalize:
         return finalize(repo, output)
+    if args.record_invocation:
+        if (
+            args.guest_artifact is None
+            or args.vnc_display is None
+            or args.qemu_timeout_seconds is None
+            or not args.qemu_argv
+        ):
+            parser.error(
+                "invocation recording requires --guest-artifact, --vnc-display, "
+                "--qemu-timeout-seconds, and --qemu-argv"
+            )
+        try:
+            return record_invocation(output, args)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"runtime invocation recording failed: {error}", file=sys.stderr)
+            return 1
     if (
         args.arch is None
         or args.scenario is None
@@ -138,6 +230,7 @@ def main() -> int:
 
     collection_errors: list[str] = []
     qemu_path_value = shutil.which(args.qemu_binary)
+    qemu_sha256: str | None = None
     if qemu_path_value is None:
         qemu_path = None
         qemu_version = None
@@ -151,10 +244,36 @@ def main() -> int:
         if qemu_path is None:
             qemu_version = None
         else:
+            try:
+                qemu_sha256 = sha256_path(qemu_path)
+            except OSError as error:
+                collection_errors.append(f"QEMU digest collection failed: {error}")
             qemu_output = collect_version(
                 "QEMU", [str(qemu_path), "--version"], repo, collection_errors
             )
             qemu_version = qemu_output.splitlines()[0] if qemu_output else None
+    authorized_sha256 = os.environ.get("DESKTOP_QEMU_AUTHORIZED_SHA256") or None
+    if authorized_sha256 is None:
+        digest_policy = "unpinned"
+        digest_matches: bool | None = None
+    else:
+        digest_policy = "authorized-sha256"
+        if SHA256_TOKEN.fullmatch(authorized_sha256) is None:
+            digest_matches = False
+            collection_errors.append(
+                "DESKTOP_QEMU_AUTHORIZED_SHA256 is not a lowercase SHA-256 digest"
+            )
+        elif qemu_sha256 is None:
+            digest_matches = False
+            collection_errors.append(
+                "authorized QEMU digest cannot be checked without a QEMU digest"
+            )
+        else:
+            digest_matches = qemu_sha256 == authorized_sha256
+            if not digest_matches:
+                collection_errors.append(
+                    "executed QEMU digest does not match DESKTOP_QEMU_AUTHORIZED_SHA256"
+                )
     rustc_version = collect_version(
         "rustc", ["rustc", "-Vv"], repo, collection_errors
     )
@@ -191,6 +310,13 @@ def main() -> int:
         "run_dir": str(run_dir),
         "qemu_binary": str(qemu_path) if qemu_path is not None else args.qemu_binary,
         "qemu_version": qemu_version,
+        "qemu_sha256": qemu_sha256,
+        "qemu_digest_policy": digest_policy,
+        "qemu_authorized_sha256": authorized_sha256,
+        "qemu_digest_matches_authorized": digest_matches,
+        "qemu_argv": None,
+        "guest_artifact": None,
+        "runner_inputs": None,
         "required_qemu_version": args.required_qemu_version,
         "observed_qemu_version": qemu_version,
         "qemu_version_matches_required": qemu_version_is_canonical(

@@ -71,8 +71,9 @@ class ReviewPackageTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        artifact = run / "orays-desktop-rv.bin"
         metadata = {
-            "schema": 3,
+            "schema": 4,
             "created_at_utc": "2026-07-19T00:00:00+00:00",
             "finalized_at_utc": "2026-07-19T00:01:00+00:00",
             "source_commit": "b" * 40,
@@ -89,8 +90,27 @@ class ReviewPackageTests(unittest.TestCase):
             "architecture": "rv",
             "scenario": "boot",
             "run_dir": str(run),
-            "qemu_binary": "/usr/bin/qemu-system-riscv64",
+            "qemu_binary": "/opt/orays-test-qemu/bin/qemu-system-riscv64",
             "qemu_version": "QEMU emulator version 9.2.4",
+            "qemu_sha256": "a" * 64,
+            "qemu_digest_policy": "unpinned",
+            "qemu_authorized_sha256": None,
+            "qemu_digest_matches_authorized": None,
+            "qemu_argv": [
+                "/opt/orays-test-qemu/bin/qemu-system-riscv64",
+                "-machine",
+                "virt",
+                "-kernel",
+                str(artifact),
+            ],
+            "guest_artifact": {
+                "path": str(artifact),
+                "type": "raw-binary",
+                "size": 4096,
+                "sha256": "c" * 64,
+                "architecture": "rv",
+            },
+            "runner_inputs": {"vnc_display": 42, "qemu_timeout_seconds": 90},
             "required_qemu_version": "9.2.4",
             "observed_qemu_version": "QEMU emulator version 9.2.4",
             "qemu_version_matches_required": True,
@@ -183,7 +203,7 @@ class ReviewPackageTests(unittest.TestCase):
             self.assertTrue((package / "package-files.sha256").is_file())
             self.assertEqual(
                 json.loads((package / "runtime-metadata.json").read_text(encoding="utf-8"))["schema"],
-                3,
+                4,
             )
             self.assertEqual(
                 json.loads((package / "summary.json").read_text(encoding="utf-8"))["schema"],
@@ -191,7 +211,7 @@ class ReviewPackageTests(unittest.TestCase):
             )
             self.assertEqual(
                 json.loads((package / "review-package.json").read_text(encoding="utf-8"))["schema"],
-                3,
+                4,
             )
             self.assertFalse((package / "disk.img").exists())
             validation = self.invoke_validator(package)
@@ -451,6 +471,162 @@ class ReviewPackageTests(unittest.TestCase):
             validation = self.invoke_validator(package)
             self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
             self.assertIn("VALID_FAIL", validation.stdout)
+
+    def make_failure_package(self, root: Path, *finalizer_args: str) -> Path:
+        run = root / "failed-qemu"
+        run.mkdir()
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(FINALIZER_SCRIPT),
+                "--repo-root",
+                str(REPO_ROOT),
+                "--run-dir",
+                str(run),
+                "--arch",
+                "la",
+                "--scenario",
+                "boot",
+                "--qemu-binary",
+                "qemu-system-loongarch64",
+                *finalizer_args,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        package = run / "review-package"
+        self.assertTrue(package.is_dir(), result.stdout + result.stderr)
+        return package
+
+    def test_qemu_zero_exit_before_guest_evidence_is_a_valid_fail_package(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = self.make_failure_package(
+                Path(directory),
+                "--qemu-exit",
+                "0",
+                "--runner-exit",
+                "1",
+                "--failure-stage",
+                "qemu-boot",
+            )
+            summary = json.loads((package / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["qemu_exit"], 0)
+            self.assertEqual(summary["result"], "FAIL")
+            self.assertTrue(summary["failures"])
+            validation = self.invoke_validator(package)
+            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
+            self.assertIn("VALID_FAIL", validation.stdout)
+
+    def test_validator_rejects_different_failure_with_same_colon_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = self.make_failure_package(
+                Path(directory),
+                "--qemu-exit",
+                "42",
+                "--runner-exit",
+                "1",
+                "--failure-stage",
+                "qemu-boot",
+            )
+            summary = json.loads((package / "summary.json").read_text(encoding="utf-8"))
+            original = "invalid capture evidence: QMP transcript is empty"
+            self.assertIn(original, summary["failures"])
+            summary["failures"] = [
+                (
+                    "invalid capture evidence: screendump target does not match "
+                    "the captured frame"
+                    if failure == original
+                    else failure
+                )
+                for failure in summary["failures"]
+            ]
+            self.rewrite_packaged_summary(package, summary, {})
+            result = self.invoke_validator(package)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("do not exactly match", result.stderr)
+
+    def test_validator_rejects_dropped_or_added_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = self.make_failure_package(
+                Path(directory),
+                "--qemu-exit",
+                "42",
+                "--runner-exit",
+                "1",
+                "--failure-stage",
+                "qemu-boot",
+            )
+            original_summary = json.loads(
+                (package / "summary.json").read_text(encoding="utf-8")
+            )
+            dropped = dict(original_summary)
+            dropped["failures"] = original_summary["failures"][1:]
+            self.rewrite_packaged_summary(package, dropped, {})
+            result = self.invoke_validator(package)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("do not exactly match", result.stderr)
+
+        with tempfile.TemporaryDirectory() as directory:
+            package = self.make_failure_package(
+                Path(directory),
+                "--qemu-exit",
+                "42",
+                "--runner-exit",
+                "1",
+                "--failure-stage",
+                "qemu-boot",
+            )
+            summary = json.loads((package / "summary.json").read_text(encoding="utf-8"))
+            summary["failures"] = summary["failures"] + ["invalid capture evidence: extra"]
+            self.rewrite_packaged_summary(package, summary, {})
+            result = self.invoke_validator(package)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("do not exactly match", result.stderr)
+
+    def test_validator_rejects_qemu_identity_tamper_in_package_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = self.make_failure_package(
+                Path(directory),
+                "--qemu-exit",
+                "42",
+                "--runner-exit",
+                "1",
+                "--failure-stage",
+                "qemu-boot",
+            )
+            summary = json.loads((package / "summary.json").read_text(encoding="utf-8"))
+            self.rewrite_packaged_summary(package, summary, {"qemu_sha256": "f" * 64})
+            result = self.invoke_validator(package)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("does not match runtime metadata", result.stderr)
+
+    def test_validator_rejects_guest_artifact_tamper_in_package_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = self.make_failure_package(
+                Path(directory),
+                "--qemu-exit",
+                "42",
+                "--runner-exit",
+                "1",
+                "--failure-stage",
+                "qemu-boot",
+            )
+            summary = json.loads((package / "summary.json").read_text(encoding="utf-8"))
+            artifact = dict(
+                json.loads((package / "runtime-metadata.json").read_text(encoding="utf-8"))[
+                    "guest_artifact"
+                ]
+                or {"path": "/x", "type": "elf", "size": 1, "sha256": "0" * 64,
+                    "architecture": "la"}
+            )
+            artifact["sha256"] = "f" * 64
+            self.rewrite_packaged_summary(package, summary, {"guest_artifact": artifact})
+            result = self.invoke_validator(package)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("does not match runtime metadata", result.stderr)
 
     def test_qemu_abnormal_exit_is_preserved_in_failure_package(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
