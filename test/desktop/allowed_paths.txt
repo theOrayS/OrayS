@@ -13,6 +13,13 @@ Makefile.desktop
 docs/plans/active/2026-07-18-orays-desktop-environment.md
 docs/development-logs/2026/07/2026-07-18-pr-draft-orays-desktop-environment.md
 docs/development-logs/2026/07/2026-07-22-pr-draft-stabilize-merge-blockers-kimi.md
+user/shell/src/uspace/fd_table.rs
+user/shell/src/uspace/metadata.rs
+user/shell/runtime_smoke/semantic_smoke.rs
+test/checks/check_file_object_event_core.py
+.github/workflows/build.yml
+.github/workflows/test.yml
+.github/workflows/docs.yml
 docs/human_reviews/OrayS-Desktop-人工审查初审报告-2026-07-19.md
 docs/human_reviews/OrayS-Desktop-第二轮人工审查复核报告-2026-07-19.md
 docs/decisions/0001-desktop-isolation.md

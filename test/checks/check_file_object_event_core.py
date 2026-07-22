@@ -312,6 +312,34 @@ def check(root: Path) -> list[str]:
             "pipe: None" in tee_fd_snapshot,
             findings,
             "tee must pin both fds together and preserve access modes before pipe classification")
+    # Device-backed descriptions must retain the open(2) access mode end to end:
+    # the variants carry fcntl status flags, open records them, duplication
+    # preserves them, and tee/read/write enforce them instead of assuming that
+    # every character device is simultaneously readable and writable.
+    enum_body = re.search(r"pub\(super\) enum FdEntry\s*\{(?P<body>.*?)\n\}", table, re.S)
+    require(enum_body is not None and "DevNull(u32)" in enum_body.group("body") and
+            "Rtc(u32)" in enum_body.group("body"),
+            findings,
+            "DevNull/Rtc must carry the open-time fcntl status flags")
+    require("FdEntry::DevNull(status_flags)" in tee_fd_snapshot and
+            "FdEntry::Rtc(status_flags)" in tee_fd_snapshot,
+            findings,
+            "tee must classify device endpoints from the preserved access mode")
+    table_read = block_after(table, "pub(super) fn read(")
+    table_write = block_after(table, "pub(super) fn write(")
+    for device in ("DevNull", "Rtc"):
+        require(f"FdEntry::{device}(status_flags)" in table_read and
+                f"FdEntry::{device}(status_flags)" in table_write,
+                findings,
+                f"device read/write must enforce the preserved access mode: {device}")
+    require("FdEntry::DevNull(fcntl_status_flags(flags))" in table and
+            "FdEntry::Rtc(fcntl_status_flags(flags))" in table,
+            findings,
+            "opening /dev/null or the RTC must record the requested access mode")
+    require("Self::DevNull(status_flags) => Ok(Self::DevNull(*status_flags))" in table and
+            "Self::Rtc(status_flags) => Ok(Self::Rtc(*status_flags))" in table,
+            findings,
+            "descriptor duplication must preserve the device access mode")
     sys_vmsplice = block_after(table, "pub(super) fn sys_vmsplice(")
     require("nonblocking || total > 0" in sys_vmsplice and
             "return if total > 0 { total } else { neg_errno(err) }" in sys_vmsplice,
@@ -337,6 +365,16 @@ def check(root: Path) -> list[str]:
                   "tee(dev_null_write, tee_pipe[1], 1, 0) != NEG_EBADF",
                   "tee(dev_null_read, tee_pipe[1], 1, 0) != NEG_EINVAL",
                   "tee(tee_pipe[0], dev_null_write, 1, 0) != NEG_EINVAL",
+                  "SYS_DUP", "SYS_FCNTL", "F_GETFL",
+                  "pipe_read(dev_null_write, &mut dev_mode_buf) != NEG_EBADF",
+                  "pipe_write(dev_null_read, &dev_mode_buf) != NEG_EBADF",
+                  "pipe_read(dev_null_read, &mut dev_mode_buf) != 0",
+                  "pipe_write(dev_null_write, &dev_mode_buf) != 1",
+                  "dup(dev_null_read)",
+                  "tee(tee_pipe[0], dev_null_read_dup as i32, 1, 0) != NEG_EBADF",
+                  "tee(dev_null_write_dup as i32, tee_pipe[1], 1, 0) != NEG_EBADF",
+                  "fcntl_getfl(dev_null_read_dup as i32) != O_RDONLY as isize",
+                  "fcntl_getfl(dev_null_write_dup as i32) != O_WRONLY as isize",
                   "SYS_VMSPLICE", "VMSPLICE_FIRST_LEN: usize = 64 * 1024",
                   "&iovecs[..count]", "expected_vmsplice_byte"):
         require(token in runtime_smoke, findings,

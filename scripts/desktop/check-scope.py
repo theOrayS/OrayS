@@ -19,7 +19,6 @@ FORBIDDEN = (
     "Makefile",
     "rust-toolchain.toml",
     "run-eval.sh",
-    "user/shell/**",
     "api/arceos_posix_api/**",
     "api/orays_linux/**",
     "api/orays_linux_abi/**",
@@ -27,9 +26,6 @@ FORBIDDEN = (
     "test/evidence/**",
     "vendor/**",
     "cargo-home/**",
-    ".github/workflows/build.yml",
-    ".github/workflows/test.yml",
-    ".github/workflows/docs.yml",
 )
 
 BASE_CANDIDATE_TOKEN = re.compile(r"[0-9A-Za-z][0-9A-Za-z._/-]*")

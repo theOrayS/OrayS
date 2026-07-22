@@ -10,6 +10,8 @@ use core::panic::PanicInfo;
 // The semantic-evidence manifest builds and executes this same source on RV64 and
 // LA64, and requires the ordered syscall assertions plus clean guest shutdown.
 
+const SYS_DUP: usize = 23;
+const SYS_FCNTL: usize = 25;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE2: usize = 59;
@@ -27,6 +29,7 @@ const NEG_EAGAIN: isize = -11;
 const NEG_EINVAL: isize = -22;
 const NEG_ESPIPE: isize = -29;
 const AT_FDCWD: isize = -100;
+const F_GETFL: usize = 3;
 const O_RDONLY: usize = 0;
 const O_WRONLY: usize = 1;
 const O_NONBLOCK: usize = 0o4000;
@@ -350,6 +353,20 @@ fn close(fd: i32) -> isize {
     // argument slots. Callers ensure each successfully installed descriptor is closed
     // at most once in the success path.
     unsafe { syscall6(SYS_CLOSE, fd as usize, 0, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn dup(fd: i32) -> isize {
+    // SAFETY: SYS_DUP consumes only the scalar descriptor and ignores the remaining
+    // argument slots.
+    unsafe { syscall6(SYS_DUP, fd as usize, 0, 0, 0, 0, 0) }
+}
+
+#[inline(always)]
+fn fcntl_getfl(fd: i32) -> isize {
+    // SAFETY: SYS_FCNTL/F_GETFL consumes only the scalar descriptor and command; the
+    // remaining argument slots are ignored.
+    unsafe { syscall6(SYS_FCNTL, fd as usize, F_GETFL, 0, 0, 0, 0) }
 }
 
 #[inline(always)]
@@ -689,6 +706,39 @@ pub extern "C" fn _start() -> ! {
         || tee(tee_pipe[0], dev_null_write, 1, 0) != NEG_EINVAL
     {
         fail(USER_FAIL_TEE_DEVICE_MODE, 228);
+    }
+    // The preserved open(2) access mode must also gate plain reads and writes on
+    // the device descriptions: a write-only description rejects reads and a
+    // read-only description rejects writes with EBADF, while the correctly
+    // directed operations succeed.
+    let mut dev_mode_buf = [0_u8; 1];
+    if pipe_read(dev_null_write, &mut dev_mode_buf) != NEG_EBADF
+        || pipe_write(dev_null_read, &dev_mode_buf) != NEG_EBADF
+    {
+        fail(USER_FAIL_TEE_DEVICE_MODE, 230);
+    }
+    if pipe_read(dev_null_read, &mut dev_mode_buf) != 0
+        || pipe_write(dev_null_write, &dev_mode_buf) != 1
+    {
+        fail(USER_FAIL_TEE_DEVICE_MODE, 231);
+    }
+    // Duplicated descriptors share the same open file description, so the
+    // preserved access mode and the tee errno behavior survive dup(2), and
+    // F_GETFL reports the mode selected at open time.
+    let dev_null_read_dup = dup(dev_null_read);
+    let dev_null_write_dup = dup(dev_null_write);
+    if dev_null_read_dup < 0 || dev_null_write_dup < 0 {
+        fail(USER_FAIL_TEE_DEVICE_MODE, 232);
+    }
+    if tee(tee_pipe[0], dev_null_read_dup as i32, 1, 0) != NEG_EBADF
+        || tee(dev_null_write_dup as i32, tee_pipe[1], 1, 0) != NEG_EBADF
+        || fcntl_getfl(dev_null_read_dup as i32) != O_RDONLY as isize
+        || fcntl_getfl(dev_null_write_dup as i32) != O_WRONLY as isize
+    {
+        fail(USER_FAIL_TEE_DEVICE_MODE, 233);
+    }
+    if close(dev_null_read_dup as i32) != 0 || close(dev_null_write_dup as i32) != 0 {
+        fail(USER_FAIL_TEE_DEVICE_MODE, 234);
     }
     if close(dev_null_read) != 0 || close(dev_null_write) != 0 {
         fail(USER_FAIL_TEE_DEVICE_CLOSE, 229);

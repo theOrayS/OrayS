@@ -2134,9 +2134,9 @@ fn proc_self_fd_number(path: &str) -> Option<i32> {
 
 pub(super) fn fd_entry_statfs_path(entry: &FdEntry) -> Option<&str> {
     match entry {
-        FdEntry::DevNull => Some("/dev/null"),
+        FdEntry::DevNull(_) => Some("/dev/null"),
         FdEntry::DevCpuDmaLatency(_) => Some("/dev/cpu_dma_latency"),
-        FdEntry::Rtc => Some("/dev/misc/rtc"),
+        FdEntry::Rtc(_) => Some("/dev/misc/rtc"),
         FdEntry::Pipe(_) => Some("pipe:"),
         FdEntry::Socket(_) | FdEntry::LocalSocket(_) => Some("socket:"),
         _ => fd_entry_path(entry),
