@@ -465,6 +465,72 @@ class SyscallBoundaryRegressionsGuardTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("all Linux timed futex commands", result.stdout)
 
+    def test_detects_futex_val_without_u32_truncation(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        truncation = "    let val_u32 = val as u32;\n"
+        self.assertIn(truncation, text)
+        path.write_text(text.replace(truncation, "    let val_u32 = val;\n", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("truncated to Linux u32", result.stdout)
+
+    def test_detects_futex_legacy_zero_wake_returning_zero(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        legacy = "if signed <= 0 { 1 } else { signed as usize }"
+        self.assertIn(legacy, text)
+        path.write_text(text.replace(legacy, "if signed <= 0 { 0 } else { signed as usize }", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("legacy FUTEX_WAKE count", result.stdout)
+
+    def test_detects_futex_requeue_zero_rejected_as_negative(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        condition = "    if signed < 0 {\n"
+        self.assertIn(condition, text)
+        path.write_text(text.replace(condition, "    if signed <= 0 {\n", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requeue counts", result.stdout)
+
+    def test_detects_futex_raw_val2_requeue_count(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        truncation = "futex_requeue_count(timeout as u32)"
+        self.assertIn(truncation, text)
+        path.write_text(text.replace(truncation, "Ok(timeout)", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("truncated to Linux u32", result.stdout)
+
+    def test_detects_futex_bitset_zero_check_before_u32_truncation(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        truncated_check = "if val3_u32 == 0"
+        self.assertEqual(text.count(truncated_check), 2)
+        path.write_text(text.replace(truncated_check, "if _val3 == 0", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("both reject zero after u32 truncation", result.stdout)
+
+    def test_detects_futex_restart_using_raw_val(self) -> None:
+        tree = self.make_tree()
+        path = tree / "user/shell/src/uspace/futex.rs"
+        text = path.read_text(encoding="utf-8")
+        truncated_restart = "tf.arg2() as u32 as usize"
+        self.assertIn(truncated_restart, text)
+        path.write_text(text.replace(truncated_restart, "tf.arg2()", 1), encoding="utf-8")
+        result = self.run_guard(tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("restart matching", result.stdout)
+
     def test_detects_futex_cmp_requeue_compare_before_target_key(self) -> None:
         tree = self.make_tree()
         path = tree / "user/shell/src/uspace/futex.rs"

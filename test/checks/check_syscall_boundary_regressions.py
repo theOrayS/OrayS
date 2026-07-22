@@ -416,6 +416,26 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
     if not (0 <= requeue_source_key < requeue_target_key < requeue_compare):
         findings.append("FUTEX_CMP_REQUEUE compares the source value before validating both futex keys")
     sys_futex = rust_function_block(futex, "sys_futex")
+    legacy_wake_count = rust_function_block(futex, "legacy_futex_wake_count")
+    requeue_count = rust_function_block(futex, "futex_requeue_count")
+    require_tokens(
+        findings,
+        legacy_wake_count,
+        "legacy FUTEX_WAKE count must use Linux's u32-to-int non-strict semantics",
+        ("value: u32", "let signed = value as i32;", "if signed <= 0", "1"),
+    )
+    require_tokens(
+        findings,
+        requeue_count,
+        "futex requeue counts must reject negative u32-to-int values",
+        (
+            "value: u32",
+            "let signed = value as i32;",
+            "if signed < 0",
+            "Err(LinuxError::EINVAL)",
+            "Ok(signed as usize)",
+        ),
+    )
     require_tokens(
         findings,
         sys_futex,
@@ -440,10 +460,34 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
             "return neg_errno(LinuxError::ENOSYS);",
         ),
     )
+    require_tokens(
+        findings,
+        sys_futex,
+        "futex scalar arguments must be truncated to Linux u32 values before dispatch",
+        (
+            "let val_u32 = val as u32;",
+            "let val3_u32 = _val3 as u32;",
+            "futex_requeue_count(val_u32)",
+            "futex_requeue_count(timeout as u32)",
+            "legacy_futex_wake_count(val_u32)",
+            "if val3_u32 == 0",
+            "Some(val3_u32)",
+        ),
+    )
+    if sys_futex.count("if val3_u32 == 0") != 2:
+        findings.append("FUTEX_WAIT_BITSET and FUTEX_WAKE_BITSET must both reject zero after u32 truncation")
+    for raw_use in (
+        "wake_addr_checked(process, uaddr, val, private)",
+        "wake_requeue_addr_checked(process, uaddr, val, timeout",
+        "if _val3 == 0",
+    ):
+        if raw_use in sys_futex:
+            findings.append(f"sys_futex still dispatches an untruncated scalar argument: {raw_use}")
     operation_decode = sys_futex.find("let op = futex_op as u32;")
     operation_reject = sys_futex.find("if unsupported_operation")
     timeout_validation = sys_futex.find("let timeout_result = match cmd")
     clock_reject = sys_futex.find("if unsupported_clock_operation")
+    requeue_count_validation = sys_futex.find("let requeue_counts = match cmd")
     source_alignment = sys_futex.find("if uaddr % size_of::<u32>() != 0")
     if not (
         0
@@ -456,6 +500,8 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
         findings.append(
             "futex timed-command validation must follow command decoding and precede operation/clock/source rejection"
         )
+    if not (0 <= clock_reject < requeue_count_validation < source_alignment):
+        findings.append("futex requeue count validation must precede source address and queue access")
     timeout_region = (
         sys_futex[timeout_validation:operation_reject]
         if 0 <= timeout_validation < operation_reject
@@ -482,9 +528,22 @@ def scan_stateful_boundaries(root: Path) -> list[str]:
     )
     if "read_futex_timeout(" in wait_addr or "read_relative_futex_timeout(" in wait_addr:
         findings.append("futex wait must not defer timeout validation until after source-word access")
-    requeue_start = sys_futex.find("general::FUTEX_REQUEUE =>")
-    cmp_requeue_start = sys_futex.find("general::FUTEX_CMP_REQUEUE =>")
-    wake_bitset_start = sys_futex.find("general::FUTEX_WAKE_BITSET =>")
+    require_tokens(
+        findings,
+        wait_addr,
+        "futex wait must compare the already truncated Linux u32 value",
+        ("val: u32", "if current != val", "value != val"),
+    )
+    restart_arm = rust_function_block(futex, "arm_relative_futex_restart")
+    require_tokens(
+        findings,
+        restart_arm,
+        "relative futex restart matching must use the same truncated u32 value",
+        ("tf.arg2() as u32 as usize",),
+    )
+    requeue_start = sys_futex.rfind("general::FUTEX_REQUEUE =>")
+    cmp_requeue_start = sys_futex.rfind("general::FUTEX_CMP_REQUEUE =>")
+    wake_bitset_start = sys_futex.rfind("general::FUTEX_WAKE_BITSET =>")
     requeue_arm = (
         sys_futex[requeue_start:cmp_requeue_start]
         if 0 <= requeue_start < cmp_requeue_start

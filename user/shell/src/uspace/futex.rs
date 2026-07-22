@@ -151,6 +151,25 @@ fn wake_addr_checked(
     wake_addr_bitset_checked(process, uaddr, count, u32::MAX, private)
 }
 
+fn legacy_futex_wake_count(value: u32) -> usize {
+    // The original futex syscall exposes u32 `val`, but the legacy wake helper
+    // receives it as a signed int. Without FUTEX2's strict-count flag, Linux's
+    // historical loop wakes one matching waiter for zero or negative counts.
+    let signed = value as i32;
+    if signed <= 0 { 1 } else { signed as usize }
+}
+
+fn futex_requeue_count(value: u32) -> Result<usize, LinuxError> {
+    // Unlike the legacy wake loop, futex_requeue rejects either signed count
+    // before looking up or changing a futex queue.
+    let signed = value as i32;
+    if signed < 0 {
+        Err(LinuxError::EINVAL)
+    } else {
+        Ok(signed as usize)
+    }
+}
+
 fn futex_waiter_matches(task: &AxTaskRef, bitset: u32) -> bool {
     task_ext(task).is_some_and(|ext| ext.futex_bitset.load(Ordering::Acquire) & bitset != 0)
 }
@@ -325,7 +344,7 @@ pub(super) fn arm_relative_futex_restart(ext: &UserTaskExt, tf: &TrapFrame) -> b
     ext.arm_relative_futex_restart(relative_restart_key(
         tf.arg0(),
         tf.arg1(),
-        tf.arg2(),
+        tf.arg2() as u32 as usize,
         tf.arg3(),
     ))
 }
@@ -377,7 +396,7 @@ where
 fn wait_addr(
     process: &UserProcess,
     uaddr: usize,
-    val: usize,
+    val: u32,
     timeout: Option<Duration>,
     bitset: u32,
     private: bool,
@@ -390,7 +409,7 @@ fn wait_addr(
             return neg_errno(err);
         }
     };
-    if current != val as u32 {
+    if current != val {
         finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::EAGAIN);
     }
@@ -408,7 +427,7 @@ fn wait_addr(
     }
     let wait_cond = || {
         current_task_ext().is_some_and(|ext| ext.futex_wait.load(Ordering::Acquire) != uaddr)
-            || read_user_value::<u32>(process, uaddr).map_or(true, |value| value != val as u32)
+            || read_user_value::<u32>(process, uaddr).map_or(true, |value| value != val)
             || current_unblocked_signal_pending()
             || process.pending_exit_group().is_some()
             || process.eval_watchdog_expired()
@@ -518,6 +537,8 @@ pub(super) fn sys_futex(
     _val3: usize,
 ) -> isize {
     let op = futex_op as u32;
+    let val_u32 = val as u32;
+    let val3_u32 = _val3 as u32;
     let cmd = op & general::FUTEX_CMD_MASK as u32;
     let allowed_operation_bits = general::FUTEX_CMD_MASK as u32
         | general::FUTEX_PRIVATE_FLAG as u32
@@ -533,7 +554,7 @@ pub(super) fn sys_futex(
     );
     let private = op & general::FUTEX_PRIVATE_FLAG as u32 != 0;
     let restart_key = (cmd == general::FUTEX_WAIT && timeout != 0)
-        .then(|| relative_restart_key(uaddr, futex_op, val, timeout));
+        .then(|| relative_restart_key(uaddr, futex_op, val_u32 as usize, timeout));
     let timeout_result = match cmd {
         general::FUTEX_WAIT => match restart_key {
             Some(restart_key) => read_relative_futex_timeout(process, timeout, restart_key),
@@ -568,6 +589,21 @@ pub(super) fn sys_futex(
         finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::ENOSYS);
     }
+    let requeue_counts = match cmd {
+        general::FUTEX_REQUEUE | general::FUTEX_CMP_REQUEUE => {
+            match (
+                futex_requeue_count(val_u32),
+                futex_requeue_count(timeout as u32),
+            ) {
+                (Ok(wake_count), Ok(requeue_count)) => Some((wake_count, requeue_count)),
+                _ => {
+                    finish_relative_futex_wait(restart_key);
+                    return neg_errno(LinuxError::EINVAL);
+                }
+            }
+        }
+        _ => None,
+    };
     if uaddr % size_of::<u32>() != 0 {
         finish_relative_futex_wait(restart_key);
         return neg_errno(LinuxError::EINVAL);
@@ -590,53 +626,77 @@ pub(super) fn sys_futex(
         general::FUTEX_WAIT => wait_addr(
             process,
             uaddr,
-            val,
+            val_u32,
             parsed_timeout,
             u32::MAX,
             private,
             restart_key,
         ),
         general::FUTEX_WAIT_BITSET => {
-            if _val3 == 0 {
+            if val3_u32 == 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
             wait_addr(
                 process,
                 uaddr,
-                val,
+                val_u32,
                 parsed_timeout,
-                _val3 as u32,
+                val3_u32,
                 private,
                 None,
             )
         }
-        general::FUTEX_WAKE => match wake_addr_checked(process, uaddr, val, private) {
-            Ok(woken) => woken as isize,
-            Err(err) => neg_errno(err),
-        },
+        general::FUTEX_WAKE => {
+            match wake_addr_checked(process, uaddr, legacy_futex_wake_count(val_u32), private) {
+                Ok(woken) => woken as isize,
+                Err(err) => neg_errno(err),
+            }
+        }
         general::FUTEX_REQUEUE => {
-            match wake_requeue_addr_checked(process, uaddr, val, timeout, _uaddr2, None, private) {
+            let Some((wake_count, requeue_count)) = requeue_counts else {
+                return neg_errno(LinuxError::ENOSYS);
+            };
+            match wake_requeue_addr_checked(
+                process,
+                uaddr,
+                wake_count,
+                requeue_count,
+                _uaddr2,
+                None,
+                private,
+            ) {
                 Ok((woken, requeued)) => woken.saturating_add(requeued) as isize,
                 Err(err) => neg_errno(err),
             }
         }
-        general::FUTEX_CMP_REQUEUE => match wake_requeue_addr_checked(
-            process,
-            uaddr,
-            val,
-            timeout,
-            _uaddr2,
-            Some(_val3 as u32),
-            private,
-        ) {
-            Ok((woken, requeued)) => woken.saturating_add(requeued) as isize,
-            Err(err) => neg_errno(err),
-        },
+        general::FUTEX_CMP_REQUEUE => {
+            let Some((wake_count, requeue_count)) = requeue_counts else {
+                return neg_errno(LinuxError::ENOSYS);
+            };
+            match wake_requeue_addr_checked(
+                process,
+                uaddr,
+                wake_count,
+                requeue_count,
+                _uaddr2,
+                Some(val3_u32),
+                private,
+            ) {
+                Ok((woken, requeued)) => woken.saturating_add(requeued) as isize,
+                Err(err) => neg_errno(err),
+            }
+        }
         general::FUTEX_WAKE_BITSET => {
-            if _val3 == 0 {
+            if val3_u32 == 0 {
                 return neg_errno(LinuxError::EINVAL);
             }
-            match wake_addr_bitset_checked(process, uaddr, val, _val3 as u32, private) {
+            match wake_addr_bitset_checked(
+                process,
+                uaddr,
+                legacy_futex_wake_count(val_u32),
+                val3_u32,
+                private,
+            ) {
                 Ok(woken) => woken as isize,
                 Err(err) => neg_errno(err),
             }
