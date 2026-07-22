@@ -139,6 +139,69 @@ desktop 既有门禁。非目标：修复 `tee_device_mode`（GitHub P1 issue #2
 6. app-test 需 musl 工具链（本机未装，CI 由 setup-musl 提供）——外部环境项。
 7. PR #3 仍不可声明 merge-ready：上述 CI 红项、人工 review、scope 政策决策未闭合。
 
+## 跟进目标（2026-07-22 第二轮）：修复 tee_device_mode 并按 RV64+LA64+Linux 收窄 CI
+
+人工决策：撤销“不修 tee_device_mode”约束；支持范围收窄为 RV64+LA64 目标、Linux 宿主；
+x86_64/aarch64/macOS 不再作为门禁。允许把 Desktop scope allowlist 精确扩大到本跟进
+所需的实现/测试/workflow/文档文件。
+
+### 基线失败证据（修复前）
+
+- `test/output/tee-baseline-20260722/{rv64,la64}/logs/smoke.*.stdout.log`：
+  `PR3_SMOKE_V1 USER_FAIL tee_device_mode`（两架构均复现），SHA-256 已记录。
+
+### 根因与修复（commit 71bd6488）
+
+- 根因：`FdEntry::DevNull`/`FdEntry::Rtc` 是无载荷 unit variant，tee 快照硬编码
+  `(readable=true, writable=true)`，open(2) 访问模式丢失：错误方向的 device 端点
+  tee(2) 报 EINVAL 而非 EBADF；read/write 完全不校验模式。
+- 修复：两个 variant 携带 open 时记录的 fcntl status flags；dup/fork 复制保持；
+  F_GETFL/F_SETFL 与其它带 flags 字符设备一致；read/write/tee 在边界按保留模式
+  返回 EBADF。无测例名/路径/架构特化。
+- RED→GREEN：静态 guard 新增 6 条结构性要求（先 RED）；runtime smoke 新增
+  wrong-direction read/write EBADF、正确方向成功、dup 模式保持与 F_GETFL 断言。
+- 验证：`evidence-runtime` rv+la 全部 case pass，USER_PASS（修复后真实 QEMU）。
+
+### CI 收窄（commit b07e8b0f 等）
+
+- build.yml：clippy/build matrix 仅 riscv64+loongarch64；删除 other-platforms 与
+  macOS job（仅为目标支持门禁且因缺移植而红）；host 侧 cargo fmt 保留；observational
+  moving-nightly lane 政策不变。
+- test.yml：app-test 仅 riscv64+loongarch64，setup-qemu arch_list 同步收窄。
+- docs.yml：移除 macOS；Linux 文档门禁保留并改用主支持目标
+  `make doc_check_missing ARCH=riscv64`。
+- 策略 guard 同步重写：要求 rv/la-only matrix，拒绝重现 unsupported job；
+  mutation fixtures 更新（33→34，run_suite.py 与 suite_manifest.json 同步 pin）。
+
+### Linux 文档门禁修复（commit a9d80255）
+
+- workspace missing-docs 债务逐个 crate 补齐（orays_linux、orays_linux_abi、
+  arceos_posix_api、axnet、axfile、axmm、axipi 的公开项文档）。
+- 结构性缺陷：axtask `irq` feature 未转发 `axhal/irq`，per-package
+  `cargo rustdoc --all-features -p axtask` 无法解析 `set_oneshot_timer`
+  （真实构建经 axruntime/axfeat 转发不受影响）；改为 `irq = ["axhal/irq"]`。
+- `make doc_check_missing ARCH=riscv64` exit 0。
+
+### 最终验证（本轮 HEAD）
+
+- quick suite：45/45 PASS（final-quick-3）。
+- `make unittest_no_fail_fast`：exit 0。
+- `cargo fmt --all -- --check`：PASS；`make clippy ARCH=riscv64|loongarch64`：exit 0。
+- `make doc_check_missing ARCH=riscv64`：exit 0。
+- `evidence-runtime` rv+la：6/6 case pass，两架构 USER_PASS。
+- desktop：Python 100/100、host-test 14/14、fmt/clippy PASS、golden 5/5 MATCH、
+  rv/la build PASS、check-scope PASS、QEMU 9.2.4 双架构 boot `VALID_PASS failures=0`。
+
+### 本轮遗留（诚实状态）
+
+- x86_64/aarch64 uspace 移植缺失：按收窄政策不再门禁，代码缺陷仍存在（如需支持
+  这些目标需单独立项）。
+- orays_linux_abi 在 la/x86_64 doc 图中的 missing-docs 已随本轮全部补齐；
+  rv doc 图不再遗漏。
+- app-test（rv/la）本地无法复跑（缺 musl 工具链）；CI 环境项，未本地验证。
+- PR #3 merge-ready 仍否：GitHub 侧 branch protection/check 名称需与新 policy
+  对齐、人工 review 未进行、GitHub issue #2 状态需人工关闭。
+
 ## AI 使用披露
 
 - 工具：Kimi Code CLI（kimi）。场景：代码审查、修复设计、测试编写、CI 诊断。
