@@ -25,27 +25,27 @@ pub struct AddrSpace {
 /// Diagnostic information for a single virtual address lookup.
 #[derive(Clone, Copy, Debug)]
 pub struct AddrSpaceQuery {
-/// /// Whether the queried address is inside any mapped area.
+    /// Whether the queried address is inside any mapped area.
     pub contains: bool,
-/// /// Whether a memory area record was found for the address.
+    /// Whether a memory area record was found for the address.
     pub area_found: bool,
-/// /// Start address of the found area.
+    /// Start address of the found area.
     pub area_start: usize,
-/// /// End address of the found area.
+    /// End address of the found area.
     pub area_end: usize,
-/// /// Mapping flags of the found area.
+    /// Mapping flags of the found area.
     pub area_flags: MappingFlags,
-/// /// Name of the backend owning the found area.
+    /// Name of the backend owning the found area.
     pub backend: &'static str,
-/// /// Whether a page-table entry exists for the address.
+    /// Whether a page-table entry exists for the address.
     pub pte_mapped: bool,
-/// /// Physical address the page-table entry maps to.
+    /// Physical address the page-table entry maps to.
     pub paddr: usize,
-/// /// Page-table entry flags for the mapping.
+    /// Page-table entry flags for the mapping.
     pub pte_flags: MappingFlags,
-/// /// Page size of the mapping, when mapped.
+    /// Page size of the mapping, when mapped.
     pub page_size: Option<PageSize>,
-/// /// Whether the mapping shares backend metadata with another space.
+    /// Whether the mapping shares backend metadata with another space.
     pub shared_metadata: bool,
 }
 
