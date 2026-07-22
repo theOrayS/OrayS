@@ -56,4 +56,3 @@ jobs:
             base=origin/develop/post-integration-next
           fi
           python3 scripts/desktop/check-scope.py --base "$base"
-
