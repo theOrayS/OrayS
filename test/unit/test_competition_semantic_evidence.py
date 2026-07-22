@@ -407,10 +407,10 @@ class CompetitionSemanticEvidenceWorkflowGuardTest(unittest.TestCase):
             findings = self.mutate(
                 root,
                 "build.yml",
-                "  build-for-other-platforms:\n    name: Other platforms (${{ matrix.lane }})\n"
+                "  build:\n    name: Build (${{ matrix.arch }}, ${{ matrix.lane }})\n"
                 "    runs-on: ubuntu-24.04\n    timeout-minutes: 60\n"
                 "    continue-on-error: ${{ matrix.lane == 'moving-nightly-observational' }}",
-                "  build-for-other-platforms:\n    name: Other platforms (${{ matrix.lane }})\n"
+                "  build:\n    name: Build (${{ matrix.arch }}, ${{ matrix.lane }})\n"
                 "    runs-on: ubuntu-24.04\n    timeout-minutes: 60\n"
                 "    continue-on-error: true",
             )
@@ -418,46 +418,59 @@ class CompetitionSemanticEvidenceWorkflowGuardTest(unittest.TestCase):
                 any("only moving nightly observational" in item for item in findings)
             )
 
-    def test_detects_moving_other_platform_dependency(self) -> None:
+    def test_detects_unsupported_target_in_required_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_tree(temporary)
             findings = self.mutate(
                 root,
                 "build.yml",
-                'CARGO_HOME="$PWD/cargo-home" cargo add --offline --path '
-                "vendor/cargo/axplat-aarch64-raspi",
-                'CARGO_HOME="$PWD/cargo-home" cargo add --offline '
-                "axplat-aarch64-raspi --git https://github.com/"
-                "arceos-org/axhal_crates.git",
+                "        arch: [riscv64, loongarch64]\n        lane: [fixed-required, moving-nightly-observational]\n    env:\n      RUSTUP_TOOLCHAIN: ${{ matrix.lane == 'fixed-required' && 'nightly-2025-05-20' || 'nightly' }}\n    steps:\n      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\n        with:\n          persist-credentials: false\n      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30\n        with:\n          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}\n          components: rust-src, clippy, rustfmt",
+                "        arch: [x86_64, riscv64, loongarch64]\n        lane: [fixed-required, moving-nightly-observational]\n    env:\n      RUSTUP_TOOLCHAIN: ${{ matrix.lane == 'fixed-required' && 'nightly-2025-05-20' || 'nightly' }}\n    steps:\n      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\n        with:\n          persist-credentials: false\n      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30\n        with:\n          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}\n          components: rust-src, clippy, rustfmt",
             )
             self.assertTrue(
-                any("repository vendor" in item or "moving git dependency" in item for item in findings)
+                any("must both be exactly" in item for item in findings)
             )
 
-    def test_detects_host_only_cargo_axplat_plugin_dependency(self) -> None:
+    def test_detects_reintroduced_other_platform_or_macos_job(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_tree(temporary)
             findings = self.mutate(
                 root,
                 "build.yml",
-                'CARGO_HOME="$PWD/cargo-home" cargo add --offline --path '
-                "vendor/cargo/axplat-aarch64-raspi",
-                "cargo axplat add --path vendor/cargo/axplat-aarch64-raspi",
-            )
-            self.assertTrue(any("host cargo-axplat plugin" in item for item in findings))
-
-    def test_detects_online_or_host_cargo_home_platform_add(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = self.copy_tree(temporary)
-            findings = self.mutate(
-                root,
-                "build.yml",
-                'CARGO_HOME="$PWD/cargo-home" cargo add --offline --path '
-                "vendor/cargo/axplat-aarch64-raspi",
-                "cargo add --path vendor/cargo/axplat-aarch64-raspi",
+                "      - name: Build shell\n        run: make ARCH=${{ matrix.arch }} A=user/shell build",
+                "      - name: Build shell\n        run: make ARCH=${{ matrix.arch }} A=user/shell build\n\n  build-for-other-platforms:\n    name: Other platforms (${{ matrix.lane }})\n    runs-on: ubuntu-24.04\n    timeout-minutes: 60\n    steps:\n      - run: make MYPLAT=axplat-aarch64-raspi defconfig",
             )
             self.assertTrue(
-                any("offline repository cargo home" in item for item in findings)
+                any("unsupported-target job must be removed" in item for item in findings)
+            )
+            self.assertTrue(
+                any("unsupported platform gate remains" in item for item in findings)
+            )
+
+    def test_detects_unsupported_application_test_matrix(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.copy_tree(temporary)
+            findings = self.mutate(
+                root,
+                "test.yml",
+                "        arch: [riscv64, loongarch64]",
+                "        arch: [x86_64, riscv64, aarch64, loongarch64]",
+            )
+            self.assertTrue(
+                any("must gate exactly the supported targets" in item for item in findings)
+            )
+
+    def test_detects_macos_docs_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.copy_tree(temporary)
+            findings = self.mutate(
+                root,
+                "docs.yml",
+                "        os: [ubuntu-24.04]",
+                "        os: [ubuntu-24.04, macos-14]",
+            )
+            self.assertTrue(
+                any("macOS is outside the supported docs scope" in item for item in findings)
             )
 
     def test_detects_docs_write_permission_expansion(self) -> None:

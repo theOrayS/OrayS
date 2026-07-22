@@ -38,6 +38,8 @@ kernel/net/axnet/src/smoltcp_impl/tcp.rs
 kernel/net/axnet/src/smoltcp_impl/udp.rs
 kernel/smp/axipi/src/event.rs
 kernel/task/axtask/Cargo.toml
+docs/pr3-semantic-evidence.md
+test/unit/test_competition_semantic_evidence.py
 docs/human_reviews/OrayS-Desktop-人工审查初审报告-2026-07-19.md
 docs/human_reviews/OrayS-Desktop-第二轮人工审查复核报告-2026-07-19.md
 docs/decisions/0001-desktop-isolation.md

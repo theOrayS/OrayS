@@ -14,6 +14,8 @@ PINNED_ACTION_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$")
 JOB_RE = re.compile(r"^  ([a-z0-9][a-z0-9-]*):\s*$", re.MULTILINE)
 QEMU_SOURCE_SHA256 = "f3cc1c4eabfdb288218ac3e33763dbe9e276d8bc890b867a2335d58de2ddd39a"
 QEMU_REQUIRED_VERSION = "QEMU emulator version 9.2.4"
+SUPPORTED_TARGET_ARCHES = ("riscv64", "loongarch64")
+UNSUPPORTED_TARGET_ARCHES = ("x86_64", "aarch64")
 DOCUMENTED_REQUIRED_CHECKS = (
     "Unit tests (required)",
     "PR3 infrastructure + host evidence (required)",
@@ -21,19 +23,14 @@ DOCUMENTED_REQUIRED_CHECKS = (
     "PR3 RV64 fixed build + runtime smoke (required)",
     "PR3 LA64 fixed build + runtime smoke (required)",
     "PR3 required aggregate",
-    *(f"Clippy ({arch}, fixed-required)" for arch in ("x86_64", "riscv64", "aarch64", "loongarch64")),
-    *(f"Build ({arch}, fixed-required)" for arch in ("x86_64", "riscv64", "aarch64", "loongarch64")),
-    "Other platforms (fixed-required)",
-    "macOS (fixed-required)",
-    *(f"Application tests ({arch}, fixed-required)" for arch in ("x86_64", "riscv64", "aarch64", "loongarch64")),
+    *(f"Clippy ({arch}, fixed-required)" for arch in SUPPORTED_TARGET_ARCHES),
+    *(f"Build ({arch}, fixed-required)" for arch in SUPPORTED_TARGET_ARCHES),
+    *(f"Application tests ({arch}, fixed-required)" for arch in SUPPORTED_TARGET_ARCHES),
     "Docs (ubuntu-24.04)",
-    "Docs (macos-14)",
 )
 DOCUMENTED_OBSERVATIONAL_CHECKS = (
-    *(f"Clippy ({arch}, moving-nightly-observational)" for arch in ("x86_64", "riscv64", "aarch64", "loongarch64")),
-    *(f"Build ({arch}, moving-nightly-observational)" for arch in ("x86_64", "riscv64", "aarch64", "loongarch64")),
-    "Other platforms (moving-nightly-observational)",
-    "macOS (moving-nightly-observational)",
+    *(f"Clippy ({arch}, moving-nightly-observational)" for arch in SUPPORTED_TARGET_ARCHES),
+    *(f"Build ({arch}, moving-nightly-observational)" for arch in SUPPORTED_TARGET_ARCHES),
 )
 
 
@@ -148,6 +145,14 @@ def scan_test_workflow(path: Path, text: str) -> list[str]:
     app = blocks.get("app-test", "")
     if "continue-on-error:" in app:
         findings.append(f"{path}: fixed application tests must remain hard-fail coverage")
+    if (
+        "arch: [riscv64, loongarch64]" not in app
+        or "arch_list: riscv64,loongarch64" not in app
+    ):
+        findings.append(
+            f"{path}: application tests must gate exactly the supported targets "
+            "(riscv64, loongarch64)"
+        )
     runtime = blocks.get("pr3-runtime", "")
     if "needs: pr3-qemu-baseline\n    if: ${{ always() }}" not in runtime:
         findings.append(
@@ -382,13 +387,25 @@ def scan_build_workflow(path: Path, text: str) -> list[str]:
                 "fixed-required",
                 "moving-nightly-observational",
                 "continue-on-error: ${{ matrix.lane == 'moving-nightly-observational' }}",
-                "Other platforms (${{ matrix.lane }})",
-                "macOS (${{ matrix.lane }})",
             ),
         )
     )
+    # Supported scope: required target gates cover RISC-V64 and LoongArch64
+    # only. x86_64/aarch64/macOS jobs must not linger as required or
+    # observational gates, and no unsupported-target job may remain.
+    if text.count("arch: [riscv64, loongarch64]") != 2:
+        findings.append(
+            f"{path}: clippy and build matrices must both be exactly "
+            "arch: [riscv64, loongarch64]"
+        )
+    for job in ("build-for-other-platforms", "build-for-macos"):
+        if f"{job}:" in text:
+            findings.append(f"{path}: unsupported-target job must be removed: {job}")
+    for token in ("macos-14", "Other platforms (", "macOS ("):
+        if token in text:
+            findings.append(f"{path}: unsupported platform gate remains: {token}")
     blocks = job_blocks(text)
-    for job in ("clippy", "build", "build-for-other-platforms", "build-for-macos"):
+    for job in ("clippy", "build"):
         block = blocks.get(job, "")
         if "lane: [fixed-required, moving-nightly-observational]" not in block:
             findings.append(f"{path}: {job} must keep fixed and moving lanes explicit")
@@ -397,25 +414,6 @@ def scan_build_workflow(path: Path, text: str) -> list[str]:
             not in block
         ):
             findings.append(f"{path}: {job} must keep only moving nightly observational")
-    other_platforms = blocks.get("build-for-other-platforms", "")
-    for platform in ("raspi", "bsta1000b", "phytium-pi"):
-        token = (
-            'CARGO_HOME="$PWD/cargo-home" cargo add --offline --path '
-            f"vendor/cargo/axplat-aarch64-{platform}"
-        )
-        if token not in other_platforms:
-            findings.append(
-                f"{path}: fixed other-platform build must use offline repository "
-                f"cargo home and vendor: {token}"
-            )
-    if "cargo axplat" in other_platforms:
-        findings.append(
-            f"{path}: fixed other-platform build must not depend on a host cargo-axplat plugin"
-        )
-    if "axhal_crates.git" in other_platforms or "cargo add --git" in other_platforms:
-        findings.append(
-            f"{path}: fixed other-platform build must not resolve a moving git dependency"
-        )
     for line_number, line in enumerate(text.splitlines(), 1):
         if "run: make " in line and "A=user/shell" in line and not line.rstrip().endswith(" build"):
             findings.append(
@@ -433,6 +431,13 @@ def scan_docs_workflow(path: Path, text: str) -> list[str]:
         findings.append(f"{path}: only the deploy job may receive contents: write")
     if "pull_request:" not in text or "github.event_name == 'push'" not in blocks.get("deploy", ""):
         findings.append(f"{path}: docs deployment is not restricted to default-branch push")
+    if "macos" in text:
+        findings.append(f"{path}: macOS is outside the supported docs scope")
+    if "make doc_check_missing ARCH=riscv64" not in text:
+        findings.append(
+            f"{path}: Linux docs validation must build the primary supported "
+            "target with make doc_check_missing ARCH=riscv64"
+        )
     return findings
 
 

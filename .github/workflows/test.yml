@@ -245,7 +245,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, riscv64, aarch64, loongarch64]
+        # Supported target scope: RISC-V64 and LoongArch64 only.
+        arch: [riscv64, loongarch64]
     env:
       RUSTUP_TOOLCHAIN: nightly-2025-05-20
     steps:
@@ -256,7 +257,7 @@ jobs:
         with:
           toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
           components: rust-src, llvm-tools
-          targets: x86_64-unknown-none, riscv64gc-unknown-none-elf, aarch64-unknown-none-softfloat, loongarch64-unknown-none-softfloat
+          targets: riscv64gc-unknown-none-elf, loongarch64-unknown-none-softfloat
       - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
         with:
           shared-key: cargo-bin-cache-${{ env.FIXED_RUST_TOOLCHAIN }}
@@ -264,7 +265,7 @@ jobs:
       - uses: arceos-org/setup-qemu@fca28917fa0d17dfdb5a1df9f3e433ffa1b85e3a
         with:
           version: ${{ env.QEMU_VERSION }}
-          arch_list: x86_64,aarch64,riscv64,loongarch64
+          arch_list: riscv64,loongarch64
       - uses: arceos-org/setup-musl@8f7b5b3b546261a1e502f6502e0e133e1e227443
         with:
           arch: ${{ matrix.arch }}
