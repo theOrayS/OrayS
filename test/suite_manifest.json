@@ -66,7 +66,10 @@
     "quick": {
       "description": "All static checks, unit suites, and structural integrity checks.",
       "arch_policy": "none",
-      "include": ["checks", "unit"],
+      "include": [
+        "checks",
+        "unit"
+      ],
       "cases": [],
       "arch_cases": {}
     },
@@ -74,7 +77,9 @@
       "description": "PR3 host-side semantic-evidence, parser, workflow, and report infrastructure shard.",
       "arch_policy": "none",
       "include": [],
-      "cases": ["evidence.host"],
+      "cases": [
+        "evidence.host"
+      ],
       "arch_cases": {}
     },
     "evidence-runtime": {
@@ -83,21 +88,29 @@
       "include": [],
       "cases": [],
       "arch_cases": {
-        "rv": ["evidence.riscv64"],
-        "la": ["evidence.loongarch64"]
+        "rv": [
+          "evidence.riscv64"
+        ],
+        "la": [
+          "evidence.loongarch64"
+        ]
       }
     },
     "evidence-aggregate": {
       "description": "Merge complete host/RV/LA semantic shards and render deterministic reports.",
       "arch_policy": "none",
       "include": [],
-      "cases": ["evidence.aggregate"],
+      "cases": [
+        "evidence.aggregate"
+      ],
       "arch_cases": {}
     },
     "evidence-required": {
       "description": "Complete local PR3 host, RV64, LA64, merge, and report sequence.",
       "arch_policy": "none",
-      "include": ["evidence-host"],
+      "include": [
+        "evidence-host"
+      ],
       "cases": [
         "evidence.riscv64",
         "evidence.loongarch64",
@@ -108,7 +121,10 @@
     "baseline": {
       "description": "Quick plus required PR3 semantic evidence and deterministic repository formatting, unit, lint, and RV/LA build checks.",
       "arch_policy": "none",
-      "include": ["quick", "evidence-required"],
+      "include": [
+        "quick",
+        "evidence-required"
+      ],
       "cases": [
         "baseline.cargo_format",
         "baseline.workspace_unit_tests",
@@ -127,18 +143,28 @@
       "include": [],
       "cases": [],
       "arch_cases": {
-        "rv": ["official.riscv64"],
-        "la": ["official.loongarch64"]
+        "rv": [
+          "official.riscv64"
+        ],
+        "la": [
+          "official.loongarch64"
+        ]
       }
     },
     "full": {
       "description": "Baseline followed by the requested RV, LA, or both official local paths.",
       "arch_policy": "one_or_all",
-      "include": ["baseline"],
+      "include": [
+        "baseline"
+      ],
       "cases": [],
       "arch_cases": {
-        "rv": ["official.riscv64"],
-        "la": ["official.loongarch64"]
+        "rv": [
+          "official.riscv64"
+        ],
+        "la": [
+          "official.loongarch64"
+        ]
       }
     }
   },
@@ -146,517 +172,1473 @@
     {
       "id": "check.compliance_regressions",
       "description": "Aggregate compliance regression guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_compliance_regressions.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_compliance_regressions.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_compliance_regressions.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_compliance_regressions.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.competition_semantic_evidence",
       "description": "PR3 fixed/observational CI, pinned QEMU, canonical profile, and evidence policy guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_competition_semantic_evidence.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_competition_semantic_evidence.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_competition_semantic_evidence.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_competition_semantic_evidence.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.evaluation_runner_and_parser_integrity",
       "description": "Evaluation execution and result parser integrity guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_evaluation_runner_and_parser_integrity.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_evaluation_runner_and_parser_integrity.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_evaluation_runner_and_parser_integrity.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_evaluation_runner_and_parser_integrity.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.file_object_event_core",
       "description": "File-object identity, readiness, lifecycle, and integration guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_file_object_event_core.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_file_object_event_core.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_file_object_event_core.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_file_object_event_core.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.kernel_state_backed_semantics",
       "description": "Kernel state-backed compatibility semantics guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_kernel_state_backed_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_kernel_state_backed_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_kernel_state_backed_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_kernel_state_backed_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.libc_stateful_semantics",
       "description": "Stateful libc operation guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_libc_stateful_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_libc_stateful_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_libc_stateful_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_libc_stateful_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.linux_boundary",
       "description": "Linux ABI, typed user-memory, syscall metadata, and dependency-boundary guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_linux_boundary.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_linux_boundary.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_linux_boundary.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_linux_boundary.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.memory_policy_semantics",
       "description": "Memory policy semantics guard split from the legacy broad check.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_memory_policy_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_memory_policy_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_memory_policy_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_memory_policy_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.no_fake_success",
       "description": "Fake-success and required-input integrity guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_no_fake_success.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_no_fake_success.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_no_fake_success.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_no_fake_success.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.posix_state_integrity",
       "description": "Observable POSIX state integrity guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_posix_state_integrity.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_posix_state_integrity.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_posix_state_integrity.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_posix_state_integrity.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.rlimit_and_fd_semantics",
       "description": "Resource limit, sysconf, fcntl, and descriptor state guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_rlimit_and_fd_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_rlimit_and_fd_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_rlimit_and_fd_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_rlimit_and_fd_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.runtime_binary_patch_prohibition",
       "description": "Runtime binary rewriting prohibition guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_runtime_binary_patch_prohibition.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_runtime_binary_patch_prohibition.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_runtime_binary_patch_prohibition.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_runtime_binary_patch_prohibition.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.socket_message_and_buffer_semantics",
       "description": "Socket message and buffer semantics guard split from the legacy broad check.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_socket_message_and_buffer_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_socket_message_and_buffer_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_socket_message_and_buffer_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_socket_message_and_buffer_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.stat_metadata_semantics",
       "description": "Stat and lstat metadata semantics guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_stat_metadata_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_stat_metadata_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_stat_metadata_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_stat_metadata_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.synthetic_capability_integrity",
       "description": "Synthetic capability claim integrity guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_synthetic_capability_integrity.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_synthetic_capability_integrity.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_synthetic_capability_integrity.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_synthetic_capability_integrity.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.syscall_boundary_regressions",
       "description": "High-risk syscall boundary regression guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_syscall_boundary_regressions.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_syscall_boundary_regressions.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_syscall_boundary_regressions.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_syscall_boundary_regressions.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.test_asset_integrity",
       "description": "Canonical registration, naming, compatibility, and output hygiene check.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_test_asset_integrity.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_test_asset_integrity.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_test_asset_integrity.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_test_asset_integrity.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.timer_semantics",
       "description": "Timer semantics guard split from the legacy broad check.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_timer_semantics.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_timer_semantics.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_timer_semantics.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_timer_semantics.py"
+      ],
       "required_commands": []
     },
     {
       "id": "check.user_memory_copy_boundaries",
       "description": "User pointer copy-in and copy-out boundary guard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/checks/check_user_memory_copy_boundaries.py"],
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/checks/check_user_memory_copy_boundaries.py"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 120,
-      "result_contract": {"type": "check"},
-      "required_paths": ["{repo}/test/checks/check_user_memory_copy_boundaries.py"],
+      "result_contract": {
+        "type": "check"
+      },
+      "required_paths": [
+        "{repo}/test/checks/check_user_memory_copy_boundaries.py"
+      ],
       "required_commands": []
     },
-
     {
       "id": "unit.compliance_regressions",
       "description": "Compliance guard unit fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_compliance_regressions.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_compliance_regressions.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 7,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_compliance_regressions.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.competition_semantic_evidence",
       "description": "PR3 workflow and evidence-policy mutation fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_competition_semantic_evidence.py"],
-      "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 33, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_competition_semantic_evidence.py", "{repo}/test/checks/check_competition_semantic_evidence.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_competition_semantic_evidence.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 300,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 34,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_competition_semantic_evidence.py",
+        "{repo}/test/checks/check_competition_semantic_evidence.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.evaluation_failure_report",
       "description": "Paired-stream evaluation failure reporter and strict LTP lifecycle fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_failure_report.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_failure_report.py", "{repo}/test/evaluation/report_evaluation_failures.py", "{repo}/test/evaluation/parse_official_results.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_evaluation_failure_report.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 9,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_evaluation_failure_report.py",
+        "{repo}/test/evaluation/report_evaluation_failures.py",
+        "{repo}/test/evaluation/parse_official_results.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.evaluation_runner_and_parser_integrity",
       "description": "Evaluation execution and parser static guard fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 24, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 24,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_evaluation_runner_and_parser_integrity.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.evaluator_protocol",
       "description": "Byte-preserving evaluator protocol and terminal-control adversarial fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluator_protocol.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 27, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_evaluator_protocol.py", "{repo}/test/evidence/evaluator_protocol.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_evaluator_protocol.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 27,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_evaluator_protocol.py",
+        "{repo}/test/evidence/evaluator_protocol.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.file_object_event_core",
       "description": "File-object identity, readiness, lifecycle, and integration mutation fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_file_object_event_core.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 33, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_file_object_event_core.py", "{repo}/test/checks/check_file_object_event_core.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_file_object_event_core.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 33,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_file_object_event_core.py",
+        "{repo}/test/checks/check_file_object_event_core.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.kernel_state_backed_semantics",
       "description": "Kernel state-backed semantics guard fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_kernel_state_backed_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 41, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_kernel_state_backed_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_kernel_state_backed_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 300,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 41,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_kernel_state_backed_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.libc_stateful_semantics",
       "description": "Stateful libc semantics guard fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_libc_stateful_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_libc_stateful_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_libc_stateful_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 9,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_libc_stateful_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.linux_boundary",
       "description": "Linux ABI, typed user-memory, syscall metadata, and dependency-boundary mutation fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_linux_boundary.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 16, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_linux_boundary.py", "{repo}/test/checks/check_linux_boundary.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_linux_boundary.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 16,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_linux_boundary.py",
+        "{repo}/test/checks/check_linux_boundary.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.ltp_result_summary",
       "description": "LTP summary, promotion, and strict lifecycle fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_ltp_result_summary.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 20, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_ltp_result_summary.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_ltp_result_summary.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 20,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_ltp_result_summary.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.memory_policy_semantics",
       "description": "Memory policy semantics positive and negative fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_memory_policy_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 3, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_memory_policy_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_memory_policy_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 3,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_memory_policy_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.no_fake_success",
       "description": "Fake-success and missing-input guard fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_no_fake_success.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 10, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_no_fake_success.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_no_fake_success.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 10,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_no_fake_success.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.official_result_validation",
       "description": "Strict official group and testcase lifecycle fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_official_result_validation.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 111, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_official_result_validation.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_official_result_validation.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 111,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_official_result_validation.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.posix_state_integrity",
       "description": "Observable POSIX state integrity fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_posix_state_integrity.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 15, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_posix_state_integrity.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_posix_state_integrity.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 15,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_posix_state_integrity.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.rlimit_and_fd_semantics",
       "description": "Resource limit and descriptor semantics fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_rlimit_and_fd_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 13, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_rlimit_and_fd_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_rlimit_and_fd_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 13,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_rlimit_and_fd_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.qemu_setup",
       "description": "Pinned QEMU 9.2.4 source and transferred-artifact setup fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_qemu_setup.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_qemu_setup.py", "{repo}/test/evidence/setup_qemu.sh"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_qemu_setup.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 9,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_qemu_setup.py",
+        "{repo}/test/evidence/setup_qemu.sh"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.runtime_binary_patch_prohibition",
       "description": "Runtime binary rewriting prohibition fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 9, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 9,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_runtime_binary_patch_prohibition.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.socket_message_and_buffer_semantics",
       "description": "Socket message and buffer semantics fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 10, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 10,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_socket_message_and_buffer_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.stat_metadata_semantics",
       "description": "Stat metadata semantics fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_stat_metadata_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 7, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_stat_metadata_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_stat_metadata_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 7,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_stat_metadata_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.semantic_evidence",
       "description": "Versioned semantic evidence validator, supervisor, merger, and deterministic renderer fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_semantic_evidence.py"],
-      "cwd": "{repo}", "timeout_seconds": 600,
-      "result_contract": {"type": "unittest", "expected_tests": 75, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_semantic_evidence.py", "{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/render_semantic_evidence.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json", "{repo}/test/evidence/semantic_evidence_schema.v1.json", "{repo}/test/fixtures/semantic_evidence/guard-ambiguous.txt", "{repo}/test/fixtures/semantic_evidence/guard-pass.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-duplicate.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-panic-after-pass.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-pass.txt", "{repo}/test/fixtures/semantic_evidence/smoke-rv64-truncated.txt"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_semantic_evidence.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 600,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 75,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_semantic_evidence.py",
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/render_semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "{repo}/test/evidence/semantic_evidence_schema.v1.json",
+        "{repo}/test/fixtures/semantic_evidence/guard-ambiguous.txt",
+        "{repo}/test/fixtures/semantic_evidence/guard-pass.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-duplicate.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-panic-after-pass.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-pass.txt",
+        "{repo}/test/fixtures/semantic_evidence/smoke-rv64-truncated.txt"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.suite_runner",
       "description": "Manifest and runner lifecycle integration fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_suite_runner.py"],
-      "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 135, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_suite_runner.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_suite_runner.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 300,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 135,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_suite_runner.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.synthetic_capability_integrity",
       "description": "Synthetic capability integrity fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_synthetic_capability_integrity.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 5, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_synthetic_capability_integrity.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_synthetic_capability_integrity.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 5,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_synthetic_capability_integrity.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.syscall_boundary_regressions",
       "description": "Syscall boundary regression fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_syscall_boundary_regressions.py"],
-      "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 26, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_syscall_boundary_regressions.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_syscall_boundary_regressions.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 300,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 26,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_syscall_boundary_regressions.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.test_asset_integrity",
       "description": "Canonical registration and naming integrity fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_test_asset_integrity.py"],
-      "cwd": "{repo}", "timeout_seconds": 300,
-      "result_contract": {"type": "unittest", "expected_tests": 36, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_test_asset_integrity.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_test_asset_integrity.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 300,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 36,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_test_asset_integrity.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.timer_semantics",
       "description": "Timer semantics positive and negative fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_timer_semantics.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 3, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_timer_semantics.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_timer_semantics.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 3,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_timer_semantics.py"
+      ],
+      "required_commands": []
     },
     {
       "id": "unit.user_memory_copy_boundaries",
       "description": "User-memory copy boundary fixtures.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_user_memory_copy_boundaries.py"],
-      "cwd": "{repo}", "timeout_seconds": 180,
-      "result_contract": {"type": "unittest", "expected_tests": 13, "identity_binding": true},
-      "required_paths": ["{repo}/test/run_unittest_suite.py", "{repo}/test/unit/test_user_memory_copy_boundaries.py"], "required_commands": []
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_user_memory_copy_boundaries.py"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 180,
+      "result_contract": {
+        "type": "unittest",
+        "expected_tests": 13,
+        "identity_binding": true
+      },
+      "required_paths": [
+        "{repo}/test/run_unittest_suite.py",
+        "{repo}/test/unit/test_user_memory_copy_boundaries.py"
+      ],
+      "required_commands": []
     },
-
     {
       "id": "evidence.host",
       "description": "Canonical PR3 host semantic-evidence shard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evidence/semantic_evidence.py", "run", "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json", "--output", "build/pr3-evidence/host", "--arch", "host"],
-      "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false},
-      "required_paths": ["{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json"],
-      "required_commands": ["python3"],
-      "infrastructure_exit_codes": [2]
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "run",
+        "--manifest",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "--output",
+        "build/pr3-evidence/host",
+        "--arch",
+        "host"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 1800,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json"
+      ],
+      "required_commands": [
+        "python3"
+      ],
+      "infrastructure_exit_codes": [
+        2
+      ]
     },
     {
       "id": "evidence.riscv64",
       "description": "Canonical PR3 RISC-V64 fixed build and repository-contained ABI smoke shard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evidence/semantic_evidence.py", "run", "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json", "--output", "build/pr3-evidence/rv64", "--arch", "riscv64"],
-      "cwd": "{repo}", "timeout_seconds": 7200,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false},
-      "required_paths": ["{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json", "{repo}/scripts/rust-lld.sh", "{repo}/scripts/rust-objcopy.sh"],
-      "required_commands": ["python3", "make", "cargo", "rustc", "qemu-system-riscv64"],
-      "infrastructure_exit_codes": [2]
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "run",
+        "--manifest",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "--output",
+        "build/pr3-evidence/rv64",
+        "--arch",
+        "riscv64"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 7200,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "{repo}/scripts/rust-lld.sh",
+        "{repo}/scripts/rust-objcopy.sh"
+      ],
+      "required_commands": [
+        "python3",
+        "make",
+        "cargo",
+        "rustc",
+        "qemu-system-riscv64"
+      ],
+      "infrastructure_exit_codes": [
+        2
+      ]
     },
     {
       "id": "evidence.loongarch64",
       "description": "Canonical PR3 LoongArch64 fixed build and repository-contained ABI smoke shard.",
-      "command": ["{python}", "-I", "-S", "-B", "-X", "pycache_prefix=/dev/null", "{repo}/test/evidence/semantic_evidence.py", "run", "--manifest", "{repo}/test/evidence/semantic_evidence_manifest.json", "--output", "build/pr3-evidence/la64", "--arch", "loongarch64"],
-      "cwd": "{repo}", "timeout_seconds": 7200,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false},
-      "required_paths": ["{repo}/test/evidence/evaluator_protocol.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json", "{repo}/scripts/rust-lld.sh", "{repo}/scripts/rust-objcopy.sh"],
-      "required_commands": ["python3", "make", "cargo", "rustc", "qemu-system-loongarch64"],
-      "infrastructure_exit_codes": [2]
+      "command": [
+        "{python}",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "pycache_prefix=/dev/null",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "run",
+        "--manifest",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "--output",
+        "build/pr3-evidence/la64",
+        "--arch",
+        "loongarch64"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 7200,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [
+        "{repo}/test/evidence/evaluator_protocol.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json",
+        "{repo}/scripts/rust-lld.sh",
+        "{repo}/scripts/rust-objcopy.sh"
+      ],
+      "required_commands": [
+        "python3",
+        "make",
+        "cargo",
+        "rustc",
+        "qemu-system-loongarch64"
+      ],
+      "infrastructure_exit_codes": [
+        2
+      ]
     },
     {
       "id": "evidence.aggregate",
       "description": "Merge complete PR3 semantic shards and render canonical JSON-derived reports.",
-      "command": ["{repo}/test/evidence/aggregate_semantic_evidence.sh"],
-      "cwd": "{repo}", "timeout_seconds": 600,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false},
-      "required_paths": ["{repo}/test/evidence/aggregate_semantic_evidence.sh", "{repo}/test/evidence/render_semantic_evidence.py", "{repo}/test/evidence/semantic_evidence.py", "{repo}/test/evidence/semantic_evidence_manifest.json"],
-      "required_commands": ["bash", "python3"],
-      "infrastructure_exit_codes": [2]
+      "command": [
+        "{repo}/test/evidence/aggregate_semantic_evidence.sh"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 600,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [
+        "{repo}/test/evidence/aggregate_semantic_evidence.sh",
+        "{repo}/test/evidence/render_semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence.py",
+        "{repo}/test/evidence/semantic_evidence_manifest.json"
+      ],
+      "required_commands": [
+        "bash",
+        "python3"
+      ],
+      "infrastructure_exit_codes": [
+        2
+      ]
     },
-
     {
       "id": "baseline.cargo_format",
       "description": "Workspace Rust formatting check.",
-      "command": ["cargo", "fmt", "--all", "--", "--check"],
-      "cwd": "{repo}", "timeout_seconds": 600,
-      "result_contract": {"type": "exit_code", "allow_empty_output": true}, "required_paths": [], "required_commands": ["cargo"]
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 600,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": true
+      },
+      "required_paths": [],
+      "required_commands": [
+        "cargo"
+      ]
     },
     {
       "id": "baseline.workspace_unit_tests",
       "description": "Existing no-fail-fast workspace Rust unit tests.",
-      "command": ["make", "-C", "{repo}", "unittest_no_fail_fast"],
-      "cwd": "{repo}", "timeout_seconds": 3600,
-      "result_contract": {"type": "cargo_test"}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "unittest_no_fail_fast"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 3600,
+      "result_contract": {
+        "type": "cargo_test"
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo"
+      ]
     },
     {
       "id": "baseline.clippy_default",
       "description": "Existing default workspace clippy target.",
-      "command": ["make", "-C", "{repo}", "clippy"],
-      "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "clippy"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 1800,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo"
+      ]
     },
     {
       "id": "baseline.clippy_riscv64",
       "description": "RISC-V64 workspace clippy target.",
-      "command": ["make", "-C", "{repo}", "clippy", "ARCH=riscv64"],
-      "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "clippy",
+        "ARCH=riscv64"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 1800,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo"
+      ]
     },
     {
       "id": "baseline.clippy_loongarch64",
       "description": "LoongArch64 workspace clippy target.",
-      "command": ["make", "-C", "{repo}", "clippy", "ARCH=loongarch64"],
-      "cwd": "{repo}", "timeout_seconds": 1800,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo", "clang"],
-      "required_capabilities": ["clang.target.loongarch64-unknown-none"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "clippy",
+        "ARCH=loongarch64"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 1800,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo",
+        "clang"
+      ],
+      "required_capabilities": [
+        "clang.target.loongarch64-unknown-none"
+      ]
     },
     {
       "id": "baseline.kernel_riscv64",
       "description": "RISC-V64 local official kernel test-build.",
-      "command": ["make", "-C", "{repo}", "kernel-rv"],
-      "cwd": "{repo}", "timeout_seconds": 3600,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "kernel-rv"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 3600,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo"
+      ]
     },
     {
       "id": "baseline.kernel_loongarch64",
       "description": "LoongArch64 local official kernel test-build.",
-      "command": ["make", "-C", "{repo}", "kernel-la"],
-      "cwd": "{repo}", "timeout_seconds": 3600,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "kernel-la"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 3600,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo"
+      ]
     },
     {
       "id": "baseline.submission_build",
       "description": "Existing dual-architecture submission build target.",
-      "command": ["make", "-C", "{repo}", "all"],
-      "cwd": "{repo}", "timeout_seconds": 5400,
-      "result_contract": {"type": "exit_code", "allow_empty_output": false}, "required_paths": [], "required_commands": ["make", "cargo"]
+      "command": [
+        "make",
+        "-C",
+        "{repo}",
+        "all"
+      ],
+      "cwd": "{repo}",
+      "timeout_seconds": 5400,
+      "result_contract": {
+        "type": "exit_code",
+        "allow_empty_output": false
+      },
+      "required_paths": [],
+      "required_commands": [
+        "make",
+        "cargo"
+      ]
     },
-
     {
       "id": "official.riscv64",
       "description": "Canonical local RISC-V64 official evaluation with strict 24-group validation.",
-      "command": ["{repo}/test/evaluation/run_official_evaluation.sh", "rv"],
+      "command": [
+        "{repo}/test/evaluation/run_official_evaluation.sh",
+        "rv"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 21600,
       "result_contract": {
         "type": "official",
         "expected_group_labels": [
-          "ltp-musl", "ltp-glibc", "libctest-musl", "basic-musl", "basic-glibc",
-          "busybox-musl", "busybox-glibc", "libctest-glibc", "lua-musl", "lua-glibc",
-          "iperf-musl", "iperf-glibc", "netperf-musl", "netperf-glibc",
-          "unixbench-musl", "unixbench-glibc", "libcbench-musl", "libcbench-glibc",
-          "lmbench-musl", "lmbench-glibc", "cyclictest-musl", "cyclictest-glibc",
-          "iozone-musl", "iozone-glibc"
+          "ltp-musl",
+          "ltp-glibc",
+          "libctest-musl",
+          "basic-musl",
+          "basic-glibc",
+          "busybox-musl",
+          "busybox-glibc",
+          "libctest-glibc",
+          "lua-musl",
+          "lua-glibc",
+          "iperf-musl",
+          "iperf-glibc",
+          "netperf-musl",
+          "netperf-glibc",
+          "unixbench-musl",
+          "unixbench-glibc",
+          "libcbench-musl",
+          "libcbench-glibc",
+          "lmbench-musl",
+          "lmbench-glibc",
+          "cyclictest-musl",
+          "cyclictest-glibc",
+          "iozone-musl",
+          "iozone-glibc"
         ],
         "expected_group_case_counts": {
           "ltp-musl": 1000,
@@ -671,7 +1653,12 @@
         "{repo}/test/evaluation/run_official_evaluation.sh",
         "{repo}/test/evaluation/official_case_plan.json"
       ],
-      "required_commands": ["make", "cargo", "qemu-img", "qemu-system-riscv64"],
+      "required_commands": [
+        "make",
+        "cargo",
+        "qemu-img",
+        "qemu-system-riscv64"
+      ],
       "required_files": [
         {
           "environment": "RV_TESTSUITE_IMG",
@@ -687,23 +1674,46 @@
         "LTP_CASE_TIMEOUT_SECS": "180",
         "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },
-      "infrastructure_exit_codes": [125]
+      "infrastructure_exit_codes": [
+        125
+      ]
     },
     {
       "id": "official.loongarch64",
       "description": "Canonical local LoongArch64 official evaluation with strict 24-group validation.",
-      "command": ["{repo}/test/evaluation/run_official_evaluation.sh", "la"],
+      "command": [
+        "{repo}/test/evaluation/run_official_evaluation.sh",
+        "la"
+      ],
       "cwd": "{repo}",
       "timeout_seconds": 21600,
       "result_contract": {
         "type": "official",
         "expected_group_labels": [
-          "ltp-musl", "ltp-glibc", "libctest-musl", "basic-musl", "basic-glibc",
-          "busybox-musl", "busybox-glibc", "libctest-glibc", "lua-musl", "lua-glibc",
-          "iperf-musl", "iperf-glibc", "netperf-musl", "netperf-glibc",
-          "unixbench-musl", "unixbench-glibc", "libcbench-musl", "libcbench-glibc",
-          "lmbench-musl", "lmbench-glibc", "cyclictest-musl", "cyclictest-glibc",
-          "iozone-musl", "iozone-glibc"
+          "ltp-musl",
+          "ltp-glibc",
+          "libctest-musl",
+          "basic-musl",
+          "basic-glibc",
+          "busybox-musl",
+          "busybox-glibc",
+          "libctest-glibc",
+          "lua-musl",
+          "lua-glibc",
+          "iperf-musl",
+          "iperf-glibc",
+          "netperf-musl",
+          "netperf-glibc",
+          "unixbench-musl",
+          "unixbench-glibc",
+          "libcbench-musl",
+          "libcbench-glibc",
+          "lmbench-musl",
+          "lmbench-glibc",
+          "cyclictest-musl",
+          "cyclictest-glibc",
+          "iozone-musl",
+          "iozone-glibc"
         ],
         "expected_group_case_counts": {
           "ltp-musl": 1000,
@@ -718,7 +1728,12 @@
         "{repo}/test/evaluation/run_official_evaluation.sh",
         "{repo}/test/evaluation/official_case_plan.json"
       ],
-      "required_commands": ["make", "cargo", "qemu-img", "qemu-system-loongarch64"],
+      "required_commands": [
+        "make",
+        "cargo",
+        "qemu-img",
+        "qemu-system-loongarch64"
+      ],
       "required_files": [
         {
           "environment": "LA_TESTSUITE_IMG",
@@ -734,7 +1749,9 @@
         "LTP_CASE_TIMEOUT_SECS": "180",
         "OSCOMP_GROUP_TIMEOUT_CEILING_SECS": "900"
       },
-      "infrastructure_exit_codes": [125]
+      "infrastructure_exit_codes": [
+        125
+      ]
     }
   ]
 }
