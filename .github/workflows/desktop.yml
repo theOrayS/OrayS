@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: ${{ env.FIXED_RUST_TOOLCHAIN }}
@@ -50,7 +51,12 @@ jobs:
           scripts/desktop/build.sh rv
           scripts/desktop/build.sh la
       - name: Enforce desktop isolation budget
-        run: python3 scripts/desktop/check-scope.py
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          if [[ -z "$base" ]]; then
+            base=origin/develop/post-integration-next
+          fi
+          python3 scripts/desktop/check-scope.py --base "$base"
 
   desktop-runtime:
     name: Fixed-QEMU ${{ matrix.arch }} desktop boot (trusted runtime)
