@@ -98,12 +98,46 @@ desktop 既有门禁。非目标：修复 `tee_device_mode`（GitHub P1 issue #2
 - clippy：为 x86_64/aarch64 补齐 uspace 移植（TrapFrame 字段映射、信号常量、
   线程终止 API、auxv 常量 cfg），工作量实质，应单独立 PR。
 
-### 验证
+### 验证（全部在本分支最终 HEAD 实测）
 
-- desktop Python：100/100 PASS（65 基线 + 35 新增/更新）。
-- `build.sh rv|la`：PASS；真实 QEMU 9.2.4 rv boot 冒烟：runner 全链路 OK，
-  因工作树未提交产生 VALID_FAIL（provenance 检查按设计 fail-closed），提交后
-  复跑见最终验证段。
+- desktop Python：`python3 -B -m unittest discover -s test/desktop -p 'test_*.py'`
+  100/100 PASS（65 基线 + 35 新增/更新），约 53s。
+- `scripts/desktop/build.sh host-test`：14/14 PASS。
+- `cargo fmt --manifest-path user/desktop/Cargo.toml -- --check`：PASS。
+- desktop clippy `--offline --locked -D warnings`（host-tools）：PASS。
+- `scripts/desktop/build.sh golden-check`：5/5 MATCH。
+- `scripts/desktop/build.sh rv` / `la`：PASS。
+- `python3 scripts/desktop/check-scope.py --base c776ceff40587de0fa0547724d0abfecbb56cc64`：
+  PASS（changed_paths=116，bridge churn=74/250，base_source=cli）。
+- 真实 QEMU 9.2.4 boot + review package（提交后干净树）：
+  - rv：`DESKTOP_QEMU_BOOT=PASS` + `VALID_PASS failures=0`（runner exit 0）；
+  - la：`DESKTOP_QEMU_BOOT=PASS` + `VALID_PASS failures=0`（runner exit 0）；
+  - rv + `DESKTOP_QEMU_AUTHORIZED_SHA256=<本机 QEMU digest>`：PASS，
+    policy=authorized-sha256，matches=True，provenance_stable=True；
+  - la package 迁移到 `/tmp` 后重新校验：`VALID_PASS failures=0`。
+- `test/run_suite.py --profile quick`：空载 45/45 PASS（ci-quick-3）。
+- `make unittest_no_fail_fast`：exit 0。
+- `test/run_suite.py --profile evidence-host`：PASS（ci-evidence-host）。
+- `test/run_suite.py --profile evidence-runtime --arch rv|la`：两架构 build 全 PASS，
+  smoke 均 `PR3_SMOKE_V1 USER_FAIL tee_device_mode`（GitHub issue #2，按政策不修不掩）。
+- 固定 QEMU 源：qemu-9.2.4.tar.xz 下载实测 SHA-256 与大小（134782772）均匹配
+  `test/evidence/setup_qemu.sh` 的固定策略；本机缺 libfdt-dev，未完整重编译
+  （CI 安装该包；源码完整性路径无缺陷证据）。
+
+### 未解决阻塞（诚实状态）
+
+1. `tee_device_mode`：GitHub P1 issue #2，rv/la smoke 均复现，保持显式失败。
+2. clippy x86_64/aarch64：`user/shell/src/uspace/*` 未移植两架构（42/39 个编译错误，
+   根因见上），修复在 desktop scope FORBIDDEN 路径内，需人工决策后单独立 PR。
+3. docs build：`api/orays_linux/src/{backend,syscall,user}.rs` 缺文档注释，同属
+   FORBIDDEN 路径，需人工决策。
+4. other-platform setup：`scripts/cargo-axplat.sh` offline shim 不查
+   `vendor/cargo/<pkg>/axconfig.toml`，且三个 aarch64 板级配置未进
+   `configs/platforms/`；修复路径同样在 scope 外。
+5. `unit.suite_runner` 300s 预算余量小（空载 228s）；CI 更慢机器上存在超时风险，
+   预算/拆分需团队决策。
+6. app-test 需 musl 工具链（本机未装，CI 由 setup-musl 提供）——外部环境项。
+7. PR #3 仍不可声明 merge-ready：上述 CI 红项、人工 review、scope 政策决策未闭合。
 
 ## AI 使用披露
 
