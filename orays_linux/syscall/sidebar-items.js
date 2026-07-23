@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_SYSCALL_ARGUMENTS"],"enum":["SyscallArchitecture","SyscallAvailability"],"struct":["SyscallArgs","SyscallMeta","SyscallNumber"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["allocation_bucket_stats","frame_allocator_stats","global_add_memory","global_allocator","global_init"],"struct":["AllocationBucketStats","FrameAllocatorStats","GlobalAllocator","GlobalPage"],"type":["DefaultByteAllocator"]};

@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["axdma",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"struct\" href=\"axdma/struct.BusAddr.html\" title=\"struct axdma::BusAddr\">BusAddr</a>"]]],["axfile",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"struct\" href=\"axfile/struct.EventToken.html\" title=\"struct axfile::EventToken\">EventToken</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"struct\" href=\"axfile/struct.OpenFileId.html\" title=\"struct axfile::OpenFileId\">OpenFileId</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"struct\" href=\"axfile/struct.RegistrationKey.html\" title=\"struct axfile::RegistrationKey\">RegistrationKey</a>"]]],["orays_linux",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"struct\" href=\"orays_linux/syscall/struct.SyscallNumber.html\" title=\"struct orays_linux::syscall::SyscallNumber\">SyscallNumber</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"struct\" href=\"orays_linux/user/struct.UserAddr.html\" title=\"struct orays_linux::user::UserAddr\">UserAddr</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[248,772,565]}
